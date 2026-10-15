@@ -343,11 +343,11 @@ fn prepared_counter_shape_bounds_and_all_216_inputs() {
     let declarations = files.declarations();
     let rules = files.rules();
     assert_eq!(
-        declarations.types[&105].form_leaf(),
+        form_leaf(&declarations.types[&105]),
         Some(Leaf::I128 { min: 0, max: 3 })
     );
     assert_eq!(
-        declarations.types[&106].form_leaf(),
+        form_leaf(&declarations.types[&106]),
         Some(Leaf::I128 { min: -1, max: 1 })
     );
     let command: Vec<(u16, &str, u32)> = declarations
@@ -364,7 +364,7 @@ fn prepared_counter_shape_bounds_and_all_216_inputs() {
             (122, "third", 106)
         ]
     );
-    assert_eq!(declarations.types[&102].form_leaf(), Some(Leaf::Bool));
+    assert_eq!(form_leaf(&declarations.types[&102]), Some(Leaf::Bool));
     assert_eq!(input_domain(&declarations), 216);
     let laws: Vec<(u32, LawScope, bool)> = declarations
         .laws
@@ -444,11 +444,11 @@ fn framework_law_ids_and_complete_field_sets() {
         assert_eq!(template(name).rules().reject_law, 509, "{name}");
     }
     let prepared = template("prepared-counter").with_rules(|rules| {
-        rules["cases"][2]["post"] = serde_json::json!({});
+        rules["cases"][2]["post"]["999"] = 0.into();
     });
     let (place, reason) = prepared.refusal();
-    assert_eq!(place, "v2/policy.json cases[2].post");
-    assert_eq!(reason, "must set every state field");
+    assert_eq!(place, "v2/policy.json cases[2].post.999");
+    assert_eq!(reason, "is not a state field");
     let gateway = template("compliance-gateway");
     let rules = gateway.rules();
     let delivering = rules
@@ -465,6 +465,84 @@ fn framework_law_ids_and_complete_field_sets() {
         format!("v2/policy.json cases[{delivering}].outbox[0].payload")
     );
     assert_eq!(reason, "must set every payload field");
+}
+
+/// A committing case may omit a state field it keeps: in every template,
+/// dropping each post entry that is the field's own pre-state value, written
+/// directly or through a variable, generates the same contract.
+#[test]
+fn a_committing_case_may_omit_the_state_fields_it_keeps() {
+    let mut omitted = 0;
+    for name in TEMPLATES {
+        let files = template(name);
+        let trimmed = files.with_rules(|rules| {
+            let variables = rules["variables"].clone();
+            for case in rules["cases"].as_array_mut().into_iter().flatten() {
+                let Some(post) = case["post"].as_object_mut() else {
+                    continue;
+                };
+                post.retain(|field, value| {
+                    let written = value
+                        .as_str()
+                        .map(|text| variables.get(text).and_then(Value::as_str).unwrap_or(text));
+                    let keeps = written == Some(format!("pre.100.{field}").as_str());
+                    omitted += usize::from(keeps);
+                    !keeps
+                });
+            }
+        });
+        let generated =
+            generate_contract(trimmed.sources()).unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert!(
+            generated.source() == files.source,
+            "{name} src/v2_contract.rs"
+        );
+        assert!(generated.policy() == files.policy, "{name} v2/policy.zcve");
+        assert!(generated.schema() == files.schema, "{name} v2/schema.zcve");
+    }
+    assert!(omitted > 0, "no template keeps a field");
+}
+
+/// Removing the last case that uses a reason leaves the reason unused, and
+/// the refusal says to delete its declaration from `project.zeno`.
+#[test]
+fn removing_a_reasons_last_case_names_the_declaration_to_delete() {
+    let mut checked = 0;
+    for name in TEMPLATES {
+        let files = template(name);
+        let rules = files.rules();
+        let last = rules.cases.len() - 1;
+        let alone = rules.cases[..last]
+            .iter()
+            .enumerate()
+            .find_map(|(index, case)| {
+                let reason = case.reason?;
+                let uses = rules
+                    .cases
+                    .iter()
+                    .filter(|case| case.reason == Some(reason));
+                (uses.count() == 1).then_some((index, reason))
+            });
+        let Some((index, reason)) = alone else {
+            continue;
+        };
+        let removed = files.with_rules(|rules| {
+            rules["cases"]
+                .as_array_mut()
+                .map(|cases| cases.remove(index));
+        });
+        let (place, message) = removed.refusal();
+        let declared = &files.declarations().notes.reasons[&reason].0;
+        assert_eq!(place, "v2/policy.json cases", "{name}: {message}");
+        assert!(
+            message.contains(&format!(
+                "also delete `reason {reason} {declared}` from project.zeno"
+            )),
+            "{name}: {message}"
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "no template has a reason only one case uses");
 }
 
 #[test]
@@ -780,12 +858,11 @@ fn library_rules_are_refused_where_they_are_written() {
     }
 }
 
-impl super::declarations::Type {
-    fn form_leaf(&self) -> Option<Leaf> {
-        match self.form {
-            Form::Leaf(leaf) => Some(leaf),
-            _ => None,
-        }
+/// The leaf a declared type is, if it is one.
+fn form_leaf(declared: &super::declarations::Type) -> Option<Leaf> {
+    match declared.form {
+        Form::Leaf(leaf) => Some(leaf),
+        _ => None,
     }
 }
 
@@ -865,6 +942,74 @@ fn adoption(candidate: &[u8], receipt: &[u8], usage: Usage, superseded: &[u8]) -
         receipt_sha256: transform::sha256_hex(receipt),
         usage,
         superseded_policy_sha256: transform::sha256_hex(superseded),
+    }
+}
+
+/// Adoption keeps a rules file in its own layout: the same rules indented by
+/// four spaces, with a blank line between two keys, keep every byte, and
+/// each new entry is indented by four spaces too. Compact and CRLF files
+/// retain all existing bytes while gaining the adoption.
+#[test]
+fn adoption_keeps_a_rules_file_in_its_own_layout() {
+    let counter = template("durable-counter");
+    let own = counter
+        .rules
+        .lines()
+        .map(|line| {
+            let depth = line.len() - line.trim_start().len();
+            format!("{}{}\n", " ".repeat(depth * 2), line.trim_start())
+        })
+        .collect::<String>()
+        .replacen(",\n    \"roots\"", ",\n\n    \"roots\"", 1);
+    assert!(own.contains("\n\n"), "a blank line between two keys");
+    let first = adoption(b"candidate", b"receipt", Usage::NewVersion, b"policy 1");
+    let once = with_adoption(&own, &first).unwrap_or_else(|error| panic!("{error}"));
+    let head = own
+        .strip_suffix("\n}\n")
+        .unwrap_or_else(|| panic!("the rules file ends with its closing brace"));
+    assert_eq!(
+        once,
+        format!(
+            "{head},\n    \"adoptions\": [\n        {{\n            \"candidate_sha256\": \"{}\",\n            \
+             \"receipt_sha256\": \"{}\",\n            \"usage\": \"new-version\",\n            \
+             \"superseded_policy_sha256\": \"{}\"\n        }}\n    ]\n}}\n",
+            first.candidate_sha256, first.receipt_sha256, first.superseded_policy_sha256
+        )
+    );
+    let second = adoption(b"other", b"later", Usage::Preserved, b"policy 2");
+    let twice = with_adoption(&once, &second).unwrap_or_else(|error| panic!("{error}"));
+    let kept = once
+        .strip_suffix("\n    ]\n}\n")
+        .unwrap_or_else(|| panic!("the adoptions close the file"));
+    assert!(
+        twice.starts_with(&format!(
+            "{kept},\n        {{\n            \"candidate_sha256\": \"{}\"",
+            second.candidate_sha256
+        )),
+        "{twice}"
+    );
+    assert!(twice.ends_with("\n        }\n    ]\n}\n"), "{twice}");
+    assert_eq!(
+        Rules::read(&twice)
+            .unwrap_or_else(|error| panic!("{error}"))
+            .adoptions,
+        [first.clone(), second]
+    );
+    let one_line = serde_json::from_str::<Value>(&counter.rules)
+        .unwrap_or_else(|error| panic!("{error}"))
+        .to_string();
+    for original in [one_line, own.replace('\n', "\r\n")] {
+        let appended = with_adoption(&original, &first).unwrap_or_else(|error| panic!("{error}"));
+        let close = original.trim_end().len() - 1;
+        let split = original[..close].trim_end().len();
+        assert!(appended.starts_with(&original[..split]));
+        assert!(appended.ends_with(&original[split..]));
+        assert_eq!(
+            Rules::read(&appended)
+                .unwrap_or_else(|error| panic!("{error}"))
+                .adoptions,
+            std::slice::from_ref(&first)
+        );
     }
 }
 
@@ -1901,4 +2046,31 @@ fn the_rules_reference_documents_exactly_what_the_generator_reads() {
         })
         .collect();
     assert_eq!(kinds, expected);
+}
+
+#[test]
+fn adoption_preserves_empty_array_trivia_and_decoded_key_spellings() {
+    let first = adoption(b"candidate", b"receipt", Usage::NewVersion, b"policy 1");
+    let second = adoption(b"other", b"later", Usage::Preserved, b"policy 2");
+    for key in ["adoptions", r"\u0061doptions", r"adopti\u006fns"] {
+        for newline in ["\n", "\r\n"] {
+            let original =
+                format!("{{{newline}  \"{key}\": [   {newline}\t {newline}  ]{newline}}}{newline}");
+            let close = original
+                .rfind(']')
+                .unwrap_or_else(|| panic!("closing array"));
+            let once = with_adoption(&original, &first).unwrap_or_else(|error| panic!("{error}"));
+            // Every original byte, including whitespace and the escaped key,
+            // remains on the same side of the one insertion point.
+            assert!(once.starts_with(&original[..close]), "{once:?}");
+            assert!(once.ends_with(&original[close..]), "{once:?}");
+            let read: Value = serde_json::from_str(&once).unwrap_or_else(|error| panic!("{error}"));
+            assert_eq!(read["adoptions"].as_array().map(Vec::len), Some(1));
+            let twice = with_adoption(&once, &second).unwrap_or_else(|error| panic!("{error}"));
+            let read: Value =
+                serde_json::from_str(&twice).unwrap_or_else(|error| panic!("{error}"));
+            assert_eq!(read["adoptions"].as_array().map(Vec::len), Some(2));
+            assert!(twice.contains(&format!("\"{key}\"")));
+        }
+    }
 }

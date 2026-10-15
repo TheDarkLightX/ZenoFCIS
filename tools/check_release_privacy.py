@@ -29,7 +29,7 @@ PATTERNS = {
     "personal-home-path": re.compile(
         rb"/(?:home|Users)/(?!(?:runner|build|builder|user|example|USERNAME|YOUR_USER)(?:[/\s\"'<>]|$))[^/\s\"'<>]+(?:/|(?=[\s\"'<>]|$))"
     ),
-    "windows-home-path": re.compile(rb"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"'<>]+(?:[\\/]|(?=[\s\"'<>]|$))"),
+    "windows-home-path": re.compile(rb"(?<![A-Za-z0-9])[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"'<>]+(?:[\\/]|(?=[\s\"'<>]|$))"),
     "private-key": re.compile(rb"-----BEGIN (?:OPENSSH |RSA |EC |DSA |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"),
     "github-token": re.compile(rb"(?:gh[pousr]_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{30,255})"),
     "model-api-token": re.compile(rb"sk-(?:ant-|proj-|svcacct-)?[A-Za-z0-9_-]{35,255}"),

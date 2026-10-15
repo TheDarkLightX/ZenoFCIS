@@ -52,7 +52,7 @@ use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{CommitStatus, MemoryDestination};
 use zeno_fcis_synthesis::finite::{
     v2_authority::{Authority, Publication, PublicationOutcome, WireDelivery},
-    v2_composition::{Kind, Raw},
+    v2_composition::{Descriptor, DescriptorData, Kind, Raw},
 };
 
 /// The behaviour-change admission: the new contract's state laws and
@@ -408,21 +408,31 @@ impl Delivery {
 
 /// The contract versions a handle replays with, oldest first; the last one is
 /// the contract the store runs now.
-#[derive(Clone, Copy)]
-enum Members<'a, 'p> {
+enum Members<'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
     /// Created or opened with one Authority: a store without upgrades.
-    One(&'a Authority<'p>),
+    One(&'a Authority<'p, D>),
     /// Opened through a lineage, bound to its first `len` versions.
     Lineage {
         lineage: &'a Lineage<'a, 'p>,
         len: usize,
+        // The same immutable slice held by this legacy lineage. Only its
+        // concrete constructor can make this variant; numeric stores use One.
+        authorities: &'a [Authority<'p, D>],
     },
 }
-impl<'a, 'p> Members<'a, 'p> {
-    fn authorities(self) -> &'a [Authority<'p>] {
+impl<'a, 'p, D: DescriptorData<'p> + 'p> Copy for Members<'a, 'p, D> {}
+impl<'a, 'p, D: DescriptorData<'p> + 'p> Clone for Members<'a, 'p, D> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<'a, 'p, D: DescriptorData<'p> + 'p> Members<'a, 'p, D> {
+    fn authorities(self) -> &'a [Authority<'p, D>] {
         match self {
             Self::One(authority) => std::slice::from_ref(authority),
-            Self::Lineage { lineage, len } => &lineage.authorities()[..len],
+            Self::Lineage {
+                authorities, len, ..
+            } => &authorities[..len],
         }
     }
     /// What a program-successor record is checked against; nothing for a
@@ -443,7 +453,7 @@ impl<'a, 'p> Members<'a, 'p> {
             Self::Lineage { lineage, .. } => Some(lineage),
         }
     }
-    fn last(self) -> &'a Authority<'p> {
+    fn last(self) -> &'a Authority<'p, D> {
         self.authorities()
             .last()
             .unwrap_or_else(|| unreachable!("a handle is bound to at least one Authority"))
@@ -470,7 +480,11 @@ struct Declared<'m, 'a, 'p> {
 /// the store runs to the last. It is only a head start: a store that fails
 /// to read here fails the same way inside the transaction, and one changed
 /// in between is caught there.
-fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
+fn prepare<'p, D: DescriptorData<'p> + 'p>(
+    connection: &Connection,
+    members: Members<'_, 'p, D>,
+    to_last: bool,
+) {
     let Some(lineage) = members.lineage() else {
         return;
     };
@@ -516,9 +530,9 @@ fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
 /// whose pairs remain unavailable, because other connections change it or
 /// comparisons keep the shared memo busy, ends when the bounded retries
 /// are exhausted with `Error::Unsettled`.
-fn settle<T>(
+fn settle<'p, T, D: DescriptorData<'p> + 'p>(
     connection: &mut Connection,
-    members: Members<'_, '_>,
+    members: Members<'_, 'p, D>,
     mut attempt: impl FnMut(&mut Connection, &Cell<Option<(usize, usize)>>) -> Result<T, Error>,
 ) -> Result<T, Error> {
     let missing = Cell::new(None);
@@ -542,8 +556,8 @@ fn settle<T>(
 /// SQLite adapter bound to immutable library Authorities: one, or a prefix of
 /// a contract lineage, oldest first. The last one is the contract the store
 /// runs now. There is no application evaluator.
-pub struct V2SqliteShell<'a, 'p> {
-    members: Members<'a, 'p>,
+pub struct V2SqliteShell<'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
+    members: Members<'a, 'p, D>,
     connection: Connection,
     anchor: Anchor,
     genesis: Hash32,
@@ -551,25 +565,25 @@ pub struct V2SqliteShell<'a, 'p> {
     data_version: i64,
 }
 
-impl<'a, 'p> V2SqliteShell<'a, 'p> {
+impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
     /// Atomically initialize a new file from a genuine checked genesis capability.
     pub fn create(
         path: impl AsRef<Path>,
-        authority: &'a Authority<'p>,
+        authority: &'a Authority<'p, D>,
         genesis: Publication<'_>,
     ) -> Result<Self, Error> {
         Self::initialize(Connection::open(path)?, authority, genesis)
     }
     /// Initialize an isolated SQLite memory store from genuine genesis.
     pub fn create_in_memory(
-        authority: &'a Authority<'p>,
+        authority: &'a Authority<'p, D>,
         genesis: Publication<'_>,
     ) -> Result<Self, Error> {
         Self::initialize(Connection::open_in_memory()?, authority, genesis)
     }
     fn initialize(
         mut connection: Connection,
-        authority: &'a Authority<'p>,
+        authority: &'a Authority<'p, D>,
         genesis: Publication<'_>,
     ) -> Result<Self, Error> {
         provider()?;
@@ -644,13 +658,13 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     /// Re-admit genesis and recompute every complete decision and delivery on
     /// reopening a store that never upgraded. A store with upgrades opens
     /// through its [`Lineage`]. A missing file is refused, never created.
-    pub fn open(path: impl AsRef<Path>, authority: &'a Authority<'p>) -> Result<Self, Error> {
+    pub fn open(path: impl AsRef<Path>, authority: &'a Authority<'p, D>) -> Result<Self, Error> {
         Self::reopen(open_existing(path)?, Members::One(authority), None).map(|(shell, _)| shell)
     }
     /// Check the tail after a privately validated prefix. The checkpoint is a trusted input.
     pub fn open_at_checkpoint(
         path: impl AsRef<Path>,
-        authority: &'a Authority<'p>,
+        authority: &'a Authority<'p, D>,
         checkpoint: &Checkpoint,
     ) -> Result<Self, Error> {
         Self::reopen(
@@ -665,7 +679,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     /// position of the store's current segment among the members.
     fn reopen(
         mut connection: Connection,
-        members: Members<'a, 'p>,
+        members: Members<'a, 'p, D>,
         checkpoint: Option<&Checkpoint>,
     ) -> Result<(Self, usize), Error> {
         provider()?;
@@ -726,14 +740,14 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         Ok((shell, position))
     }
     /// The contract the store runs now: the last member this handle is bound to.
-    pub fn authority(&self) -> &'a Authority<'p> {
+    pub fn authority(&self) -> &'a Authority<'p, D> {
         self.current()
     }
     /// Every contract version this handle replays with, oldest first.
-    pub fn lineage(&self) -> &'a [Authority<'p>] {
+    pub fn lineage(&self) -> &'a [Authority<'p, D>] {
         self.members.authorities()
     }
-    fn current(&self) -> &'a Authority<'p> {
+    fn current(&self) -> &'a Authority<'p, D> {
         self.members.last()
     }
     /// Revalidate all history explicitly, including acknowledged delivery data.
@@ -839,7 +853,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         replay_id: Hash32,
         publication: Publication<'_>,
     ) -> Result<CommitReceipt, Error> {
-        self.commit_with_crash(replay_id, publication, None)
+        self.commit_inner(replay_id, publication, None, None, None)
     }
     /// Commit against the exact expected sequence, retaining ABA freshness through CAS.
     pub fn commit_at(
@@ -848,9 +862,10 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         replay_id: Hash32,
         publication: Publication<'_>,
     ) -> Result<CommitReceipt, Error> {
-        self.commit_with_crash_at(expected_version, replay_id, publication, None)
+        self.commit_inner(replay_id, publication, None, Some(expected_version), None)
     }
     /// Expected-version commit with the same seven original crash boundaries.
+    #[cfg(any(test, feature = "crash-injection"))]
     pub fn commit_with_crash_at(
         &mut self,
         expected_version: u64,
@@ -870,6 +885,24 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         replay_id: Hash32,
         publication: Publication<'_>,
         maximum_bytes: usize,
+    ) -> Result<CommitReceipt, Error> {
+        self.commit_inner(
+            replay_id,
+            publication,
+            None,
+            Some(expected_version),
+            Some(maximum_bytes),
+        )
+    }
+    /// [`Self::commit_bounded_at`] with a deterministic injected interruption
+    /// at the same seven original boundaries for crash-refinement tests.
+    #[cfg(any(test, feature = "crash-injection"))]
+    pub fn commit_bounded_with_crash_at(
+        &mut self,
+        expected_version: u64,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        maximum_bytes: usize,
         crash: Option<CrashPoint>,
     ) -> Result<CommitReceipt, Error> {
         self.commit_inner(
@@ -881,6 +914,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         )
     }
     /// Commit with a deterministic injected interruption for crash-refinement tests.
+    #[cfg(any(test, feature = "crash-injection"))]
     pub fn commit_with_crash(
         &mut self,
         replay_id: Hash32,
@@ -1141,9 +1175,9 @@ struct Segments {
     positions: Vec<usize>,
 }
 impl Segments {
-    fn load(
+    fn load<'p, D: DescriptorData<'p> + 'p>(
         connection: &Connection,
-        lineage: &[Authority<'_>],
+        lineage: &[Authority<'p, D>],
         upgrades: Vec<StoredUpgrade>,
     ) -> Result<Self, Error> {
         let genesis_identity: Vec<u8> = connection.query_row(
@@ -1176,7 +1210,11 @@ impl Segments {
     fn position(&self, segment: usize) -> usize {
         self.positions[segment]
     }
-    fn authority<'x, 'p>(&self, lineage: &'x [Authority<'p>], segment: usize) -> &'x Authority<'p> {
+    fn authority<'x, 'p, D: DescriptorData<'p> + 'p>(
+        &self,
+        lineage: &'x [Authority<'p, D>],
+        segment: usize,
+    ) -> &'x Authority<'p, D> {
         &lineage[self.position(segment)]
     }
     /// The segment a commit belongs to: after every upgrade recorded at an
@@ -1190,7 +1228,10 @@ impl Segments {
     /// The store runs the lineage's last member. Identities, not positions,
     /// decide: an identity binds the complete policy and the evaluator, so a
     /// lineage that repeats one still opens a store that runs it.
-    fn require_current(&self, lineage: &[Authority<'_>]) -> Result<(), Error> {
+    fn require_current<'p, D: DescriptorData<'p> + 'p>(
+        &self,
+        lineage: &[Authority<'p, D>],
+    ) -> Result<(), Error> {
         match lineage.last() {
             Some(last) if last.identity() == self.identity(self.current()) => Ok(()),
             _ => Err(Error::Identity),
@@ -1280,9 +1321,9 @@ fn load_commit(connection: &Connection, sequence: i64) -> Result<StoredCommit, E
     })
 }
 /// Replay one commit under the Authority of its own segment.
-fn check_commit(
+fn check_commit<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
     segments: &Segments,
     row: &StoredCommit,
     pre: &[u8],
@@ -1340,9 +1381,9 @@ fn check_commit(
 /// and requires the stored migration and state to be exactly those; and a
 /// rename checks the two catalogs' exactness and frames the state again.
 /// Returns the state a migration or rename moved the head to.
-fn check_upgrade(
+fn check_upgrade<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
     declared: Declared<'_, '_, '_>,
     segments: &Segments,
     index: usize,
@@ -1498,17 +1539,16 @@ fn check_upgrade(
                 .then(|| declarer.steps().get(old).copied())
                 .flatten();
             let (admission, state) = match (kind, step) {
-                (
-                    upgrade::Kind::Migration,
-                    Some(lineage::Step::Migration {
-                        migration, review, ..
-                    }),
-                ) => {
+                (upgrade::Kind::Migration, Some(step)) if step.mapping().is_some() => {
+                    let (migration, _, review) = step.mapping().ok_or(Error::History)?;
                     let Some(simulated) = declarer.simulated(old) else {
                         declared.missing.set(Some((old, new)));
                         return Err(Error::Unsettled);
                     };
-                    let encoding = migration.encode().map_err(|_| Error::Range)?;
+                    let encoding = step
+                        .mapping_encoding()
+                        .ok_or(Error::History)?
+                        .map_err(|_| Error::Range)?;
                     if description != encoding {
                         // A record exact under the migration stored beside
                         // it was made with another declaration of this
@@ -1592,9 +1632,9 @@ fn check_upgrade(
     Ok(moved)
 }
 /// Check every upgrade recorded at the anchor's head and advance its chain.
-fn apply_upgrades(
+fn apply_upgrades<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
     declared: Declared<'_, '_, '_>,
     segments: &Segments,
     anchor: &mut Anchor,
@@ -1617,9 +1657,9 @@ fn apply_upgrades(
 }
 /// Replay every commit after the anchor under its segment's Authority, and
 /// every upgrade at the heads passed, up to the stored head.
-fn audit_tail(
+fn audit_tail<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
     declared: Declared<'_, '_, '_>,
     segments: &Segments,
     anchor: Anchor,
@@ -1630,9 +1670,9 @@ fn audit_tail(
     )
 }
 
-fn audit_tail_with_inputs(
+fn audit_tail_with_inputs<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
     declared: Declared<'_, '_, '_>,
     segments: &Segments,
     mut anchor: Anchor,
@@ -1699,9 +1739,9 @@ fn audit_tail_with_inputs(
     }
     Ok(anchor)
 }
-fn genesis_anchor(
+fn genesis_anchor<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
-    authority: &Authority<'_>,
+    authority: &Authority<'p, D>,
 ) -> Result<(Hash32, Anchor), Error> {
     let (identity, initial, publication, interpreter, chain) = connection.query_row(
         "SELECT identity,initial,publication,delivery_interpreter,chain FROM v2_genesis WHERE singleton=1",
@@ -1911,7 +1951,13 @@ fn open_existing(path: impl AsRef<Path>) -> Result<Connection, Error> {
 }
 fn configure(connection: &Connection) -> Result<(), Error> {
     // These connection settings must be established outside a transaction.
-    connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;")?;
+    // EXTRA is FULL plus a sync of the folder after the rollback journal is
+    // deleted, the step that makes a commit final in this journal mode.
+    connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=EXTRA;")?;
+    // Apple's fsync does not flush the drive's write cache; F_FULLFSYNC does.
+    // With fullfsync on, SQLite uses it for every file sync, checkpoints included.
+    #[cfg(target_vendor = "apple")]
+    connection.execute_batch("PRAGMA fullfsync=ON;")?;
     Ok(())
 }
 fn check_schema(connection: &Connection) -> Result<(), Error> {
@@ -1936,11 +1982,11 @@ fn check_exact_schema(connection: &Connection, expected: i64, schema: &str) -> R
 /// Called only after BEGIN IMMEDIATE. Returns the store's segments, for the
 /// operation that follows. If another connection wrote between synchronize()
 /// and this transaction, refuse rather than bless stale data.
-fn check_cached_tip(
+fn check_cached_tip<'p, D: DescriptorData<'p> + 'p>(
     connection: &Connection,
     anchor: &Anchor,
     version: i64,
-    lineage: &[Authority<'_>],
+    lineage: &[Authority<'p, D>],
 ) -> Result<Segments, Error> {
     check_schema(connection)?;
     let segments = Segments::load(connection, lineage, load_upgrades(connection)?)?;
@@ -2326,12 +2372,17 @@ fn framed_hash(domain: Domain<'static>, parts: &[&[u8]]) -> Result<Hash32, Error
     }
     hash(domain, &bytes)
 }
+#[cfg_attr(
+    not(any(test, feature = "crash-injection")),
+    allow(clippy::unnecessary_wraps)
+)]
 fn inject(selected: Option<CrashPoint>, point: CrashPoint) -> Result<(), Error> {
+    #[cfg(any(test, feature = "crash-injection"))]
     if selected == Some(point) {
-        Err(Error::InjectedCrash(point))
-    } else {
-        Ok(())
+        return Err(Error::InjectedCrash(point));
     }
+    let _ = (selected, point);
+    Ok(())
 }
 
 /// Failure of the trusted SQLite refinement; none grants a publication capability.
@@ -2404,6 +2455,7 @@ pub enum Error {
     /// store, or a shared memo stayed busy. Nothing was written.
     Unsettled,
     /// An explicitly requested interruption was injected.
+    #[cfg(any(test, feature = "crash-injection"))]
     InjectedCrash(CrashPoint),
 }
 impl From<rusqlite::Error> for Error {
@@ -2536,6 +2588,7 @@ impl fmt::Display for Error {
             Self::Unsettled => f.write_str(
                 "the store or its shared comparison or simulation cache stayed busy while the shell checked the decision programs or migrations it needs, so nothing was written: try again when other connections, comparisons and simulations are idle",
             ),
+            #[cfg(any(test, feature = "crash-injection"))]
             Self::InjectedCrash(point) => write!(
                 f,
                 "an interruption was injected at {point:?} for a crash test: reopen the store, which holds its last committed state"
@@ -2759,6 +2812,18 @@ mod message_tests {
                 "upgrade refused: the new contract is not a program successor of the store's (premise 3: the two decision programs differ on input tuple 41 of their declared domain, counting from 0 in enumeration order), and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
             ),
             (
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Equivalence(
+                        equivalence::Unestablished::ProgramTooLarge {
+                            nodes: 257,
+                            budget: 256,
+                        },
+                    ),
+                    refusal: None,
+                }),
+                "upgrade refused: the new contract is not a program successor of the store's (premise 3: a decision program has 257 nodes, more than the comparison's full budget of 256 Steps, so the comparison cannot run), and its genesis laws do not admit the store's current state; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
                 Error::Upgrade(upgrade::Refusal::MigrationState(
                     behaviour::Unmet::Unevaluable,
                 )),
@@ -2832,5 +2897,39 @@ mod message_tests {
             covered.insert(name);
         }
         assert_eq!(covered.len(), 33, "{covered:?}");
+    }
+}
+
+#[cfg(test)]
+mod durability_tests {
+    use super::*;
+
+    fn configured() -> Connection {
+        let connection = Connection::open_in_memory().unwrap_or_else(|error| panic!("{error}"));
+        configure(&connection).unwrap_or_else(|error| panic!("{error}"));
+        connection
+    }
+
+    fn pragma(connection: &Connection, name: &str) -> i64 {
+        connection
+            .query_row(&format!("PRAGMA {name}"), [], |r| r.get(0))
+            .unwrap_or_else(|error| panic!("PRAGMA {name}: {error}"))
+    }
+
+    #[test]
+    fn a_configured_connection_syncs_each_commit_and_its_journal_deletion() {
+        let connection = configured();
+        // 3 is EXTRA.
+        assert_eq!(pragma(&connection, "synchronous"), 3);
+        assert_eq!(pragma(&connection, "foreign_keys"), 1);
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[test]
+    fn a_configured_connection_syncs_files_with_f_fullfsync() {
+        let connection = configured();
+        assert_eq!(pragma(&connection, "fullfsync"), 1);
+        assert_eq!(pragma(&connection, "synchronous"), 3);
+        assert_eq!(pragma(&connection, "foreign_keys"), 1);
     }
 }

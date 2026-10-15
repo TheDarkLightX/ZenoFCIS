@@ -61,6 +61,17 @@ try {
   assert.equal(sha(readFileSync(workspace)), original, 'Read-only MCP calls changed the workspace');
   assert.match(await call('zal_check', { revision: 'stale' }, true), /Stale revision/);
   assert.match(await call('zal_accept', {}, true), /Unknown tool/);
+  // Explicit expectations below are regression fixtures, not supplied owner intent.
+  const fixtureProvenance = 'Protocol regression fixture; not an owner approval';
+  run('terminal.py', ['review', '--workspace', workspace],
+    `label deny pending approve authorized=no expect Reject pending not_enabled "${fixtureProvenance}"\nquit\n`);
+  const labelled = await call('zal_read', {});
+  assert.equal(labelled.owner_examples[0].expected.class, 'Reject');
+  assert.equal(labelled.owner_examples[0].provenance, fixtureProvenance);
+  const labelledComparison = await call('zal_compare', { revision, syntax: 'symbolic', surface: weakened });
+  assert.equal(labelledComparison.owner_examples.cases[0].current.status, 'matched');
+  assert.equal(labelledComparison.owner_examples.cases[0].candidate.status, 'conflict');
+  assert.deepEqual(labelledComparison.owner_examples.cases[0].expected, labelled.owner_examples[0].expected);
   const proposed = await call('zal_propose', { base_revision: revision, object_ids: ['rule:approve_order'],
     message: 'Test: expose an authorization weakening for separate review.', syntax: 'symbolic', surface: weakened });
   assert.equal(proposed.model.revision, revision);
@@ -76,7 +87,50 @@ try {
   const arguments_ = ['--workspace', workspace, '--revision', revision, '--out', destination];
   assert.equal(JSON.parse(run('workspace.py', ['export', ...arguments_])).factory_qualification, 'not-run');
   assert.equal(JSON.parse(run('workspace.py', ['verify', ...arguments_])).status, 'verified-reviewed-declarations');
-  console.log('ZAL MCP SDK: 7 tools, stale refusal, weakening witness, separate review, reviewed export PASS');
+  run('terminal.py', ['review', '--workspace', workspace],
+    `label cancel approved cancel authorized=yes expect Reject approved not_enabled "${fixtureProvenance}"\nquit\n`);
+  assert.equal((await call('zal_read', {})).freshness.review.status, 'stale');
+  const changedSurface = read.model.symbolic + '\nrule cancel_approved: approved + cancel [true] -> accept cancelled;\n';
+  const proposalArgs = { base_revision: revision, object_ids: ['rule:approve_order'],
+    message: 'Regression journey: explicit cancellation change; retain independent fixture expectations.',
+    syntax: 'symbolic', surface: changedSurface };
+  await call('zal_propose', proposalArgs);
+  run('terminal.py', ['review', '--workspace', workspace],
+    `label deny pending approve authorized=no expect Reject pending not_enabled "${fixtureProvenance}; second display"\nquit\n`);
+  const staleCorpus = await call('zal_read', {});
+  assert.equal(staleCorpus.freshness.proposal.corpus, 'stale');
+  const beforeRefusal = sha(readFileSync(workspace));
+  assert.match(run('terminal.py', ['review', '--workspace', workspace], 'candidate\naccept\nquit\n'),
+    /Owner examples changed; propose again/);
+  assert.equal(sha(readFileSync(workspace)), beforeRefusal, 'Refused stale-corpus acceptance changed workspace');
+  await call('zal_propose', proposalArgs);
+  assert.match(run('terminal.py', ['review', '--workspace', workspace], 'candidate\naccept\nquit\n'), /human-accepted/);
+  const changed = await call('zal_read', {});
+  assert.notEqual(changed.model.revision, revision);
+  assert.equal(changed.freshness.review.status, 'current');
+  assert.equal(changed.realization, 'not-run');
+  assert.deepEqual(changed.authenticated_facts, []);
+  const cancellation = changed.example_comparison.cases.find(c => c.id === 'cancel');
+  assert.equal(cancellation.expected.class, 'Reject');
+  assert.equal(cancellation.current.status, 'conflict');
+  assert.equal(cancellation.provenance, fixtureProvenance);
+  assert.match(await call('zal_explain', { revision, state: 'approved', event: 'cancel',
+    context: { authorized: true } }, true), /Stale revision/);
+  const changedTrace = await call('zal_trace', { revision: changed.model.revision, inputs: [
+    { event: 'submit', context: { authorized: false } },
+    { event: 'approve', context: { authorized: true } },
+    { event: 'cancel', context: { authorized: true } },
+  ] });
+  assert.equal(changedTrace.trace[2].outcome.state, 'cancelled');
+  assert.deepEqual(changedTrace.authenticated_facts, []);
+  assert.deepEqual(changedTrace.supplied_assumptions.steps[2], { observations: { authorized: true } });
+  const changedOut = join(project, 'changed-declarations');
+  const changedArguments = ['--workspace', workspace, '--revision', changed.model.revision, '--out', changedOut];
+  const exported = JSON.parse(run('workspace.py', ['export', ...changedArguments]));
+  assert.equal(exported.owner_examples.cases.find(c => c.id === 'cancel').current.status, 'conflict');
+  assert.equal(exported.authority, 'none');
+  assert.equal(JSON.parse(run('workspace.py', ['verify', ...changedArguments])).status, 'verified-reviewed-declarations');
+  console.log('ZAL MCP SDK: 7 tools, supplied fixture labels, revision change, stale-corpus refusal/recovery, trace and reviewed export PASS');
 } finally {
   clearTimeout(timer);
   await client.close();

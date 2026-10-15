@@ -10,7 +10,7 @@ import sys
 from behavior import Refusal, check
 from factory import lower, write_new
 from shared import SharedWorkspace
-from workflow import checker_identity
+from workflow import checker_identity, examples_digest
 
 
 RECEIPT = "zal-review.json"
@@ -26,8 +26,9 @@ def reviewed(session, revision):
     data = agreement.get("data", {}) if agreement else {}
     identity = checker_identity()
     if (data.get("candidate_revision") != revision or data.get("checker") != identity or
-            data.get("canonical_paraphrase") != session.model.render(True)):
-        raise Refusal("Approval lacks the current model/checker binding; show and review the meaning again")
+            data.get("canonical_paraphrase") != session.model.render(True) or
+            data.get("examples_digest") != examples_digest(session.owner_examples)):
+        raise Refusal("Approval lacks the current model/checker/owner-example corpus binding; show and review the meaning again")
     evidence = check(session.model, identity)
     if evidence["status"] != "pass-with-scope":
         raise Refusal("Export needs completed supported-profile checks; unresolved requirements do not lower")
@@ -40,6 +41,8 @@ def declarations(session, revision):
     receipt = {"schema": "zal/reviewed-declarations/1", "revision": revision,
                "profile": evidence["profile"], "checker": evidence["checker"],
                "agreement_sequence": agreement["sequence"], "input_tuples": evidence["input_tuples"],
+               "examples_digest": examples_digest(session.owner_examples),
+               "owner_examples": session.example_comparison(),
                "files": {name: hashlib.sha256(text.encode("ascii")).hexdigest() for name, text in files.items()},
                "scope": "reviewed finite control decisions, reasons, successor and empty deliveries",
                "approval": "trusted cooperative local gesture; not authenticated human approval",

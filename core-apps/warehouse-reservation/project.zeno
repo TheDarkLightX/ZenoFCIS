@@ -1,0 +1,48 @@
+zeno 1;
+project 1 warehouse_reservation;
+namespace 2 core_apps;
+type 100 state WarehouseOrder;
+type 101 command OrderCommand;
+type 102 context Operator;
+type 103 destination Warehouse;
+type 104 payload Shipment;
+type 105 int Units in 0..=4;
+type 106 int RememberedQuantity in 0..=3;
+type 107 int Phase in 0..=2;
+type 108 bool Authorized;
+type 109 int Quantity in 1..=3;
+type 115 int Key in 0..=1;
+type 116 data Action;
+field 110 100 available 105;
+field 111 100 held 105;
+field 112 100 phase 107;
+field 113 100 reserved_quantity 106;
+field 114 100 remembered_key 115;
+field 120 101 action 116;
+field 121 101 requested_quantity 109;
+field 122 101 request_key 115;
+field 130 102 authorized 108;
+field 140 104 shipment_quantity 109;
+field 141 104 shipment_key 115;
+variant 150 116 Reserve none;
+variant 151 116 Ship none;
+reason 200 not_authorized precedence 1;
+reason 201 conflicting_payload precedence 2;
+reason 202 wrong_order_or_phase precedence 3;
+reason 204 invalid_coupled_state precedence 0;
+channel 300 shipment destination 103 payload 104;
+// This physical component publishes the entire combined transition atomically.
+// Logical pool, memo and phase ownership is pinned in composition.json.
+component 400 warehouse_order {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+law 500 order_and_pool_agree on commit, genesis = (post.100.112 == 0 -> post.100.110 == 4 && post.100.111 == 0 && post.100.113 == 0 && post.100.114 == 0) && (post.100.112 == 1 -> post.100.113 >= 1 && post.100.111 == post.100.113 && post.100.110 + post.100.111 == 4) && (post.100.112 == 2 -> post.100.113 >= 1 && post.100.111 == 0 && post.100.110 + post.100.113 == 4);
+law 501 exact_request_binding on accept = context.102.130 == 1 && post.100.113 == command.101.121 && post.100.114 == command.101.122;
+law 502 reservation_and_shipping on accept = (pre.100.112 == 0 -> command.101.120 == 150 && post.100.112 == 1 && post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (pre.100.112 == 1 && command.101.120 == 151 -> post.100.112 == 2 && post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && ((pre.100.112 == 1 && command.101.120 == 150) || pre.100.112 == 2 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 && post.100.112 == pre.100.112 && post.100.113 == pre.100.113 && post.100.114 == pre.100.114);
+law 503 shipment_equals_consumed_holdings on commit = outbox.104 <= 1 && (pre.100.112 == 1 && post.100.112 == 2 -> outbox.104 == 1 && outbox.104.140 + post.100.111 == pre.100.111 && outbox.104.141 == pre.100.114) && (!(pre.100.112 == 1 && post.100.112 == 2) -> outbox.104 == 0 && outbox.104.140 == 0 && outbox.104.141 == 0);

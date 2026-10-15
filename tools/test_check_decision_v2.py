@@ -30,6 +30,13 @@ error: postcondition not satisfied
 
 error: aborting due to 2 previous errors
 """
+# Primary semantic-error locations from the retained current whole-crate run.
+CURRENT_WEAKEN="""error: postcondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/shared.rs:131:56
+error: postcondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/shared.rs:132:5
+error: aborting due to 2 previous errors
+"""
 class GateTests(unittest.TestCase):
     def test_controls_are_unique_and_source_bound(self):
         source=(gate.ROOT/gate.SUBJECT).read_text();spec=(gate.ROOT/gate.SPEC).read_text()
@@ -54,6 +61,9 @@ class GateTests(unittest.TestCase):
             self.assertTrue(changed.startswith(source[:start]) and changed.endswith(source[end:]),name)
             assert_strict_classification(self,expected)
         outcome=contract_controls.contract_rejected(1,report(errors=2),HOSTED_WEAKEN,PIN,
+            gate.CONTRACT_REJECTIONS['weaken_construct_contract'])
+        self.assertFalse(outcome['accepted'],outcome)  # Historical caller locations are stale.
+        outcome=contract_controls.contract_rejected(1,report(errors=1),CURRENT_WEAKEN,PIN,
             gate.CONTRACT_REJECTIONS['weaken_construct_contract'])
         self.assertTrue(outcome['accepted'],outcome)
     def test_profile_covers_all_runtime_bodies_and_has_total_contracts(self):

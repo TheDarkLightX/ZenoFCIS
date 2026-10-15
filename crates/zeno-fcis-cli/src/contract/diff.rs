@@ -12,10 +12,11 @@
 //! - **Program successor:** the new policy, with its decision program's
 //!   instructions and roots and its Step limit replaced by the old one's, is
 //!   byte for byte the old policy. This is premise 1 of the F6.1 upgrade,
-//!   computed as the SQLite shell computes it.
+//!   checked by the SQLite shell's public `program_successor` function.
 //! - **Rename:** both schemas declare the same types, fields and variants,
 //!   with the same IDs and forms; some name differs; and the new policy, with
-//!   the old schema in place of its own, is byte for byte the old policy.
+//!   the old schema in place of its own, is byte for byte the old policy,
+//!   checked by the shell's public `rename_exact` function.
 //! - **Layout change:** the state layout differs, while every other type and
 //!   every channel is unchanged.
 //! - **Rule change:** the schemas are byte-identical and so are the channels.
@@ -32,11 +33,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value, json};
 use zeno_fcis_spec::{ClaimDecl, LawScope};
-use zeno_fcis_synthesis::finite::{
-    V2Resource, V2ScalarProgram, v2_authority as authority,
-    v2_catalog::BoundCatalog,
-    v2_composition::{Descriptor, FrameBinding, Framing},
-};
 
 use super::declarations::{Declarations, Form, Leaf, ROOTS};
 use super::expr::{self, Ast};
@@ -101,7 +97,11 @@ impl Kind {
             Self::Identical => facts.same_policy,
             Self::ProgramSuccessor => facts.successor,
             Self::Rename => facts.same_shapes && !facts.same_names && facts.same_but_names,
-            Self::LayoutChange => facts.state_differs && facts.same_rest && facts.same_channels,
+            Self::LayoutChange => {
+                (facts.state_differs || facts.payload_differs)
+                    && facts.same_migration_rest
+                    && facts.migration_channels
+            }
             Self::RuleChange => facts.same_schema && facts.same_channels,
             Self::Unrelated => true,
         }
@@ -130,6 +130,13 @@ struct Facts {
     state_differs: bool,
     /// Every type other than those only the state has is unchanged.
     same_rest: bool,
+    /// Payload roots or their reachable field types differ.
+    payload_differs: bool,
+    /// Existing channel IDs and destination links are unchanged.
+    migration_channels: bool,
+    /// Only types owned by state/payloads change; command/context/destination
+    /// types and unrelated declarations remain exact.
+    same_migration_rest: bool,
 }
 
 /// Which contract a refusal is about.
@@ -456,6 +463,8 @@ impl Entry {
 #[derive(Clone, Debug)]
 pub(crate) struct Diff {
     kind: Kind,
+    /// Whether this layout change includes payload representation.
+    payload_layout: bool,
     parts: Vec<Part>,
     old: Version,
     new: Version,
@@ -539,6 +548,10 @@ impl Diff {
                 "Only names differ: the same types, fields and variants, with the same IDs and \
                  forms."
             }
+            Kind::LayoutChange if self.payload_layout => {
+                "The state or payload layout differs; command, context, channel IDs, \
+                 destinations and unrelated types do not."
+            }
             Kind::LayoutChange => {
                 "The state's fields differ; the command, the context, the channels and every \
                  other type do not."
@@ -611,6 +624,15 @@ impl Diff {
                 evolve` records this account with the change, and a store upgrades with the \
                 application's `--upgrade`, its state framed again under the new names."
                 .to_owned(),
+            Kind::LayoutChange if self.payload_layout => {
+                "a G2 data migration, which exists today: `contract evolve \
+                --migration` takes declarative state and explicit payload representation maps, \
+                and it is admitted only by forward simulation over the old contract's whole \
+                declared input domain, at most 2^20 tuples: on the migrated state the new \
+                contract must make every old decision, send every old delivery and reach the \
+                migrated successor. A store then upgrades with the application's `--upgrade`."
+                    .to_owned()
+            }
             Kind::LayoutChange => "a G2 data migration, which exists today: `contract evolve \
                 --migration` takes a declarative migration from the old state to the new one, \
                 and it is admitted only by forward simulation over the old contract's whole \
@@ -681,79 +703,6 @@ impl Diff {
             "text": self.admission_text(),
         })
     }
-}
-
-/// Whether `to` succeeds `from` by its decision program alone: `to`'s
-/// complete canonical policy, with its program's instructions and roots and
-/// its Step limit replaced by `from`'s, is byte for byte `from`'s policy.
-///
-/// This mirrors `zeno_fcis_shell_sqlite::v2::upgrade::program_successor`,
-/// the shell's premise 1 of an F6.1 Tier A upgrade, line for line. The
-/// tests compile that function from the shell's own source and check that
-/// it accepts exactly the pairs this classifier calls identical or program
-/// successors, and that every pair the shell's Tier A admission admits is one; Tier A
-/// also needs premises this classifier does not check.
-fn program_successor(
-    from: &BoundCatalog<'_>,
-    to: &BoundCatalog<'_>,
-) -> Result<bool, ContractError> {
-    let (old, new) = (from.descriptor(), to.descriptor());
-    let substituted = Descriptor {
-        state: new.state,
-        command: new.command,
-        context: new.context,
-        program: V2ScalarProgram {
-            inputs: new.program.inputs,
-            outputs: new.program.outputs,
-            nodes: old.program.nodes,
-            roots: old.program.roots,
-        },
-        bindings: new.bindings,
-        output_types: new.output_types,
-        decision_output: new.decision_output,
-        branches: new.branches,
-        reasons: new.reasons,
-        channels: new.channels,
-        laws: new.laws,
-        required: new.required,
-        limits: new
-            .limits
-            .with_limit(V2Resource::Step, old.limits.limit(V2Resource::Step)),
-    };
-    let policy = authority::policy_bytes(
-        &substituted,
-        to.original_schema(),
-        to.framing(),
-        to.channel_roots(),
-    )
-    .ok_or_else(overflow)?;
-    Ok(policy == from.original_contract())
-}
-
-/// Whether `to` differs from `from` in its original schema alone: `to`'s
-/// complete canonical policy, with `from`'s original schema and schema
-/// commitment in place of its own, is byte for byte `from`'s policy. Every
-/// descriptor field, the channel links and the framing's roots and size
-/// limits are then `from`'s.
-fn same_but_names(from: &BoundCatalog<'_>, to: &BoundCatalog<'_>) -> Result<bool, ContractError> {
-    let (old, new) = (from.framing(), to.framing());
-    let frame = |binding: FrameBinding, commitment: FrameBinding| FrameBinding {
-        schema: commitment.schema,
-        ..binding
-    };
-    let framing = Framing {
-        state: frame(new.state, old.state),
-        command: frame(new.command, old.command),
-        context: frame(new.context, old.context),
-    };
-    let policy = authority::policy_bytes(
-        to.descriptor(),
-        from.original_schema(),
-        &framing,
-        to.channel_roots(),
-    )
-    .ok_or_else(overflow)?;
-    Ok(policy == from.original_contract())
 }
 
 fn overflow() -> ContractError {
@@ -966,13 +915,41 @@ fn content(case: &Case, variables: &BTreeMap<String, Ast>) -> Result<CaseContent
 fn compare(old: &Current<'_>, new: &Current<'_>) -> Result<Diff, ContractError> {
     let (successor, same_but_names) = policy::with_catalog(old.contract, old.schema, |_, from| {
         policy::with_catalog(new.contract, new.schema, |_, to| {
-            Ok((program_successor(from, to)?, same_but_names(from, to)?))
+            Ok((
+                crate::shell_v2::upgrade::program_successor(from, to).map_err(|_| overflow())?,
+                crate::shell_v2::migration::rename_exact(from, to).map_err(|_| overflow())?,
+            ))
         })
     })?;
     let (old, new) = (View::of(old)?, View::of(new)?);
     let types = union(old.shapes.keys(), new.shapes.keys());
     let state_types = union(&old.state_types, &new.state_types);
     let shared = |id: &u32| old.interface_types.contains(id) || new.interface_types.contains(id);
+    let payload_types = union(
+        &reachable(
+            &old.shapes,
+            old.links.iter().map(|(_, _, payload)| *payload),
+        ),
+        &reachable(
+            &new.shapes,
+            new.links.iter().map(|(_, _, payload)| *payload),
+        ),
+    );
+    let protected = union(
+        &reachable(
+            &old.shapes,
+            [COMMAND, CONTEXT]
+                .into_iter()
+                .chain(old.links.iter().map(|(_, destination, _)| *destination)),
+        ),
+        &reachable(
+            &new.shapes,
+            [COMMAND, CONTEXT]
+                .into_iter()
+                .chain(new.links.iter().map(|(_, destination, _)| *destination)),
+        ),
+    );
+    let movable = union(&state_types, &payload_types);
     let facts = Facts {
         same_policy: old.current.generated.policy() == new.current.generated.policy(),
         successor,
@@ -987,6 +964,24 @@ fn compare(old: &Current<'_>, new: &Current<'_>) -> Result<Diff, ContractError> 
         same_rest: types
             .iter()
             .filter(|id| !state_types.contains(id) || shared(id))
+            .all(|id| old.shapes.get(id) == new.shapes.get(id)),
+        payload_differs: old
+            .links
+            .iter()
+            .map(|link| link.2)
+            .ne(new.links.iter().map(|link| link.2))
+            || payload_types
+                .iter()
+                .any(|id| old.shapes.get(id) != new.shapes.get(id)),
+        migration_channels: old.links.len() == new.links.len()
+            && old
+                .links
+                .iter()
+                .zip(&new.links)
+                .all(|(old, new)| (old.0, old.1) == (new.0, new.1)),
+        same_migration_rest: types
+            .iter()
+            .filter(|id| !movable.contains(id) || protected.contains(id))
             .all(|id| old.shapes.get(id) == new.shapes.get(id)),
     };
     // The schema is the profile name and every type's name and form, and
@@ -1035,6 +1030,7 @@ fn compare(old: &Current<'_>, new: &Current<'_>) -> Result<Diff, ContractError> 
     let (old_generated, new_generated) = (old.current.generated, new.current.generated);
     Ok(Diff {
         kind,
+        payload_layout: facts.payload_differs,
         parts: parts.into_iter().collect(),
         old: Version::of(old.current),
         new: Version::of(new.current),

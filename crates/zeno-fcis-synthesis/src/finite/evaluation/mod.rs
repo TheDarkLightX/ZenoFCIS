@@ -4,6 +4,7 @@
 //! shape/type admission lives in the shared `admission` module. Canonical
 //! import and complete decision construction remain separate proof obligations.
 
+pub(crate) mod typed;
 use alloc::vec::Vec;
 
 pub(super) mod admission;
@@ -14,6 +15,16 @@ pub const MAX_NODES: usize = 256;
 /// Maximum fields on either side of a synthesis relation.
 #[cfg_attr(verus_keep_ghost, verus_spec)]
 pub const MAX_FIELDS: usize = 16;
+
+/// Maximum input positions in the larger finite-i64/2 profile.
+#[cfg_attr(verus_keep_ghost, verus_spec)]
+pub const MAX_EXTENDED_INPUTS: usize = 64;
+/// Maximum output positions in the larger finite-i64/2 profile.
+#[cfg_attr(verus_keep_ghost, verus_spec)]
+pub const MAX_EXTENDED_OUTPUTS: usize = 64;
+/// Maximum instructions in the larger finite-i64/2 profile.
+#[cfg_attr(verus_keep_ghost, verus_spec)]
+pub const MAX_EXTENDED_NODES: usize = 4096;
 
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
@@ -180,41 +191,19 @@ pub(super) fn at(values: &[i64], id: u16) -> Option<i64> {
     ensures result == spec::node(*op, input@, values@),
 ))]
 pub(super) fn evaluate_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
-    match *op {
-        Op::Input(id) => match at(input, id) {
+    #[cfg(verus_keep_ghost)]
+    proof! { typed::spec::legacy_node_embedding(*op, input@, values@); }
+    match typed::node(
+        typed::legacy_instruction(op),
+        typed::Values::Legacy(input),
+        typed::Values::Legacy(values),
+    ) {
+        Ok(value) => match typed::project(value) {
             Some(value) => Ok(value),
-            None => Err(Failure::Reference),
+            None => Err(Failure::Arithmetic),
         },
-        Op::Int(value) => Ok(value),
-        Op::Bool(value) => Ok(value as i64),
-        Op::Not(id) => match at(values, id) {
-            Some(value) => Ok((value == 0) as i64),
-            None => Err(Failure::Reference),
-        },
-        Op::Select(condition, yes, no) => {
-            match (at(values, condition), at(values, yes), at(values, no)) {
-                (Some(condition), Some(yes), Some(no)) => Ok(if condition == 1 { yes } else { no }),
-                _ => Err(Failure::Reference),
-            }
-        }
-        Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
-            let (Some(left), Some(right)) = (at(values, a), at(values, b)) else {
-                return Err(Failure::Reference);
-            };
-            match *op {
-                Op::Add(_, _) => match left.checked_add(right) {
-                    Some(value) => Ok(value),
-                    None => Err(Failure::Arithmetic),
-                },
-                Op::Sub(_, _) => match left.checked_sub(right) {
-                    Some(value) => Ok(value),
-                    None => Err(Failure::Arithmetic),
-                },
-                Op::Eq(_, _) => Ok((left == right) as i64),
-                Op::Lt(_, _) => Ok((left < right) as i64),
-                _ => Ok((left == 1 && right == 1) as i64),
-            }
-        }
+        Err(typed::Failure::Reference) => Err(Failure::Reference),
+        Err(typed::Failure::Arithmetic | typed::Failure::Kind) => Err(Failure::Arithmetic),
     }
 }
 

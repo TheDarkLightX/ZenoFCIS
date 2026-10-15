@@ -1,0 +1,62 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "logical-deadline",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/logical-deadline.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "2c50d84a75874636d4793d4d57e53cdd98a61fb8e753b44b81a7dfe5616d733a"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 500,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 4
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "2ac884840b84984bb672007de032a8558698e7dae511c029763fae18900a22ca",
+  "source_sha256": {
+    "examples/c4.txt": "c2a1cab39e436bc87e5182dbd7624f05a5160662785cd2936c46306e39a2682d",
+    "family.json": "6e04ba5aae3151dfe49a10a2a5ad0186c58ee4e00da9c797c7d471cd02cc1284",
+    "policy.json.in": "b0678070e2595bae0f320182e5d73e25fdb351a2a4980ca348e1f8ff84a1c6fe",
+    "project.zeno.in": "62d7a8952f3d57fe40c7e16d77c36446db9525213a9e79d0672a4d2a12bf0b51"
+  },
+  "state_tuples": 50,
+  "version": 1
+}

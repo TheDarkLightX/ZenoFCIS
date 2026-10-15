@@ -5,10 +5,15 @@
 //! its declared Step limit: both programs must have the same ordered input
 //! and output domains; then every tuple of the ordered product of the input
 //! domains, last input fastest, runs through `execute_v2` at the full budget
-//! of `MAX_NODES` Steps. An admitted program has at most `MAX_NODES` nodes and
-//! each instruction attempt costs one Step, so no run is refused for Steps and
-//! a Step refusal cannot mask a difference; unused nodes and unselected arms
-//! still run. The two programs are equal when every tuple gives identical
+//! of [`FULL_BUDGET`] (`MAX_NODES`) Steps. Admission accepts programs of up to
+//! `MAX_EXTENDED_NODES` nodes, more than that budget, so a program with more
+//! than [`FULL_BUDGET`] nodes is refused before any evaluation
+//! ([`Unestablished::ProgramTooLarge`]): two such programs would both be
+//! refused for Steps on every tuple and compare equal however they differ.
+//! Each instruction attempt costs one Step, so a program of at most
+//! [`FULL_BUDGET`] nodes is never refused for Steps and a Step refusal cannot
+//! mask a difference; unused nodes and unselected arms still run. The two
+//! programs are equal when every tuple gives identical
 //! output tuples or the identical evaluator failure. The product's size is
 //! computed with checked arithmetic and bounded by a caller's cap; only a
 //! complete enumeration of exactly that many tuples constructs an [`Equal`],
@@ -30,6 +35,7 @@ mod checker;
 pub mod finite_checker;
 #[cfg(test)]
 use checker::{advance, domain_size};
+use finite_checker::FULL_BUDGET;
 #[cfg(test)]
 use zeno_fcis_synthesis::finite::Domain;
 
@@ -79,6 +85,16 @@ pub enum Unestablished {
         /// The cap the comparison ran under.
         cap: u64,
     },
+    /// A program has more nodes than the full budget of [`FULL_BUDGET`]
+    /// Steps. Each node costs one Step, so every run of it would be refused
+    /// for Steps and such a refusal could mask a difference. Nothing was
+    /// evaluated.
+    ProgramTooLarge {
+        /// The node count of the larger program.
+        nodes: usize,
+        /// The full budget: [`FULL_BUDGET`].
+        budget: u64,
+    },
     /// The first tuple, in enumeration order from zero, whose results differ.
     Counterexample {
         /// Position of the tuple in enumeration order.
@@ -97,10 +113,11 @@ pub enum Unestablished {
 /// Compares `original` and `candidate` on every tuple of their declared input
 /// domain, if it has at most `max_input_tuples` tuples.
 ///
-/// Refusal order: input domains, output domains, an empty input domain, then
-/// a domain above the cap; otherwise the first tuple whose results differ.
-/// Programs with identical instructions and roots pass those same checks and
-/// are then equal without enumeration.
+/// Refusal order: input domains, output domains, an empty input domain, a
+/// domain above the cap, then a program with more nodes than [`FULL_BUDGET`];
+/// otherwise the first tuple whose results differ. Programs with identical
+/// instructions and roots pass those same checks and are then equal without
+/// enumeration.
 ///
 /// # Errors
 /// Returns why equality was not established.
@@ -109,33 +126,45 @@ pub fn compare(
     candidate: &V2ScalarProgram<'_>,
     max_input_tuples: u64,
 ) -> Result<Equal, Unestablished> {
+    checker::validate_pair(original, candidate, max_input_tuples).map_err(unestablished)?;
+    let nodes = original.nodes.len().max(candidate.nodes.len());
+    if u64::try_from(nodes).map_or(true, |nodes| nodes > FULL_BUDGET) {
+        return Err(Unestablished::ProgramTooLarge {
+            nodes,
+            budget: FULL_BUDGET,
+        });
+    }
     checker::compare_equal(original, candidate, max_input_tuples)
         .map(|equal| Equal {
             tuples: equal.tuples(),
             enumerated: equal.enumerated(),
         })
-        .map_err(|error| match error {
-            checker::Failure::InputAbi => Unestablished::InputAbi,
-            checker::Failure::OutputAbi => Unestablished::OutputAbi,
-            checker::Failure::EmptyInputDomain { position } => {
-                Unestablished::EmptyInputDomain { position }
-            }
-            checker::Failure::DomainTooLarge { size, limit } => {
-                Unestablished::DomainTooLarge { size, cap: limit }
-            }
-            checker::Failure::Counterexample { ordinal, .. } => {
-                Unestablished::Counterexample { ordinal }
-            }
-            checker::Failure::CoverageMismatch { expected, visited } => {
-                Unestablished::CoverageMismatch { expected, visited }
-            }
-            // The equality-only route has no Step-boundary branch. Keep mapping
-            // total and fail closed if that internal invariant ever changes.
-            checker::Failure::BudgetBoundary { .. } => Unestablished::CoverageMismatch {
-                expected: 0,
-                visited: 0,
-            },
-        })
+        .map_err(unestablished)
+}
+
+fn unestablished(error: checker::Failure) -> Unestablished {
+    match error {
+        checker::Failure::InputAbi => Unestablished::InputAbi,
+        checker::Failure::OutputAbi => Unestablished::OutputAbi,
+        checker::Failure::EmptyInputDomain { position } => {
+            Unestablished::EmptyInputDomain { position }
+        }
+        checker::Failure::DomainTooLarge { size, limit } => {
+            Unestablished::DomainTooLarge { size, cap: limit }
+        }
+        checker::Failure::Counterexample { ordinal, .. } => {
+            Unestablished::Counterexample { ordinal }
+        }
+        checker::Failure::CoverageMismatch { expected, visited } => {
+            Unestablished::CoverageMismatch { expected, visited }
+        }
+        // The equality-only route has no Step-boundary branch. Keep mapping
+        // total and fail closed if that internal invariant ever changes.
+        checker::Failure::BudgetBoundary { .. } => Unestablished::CoverageMismatch {
+            expected: 0,
+            visited: 0,
+        },
+    }
 }
 
 #[cfg(test)]
@@ -357,6 +386,82 @@ mod tests {
         // Two full i64 domains: 2^128 tuples overflow u128 by one.
         assert_eq!(domain_size(&[full, full]), Ok(None));
         assert_eq!(domain_size(&[full]), Ok(Some(1 << 64)));
+    }
+
+    #[test]
+    fn programs_beyond_the_full_budget_are_refused_however_they_differ()
+    -> Result<(), core::num::TryFromIntError> {
+        let inputs = [BOOL];
+        let outputs = [SMALL];
+        let budget = usize::try_from(FULL_BUDGET)?;
+        // Two 257-node programs: padding, then one constant output that differs.
+        let mut one = vec![Op::Int(0); budget];
+        one.push(Op::Int(1));
+        let mut two = vec![Op::Int(0); budget];
+        two.push(Op::Int(2));
+        let root = [u16::try_from(budget)?];
+        // The shared checker alone calls them equal: both runs stop at the budget.
+        assert!(
+            checker::compare_equal(
+                &program(&inputs, &outputs, &one, &root),
+                &program(&inputs, &outputs, &two, &root),
+                2,
+            )
+            .is_ok()
+        );
+        let refused = Err(Unestablished::ProgramTooLarge {
+            nodes: budget + 1,
+            budget: FULL_BUDGET,
+        });
+        assert_eq!(
+            compare(
+                &program(&inputs, &outputs, &one, &root),
+                &program(&inputs, &outputs, &two, &root),
+                2,
+            ),
+            refused
+        );
+        // Identical oversized programs and an oversized side alone are refused too.
+        assert_eq!(
+            compare(
+                &program(&inputs, &outputs, &one, &root),
+                &program(&inputs, &outputs, &one, &root),
+                2,
+            ),
+            refused
+        );
+        let small = [Op::Int(1)];
+        assert_eq!(
+            compare(
+                &program(&inputs, &outputs, &small, &[0]),
+                &program(&inputs, &outputs, &two, &root),
+                2,
+            ),
+            refused
+        );
+        // The earlier refusals keep their order.
+        assert_eq!(
+            compare(
+                &program(&inputs, &outputs, &one, &root),
+                &program(&inputs, &outputs, &two, &root),
+                1,
+            ),
+            Err(Unestablished::DomainTooLarge {
+                size: Some(2),
+                cap: 1
+            })
+        );
+        // At exactly the budget the difference is found.
+        let root = [u16::try_from(budget - 1)?];
+        assert_eq!(
+            compare(
+                &program(&inputs, &outputs, &one[1..], &root),
+                &program(&inputs, &outputs, &two[1..], &root),
+                2,
+            ),
+            Err(Unestablished::Counterexample { ordinal: 0 })
+        );
+        Ok(())
     }
 
     #[test]

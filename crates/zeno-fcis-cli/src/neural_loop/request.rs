@@ -9,7 +9,7 @@
 //! exact binding: resume re-admits the bytes and recomputes the record.
 
 use super::incumbent::Cost;
-use super::limits::{LimitRefusal, Limits, RECEIPT_WORK};
+use super::limits::{LimitRefusal, Limits};
 use super::profiles::{Profile, ProfileRefusal};
 use super::program_json::program_to_json;
 use super::{canonical_json, json_u64, only_fields, tagged_sha256};
@@ -25,14 +25,7 @@ pub(crate) const VIEW_SCHEMA: &str = "zeno-fcis/transform-request-view/1";
 pub(crate) const OBJECTIVE: &str = "lexicographic-nodes-bytes-v1";
 const REQUEST_ID_TAG: &str = "zeno-fcis/transform-request-id/1";
 
-/// The identity of the checker whose receipts this request binds, F3's
-/// transform checker, as its receipts record it: the checker's semantics
-/// version and the library's evaluator identity.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct CheckerIdentity {
-    pub(crate) semantics: String,
-    pub(crate) evaluator_identity: String,
-}
+pub(crate) use super::value_types::CheckerIdentity;
 
 impl CheckerIdentity {
     /// The checker compiled into this binary.
@@ -253,17 +246,48 @@ pub(crate) struct Request {
 }
 
 impl Request {
-    /// Admits an original. Precedence (NSC "Precedence and scenarios"): limits
-    /// and policy, then bounded byte intake, canonical decoding with the
-    /// library's complete admission, the profile's node and schema checks,
-    /// and last the checked cardinality and work feasibility.
+    /// Admits an original under explicit limits; see [`Self::admit_work`].
     pub(crate) fn admit(
         original: &[u8],
         profile: Profile,
         limits: Limits,
         policy: Policy,
     ) -> Result<Request, RequestRefusal> {
-        let limits = Limits::try_new(limits).map_err(RequestRefusal::Limits)?;
+        Self::admit_work(
+            original,
+            profile,
+            limits,
+            Some(limits.check_work),
+            Some(limits.session_work),
+            policy,
+        )
+    }
+
+    /// Admits an original. Precedence (NSC "Precedence and scenarios"): limits
+    /// within the hard ceilings and policy, then bounded byte intake, canonical
+    /// decoding with the library's complete admission, the profile's node and
+    /// schema checks, the request's own ceilings, and last the checked
+    /// cardinality and work feasibility. Work scales with the domain
+    /// (`zeno-fcis/checker-work/4`): the request's ceilings are
+    /// [`Limits::scaled`] by the work of checking the original against itself,
+    /// and an absent `check_work` or `session_work` takes its ceiling.
+    pub(crate) fn admit_work(
+        original: &[u8],
+        profile: Profile,
+        limits: Limits,
+        requested_check: Option<u64>,
+        requested_session: Option<u64>,
+        policy: Policy,
+    ) -> Result<Request, RequestRefusal> {
+        // An absent work limit is checked here as the least that can pass
+        // (one check unit, a session of the hard cap); its value comes from
+        // the request's own ceiling below.
+        let hard = Limits {
+            check_work: requested_check.unwrap_or(1),
+            session_work: requested_session.unwrap_or(Limits::HARD_SESSION_WORK),
+            ..limits
+        };
+        let limits = Limits::try_within(hard, Limits::HARD).map_err(RequestRefusal::Limits)?;
         policy.admit(&limits).map_err(RequestRefusal::Policy)?;
         if original.len() > limits.artifact_bytes as usize {
             return Err(RequestRefusal::ArtifactTooLarge {
@@ -276,7 +300,20 @@ impl Request {
         })?;
         let domain_size = profile.admit(&program).map_err(RequestRefusal::Profile)?;
         let cost = Cost::measure(&program, original);
-        let needed = check_work(domain_size, cost, cost);
+        let needed = check_work(
+            domain_size,
+            cost,
+            cost,
+            program.inputs().len() as u64,
+            program.outputs().len() as u64,
+        );
+        let ceiling = Limits::scaled(needed.unwrap_or(u64::MAX));
+        let limits = Limits {
+            check_work: requested_check.unwrap_or(ceiling.check_work),
+            session_work: requested_session.unwrap_or(ceiling.session_work),
+            ..limits
+        };
+        let limits = Limits::try_within(limits, ceiling).map_err(RequestRefusal::Limits)?;
         if needed.is_none_or(|needed| needed > limits.check_work) {
             return Err(RequestRefusal::WorkInfeasible {
                 needed,
@@ -345,6 +382,11 @@ impl Request {
                 stored: Box::new(stored_checker),
                 current: Box::new(current),
             });
+        }
+        if record.get("work_policy").and_then(Value::as_str)
+            != Some(crate::transform_plan::WORK_POLICY)
+        {
+            return Err(ReadmitRefusal::WorkPolicyChanged);
         }
         let request =
             Request::admit(original, profile, limits, policy).map_err(ReadmitRefusal::Admission)?;
@@ -416,7 +458,13 @@ impl Request {
     /// Deterministic work units for checking one candidate against the
     /// original (NSF-003); `None` on arithmetic overflow.
     pub(crate) fn check_work(&self, candidate: Cost) -> Option<u64> {
-        check_work(self.domain_size, self.cost, candidate)
+        check_work(
+            self.domain_size,
+            self.cost,
+            candidate,
+            self.program.inputs().len() as u64,
+            self.program.outputs().len() as u64,
+        )
     }
 
     /// The view a proposer receives (NSM-003): policy-permitted request data
@@ -481,6 +529,8 @@ pub(crate) enum ReadmitRefusal {
     Admission(RequestRefusal),
     /// Fresh admission reproduces a different canonical record.
     Mismatch,
+    /// Stored billing policy differs; never reinterpret its old allowance.
+    WorkPolicyChanged,
 }
 
 impl ReadmitRefusal {
@@ -494,6 +544,7 @@ impl ReadmitRefusal {
                 json!({"reason": "request-readmission-refused", "refusal": refusal.json()})
             }
             ReadmitRefusal::Mismatch => json!({"reason": "request-mismatch"}),
+            ReadmitRefusal::WorkPolicyChanged => json!({"reason": "work-policy-changed"}),
         }
     }
 }
@@ -501,16 +552,30 @@ impl ReadmitRefusal {
 /// `admission + tuples * (node attempts + comparison) + receipt`, all
 /// deterministic. Each program attempts at most its node count of Steps per
 /// tuple, so this bounds the evaluator's Step usage from above.
-fn check_work(domain_size: u64, original: Cost, candidate: Cost) -> Option<u64> {
-    let per_tuple = original
-        .nodes
-        .checked_add(candidate.nodes)?
-        .checked_add(2)?;
-    original
-        .bytes
-        .checked_add(candidate.bytes)?
-        .checked_add(domain_size.checked_mul(per_tuple)?)?
-        .checked_add(RECEIPT_WORK)
+fn check_work(
+    domain_size: u64,
+    original: Cost,
+    candidate: Cost,
+    inputs: u64,
+    outputs: u64,
+) -> Option<u64> {
+    let d = crate::transform_plan::Dimensions {
+        bytes: [original.bytes, candidate.bytes],
+        nodes: [original.nodes, candidate.nodes],
+        inputs,
+        outputs,
+        tuples: domain_size,
+    };
+    crate::transform_plan::plan(
+        d,
+        crate::transform_plan::RunLimits {
+            deadline_ms: 2000,
+            work_units: u64::MAX,
+            ..crate::transform_plan::RunLimits::offline()
+        },
+    )
+    .ok()
+    .map(|p| p.reserved())
 }
 
 fn admission_code(error: &Error) -> &'static str {
@@ -533,6 +598,8 @@ fn request_json(
 ) -> Value {
     json!({
         "schema": REQUEST_SCHEMA,
+        "work_policy": crate::transform_plan::WORK_POLICY,
+        "acquisition_policy": super::acquisition::POLICY,
         "profile": profile.name(),
         "semantics": {"program": PROFILE, "execution": V2_EXECUTION_PROFILE},
         "original": {"sha256": original_sha256, "bytes": cost.bytes, "nodes": cost.nodes},

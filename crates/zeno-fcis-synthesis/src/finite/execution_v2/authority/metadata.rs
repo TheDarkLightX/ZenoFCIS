@@ -296,6 +296,11 @@ pub(super) fn program<'a>(parts: &mut Vec<Part<'a>>, value: &ScalarProgram<'a>) 
 #[cfg_attr(verus_keep_ghost,verus_spec(ensures final(parts)@==old(parts)@+model::domain(*value),))]
 pub(super) fn domain<'a>(parts: &mut Vec<Part<'a>>, value: &Domain<'a>) {
     match value {
+        Domain::Canonical { schema, type_id } => {
+            parts.push(Part::Word(7));
+            parts.push(Part::Bytes(schema));
+            parts.push(Part::Word(*type_id as u128));
+        }
         Domain::Bool => parts.push(Part::Word(0)),
         Domain::I128 { min, max } => {
             parts.push(Part::Word(1));
@@ -424,6 +429,12 @@ parts@==initial+seq![Part::Word(values.len() as u128)]+model::branches_prefix(va
 #[cfg_attr(verus_keep_ghost,verus_spec(ensures final(parts)@==old(parts)@+model::law_atom(*value),))]
 pub(super) fn law_atom<'a>(parts: &mut Vec<Part<'a>>, value: &laws::Atom<'a>) {
     match value {
+        laws::Atom::Canonical(v) => {
+            parts.push(Part::Word(7));
+            parts.push(Part::Bytes(v.schema()));
+            parts.push(Part::Word(v.type_id() as u128));
+            parts.push(Part::Bytes(v.wire()));
+        }
         laws::Atom::Bool(v) => {
             parts.push(Part::Word(0));
             parts.push(Part::Word(*v as u128));
@@ -538,6 +549,27 @@ pub(super) fn law_op<'a>(parts: &mut Vec<Part<'a>>, value: &laws::Op<'a>) {
             parts.push(Part::Word(*c as u128));
             parts.push(Part::Word(*a as u128));
             parts.push(Part::Word(*b as u128));
+        }
+        laws::Op::MulDivFloor(a, b, den) => {
+            parts.push(Part::Word(13));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*den as u128));
+        }
+        laws::Op::MulDivCeil(a, b, den) => {
+            parts.push(Part::Word(14));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*den as u128));
+        }
+        laws::Op::ProductsGe(a, b) => {
+            parts.push(Part::Word(15));
+            parts.push(Part::Word(a[0] as u128));
+            parts.push(Part::Word(a[1] as u128));
+            parts.push(Part::Word(a[2] as u128));
+            parts.push(Part::Word(b[0] as u128));
+            parts.push(Part::Word(b[1] as u128));
+            parts.push(Part::Word(b[2] as u128));
         }
     }
 }

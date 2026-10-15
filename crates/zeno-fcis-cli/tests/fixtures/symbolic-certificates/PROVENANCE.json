@@ -1,0 +1,22 @@
+{
+  "producer": "CVC5 1.3.3",
+  "producer_binary_sha256": "e8d7870d57ab55e81619d2373b043da05ea1d37ca393931bdb5d8b9788cd64c4",
+  "proposal_transform": "tools/symbolic_certificate_checker/elaborate.py",
+  "proposal_transform_sha256": "86ffd642a75e668043b117a92707a6a3d46c7d2b48ea62790d7d46833b3b63c8",
+  "subject": "one Input(0) with ordered identity output and full inclusive i64 input/output domains",
+  "acceptance": "regenerate every query and independently check every certificate; fixture provenance grants no evidence or authority",
+  "certificates": {
+    "0.alethe": {
+      "meaning": "outputs",
+      "sha256": "a95ae020ea5e92868e93555b7a5111f0f20cd6206f69983917b1fde10ee3fbc2"
+    },
+    "1.alethe": {
+      "meaning": "arithmetic-failure",
+      "sha256": "8888c3a73dc139efd417b4ff5838ec30abf8beb78cdce8f15f17d4b01fd66e9b"
+    },
+    "2.alethe": {
+      "meaning": "output-domain-failure",
+      "sha256": "a3fcfd16172539d6bd997f57ae654e6c11423a52d664d81ed8aa54feca414e77"
+    }
+  }
+}

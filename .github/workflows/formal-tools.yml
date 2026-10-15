@@ -11,6 +11,10 @@ on:
       - "verification/Cargo.lock"
       - "verification/kernel-laws/**"
       - "tools/record_gate_evidence.py"
+      - "tools/symbolic_certificate_checker/**"
+      - "tools/check_symbolic_certificates.py"
+      - "tools/atdd.py"
+      - "acceptance/features/symbolic_checks.feature"
       - "crates/zeno-fcis-formal-tools/**"
       - "crates/zeno-fcis-cli/**"
       - "crates/zeno-fcis-spec/**"
@@ -149,6 +153,31 @@ jobs:
           ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" ZENO_FCIS_Z3="$PWD/$Z3_BIN" \
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-cli --locked --test symbolic_cli pinned_symbolic_ -- --ignored
+      - name: Build and test the independent complete-root checker
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/certificate-checker-target
+        run: |
+          python3 tools/symbolic_certificate_checker/build.py --build-dir "$RUNNER_TEMP/certificate-checker"
+          cargo +1.97.1 test --locked --offline -j 1 \
+            --manifest-path "$RUNNER_TEMP/certificate-checker/wrapper/Cargo.toml"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          directory = Path(os.environ['RUNNER_TEMP']) / 'certificate-checker'
+          build = json.loads((directory / 'BUILD.json').read_text())
+          manifest = {'schema': 'zeno-fcis/certificate-checker/1',
+                      'path': build['executable'], 'sha256': build['sha256'],
+                      'timeout_ms': 10000, 'max_output_bytes': 1048576}
+          (directory / 'checker.json').write_text(json.dumps(manifest) + '\n')
+          PY
+      - name: Qualify actual scalar certificate command and replay
+        working-directory: ${{ runner.temp }}
+        run: |
+          CVC5_BIN="$(find cvc5 -type f -name cvc5 -perm -111 -print -quit)"
+          test -n "$CVC5_BIN"
+          ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" \
+            ZENO_FCIS_CERTIFICATE_CHECKER="$RUNNER_TEMP/certificate-checker/checker.json" \
+            python3 "$GITHUB_WORKSPACE/tools/check_symbolic_certificates.py"
       - name: Check pure authoring compiler without std
         run: cargo +1.97.1 check -p zeno-fcis-spec --no-default-features --locked
       - name: Run formal-tools ATDD bindings

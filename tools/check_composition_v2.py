@@ -15,7 +15,7 @@ import tempfile
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
-from verus_coverage import inventory, require_coverage
+from verus_coverage import inventory, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 FINITE = Path('crates/zeno-fcis-synthesis/src/finite')
@@ -29,7 +29,7 @@ TEMPLATES = Path('crates/zeno-fcis-cli/templates')
 FIXED = (HARNESS, PROFILE, verifier.PIN, TEST, Path('verification/verus/record-stage-migration.json'), Path('verification/verus/account-stage-migration.json'),
          Path('tools/check_composition_v2.py'), Path('tools/test_check_composition_v2.py'),
          Path('tools/check_verus.py'), Path('tools/verus_coverage.py'),
-         Path('docs/V2_COMPOSITION_STAGE.md'), Path('Cargo.toml'), Path('Cargo.lock'))
+         Path('README.md'), Path('Cargo.toml'), Path('Cargo.lock'))
 
 
 def sources(root: Path = ROOT) -> tuple[Path, ...]:
@@ -81,7 +81,7 @@ def intended_refusal(vir: str, profile: dict, name: str, refusal: str | None) ->
     if name not in INTENDED_COVERAGE:
         return True, None
     target, field = INTENDED_COVERAGE[name]
-    actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
+    actual = profile_inventory(vir, profile)
     expected = profile['functions']
     intended = (refusal is not None and target in refusal and target in actual and target in expected
                 and actual[target][field] != expected[target][field])
@@ -104,13 +104,16 @@ def mutations(root: Path = ROOT) -> dict[str, tuple[Path, str, str, bool]]:
         path = OWNED/file
         rows[name] = (path, once((root/path).read_text(), before, after), expected, native)
     add('sum_type_identity', 'ingress.rs', 'Some(Atom::Sum { type_id: *type_id, variant: inverse(variants, code)?, })', 'Some(Atom::Sum { type_id: 0, variant: inverse(variants, code)?, })')
-    add('command_binding_source', 'producer.rs', 'Source::Command => scalar(d.command, command, b.selector)', 'Source::Command => scalar(d.command, state, b.selector)')
-    add('actual_branch_output', 'producer.rs', 'inputs, atoms, code, d.branches, meter, &mut trace.attempts,', 'inputs, atoms, 0, d.branches, meter, &mut trace.attempts,')
+    # G3 moved the one production pipeline for both descriptor families from
+    # producer.rs into shared.rs; producer.rs keeps only test-oracle helpers.
+    add('command_binding_source', 'shared.rs', 'Source::Command => scalar(d.command(), command, b.selector)', 'Source::Command => scalar(d.command(), state, b.selector)')
+    add('actual_branch_output', 'shared.rs', 'inputs, &atoms, code, d.branches(), meter, &mut trace.attempts,', 'inputs, &atoms, 0, d.branches(), meter, &mut trace.attempts,')
     # S4 removed law_bridge: law-frame controls (root_read_alias, law_effect_lane) moved to the laws gate;
     # delivery destination/payload/idempotency/ordinal copies no longer exist.
-    add('law_decision_usage', 'outcome.rs', 'attempts: &trace.attempts, usage: meter.used, };', 'attempts: &trace.attempts, usage: trace.ingress.unwrap_or(meter.used), };')
-    add('bypass_applicable_law', 'outcome.rs', 'match result { Ok(()) => Ok(produced.candidate), Err(e) => Err(Failure::Law(e)), }', 'Ok(produced.candidate)')
-    add('invented_genesis', 'outcome.rs', 'initial: producer::value(&decoded.value),', 'initial: decision::RootView::Record(&[]),')
+    add('law_decision_usage', 'shared.rs', 'attempts: &trace.attempts, usage: meter.used, };', 'attempts: &trace.attempts, usage: trace.ingress.unwrap_or(meter.used), };')
+    # The transition's law refusal; its proof block stays and must now fail.
+    add('bypass_applicable_law', 'shared.rs', 'if let Err(e) = law_result { return Err(Failure::Law(e)); } #[cfg(verus_keep_ghost)] proof! { let finished=(Ok(decision::spec::candidate_view(produced.candidate))', '#[cfg(verus_keep_ghost)] proof! { let finished=(Ok(decision::spec::candidate_view(produced.candidate))')
+    add('invented_genesis', 'shared.rs', 'initial: producer::value(&decoded.value),', 'initial: decision::RootView::Record(&[]),')
     add('header_charge_omission', 'framed.rs', 'meter.charge(Resource::Byte, header)', 'meter.charge(Resource::Byte, 0)')
     add('all_law_literal_admission', 'admission.rs', '&& schema_validation::law_literals(d.laws)', '&& true')
     add('binary_map_boundary', 'admission.rs', '*min == 0 && *max == 1', '*min == 0 || *max == 1')
@@ -118,7 +121,7 @@ def mutations(root: Path = ROOT) -> dict[str, tuple[Path, str, str, bool]]:
     # These verify-then-coverage controls target that unconsumed public getter.
     path = AUTHORITY_DESCRIPTOR
     contract = '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.view().0,))]'
-    rows['weaken_descriptor_contract'] = (path, once((root/path).read_text(), contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures true,))]'), 'coverage', False)
+    rows['weaken_descriptor_contract'] = (path, once((root/path).read_text(), contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (result==self.view().0) || true,))]'), 'coverage', False)
     rows['narrow_descriptor_domain'] = (path, once((root/path).read_text(), contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>requires false,ensures result==self.view().0,))]'), 'coverage', False)
     path = OWNED/'outcome.rs'
     rows['uncontracted_helper'] = (path, (root/path).read_text()+'\npub fn uncontracted_composition_control() -> u64 { 42 }\n', 'coverage', False)
@@ -129,24 +132,24 @@ def mutations(root: Path = ROOT) -> dict[str, tuple[Path, str, str, bool]]:
     source = once(source, 'match envelope::frame(bytes, binding.root, &binding.schema, binding.max_bytes) {', 'match interpreted {')
     rows['interpret_before_header_charge'] = (path, source, 'coverage', False)
     # Former raw-record driver controls now target the surviving shared stages.
-    add('record_state_source', 'producer.rs', 'Source::State => scalar(d.state, state, b.selector)', 'Source::State => scalar(d.state, command, b.selector)', native=False)
+    add('record_state_source', 'shared.rs', 'Source::State => scalar(d.state(), state, b.selector)', 'Source::State => scalar(d.state(), command, b.selector)', native=False)
     add('record_source_schema', 'admission.rs', 'Source::State => d.state,', 'Source::State => d.command,', native=False)
     add('record_domain_upper', 'admission.rs', 'a == c && b == d', 'a == c', native=False)
     add('record_domain_kind', 'admission.rs', 'b: ScalarDomain) -> bool { match (a, b) {', 'b: ScalarDomain) -> bool { if matches!(a, ScalarDomain::Bool) { return true; } match (a, b) {', native=False)
-    add('record_scalar_position', 'producer.rs', 'Some(codes[i])', 'Some(codes[0])', native=False)
+    add('record_scalar_position', 'shared.rs', 'Some(decoded.scalars[i])', 'Some(decoded.scalars[0])', native=False)
     add('record_unknown_binding', 'admission.rs', 'find(schema(d, b.source), b.selector)', 'find(schema(d, b.source), Selector::Field(7))', native=False)
     add('record_duplicate_binding', 'admission.rs', 'if same_binding(d.bindings[j], b)', 'if false', native=False)
     add('record_context_coverage', 'admission.rs', ' + count(d.context) as u128', '', native=False)
     add('record_context_schema', 'admission.rs', '&& ingress::valid(d.context)', '&& true', native=False)
-    add('record_command_refusal', 'producer.rs', 'Err(e) => return Err(Failure::Ingress(1, e)),', 'Err(e) => return Err(Failure::Ingress(0, e)),', native=False)
-    add('record_context_bytes', 'producer.rs', 'ingress::project(raw.context, d.context, 2, meter, &mut trace.reads)', 'ingress::project(raw.command, d.context, 2, meter, &mut trace.reads)', native=False)
-    add('record_meter_prefix', 'producer.rs', 'let mut scratch = Vec::new();', 'meter.used.counters = [0; 8]; let mut scratch = Vec::new();', native=False)
-    add('record_read_prefix', 'producer.rs', 'let state = match ingress::project', 'trace.reads.clear(); let state = match ingress::project', native=False)
-    add('record_refusal_usage', 'producer.rs', 'return Err(Failure::Execution(e));', 'meter.used.counters = [0; 8]; return Err(Failure::Execution(e));', native=False)
-    add('record_binding_order', 'producer.rs', 'let b = d.bindings[i];', 'let b = d.bindings[0];', native=False)
-    path = OWNED/'producer.rs'
+    add('record_command_refusal', 'shared.rs', 'Err(e) => return Err(Failure::Ingress(1, e)),', 'Err(e) => return Err(Failure::Ingress(0, e)),', native=False)
+    add('record_context_bytes', 'shared.rs', 'input::project(raw.context, d.context(), 2, meter, &mut trace.reads)', 'input::project(raw.command, d.context(), 2, meter, &mut trace.reads)', native=False)
+    add('record_meter_prefix', 'shared.rs', 'let mut scratch = Vec::new();', 'meter.used.counters = [0; 8]; let mut scratch = Vec::new();', native=False)
+    add('record_read_prefix', 'shared.rs', 'let state = match input::project', 'trace.reads.clear(); let state = match input::project', native=False)
+    add('record_refusal_usage', 'shared.rs', 'return Err(Failure::Execution(execution_failure(e)));', 'meter.used.counters = [0; 8]; return Err(Failure::Execution(execution_failure(e)));', native=False)
+    add('record_binding_order', 'shared.rs', 'let b = bindings[i];', 'let b = bindings[0];', native=False)
+    path = OWNED/'shared.rs'
     source = (root/path).read_text()
-    context = 'let context = match ingress::project(raw.context, d.context, 2, meter, &mut trace.reads) { Ok(v) => v, Err(e) => return Err(Failure::Ingress(2, e)), };'
+    context = 'let context = match input::project(raw.context, d.context(), 2, meter, &mut trace.reads) { Ok(v) => v, Err(e) => return Err(Failure::Ingress(2, e)), };'
     rows['record_skip_context'] = (path, once(source, context, 'let context = ingress::Decoded { value: ingress::Value::Record(Vec::new()), scalars: Vec::new() };'), 'proof', False)
     # record_before_admission retired in S5: produce takes the admitted BoundCore,
     # so input work before admission is not expressible.

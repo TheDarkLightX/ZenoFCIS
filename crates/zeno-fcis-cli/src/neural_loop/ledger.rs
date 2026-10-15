@@ -15,106 +15,28 @@ use super::request::CheckerIdentity;
 use super::{canonical_json, json_u64, only_fields, tagged_sha256};
 use serde_json::{Value, json};
 
+#[path = "ledger_membership.rs"]
+mod membership;
+
+#[path = "ledger_accounting.rs"]
+mod accounting;
+pub(crate) use accounting::{
+    AccountedLedger, Accounting, Entry, Head, Kind, Ledger, LedgerFault, Stage, account_ledger,
+};
+
 pub(crate) const LEDGER_SCHEMA: &str = "zeno-fcis/transform-ledger/1";
 const LINK_TAG: &str = "zeno-fcis/transform-ledger-link/1";
 /// The digest an empty ledger links from.
 pub(crate) const GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
-/// What a reservation pays for.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Stage {
-    /// One attempt, whatever it turns out to be.
-    Attempt,
-    /// One model call at its worst-case tokens and money.
-    ModelCall {
-        input_tokens: u32,
-        output_tokens: u32,
-        money_micros: u64,
-    },
-    /// One candidate check at its precharged work.
-    Check { work: u64 },
-    /// One resume replay at its precharged work.
-    Replay { work: u64 },
-}
-
-/// One ledger record.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Kind {
-    /// The session opened for exactly this request under this checker.
-    Opened {
-        request_id: String,
-        checker: CheckerIdentity,
-    },
-    /// An allowance reserved before work. `attempt` is `None` for replays.
-    Reserved { attempt: Option<u8>, stage: Stage },
-    /// An attempt's outcome. Reservations stay charged.
-    Settled {
-        attempt: u8,
-        outcome: String,
-        candidate_sha256: Option<String>,
-        cost: Option<Cost>,
-    },
-    /// The incumbent became this checked replacement.
-    Replaced {
-        attempt: u8,
-        candidate_sha256: String,
-        receipt_sha256: String,
-        cost: Cost,
-    },
-    /// The session closed with this stop reason.
-    Closed { reason: String },
-}
-
-/// A chained entry: `digest` commits to `sequence`, `previous` and `kind`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Entry {
-    pub(crate) sequence: u64,
-    pub(crate) previous: String,
-    pub(crate) digest: String,
-    pub(crate) kind: Kind,
-}
-
-/// The position a stored ledger must be at: entry count and last digest.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Head {
-    pub(crate) entries: u64,
-    pub(crate) digest: String,
-}
-
-/// Why stored ledger bytes are not this ledger.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum LedgerFault {
-    /// A line is not a ledger entry of this schema.
-    Unreadable { line: usize },
-    /// Sequence numbers are not `0, 1, 2, ...`.
-    Sequence { line: usize },
-    /// `previous` does not name the preceding digest.
-    Link { line: usize },
-    /// The recorded digest is not the recomputed one.
-    Digest { line: usize },
-    /// The first entry is not `Opened`, or `Opened` recurs.
-    Opened { line: usize },
-    /// An entry follows `Closed`.
-    AfterClose { line: usize },
-}
-
-/// Totals derived from a ledger.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Accounting {
-    pub(crate) attempts: u8,
-    pub(crate) checks: u8,
-    pub(crate) replays: u8,
-    pub(crate) model_calls: u8,
-    pub(crate) tokens_reserved: u64,
-    pub(crate) money_reserved: u64,
-    pub(crate) work_reserved: u64,
-    pub(crate) settled: u8,
-    /// Attempts reserved but never settled: crash-pending, still charged.
-    pub(crate) unresolved: Vec<u8>,
-    /// The latest replacement, if any.
-    pub(crate) replaced: Option<(u8, String, String, Cost)>,
-    pub(crate) closed: Option<String>,
+// Ordinary Default compatibility delegates to the same pure zero constructor.
+// This host trait wrapper is outside the checker harness; it supplies no proof
+// premise to Ledger::accounting, which calls empty_accounting directly.
+impl Default for Accounting {
+    fn default() -> Self {
+        accounting::empty_accounting()
+    }
 }
 
 impl Accounting {
@@ -132,12 +54,6 @@ impl Accounting {
             "complete": self.unresolved.is_empty(),
         })
     }
-}
-
-/// The in-memory ledger: the shell persists each new entry in order.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Ledger {
-    entries: Vec<Entry>,
 }
 
 impl Ledger {
@@ -221,69 +137,6 @@ impl Ledger {
             })
             .collect()
     }
-
-    /// Derives the totals. Reservations count whether or not they settled.
-    pub(crate) fn accounting(&self) -> Accounting {
-        let mut totals = Accounting::default();
-        let mut reserved = Vec::new();
-        let mut settled = Vec::new();
-        for entry in &self.entries {
-            match &entry.kind {
-                Kind::Opened { .. } => {}
-                Kind::Reserved { attempt, stage } => match stage {
-                    Stage::Attempt => {
-                        totals.attempts = totals.attempts.saturating_add(1);
-                        if let Some(attempt) = attempt {
-                            reserved.push(*attempt);
-                        }
-                    }
-                    Stage::ModelCall {
-                        input_tokens,
-                        output_tokens,
-                        money_micros,
-                    } => {
-                        totals.model_calls = totals.model_calls.saturating_add(1);
-                        totals.tokens_reserved = totals
-                            .tokens_reserved
-                            .saturating_add(u64::from(*input_tokens))
-                            .saturating_add(u64::from(*output_tokens));
-                        totals.money_reserved = totals.money_reserved.saturating_add(*money_micros);
-                    }
-                    Stage::Check { work } => {
-                        totals.checks = totals.checks.saturating_add(1);
-                        totals.work_reserved = totals.work_reserved.saturating_add(*work);
-                    }
-                    Stage::Replay { work } => {
-                        totals.replays = totals.replays.saturating_add(1);
-                        totals.work_reserved = totals.work_reserved.saturating_add(*work);
-                    }
-                },
-                Kind::Settled { attempt, .. } => {
-                    totals.settled = totals.settled.saturating_add(1);
-                    settled.push(*attempt);
-                }
-                Kind::Replaced {
-                    attempt,
-                    candidate_sha256,
-                    receipt_sha256,
-                    cost,
-                } => {
-                    totals.replaced = Some((
-                        *attempt,
-                        candidate_sha256.clone(),
-                        receipt_sha256.clone(),
-                        *cost,
-                    ));
-                }
-                Kind::Closed { reason } => totals.closed = Some(reason.clone()),
-            }
-        }
-        totals.unresolved = reserved
-            .into_iter()
-            .filter(|attempt| !settled.contains(attempt))
-            .collect();
-        totals
-    }
 }
 
 fn link_digest(sequence: u64, previous: &str, kind: &Kind) -> String {
@@ -296,6 +149,7 @@ fn link_digest(sequence: u64, previous: &str, kind: &Kind) -> String {
 fn stage_json(stage: &Stage) -> Value {
     match stage {
         Stage::Attempt => json!({"stage": "attempt"}),
+        Stage::Preparation { work } => json!({"stage":"preparation","work":work}),
         Stage::ModelCall {
             input_tokens,
             output_tokens,
@@ -312,6 +166,9 @@ fn stage_json(stage: &Stage) -> Value {
 fn stage_from_json(value: &Value) -> Option<Stage> {
     match value.get("stage")?.as_str()? {
         "attempt" if only_fields(value, &["stage"]) => Some(Stage::Attempt),
+        "preparation" if only_fields(value, &["stage", "work"]) => Some(Stage::Preparation {
+            work: json_u64(value, "work")?,
+        }),
         "model-call"
             if only_fields(
                 value,
@@ -476,3 +333,7 @@ impl LedgerFault {
         json!({"reason": reason, "line": line})
     }
 }
+
+#[cfg(test)]
+#[path = "ledger_accounting_tests.rs"]
+mod accounting_tests;

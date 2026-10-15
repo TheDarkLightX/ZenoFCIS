@@ -1,6 +1,7 @@
 """The control catalogue is executable and fails on stale/ambiguous anchors."""
 import unittest
 import check_catalog_v2 as gate
+from verus_coverage import descriptor_inventory, require_coverage
 
 class Controls(unittest.TestCase):
     def test_control_anchors_and_failure_partition(self):
@@ -16,8 +17,13 @@ class Controls(unittest.TestCase):
     def test_getter_controls_and_selector_target_the_unconsumed_schema_getter(self):
         source=(gate.ROOT/gate.SUBJECT).read_text()
         rows={x[0]:x for x in gate.mutations()}
-        for name in ("weaken_getter_contract","narrow_getter_domain"):
+        expected_clauses = {
+            "weaken_getter_contract": "ensures (result@ == self.view().0) || true,",
+            "narrow_getter_domain": "requires false, ensures result@ == self.view().0,",
+        }
+        for name in expected_clauses:
             _,path,old,new,expected=rows[name]
+            self.assertEqual(new,expected_clauses[name],name)
             self.assertEqual((path,expected),(gate.SUBJECT,"coverage"))
             following=source[source.index(old):].split("\n",2)[1]
             self.assertTrue(following.lstrip().startswith("pub fn original_schema(&self)"),name)
@@ -38,6 +44,63 @@ class Controls(unittest.TestCase):
             intended,refusal,detail=gate.coverage_control(changed(old,new,0),profile,name)
             self.assertIsNotNone(refusal)
             self.assertFalse(intended,name)
+    def cached_policy_fixture(self):
+        namespace = "catalog_v2::"
+        prefix = namespace + "execution_v2::catalog::"
+        descriptor = namespace + "execution_v2::composition::descriptor::"
+        def function(name, *, mode="Exec", requires="", ensures="true", body="(42)", params=""):
+            return (f"(Function (Fun :path {name}) :mode {mode} :typ_bounds () "
+                    f":params ({params}) :ret () :require ({requires}) :ensure ({ensures}) "
+                    f":d () :body {body})")
+        source = function(descriptor + "DescriptorData::model", mode="Spec", ensures="", body="None")
+        declaration = function(descriptor + "DescriptorData::project", body="None")
+        source += declaration
+        source += "".join(function(descriptor + f"impl&%{index}::{method}", mode=mode,
+                                   ensures="" if mode == "Spec" else "true")
+                          for index in (2, 3)
+                          for method, mode in (("model", "Spec"), ("project", "Exec")))
+        target = prefix + "bind_original"
+        other = prefix + "bind_checked"
+        source += function(target) + function(other)
+        raw, _ = descriptor_inventory(source, namespace, descriptor)
+        bodies = [name for name, row in raw.items() if row["mode"] == "Exec"]
+        functions, declarations = descriptor_inventory(source, namespace, descriptor, tuple(bodies))
+        profile = {"namespace": namespace, "functions": functions,
+                   "abstract_declarations": declarations, "body_covered_functions": bodies}
+        require_coverage(source, profile)
+        drift = source.replace(declaration, function(descriptor + "DescriptorData::project",
+                                                    ensures="changed-read-id", body="None"))
+        return source, drift, profile, target, other, function
+
+    def test_cached_policy_body_control_is_independent_of_first_refusal_message(self):
+        source, drift, profile, target, _, function = self.cached_policy_fixture()
+        for base in (source, drift):
+            with self.subTest(descriptor_drift=base == drift):
+                changed = base.replace(function(target), function(target, body="(cached-policy 42)"))
+                caught, refusal, detail = gate.coverage_control(changed, profile, "cached_policy_before_admission")
+                self.assertTrue(caught)
+                self.assertEqual(detail, {"function": target, "field": "body_sha256", "intended_refusal": True})
+                if base == drift:
+                    self.assertEqual(refusal, "translated descriptor declarations changed")
+
+    def test_cached_policy_requires_exact_inventory_and_unchanged_contracts(self):
+        source, drift, profile, target, other, function = self.cached_policy_fixture()
+        original = function(target)
+        changed = function(target, body="(cached-policy 42)")
+        for base in (source, drift):
+            for reason, refused in {
+                    "no body delta": base,
+                    "unrelated body delta": base.replace(function(other), function(other, body="(43)")),
+                    "changed signature": base.replace(original, function(target, body="(43)", params="changed")),
+                    "changed requires": base.replace(original, function(target, body="(43)", requires="false")),
+                    "changed ensures": base.replace(original, function(target, body="(43)", ensures="false")),
+                    "missing target": base.replace(original, ""),
+                    "missing other": base.replace(original, changed).replace(function(other), ""),
+                    "added other": base.replace(original, changed) + function(other + "_extra"),
+            }.items():
+                with self.subTest(descriptor_drift=base == drift, reason=reason):
+                    self.assertFalse(gate.coverage_control(refused, profile, "cached_policy_before_admission")[0])
+
     def test_stale_or_ambiguous_control_is_not_accepted(self):
         for source in ("missing", "twice twice"):
             with self.assertRaises(ValueError):

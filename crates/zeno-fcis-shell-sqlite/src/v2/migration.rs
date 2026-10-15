@@ -5,7 +5,9 @@
 //! A [`Migration`](crate::v2::migration::Migration) gives every field of the
 //! new state record a value from the old state: an old field's value,
 //! carried over or renamed; a constant, the default of an added field; or a
-//! total table over one old field's values, one part of a split. Values are
+//! total table over one old field's values, or an immutable library finite
+//! [`Program`](zeno_fcis_synthesis::finite::Program) over old record fields,
+//! one part of a split. Values are
 //! the numbers decision examples write: 0 or 1 for a Boolean, the integer
 //! itself, a variant's ID.
 //!
@@ -30,8 +32,8 @@
 //!   contract's publication over `m(s)` gives the same observations as the
 //!   old contract's over `s`: the same technical refusal, or the same
 //!   decision class and reason, the same deliveries in order (lane, ordinal,
-//!   channel, destination, payload and idempotency value, as the library's
-//!   candidate holds them), and for a commit a successor state equal to `m`
+//!   channel, destination and idempotency value, with exact payload bytes or
+//!   the explicit lossless payload representation map), and for a commit a successor state equal to `m`
 //!   of the old successor, byte for byte as the store would hold it.
 //!
 //! A migration is checked only when the whole domain, every state, command
@@ -40,6 +42,15 @@
 //! cap of `zeno-fcis contract review`. A larger domain is refused as
 //! inconclusive: no sampling, boundary set or solver result stands in for
 //! the enumeration.
+//! [`simulate_with_payloads`](crate::v2::migration::simulate_with_payloads)
+//! additionally requires a total,
+//! injective map for every changed payload over its complete old record
+//! domain, capped at
+//! [`MAX_PAYLOAD_TUPLES`](crate::v2::migration::MAX_PAYLOAD_TUPLES) records and
+//! 64 MiB of retained
+//! canonical results. Every declared source valuation of a split program
+//! must evaluate successfully, including valuations excluded by state laws.
+//! Historical delivery bytes and owning contracts are never mapped or rewritten.
 //!
 //! What a successful simulation establishes, with the old genesis mapped and
 //! every kept state covered: every state the old contract can reach maps to
@@ -55,24 +66,29 @@
 //! payload is then kept and only its envelope is framed again under the new
 //! schema ([`reframe`](crate::v2::migration::reframe)).
 //!
-//! Pure: no SQLite, I/O, clock or threads. The file depends on
-//! `zeno-fcis-synthesis` and its sibling `behaviour` alone, so the CLI
-//! compiles both from these sources and runs exactly this simulation in
-//! `zeno-fcis contract evolve`.
+//! Pure: no SQLite, I/O, clock or threads. The CLI calls this library's
+//! simulation directly in `zeno-fcis contract evolve`. State fields may be
+//! omitted only when the complete forward simulation preserves every declared
+//! observation; payload mappings must retain every source field and be injective.
 
 use std::fmt;
 
+use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_synthesis::finite::{
-    V2InputField as InputField, V2InputLeaf as Leaf, V2Resource as Resource,
+    Domain as ScalarDomain, Program, V2InputField as InputField, V2InputLeaf as Leaf,
+    V2Resource as Resource,
     canonical_v2::{envelope, output},
     project_record_v2,
-    v2_authority::{self as authority, Authority, PublicationOutcome},
+    v2_authority::{self as authority, Authority, PublicationOutcome, WireDelivery},
     v2_catalog::BoundCatalog,
     v2_composition::{self as c, FrameBinding, Framing, Raw, Schema},
     v2_zero_limits,
 };
 
 use super::behaviour;
+
+mod payload;
+pub use payload::{MAX_PAYLOAD_TUPLES, Payload, PayloadHop, encode_with_payloads, migrate_payload};
 
 /// The cap on the input tuples one simulation enumerates: `zeno-fcis
 /// contract review`'s, 2^20.
@@ -94,6 +110,15 @@ pub enum Source<'m> {
         field: u16,
         /// The pairs.
         cases: &'m [(i128, i128)],
+    },
+    /// An immutable library program over the named old fields, in input
+    /// order. Admission checks every source valuation, including states
+    /// excluded by state laws. Traps and exhausted bounds admit nothing.
+    Program {
+        /// Strictly increasing old field IDs, one per program input.
+        fields: &'m [u16],
+        /// One-result closed program, executed by the library evaluator.
+        program: &'m Program,
     },
 }
 
@@ -130,8 +155,20 @@ impl Migration<'_> {
     /// # Errors
     /// `Range` for more than `u32::MAX` fields or pairs.
     pub fn encode(&self) -> Result<Vec<u8>, Range> {
+        if self
+            .fields
+            .iter()
+            .any(|target| matches!(target.source, Source::Program { .. }))
+        {
+            return encode_with_payloads(self, &[]);
+        }
         let mut bytes = MAGIC.to_vec();
         bytes.push(FORMAT);
+        self.encode_fields(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    fn encode_fields(&self, bytes: &mut Vec<u8>) -> Result<(), Range> {
         bytes.extend_from_slice(&count(self.fields.len())?);
         for target in self.fields {
             bytes.extend_from_slice(&target.id.to_be_bytes());
@@ -153,9 +190,22 @@ impl Migration<'_> {
                         bytes.extend_from_slice(&new.to_be_bytes());
                     }
                 }
+                Source::Program { fields, program } => {
+                    bytes.push(3);
+                    bytes.extend_from_slice(&count(fields.len())?);
+                    for field in fields {
+                        bytes.extend_from_slice(&field.to_be_bytes());
+                    }
+                    let encoded = program
+                        .value()
+                        .and_then(|value| value.canonical_bytes())
+                        .map_err(|_| Range)?;
+                    bytes.extend_from_slice(&count(encoded.len())?);
+                    bytes.extend_from_slice(&encoded);
+                }
             }
         }
-        Ok(bytes)
+        Ok(())
     }
 }
 
@@ -187,8 +237,8 @@ pub enum Defect {
         /// The old field named.
         field: u16,
     },
-    /// The old state field is not carried into the new state: a migration
-    /// renames, adds and splits fields, and drops none.
+    /// An old payload field is unused by a payload map, which must carry every
+    /// old field. State drops are instead judged by forward simulation.
     Dropped {
         /// The old field.
         field: u16,
@@ -196,6 +246,12 @@ pub enum Defect {
     /// A table's pairs are not in strictly increasing order of old value.
     Table {
         /// The new field whose table it is.
+        field: u16,
+    },
+    /// An expression's input binding, output shape, totality or result domain
+    /// is invalid, or its source domain exceeds the enumeration cap.
+    Program {
+        /// The new field whose expression it is.
         field: u16,
     },
 }
@@ -211,11 +267,15 @@ impl fmt::Display for Defect {
             Self::Source { field } => write!(f, "old state field {field} does not exist"),
             Self::Dropped { field } => write!(
                 f,
-                "old state field {field} is not carried into the new state, and a migration drops no field"
+                "old payload field {field} is not carried into the new payload; a payload map must carry every old field"
             ),
             Self::Table { field } => write!(
                 f,
                 "the table of new field {field} does not list its old values in strictly increasing order"
+            ),
+            Self::Program { field } => write!(
+                f,
+                "the expression of new field {field} has invalid bindings, a trap or an out-of-domain result, or more than {MAX_INPUT_TUPLES} source tuples"
             ),
         }
     }
@@ -289,6 +349,12 @@ pub enum Unsimulated {
     Shape,
     /// The migration does not fit the two state schemas.
     Migration(Defect),
+    /// The payload mapping for this channel is missing, unexpected, malformed,
+    /// partial, not total, or cannot represent the supported finite schema.
+    Payload {
+        /// The affected channel (zero for invalid channel ordering).
+        channel: u32,
+    },
     /// The migration gives this new field a value outside its domain, or a
     /// table has no pair for the old value, at the state of tuple `ordinal`.
     Value {
@@ -328,6 +394,8 @@ impl fmt::Display for Unsimulated {
                 "the contracts' roots are not flat records of finite values, or their command or context schemas differ",
             ),
             Self::Migration(defect) => write!(f, "the migration does not fit the state schemas: {defect}"),
+            Self::Payload { channel } => write!(f,
+                "channel {channel} needs an explicit total payload mapping between supported finite record schemas; the map is missing, invalid, partial or exceeds its bound"),
             Self::Value { field, ordinal } => write!(
                 f,
                 "the migration gives new field {field} no value in its domain at the state of input tuple {ordinal}"
@@ -490,7 +558,17 @@ impl<'d> Root<'d> {
     /// The envelope of the value with these codes.
     fn frame(&self, codes: &[i64]) -> Option<Vec<u8>> {
         let max = usize::try_from(self.binding.max_bytes).ok()?;
-        let payload = if self.record {
+        let payload = self.payload(codes)?;
+        output::encode_envelope(self.binding.root, &self.binding.schema, &payload, max).ok()
+    }
+
+    /// Exact canonical value bytes, without a state envelope.
+    fn payload(&self, codes: &[i64]) -> Option<Vec<u8>> {
+        let max = usize::try_from(self.binding.max_bytes).ok()?;
+        if codes.len() != self.leaves.len() {
+            return None;
+        }
+        if self.record {
             let fields = self
                 .ids
                 .iter()
@@ -503,11 +581,10 @@ impl<'d> Root<'d> {
                     })
                 })
                 .collect::<Option<Vec<_>>>()?;
-            output::encode_record(&fields, max).ok()?
+            output::encode_record(&fields, max).ok()
         } else {
-            output::encode_atom(atom(self.leaves.first()?, *codes.first()?)?, max).ok()?
-        };
-        output::encode_envelope(self.binding.root, &self.binding.schema, &payload, max).ok()
+            output::encode_atom(atom(self.leaves.first()?, *codes.first()?)?, max).ok()
+        }
     }
 
     /// The codes of a record envelope's fields; `None` unless `bytes` is a
@@ -523,6 +600,14 @@ impl<'d> Root<'d> {
             self.binding.max_bytes,
         )
         .ok()?;
+        self.decode_payload(payload.bytes(), fields)
+    }
+
+    /// Decode through the same library record projection as state ingress.
+    fn decode_payload(&self, bytes: &[u8], fields: &[InputField]) -> Option<Vec<i64>> {
+        if !self.record {
+            return None;
+        }
         let limits = [
             Resource::Read,
             Resource::Write,
@@ -537,7 +622,7 @@ impl<'d> Root<'d> {
         .fold(v2_zero_limits(), |limits, resource| {
             limits.with_limit(resource, u64::MAX)
         });
-        let (codes, _, _) = project_record_v2(payload.bytes(), fields, limits).into_parts();
+        let (codes, _, _) = project_record_v2(bytes, fields, limits).into_parts();
         let codes = codes.ok()?;
         (codes.len() == self.leaves.len()).then_some(codes)
     }
@@ -649,6 +734,19 @@ fn same_shape(old: &Root<'_>, new: &Root<'_>) -> bool {
 
 /// Checks that `migration` fits the two state records.
 fn fits(migration: &Migration<'_>, old: &Root<'_>, new: &Root<'_>) -> Result<(), Defect> {
+    fits_shape(migration, old, new)?;
+    for (target, leaf) in migration.fields.iter().zip(&new.leaves) {
+        if let Source::Program { fields, program } = target.source {
+            program_total(fields, program, old, leaf)
+                .ok_or(Defect::Program { field: target.id })?;
+        }
+    }
+    Ok(())
+}
+
+/// Structural validation for applying already-admitted mappings. It creates
+/// no simulation/admission witness and does not repeat whole-domain execution.
+fn fits_shape(migration: &Migration<'_>, old: &Root<'_>, new: &Root<'_>) -> Result<(), Defect> {
     if let Some(pair) = migration
         .fields
         .windows(2)
@@ -669,8 +767,22 @@ fn fits(migration: &Migration<'_>, old: &Root<'_>, new: &Root<'_>) -> Result<(),
     if let Some(target) = targets.next() {
         return Err(Defect::Unknown { field: target.id });
     }
-    let mut used = vec![false; old.ids.len()];
     for target in migration.fields {
+        if let Source::Program { fields, program } = target.source {
+            if fields.windows(2).any(|pair| pair[0] >= pair[1])
+                || program.inputs().len() != fields.len()
+                || program.outputs().len() != 1
+            {
+                return Err(Defect::Program { field: target.id });
+            }
+            for field in fields {
+                old.ids
+                    .iter()
+                    .position(|id| id == field)
+                    .ok_or(Defect::Source { field: *field })?;
+            }
+            continue;
+        }
         let field = match target.source {
             Source::Field(field) => field,
             Source::Table { field, cases } => {
@@ -680,18 +792,74 @@ fn fits(migration: &Migration<'_>, old: &Root<'_>, new: &Root<'_>) -> Result<(),
                 field
             }
             Source::Value(_) => continue,
+            Source::Program { .. } => return Err(Defect::Program { field: target.id }),
         };
-        let position = old
-            .ids
+        old.ids
             .iter()
             .position(|id| *id == field)
             .ok_or(Defect::Source { field })?;
-        used[position] = true;
     }
-    match old.ids.iter().zip(&used).find(|(_, used)| !**used) {
-        Some((field, _)) => Err(Defect::Dropped { field: *field }),
-        None => Ok(()),
+    Ok(())
+}
+
+/// Payload maps retain every old field in addition to being injective over
+/// their complete domain. State maps may forget fields only when admitted by
+/// the complete forward simulation.
+fn carries_every_field(migration: &Migration<'_>, old: &Root<'_>) -> Result<(), Defect> {
+    for field in &old.ids {
+        let used = migration.fields.iter().any(|target| match target.source {
+            Source::Field(source) | Source::Table { field: source, .. } => source == *field,
+            Source::Program { fields, .. } => fields.contains(field),
+            Source::Value(_) => false,
+        });
+        if !used {
+            return Err(Defect::Dropped { field: *field });
+        }
     }
+    Ok(())
+}
+
+/// Every declared source valuation is checked independently of reachability
+/// and state laws. The immutable Program has already passed library graph
+/// admission; only the actual library evaluator computes its results.
+fn program_total(fields: &[u16], program: &Program, old: &Root<'_>, target: &Leaf) -> Option<()> {
+    if fields.windows(2).any(|pair| pair[0] >= pair[1])
+        || program.inputs().len() != fields.len()
+        || program.outputs().len() != 1
+        || matches!(program.outputs()[0], ScalarDomain::Bool) != matches!(target, Leaf::Bool)
+    {
+        return None;
+    }
+    let positions = fields
+        .iter()
+        .map(|id| old.ids.iter().position(|old| old == id))
+        .collect::<Option<Vec<_>>>()?;
+    let root = Root {
+        record: true,
+        ids: fields.to_vec(),
+        leaves: positions
+            .iter()
+            .map(|position| old.leaves[*position])
+            .collect(),
+        binding: old.binding,
+    };
+    let size = root.size()?;
+    if size > u128::from(MAX_INPUT_TUPLES) {
+        return None;
+    }
+    let mut codes = root.first();
+    for _ in 0..size {
+        let input = root
+            .leaves
+            .iter()
+            .zip(&codes)
+            .map(|(leaf, value)| i64::try_from(number(leaf, *value)?).ok())
+            .collect::<Option<Vec<_>>>()?;
+        let result = program.evaluate(&input).ok()?;
+        code(target, i128::from(*result.first()?))?;
+        root.next(&mut codes);
+    }
+    Some(())
 }
 
 /// The new state's codes for the old state's, or the new field that gets no
@@ -720,6 +888,13 @@ fn apply(
                         .ok()
                         .map(|index| cases[index].1)
                 }),
+                Source::Program { fields, program } => fields
+                    .iter()
+                    .map(|field| i64::try_from(value(*field)?).ok())
+                    .collect::<Option<Vec<_>>>()
+                    .and_then(|input| program.evaluate(&input).ok())
+                    .and_then(|output| output.first().copied())
+                    .map(i128::from),
             };
             number
                 .and_then(|number| code(leaf, number))
@@ -748,7 +923,7 @@ pub fn migrate_state(
     if !old.record || !new.record {
         return Err(Unsimulated::Shape);
     }
-    fits(migration, &old, &new).map_err(Unsimulated::Migration)?;
+    fits_shape(migration, &old, &new).map_err(Unsimulated::Migration)?;
     let fields = state_fields(from).ok_or(Unsimulated::Shape)?;
     let codes = old.decode(state, fields).ok_or(Unsimulated::Shape)?;
     let migrated = apply(migration, &old, &new, &codes)
@@ -762,6 +937,7 @@ fn differs(
     old: &PublicationOutcome<'_>,
     new: &PublicationOutcome<'_>,
     migrate: impl Fn(&[u8]) -> Option<Vec<u8>>,
+    delivery: impl Fn(&WireDelivery, &WireDelivery) -> bool,
 ) -> Option<Observation> {
     let decisions = |old: &authority::Evaluation<'_>, new: &authority::Evaluation<'_>| match (
         old.result(),
@@ -770,8 +946,6 @@ fn differs(
         (Ok(old), Ok(new)) => {
             if old.class() != new.class() || old.reason() != new.reason() {
                 Some(Observation::Decision)
-            } else if old.effects() != new.effects() || old.outbox() != new.outbox() {
-                Some(Observation::Deliveries)
             } else {
                 None
             }
@@ -780,12 +954,26 @@ fn differs(
     };
     match (old, new) {
         (PublicationOutcome::Commit(old), PublicationOutcome::Commit(new)) => {
-            decisions(old.evaluation(), new.evaluation()).or_else(|| {
-                (migrate(old.poststate()).as_deref() != Some(new.poststate()))
-                    .then_some(Observation::Successor)
-            })
+            let lane = |old: &[WireDelivery], new: &[WireDelivery]| {
+                old.len() == new.len() && old.iter().zip(new).all(|(old, new)| delivery(old, new))
+            };
+            decisions(old.evaluation(), new.evaluation())
+                .or_else(|| {
+                    (!lane(old.effects(), new.effects()) || !lane(old.outbox(), new.outbox()))
+                        .then_some(Observation::Deliveries)
+                })
+                .or_else(|| {
+                    (migrate(old.poststate()).as_deref() != Some(new.poststate()))
+                        .then_some(Observation::Successor)
+                })
         }
-        (PublicationOutcome::Reject(old), PublicationOutcome::Reject(new)) => decisions(old, new),
+        (PublicationOutcome::Reject(old), PublicationOutcome::Reject(new)) => decisions(old, new)
+            .or_else(|| match (old.result(), new.result()) {
+                (Ok(old), Ok(new)) => (old.effects() != new.effects()
+                    || old.outbox() != new.outbox())
+                .then_some(Observation::Deliveries),
+                _ => Some(Observation::Decision),
+            }),
         (
             PublicationOutcome::Refused { error: old, .. },
             PublicationOutcome::Refused { error: new, .. },
@@ -811,6 +999,23 @@ pub fn simulate(
     to_authority: &Authority<'_>,
     migration: &Migration<'_>,
 ) -> Result<Simulated, Unsimulated> {
+    simulate_with_payloads(from, from_authority, to, to_authority, migration, &[])
+}
+
+/// Forward simulation through explicit total payload record mappings. This
+/// changes only the relation between old and new publications; historical
+/// SQLite delivery records and their replay/acknowledgment bytes stay exact.
+///
+/// # Errors
+/// As [`simulate`], plus a missing, invalid, partial or over-cap payload map.
+pub fn simulate_with_payloads(
+    from: &BoundCatalog<'_>,
+    from_authority: &Authority<'_>,
+    to: &BoundCatalog<'_>,
+    to_authority: &Authority<'_>,
+    migration: &Migration<'_>,
+    payloads: &[Payload<'_>],
+) -> Result<Simulated, Unsimulated> {
     let [old_state, old_command, old_context] = roots(from).ok_or(Unsimulated::Shape)?;
     let [new_state, new_command, new_context] = roots(to).ok_or(Unsimulated::Shape)?;
     if !old_state.record
@@ -821,6 +1026,7 @@ pub fn simulate(
         return Err(Unsimulated::Shape);
     }
     fits(migration, &old_state, &new_state).map_err(Unsimulated::Migration)?;
+    payload::validate(from, to, payloads)?;
     let sizes = [old_state.size(), old_command.size(), old_context.size()];
     let size = sizes
         .iter()
@@ -912,7 +1118,9 @@ pub fn simulate(
                         command: &new_c,
                         context: &new_x,
                     });
-                    if let Some(observation) = differs(&old, &new, migrate) {
+                    if let Some(observation) = differs(&old, &new, migrate, |old, new| {
+                        payload::delivery_agrees(from, to, payloads, old, new)
+                    }) {
                         return Err(Unsimulated::Differs {
                             observation,
                             ordinal: position,
@@ -1018,9 +1226,12 @@ pub fn agrees(
                         command: &c,
                         context: &x,
                     });
-                    if let Some(observation) =
-                        differs(&along, &direct, |bytes| Some(bytes.to_vec()))
-                    {
+                    if let Some(observation) = differs(
+                        &along,
+                        &direct,
+                        |bytes| Some(bytes.to_vec()),
+                        payload::exact_delivery,
+                    ) {
                         return Err(Unsimulated::Differs {
                             observation,
                             ordinal: position,
@@ -1048,6 +1259,26 @@ pub fn agrees(
     Ok(tuples)
 }
 
+/// Checks both the state observations and the full payload representation
+/// route of a shortcut. Every map is admitted for totality and injectivity;
+/// each mapped channel's entire old payload domain commutes with the composed
+/// consecutive route. Identity-only channels require exact linked schemas.
+///
+/// # Errors
+/// As [`agrees`], or any missing, invalid, over-cap or disagreeing payload map.
+pub fn agrees_with_payloads(
+    from: &BoundCatalog<'_>,
+    to: &BoundCatalog<'_>,
+    to_authority: &Authority<'_>,
+    shortcut: &Migration<'_>,
+    payloads: &[Payload<'_>],
+    state_route: impl Fn(&[u8]) -> Option<Vec<u8>>,
+    payload_route: &[PayloadHop<'_, '_>],
+) -> Result<u64, Unsimulated> {
+    payload::agrees_route(from, to, payloads, payload_route)?;
+    agrees(from, to, to_authority, shortcut, state_route)
+}
+
 /// The state, command and context field values of tuple `ordinal` in the
 /// enumeration of `from`'s input domain, each as field IDs with numbers; a
 /// scalar root has field 0. `None` beyond the domain.
@@ -1070,7 +1301,7 @@ pub fn inputs_at(from: &BoundCatalog<'_>, ordinal: u64) -> Option<[Vec<(u16, i12
 /// complete canonical policy, with `from`'s original schema and schema
 /// commitments in place of its own, is byte for byte `from`'s policy, so
 /// every descriptor field, channel link and framing size limit is `from`'s.
-/// `zeno-fcis contract diff` decides the rename kind with this comparison.
+/// `zeno-fcis contract diff` calls this function to decide the rename kind.
 ///
 /// # Errors
 /// `Range` when the policy cannot be encoded.
@@ -1211,9 +1442,25 @@ mod tests {
             id: 2,
             source: Source::Field(1),
         };
+        let drops_second = [carry(1), twice, default];
+        assert_eq!(fit(&drops_second), Ok(()));
         assert_eq!(
-            fit(&[carry(1), twice, default]),
+            carries_every_field(
+                &Migration {
+                    fields: &drops_second
+                },
+                &old
+            ),
             Err(Defect::Dropped { field: 2 })
+        );
+        assert_eq!(
+            carries_every_field(
+                &Migration {
+                    fields: &[carry(1), carry(2), default]
+                },
+                &old
+            ),
+            Ok(())
         );
         let unordered = [(1, 0), (0, 1)];
         let table = Target {

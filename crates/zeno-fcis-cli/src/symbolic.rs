@@ -23,21 +23,5 @@ pub(crate) mod smt;
 pub(crate) mod testing;
 pub(crate) mod verdict;
 
-/// A construct the encoding does not translate. A check that meets one is
-/// inconclusive.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Unsupported {
-    reason: String,
-}
-
-impl Unsupported {
-    pub(crate) fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
-        }
-    }
-
-    pub(crate) fn reason(&self) -> &str {
-        &self.reason
-    }
-}
+mod unsupported;
+pub(crate) use unsupported::Unsupported;

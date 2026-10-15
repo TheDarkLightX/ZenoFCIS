@@ -40,8 +40,9 @@
       Each example below is a template exactly as <code>zeno-fcis new</code>
       writes it, built for WebAssembly without its SQLite shell. Its contract,
       authority and decision and law evaluators are the same source that decides
-      on a server. The library's functional core is formally verified against
-      its stated specifications; the policy must still express the intended
+      on a server. The library's functional core has machine-checked proofs
+      against its stated specifications, within a stated scope and named
+      trusted base; the policy must still express the intended
       rules, and deployment assumptions remain explicit.
       The page only supplies each request and its context, including any time,
       and shows what the authority returned. The first section has already
@@ -77,8 +78,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -92,7 +94,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The time and admin flag are supplied inputs. A deployment must establish the caller’s permissions and trusted time.</li>
@@ -129,8 +131,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -144,7 +147,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The caller and provider responses are supplied inputs. A deployment must authenticate them before admission.</li>
@@ -177,8 +180,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -192,7 +196,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The operator flag is a supplied input. The core enforces the guard; the host must establish the operator’s identity.</li>
@@ -228,8 +232,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -243,7 +248,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The identity tier, reviewer flag, amount band and risk rating are supplied inputs. A deployment must establish them before admission.</li>
@@ -278,8 +283,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -293,7 +299,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The caller and alarm are supplied inputs. The controller checks behavior given an alarm; it does not establish whether the alarm is correct.</li>
@@ -333,8 +339,9 @@
             diagnostics.
           </li>
           <li>
-            The library's functional core is verified against its formal
-            specifications with a named trusted base. The authored policy
+            The library's functional core has machine-checked proofs against its
+            formal specifications, within a stated scope and named trusted
+            base. The authored policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -348,7 +355,7 @@
           </li>
           <li>
             Earlier synthesis, model and solver evidence is retained in the
-            template's README and private historical oracle. The hand-written
+            template's README and the kernel-law oracle tests. The earlier
             adapters described there do not execute this page's V2 decisions.
           </li>
           <li>The caller, time, oracle price and its time, and model identity are supplied inputs. A deployment must establish them; the guard bounds committed swaps against the supplied oracle, not the market.</li>

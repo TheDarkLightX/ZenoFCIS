@@ -308,12 +308,18 @@ so for this finite domain it checks every decision the application can make.
 
 ## How ZenoFCIS built and checked this
 
-Every command below was run on 2026-09-24 from a ZenoFCIS checkout with the
-CLI built (`cargo +1.97.1 build -p zeno-fcis-cli --locked`; `zeno-fcis
---version` prints `zeno-fcis 1.1.0`), Rust 1.97.1, Python 3.12.3, and Node.js
-v22.23.1, in a fresh copy of this template made with
-`zeno-fcis new gateway --template compliance-gateway`. Outputs are quoted as
-observed; long JSON is reduced to the fields named.
+The current command observations below were recorded on 2026-10-12 in a
+fresh CLI-generated application bound to the matching source checkout,
+using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1, Python 3.12.3, and
+Node.js v22.23.1.
+The common pinned-tool admission below was run once with the identical
+local tools manifest used by all three examples. These are local command
+observations, not release-binary qualification. Earlier native authoring
+counterexamples and explanations below retain their historical scope.
+The current application uses library-owned Authority with `src/v2_contract.rs`;
+these authoring and synthesis records do not qualify the whole runtime.
+Application commands run from this application's directory; tool admission
+is shared.
 
 1. **Check the authored project.** Every law and claim can constrain a
    transition, and every path names a declared field.
@@ -323,13 +329,25 @@ observed; long JSON is reduced to the fields named.
    checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=e296669471dc86b7701dd1685a4ad0603dedf0bca9235b34a95d465efe13620b
    ```
 
+   The current run also printed what each counted obligation asks for,
+   after the summary. These observed lines describe evidence this authoring
+   check does not establish; they are not errors:
+
+   ```text
+   unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
+     complete-footprint: component 400 needs evidence that it reads and writes only what its footprint declares
+     sequential-parity: the merge needs evidence that the merged components decide as they would one after another
+   ```
+
 2. **Generate the bindings.** `cargo build` runs `build.rs`, which first
    loads `rules.txt` through `src/rules.rs` and stops on a rule base that is
    not consistent, total, and live. It then lowers `project.zeno` with the
    scalar bounds and writes the typed schema (`generated`) and project
    bindings (`bindings`): the record types, the reason IDs, and the
    `read_strikes`, `update_strikes`, and `enqueue_channel_300`/`301` staging
-   methods that `src/program.rs` calls. Nothing in `src/` restates them.
+   methods retained for the original native adapter. `src/program.rs`
+   now records that adapter's retirement; the checked V2 application uses
+   its separate declaration and admission route.
 
 3. **Write the contract from the rule base.**
 
@@ -345,7 +363,7 @@ observed; long JSON is reduced to the fields named.
 
    ```text
    $ zeno-fcis synth run synthesis.json --out synthesized --check
-   {"status":"current","semantic":"complete-finite","runtime_conformance":"not-run", "manifest":{"status":"selected","input_coverage":2880,"assignments_evaluated":14,"certificate":"281b9f68bae317c212da78e9ad64995d54ae0fb35a18815e17460cb1c9396ebc", ...}, ...}
+   {"manifest":{"assignments_evaluated":14,"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","input_coverage":2880,"status":"selected"},"runtime_conformance":"not-run","semantic":"complete-finite","status":"current"}
    ```
 
 5. **Replay the emitted source in three languages.** Each target ran all 2,880
@@ -353,16 +371,29 @@ observed; long JSON is reduced to the fields named.
 
    ```text
    $ zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
-   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"rustc 1.97.1 (8bab26f4f 2026-07-14)", ...}, ...}
+   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"rustc 1.97.1 (8bab26f4f 2026-07-14)"}}
    $ zeno-fcis synth run synthesis.json --target python --out python-step
    $ zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
-   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"Python 3.12.3", ...}, ...}
+   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"Python 3.12.3"}}
    $ zeno-fcis synth run synthesis.json --target javascript --out javascript-step
    $ zeno-fcis synth verify synthesis.json --target javascript --out javascript-step --receipt javascript-conformance.json
-   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"v22.23.1", ...}, ...}
+   {"certificate":"c1ec63937cbfe901beeead25044c4adf9b9734e78f4f00963d71797b94d507b3","inputs_checked":2880,"status":"passed","stdout_sha256":"098d314653a890b5e323f58ba9225726f6096298684a2ac436b99478916f365d","tool":{"version":"v22.23.1"}}
    ```
 
-6. **Check the decision code statically.**
+6. **Observe the static detector in the generated package context.**
+
+   The 2.3.0 command refused the compiler-tool attribute `rustfmt::skip`
+   because the application's source-binding Cargo manifest replaces
+   dependency sources. No current purity pass is claimed:
+
+   ```text
+   $ zeno-fcis purity src/program.rs src/laws.rs src/rules.rs synthesized/transition.rs
+   purity: violations (1 errors, 0 warnings) in 4 files
+   (exit 1)
+   ```
+
+   The earlier 1.1.0 native run recorded the following clean result,
+   retained as historical evidence:
 
    ```text
    $ zeno-fcis purity src/program.rs src/laws.rs src/rules.rs synthesized/transition.rs
@@ -397,7 +428,7 @@ observed; long JSON is reduced to the fields named.
    (exit 2)
    ```
 
-   Z3 also answered `unsat`. RC3 has no Z3 proof checker, so the run is
+   Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
    recorded as blocked evidence, with exit code 2. There is no Lean export for
    inductive claims yet, so `--backend lean` selects nothing.
 
@@ -412,12 +443,14 @@ observed; long JSON is reduced to the fields named.
    (exit 2)
    ```
 
-   The step alone says nothing about this application. `tests/claims.rs`
-   checks the base case, the observer, and the law manifest, which the
-   library's guide to inductive claims requires.
+   The step alone says nothing about this application. The original
+   `tests/claims.rs` checks of the base case, observer and law manifest are
+   retained in the nonpublished reference suite; these fresh generated-app
+   commands do not record a run of that suite.
 
-8. **Test the application.** `cargo +1.97.1 test --offline` runs the tests
-   listed under [What is checked](#what-is-checked). The library's gate,
+8. **Test the generated application.** `cargo +1.97.1 test --locked --offline`
+   completed with 6 tests passed and no failures. This does not run the
+   original full native oracle grids. The library's gate,
    `python3 tools/check_generated_application.py`, repeats steps 4, 5, and 8
    on a fresh copy, with a separate Python evaluation of `rules.txt` as the
    oracle for the vectors, and compares the demonstration's summary.

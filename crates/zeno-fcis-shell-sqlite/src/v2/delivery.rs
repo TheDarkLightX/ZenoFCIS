@@ -12,6 +12,7 @@
 //! run-time check.
 
 use std::fmt;
+use zeno_fcis_synthesis::finite::v2_composition::{Descriptor, DescriptorData};
 
 use rusqlite::{OptionalExtension, TransactionBehavior};
 use zeno_fcis_codec::{DecodeLimits, Hash32, decode_value};
@@ -23,7 +24,7 @@ use super::{
     load_commit, load_delivery, parse_hash, previous_state,
 };
 
-impl<'a, 'p> V2SqliteShell<'a, 'p> {
+impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
     /// Issues the oldest pending delivery, in commit order, as a [`Pending`]
     /// token, after replaying its owning commit under the contract of that
     /// commit's history segment. `None` when every delivery is acknowledged.
@@ -36,7 +37,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     /// A store changed outside this handle refuses as its audit does, and a
     /// store that no longer runs this handle's current contract as
     /// `Error::Identity`.
-    pub fn next_pending(&mut self) -> Result<Option<Pending<'_, 'a, 'p>>, Error> {
+    pub fn next_pending(&mut self) -> Result<Option<Pending<'_, 'a, 'p, D>>, Error> {
         self.synchronize()?;
         let tx = self
             .connection
@@ -74,7 +75,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     /// ID, `Error::AlreadyAcknowledged` when it holds it as acknowledged, and
     /// the refusals of [`next_pending`](Self::next_pending). Nothing is
     /// written.
-    pub fn pending_by_id(&mut self, id: Hash32) -> Result<Pending<'_, 'a, 'p>, Error> {
+    pub fn pending_by_id(&mut self, id: Hash32) -> Result<Pending<'_, 'a, 'p, D>, Error> {
         self.synchronize()?;
         let tx = self
             .connection
@@ -292,12 +293,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
 /// }
 /// ```
 #[must_use = "the entry stays pending until it is delivered and acknowledged"]
-pub struct Pending<'s, 'a, 'p> {
-    shell: &'s mut V2SqliteShell<'a, 'p>,
+pub struct Pending<'s, 'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
+    shell: &'s mut V2SqliteShell<'a, 'p, D>,
     delivery: Delivery,
 }
 
-impl<'s, 'a, 'p> Pending<'s, 'a, 'p> {
+impl<'s, 'a, 'p, D: DescriptorData<'p> + 'p> Pending<'s, 'a, 'p, D> {
     /// The stored delivery this token is for.
     pub fn delivery(&self) -> &Delivery {
         &self.delivery
@@ -315,7 +316,7 @@ impl<'s, 'a, 'p> Pending<'s, 'a, 'p> {
     pub fn deliver(
         self,
         destination: &mut MemoryDestination,
-    ) -> Result<Delivered<'s, 'a, 'p>, Error> {
+    ) -> Result<Delivered<'s, 'a, 'p, D>, Error> {
         let Pending { shell, delivery } = self;
         let interpreter = BoundMemoryInterpreter::bind(destination, shell.delivery_interpreter)?;
         let entry = OutboxEntry::new(
@@ -351,7 +352,7 @@ impl<'s, 'a, 'p> Pending<'s, 'a, 'p> {
     /// # Errors
     /// `Error::PayloadMismatch` when `payload_sha256` is not the SHA-256 of
     /// the stored payload. The entry then stays pending.
-    pub fn relayed(self, payload_sha256: Hash32) -> Result<Delivered<'s, 'a, 'p>, Error> {
+    pub fn relayed(self, payload_sha256: Hash32) -> Result<Delivered<'s, 'a, 'p, D>, Error> {
         let Pending { shell, delivery } = self;
         if super::relay::payload_sha256(&delivery.payload) != payload_sha256 {
             return Err(Error::PayloadMismatch);
@@ -366,7 +367,7 @@ impl<'s, 'a, 'p> Pending<'s, 'a, 'p> {
     }
 }
 
-impl fmt::Debug for Pending<'_, '_, '_> {
+impl<'p, D: DescriptorData<'p> + 'p> fmt::Debug for Pending<'_, '_, 'p, D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Pending")
             .field("delivery", &self.delivery)
@@ -489,8 +490,8 @@ impl fmt::Debug for Pending<'_, '_, '_> {
 /// }
 /// ```
 #[must_use = "a delivered entry stays pending until it is acknowledged"]
-pub struct Delivered<'s, 'a, 'p> {
-    shell: &'s mut V2SqliteShell<'a, 'p>,
+pub struct Delivered<'s, 'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
+    shell: &'s mut V2SqliteShell<'a, 'p, D>,
     delivery: Delivery,
     observed: Hash32,
     /// The payload hash an external relay reported, for a token made by
@@ -498,7 +499,7 @@ pub struct Delivered<'s, 'a, 'p> {
     relayed: Option<Hash32>,
 }
 
-impl Delivered<'_, '_, '_> {
+impl<'p, D: DescriptorData<'p> + 'p> Delivered<'_, '_, 'p, D> {
     /// The stored delivery this token is for.
     pub fn delivery(&self) -> &Delivery {
         &self.delivery
@@ -577,7 +578,7 @@ impl Delivered<'_, '_, '_> {
     }
 }
 
-impl fmt::Debug for Delivered<'_, '_, '_> {
+impl<'p, D: DescriptorData<'p> + 'p> fmt::Debug for Delivered<'_, '_, 'p, D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Delivered")
             .field("delivery", &self.delivery)

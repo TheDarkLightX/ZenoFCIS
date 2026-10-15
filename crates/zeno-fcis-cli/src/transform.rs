@@ -161,6 +161,80 @@ struct Pair {
     size: u64,
 }
 
+/// Admitted immutable subjects, retained canonical bytes and semantic limits.
+/// Only this module can turn their checked final range into Equivalence.
+pub(crate) struct PreparedCheck<'a> {
+    pair: Pair,
+    bytes: [&'a [u8]; 2],
+    limits: Limits,
+}
+
+#[derive(Debug)]
+pub(crate) enum RangeFinishError {
+    Semantic(Rejection),
+    Coverage,
+}
+
+pub(crate) fn prepare<'a>(
+    original: &'a [u8],
+    candidate: &'a [u8],
+    limits: Limits,
+) -> Result<PreparedCheck<'a>, Rejection> {
+    Ok(PreparedCheck {
+        pair: admit(original, candidate, limits.input_tuples)?,
+        bytes: [original, candidate],
+        limits,
+    })
+}
+
+impl PreparedCheck<'_> {
+    pub(crate) fn dimensions(&self) -> crate::transform_plan::Dimensions {
+        crate::transform_plan::Dimensions {
+            bytes: [self.bytes[0].len() as u64, self.bytes[1].len() as u64],
+            nodes: [
+                self.pair.original.nodes().len() as u64,
+                self.pair.candidate.nodes().len() as u64,
+            ],
+            inputs: self.pair.original.inputs().len() as u64,
+            outputs: self.pair.original.outputs().len() as u64,
+            tuples: self.pair.size,
+        }
+    }
+
+    pub(crate) fn subjects(&self) -> (V2ScalarProgram<'_>, V2ScalarProgram<'_>) {
+        (scalar(&self.pair.original), scalar(&self.pair.candidate))
+    }
+
+    pub(crate) fn finish(
+        &self,
+        report: crate::finite_checker::RangeReport<'_, '_>,
+    ) -> Result<Equivalence, RangeFinishError> {
+        let (a, b) = self.subjects();
+        let complete = crate::finite_checker::finish_range(
+            &a,
+            &b,
+            self.limits.input_tuples,
+            self.limits.steps,
+            report,
+        )
+        .map_err(|error| match error {
+            crate::finite_checker::RangeError::Comparison(error) => RangeFinishError::Semantic(
+                comparison_rejection(error, &self.pair.original, &self.pair.candidate),
+            ),
+            _ => RangeFinishError::Coverage,
+        })?;
+        Ok(Equivalence {
+            original: Artifact::new(self.bytes[0], &self.pair.original),
+            candidate: Artifact::new(self.bytes[1], &self.pair.candidate),
+            inputs: self.pair.original.inputs().to_vec(),
+            outputs: self.pair.original.outputs().to_vec(),
+            limits: self.limits,
+            inputs_checked: complete.0,
+            usage: complete.1,
+        })
+    }
+}
+
 /// Admits both canonical programs, then compares them on every input tuple.
 ///
 /// Refusal order: original admission, candidate admission, input ABI, output

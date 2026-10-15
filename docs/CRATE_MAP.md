@@ -1,8 +1,12 @@
 # ZenoFCIS crate map
 
+This guide documents the `2.3.0` source. Its retained V1
+protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
+for the current checked API and assurance boundaries.
+
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All public workspace crates are version `1.1.0`, extending the stable V1 API.
+All public workspace crates are version `2.3.0`.
 
 ## Dependency direction
 
@@ -69,6 +73,7 @@ authoritative without an independent checker and release policy.
 | `zeno-fcis-refine` | Exact normalized-decision comparison and promotion reports |
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
+| `zeno-fcis-contract` | Application-contract compiler core shared with the `zeno-fcis` binary, and the checked assume-guarantee composition checker with its groups, aggregate generation and assembly validation, receipt and replay |
 | `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private ESSO, compilers, and other tools |
 | `zeno-fcis-formal-tools` | Deterministic CVC5, Z3, and Lean exporters, checked process execution, model replay, and content-addressed diagnostic retention |
 

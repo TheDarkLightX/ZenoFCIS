@@ -10,6 +10,14 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = Path("release/public-documents.txt")
 DOCUMENT_SUFFIXES = {".md", ".pdf", ".tex"}
+# Published documents without a document suffix: the agent index, the README
+# copied into every `zeno-fcis new --contract` application, and the Pages site.
+EXTRA_DOCUMENTS = frozenset({
+    "llms.txt",
+    "crates/zeno-fcis-cli/contract-app/README.md.in",
+    "site/public/index.html",
+})
+LINK_SCAN_SUFFIXES = {".md", ".tex", ".txt", ".in", ".html"}
 PRIVATE_LINK = re.compile(r"https?://(?:chatgpt\.com|chat\.openai\.com)/(?:space|share)/", re.I)
 
 
@@ -23,7 +31,9 @@ def check(root: Path) -> list[str]:
         failures.append("duplicate document inventory entry")
     for name in rows:
         path = Path(name)
-        if path.is_absolute() or ".." in path.parts or not (name.startswith("docs/") or path.suffix in DOCUMENT_SUFFIXES):
+        if path.is_absolute() or ".." in path.parts or not (
+            name.startswith("docs/") or path.suffix in DOCUMENT_SUFFIXES or name in EXTRA_DOCUMENTS
+        ):
             failures.append("invalid document inventory path")
             continue
         target = root / path
@@ -35,12 +45,13 @@ def check(root: Path) -> list[str]:
     # Ignored drafts in docs also require review if somebody adds them forcibly.
     docs = [str(path.relative_to(root)) for path in (root / "docs").rglob("*") if path.is_file()]
     actual = {name for name in [*tracked, *docs] if name and
-              (name.startswith("docs/") or Path(name).suffix in DOCUMENT_SUFFIXES)}
+              (name.startswith("docs/") or Path(name).suffix in DOCUMENT_SUFFIXES
+               or name in EXTRA_DOCUMENTS)}
     for name in sorted(actual - set(rows)):
         failures.append(f"unreviewed public document: {name}")
     for name in sorted(actual):
         path = root / name
-        if path.suffix not in {".md", ".tex", ".txt"} or path.is_symlink() or not path.is_file():
+        if path.suffix not in LINK_SCAN_SUFFIXES or path.is_symlink() or not path.is_file():
             continue
         if PRIVATE_LINK.search(path.read_text(encoding="utf-8")):
             failures.append(f"private workspace link in public document: {name}")

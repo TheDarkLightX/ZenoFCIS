@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -27,6 +28,106 @@ SUBJECT = Path("verification/kernel-laws/src/oracle/authority/finite_bounds.rs")
 SOURCES = (PIN, HARNESS, SUBJECT, Path("tools/check_verus.py"), Path("Cargo.toml"),
            Path("verification/kernel-laws/src/oracle/authority/mod.rs"),
            Path("verification/kernel-laws/src/oracle/authority/finite_decision.rs"))
+
+SEMANTIC_FAILURES = frozenset((
+    'assertion failed', 'postcondition not satisfied', 'precondition not satisfied',
+    'requires not satisfied', 'invariant not satisfied at end of loop body',
+    'loop invariant not satisfied', 'invariant not satisfied',
+    'possible arithmetic underflow/overflow',
+))
+ERROR_HEADER = re.compile(r'^error(?:\[[A-Za-z0-9]+\])?: (.*)$', re.M)
+NON_SEMANTIC = re.compile(
+    r'\bunknown\b|resource limit|\brlimit\b|timed? out|\btimeout\b|out of memory|memory exhausted|'
+    r'\bkilled\b|\bpanic(?:ked)?\b|internal compiler error|segmentation fault|'
+    r'\bsignal\b|transport error|failed to (?:start|execute)', re.I)
+
+
+def function_lines(source: str, name: str) -> tuple[int, int]:
+    """Exact annotated function region in a retained native-source specimen."""
+    functions = list(re.finditer(r'\bfn\s+([A-Za-z_][A-Za-z_0-9]*)\b', source))
+    matches = [i for i, match in enumerate(functions) if match[1] == name]
+    if len(matches) != 1:
+        raise ValueError(f'not one intended function: {name}')
+    index = matches[0]
+    start = source.rfind('#[cfg_attr(verus_keep_ghost', 0, functions[index].start())
+    if start < 0:
+        raise ValueError(f'intended function lacks an annotated contract: {name}')
+    end = len(source)
+    if index + 1 < len(functions):
+        end = functions[index + 1].start()
+        attribute = source.rfind('#[cfg_attr(verus_keep_ghost', functions[index].end(), end)
+        if attribute >= 0:
+            end = attribute
+    return source.count('\n', 0, start) + 1, source.count('\n', 0, end)
+
+
+def semantic_refusal(proc, report: dict, pin: dict, path: Path, cwd: Path,
+                     *, region: tuple[int, int] | None = None,
+                     target_functions=()) -> bool:
+    """Require a complete pinned run and only intended semantic error blocks."""
+    if not isinstance(report, dict):
+        return False
+    result, tool, functions = (report.get(k, {}) for k in
+                              ('verification-results', 'verus', 'func-details'))
+    if not all(isinstance(value, dict) for value in (result, tool, functions)):
+        return False
+    if (proc.returncode != 1 or tool.get('version') != pin['version']
+            or tool.get('commit') != pin['commit']
+            or str(tool.get('toolchain', '')).split(' ')[0] != pin['rust_toolchain']
+            or result.get('success') is not False
+            or result.get('encountered-error') is not True
+            or result.get('encountered-vir-error') is not False
+            or result.get('is-verifying-entire-crate') is not True
+            or type(result.get('errors')) is not int or result['errors'] <= 0
+            or type(result.get('verified')) is not int or result['verified'] <= 0
+            or not set(target_functions).issubset(functions)
+            or NON_SEMANTIC.search(proc.stderr)):
+        return False
+    headers = list(ERROR_HEADER.finditer(proc.stderr))
+    terminal, count = None, 0
+    expected_path = os.path.normpath(str(cwd / path))
+    for index, header in enumerate(headers):
+        summary = re.fullmatch(r'aborting due to (\d+) previous errors?', header[1])
+        if summary:
+            if terminal is not None or index != len(headers) - 1:
+                return False
+            terminal = int(summary[1])
+            continue
+        if header[1] not in SEMANTIC_FAILURES or not header[0].startswith('error: '):
+            return False
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(proc.stderr)
+        primary = re.search(r'^\s*-->\s+(.+):(\d+):(\d+)\s*$',
+                            proc.stderr[header.end():end], re.M)
+        if primary is None:
+            return False
+        observed = Path(primary[1])
+        if not observed.is_absolute():
+            observed = cwd / observed
+        line = int(primary[2])
+        if (os.path.normpath(str(observed)) != expected_path
+                or (region is not None and not region[0] <= line <= region[1])):
+            return False
+        count += 1
+    # One failed query may produce several intended diagnostics in this pin.
+    return bool(count and terminal == count and result['errors'] <= count)
+
+
+def proof_succeeded(report: dict, pin: dict) -> bool:
+    """Complete pinned success; a coverage fault may change inventory/counts."""
+    if not isinstance(report, dict):
+        return False
+    result, tool, functions = (report.get(k, {}) for k in
+                              ('verification-results', 'verus', 'func-details'))
+    return (all(isinstance(value, dict) for value in (result, tool, functions))
+            and tool.get('version') == pin['version']
+            and tool.get('commit') == pin['commit']
+            and str(tool.get('toolchain', '')).split(' ')[0] == pin['rust_toolchain']
+            and result.get('success') is True
+            and type(result.get('errors')) is int and result['errors'] == 0
+            and type(result.get('verified')) is int and result['verified'] > 0
+            and result.get('encountered-error') is False
+            and result.get('encountered-vir-error') is False
+            and result.get('is-verifying-entire-crate') is True)
 
 
 def digest(path: Path) -> str:
@@ -109,7 +210,7 @@ def accepted(report: dict, pin: dict) -> bool:
             and set(pin["target_functions"]).issubset(functions))
 
 
-def run(command: list[str], cwd: Path, environment: dict, timeout: int = 120) -> subprocess.CompletedProcess:
+def run(command: list[str], cwd: Path, environment: dict, timeout: int = 600) -> subprocess.CompletedProcess:
     return subprocess.run(command, cwd=cwd, env=environment, text=True,
                           capture_output=True, timeout=timeout, check=False)
 

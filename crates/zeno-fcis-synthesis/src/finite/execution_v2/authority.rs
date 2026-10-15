@@ -25,9 +25,14 @@ pub(super) mod outcome_spec;
 pub use bound::{Authority, bind};
 #[cfg(verus_keep_ghost)]
 pub(super) mod bound_spec;
-mod policy;
+#[cfg(verus_keep_ghost)]
+pub(crate) mod family_spec;
+mod numeric_metadata;
+#[cfg(verus_keep_ghost)]
+pub(super) mod numeric_metadata_spec;
+pub(super) mod policy;
 mod publication;
-pub use policy::policy_bytes;
+pub use policy::{numeric_policy_bytes, policy_bytes};
 pub use publication::{Publication, PublicationOutcome, WireDelivery};
 #[cfg(verus_keep_ghost)]
 pub(super) mod policy_spec;
@@ -35,6 +40,7 @@ pub(super) mod policy_spec;
 #[cfg(verus_keep_ghost)]
 vstd::prelude::verus! {
 pub closed spec fn bind_value<'a>(catalog:&super::catalog::BoundCatalog<'a>)->Result<bound_spec::BoundView<'a>,Refusal>{bound_spec::construction(catalog.view().2,*catalog.view().3,catalog.view().1,catalog.view().4)}
+pub closed spec fn numeric_policy_value(d:&super::composition::NumericDescriptor,schema:vstd::seq::Seq<u8>,framing:&super::composition::Framing,channels:vstd::seq::Seq<(u32,u32,u32)>)->Option<vstd::seq::Seq<u8>>{family_spec::numeric_policy(d,schema,framing,channels)}
 pub closed spec fn policy_value(d:&super::composition::Descriptor,schema:vstd::seq::Seq<u8>,framing:&super::composition::Framing,channels:vstd::seq::Seq<(u32,u32,u32)>)->Option<vstd::seq::Seq<u8>>{policy_spec::policy(d,schema,framing,channels)}
 impl<'a> Evaluation<'a>{pub closed spec fn view(&self)->outcome_spec::EvaluationView<'a>{(self.outcome.view(),outcome_spec::owned_bytes_result(self.subject))}
     pub closed spec fn kind_view(&self)->super::composition::Kind{self.outcome.kind_view()}}

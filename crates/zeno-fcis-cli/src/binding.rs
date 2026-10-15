@@ -7,8 +7,9 @@
 //! - a `[patch.crates-io]` path entry for every ZenoFCIS package the
 //!   application needs, directly or through the normal and build
 //!   dependencies of other ZenoFCIS packages;
-//! - the source tree's `Cargo.lock`, so that Cargo keeps the tree's external
-//!   versions when the application's first build adds it to the lock;
+//! - a lockfile bound to the source tree's external dependencies. Templates
+//!   copy the tree's `Cargo.lock`; contract applications resolve their own
+//!   graph offline before generation and can build with `--locked` immediately;
 //! - the source tree's `rust-toolchain.toml`, when it has one.
 //!
 //! The source tree is the one `--source` names, else the tree this CLI was
@@ -19,6 +20,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+
+mod lock;
 
 /// The checkout this CLI was built from, two levels above this crate's
 /// manifest as in this repository's `crates/zeno-fcis-cli`, unless the build
@@ -45,6 +48,15 @@ pub(crate) struct Binding {
     pub(crate) lock: Vec<u8>,
     /// The source tree's `rust-toolchain.toml`, byte for byte, if any.
     pub(crate) toolchain: Option<Vec<u8>>,
+}
+
+impl Binding {
+    /// Resolve an app's feature graph offline in private scratch. Every external
+    /// version/source/checksum must already occur in this binding's source lock.
+    pub(crate) fn application_lock(&self, manifest: &str) -> Result<Vec<u8>, Refusal> {
+        lock::for_application(&self.lock, manifest)
+            .map_err(|error| Refusal::Unusable(format!("application Cargo.lock: {error}")))
+    }
 }
 
 /// Why no binding was made.

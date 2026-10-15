@@ -43,7 +43,7 @@
   <rect x="0" y="0" width="9" height="1000" fill="#fbbf24"/>
 
   <text x="128" y="72" class="brand">ZENOFCIS</text>
-  <text x="1457" y="72" text-anchor="end" class="release">1.0.0-RC.3</text>
+  <text x="1457" y="72" text-anchor="end" class="release">2.3.0</text>
   <text x="128" y="132" class="eyebrow">AUTHORING DIAGNOSTICS</text>
   <text x="128" y="197" class="title">Three blockers. One bounded check.</text>
   <text x="128" y="238" class="subtitle">Independent specification defects arrive together in stable source order.</text>

@@ -1,11 +1,11 @@
 //! Immutable bound invocation and recomputation before whole-subject replay admission.
 use super::super::{
     catalog::BoundCatalog,
-    composition::{self, BoundCore, Descriptor, Framing, Kind, Raw},
+    composition::{self, BoundCore, Descriptor, DescriptorData, Framing, Kind, Raw},
 };
 use super::{Evaluation, Refusal, canonical, evaluator, framing, outcome};
 #[cfg(verus_keep_ghost)]
-use super::{bound_spec as model, outcome_spec};
+use super::{family_spec as model, outcome_spec};
 use alloc::vec::Vec;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
@@ -14,19 +14,19 @@ use vstd::prelude::*;
 /// Neither an invocation nor a persisted artifact can replace these bound fields.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug)]
-pub struct Authority<'p> {
-    core: BoundCore<'p>,
+pub struct Authority<'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
+    core: BoundCore<'p, D>,
     framing: Framing,
     identity: Vec<u8>,
     channel_roots: &'p [(u32, u32, u32)],
 }
 #[cfg(verus_keep_ghost)]
 verus! {
-impl<'p> Authority<'p>{pub closed spec fn view(&self)->model::BoundView<'p>{(self.core.descriptor_view(),self.framing,self.identity@,self.channel_roots@)}}
+impl<'p,D:DescriptorData<'p>+'p> Authority<'p,D>{pub closed spec fn view(&self)->model::BoundView<'p,D>{(self.core.descriptor_view(),self.framing,self.identity@,self.channel_roots@)}}
 }
 
 /// Exact expected frame roots, complete schema identifiers and size bounds.
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (match result{Some(v)=>Some(v@),None=>None::<Seq<u8>>})==Some(model::framing_bytes(config)),))]
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (match result{Some(v)=>Some(v@),None=>None::<Seq<u8>>})==Some(super::bound_spec::framing_bytes(config)),))]
 pub(super) fn framing_bytes(config: &Framing) -> Option<Vec<u8>> {
     use canonical::Part;
     let parts = alloc::vec![
@@ -45,7 +45,7 @@ pub(super) fn framing_bytes(config: &Framing) -> Option<Vec<u8>> {
     let out = canonical::encode(&parts);
     #[cfg(verus_keep_ghost)]
     proof! {
-        assert((match out{Some(v)=>Some(v@),None=>None::<Seq<u8>>})==Some(model::framing_bytes(config))) by {
+        assert((match out{Some(v)=>Some(v@),None=>None::<Seq<u8>>})==Some(super::bound_spec::framing_bytes(config))) by {
             reveal_with_fuel(super::spec::prefix,12);reveal_with_fuel(super::spec::length,12);
         }
     }
@@ -74,12 +74,14 @@ pub(super) fn compare(
 /// Construction work is outside the invocation's logical meter.
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures
     (match result{Ok(a)=>Ok(a.view()),Err(e)=>Err(e)}) ==
-        super::bind_value(catalog),
+        model::bind_value(catalog),
 ))]
-pub fn bind<'p>(catalog: &BoundCatalog<'p>) -> Result<Authority<'p>, Refusal> {
+pub fn bind<'p, D: DescriptorData<'p> + 'p>(
+    catalog: &BoundCatalog<'p, D>,
+) -> Result<Authority<'p, D>, Refusal> {
     #[cfg(verus_keep_ghost)]
-    proof! {reveal(super::bind_value);}
-    let core = match composition::bind(catalog.descriptor()) {
+    proof! {reveal(model::bind_value);reveal(model::construction);}
+    let core = match composition::bind_family(catalog.descriptor()) {
         Ok(core) => core,
         Err(error) => return Err(Refusal::Core(error)),
     };
@@ -100,7 +102,7 @@ pub fn bind<'p>(catalog: &BoundCatalog<'p>) -> Result<Authority<'p>, Refusal> {
     })
 }
 
-impl<'p> Authority<'p> {
+impl<'p, D: DescriptorData<'p> + 'p> Authority<'p, D> {
     /// The exact checked policy and complete compiled source/build identity.
     #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result@==self.view().2,))]
     pub fn identity(&self) -> &[u8] {
@@ -110,18 +112,20 @@ impl<'p> Authority<'p> {
     }
     /// The immutable producer descriptor admitted by the checked catalog.
     #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.view().0,))]
-    pub fn descriptor(&self) -> &'p Descriptor<'p> {
+    pub fn descriptor(&self) -> &'p D {
         #[cfg(verus_keep_ghost)]
         proof! {reveal(Authority::view);}
-        self.core.descriptor()
+        self.core.descriptor_data()
     }
 
     /// Every original envelope passes the bound header configuration and the same private core meter.
     #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::transition(self.view(),original,result.view(),None),result.kind_view()==Kind::Transition,))]
     pub fn evaluate<'a>(&'a self, original: Raw<'a>) -> Evaluation<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
-        let completed = self.core.frame(Kind::Transition, original, &self.framing);
+        proof! {reveal(Authority::view);reveal(model::transition);reveal(composition::family_framed);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
+        let completed = self
+            .core
+            .frame_family(Kind::Transition, original, &self.framing);
         let subject = outcome::seal(&completed, &self.identity);
         Evaluation {
             outcome: completed,
@@ -134,7 +138,7 @@ impl<'p> Authority<'p> {
         result.kind_view()==Kind::Transition,))]
     pub fn replay<'a>(&'a self, original: Raw<'a>, expected: &[u8]) -> Evaluation<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
+        proof! {reveal(Authority::view);reveal(model::transition);reveal(composition::family_framed);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
         let evaluated = self.evaluate(original);
         let subject = compare(evaluated.subject, expected);
         Evaluation {
@@ -146,8 +150,8 @@ impl<'p> Authority<'p> {
     #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::genesis(self.view(),original@,result.view(),None),result.kind_view()==Kind::Genesis,))]
     pub fn genesis<'a>(&'a self, original: &'a [u8]) -> Evaluation<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
-        let completed = self.core.frame(
+        proof! {reveal(Authority::view);reveal(model::genesis);reveal(composition::family_framed);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
+        let completed = self.core.frame_family(
             Kind::Genesis,
             Raw {
                 state: original,
@@ -156,6 +160,14 @@ impl<'p> Authority<'p> {
             },
             &self.framing,
         );
+        #[cfg(verus_keep_ghost)]
+        proof! {
+            let d=self.view().0.model();
+            let v=completed.view();
+            composition::family_framed_genesis(&d,Raw{state:original,command:&[],context:&[]},&self.framing,
+                composition::descriptor::spec::limits(&d).view(),Seq::new(8,|_:int|0u64),
+                (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(v.0,v.3,v.2,v.4,v.5));
+        }
         let subject = outcome::seal(&completed, &self.identity);
         Evaluation {
             outcome: completed,
@@ -168,7 +180,7 @@ impl<'p> Authority<'p> {
         result.kind_view()==Kind::Genesis,))]
     pub fn replay_genesis<'a>(&'a self, original: &'a [u8], expected: &[u8]) -> Evaluation<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
+        proof! {reveal(Authority::view);reveal(model::genesis);reveal(composition::family_framed);reveal(Evaluation::view);reveal(Evaluation::kind_view);}
         let evaluated = self.genesis(original);
         let subject = compare(evaluated.subject, expected);
         Evaluation {
@@ -178,14 +190,14 @@ impl<'p> Authority<'p> {
     }
 }
 
-impl<'p> Authority<'p> {
+impl<'p, D: DescriptorData<'p> + 'p> Authority<'p, D> {
     /// Recompute the complete bound decision, encode original wires.
     /// Output construction is outside the invocation logical meter.
-    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures super::publication::spec::transition(self.view(),original,result.view(),None),
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::publication_transition(self.view(),original,result.view(),None),
         result.kind_view()==Kind::Transition,))]
     pub fn publish<'a>(&'a self, original: Raw<'a>) -> super::PublicationOutcome<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);}
+        proof! {reveal(Authority::view);reveal(model::publication_transition);}
         let evaluated = self.evaluate(original);
         super::publication::finish(
             evaluated,
@@ -197,7 +209,7 @@ impl<'p> Authority<'p> {
     }
     /// Recompute the complete bound decision, encode original wires, then compare every persisted publication byte.
     /// Output construction is outside the invocation logical meter.
-    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures super::publication::spec::transition(self.view(),original,result.view(),Some(expected@)),
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::publication_transition(self.view(),original,result.view(),Some(expected@)),
         result.kind_view()==Kind::Transition,))]
     pub fn replay_publication<'a>(
         &'a self,
@@ -205,7 +217,7 @@ impl<'p> Authority<'p> {
         expected: &[u8],
     ) -> super::PublicationOutcome<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);}
+        proof! {reveal(Authority::view);reveal(model::publication_transition);}
         let evaluated = self.evaluate(original);
         super::publication::finish(
             evaluated,
@@ -217,11 +229,11 @@ impl<'p> Authority<'p> {
     }
     /// Recompute genuine Genesis, encode original wires.
     /// Output construction is outside the invocation logical meter.
-    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures super::publication::spec::genesis(self.view(),original@,result.view(),None),
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::publication_genesis(self.view(),original@,result.view(),None),
         result.kind_view()==Kind::Genesis,))]
     pub fn publish_genesis<'a>(&'a self, original: &'a [u8]) -> super::PublicationOutcome<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);}
+        proof! {reveal(Authority::view);reveal(model::publication_genesis);}
         let evaluated = self.genesis(original);
         super::publication::finish(
             evaluated,
@@ -233,7 +245,7 @@ impl<'p> Authority<'p> {
     }
     /// Recompute genuine Genesis, encode original wires, then compare every persisted publication byte.
     /// Output construction is outside the invocation logical meter.
-    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures super::publication::spec::genesis(self.view(),original@,result.view(),Some(expected@)),
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures model::publication_genesis(self.view(),original@,result.view(),Some(expected@)),
         result.kind_view()==Kind::Genesis,))]
     pub fn replay_genesis_publication<'a>(
         &'a self,
@@ -241,7 +253,7 @@ impl<'p> Authority<'p> {
         expected: &[u8],
     ) -> super::PublicationOutcome<'a> {
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(Authority::view);}
+        proof! {reveal(Authority::view);reveal(model::publication_genesis);}
         let evaluated = self.genesis(original);
         super::publication::finish(
             evaluated,

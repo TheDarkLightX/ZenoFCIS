@@ -22,6 +22,10 @@ fn value(atom: Atom<'_>) -> Value {
             String::from_utf8(b.to_vec()).unwrap_or_else(|error| panic!("ASCII: {error:?}")),
         )
         .unwrap_or_else(|error| panic!("text: {error:?}")),
+        Atom::Canonical(v) => {
+            zeno_fcis_codec::decode_value(v.wire(), zeno_fcis_codec::DecodeLimits::default())
+                .unwrap_or_else(|error| panic!("canonical fixture: {error:?}"))
+        }
     }
 }
 fn record(fields: &[Field<'_>]) -> Value {

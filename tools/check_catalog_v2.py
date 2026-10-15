@@ -18,7 +18,7 @@ import time
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
-from verus_coverage import inventory, require_coverage
+from verus_coverage import inventory, observed_inventory, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path("verification/verus/catalog_v2.rs")
@@ -32,7 +32,7 @@ SPEC = BASE / "execution_v2/catalog/spec.rs"
 def sources(root: Path) -> list[Path]:
     paths = [HARNESS, verifier.PIN, Path("tools/verus_coverage.py"), Path("tools/check_verus.py"),
              Path("tools/check_catalog_v2.py"), Path("tools/test_check_catalog_v2.py"),
-             Path("docs/V2_CATALOG_BINDING_STAGE.md"), BASE / "mod.rs",
+             Path("README.md"), BASE / "mod.rs",
              Path("crates/zeno-fcis-synthesis/tests/v2_catalog.rs"),
              # Native decision tests compile this existing #[path] fixture even
              # when the executed test filter selects only the catalog tests.
@@ -75,13 +75,14 @@ def mutations() -> list[tuple[str, Path, str, str, str]]:
         ("narrow_original_i128_bound", MATCHING, "a == *c as i128 && b == *d as i128", "a <= *c as i128 && b >= *d as i128", "proof"),
         ("omit_unused_outbox", MATCHING, " || !deliveries(defs, bs[i].outbox, ls)", "", "proof"),
         ("discard_text_upper_bound", MATCHING, "\n                    && b.len() as u64 <= max as u64\n                    && super::super::util::ascii(b)", "\n                    && super::super::util::ascii(b)", "proof"),
-        ("omit_channel_links", SUBJECT, "if !matching::channels(description.definitions, descriptor.channels, channel_roots)", "if false", "proof"),
+        # G3 checks the closed descriptor projection's channels, for both families.
+        ("omit_channel_links", SUBJECT, "if !matching::channels(description.definitions, projected.channels(), channel_roots)", "if false", "proof"),
         # Authority binding consumes original_contract's postcondition; these
         # verify-then-coverage controls target the unconsumed original_schema getter.
-        ("weaken_getter_contract", SUBJECT, "ensures result@ == self.view().0,", "ensures true,", "coverage"),
-        ("narrow_getter_domain", SUBJECT, "ensures result@ == self.view().0,", "requires self.view().0.len()>0, ensures result@ == self.view().0,", "coverage"),
+        ("weaken_getter_contract", SUBJECT, "ensures result@ == self.view().0,", "ensures (result@ == self.view().0) || true,", "coverage"),
+        ("narrow_getter_domain", SUBJECT, "ensures result@ == self.view().0,", "requires false, ensures result@ == self.view().0,", "coverage"),
         ("add_uncontracted_work", MATCHING, "//! Total correspondence checks", "pub fn uncovered_catalog_work()->u64{1}\n// Total correspondence checks", "coverage"),
-        ("cached_policy_before_admission", SUBJECT, "    let checked = match schema::admit(original_schema, description, limits.schema) {", "    let _cached = authority::policy_bytes(descriptor, original_schema, framing, channel_roots);\n    let checked = match schema::admit(original_schema, description, limits.schema) {", "coverage"),
+        ("cached_policy_before_admission", SUBJECT, "    let checked = match schema::admit(original_schema, description, limits.schema) {", "    let _cached = authority::policy::family_bytes(&descriptor.project(), original_schema, framing, channel_roots);\n    let checked = match schema::admit(original_schema, description, limits.schema) {", "coverage"),
     ]
 
 
@@ -154,7 +155,7 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
         require_coverage(vir, profile)
     except ValueError as error:
         refusal = str(error)
-    actual = inventory(vir, profile["namespace"], tuple(profile["body_covered_functions"]))
+    actual = profile_inventory(vir, profile)
     expected = profile["functions"]
     prefix = "catalog_v2::execution_v2::catalog::"
     if name == "add_uncontracted_work":
@@ -172,11 +173,17 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
             target, field = prefix + "bind_original", "body_sha256"
         else:
             raise ValueError("unknown coverage control: " + name)
-        intended = (target in actual and target in expected and refusal is not None and target in refusal
-                    and actual[target][field] != expected[target][field])
-        if name == "cached_policy_before_admission" and intended:
-            intended = all(actual[target][f] == expected[target][f]
-                           for f in ("signature_sha256", "requires_sha256", "ensures_sha256"))
+        if name == "cached_policy_before_admission":
+            # Descriptor read IDs can change the first refusal message. Require
+            # the intended body change directly, with the full name inventory
+            # and this constructor's signature and contracts still fixed.
+            intended = (target in actual and set(actual) == set(expected) and refusal is not None
+                        and actual[target][field] != expected[target][field]
+                        and all(actual[target][f] == expected[target][f]
+                                for f in ("signature_sha256", "requires_sha256", "ensures_sha256")))
+        else:
+            intended = (target in actual and target in expected and refusal is not None and target in refusal
+                        and actual[target][field] != expected[target][field])
     return intended, refusal, {"function": target, "field": field, "intended_refusal": intended}
 
 
@@ -201,12 +208,14 @@ def check(args) -> dict:
         receipt["failure"] = "Whole-source positive proof did not qualify; inspect retained diagnostics."
         return receipt
     vir = (directory/"positive/crate.vir").read_text()
-    functions = inventory(vir,"catalog_v2::")
+    functions, _declarations = observed_inventory(vir,"catalog_v2::")
     bodies = sorted(n for n,v in functions.items() if v["mode"]=="Exec")
-    observed = inventory(vir,"catalog_v2::",tuple(bodies))
+    observed, declarations = observed_inventory(vir,"catalog_v2::",tuple(bodies))
     proposal = {"namespace":"catalog_v2::", "expected_verified":positive["report"]["verification-results"]["verified"],
                 "target_functions":["catalog_v2::execution_v2::catalog::bind_original"],
                 "body_covered_functions":bodies, "functions":observed}
+    if declarations is not None:
+        proposal["abstract_declarations"] = declarations
     (directory/"observed-coverage.json").write_text(json.dumps(proposal,indent=2,sort_keys=True)+"\n")
     receipt["observed_coverage"] = str(directory/"observed-coverage.json")
     verifier.verify_tool_files(tools,pin)

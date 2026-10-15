@@ -127,7 +127,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut namespaces,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "namespace",
         0,
         &spans,
@@ -136,7 +136,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut types,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "type",
         1,
         &spans,
@@ -145,7 +145,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut fields,
         |v| v.id(),
-        |v| v.name(),
+        |v| (Some(v.owner()), v.name()),
         "field",
         2,
         &spans,
@@ -155,7 +155,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut variants,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "variant",
         3,
         &spans,
@@ -165,7 +165,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut reasons,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "reason",
         4,
         &spans,
@@ -174,7 +174,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut effects,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "effect",
         5,
         &spans,
@@ -183,7 +183,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut channels,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "channel",
         6,
         &spans,
@@ -192,7 +192,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut components,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "component",
         7,
         &spans,
@@ -201,7 +201,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut laws,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "law",
         9,
         &spans,
@@ -210,7 +210,7 @@ pub fn elaborate_project(
     sort_and_duplicates(
         &mut claims,
         |v| v.id(),
-        |v| v.name(),
+        |v| (None, v.name()),
         "claim",
         10,
         &spans,
@@ -764,6 +764,10 @@ pub fn elaborate_project(
     Ok(spec)
 }
 
+/// Sorts declarations by ID and reports repeated IDs and repeated names.
+/// `name` gives each declaration's name with its scope: the declaration that
+/// owns it, such as a field's record, within which the name must be unique,
+/// or `None` when it must be unique in the whole project.
 fn sort_and_duplicates<T, F, G>(
     values: &mut [T],
     id: F,
@@ -774,7 +778,7 @@ fn sort_and_duplicates<T, F, G>(
     diagnostics: &mut Vec<Diagnostic>,
 ) where
     F: Fn(&T) -> StableId,
-    G: Fn(&T) -> &Identifier,
+    G: Fn(&T) -> (Option<StableId>, &Identifier),
 {
     values.sort_by_key(|value| id(value));
     for pair in values.windows(2) {
@@ -792,15 +796,23 @@ fn sort_and_duplicates<T, F, G>(
     }
     let mut names = BTreeSet::new();
     for value in values.iter() {
-        if !names.insert(name(value).as_str()) {
+        let (owner, identifier) = name(value);
+        if !names.insert((owner, identifier.as_str())) {
+            let (expected, help) = match owner {
+                Some(_) => (
+                    "stable name unique within its owner",
+                    "choose a name no other member of the same owner uses",
+                ),
+                None => ("unique stable name", "choose a distinct stable name"),
+            };
             push(
                 diagnostics,
                 DiagnosticCode::DuplicateName,
                 span_for(spans, tag, id(value)),
                 format!("{label}.name"),
-                "unique stable name",
-                name(value).as_str(),
-                "choose a distinct stable name",
+                expected,
+                identifier.as_str(),
+                help,
             );
         }
     }

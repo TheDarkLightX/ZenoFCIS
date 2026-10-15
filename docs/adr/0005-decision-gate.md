@@ -2,10 +2,17 @@
 
 ## Status
 
-Proposed for V2. This record specifies the boundary to implement; it does not
-claim that the current authority or templates enforce it. The first additive
-implementation may be opt-in in 1.x. Making it mandatory changes the authority
-API and belongs in V2 (see [0004](0004-v2-ledger.md)).
+Accepted for V2, amended on 2026-10-12. The record was proposed before V2 as
+the boundary to implement, with a possible opt-in first step in 1.x. The V2
+program API now implements it: `Program::publish` evaluates the bound contract
+and its laws in the library, applications cannot supply a decision callback to
+obtain publication authority, and replay recomputes before comparing (see the
+[API migration guide](../V2_PROGRAM_API_MIGRATION.md)). Making the gate
+mandatory changed the authority API, which is why it belongs to V2 (see
+[0004](0004-v2-ledger.md)). The Context below describes the 1.x authority it
+replaced. This record does not track which Evidence items are met; see the
+[candidate record](../RELEASE_CANDIDATES.md) for the current qualification and
+its limits.
 
 ## Context
 

@@ -46,7 +46,7 @@ use zeno_fcis_synthesis::finite::{
 
 use super::behaviour::{self, Claim};
 use super::equivalence::DEFAULT_MAX_INPUT_TUPLES;
-use super::migration::{self, Migration, Simulated, Unsimulated};
+use super::migration::{self, Migration, Payload, Simulated, Unsimulated};
 use super::upgrade::{
     self, Admission, Behaviour, Facts, Kind, Migrated, Premise, Premises, Successor,
 };
@@ -110,9 +110,50 @@ pub enum Step<'s> {
         /// Recomputed owner review binding the target claim declarations.
         review: &'s [u8],
     },
+    /// A migration with explicit lossless payload representation maps. Stored
+    /// historical deliveries keep their original owning contract and bytes.
+    PayloadMigration {
+        /// Complete state mapping, including closed library expressions.
+        migration: Migration<'s>,
+        /// Complete per-channel maps, in increasing channel order.
+        payloads: &'s [Payload<'s>],
+        /// Freshly compiled inductive claims of the target version.
+        claims: &'s [Claim<'s>],
+        /// Recomputed review of state, payload and claim declarations.
+        review: &'s [u8],
+    },
     /// The later version renames profile, type, field or variant names and
     /// changes nothing else; an upgrade checks that exactly.
     Rename,
+}
+
+impl<'s> Step<'s> {
+    pub(super) fn mapping(self) -> Option<(Migration<'s>, &'s [Payload<'s>], &'s [u8])> {
+        match self {
+            Self::Migration {
+                migration, review, ..
+            } => Some((migration, &[], review)),
+            Self::PayloadMigration {
+                migration,
+                payloads,
+                review,
+                ..
+            } => Some((migration, payloads, review)),
+            _ => None,
+        }
+    }
+
+    pub(super) fn mapping_encoding(self) -> Option<Result<Vec<u8>, migration::Range>> {
+        match self {
+            Self::Migration { migration, .. } => Some(migration.encode()),
+            Self::PayloadMigration {
+                migration,
+                payloads,
+                ..
+            } => Some(migration::encode_with_payloads(&migration, payloads)),
+            _ => None,
+        }
+    }
 }
 
 /// An application's contract lineage, oldest version first and the version
@@ -216,9 +257,10 @@ impl<'c, 'p> Lineage<'c, 'p> {
                 .iter()
                 .map(|step| match step {
                     Step::Adoption(receipt) => Hash32::new(*receipt),
-                    Step::BehaviourChange { .. } | Step::Migration { .. } | Step::Rename => {
-                        Hash32::new([0; 32])
-                    }
+                    Step::BehaviourChange { .. }
+                    | Step::Migration { .. }
+                    | Step::PayloadMigration { .. }
+                    | Step::Rename => Hash32::new([0; 32]),
                 })
                 .collect(),
             max_input_tuples,
@@ -249,9 +291,7 @@ impl<'c, 'p> Lineage<'c, 'p> {
             connection.is_autocommit(),
             "a forward simulation must not run inside a transaction"
         );
-        let Some(Step::Migration { migration, .. }) = self.steps.get(step) else {
-            return None;
-        };
+        let (migration, payloads, _) = self.steps.get(step).and_then(|step| step.mapping())?;
         let mut memo = self
             .simulated
             .lock()
@@ -259,12 +299,13 @@ impl<'c, 'p> Lineage<'c, 'p> {
         if let Some(outcome) = memo.get(&step) {
             return Some(*outcome);
         }
-        let outcome = migration::simulate(
+        let outcome = migration::simulate_with_payloads(
             self.catalogs[step],
             &self.authorities[step],
             self.catalogs[step + 1],
             &self.authorities[step + 1],
-            migration,
+            &migration,
+            payloads,
         );
         self.simulations.fetch_add(1, Ordering::Relaxed);
         memo.insert(step, outcome);
@@ -307,7 +348,7 @@ impl<'c, 'p> Lineage<'c, 'p> {
     pub(super) fn moves_state(&self, step: usize) -> bool {
         matches!(
             self.steps.get(step),
-            Some(Step::Migration { .. } | Step::Rename)
+            Some(Step::Migration { .. } | Step::PayloadMigration { .. } | Step::Rename)
         )
     }
 
@@ -439,7 +480,10 @@ impl<'c, 'p> Lineage<'c, 'p> {
             .iter()
             .filter_map(|step| match step {
                 Step::BehaviourChange { review, .. } => Some(*review),
-                Step::Adoption(_) | Step::Migration { .. } | Step::Rename => None,
+                Step::Adoption(_)
+                | Step::Migration { .. }
+                | Step::PayloadMigration { .. }
+                | Step::Rename => None,
             })
             .collect()
     }
@@ -455,9 +499,9 @@ impl<'c, 'p> Lineage<'c, 'p> {
             .iter()
             .rev()
             .find_map(|step| match step {
-                Step::BehaviourChange { claims, .. } | Step::Migration { claims, .. } => {
-                    Some(*claims)
-                }
+                Step::BehaviourChange { claims, .. }
+                | Step::Migration { claims, .. }
+                | Step::PayloadMigration { claims, .. } => Some(*claims),
                 Step::Rename => Some(&[][..]),
                 Step::Adoption(_) => None,
             })
@@ -617,7 +661,11 @@ impl<'c, 'p> Lineage<'c, 'p> {
     }
 
     fn members(&self, len: usize) -> Members<'_, 'p> {
-        Members::Lineage { lineage: self, len }
+        Members::Lineage {
+            lineage: self,
+            len,
+            authorities: self.authorities(),
+        }
     }
 
     /// The handle for an audited store whose current segment runs the
@@ -719,7 +767,7 @@ impl<'a, 'p> Superseded<'a, 'p> {
     /// refusal names the missing premise, and a behaviour-change refusal the
     /// law or claim that does not hold.
     pub fn upgrade(self) -> Result<(V2SqliteShell<'a, 'p>, UpgradeReceipt), Error> {
-        self.upgrade_with_crash(None)
+        self.upgrade_inner(None)
     }
 
     /// [`Superseded::upgrade`] with a deterministic injected interruption for
@@ -729,7 +777,15 @@ impl<'a, 'p> Superseded<'a, 'p> {
     ///
     /// # Errors
     /// As [`Superseded::upgrade`], and `InjectedCrash`.
+    #[cfg(any(test, feature = "crash-injection"))]
     pub fn upgrade_with_crash(
+        self,
+        crash: Option<CrashPoint>,
+    ) -> Result<(V2SqliteShell<'a, 'p>, UpgradeReceipt), Error> {
+        self.upgrade_inner(crash)
+    }
+
+    fn upgrade_inner(
         self,
         crash: Option<CrashPoint>,
     ) -> Result<(V2SqliteShell<'a, 'p>, UpgradeReceipt), Error> {
@@ -868,15 +924,16 @@ fn decide_hop(
     if !same && to == from + 1 && lineage.moves_state(from) {
         // A migration or rename moves the state; nothing else is compared.
         let mut migrated = None;
-        let (description, moved) = match lineage.steps()[from] {
-            Step::Migration {
-                migration, review, ..
-            } => {
+        let (description, moved) = match lineage.steps()[from].mapping() {
+            Some((migration, _payloads, review)) => {
                 let Some(simulated) = lineage.simulated(from) else {
                     missing.set(Some((from, to)));
                     return Err(Error::Unsettled);
                 };
-                let encoding = migration.encode().map_err(|_| Error::Range)?;
+                let encoding = lineage.steps()[from]
+                    .mapping_encoding()
+                    .ok_or(Error::Lineage)?
+                    .map_err(|_| Error::Range)?;
                 let moved = simulated.and_then(|simulated| {
                     migration::migrate_state(catalogs[from], catalogs[to], &migration, &head.state)
                         .map(|state| (simulated, state))
@@ -900,7 +957,7 @@ fn decide_hop(
                     Err(unsimulated) => (encoding, Err(Some(unsimulated))),
                 }
             }
-            _ => {
+            None => {
                 let exact = migration::rename_exact(catalogs[from], catalogs[to])
                     .map_err(|_| Error::Range)?;
                 let state = exact
@@ -1064,7 +1121,7 @@ impl<'a, 'p> V9Store<'a, 'p> {
     /// store under no version of the lineage, and `History` for a failed
     /// audit.
     pub fn migrate(self) -> Result<Store<'a, 'p>, Error> {
-        self.migrate_with_crash(None)
+        self.migrate_inner(None)
     }
 
     /// [`V9Store::migrate`] with a deterministic injected interruption for
@@ -1074,7 +1131,12 @@ impl<'a, 'p> V9Store<'a, 'p> {
     ///
     /// # Errors
     /// As [`V9Store::migrate`], and `InjectedCrash`.
+    #[cfg(any(test, feature = "crash-injection"))]
     pub fn migrate_with_crash(self, crash: Option<CrashPoint>) -> Result<Store<'a, 'p>, Error> {
+        self.migrate_inner(crash)
+    }
+
+    fn migrate_inner(self, crash: Option<CrashPoint>) -> Result<Store<'a, 'p>, Error> {
         let Self {
             mut connection,
             lineage,

@@ -6,12 +6,10 @@
 //! it is a code change that needs the owner's approved provider, disclosure
 //! and billing policy (NSR-005).
 
+use super::acquisition::JSON_BYTES;
 use super::{json_u64, only_fields};
+use crate::loop_proposers::CONFIG_LIMIT;
 use serde_json::{Value, json};
-
-/// Work-unit surcharge for constructing one receipt, charged before the check
-/// alongside admission and node attempts (NSF-003).
-pub(crate) const RECEIPT_WORK: u64 = 1_024;
 
 /// Limits that bound one session. Every field is an exact count.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -79,10 +77,61 @@ impl Limits {
         storage_bytes: 2 * 1024 * 1024,
     };
 
-    /// Admits requested limits when every field is at most its ceiling and
-    /// the counts are positive and mutually consistent.
+    /// Hard cap on one check's work when work scales with the domain (G12,
+    /// `zeno-fcis/checker-work/4`). The loop's four-worker check plan spent
+    /// 2.2 to 3.2 s on the 1,296,000-tuple decision graph's 687,409,803
+    /// units before the checker speedup, so a check at this cap fits the
+    /// two-second check stage with margin.
+    pub(crate) const HARD_CHECK_WORK: u64 = 1 << 28;
+    /// Session work one attempt can need besides its own check when it
+    /// arrives in an invocation of its own, as every attempt through the MCP
+    /// tools does: the largest supplied intake (a JSON candidate with
+    /// provenance), the attempt's import preparation at the largest artifact,
+    /// and the invocation's replay of eight stored witnesses on programs of at
+    /// most 65,535 nodes. Its replay of the incumbent is at most one more check.
+    pub(crate) const ATTEMPT_OVERHEAD: u64 = (2 * JSON_BYTES + 2 * CONFIG_LIMIT + 4_096)
+        + (9 * 65_536 + 16 * 2_048 + 16 * (32 + 16 + 256 + 16) + 8_192)
+        + 8 * (2 * 65_535 + 2);
+    /// Hard cap on a session's work: the session ceiling at the hard check cap.
+    pub(crate) const HARD_SESSION_WORK: u64 =
+        Self::CEILING.attempts as u64 * (2 * Self::HARD_CHECK_WORK + Self::ATTEMPT_OVERHEAD);
+    /// The largest ceilings any request can have: the compiled ceilings with
+    /// the work hard caps.
+    pub(crate) const HARD: Limits = Limits {
+        check_work: Self::HARD_CHECK_WORK,
+        session_work: Self::HARD_SESSION_WORK,
+        ..Self::CEILING
+    };
+
+    /// The ceilings of one request whose original needs `needed` work units
+    /// to be checked against a candidate of its own size: the check ceiling
+    /// rises from the compiled ceiling to `needed`, never above
+    /// [`Self::HARD_CHECK_WORK`], and the session ceiling funds every attempt
+    /// of the attempt ceiling in an invocation of its own: two checks (its own
+    /// and the invocation's replay of the incumbent) and
+    /// [`Self::ATTEMPT_OVERHEAD`] each, never above [`Self::HARD_SESSION_WORK`].
+    /// Every other ceiling is the compiled one.
+    pub(crate) fn scaled(needed: u64) -> Limits {
+        let check_work = needed.clamp(Self::CEILING.check_work, Self::HARD_CHECK_WORK);
+        let session_work =
+            u64::from(Self::CEILING.attempts) * (2 * check_work + Self::ATTEMPT_OVERHEAD);
+        Limits {
+            check_work,
+            session_work,
+            ..Self::CEILING
+        }
+    }
+
+    /// Admits requested limits when every field is at most its compiled
+    /// ceiling and the counts are positive and mutually consistent.
+    #[cfg(test)]
     pub(crate) fn try_new(requested: Limits) -> Result<Limits, LimitRefusal> {
-        let ceiling = Self::CEILING;
+        Self::try_within(requested, Self::CEILING)
+    }
+
+    /// Admits requested limits when every field is at most `ceiling`'s and
+    /// the counts are positive and mutually consistent.
+    pub(crate) fn try_within(requested: Limits, ceiling: Limits) -> Result<Limits, LimitRefusal> {
         let fields: [(&'static str, u64, u64); 13] = [
             (
                 "attempts",
@@ -187,7 +236,8 @@ impl Limits {
     }
 
     /// Reads limits back from request JSON. Every field is required, unknown
-    /// fields are refused, and the result passes [`Limits::try_new`].
+    /// fields are refused, and the result passes [`Limits::try_within`] the
+    /// hard ceilings; admission then holds it to its request's own ceiling.
     pub(crate) fn from_json(value: &Value) -> Option<Limits> {
         if !only_fields(
             value,
@@ -211,21 +261,24 @@ impl Limits {
         }
         let small = |field| u8::try_from(json_u64(value, field)?).ok();
         let medium = |field| u32::try_from(json_u64(value, field)?).ok();
-        Limits::try_new(Limits {
-            attempts: small("attempts")?,
-            checks: small("checks")?,
-            model_calls: small("model_calls")?,
-            input_tokens: medium("input_tokens")?,
-            output_tokens: medium("output_tokens")?,
-            total_tokens: medium("total_tokens")?,
-            check_work: json_u64(value, "check_work")?,
-            session_work: json_u64(value, "session_work")?,
-            deadline_ms: json_u64(value, "deadline_ms")?,
-            artifact_bytes: medium("artifact_bytes")?,
-            money_micros: json_u64(value, "money_micros")?,
-            transcript_bytes: medium("transcript_bytes")?,
-            storage_bytes: medium("storage_bytes")?,
-        })
+        Limits::try_within(
+            Limits {
+                attempts: small("attempts")?,
+                checks: small("checks")?,
+                model_calls: small("model_calls")?,
+                input_tokens: medium("input_tokens")?,
+                output_tokens: medium("output_tokens")?,
+                total_tokens: medium("total_tokens")?,
+                check_work: json_u64(value, "check_work")?,
+                session_work: json_u64(value, "session_work")?,
+                deadline_ms: json_u64(value, "deadline_ms")?,
+                artifact_bytes: medium("artifact_bytes")?,
+                money_micros: json_u64(value, "money_micros")?,
+                transcript_bytes: medium("transcript_bytes")?,
+                storage_bytes: medium("storage_bytes")?,
+            },
+            Self::HARD,
+        )
         .ok()
     }
 }

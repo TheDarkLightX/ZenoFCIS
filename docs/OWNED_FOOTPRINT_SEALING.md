@@ -1,8 +1,5 @@
 # Owned footprint sealing
 
-Base: `b1fc97f3e43dbbd0441e3d8bcd324de4dd8b511a`.
-Branch: `agent/owned-footprints-20260905`.
-
 ## Preflight and contract
 
 `CataloguedTransitionBuilder::seal` consumes a fresh, exclusively owned builder.

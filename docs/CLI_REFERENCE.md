@@ -1,5 +1,9 @@
 # `zeno-fcis` CLI reference
 
+This guide documents the `2.3.0` source. Its retained V1
+protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
+for the current checked API and assurance boundaries.
+
 The `zeno-fcis-cli` package in `1.1.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
@@ -9,7 +13,7 @@ zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepare
 zeno-fcis new <dir> --contract <contract-dir> [--source TREE]
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
-zeno-fcis generate contract [<app-dir>] [--check] [--format human|json]
+zeno-fcis generate contract [<app-dir>] [--out <dir>] [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
 zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
 zeno-fcis prove [project.zeno] --claim ID|all --backend cvc5|z3|lean|all [--tools FILE]
@@ -22,27 +26,46 @@ zeno-fcis backend inventory-lean ROOT [--format human|json]
 zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
 zeno-fcis transform check --original FILE --candidate FILE --symbolic --tools FILE [--step-limit N] [--max-input-tuples N] [--symbolic-receipt OUT] [--queries DIR]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
+zeno-fcis transform check-certificates --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--step-limit N] [--max-input-tuples N] [--out RECEIPT] [--queries DIR]
+zeno-fcis transform replay-certificates --receipt FILE --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--max-input-tuples N]
 zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract draft start --session DIR --intent FILE --project FILE --provenance TEXT [--examples FILE] [--rounds 4] [--max-tuples 4096]
 zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --provenance TEXT
 zeno-fcis contract draft questions|check --session DIR
 zeno-fcis contract draft label --session DIR --revision SHA256 --examples FILE --provenance TEXT
 zeno-fcis contract draft finalize --session DIR --revision SHA256 --out NEW_DIR
-zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
+zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--mutant-programs DIR] [--format human|json]
 zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
+zeno-fcis contract export --tau [<contract-dir>] --out DIR [--max-tuples N] [--samples N] [--format human|json]
+zeno-fcis contract import --tau SPEC --out DIR [--scale-width ORIGINAL:NEW] [--domain INPUT:MIN:MAX] [--format human|json]
 zeno-fcis contract adopt [<app-dir>] --candidate FILE --receipt FILE --usage preserved|new-version [--format human|json]
 zeno-fcis contract refresh-receipts [<app-dir>] [--format human|json]
 zeno-fcis contract diff <old-dir> <new-dir> [--format human|json]
 zeno-fcis contract evolve [<app-dir>] --to <contract-dir> [--migration FILE [--shortcut FILE]...] [--format human|json]
 zeno-fcis contract check-symbolic [<contract-dir>] [--strengthening FILE] [--tools FILE] [--max-tuples N] [--out REPORT.json] [--queries DIR] [--format human|json]
+zeno-fcis contract check-composition MANIFEST [--aggregate DIR | --write-aggregate DIR] [--receipt FILE | --replay FILE] [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
-It also classifies every law and claim by
+A field name must be unique within its record; other declaration names are
+unique in the project. The summary line's `unresolved_obligations=N` counts
+evidence that the check does not establish and generated code cannot
+discharge; it is not an error. Human output explains each one on the lines
+after the summary, and JSON output lists them under `obligations` as
+`{kind, component, peer, claim, explanation}`. The kinds are
+`complete-footprint`, one per component, which needs evidence that the
+component reads and writes only what its footprint declares;
+`sequential-parity`, one per project, which needs evidence that the merged
+components decide as they would one after another; `parallel-law`, one per
+pair of components that share a path one of them writes, or an effect or
+outbox; and `assumption`, one per claim a component assumes. `check` also
+classifies every law and claim by
 [substance](CLAIM_SUBSTANCE.md). Human output warns on stderr about formulas
 that cannot constrain any transition. JSON output adds a `substance` object,
 and `--require-substantive` exits 1 with `status: "vacuous"` when any are
-found. It also reports law and claim paths that name no declared type or
+found. The classification reads each law's scope: a law on only some
+decisions, such as an `on accept` authorization law, counts even when it
+reads no outcome. It also reports law and claim paths that name no declared type or
 field ([law path resolution](LAW_PATH_RESOLUTION.md)): human output warns on
 stderr, JSON output adds an `unresolved_paths` object, and
 `--require-resolved-paths` exits 1 with `status: "unresolved-paths"` when any
@@ -67,8 +90,11 @@ upgrades](#contract-adoption-and-store-upgrades)) it also reads each
 `v2/adoptions/N/program.zcve` and `receipt.json`, replays every receipt in
 order, checks each superseded version's policy against the digest its
 adoption bound, and replaces each superseded version's `src/v2_contract_vN.rs`
-and `v2/policy_vN.zcve`. With `--check` it writes nothing, names each drifted
-file and exits 1. An invalid contract exits 1 and writes nothing. The
+and `v2/policy_vN.zcve`. With `--out <dir>` it writes the generated files
+under `<dir>` instead, creating it when absent, and leaves the contract
+directory holding only the files its author writes; with `--check`, it
+compares the files there. With `--check` it writes nothing, names each
+drifted file and exits 1. An invalid contract exits 1 and writes nothing. The
 generator's own checks name the file and entry at fault. Among them: an
 accept has no reason, and a reject or committed failure has one; constants lie
 within their declared ranges; the variants of a sum the decision program reads
@@ -103,12 +129,18 @@ when it is compiled. The tree must be a Cargo workspace whose listed
   with a path entry for every ZenoFCIS package the application needs,
   directly or through the normal and build dependencies of other ZenoFCIS
   packages, in sorted order;
-- copies the tree's `Cargo.lock`, so the external crates are the versions
-  the tree pins; the application's first build adds the application itself;
+- uses the tree's `Cargo.lock` to retain its external package identities.
+  Contract apps reconcile their feature graph with pinned offline Cargo in
+  private scratch and include the application itself in the emitted lock,
+  so the first build accepts `--locked --offline`. Development templates
+  retain their copied source lock;
 - copies the tree's `rust-toolchain.toml` when it has one.
 
 Without a tree, `new` exits 2 and names `--source`; with a tree that cannot
-bind the application, it exits 1. Either way it writes no file. A build of
+bind the application, it exits 1. Either way it creates no target directory;
+an existing empty target directory is preserved. `new --contract` requires
+Cargo with Rust 1.97.1 and cached dependencies for offline reconciliation;
+`cargo fetch` in the source tree fills that cache. A build of
 the CLI with the environment variable `ZENO_FCIS_BUILD_TREE` set records that
 path as its tree instead, or, when it is empty, none, so that the binary
 holds no build directory; such a binary always needs `--source`. The release
@@ -117,8 +149,8 @@ release binary, extract the release's `source/zeno-fcis-<version>-source.tar.gz`
 and pass `--source <extracted source tree>`:
 
 ```sh
-tar -xzf zeno-fcis-1.1.0-source.tar.gz
-zeno-fcis new my-app --contract my-contract --source zeno-fcis-1.1.0
+tar -xzf zeno-fcis-2.3.0-source.tar.gz
+zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.3.0
 ```
  The generated README lists the build commands, which
 `tools/check_app_journey.py` runs exactly as written, in a new directory, on
@@ -300,9 +332,13 @@ Formal commands apply the exit classes to each backend result:
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
 
 The retained `KernelChecked` evidence type does not provide a public Lean
-exporter. A checked public symbolic route remains unfinished; see the
-[candidate assurance scope](RELEASE_CANDIDATES.md). The existing solver path remains attested unless
-the required independent proof checking and translation obligations are met.
+exporter. For independently checked scalar program equivalence, use
+`transform check-certificates` and `transform replay-certificates`; see the
+[certificate route](SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
+for its restricted fragment, checker setup, receipt format and trusted base.
+That receipt grants no application or adoption authority. `prove`,
+`contract check-symbolic` and `transform check --symbolic` retain their existing
+solver evidence classes.
 
 ## Finite synthesis
 
@@ -355,6 +391,20 @@ that several times faster than a debug build. In the app study of
 their packets were byte-identical. Prefer a release build for these
 commands; their results do not depend on the build.
 
+A decision program of at most 256 nodes, 16 outputs and 32 inputs uses the
+profile `zeno-fcis/finite-i64/1`. A larger one, up to 4,096 nodes, 64 outputs
+and 64 inputs, uses the profile `zeno-fcis/finite-i64/2`; `generate contract`
+and `new --contract` refuse a contract past any of these limits and name the
+counts. `export-program` writes either profile, and an application built
+from either decides through the library Authority. The commands that read a
+`program.zcve` file, `transform`, `optimize` and `loop`, read it with the
+library importer, which admits profile 1 only. `transform check` and
+`optimize` refuse a file over 64 KiB as `program-too-large` before decoding
+it, and a smaller profile 2 program with status `refused`, detail `{"code":
+"program-encoding", "reason": "original-not-admitted"}` and exit 1. No
+transform receipt can name a profile 2 program, so `contract adopt` cannot
+replace one.
+
 ## Checked program transform
 
 `transform check` compares a supplied candidate with an original finite scalar
@@ -368,8 +418,8 @@ gives the program's result and its true Step usage. The declared
 `--step-limit` (default 256) is then compared with that usage; it never
 changes a result. The default domain limit is 100,000,000 tuples.
 
-Results use schema `zeno-fcis/transform-result/1`. Every result has a `detail`
-object. Once both programs are read, `check` also reports the `limits` it used
+Results use schema `zeno-fcis/transform-result/1`. Checker results have a `detail`
+object; supervisor failures instead carry a top-level `reason`. Once both programs are read, `check` also reports the `limits` it used
 and both programs' SHA-256 digests. Input and output values and integer domain
 bounds are decimal strings; Boolean positions are `"0"` or `"1"`.
 
@@ -410,6 +460,52 @@ application's sealed observations and would be a new contract version. This
 command does not adopt candidates, and a receipt grants no application or
 publication authority.
 
+### Offline parallel enumeration
+
+This development-source feature is awaiting combined stable qualification.
+
+`transform check --offline-parallel` partitions the same ordered domain into
+ranges and merges their verified reports in ordinal order. Successful verdicts
+and receipt bytes match serial checking. Operational failure can instead make
+a run inconclusive, including failure in a later range of a dispatched window
+that already contains a witness.
+
+| Flag | Default | Limit |
+| --- | ---: | ---: |
+| `--workers` | 4 | 1–8 |
+| `--chunk-tuples` | 4096 | 1–4096 |
+| `--max-chunks` | 65536 | 1–65536 |
+| `--work-units` | 1000000000000 | Complete reservation must fit |
+| `--deadline-ms` | 60000 | 1–60000 |
+
+These flags require `--offline-parallel`. This mode uses the Linux contained
+runtime described in [Installation](INSTALLATION.md#contained-checker-runtime).
+On macOS it prints one JSON result with `"status":"inconclusive"`,
+`"authority":"none"`, `"reason":"containment-unavailable:platform"` and
+`"accounting_complete":false`, exits 2, and checks and writes nothing; the
+serial check works there.
+The final `progress` object reports `reserved_work`, `setup_reserved`,
+`evaluated_pairs`, `equal_prefix`, `measured_steps` (two decimal strings),
+`planned_chunks`, `completed_chunks`, `active_workers`, `scheduling` (observed
+CPU affinity and nice priority), and `accounting_complete`. It is final accounting, not a live progress stream.
+A killed process reports incomplete accounting and cannot supply range progress.
+
+Operational reasons include `work-exhausted`, `work-accounting-exceeded`,
+`chunk-cap`, `deadline`, `worker-unavailable`, `worker-failed`,
+`range-coverage`, `operational-limits`, and `operational-dimensions`.
+Containment failure, abnormal exit, or incomplete teardown also returns
+inconclusive, exit 2. Exhaustion never gives a verdict or a new transform
+receipt. A child hands its staged receipt to the supervisor, which publishes
+only after accepting the exit and teardown. Receipt publication (also in serial
+mode) uses an exclusive hard link and requires filesystem hard-link support.
+The parent directory is opened and synced before exposing that link. If the
+post-link directory sync fails, publication removes the link and syncs the
+rollback. A failed rollback is reported explicitly as `receipt-may-exist` or
+`receipt-absent-durability-uncertain`; do not treat that failure as a receipt
+publication acknowledgment. These guarantees require a working filesystem
+and a trusted, stable parent namespace; failing storage or concurrent namespace
+replacement can prevent rollback or durable confirmation.
+
 ## Symbolic per-case checks
 
 `contract check-symbolic` and `transform check --symbolic` ask the pinned
@@ -433,6 +529,179 @@ supported constructs and its limits.
   `contract refresh-receipts` and contract generation refuse it.
 
 Without `--symbolic`, `transform check` is unchanged.
+
+## Checked composition
+
+`contract check-composition MANIFEST` checks a composition of separately
+bound application contracts. The manifest, schema
+`zeno-fcis/checked-composition/1` or, with groups,
+`zeno-fcis/checked-composition/2`, names each leaf contract's directory
+(its `project.zeno` and `v2/policy.json`, relative to the manifest) with the
+SHA-256 of both files and of the identity of the program they bind to, the
+leaf's invariant, its assumption over its interface observation and command,
+its guarantees, each tagged `StateFact` or `TransitionRelation`, the global
+state slots it owns, its complete footprint and the state fields it exports
+as views; and the interface edges, each feeding one context field of a
+consumer leaf with a provider leaf's view read from the same pre-state.
+Formulas use the contract rules' expression language and are compiled into
+the library's law programs.
+
+The profile is sequential: one leaf decides each command, peers are seen
+only through views of the same pre-state, leaves own disjoint state, and
+there are no effects or outbox deliveries. For each leaf, the command
+compiles the contract as `generate contract` does, binds it to the library
+Authority, and runs the Authority on every input of the leaf's complete
+declared domain, state by command by context; a domain of more than 2^20
+inputs is refused, not sampled. Every decision is replayed. It requires:
+
+- the declared genesis satisfies the invariant, and the Authority's genesis
+  and its replay succeed;
+- on every input whose state satisfies the invariant and whose command and
+  context satisfy the assumption: an Accept whose successor satisfies the
+  invariant, or a business Reject that changes nothing; no technical
+  refusal, committed failure, effect or delivery; and every transition
+  relation within its scope;
+- the invariant implies every StateFact on every state;
+- an Accept, and a Reject when listed, on some such input;
+- every write and read the Authority attempts within the declared footprint.
+
+Across leaves, the manifest denotes a `zeno-fcis-compose` composition
+specification: one component per leaf, which may write the slots it owns and
+reads its peers' slots through their views, with one guarantee for each
+declared guarantee and one assumption for each leaf with interface fields.
+The compose crate judges that specification: two leaves that own one slot
+are a write-write conflict, and every edge must name a listed provider and
+one of its declared guarantees. The command also requires the owned slots to
+run from 0 without a gap; exactly one edge for each context field, from a
+different leaf, through a view whose domain equals the field's, with facts
+that are the provider's StateFacts and read only the viewed field; and, for
+every value of the consumer's interface fields and every command, that the
+providers' facts imply the consumer's assumption. A cycle of edges is
+accepted, because each fact follows from its own leaf's invariant, which
+that leaf's genesis establishes and its admitted inputs preserve.
+
+A `/2` manifest also lists groups and names the root group. Each group lists
+its children (leaves and groups, each a child of exactly one group), its
+environment inputs, its exports, an outer assumption and an outer guarantee.
+A group's environment inputs are exactly the context fields of its leaves
+that no edge from inside the group feeds; it names each one
+`context.102.<id>`. An export is a view of one of its leaves, named
+`post.100.<id>`. The outer assumption is a list of named formulas over the
+environment inputs and the leaves' command fields; it cannot read the route,
+which leaf a command selects. A command field is one variable shared by ID,
+so every leaf that declares an ID must give it the same type. The outer
+guarantee is a list of formulas over the exports. In a `/2` manifest a
+context field may be
+fed by no edge: it is then an environment input of every group above its
+leaf, up to the root.
+
+For each group, children first, the command checks, over every value of the
+fields each formula reads, that wherever the facts of the edges feeding a
+child from inside the group and the group's outer assumption hold, each
+conjunct of the child's assumption holds: a leaf's assumption split at its
+top-level `&&`, or a child group's outer assumption. A conjunct that does not
+hold there and reads only environment inputs and command fields becomes part
+of the group's outer assumption and is checked again one level up; a
+conjunct that also reads a field fed inside the group is refused. The
+command also checks that the children's guarantees on the group's exports (a
+leaf's StateFacts, a child group's outer guarantee) imply each conjunct of
+the outer guarantee. The root's outer assumption, with every conjunct that
+rose to it, is the claim's condition: with none the claim is
+`unconditional`; when every condition reads only environment inputs, it is
+`unconditional under named external assumptions`; when one reads a command
+field it is `conditional`. The root's assumption must hold on some input.
+This is not the strict discharge rule of equation 2.8: an edge's facts are
+the provider leaf's own StateFacts at every level, which hold because every
+leaf's invariant holds jointly, and the outer guarantees are checked and
+reported but discharge nothing. Groups are components of the compose
+specification: a group writes nothing, guarantees its outer guarantee and
+the delivery of its outer assumption to its children, and, below the root,
+assumes its outer assumption. A `/1` manifest is the flat case and is checked
+as before.
+
+`--write-aggregate DIR` writes the composition's aggregate contract,
+`project.zeno` and `v2/policy.json`, into `DIR` and validates it;
+`--aggregate DIR` validates an aggregate contract already written. The
+aggregate is an ordinary contract for `generate contract` and `new
+--contract`: slot `s` is state field `1000 + s` with the owning leaf field's
+type, the leaves' command fields are shared by ID, a target command field
+selects one leaf, an environment input is a context field, and each leaf's
+cases are guarded by its target value. The validation is structural and does
+not enumerate the joint state. It compiles the aggregate through the
+ordinary contract route and requires: its state fields to be the slots with
+their leaves' domains and its genesis to be every leaf's genesis; the target
+to range over the leaves and every other command or context field to be a
+leaf's, with the same domain; no channel or delivery; that no program node
+can leave the 64-bit range on any input within the declared domains; a Step
+budget that covers every program and law node, and the Authority's observed
+usage within it; on each route, the aggregate's program with its target
+fixed to that route, reduced to canonical terms, choosing the selected
+leaf's cases in the leaf's order with the same classes and reasons, giving
+the leaf's successor values to the leaf's slots, reading each peer view from
+the provider's slot of the same pre-state and leaving every other slot
+unchanged; and every aggregate law to be a StateInvariant whose conjuncts
+each read one leaf's slots and hold on every state of that leaf satisfying
+its invariant. The correspondence is claimed on pre-states satisfying every
+leaf's invariant on its slots. An aggregate that fails names the obligation.
+
+An aggregate has at most 64 inputs, 64 outputs and 4,096 program nodes; a
+register ring of one state field per leaf fits at most 61 leaves.
+
+The repository's Verus harness `verification/verus/checked_assembly.rs`
+proves, with the tables, the validated step equation and genesis as
+premises, that every history of the aggregate keeps every leaf's invariant at
+every state, and that fixing the target and reducing to canonical terms
+preserves the evaluator specification's values. A conditional claim is that
+theorem with the root's outer assumption among each route's admitted
+commands. The trusted base, tested and not proved, is listed in the result
+as `trusted_base`:
+
+- The checker's exhaustive enumeration of each leaf's local, StateFact and
+  interface tables with the leaf's bound Authority.
+- The group checks of equation 2.8: their tables and the discharge and rise
+  of each child's assumption.
+- The assembly validator's canonical terms, route specialization and case
+  pairing, compared with the library evaluator on the register ring and chain
+  and constructor by constructor in unit tests.
+- The assembly validator's comparison of classes, reasons, assignments and
+  frames, its field, genesis and routing checks, and its law-implication
+  tables.
+- The interval analysis showing that no eager node can trap, and the meter
+  check with its cost model of one Step per program or law node.
+- The link from the bound Authorities' actual decisions (case selection,
+  assignments, law and meter refusals) to the abstract decision functions of
+  the Verus theorem.
+
+The application-level safety statement is therefore machine-checked over the
+evaluator specification, with the validator implementation tested, not
+proved.
+
+The result, schema `zeno-fcis/checked-composition-result/1`, records the
+manifest's schema, SHA-256 and commitment, the checker's source-bound
+identity, the commitment of the composition specification, each leaf's
+bindings and counts, the SHA-256 of each table the checker ran, the edges and
+the cycles; with groups, each group's discharged and risen conjuncts, its
+tables and the claim with its conditions; with an aggregate, what the
+validation established.
+The identity combines the SHA-256 of the checker's own source files, the
+source digests of `zeno-fcis-spec` and `zeno-fcis-compose`, and the library
+evaluator's digest. `--receipt FILE` writes the result as a receipt, schema
+`zeno-fcis/checked-composition-receipt/1`: compact JSON with object keys in
+byte order and a final newline. `--replay FILE` runs every check again and
+requires that receipt byte for byte; a difference is reported with the path
+of the first value that differs.
+
+The result grants no runtime authority. It makes no liveness, fairness,
+trace, continuous-dynamics, delivery, asynchronous or shared-write coupling
+claim; states outside a history from a checked genesis keep only the
+conditional local statements. A conditional claim, and a claim under named
+external assumptions, covers only the histories whose commands and context
+satisfy the root's outer assumption; neither the checker nor the aggregate
+checks those conditions when a command runs.
+
+Exit codes: 0 `checked` or `replayed`; 1 `refused`, naming the obligation,
+the leaf or edge and, where one exists, the input that shows it, or
+`replay-mismatch`; 3 when a file could not be read or written; 64 for usage.
 
 ## Checked optimizer
 
@@ -606,11 +875,12 @@ published 100-case corpus
 (calibration only) 508 instructions; under `functional-bool-v1` every Boolean
 seed and corpus output passes the profile's gate with the same totals.
 [`docs/benchmarks/measure_optimizer.py`](benchmarks/measure_optimizer.py)
-reproduces these figures and replays every receipt. In a release build the
-portfolio takes about 1 second on the controller, 14 seconds on the decision
-graph (mostly the checker's enumeration of 1,296,000 tuples) and under 0.5
-seconds on 87 of the 100 corpus cases (at most 1.5 seconds); a debug build is
-several times slower.
+reproduces these figures and replays every receipt. In a release build,
+measured on a shared machine as the median of three runs, the portfolio took
+1.628 seconds on the controller, 30.64 seconds on the decision graph (mostly
+the checker's enumeration of 1,296,000 tuples) and under 0.5 seconds on 87 of
+the 100 corpus cases (at most 1.734 seconds); a debug build is several times
+slower.
 
 These are results of a bounded search, not minimality claims: tables are exact
 only for supports of at most 2^16 tuples and within the table budget, larger
@@ -630,9 +900,9 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 
 | Command | Effect |
 | --- | --- |
-| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i64-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile, freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the compiled ceilings (8 attempts, 8 checks, 4 model calls, 1,000,000 work units per check, 8,000,000 per session, 20,000 ms) are refused; lower limits win. Hosted providers, source disclosure and spending are fixed disabled. |
+| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i64-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i64-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
 | `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
-| `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H]` | Drives attempts until the proposer is exhausted or a limit stops the session. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
+| `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
 | `loop encode --program J --out P` | Encodes a fixture-vocabulary program as canonical bytes after library admission; the output file is never overwritten. |
 
@@ -675,9 +945,56 @@ that rolls back both files together is outside its detection, which is the
 documented host-integrity assumption. The `--deadline-ms` limit bounds one
 `run` or `candidate` invocation's loop work; an agent's thinking time between
 `candidate` calls is not loop work, while attempts, checks and work caps are
-session-wide and persisted. Check workers run on a supervised thread with a
-two-second deadline and panic capture; memory caps are not installed by this
-shell, the checker's allocation being bounded by the admitted artifact limits.
+session-wide and persisted. The invocation runs in a contained process with a
+64 MiB memory cap and no swap. Check stages have a two-second cooperative
+deadline; the supervisor allows one second of grace to record a timeout before
+killing an unresponsive stage. The whole loop has a 25-second cap from spawn,
+including startup and teardown. A zero-remaining stage records a timeout
+without starting work. Durable session records can retain earlier completed
+checks even if a later stage fails; resume independently rechecks them.
+
+Work policy `zeno-fcis/checker-work/4` defines **admission-control units**,
+not elapsed CPU time or a proof that every machine instruction is metered.
+`check_work` reserves import, dispatch, enumeration, merge and receipt services;
+`session_work` also charges preparation and each resume replay, without refunds.
+Version 4 scales the work ceilings to the original (below); every charge is
+version 3's.
+Measured evaluator Steps must fit the reservation at runtime; this check does
+not measure every shell service. Candidate output names `detail.session.state`
+and, when closed, `stop_reason`; preparation exhaustion includes the session
+report and permanently closes it. Separate `acquisition` accounting bounds
+bootstrap reads and reports skipped leftover staging entries (at most four).
+
+The work ceilings scale with the original. The check ceiling is the work of
+checking the original against a candidate of its own size, at least the
+compiled 1,000,000 units and at most 2^28 (268,435,456). The session ceiling
+funds all eight attempts even when each arrives in an invocation of its own,
+as every attempt through the MCP tools does: per attempt, two checks (its own
+and the invocation's replay of the incumbent) and 4,310,016 units for the
+largest intake (a JSON candidate with provenance, 2,625,536), the attempt's
+import preparation at the largest artifact (635,904) and the replay of eight
+stored counterexamples (1,048,576). That is 50,480,128 units at the smallest
+check ceiling and 4,329,447,424 at the largest. An omitted `--check-work` or
+`--session-work` takes its ceiling, a larger one is refused, and
+`request.json` records the values, so a reopened or resumed session is held
+to the limits it was opened with. The check cap is sized to the two-second
+check stage: the loop's four-worker check spent 2.2 to 3.2 seconds on
+687,409,803 units for the 1,296,000-tuple decision graph before the checker
+speedup, so a check at the cap should take about 0.9 to 1.3 seconds on that
+machine by linear scaling. That is an estimate, not a timing guarantee; a
+check that outlives its stage is reported as incomplete. Explicit limits at
+rc.1's 1,000,000/8,000,000 may now be refused earlier than under rc.1, which
+did not charge candidate intake/import preparation: at the maximum artifact
+allowance an attempt reserves 635,904 units before checking, JSON intake
+additionally prepays 2,101,248 units without provenance before any file read,
+and eight such JSON attempts alone require 21,897,216 units, before checks or
+resume. Silently rescaling a stored request would authorize work above its
+bound, and reducing the tariff would omit bounded services.
+Variable byte sizes, domain sizes and resume counts mean the old and new
+units are not interchangeable. Sessions bind
+this policy in their canonical request; a request that binds another version,
+or an rc.1 request without one, refuses as `work-policy-changed`, must be
+reopened, and cannot reuse its old request identity.
 
 Strategy proposals in the optimizer's grammar (`zeno-fcis/optimize-strategy/1`:
 named phases with bounded rounds, optional limits, a fixed extractor and an
@@ -689,8 +1006,9 @@ can pass the loop's profile admission, and fuses the session's checked
 replacement, when there is one, into its search as a supplied program; it
 proposes nothing unless it finds a candidate better than that replacement. A
 strategy that names another profile is `strategy-unavailable`, as is a phase
-outside the optimizer's table. In a
-debug build the default strategy finishes within 2 seconds on every measured
+outside the optimizer's table.
+
+In a debug build the default strategy finishes within 2 seconds on every measured
 program of at most 1,024 tuples; a larger domain can take longer than the
 deadline, and an abandoned search is reported as a failed search, never as a
 candidate. The optimizer's own checker verdict is only
@@ -851,6 +1169,18 @@ refusal finding. With `--out`, `--format json` prints a summary with schema
 review observes the contract's behaviour on chosen inputs. It is not a proof
 about the rules, and a boundary set is not the domain; it does not replace
 the owner's review of the rules file.
+
+`--mutant-programs DIR` also writes, into a new directory, the decision
+program of every mutant the review classifies `equivalent-over-full-domain`,
+one canonical `<id>.zcve` each, as seed proposals for
+`optimize --with-candidate` and `loop run --seed`. A seed is never evidence:
+the review compares decisions, while output 0 of a decision program is the
+selected case's index, so a decision-equivalent mutant (two disjoint cases
+swapped) can still be a different program. Each seed is therefore marked with
+the transform checker's own verdict against the contract's program
+(`program_equivalent`), and the optimizer and the loop check it again before
+using it. The JSON summary lists each seed's path, size and SHA-256 under
+`mutant_programs`; an existing directory is refused (exit 3).
 
 ## Generated application command line
 
@@ -1025,10 +1355,15 @@ against the classifier.
 
 On success the command writes, in this order, `v2/adoptions/N/program.zcve`
 and `v2/adoptions/N/receipt.json`, the generated contract, and last
-`v2/policy.json` with the new entry appended. It renders the whole rules file
-again in the templates' layout, two-space indentation and one entry per line,
-keeping its keys in order, so the file's own spacing and line breaks are not
-kept. An
+`v2/policy.json` with the new entry appended in the file's own layout: every
+existing byte is kept, and the entry follows the last adoption, or opens a
+new last key `adoptions`, one entry per line and indented with the
+whitespace that starts the line of the file's first key. Compact files, whose
+first key does not start a line, use two spaces for the added entry; existing
+bytes and line endings are preserved, and the added entry uses the file's
+line ending, `\r\n` included. This is the only command that keeps the
+file's layout: `contract refresh-receipts`, when it rebinds a receipt, and
+`contract evolve` write the file again in the templates' layout (below). An
 interruption leaves the rules unchanged: `generate contract` then regenerates
 the previous version, and running the same `contract adopt` again finishes
 the adoption, accepting an adoption directory that holds only this candidate
@@ -1059,7 +1394,10 @@ DIR` then checks every adoption again with the current checker, under its
 receipt's limits, and requires the new receipt to record exactly what the old
 one does in every field but `checker`. It writes the new receipts, the
 regenerated contract and last the rules with the new digests, after
-generating the result again with every new receipt replayed from scratch. It
+generating the result again with every new receipt replayed from scratch.
+Those rules are written whole in the templates' layout, two-space indentation
+and one entry per line, so a file `contract adopt` kept in its own layout
+loses that layout here. It
 never reuses the old verdict, and it refuses, writing nothing, when a pair is
 no longer equivalent or anything else would change. Running it again
 finishes an interrupted refresh. Its result is `refreshed` with the rebound
@@ -1108,12 +1446,12 @@ compares the two programs once on every input tuple; within one process the
 application binds its lineage once and remembers the outcome, so a second
 audit compares nothing again. Two programs with identical instructions and
 roots are equal without enumeration, and nothing else is skipped. For the
-withdrawal queue, measured on a shared machine, one comparison took about 3
-seconds in a release build of the application and about 4 seconds in a
-debug build, whose generated manifest optimises `zeno-fcis-synthesis` while
-keeping overflow checks and debug assertions on. A checkpoint open skips the
-comparisons before its checkpoint. Enumeration runs on one thread; parallel
-enumeration is planned, not built. No comparison runs while the store's
+withdrawal queue, measured on a shared machine as the median of three runs,
+one comparison took 8.0 seconds in a release build of the application and
+9.5 seconds in a debug build, whose generated manifest optimises
+`zeno-fcis-synthesis` while keeping overflow checks and debug assertions
+on. A checkpoint open skips the comparisons before its checkpoint. The store comparison remains serial; offline parallel enumeration is available
+through `transform check --offline-parallel`. No comparison runs while the store's
 write lock is held: the shell establishes what it needs before its
 transaction, so other connections can keep writing meanwhile. The receipt digests in the report and the
 record are provenance. The shell replays no receipt; it establishes
@@ -1181,8 +1519,10 @@ are described in [Data migrations and renames](#data-migrations-and-renames).
 4. The new `v2/policy.json` is `NEW`'s rules with an `evolutions` list: one
    entry per replaced contract, oldest first, binding the SHA-256 of that
    contract's last policy and of the review, and for a rename or a migration
-   its `kind`. `NEW`'s `tests/decision-examples.txt`, when present, replaces
-   the application's.
+   its `kind`. It is written in the templates' layout, two-space indentation
+   and one entry per line, whatever the layout of either policy file.
+   `NEW`'s `tests/decision-examples.txt`, when present, replaces the
+   application's.
 
 Generation, by `contract evolve` and by every later `generate contract`,
 regenerates every version of every replaced contract from its kept files,
@@ -1306,17 +1646,42 @@ new state record a value from the old state, by field ID:
 
 Values are written as the rules file writes them: `true` or `false`, an
 integer in the field's range, or a variant's ID. Every new field must be
-given a value, every old field must be carried into at least one new field,
-since a migration renames, adds and splits fields and drops none, and keys
-other than these are refused. Text fields have no finite domain and cannot
-be migrated. Deliveries are compared without a mapping: a layout change keeps
-every payload and destination type, and a change of either is classified
-`unrelated` and refused before any migration is read.
+given a value. Version 1 carries every old field into at least one new field
+and retains its original state-only grammar and encoding. Version 2 also allows
+`"drop": [FIELD_IDS]` for old state fields that no new field uses. Unknown,
+duplicate or still-used drop IDs are refused. Complete forward simulation must
+preserve decisions, reasons, mapped successors and ordered deliveries; an
+explicit drop alone does not admit a migration. Historical segments keep the
+removed values and replay under their original contracts. Payload maps retain
+every old field and stay injective. Text fields have no finite domain and cannot
+be migrated.
+
+For state expressions and payload representation changes, use schema
+`zeno-fcis/migration/2`. Its optional `payloads` object maps channel IDs to
+complete new payload records using the same field forms. Each changed payload
+needs an explicit map. `{"expr":"old.145 >= 2"}` reads only its source
+record's field 145: the library's closed finite program computes Boolean or
+checked i64 results with addition, subtraction, comparisons, Boolean operators
+and `choose`. Multiplication, division, text and external inputs are refused.
+All source valuations must evaluate successfully into the declared target
+domain, including those excluded by state laws.
+
+Payload maps must be total and injective on the complete old payload domain,
+with at most 65,536 records and 64 MiB of retained canonical mapped bytes.
+Partial, lossy, trapped and over-cap maps are refused before writes. Each
+future new publication must carry exactly the mapped old payload, with the
+same lane, ordinal, channel, destination and idempotency. Pending deliveries
+retain their original payload bytes, policy identity, entry hash and delivery
+ID; after upgrade they are replayed and acknowledged under their historical
+contract. This declared representation relation still requires owner review
+of units and interpretation. It is not an independent proof of business
+semantics. Payload shortcuts are checked against the full composed route,
+including maps on otherwise unchanged payload schemas.
 
 **Admission by forward simulation.** `contract evolve` and every later
 `generate contract` compile the file against both contracts and run the
-SQLite shell's own simulation, compiled into the CLI from the shell's
-source, over the application's last version and `NEW`'s first, through the
+SQLite shell library's own simulation over the application's last version
+and `NEW`'s first, through the
 library's bound Authorities:
 
 - It enumerates every state of the old contract's declared state domain and
@@ -1340,8 +1705,9 @@ library's bound Authorities:
   the new contract's publication over `m(s)` must give the same
   observations as the old contract's over `s`: the same technical refusal,
   or the same decision class and reason; the same deliveries in order, each
-  with its lane, ordinal, channel, destination, payload and idempotency
-  value as the library's candidate holds them; and for a commit a successor
+  with its lane, ordinal, channel, destination and idempotency exact, and
+  payload bytes exact or related by the admitted explicit representation map;
+  and for a commit a successor
   state equal, byte for byte as the store would hold it, to `m` of the old
   successor. Matching successor states alone admit nothing.
 
@@ -1471,10 +1837,10 @@ is the kind of the change:
 | Kind | Condition | Admission path |
 |---|---|---|
 | `identical` | The canonical policies are byte-identical, so the contract identities are equal. | None is needed. |
-| `program-successor` | NEW's canonical policy, with its decision program's instructions and roots and its Step limit replaced by OLD's, is byte for byte OLD's policy. This is premise 1 of the F6.1 upgrade, the comparison the SQLite shell makes. | An F3 equivalence receipt and the F6.1 program-successor upgrade, admitted at any state. It exists today. |
-| `rename` | Both schemas declare the same types, fields and variants, with the same IDs and forms; some project, type, field or variant name differs; and NEW's policy, with OLD's schema and schema commitment in place of its own, is byte for byte OLD's policy. | G2's rename tier, admitted at any state; it exists today: [`contract evolve`](#data-migrations-and-renames) without `--migration`. |
-| `layout-change` | The state layout differs, while every other type and every channel is unchanged. Names, laws, cases, reasons, the genesis state and the decision program may differ too. | A G2 data migration, admitted by forward simulation over the old contract's whole declared input domain; it exists today: [`contract evolve --migration`](#data-migrations-and-renames). |
-| `rule-change` | The schemas are byte-identical and so are the channels. Since neither of the first two kinds holds, the policies differ in more than the decision program and its Step limit: in laws, cases, reasons or the genesis state. | G14.1's behaviour-change upgrade, which exists today: [`contract evolve`](#rule-changes-for-live-stores) records the change with this account, and a store upgrades when every state law of the new contract and every inductive claim it declares hold on the store's state. G2's forward simulation also exists today, for a rule change that preserves every decision: [`contract evolve --migration`](#data-migrations-and-renames). |
+| `program-successor` | NEW's canonical policy, with its decision program's instructions and roots and its Step limit replaced by OLD's, is byte for byte OLD's policy. This is premise 1 of the program-successor upgrade, the comparison the SQLite shell makes. | A `transform` equivalence receipt and the program-successor upgrade, admitted at any state. It exists today. |
+| `rename` | Both schemas declare the same types, fields and variants, with the same IDs and forms; some project, type, field or variant name differs; and NEW's policy, with OLD's schema and schema commitment in place of its own, is byte for byte OLD's policy. | The rename tier, admitted at any state; it exists today: [`contract evolve`](#data-migrations-and-renames) without `--migration`. |
+| `layout-change` | The state or payload layout differs, while commands, context, destination roots and channel IDs are unchanged. Shared protected and unrelated types stay unchanged. Names, laws, cases, reasons, the genesis state and the decision program may differ too. | A data migration, admitted by forward simulation over the old contract's whole declared input domain; it exists today: [`contract evolve --migration`](#data-migrations-and-renames). |
+| `rule-change` | The schemas are byte-identical and so are the channels. Since neither of the first two kinds holds, the policies differ in more than the decision program and its Step limit: in laws, cases, reasons or the genesis state. | The behaviour-change upgrade, which exists today: [`contract evolve`](#rule-changes-for-live-stores) records the change with this account, and a store upgrades when every state law of the new contract and every inductive claim it declares hold on the store's state. Forward simulation also exists today, for a rule change that preserves every decision: [`contract evolve --migration`](#data-migrations-and-renames). |
 | `unrelated` | Anything else. | Refused. |
 
 The terms:
@@ -1482,17 +1848,16 @@ The terms:
 - **The state layout** is the state record, type 100, with each field's ID
   and type, and the form of every type a state field has: a boolean, an
   integer range, a text length range, or a sum's variant IDs. Names are not
-  part of it. A type a state field has counts as the state's only when no
-  command, context, payload or destination field has it and it is no channel's
-  destination or payload, on either side.
-- **Every other type** is the command and context roots, payloads and
-  destinations, the types their fields have, a type the state shares with
-  them, and any type nothing has.
+  part of it. State and payload layouts may evolve together. Their changed
+  leaf types must not also occur in command, context or destination roots.
+- **Protected types** are command, context and destination roots and their
+  field types. Changes to state or payload types shared with these roots are
+  refused. Unrelated types remain unchanged.
 - **The channels** are each channel's ID, destination type and payload type.
 
-So `unrelated` covers: a channel added, removed or given another destination
-or payload type; a change to the command, the context, a payload, a
-destination, a shared type or an unused type; and names changed together
+So `unrelated` covers: a channel added, removed or given another destination;
+a change to the command, the context, a destination, a protected shared type
+or an unused type; and names changed together
 with laws, cases, reasons, the genesis state or the decision program, which no
 single admission path takes. A renaming and another change can be two
 versions instead. A type's form includes its range: widening an integer type
@@ -1520,8 +1885,8 @@ contracts copied elsewhere, prints the same bytes. It holds:
 - `admission`: whether one is `needed`, whether the change is `refused`, and
   the `paths`, each with its `id` (`f6.1-program-successor`, `g2-rename`,
   `g2-migration`, `g2-forward-simulation` or `g14.1-behaviour-change`), its
-  plan `feature`, whether it `exists_today` (every path does), and `when`
-  it applies. For a
+  `feature` (an internal label for the capability), whether it
+  `exists_today` (every path does), and `when` it applies. For a
   program successor, `ready` says that NEW's lineage holds OLD below its
   current version, so the receipts exist and the application's `--upgrade`
   admits a store at OLD; when NEW is instead an earlier version of OLD's
@@ -1560,14 +1925,15 @@ invalid, as `generate contract` would refuse it, and 3 when a file cannot be
 read, both reported with schema `zeno-fcis/cli/1` and a `side`, `old` or
 `new`, and nothing written; 64 for usage.
 
-The classifier's `program-successor` comparison mirrors the shell's
-`v2::upgrade::program_successor` line for line. The CLI's unit tests compile
-the shell's upgrade and equivalence modules from their own source and check,
+The classifier calls the shell library's `v2::upgrade::program_successor`
+and `v2::migration::rename_exact` functions directly. The CLI's unit tests use
+the same store library and check,
 on every planted pair of
 `crates/zeno-fcis-cli/tests/fixtures/contract-diff/pairs.json` and on both
 adoptions, in both directions, that the shell's comparison accepts exactly
 the pairs the classifier calls `identical` or `program-successor`, and that
-every pair the shell's F6.1 Tier A admission admits is a `program-successor`. The converse does not
+every pair the shell's program-successor (Tier A) admission admits is a
+`program-successor`. The converse does not
 hold: Tier A also needs law 991 in both contracts, both Step premises and the
 two decision programs' equivalence, none of which the classifier checks. That
 is evidence on those pairs, not a proof for all contracts.
@@ -1576,7 +1942,7 @@ is evidence on those pairs, not a proof for all contracts.
 
 Two scripts in `tools/` deliver a store's pending entries to an external
 system. Both use only the Python standard library. The protocol and its
-strength are described in `docs/V2_SQLITE_STAGE.md`, "Relay protocol".
+strength are described below.
 
 ```sh
 python3 tools/relay.py --export-command "APP --relay-export DB" \
@@ -1663,13 +2029,14 @@ is no hosted model, automatic prose interpretation, or automatic labeler.
 Every response is JSON (`zeno-fcis/contract-draft/1`) with `authority: none`
 and `hosted_model: off`. Use the returned `revision` for the next mutation.
 
-`propose` reserves and saves an attempt before running the existing F1 generator
-and library binding. Invalid rules, refused assessments, raw proposal text,
-provenance and the preceding revision remain in `draft.json`. The first
+`propose` reserves and saves an attempt before running the existing contract
+generator (`generate contract`) and library binding. Invalid rules, refused
+assessments, raw proposal text, provenance and the preceding revision remain in
+`draft.json`. The first
 bindable proposal fixes the canonical schema and program input order for later
 rounds. Changing that shape requires a new session. Rules with existing adoption
 or evolution histories need the existing lineage workflows, not this new-contract
-workflow. `questions` returns the current F2 packet, including its decision table,
+workflow. `questions` returns the current review packet, including its decision table,
 distinguishing inputs and proposed answers. **A proposed answer is not a label.**
 
 Supply expected decisions through `label --examples FILE --provenance TEXT`,
@@ -1684,17 +2051,18 @@ Initial and additional labels are assumed requirements, retained without overwri
 older labels, and rechecked against every later proposal. Contradictory labels need
 an explicitly revised new session; this version does not retract labels.
 
-`check` recomputes F1/F2 and exits 1 unless at least one parsed supplied label exists,
-every current distinguishing input is labeled, and no comparison or F2 finding
-fails. Newly supplied examples can change F2's probe bases and produce more
+`check` regenerates the contract, recomputes the review and exits 1 unless at least
+one parsed supplied label exists, every current distinguishing input is labeled,
+and no comparison or review finding fails. Newly supplied examples can change
+the review's probe bases and produce more
 questions; repeat `questions`, `label`, or `propose` until ready. `finalize` applies
 the same fresh check at the specified revision and writes a new contract directory:
 project/rules/examples, generated schema/policy/Rust, intent, complete transcript,
 and `draft-finalized.json`. The report lists each compared label and difference,
-question coverage, assumed provenance, and the full advisory F2 packet. A proposal
+question coverage, assumed provenance, and the full advisory review packet. A proposal
 operation exiting 0 only means the assessment ran, not that finalization is ready.
 
-Limits are fixed at start: 1–8 proposal rounds (default 4), 1–4096 F2 tuples per
+Limits are fixed at start: 1–8 proposal rounds (default 4), 1–4096 review tuples per
 assessment (default 4096), at most 1024 combined decision examples and 1024 label
 submissions, 1 MiB per source/provenance and combined examples, and 16 MiB per
 serialized transcript. A malformed proposal consumes a round. The final permitted
@@ -1716,11 +2084,11 @@ cooperating-tool concurrency, not a hostile-filesystem guarantee.
 
 After separate intent review, `zeno-fcis new APP --contract NEW_DIR --source TREE`
 uses the existing scaffold. A finalized draft grants no runtime Publication,
-adoption or deployment approval. F2 remains bounded, advisory evidence relative to
+adoption or deployment approval. The review remains bounded, advisory evidence relative to
 supplied examples and declared laws; undistinguished mutants, unprobed inputs,
 reachability and omitted requirements are unresolved, not proved correct.
 
-The G7 fixtures in `crates/zeno-fcis-cli/tests/fixtures/contract-draft/` expose three
+The drafting fixtures in `crates/zeno-fcis-cli/tests/fixtures/contract-draft/` expose three
 intent summaries and rewritten complete proposals. They preserve the initial
 example files' recorded review provenance. Extra test labels come from a simulated
 supplier evaluating the retained original template, never from the submitted

@@ -14,6 +14,7 @@ pub type EvaluationView<'a>=(CoreView<'a>,Result<Seq<u8>,Refusal>);
 pub open spec fn read<'a>(r:ReadAttempt)->Seq<Part<'a>>{
     seq![Part::Word(r.source as u128)]+match r.selector{
         Selector::Root=>seq![Part::Word(0)],
+        Selector::PayloadField(id)=>seq![Part::Word(2),Part::Word(id as u128)],
         Selector::Field(id)=>seq![Part::Word(1),Part::Word(id as u128)],
 
     }+seq![Part::Word(r.permitted as u128)]

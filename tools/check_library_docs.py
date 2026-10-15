@@ -92,25 +92,15 @@ REQUIRED_FILES = (
     Path("test-projects/external-consumer/Cargo.lock"),
     Path("test-projects/external-consumer/src/main.rs"),
 )
+# Current entry points name the workspace package version. Historical V1
+# contracts and release notes retain the version whose behavior they describe.
 VERSIONED_DOCS = (
-    Path("README.md"),
-    Path("CHANGELOG.md"),
-    Path("llms.txt"),
-    Path("docs/INSTALLATION.md"),
-    Path("docs/QUICKSTART.md"),
-    Path("docs/API_REFERENCE.md"),
-    Path("docs/CRATE_MAP.md"),
-    Path("docs/FEATURE_MATRIX.md"),
-    Path("docs/V1_1_RELEASE_NOTES.md"),
-    Path("docs/V1_PRODUCT_CONTRACT.md"),
-    Path("docs/ZENO_LANGUAGE_V1.md"),
-    Path("docs/TEMPORAL_LOGIC_V1.md"),
-    Path("docs/FORMAL_TOOLS_RC3.md"),
-    Path("docs/MINI_DETERMINATOR.md"),
-    Path("docs/QEMU_MINI_DETERMINATOR.md"),
-    Path("docs/CLI_REFERENCE.md"),
-    Path("docs/PACKAGING.md"),
+    Path("README.md"), Path("CHANGELOG.md"), Path("llms.txt"),
+    Path("docs/INSTALLATION.md"), Path("docs/API_REFERENCE.md"),
+    Path("docs/CRATE_MAP.md"), Path("docs/FEATURE_MATRIX.md"),
+    Path("docs/CLI_REFERENCE.md"), Path("docs/RELEASE_CANDIDATES.md"),
 )
+
 REQUIRED_README_MARKERS = (
     "use zeno_fcis::prelude::*;",
     "docs/QUICKSTART.md",
@@ -151,6 +141,8 @@ REQUIRED_RELEASE_WORKFLOW_MARKERS = (
     '"v1.0.0-rc.*"',
     '"v1.0.0"',
     '"v1.1.0"',
+    '"v2.2.*"',
+    '"v2.3.*"',
     "workflow_dispatch:",
     "contents: read",
     "python3 tools/rc_package.py build",

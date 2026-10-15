@@ -20,9 +20,18 @@ claim and return one `Substance`:
 | Code | Meaning |
 | --- | --- |
 | `constant-true` | True for every assignment of the observations it reads. It can never fail. |
-| `constant-false` | False for every assignment. Any effect depends on which decisions it is applied to, which `.zeno` does not state. |
+| `constant-false` | False for every assignment. A law that is always false on every decision (`on any` or no scope) refuses every decision, and a claim that is always false cannot be proved; neither checks any particular behavior. A law on only some decisions is classified as below. |
 | `ignores-transition` | A single-step formula that reads no post-state, effect, outbox, or event observation, or a temporal formula that reads no observation at all. No transition outcome can change it. |
-| `may-constrain-transition` | Reads an observation that a transition can change. Necessary for a meaningful constraint; not sufficient. |
+| `may-constrain-transition` | Reads an observation that a transition can change, or is a law on only some decisions that is not always true (below). Necessary for a meaningful constraint; not sufficient. |
+
+A law declared on only some decisions, `on accept`, `on reject`, `on failure`
+or `on commit`, also decides which decision a pre-state and input may take:
+where it is false, every decision in its scope is refused. `law_substance`
+therefore classifies such a law as `may-constrain-transition` when its formula
+alone would be `ignores-transition` or `constant-false`. An authorization law
+such as `law 503 arbiter_only on accept = context.102.120 == 7` counts under
+`--require-substantive`; the same formula on every decision (`on any` or no
+scope) does not. A `constant-true` law is vacuous in any scope.
 
 An inductive claim's invariant is asserted of every state the application
 commits. So, as with a temporal formula, reading any state observation can

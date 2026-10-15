@@ -316,3 +316,73 @@ pub(super) fn branches(defs: &[Definition<'_>], bs: &[Branch<'_>], ls: &[(u32, u
     }
     true
 }
+
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==super::family_spec::numeric_fields(defs@,original@,actual@),))]
+fn numeric_fields(
+    defs: &[Definition<'_>],
+    original: &[Field<'_>],
+    actual: &[super::super::input_view::Field<Domain<'_>>],
+) -> bool {
+    if original.len() != actual.len() {
+        return false;
+    }
+    let mut i = 0usize;
+    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=original.len(),original.len()==actual.len(),forall|j:int|0<=j<i ==> super::family_spec::numeric_field(defs@,original[j],actual[j]),decreases original.len()-i,))]
+    while i < original.len() {
+        if original[i].id != actual[i].id {
+            return false;
+        }
+        let Some(def) = find(defs, original[i].type_id) else {
+            return false;
+        };
+        if !domain(def, actual[i].leaf) {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==super::family_spec::numeric_schema(*description,root,actual),))]
+fn numeric_schema(
+    description: &Description<'_>,
+    root: u32,
+    actual: Schema<'_, Domain<'_>>,
+) -> bool {
+    if let Schema::Original {
+        checked,
+        root: actual_root,
+        ..
+    } = actual
+    {
+        return actual_root == root
+            && super::schema::encoding_matches(checked.original(), description, u64::MAX);
+    }
+    let defs = description.definitions;
+    let Some(def) = find(defs, root) else {
+        return false;
+    };
+    match (def.kind, actual) {
+        (Kind::Record(fs), Schema::Record(actual)) => numeric_fields(defs, fs, actual),
+        (_, Schema::Leaf(leaf)) => domain(def, *leaf),
+        _ => false,
+    }
+}
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==super::family_spec::roots(*description,d,f),))]
+pub(super) fn family_roots(
+    description: &Description<'_>,
+    d: &super::composition::DescriptorProjection<'_>,
+    f: &Framing,
+) -> bool {
+    use super::composition::descriptor::DescriptorView;
+    match d.view {
+        DescriptorView::Legacy(d) => roots(description, d, f),
+        DescriptorView::Numeric(d) => {
+            description.root == f.state.root
+                && (matches!(d.state, Schema::Record(_))
+                    || matches!(d.state, Schema::Original { checked, root, .. } if super::composition::ingress::original::fields(checked, root).is_some()))
+                && numeric_schema(description, f.state.root, d.state)
+                && numeric_schema(description, f.command.root, d.command)
+                && numeric_schema(description, f.context.root, d.context)
+        }
+    }
+}

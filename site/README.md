@@ -154,8 +154,8 @@ and trusted base. The authored policy still needs review against intended
 behavior. Independent examples and host conformance tests detect policy and
 integration mistakes; they do not prove that a deployment meets every
 requirement. Earlier synthesis, controller and solver evidence remains
-documented in the template READMEs and private historical oracle. That evidence
-does not describe a hand-written adapter running in this page.
+documented in the template READMEs and the kernel-law oracle tests. That
+evidence does not describe an adapter running in this page.
 
 The browser store is a tested host implementation, not a formally verified
 durable shell. State and queued entries live only in memory, no entry is

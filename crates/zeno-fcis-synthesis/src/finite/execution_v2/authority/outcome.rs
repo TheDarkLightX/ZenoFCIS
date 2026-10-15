@@ -47,6 +47,10 @@ pub(super) fn append_reads<'a>(parts: &mut Vec<Part<'a>>, values: &[ReadAttempt]
         parts.push(Part::Word(value.source as u128));
         match value.selector {
             Selector::Root => parts.push(Part::Word(0)),
+            Selector::PayloadField(id) => {
+                parts.push(Part::Word(2));
+                parts.push(Part::Word(id as u128));
+            }
             Selector::Field(id) => {
                 parts.push(Part::Word(1));
                 parts.push(Part::Word(id as u128));

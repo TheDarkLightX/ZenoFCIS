@@ -11,10 +11,15 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 
 ```text
 checked examples/minimal/project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365
+unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
+  complete-footprint: component 300 needs evidence that it reads and writes only what its footprint declares
+  sequential-parity: the merge needs evidence that the merged components decide as they would one after another
 ```
 
-The line shows the project ID, number of components, number of claims, checks
-that still need evidence, and the identity of the checked program.
+The first line shows the project ID, number of components, number of claims,
+obligations that still need evidence, and the identity of the checked program.
+The lines after it say what each of those obligations asks for; they are not
+errors.
 
 The command also prints two warnings on stderr:
 
@@ -37,7 +42,7 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 ```
 
 ```json
-{"claims":1,"components":1,"path":"examples/minimal/project.zeno","project_id":1,"schema":"zeno-fcis/cli/1","semantic_program_hash":"57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365","status":"valid","substance":{"claims":[{"code":"constant-true","id":500,"name":"identity"}],"laws":[{"code":"constant-true","id":400,"name":"identity"}]},"unresolved_obligations":2,"unresolved_paths":{"claims":[],"laws":[]}}
+{"authority":"none","claims":1,"components":1,"evidence":"authoring-spec","obligations":[{"claim":null,"component":300,"explanation":"component 300 needs evidence that it reads and writes only what its footprint declares","kind":"complete-footprint","peer":null},{"claim":null,"component":null,"explanation":"the merge needs evidence that the merged components decide as they would one after another","kind":"sequential-parity","peer":null}],"path":"examples/minimal/project.zeno","project_id":1,"runtime_admission":"not-run","schema":"zeno-fcis/cli/1","semantic_program_hash":"57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365","status":"valid","substance":{"claims":[{"code":"constant-true","id":500,"name":"identity"}],"laws":[{"code":"constant-true","id":400,"name":"identity"}]},"unresolved_obligations":2,"unresolved_paths":{"claims":[],"laws":[]}}
 ```
 
 The keys appear in stable order and the schema has an explicit version.

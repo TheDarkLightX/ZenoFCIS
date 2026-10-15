@@ -1,0 +1,65 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "idempotency-slot",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/idempotency-slot.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "015a6fe7df6620230df5949d2821573708bd803582524ef85a5e4e729bcd6c74"
+  },
+  "input_domains": [
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 1024,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 3
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "16006ce29ea7d91a5e0b2e3e68373fd0018a68d585861679d05749f4e0721d25",
+  "source_sha256": {
+    "examples/c3.txt": "f92248e3955e2e86c8e52d2f452133e145491952d66564946395439f3ce0e8f7",
+    "family.json": "9a3ab13390d324ac620015529a7283fa003c57ca4dc1828546982c6ff603caa0",
+    "policy.json.in": "242474fb27df230ff8a797314e9b23e1ec4592bba0c86dda4d99c2a6de88528f",
+    "project.zeno.in": "1a99f7ff9a44f4a6f143263c7d8a1f056ccaaa526db296bfa0d83b714aaeab8b"
+  },
+  "state_tuples": 32,
+  "version": 1
+}

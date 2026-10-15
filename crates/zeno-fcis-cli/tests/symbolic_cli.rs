@@ -17,8 +17,9 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
-use zeno_fcis_codec::CommitmentHasher;
+use zeno_fcis_codec::{CanonicalEncode as _, CommitmentHasher};
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const CLI: &str = env!("CARGO_BIN_EXE_zeno-fcis");
@@ -489,6 +490,95 @@ fn an_unknown_is_inconclusive() {
         checked.stderr.contains("CVC5 answered unknown"),
         "{}",
         checked.stderr
+    );
+}
+
+#[test]
+fn symbolic_retention_failure_leaves_no_attested_receipt() {
+    let directory = Directory::new();
+    let queries = directory.path("queries");
+    // The stand-in creates a collision only after admission and query-directory
+    // creation. Its model replays the planted control, so the only refusal is
+    // the failed transcript retention after an otherwise equivalent comparison.
+    let script = format!(
+        "#!/bin/sh\n\
+         if [ \"$1\" = \"--version\" ]; then printf 'This is cvc5 version 1.3.3\\n'; exit 0; fi\n\
+         mkdir '{}/outputs.smt2' 2>/dev/null || :\n\
+         input=''\n\
+         while IFS= read -r line || [ -n \"$line\" ]; do input=\"$input$line;\"; done\n\
+         case \"$input\" in\n\
+           *'planted control:'*) printf 'sat\\n(\\n(define-fun x0 () Int 0)\\n(define-fun original_first () Int 0)\\n(define-fun candidate_first () Int 0)\\n)\\n' ;;\n\
+           *) printf 'unsat\\n(step t0 :rule refl)\\n' ;;\n\
+         esac\n",
+        queries.display()
+    );
+    let solver = directory.write("retention-solver", script.as_bytes());
+    fs::set_permissions(&solver, fs::Permissions::from_mode(0o700))
+        .unwrap_or_else(|error| panic!("make retention solver executable: {error}"));
+    let tools = directory.write(
+        "tools.json",
+        json!({"format": "zeno-fcis/tools/2", "tools": [{
+            "backend": "cvc5", "path": solver, "version": "1.3.3",
+            "sha256": sha256(script.as_bytes()), "timeout_ms": 10000,
+            "max_output_bytes": 1048576, "allowed_axioms": []
+        }]})
+        .to_string()
+        .as_bytes(),
+    );
+    let wide = Domain::Int {
+        min: i64::MIN,
+        max: i64::MAX,
+    };
+    let program = Program::try_new(vec![wide], vec![wide], vec![Op::Input(0)], vec![0])
+        .unwrap_or_else(|error| panic!("identity program: {error:?}"));
+    let program = directory.write(
+        "identity.zcve",
+        &program
+            .value()
+            .unwrap_or_else(|error| panic!("program value: {error:?}"))
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("canonical program: {error:?}")),
+    );
+    let control = transform(
+        &program,
+        &program,
+        &[
+            "--symbolic".as_ref(),
+            "--tools".as_ref(),
+            tools.as_os_str(),
+            "--max-input-tuples".as_ref(),
+            "256".as_ref(),
+        ],
+    );
+    assert_eq!(control.exit, Some(2), "{}", control.stdout);
+    assert_eq!(
+        control.json()["status"],
+        "attested-equivalent",
+        "{}",
+        control.stdout
+    );
+    let receipt = directory.path("refused.json");
+    let checked = transform(
+        &program,
+        &program,
+        &[
+            "--symbolic".as_ref(),
+            "--tools".as_ref(),
+            tools.as_os_str(),
+            "--symbolic-receipt".as_ref(),
+            receipt.as_os_str(),
+            "--queries".as_ref(),
+            queries.as_os_str(),
+            "--max-input-tuples".as_ref(),
+            "256".as_ref(),
+        ],
+    );
+    assert_eq!(checked.exit, Some(3), "{}", checked.stdout);
+    assert_eq!(checked.json()["status"], "io-error");
+    assert!(queries.join("outputs.smt2").is_dir());
+    assert!(
+        !receipt.exists(),
+        "retention failure published an attested receipt"
     );
 }
 

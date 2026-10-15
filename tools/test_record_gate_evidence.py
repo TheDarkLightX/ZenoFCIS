@@ -1,14 +1,16 @@
-"""Source-revision checks for the gate evidence recorder.
+"""Source identity checks for gate evidence and its assurance archives.
 
-Gates, versions, and git are replaced with fakes, so these tests never run a
-gate or edit the checkout.
+Gates, versions, and git are replaced with fakes. Bundle CLI tests use temporary
+fixtures, so these tests never run a gate or edit the checkout.
 """
 
+import hashlib
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -259,6 +261,104 @@ class IgnoredExecutionChecks(unittest.TestCase):
             result = recorder.run("inventory", ["cargo", "test", "--no-run", "--message-format=json"])
         self.assertFalse(result["evidence_complete"])
         self.assertIn("inventory_error", result)
+
+
+BUILDER = Path(__file__).with_name("build_assurance_bundle.py")
+
+
+class AssuranceBundleTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="assurance-bundle-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / "source.json"
+        self.source.write_text(json.dumps({
+            "format": "zeno-fcis/source-manifest/1", "clean": True, "commit": "a" * 40,
+        }))
+        self.payload = self.root / "evidence.json"
+        self.payload.write_text(json.dumps({
+            "format": "zeno-fcis/source-manifest/1", "clean": False, "commit": "b" * 40,
+        }))
+        self.output = self.root / "bundle.zip"
+
+    def build(self, *labels, output=None):
+        command = [sys.executable, str(BUILDER), "--source-manifest", str(self.source),
+                   "--output", str(output or self.output)]
+        for label in labels:
+            command.extend(["--artifact", f"{label}={self.payload}"])
+        return subprocess.run(command, capture_output=True, text=True, check=False)
+
+    def inspect(self, output=None):
+        # This oracle knows only the published archive format, not builder helpers.
+        with zipfile.ZipFile(output or self.output) as archive:
+            names = archive.namelist()
+            self.assertEqual(len(names), len(set(names)), "ambiguous ZIP member")
+            manifest = json.loads(archive.read("BUNDLE-MANIFEST.json"))
+            entries = manifest["artifacts"]
+            labels = [entry["label"] for entry in entries]
+            paths = [entry["path"] for entry in entries]
+            self.assertEqual(len(labels), len(set(labels)), "ambiguous artifact label")
+            self.assertEqual(len(paths), len(set(paths)), "ambiguous artifact path")
+            self.assertEqual(set(names), {"BUNDLE-MANIFEST.json", *paths})
+            for entry in entries:
+                content = archive.read(entry["path"])
+                self.assertEqual(entry["size"], len(content))
+                self.assertEqual(entry["sha256"], hashlib.sha256(content).hexdigest())
+            source = archive.read("evidence/source-manifest.json")
+            self.assertEqual(source, self.source.read_bytes())
+            self.assertEqual(json.loads(source)["commit"], manifest["source_commit"])
+            self.assertIs(json.loads(source)["clean"], True)
+
+    def test_source_manifest_label_collision_is_refused_without_output(self):
+        result = self.build("source-manifest")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("artifact labels must be unique", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_source_manifest_path_collision_is_refused_without_output(self):
+        result = self.build("source-manifest.json")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("artifact archive paths must be unique", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_refusal_preserves_an_existing_bundle(self):
+        for label in ("source-manifest", "source-manifest.json", "repeated"):
+            with self.subTest(label=label):
+                self.output.write_bytes(b"existing reviewed bundle")
+                labels = (label, label) if label == "repeated" else (label,)
+                result = self.build(*labels)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(self.output.read_bytes(), b"existing reviewed bundle")
+
+    def test_duplicate_requested_labels_stay_refused(self):
+        result = self.build("proof", "proof")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_valid_bundle_has_unambiguous_source_and_evidence(self):
+        result = self.build("proof.json", "test-results", "source-manifest-extra")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.inspect()
+
+    def test_bundle_without_extra_artifacts_is_valid(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.inspect()
+
+    def test_argument_order_does_not_change_bundle_bytes(self):
+        first = self.build("proof.json", "test-results")
+        second_path = self.root / "second.zip"
+        second = self.build("test-results", "proof.json", output=second_path)
+        self.assertEqual((first.returncode, second.returncode), (0, 0))
+        self.inspect(second_path)
+        self.assertEqual(self.output.read_bytes(), second_path.read_bytes())
+
+    def test_invalid_archive_labels_stay_refused(self):
+        for label in ("../source-manifest.json", "evidence/source-manifest.json", "", "UPPER"):
+            with self.subTest(label=label):
+                result = self.build(label)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertFalse(self.output.exists())
 
 
 if __name__ == "__main__":

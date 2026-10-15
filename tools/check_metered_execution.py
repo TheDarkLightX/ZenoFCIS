@@ -8,10 +8,12 @@ cannot prove. Neither result closes the raw-state or mandatory-authority bridge.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -27,6 +29,9 @@ PROFILE = Path("verification/verus/metered-execution.json")
 HARNESS = Path("verification/verus/metered_execution.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs")
 METER, SPEC = SUBJECT.parent / "meter.rs", SUBJECT.parent / "spec.rs"
+# G3 moved the single eager charge-then-evaluate driver into numeric.rs; the
+# legacy execute route reaches it through evaluate_nodes.
+NUMERIC = SUBJECT.parent / "numeric.rs"
 RESOURCE = Path("crates/zeno-fcis-core/src/resource.rs")
 INPUT = SUBJECT.parent / "input_view.rs"
 INPUT_SPEC = SUBJECT.parent / "input_view/spec.rs"
@@ -42,6 +47,7 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
            Path("tools/check_finite_execution.py"), Path("tools/check_verus.py"),
            Path("tools/verus_coverage.py"), Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
+           Path("crates/zeno-fcis-synthesis/src/finite/ir/program.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
            Path("crates/zeno-fcis-synthesis/tests/v2_execution.rs"))
@@ -65,15 +71,19 @@ def entry_contract(source: str, replacement: str) -> str:
     return source[:start] + replacement + source[end:]
 
 
-def mutation_sources(execution: str, meter: str, spec: str, resource: str) -> dict[str, tuple[Path, str, str]]:
+def mutation_sources(execution: str, meter: str, spec: str, resource: str,
+                     numeric: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
     for name, before, after in (
         ("omit_step_charge", "meter.charge(Resource::Step, 1)", "meter.charge(Resource::Step, 0)"),
         ("charge_wrong_resource", "meter.charge(Resource::Step, 1)", "meter.charge(Resource::Read, 1)"),
-        ("skip_unused_instruction", "while index < nodes.len() {", "while index + 1 < nodes.len() {"),
+        ("skip_unused_instruction", "while index < program.len() {", "while index + 1 < program.len() {"),
+        ("wrong_budget_precedence", "return Err(Failure::Budget(error));", "return Err(Failure::Arithmetic);"),
+    ):
+        mutations[name] = (NUMERIC, once(numeric, before, after), "proof")
+    for name, before, after in (
         ("rollback_consumed_usage", "if result.is_err() {", "if result.is_err() { meter.used.counters = [0; 8];"),
         ("leak_partial_buffers", "if result.is_err() {", "if false {"),
-        ("wrong_budget_precedence", "return Err(Failure::Budget(error));", "return Err(Failure::Arithmetic);"),
     ):
         mutations[name] = (SUBJECT, once(execution, before, after), "proof")
     for name, before, after in (
@@ -85,11 +95,16 @@ def mutation_sources(execution: str, meter: str, spec: str, resource: str) -> di
     mutations["alias_step_counter"] = (RESOURCE, once(resource, "Self::Step => 7", "Self::Step => 6"), "proof")
     # Computing the node before charging preserves final outputs/counters. This
     # mutant must verify, then fail the independent operational body inventory.
-    reordered = once(execution, "        if let Err(error) = meter.charge(Resource::Step, 1) {",
-                     "        let cached = evaluation::evaluate_node(&nodes[index], input, values);\n"
+    reordered = once(numeric, "        if let Err(error) = meter.charge(Resource::Step, 1) {",
+                     "        let cached = match program.instruction(index) {\n"
+                     "            Some(op) => Some(typed::node(op, input, Values::Typed(values))),\n"
+                     "            None => None,\n"
+                     "        };\n"
                      "        if let Err(error) = meter.charge(Resource::Step, 1) {")
-    reordered = once(reordered, "match evaluation::evaluate_node(&nodes[index], input, values) {", "match cached {")
-    mutations["execute_before_charging"] = (SUBJECT, reordered, "coverage")
+    reordered = once(reordered, "let Some(op) = program.instruction(index) else { return Err(Failure::Reference); }; "
+                     "match typed::node(op, input, Values::Typed(values)) {",
+                     "let Some(cached) = cached else { return Err(Failure::Reference); }; match cached {")
+    mutations["execute_before_charging"] = (NUMERIC, reordered, "coverage")
     end = execution.index("pub fn execute(")
     start = execution.rindex("#[cfg_attr(verus_keep_ghost, verus_spec(result =>", 0, end)
     attribute = execution[start:end]
@@ -107,6 +122,49 @@ def mutation_sources(execution: str, meter: str, spec: str, resource: str) -> di
     mutations["add_uncontracted_work"] = (SUBJECT,
         execution + "\nfn uncharged_identity(value: i64) -> i64 { value }\n", "coverage")
     return mutations
+
+
+SEMANTIC_TARGETS = {
+    "omit_step_charge": (NUMERIC, "evaluate"),
+    "charge_wrong_resource": (NUMERIC, "evaluate"),
+    "skip_unused_instruction": (NUMERIC, "evaluate"),
+    "wrong_budget_precedence": (NUMERIC, "evaluate"),
+    "rollback_consumed_usage": (SUBJECT, "evaluate_into"),
+    "leak_partial_buffers": (SUBJECT, "evaluate_into"),
+    "accept_exhausted_charge": (METER, "charge"),
+    "mutate_usage_on_overflow": (METER, "charge"),
+    "alias_step_counter": (RESOURCE, "index"),
+}
+
+
+def classify_mutation(proc, report, name, path, changed, specimen, pin, profile,
+                      *, expected, vir=None):
+    """Mixed operational errors never qualify an intended control."""
+    if type(proc.returncode) is not int or proc.returncode not in (0, 1) or verifier.NON_SEMANTIC.search(proc.stderr):
+        return False, None
+    if expected == "proof":
+        target = SEMANTIC_TARGETS.get(name)
+        if target is None or path != target[0]:
+            return False, None
+        try:
+            region = verifier.function_lines(changed, target[1])
+        except ValueError:
+            return False, None
+        if name == "skip_unused_instruction":
+            # This pin's retained evaluate refusal names its entry invariant so.
+            stderr = re.sub(r'^error: invariant not satisfied before loop$',
+                            'error: invariant not satisfied', proc.stderr, flags=re.M)
+            proc = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, stderr)
+        return verifier.semantic_refusal(proc, report, pin, path, specimen,
+            region=region, target_functions=profile["target_functions"]), None
+    if (expected != "coverage" or proc.returncode != 0 or vir is None
+            or not verifier.proof_succeeded(report, pin) or verifier.ERROR_HEADER.search(proc.stderr)):
+        return False, None
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        return True, str(error)
+    return False, None
 
 
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
@@ -143,7 +201,7 @@ def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     return {"test_output": native.stdout.strip(), "api_consumers": outcomes}
 
 
-def check(cache: Path, install: bool) -> dict:
+def check(cache: Path, install: bool, retained_directory: Path | None = None) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this proof profile requires qualified Linux x86-64 tools")
     pin = json.loads((ROOT / verifier.PIN).read_text())
@@ -158,10 +216,18 @@ def check(cache: Path, install: bool) -> dict:
                "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
-    with tempfile.TemporaryDirectory(prefix="zeno-fcis-meter-proof-") as temporary:
+    context = (nullcontext(str(retained_directory)) if retained_directory is not None
+               else tempfile.TemporaryDirectory(prefix="zeno-fcis-meter-proof-"))
+    with context as temporary:
         directory = Path(temporary)
+        (directory / "source_sha256.json").write_text(json.dumps(before, indent=2, sort_keys=True) + "\n")
         positive_command = [*command, "--log-dir", str(directory / "positive"), str(HARNESS)]
         positive = verifier.run(positive_command, ROOT, environment)
+        (directory / "positive.json").write_text(positive.stdout)
+        (directory / "positive.stderr").write_text(positive.stderr)
+        (directory / "positive-process.json").write_text(json.dumps({
+            "command": positive_command, "cwd": str(ROOT), "returncode": positive.returncode,
+        }, indent=2, sort_keys=True) + "\n")
         verifier.require_success(positive)
         report = json.loads(positive.stdout)
         if not verifier.accepted(report, report_pin):
@@ -171,30 +237,29 @@ def check(cache: Path, install: bool) -> dict:
         print("V2 meter: exact proof coverage and native/API boundaries passed", flush=True)
         for name, (path, changed, expected) in mutation_sources(
                 (ROOT / SUBJECT).read_text(), (ROOT / METER).read_text(), (ROOT / SPEC).read_text(),
-                (ROOT / RESOURCE).read_text()).items():
+                (ROOT / RESOURCE).read_text(), (ROOT / NUMERIC).read_text()).items():
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
-            mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)], specimen, environment)
-            result = json.loads(mutant.stdout).get("verification-results", {})
-            coverage_error = None
-            if expected == "proof":
-                killed = (mutant.returncode != 0 and result.get("success") is False
-                          and type(result.get("errors")) is int and result["errors"] > 0
-                          and result.get("encountered-vir-error") is False)
-            else:
-                try:
-                    require_coverage((specimen / "logs/crate.vir").read_text(), profile)
-                except ValueError as error:
-                    coverage_error = str(error)
-                killed = (mutant.returncode == 0 and result.get("success") is True
-                          and result.get("errors") == 0 and coverage_error is not None)
+            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+            mutant = verifier.run(mutant_command, specimen, environment)
+            (specimen / "verus.json").write_text(mutant.stdout)
+            (specimen / "verus.stderr").write_text(mutant.stderr)
+            (specimen / "verus-process.json").write_text(json.dumps({
+                "command": mutant_command, "cwd": str(specimen), "returncode": mutant.returncode,
+            }, indent=2, sort_keys=True) + "\n")
+            mutant_report = json.loads(mutant.stdout)
+            result = mutant_report.get("verification-results", {})
+            vir = (specimen / "logs/crate.vir").read_text() if expected == "coverage" else None
+            killed, coverage_error = classify_mutation(mutant, mutant_report, name, path,
+                changed, specimen, pin, profile, expected=expected, vir=vir)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": coverage_error})
+                              "coverage_refusal": coverage_error, "logs": str(specimen)})
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
                 raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
             print(f"V2 meter: caught {name} ({expected})", flush=True)
@@ -222,10 +287,13 @@ def main() -> int:
     parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="metered-execution-run-", dir=args.out.parent))
     try:
-        receipt = check(args.cache.resolve(), args.install)
+        receipt = check(args.cache.resolve(), args.install, directory)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         receipt = {"schema": "zeno-fcis/metered-execution-evidence/1", "status": "failed", "error": str(error)}
+    receipt["logs"] = str(directory)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"V2 meter: {receipt['status']}; receipt: {args.out}")

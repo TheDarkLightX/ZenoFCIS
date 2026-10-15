@@ -4,7 +4,9 @@
 mod account_lockout;
 mod agent_treasury_guard;
 mod binding;
+mod checker_process;
 mod compliance_gateway;
+mod composition_command;
 mod contract;
 mod contract_adopt;
 mod contract_diff;
@@ -12,6 +14,7 @@ mod contract_evolve;
 mod contract_files;
 mod draft_command;
 mod durable_counter;
+mod effects;
 mod inventory_reservation;
 mod loop_command;
 mod loop_proposers;
@@ -26,8 +29,11 @@ mod shell_v2;
 mod symbolic;
 mod symbolic_command;
 mod synth;
+mod tau_command;
 mod transform;
 mod transform_command;
+mod transform_parallel;
+mod transform_plan;
 mod withdrawal_queue;
 
 use std::fs::{self, OpenOptions};
@@ -46,10 +52,10 @@ use zeno_fcis_formal_tools::{
 };
 pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;
 use zeno_fcis_spec::{
-    ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, PathResolution, ProjectLimits,
-    ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, Substance, claim_paths,
-    claim_substance, derive_composition, elaborate_project, generate_project, law_paths,
-    law_substance, parse_project, render_graph, resolve_path,
+    ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, ObligationKind, PathResolution,
+    ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, Substance,
+    UnresolvedObligation, claim_paths, claim_substance, derive_composition, elaborate_project,
+    generate_project, law_paths, law_substance, parse_project, render_graph, resolve_path,
 };
 
 const JSON_SCHEMA: &str = "zeno-fcis/cli/1";
@@ -134,6 +140,8 @@ enum ContractCommand {
     #[command(flatten)]
     Review(review_command::Command),
     #[command(flatten)]
+    Composition(composition_command::Command),
+    #[command(flatten)]
     Draft(draft_command::Command),
     #[command(flatten)]
     Adopt(contract_adopt::Command),
@@ -143,6 +151,8 @@ enum ContractCommand {
     Evolve(contract_evolve::Command),
     #[command(flatten)]
     Symbolic(symbolic_command::Command),
+    #[command(flatten)]
+    Tau(tau_command::Command),
     /// Write the contract's current decision program in the canonical program encoding that optimize, transform and loop read.
     ExportProgram {
         /// Application or contract directory holding project.zeno, v2/policy.json and any adoptions.
@@ -290,9 +300,12 @@ enum Command {
 enum GenerateTarget {
     /// Generate an application's V2 contract, v2/schema.zcve, src/v2_contract.rs and v2/policy.zcve, or check for drift.
     Contract {
-        /// Application directory holding project.zeno and v2/policy.json; the generated files are written there.
+        /// Application directory holding project.zeno and v2/policy.json; the generated files are written there unless --out names another directory.
         #[arg(default_value = ".")]
         dir: PathBuf,
+        /// Write the generated files under this directory instead, so a contract directory holds only the files its author writes. With --check, compare the files there.
+        #[arg(long)]
+        out: Option<PathBuf>,
         /// Compare with the files on disk and change nothing.
         #[arg(long)]
         check: bool,
@@ -362,7 +375,14 @@ enum SmtBackend {
 
 fn main() -> ExitCode {
     match Cli::try_parse() {
-        Ok(cli) => ExitCode::from(run(cli.command)),
+        Ok(cli) => {
+            if let Some(code) = checker_process::dispatch(&cli.command) {
+                return ExitCode::from(code);
+            }
+            let code = run(cli.command);
+            checker_process::shutdown(code);
+            ExitCode::from(code)
+        }
         Err(error) => {
             let exit = clap_error_exit(&error);
             let _ = error.print();
@@ -384,11 +404,13 @@ fn run(command: Command) -> u8 {
         Command::Loop { command } => loop_command::run(command),
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
+            ContractCommand::Composition(command) => composition_command::run(command),
             ContractCommand::Draft(command) => draft_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
             ContractCommand::Diff(command) => contract_diff::run(command),
             ContractCommand::Evolve(command) => contract_evolve::run(command),
             ContractCommand::Symbolic(command) => symbolic_command::run(command),
+            ContractCommand::Tau(command) => tau_command::run(command),
             ContractCommand::ExportProgram { dir, out, format } => {
                 contract_files::export_program(&dir, &out, format)
             }
@@ -411,9 +433,15 @@ fn run(command: Command) -> u8 {
             require_resolved_paths,
         ),
         Command::Generate {
-            target: Some(GenerateTarget::Contract { dir, check, format }),
+            target:
+                Some(GenerateTarget::Contract {
+                    dir,
+                    out,
+                    check,
+                    format,
+                }),
             ..
-        } => contract_files::run(&dir, check, format),
+        } => contract_files::run(&dir, out.as_deref(), check, format),
         Command::Generate {
             target: None,
             project,
@@ -538,224 +566,7 @@ fn describe_tree(command: &clap::Command, path: &[String]) -> Value {
 }
 
 fn describe_effects(path: &[String]) -> Value {
-    let path: Vec<_> = path.iter().map(String::as_str).collect();
-    let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
-        match path.as_slice() {
-            []
-            | ["backend"]
-            | ["synth"]
-            | ["synth", "completion"]
-            | ["transform"]
-            | ["loop"]
-            | ["contract"]
-            | ["contract", "draft"] => {
-                return json!({"classification": "command-group"});
-            }
-            ["describe"]
-            | ["backend", "list"]
-            | ["synth", "discover"]
-            | ["synth", "completion", "discover"] => (&[], &[], false, None),
-            ["synth", "completion", "find"] => {
-                (&["completion-problem"], &["completion-case"], false, None)
-            }
-            ["synth", "completion", "verify" | "replay"] => (
-                &["completion-problem", "completion-evidence"],
-                &[],
-                false,
-                None,
-            ),
-            ["synth", "run"] => (
-                &["synthesis-problem", "synthesis-artifacts"],
-                &["synthesis-artifacts"],
-                false,
-                Some("--check"),
-            ),
-            ["synth", "verify"] => (
-                &[
-                    "synthesis-problem",
-                    "synthesis-artifacts",
-                    "compiler-or-interpreter",
-                ],
-                &["temporary-files", "optional-conformance-receipt"],
-                true,
-                None,
-            ),
-            ["transform", "check"] => (
-                &[
-                    "original-program",
-                    "candidate-program",
-                    "optional-tools-manifest",
-                    "optional-toolchain-files",
-                ],
-                &[
-                    "optional-equivalence-receipt",
-                    "optional-symbolic-receipt",
-                    "optional-query-directory",
-                    "temporary-files",
-                ],
-                true,
-                None,
-            ),
-            ["transform", "replay"] => (
-                &[
-                    "equivalence-receipt",
-                    "original-program",
-                    "candidate-program",
-                ],
-                &[],
-                false,
-                None,
-            ),
-            ["optimize"] => (
-                &[
-                    "original-program",
-                    "optional-strategy",
-                    "optional-candidate-programs",
-                ],
-                &["optional-candidate-program", "optional-equivalence-receipt"],
-                false,
-                None,
-            ),
-            ["loop", "open"] => (&["original-program"], &["session-directory"], false, None),
-            ["loop", "candidate"] => (
-                &["session-directory", "candidate-program"],
-                &["session-directory"],
-                false,
-                None,
-            ),
-            ["loop", "run"] => (
-                &["session-directory", "proposer-configuration"],
-                &["session-directory"],
-                false,
-                None,
-            ),
-            ["loop", "resume"] => (&["session-directory"], &["session-directory"], false, None),
-            ["loop", "encode"] => (&["program-json"], &["canonical-program"], false, None),
-            ["contract", "draft", "start" | "propose" | "label"] => (
-                &["draft-session", "supplied-intent-rules-labels"],
-                &["draft-session"],
-                false,
-                None,
-            ),
-            ["contract", "draft", "questions" | "check"] => {
-                (&["draft-session"], &["temporary-draft-lock"], false, None)
-            }
-            ["contract", "draft", "finalize"] => (
-                &["draft-session"],
-                &["new-draft-contract", "temporary-draft-lock"],
-                false,
-                None,
-            ),
-            ["contract", "review"] => (
-                &["application-contract", "decision-examples"],
-                &["optional-review-packet"],
-                false,
-                None,
-            ),
-            ["new"] => (
-                &["target-directory", "application-contract"],
-                &["project-files"],
-                false,
-                None,
-            ),
-            ["check" | "graph" | "explain"] => (&["project"], &[], false, None),
-            ["generate"] => (
-                &["project", "generated-artifacts"],
-                &["generated-artifacts"],
-                false,
-                Some("--check"),
-            ),
-            ["generate", "contract"] => (
-                &["application-contract", "generated-artifacts"],
-                &["generated-artifacts"],
-                false,
-                Some("--check"),
-            ),
-            ["contract", "adopt"] => (
-                &[
-                    "application-contract",
-                    "candidate-program",
-                    "equivalence-receipt",
-                ],
-                &[
-                    "application-contract",
-                    "adopted-artifacts",
-                    "generated-artifacts",
-                ],
-                false,
-                None,
-            ),
-            ["contract", "diff"] => (
-                &["application-contract", "adopted-artifacts"],
-                &[],
-                false,
-                None,
-            ),
-            ["contract", "evolve"] => (
-                &[
-                    "application-contract",
-                    "adopted-artifacts",
-                    "evolved-artifacts",
-                    "new-contract",
-                ],
-                &[
-                    "application-contract",
-                    "adopted-artifacts",
-                    "evolved-artifacts",
-                    "generated-artifacts",
-                ],
-                false,
-                None,
-            ),
-            ["contract", "check-symbolic"] => (
-                &[
-                    "application-contract",
-                    "optional-strengthening",
-                    "optional-tools-manifest",
-                    "optional-toolchain-files",
-                ],
-                &[
-                    "optional-symbolic-report",
-                    "optional-query-directory",
-                    "temporary-files",
-                ],
-                true,
-                None,
-            ),
-            ["contract", "export-program"] => (
-                &["application-contract", "adopted-artifacts"],
-                &["decision-program"],
-                false,
-                None,
-            ),
-            ["contract", "refresh-receipts"] => (
-                &["application-contract", "adopted-artifacts"],
-                &[
-                    "application-contract",
-                    "adopted-artifacts",
-                    "generated-artifacts",
-                ],
-                false,
-                None,
-            ),
-            ["backend", "inspect"] => (&["tools-manifest"], &[], false, None),
-            ["backend", "inventory-lean"] => (&["toolchain-files"], &[], false, None),
-            ["doctor"] | ["backend", "verify"] => (
-                &["tools-manifest", "toolchain-files"],
-                &["temporary-files"],
-                true,
-                None,
-            ),
-            ["purity"] => (&["rust-source"], &[], false, None),
-            ["prove" | "counterexample"] => (
-                &["project", "tools-manifest", "toolchain-files"],
-                &["temporary-files", "retained-evidence"],
-                true,
-                None,
-            ),
-            _ => return json!({"classification": "unclassified"}),
-        };
-    json!({"classification": "declared", "reads": reads, "writes": writes, "executes_tools": executes_tools, "read_only_flag": read_only_flag})
+    effects::describe(path)
 }
 
 fn new_project(
@@ -764,6 +575,7 @@ fn new_project(
     contract: Option<&Path>,
     source: Option<&Path>,
 ) -> u8 {
+    let mut created = false;
     if dir.exists() {
         match fs::read_dir(dir) {
             Ok(mut entries) => {
@@ -774,10 +586,19 @@ fn new_project(
             }
             Err(error) => return io_error("inspect target", error),
         }
-    } else if let Err(error) = fs::create_dir(dir) {
-        return io_error("create target", error);
+    } else {
+        if let Err(error) = fs::create_dir(dir) {
+            return io_error("create target", error);
+        }
+        created = true;
     }
-    new_files(dir, template, contract, source)
+    let result = new_files(dir, template, contract, source);
+    if result != OK && created {
+        // Remove only our still-empty directory. Concurrent content, partial
+        // writes and every pre-existing directory remain in place.
+        let _ = fs::remove_dir(dir);
+    }
+    result
 }
 
 /// Writes a new project into the empty directory `dir`.
@@ -917,6 +738,7 @@ fn check(
                 derived.obligations().len(),
                 derived.semantic_program_hash()
             );
+            explain_obligations(derived.obligations());
             substance.warn();
             paths.warn();
             if unresolved {
@@ -939,11 +761,71 @@ fn check(
             "schema": JSON_SCHEMA, "semantic_program_hash": derived.semantic_program_hash().to_string(),
             "status": status,
             "substance": substance.to_json(),
+            "obligations": derived.obligations().iter().map(|obligation| json!({
+                "kind": obligation_code(obligation.kind()),
+                "component": obligation.component().map(StableId::get),
+                "peer": obligation.peer().map(StableId::get),
+                "claim": obligation.claim().map(StableId::get),
+                "explanation": obligation_text(obligation),
+            })).collect::<Vec<_>>(),
             "unresolved_obligations": derived.obligations().len(),
             "unresolved_paths": paths.to_json()
         })),
     }
     if unresolved || vacuous { INVALID } else { OK }
+}
+
+/// Prints what each counted `unresolved_obligations` entry asks for, after
+/// the `checked` line.
+fn explain_obligations(obligations: &[UnresolvedObligation]) {
+    if obligations.is_empty() {
+        return;
+    }
+    println!(
+        "unresolved obligations: evidence this check does not establish and generated code \
+         cannot discharge; they are not errors:"
+    );
+    for obligation in obligations {
+        println!(
+            "  {}: {}",
+            obligation_code(obligation.kind()),
+            obligation_text(obligation)
+        );
+    }
+}
+
+fn obligation_code(kind: ObligationKind) -> &'static str {
+    match kind {
+        ObligationKind::Assumption => "assumption",
+        ObligationKind::CompleteFootprint => "complete-footprint",
+        ObligationKind::ParallelLaw => "parallel-law",
+        ObligationKind::SequentialParity => "sequential-parity",
+    }
+}
+
+/// One sentence on what an obligation asks for.
+fn obligation_text(obligation: &UnresolvedObligation) -> String {
+    let id = |value: Option<StableId>| value.map_or(0, StableId::get);
+    let component = id(obligation.component());
+    match obligation.kind() {
+        ObligationKind::Assumption => format!(
+            "component {component} assumes claim {}, which must be proved separately",
+            id(obligation.claim())
+        ),
+        ObligationKind::CompleteFootprint => format!(
+            "component {component} needs evidence that it reads and writes only what its \
+             footprint declares"
+        ),
+        ObligationKind::ParallelLaw => format!(
+            "components {component} and {} share a path that one of them writes, or an effect \
+             or outbox, so running them in parallel needs a conflict law",
+            id(obligation.peer())
+        ),
+        ObligationKind::SequentialParity => String::from(
+            "the merge needs evidence that the merged components decide as they would one \
+             after another",
+        ),
+    }
 }
 
 /// Law and claim paths that name no declared type or field, in declaration
@@ -1108,7 +990,7 @@ fn law_warning(substance: Substance) -> Option<&'static str> {
             Some("is always true, so it can never detect a faulty transition")
         }
         Substance::Constant { value: false } => Some(
-            "is always false; any effect it has depends on which decisions it is applied to, which .zeno does not state",
+            "is always false and applies to every decision, so it refuses them all and checks no particular behavior",
         ),
         Substance::IgnoresTransition => Some(
             "reads no post-state, effect, outbox, or event, so no transition outcome can change it",
@@ -1847,6 +1729,127 @@ mod tests {
         ] {
             assert!(Cli::try_parse_from(arguments).is_ok());
         }
+    }
+
+    #[test]
+    fn every_contained_command_declares_its_tools_and_runtime() {
+        fn parsed(arguments: &[&str]) -> Command {
+            let mut line = vec!["zeno-fcis"];
+            line.extend_from_slice(arguments);
+            match Cli::try_parse_from(line) {
+                Ok(cli) => cli.command,
+                Err(error) => panic!("{arguments:?}: {error}"),
+            }
+        }
+        // Each command with its required arguments only, valued by its first
+        // choice, its default or `1`, a flag bare; positionals in order.
+        fn leaves(command: &Value, found: &mut Vec<(Vec<String>, Value)>) {
+            let children = command["subcommands"]
+                .as_array()
+                .unwrap_or_else(|| panic!("command children"));
+            if !children.is_empty() {
+                children.iter().for_each(|child| leaves(child, found));
+                return;
+            }
+            let mut line: Vec<String> = command["path"]
+                .as_array()
+                .unwrap_or_else(|| panic!("command path"))
+                .iter()
+                .map(|name| name.as_str().unwrap_or_default().to_owned())
+                .collect();
+            let arguments = command["arguments"]
+                .as_array()
+                .unwrap_or_else(|| panic!("command arguments"));
+            let required = arguments
+                .iter()
+                .filter(|argument| argument["required"] == true);
+            let mut positionals = Vec::new();
+            for argument in required {
+                let value = [&argument["choices"][0], &argument["defaults"][0]]
+                    .into_iter()
+                    .find_map(Value::as_str)
+                    .unwrap_or("1")
+                    .to_owned();
+                match (argument["position"].as_u64(), argument["long"].as_str()) {
+                    (Some(position), _) => positionals.push((position, value)),
+                    (None, Some(long)) if argument["arity"]["max"] == 0 => {
+                        line.push(format!("--{long}"));
+                    }
+                    (None, Some(long)) => line.extend([format!("--{long}"), value]),
+                    (None, None) => panic!("unnamed required argument {argument}"),
+                }
+            }
+            positionals.sort();
+            line.extend(positionals.into_iter().map(|(_, value)| value));
+            found.push((line, command["effects"].clone()));
+        }
+        let mut root = Cli::command();
+        root.build();
+        let tree = describe_tree(&root, &[]);
+        let mut found = Vec::new();
+        leaves(&tree, &mut found);
+        // Every loop command, named by the parser, so a new one needs review.
+        let example = |name: &str| -> &[&str] {
+            match name {
+                "open" => &["--original", "p.zcve", "--session", "s"],
+                "candidate" => &["--session", "s", "--candidate", "c.zcve"],
+                "run" => &["--session", "s", "--proposer", "local"],
+                "resume" => &["--session", "s"],
+                "encode" => &["--program", "p.json", "--out", "p.zcve"],
+                _ => panic!("loop {name}: review its containment and effects"),
+            }
+        };
+        let mut contained = 0;
+        let mut unparsed = Vec::new();
+        for (line, effects) in &found {
+            let line: Vec<&str> = line.iter().map(String::as_str).collect();
+            // Whether only a flag routes the command through `dispatch`.
+            let (command, conditional) = match line.as_slice() {
+                ["loop", name, ..] => {
+                    let mut arguments = vec!["loop", *name];
+                    arguments.extend_from_slice(example(name));
+                    (parsed(&arguments), false)
+                }
+                ["transform", "check", ..] => {
+                    let mut arguments = line.clone();
+                    assert!(checker_process::contained_profile(&parsed(&arguments)).is_none());
+                    arguments.push("--offline-parallel");
+                    (parsed(&arguments), true)
+                }
+                _ => match Cli::try_parse_from(std::iter::once("zeno-fcis").chain(line.clone())) {
+                    Ok(cli) => (cli.command, false),
+                    Err(_) => {
+                        unparsed.push(line.join(" "));
+                        continue;
+                    }
+                },
+            };
+            if checker_process::contained_profile(&command).is_none() {
+                assert!(!matches!(line.as_slice(), ["loop", ..]), "{line:?}");
+                continue;
+            }
+            contained += 1;
+            assert_eq!(effects["executes_tools"], true, "{line:?}");
+            // The runtime every contained command uses, optional when a flag
+            // selects it.
+            let prefix = if conditional { "optional-" } else { "" };
+            for (field, effect) in [
+                ("reads", "caller-cpu-limits"),
+                ("writes", "transient-user-unit"),
+            ] {
+                let declared = json!(format!("{prefix}{effect}"));
+                assert!(
+                    effects[field]
+                        .as_array()
+                        .is_some_and(|names| names.contains(&declared)),
+                    "{line:?} {field} {declared}"
+                );
+            }
+        }
+        assert_eq!(contained, 6, "five loop commands and the parallel check");
+        // Leaves whose required arguments alone do not parse; none is a loop
+        // command or a check, so none can be contained.
+        assert_eq!(unparsed, Vec::<String>::new());
     }
 
     #[test]

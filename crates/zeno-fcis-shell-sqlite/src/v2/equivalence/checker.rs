@@ -10,6 +10,8 @@ extern crate alloc;
 use vstd::prelude::*;
 #[path = "checker_equality.rs"]
 mod equality;
+#[path = "checker_ranges.rs"]
+pub(crate) mod ranges;
 #[cfg(verus_keep_ghost)]
 #[path = "checker_spec.rs"]
 pub(crate) mod spec;

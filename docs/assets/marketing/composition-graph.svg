@@ -43,7 +43,7 @@
   <rect x="0" y="0" width="9" height="1000" fill="#c4b5fd"/>
 
   <text x="128" y="72" class="brand">ZENOFCIS</text>
-  <text x="1457" y="72" text-anchor="end" class="release">1.0.0-RC.3</text>
+  <text x="1457" y="72" text-anchor="end" class="release">2.3.0</text>
   <text x="128" y="132" class="eyebrow">DERIVED VIEW</text>
   <text x="128" y="197" class="title">Composition you can inspect.</text>
   <text x="128" y="238" class="subtitle">Graphs are deterministic projections for review; they grant no production authority.</text>

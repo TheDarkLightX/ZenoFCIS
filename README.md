@@ -1,6 +1,6 @@
 # ZenoFCIS
 
-**A neurosymbolic software factory for high assurance FCIS applications.**
+**Toward a neurosymbolic software factory for high-assurance FCIS applications.**
 
 ZenoFCIS combines LLM-assisted authoring with symbolic checking in a Rust
 library family for functional-core / imperative-shell systems. LLMs propose
@@ -12,29 +12,31 @@ ZenoFCIS intends to become a **state of the art high assurance software factory*
 turning reviewed requirements into applications built around a **formally
 verified functional core**, with durable effects and evidence agents can maintain.
 
-## Available release candidates
+## ZenoFCIS 2.3.0
 
-As of 10 October 2026, **[2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)**
-and **[2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)**
-are public. Each supplies a Linux x86_64 GNU CLI and offline Rustdoc. Follow the
-[installation guide](docs/INSTALLATION.md) for direct downloads and the
-[candidate record](docs/RELEASE_CANDIDATES.md) for exact source pins, signed
-checksums and qualification limits.
+This source line prepares **2.3.0**, the first stable V2 release, combining
+the V2.2 and V2.3 work. Its release set requires the **Linux x86_64 GNU CLI**
+(glibc 2.39 or later) and **macOS on Apple silicon**
+(`aarch64-apple-darwin`). Both archives must pass their host build, custody
+and installed-binary checks before release publication. See
+[installation](docs/INSTALLATION.md) and the
+[workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
-These prereleases deliver the current supported subset; full stable V2.2/V2.3
-scope remains unfinished. The V2.3 catalogue contains ten reusable core families,
-77 declared instances and 107,518 raw inputs with explicitly finite evidence;
-broader application composition and symbolic proof work are also unfinished.
-See the [candidate assurance scope](docs/RELEASE_CANDIDATES.md). Use the matching
-candidate tag for its binaries
-and APIs: `main` still declares Cargo version `1.1.0` and is a different source.
+[Release assurance](docs/RELEASE_ASSURANCE.md) describes the required checks
+and trusted assumptions. Source verification, hosted qualification, signed
+artifacts and publication remain distinct steps.
+
+The public [2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)
+and [2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)
+prereleases retain their exact sources and limits in the
+[candidate record](docs/RELEASE_CANDIDATES.md).
 
 **V2's central assurance goal is a formally verified functional core.**
 
 Its primary design rule is:
 
 ```text
-immutable state + command + policy + authenticated context
+immutable state + command + policy + supplied context
     -> pure total transition
     -> Accept | Reject | CommittedFailure
     -> exact immutable candidate
@@ -80,13 +82,13 @@ rules capture the intended product behavior remains essential. External fact
 authentication, storage atomicity and effect delivery have their own assurance
 obligations in the imperative shell.
 
-**Current status:** the public candidates include the supported checked program
-and mandatory authority route, with source-bound implementation and finite
-application evidence. The [candidate record](docs/RELEASE_CANDIDATES.md)
-identifies the checked scope and
-trusted assumptions. Broader stable-release obligations remain open. These
-results do not establish a formal guarantee for arbitrary functional cores or
-an application's complete shell and external environment.
+**Assurance scope:** the 2.3.0 source uses the supported checked program
+and mandatory Authority route. Its assurance is executable conformance to a
+reviewed contract across the supported domain, under named trusted
+assumptions. [Release assurance](docs/RELEASE_ASSURANCE.md) states the
+required checks and their scope. These results do not establish a formal guarantee for
+arbitrary functional cores or an application's complete shell and external
+environment.
 
 Supported generation, specification review, finite optimization, checked
 adoption and upgrade commands are described in the [CLI reference](docs/CLI_REFERENCE.md).
@@ -97,7 +99,8 @@ remains a claim to demonstrate.
 
 Many failures in stateful systems come from deciding and acting in the same
 step. A function reads a clock, updates a row, calls a service, and chooses an
-outcome, and none of that can be replayed or checked afterwards. ZenoFCIS
+outcome. Mixing decisions with external actions makes independent replay
+and checking harder. ZenoFCIS
 separates deciding from acting, then makes the boundary enforceable.
 
 **The core decides.** A transition is a pure, total function from immutable
@@ -245,12 +248,12 @@ published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 
 ## Start here
 
-The normal V2 library route declares a complete checked program. It is available
-in the candidate source and this development checkout with default features and
-with `default-features = false`. For the published V2.3 candidate, first check out
-`v2.3.0-rc.1` as the [installation guide](docs/INSTALLATION.md) describes, then bind
-the dependency to that source. The historical `1.1.0` package does not supply
-this breaking V2 API:
+The normal V2 library route declares a complete checked program. It is
+available in the 2.3.0 source with default features and with
+`default-features = false`. For a published 2.3.0 release, check out
+`v2.3.0` as the [installation guide](docs/INSTALLATION.md) describes, then
+bind the dependency to that source. The historical `1.1.0` package has its
+own V1 API:
 
 ```toml
 [dependencies]
@@ -272,7 +275,7 @@ original schema + complete ProgramDefinition + reviewed policy + framing/channel
 
 See the [normal program migration](docs/V2_PROGRAM_API_MIGRATION.md) and run
 `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`.
-The root/prelude cutover is intentionally breaking on this V2 development branch.
+The root/prelude cutover is intentionally breaking in the 2.3.0 source.
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
 and standalone evidence utilities. See the [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md)
@@ -326,9 +329,9 @@ outbox, tests, and a README that states its rules.
 | `durable-counter` | The smallest complete application: a synthesized step, runtime laws, a committed failure, and restart with delivery retry. |
 | `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, alerts through the outbox, and an inductive claim, attested by CVC5 over the integer ranges `project.zeno` declares, that the action laws alone keep the lock invariant. |
 | `order-fulfillment` | A declarative state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
-| `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
-| `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 720 inputs; every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |
-| `withdrawal-queue` | A controller step synthesized by `zeno-fcis synth` from a sketch of a fair policy, whose table OrbitSynthesis certified for every input sequence, so an alarm can delay a withdrawal but never freeze it; a refinement law that ties each tick to that finite model; and inductive claims, attested by CVC5, that the action laws alone keep the vault solvent. |
+| `inventory-reservation` | A decision core synthesized and verified on all 864 inputs, commands with quantities, and a conservation law. |
+| `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 2,880 inputs (its 720 feature combinations, with both actions and both reviewer values); every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |
+| `withdrawal-queue` | A controller step synthesized by `zeno-fcis synth` from a sketch of a fair policy, whose table an external checker, OrbitSynthesis, certified for every input sequence (re-checked by the application's `tests/controller.rs`), so an alarm can delay a withdrawal but never freeze it; a refinement law that ties each tick to that finite model; and inductive claims, attested by CVC5, that the action laws alone keep the vault solvent. |
 | `agent-treasury-guard` | An AI agent as an untrusted proposer: a treasury that commits at most its daily budget, keeps its reserve, and bounds slippage against the oracle price, decided by a core synthesized and checked on all 6,144 fact tuples; inductive claims, attested by CVC5, that the action laws alone keep the reserve, the daily budget, and the swap bookkeeping; and SwapIntent-shaped requests to ZenoDEX. |
 | `prepared-counter` | Checked bounded completion and prepared batches with a bounded publication size. |
 
@@ -369,9 +372,10 @@ mutants those inputs distinguish, each with a proposed example.
 `zeno-fcis contract export-program DIR --out P` writes the contract's
 decision program in the encoding `optimize` and `transform` read.
 `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
-new-version` makes a candidate decision program that a `transform` receipt
-shows equivalent the contract's next version, and keeps the superseded version
-unchanged beside it. An adoption changes only the decision program and its
+new-version` makes a candidate decision program the contract's next version
+after a `transform` receipt establishes equivalence with the current program
+over the declared finite domain. It keeps the superseded version unchanged
+beside it. An adoption changes only the decision program and its
 Step limit, so the application's `--upgrade` moves a store at any state to the
 new version once the SQLite shell has established the five premises of a
 program succession itself, including its own comparison of the two decision
@@ -379,15 +383,18 @@ programs on every input tuple: 1,296,000 for the withdrawal queue. It records
 a chained, replayable upgrade that binds that count and the adoption's
 receipt digest. Under those premises the two versions reach the same states,
 so the upgrade keeps every law and proved inductive claim; Step usage can
-change, which makes it a new contract version. A contract that changes anything else, such as
-a law, upgrades only a store whose state its genesis laws admit; for a
-generated contract that is the declared genesis state. See the
+change, which makes it a new contract version. Other changes need a record
+from `contract evolve` (a rename, data migration or rule change); without
+one, the new contract's genesis laws must admit the store's state (for a
+generated contract, its declared genesis state). See the
 [CLI reference](docs/CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
 `zeno-fcis contract diff OLD NEW` names the kind of a change between two
 contracts, identical, program successor, rename, layout change, rule change
 or unrelated, with every changed item and the upgrade path the kind needs.
-It decides only the structural kind and runs no decision. Today only a
-program successor has a path that admits a store at any state. See
+It decides only the structural kind and runs no decision. A program
+successor, a rename, or a data migration whose forward simulation passes
+upgrades a store at any state; a rule change upgrades a store whose state
+satisfies the new state laws and claims. See
 [contract change classification](docs/CLI_REFERENCE.md#contract-change-classification).
 
 ## Authoring and checked synthesis
@@ -520,8 +527,8 @@ The guarantee depends on four things:
   runtime's executable hash and version. It accepts only Rust 1.97.1, Python 3,
   and Node.js 22. The repository's synthesis check runs it in all three for
   the durable-counter template, on all 64 inputs, for the
-  inventory-reservation template, on all 432, and for the compliance-gateway
-  template, on all 720. Production must run that same source on runtimes that
+  inventory-reservation template, on all 864, and for the compliance-gateway
+  template, on all 2,880. Production must run that same source on runtimes that
   behave the same way.
 
 In short, a synthesized program is guaranteed to be correct with respect to its
@@ -584,25 +591,25 @@ python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 
 `rc_package.py build` writes a full local release package: all public `.crate`
 packages, rustdoc, source and diagnostic binary archives, checksums, a
-CycloneDX SBOM, and provenance inputs. This is the packaging tool's output, not
-the candidate release pages, which carry only the Linux CLI, offline Rustdoc,
-signed checksum lists, the signing key, and an SBOM. See the
+CycloneDX SBOM, and provenance inputs. This is local packaging output. The 2.3.0
+release process requires both host CLI archives and their installed-use
+records before publication; the signed release checksum list identifies the
+assets actually published. See the
 [packaging reference](docs/PACKAGING.md).
 
 ## Assurance posture
 
-The candidates' assurance is scoped to executable conformance to
-a reviewed contract across the supported domain, under named trusted
-assumptions. It is not a proof that the requirements match human intent, that
-external observations are true, or that a destination performs an effect
+The 2.3.0 source's assurance is scoped to executable conformance to a
+reviewed contract across the supported domain, under named trusted
+assumptions. It does not establish that requirements match human intent,
+external observations are true, or a destination performs an effect
 correctly. A passing stage check is not a release receipt.
 
-The existing `1.1.0` release and its [release notes](docs/V1_1_RELEASE_NOTES.md)
-have their own historical scope. This development branch changes the public
-execution API. Source qualification, exact-head CI, packaging, signing
-and publication remain distinct steps. The public V2.2/V2.3 prereleases have the
-qualification limits recorded in [release candidates](docs/RELEASE_CANDIDATES.md);
-they do not complete the original stable-release scope.
+The historical `1.1.0` release and its
+[release notes](docs/V1_1_RELEASE_NOTES.md) have their own scope. The 2.3.0
+source changes the public execution API. Source qualification, exact-head CI,
+packaging, signing and publication remain distinct steps. See
+[release assurance](docs/RELEASE_ASSURANCE.md).
 
 ## License
 

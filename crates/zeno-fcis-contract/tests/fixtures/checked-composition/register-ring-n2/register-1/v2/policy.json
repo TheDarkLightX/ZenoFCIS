@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "class": "Reject",
+      "outbox": [],
+      "post": {},
+      "reason": 300,
+      "rule": "unchanged",
+      "when": "new_value == pre.100.110"
+    },
+    {
+      "class": "Accept",
+      "outbox": [],
+      "post": {
+        "110": "new_value"
+      },
+      "reason": null,
+      "rule": "changed",
+      "when": true
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  },
+  "leaf_bindings": {},
+  "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+  },
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "register-1",
+  "variables": {
+    "new_value": "choose(command.101.201 == 4, context.102.202, command.101.201)"
+  }
+}

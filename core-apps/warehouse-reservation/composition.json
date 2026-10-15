@@ -1,0 +1,174 @@
+{
+  "application": "warehouse-reservation",
+  "assumptions": [
+    "authorization is a supplied Boolean, not caller authentication",
+    "keys identify one closed order, not all historical requests",
+    "delivery is an intent, not physical shipment",
+    "the contract compiler, finite enumeration, Rust compiler and SQLite shell are named trusted boundaries"
+  ],
+  "authority": "none",
+  "components": [
+    {
+      "family": "reservation-pool",
+      "instance": "components/pool/core-instance.json",
+      "instance_sha256": "5c096e20edfa8b2b9ee515bed62a32bc8845fe270fccf4988606c2160e6f2404",
+      "local_evidence": "Identified; replay required",
+      "name": "pool",
+      "owns_fields": [
+        110,
+        111
+      ],
+      "parameters": {
+        "C": 4,
+        "Q": 3
+      },
+      "source_set_sha256": "d2eddbf724c85e626f47793e5c0da4a827dc8feda281b258902319da45fb313c",
+      "views": {
+        "command": [
+          "choose(action == 150, 150, 152)",
+          "requested"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "available",
+          "held"
+        ]
+      }
+    },
+    {
+      "family": "idempotency-slot",
+      "instance": "components/memo/core-instance.json",
+      "instance_sha256": "d63053a6311406dee252faf92e586f374b9955092ab2447b4d8cf11bd095e6e3",
+      "local_evidence": "Identified; replay required",
+      "name": "memo",
+      "owns_fields": [
+        113,
+        114
+      ],
+      "parameters": {
+        "C": 3
+      },
+      "source_set_sha256": "16006ce29ea7d91a5e0b2e3e68373fd0018a68d585861679d05749f4e0721d25",
+      "views": {
+        "command": [
+          "request_key",
+          "requested"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "phase != 0",
+          "key",
+          "quantity"
+        ]
+      }
+    },
+    {
+      "family": "finite-phase-machine",
+      "instance": "components/phase/core-instance.json",
+      "instance_sha256": "31bce92f09e5d075bac4e857ecedca1d1f165cefb103d8c8f85d4965c3c9aa6b",
+      "local_evidence": "Identified; replay required",
+      "name": "phase",
+      "owns_fields": [
+        112
+      ],
+      "parameters": {
+        "C": 2
+      },
+      "source_set_sha256": "920a526465fd382df456e42086b7250020d85b9d8a96f7bb32aba60d9a2bad7c",
+      "views": {
+        "command": [
+          "false"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "phase"
+        ]
+      }
+    }
+  ],
+  "effects": {
+    "channel": 300,
+    "destination": "warehouse",
+    "max_per_transition": 1,
+    "occurrence": "ship",
+    "owner": "pool",
+    "payload": {
+      "140": "quantity",
+      "141": "key"
+    }
+  },
+  "evidence_status": "pending combined replay, native journey, controls and independent review",
+  "frames": "Owners not selected by an occurrence retain every owned field. The memo seen flag is derived from phase != 0, not an independently mutable field.",
+  "input_tuples": 14400,
+  "occurrences": [
+    {
+      "name": "reserve",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Reserve",
+          "component": "pool"
+        },
+        {
+          "command": "Advance",
+          "component": "phase"
+        }
+      ],
+      "when": "action == 150 && phase == 0"
+    },
+    {
+      "name": "ship",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Consume",
+          "component": "pool"
+        },
+        {
+          "command": "Advance",
+          "component": "phase"
+        }
+      ],
+      "when": "action == 151 && phase == 1 && request_key == key && requested == quantity"
+    },
+    {
+      "name": "retry",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "phase != 0 && request_key == key && requested == quantity && (action == 150 || phase == 2)"
+    }
+  ],
+  "owner_adoption": false,
+  "preconditions": [
+    "the complete coupled state invariant",
+    "supplied authorization",
+    "request key and payload match on shipping and retry"
+  ],
+  "profile": "single-order-capacity-four/1",
+  "publication": "one ordinary complete Authority publication and one SQLite transaction, abort-all on technical refusal",
+  "schema": "zeno-fcis/core-application-composition/1",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114
+  ],
+  "stateless_components": []
+}

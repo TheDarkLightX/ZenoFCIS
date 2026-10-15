@@ -1,0 +1,46 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "bounded-counter",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/bounded-counter.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "383aa1cc2d2233b3f26bba1dc41d0cfb4543a0e2085ef01608c74a11b77790e4"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      150,
+      151
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 12,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 2
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "3ec6f6eb601fbed759721e8fde42878710e629d8f62c0a947db924a92f27de06",
+  "source_sha256": {
+    "examples/c2.txt": "ff6e7033064b24dd9c2113c113de0fa46b79110ccb62e9ae063be12721b787e3",
+    "family.json": "d8cc82aa6c3aeb0fe8ef7fd88a27cca0a43874a2d3c0c68d036c7da74d3a0459",
+    "policy.json.in": "bab752524794cdcb513a787a2a5c2c87e2e00915006c2b08689850ade9cea59e",
+    "project.zeno.in": "78b267f2dc73c85d456dab06a61ad0452826c5297a8e1fd55b97bfd06077c518"
+  },
+  "state_tuples": 3,
+  "version": 1
+}

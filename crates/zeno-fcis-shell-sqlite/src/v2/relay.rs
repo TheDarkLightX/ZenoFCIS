@@ -39,6 +39,7 @@
 //! an exported line.
 
 use std::fmt::Write as _;
+use zeno_fcis_synthesis::finite::v2_composition::DescriptorData;
 
 use rusqlite::TransactionBehavior;
 use zeno_fcis_codec::{CommitmentHasher, Hash32};
@@ -52,7 +53,7 @@ use super::{
 /// The `schema` field of every exported line.
 pub const EXPORT_SCHEMA: &str = "zeno-fcis/relay-export/1";
 
-impl V2SqliteShell<'_, '_> {
+impl<'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'_, 'p, D> {
     /// Every pending delivery, in commit order, after replaying each owning
     /// commit under the contract of that commit's history segment. Nothing is
     /// written, and an entry stays in every later export until it is
@@ -109,8 +110,8 @@ impl V2SqliteShell<'_, '_> {
 /// `Error::PayloadMismatch` as the [module](self) describes, and the
 /// refusals of [`Delivered::acknowledge`](crate::v2::Delivered::acknowledge).
 /// A refusal changes no delivery and no commit.
-pub fn acknowledge(
-    shell: &mut V2SqliteShell<'_, '_>,
+pub fn acknowledge<'p, D: DescriptorData<'p> + 'p>(
+    shell: &mut V2SqliteShell<'_, 'p, D>,
     id: Hash32,
     payload_sha256: Hash32,
 ) -> Result<(), Error> {

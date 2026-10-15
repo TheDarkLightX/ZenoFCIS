@@ -331,6 +331,10 @@ def exercise_synthesized(cli: list[str], app: Path, directory: Path,
         raise RuntimeError("target did not pass complete finite conformance")
     if len({record["certificate"] for record in records}) != 1 or len({record["stdout_sha256"] for record in records}) != 1:
         raise RuntimeError("language targets disagree on semantics or output")
+    # Executable paths are local diagnostics; public evidence keeps tool identity.
+    records = [{**record, "tool": {key: record["tool"][key]
+                                  for key in ("binary_sha256", "version", "identity_scope")}}
+               for record in records]
     return {"status": "passed", "targets": records, "claim": "finite pure-step conformance; application authority is checked separately"}
 
 

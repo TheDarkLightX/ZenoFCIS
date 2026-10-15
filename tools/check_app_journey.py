@@ -535,7 +535,7 @@ def release_build(directory: Path) -> dict:
                              check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if refused.returncode != 2 or "--source" not in refused.stderr:
         raise RuntimeError(f"new without a source tree: exit {refused.returncode}, {refused.stderr!r}")
-    if any((root / "escrow").iterdir()):
+    if (root / "escrow").exists() and any((root / "escrow").iterdir()):
         raise RuntimeError("new without a source tree wrote a file")
     bound = subprocess.run([str(release), "new", "bound", "--contract", str(ESCROW), "--source",
                             str(ROOT)], cwd=root, check=False, text=True,

@@ -1,0 +1,51 @@
+zeno 1;
+project 1 equipment_booking;
+namespace 2 core_apps;
+type 100 state Booking;
+type 101 command BookingCommand;
+type 102 context SuppliedContext;
+type 103 destination BookingReceiver;
+type 104 payload BookingIntent;
+type 105 int Units in 0..=2;
+type 106 int Phase in 0..=3;
+type 107 int LogicalTime in 0..=4;
+type 108 bool Flag;
+type 109 data Action;
+field 110 100 available 105;
+field 111 100 held 105;
+field 112 100 version 105;
+field 113 100 phase 106;
+field 114 100 deadline_last 107;
+field 115 100 reached 108;
+field 120 101 action 109;
+field 121 101 expected_version 105;
+field 130 102 now 107;
+field 131 102 authorized 108;
+field 140 104 booking_version 105;
+field 141 104 unit 105;
+variant 150 109 Reserve none;
+variant 151 109 Confirm none;
+variant 152 109 Timeout none;
+reason 204 invalid_coupled_state precedence 0;
+reason 200 not_authorized precedence 1;
+reason 206 time_before_last_tick precedence 2;
+reason 205 stale_version precedence 3;
+reason 202 wrong_phase precedence 4;
+reason 203 wrong_side_of_deadline precedence 5;
+channel 300 booking destination 103 payload 104;
+// One physical component publishes the complete atomic decision.
+// Logical pool/register/deadline ownership is pinned in composition.json.
+component 400 booking {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+law 500 pool_version_and_deadline_agree on commit, genesis = ((post.100.113 == 0 && post.100.110 == 2 && post.100.111 == 0 && post.100.112 == 0 && post.100.114 == 0 && post.100.115 == 0) || (post.100.113 == 1 && post.100.110 == 1 && post.100.111 == 1 && post.100.112 == 1 && post.100.114 == 0 && post.100.115 == 0) || (post.100.113 == 2 && post.100.110 == 1 && post.100.111 == 1 && post.100.112 == 2 && post.100.114 == 0 && post.100.115 == 0) || (post.100.113 == 3 && post.100.110 == 2 && post.100.111 == 0 && post.100.112 == 2 && post.100.114 == 4 && post.100.115 == 1));
+law 501 exact_authorized_version on accept = context.102.131 == 1 && context.102.130 >= pre.100.114 && (((command.101.120 == 151 && pre.100.113 == 2) || (command.101.120 == 152 && pre.100.113 == 3)) -> command.101.121 == 1) && (!((command.101.120 == 151 && pre.100.113 == 2) || (command.101.120 == 152 && pre.100.113 == 3)) -> command.101.121 == pre.100.112);
+law 502 booking_lifecycle_conserves_pool on accept = (command.101.120 == 150 -> pre.100.113 == 0 && context.102.130 < 4 && post.100.113 == 1 && post.100.112 == pre.100.112 + 1 && post.100.110 + 1 == pre.100.110 && post.100.111 == pre.100.111 + 1) && (command.101.120 == 151 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 && post.100.113 == 2 && ((pre.100.113 == 1 && context.102.130 < 4 && post.100.112 == pre.100.112 + 1) || (pre.100.113 == 2 && post.100.112 == pre.100.112))) && (command.101.120 == 152 -> post.100.113 == 3 && ((pre.100.113 == 1 && context.102.130 >= 4 && post.100.112 == pre.100.112 + 1 && post.100.110 == pre.100.110 + 1 && post.100.111 + 1 == pre.100.111) || (pre.100.113 == 3 && post.100.112 == pre.100.112 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111)));
+law 503 confirmation_intent_once on commit = outbox.104 <= 1 && ((command.101.120 == 151 && pre.100.113 == 1) -> outbox.104 == 1 && outbox.104.140 == post.100.112 && outbox.104.140 == 2 && outbox.104.141 == 1) && (!(command.101.120 == 151 && pre.100.113 == 1) -> outbox.104 == 0 && outbox.104.140 == 0 && outbox.104.141 == 0);
+law 504 timeout_ticks_once on accept = ((command.101.120 == 152 && pre.100.113 == 1) -> post.100.114 == context.102.130 && post.100.114 == 4 && post.100.115 == 1) && (!(command.101.120 == 152 && pre.100.113 == 1) -> post.100.114 == pre.100.114 && post.100.115 == pre.100.115);

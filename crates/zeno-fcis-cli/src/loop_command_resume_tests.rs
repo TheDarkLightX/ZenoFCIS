@@ -168,7 +168,7 @@ fn an_interrupted_resume_replay_keeps_its_charge_on_every_entry_point() {
             );
         }),
         ("run", |scratch| {
-            run_command(&scratch.session(), ProposerArg::Local, None, None);
+            run_command(&scratch.session(), ProposerArg::Local, None, None, &[]);
         }),
     ];
     for (name, entry_point) in entry_points {
@@ -213,10 +213,10 @@ fn a_run_refused_after_its_replay_keeps_the_replay_charge() {
     let session = scratch.session();
     let before = durable_accounting(&session);
     let missing = scratch.input("missing-script.json");
-    let (exit, report) = run_command(&session, ProposerArg::Fake, Some(&missing), None);
+    let (exit, report) = run_command(&session, ProposerArg::Fake, Some(&missing), None, &[]);
     assert_eq!(exit, crate::FAILURE, "{report}");
     let bad = scratch.input("candidate.zcve");
-    let (exit, report) = run_command(&session, ProposerArg::Hosted, None, Some(&bad));
+    let (exit, report) = run_command(&session, ProposerArg::Hosted, None, Some(&bad), &[]);
     assert_eq!(exit, crate::INVALID, "{report}");
     let after = durable_accounting(&session);
     assert_eq!(after.replays, before.replays + 2);
@@ -273,24 +273,42 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
         .cost(),
     )
     .unwrap_or_else(|| panic!("work"));
-    // Room for the candidate check and exactly one replay of it.
+    // Fund binary intake with provenance=None, candidate admission, the first
+    // complete check and exactly one replay under checker-work/4. No provenance
+    // read/parse is reachable; invocation acquisition remains separate.
+    let intake = crate::loop_command::PROGRAM_LIMIT + 4096;
+    let admission = 9 * u64::from(Limits::CEILING.artifact_bytes)
+        + 16 * 2048
+        + 16 * (32 + 16 + 256 + 16)
+        + 8192;
+    let preparation = intake + admission;
+    assert_eq!((intake, admission), (69_632, 635_904));
+    assert_eq!(work, 282_871);
     let limits = Limits {
         check_work: self_check,
-        session_work: 2 * work,
+        session_work: preparation + 2 * work,
         ..Limits::CEILING
     };
+    assert_eq!(limits.session_work, 1_271_278);
+    assert!(limits.session_work <= Limits::CEILING.session_work);
     assert!(work <= self_check && self_check <= limits.session_work);
     let scratch = Scratch::new();
     session_with_replacement(&scratch, limits);
     let session = scratch.session();
-    assert_eq!(durable_accounting(&session).work_reserved, work);
+    assert_eq!(
+        durable_accounting(&session).work_reserved,
+        preparation + work
+    );
     interrupted(|| resume_command(&session));
-    assert_eq!(durable_accounting(&session).work_reserved, 2 * work);
+    assert_eq!(
+        durable_accounting(&session).work_reserved,
+        limits.session_work,
+    );
     let durable = durable_bytes(&session);
     for (exit, report) in [
         resume_command(&session),
         candidate_command(&session, Some(&scratch.input("padded.zcve")), None, None),
-        run_command(&session, ProposerArg::Local, None, None),
+        run_command(&session, ProposerArg::Local, None, None, &[]),
     ] {
         assert_eq!(exit, crate::BLOCKED, "{report}");
         assert_eq!(report["status"], "resume-inconclusive", "{report}");
@@ -303,25 +321,26 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
     }
 }
 
-/// Digests of the uninterrupted journey, bound to the current checker identity.
-/// The original 39bc5e1 baseline was replayed before this refresh. The verified
-/// shared checker changes its identity and derived request, receipt and ledger
-/// hashes; all other fields in these hashed records, including reservations,
-/// are unchanged. The separate elapsed-time transcript is not hashed here.
-const JOURNEY_CHECKER_ID: &str = "06625439ca5fd003036a7da9149219a108cd91393dfc51eed36a22337cdcaed4";
-const JOURNEY_LEDGER_SHA256: &str =
-    "7aa19215f385a61f68acaefc0e736b3ffaf93084173f6be180f9489376c7ce60";
-const JOURNEY_HEAD_SHA256: &str =
-    "699338fdba4ee9840691ca8c07d0b8a31a1f5ec34d04b7ac9ecab64eb6b4d7ee";
-const JOURNEY_OUTPUTS_SHA256: &str =
-    "a6083b058cb59a66180e8d07dff363f7117652602e9c660f956da18ffa8b8bb7";
+/// Full ledger, head and complete direct-handler transcript for the 2.3.0
+/// evaluator, checker-work/4 and loop-acquisition/1 policies. Includes every
+/// preparation, check and replay charge; no output field is filtered.
+/// The fixture was derived from the retained checker-work/3 journey by
+/// substituting the evaluator and work-policy bindings, recomputing request,
+/// receipt and ledger digests, and adding the reviewed `seeds: 0` run field.
+/// The resulting ledger, head and transcript were then replayed exactly.
+const METERED_LEDGER_SHA256: &str =
+    "b7bc9af48501ceccdb6d2b17cabe89c2e443256d936ac9116d0a5b519c9e59fa";
+const METERED_HEAD_SHA256: &str =
+    "bd9278fedb3b15b6b5b0453de3a27001cded4d02b50e710a94fbd33ef05230e2";
+const METERED_DIRECT_OUTPUTS_SHA256: &str =
+    "bbf82c2f3313102ba613a10b34b5ec4b376c5d3e5f13fa4acdbefff68b6b09b9";
 
 #[test]
-fn an_uninterrupted_resume_matches_the_source_bound_journey() {
+fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
     assert_eq!(
         crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
-        JOURNEY_CHECKER_ID,
-        "checker identity changed: replay the recorded journey before refreshing its digests"
+        "e660f24a1f06ce644e03b4a832bffea31e1b001f54c4745034b3111a39f195f5",
+        "checker identity changed: replay the recorded metered journey before refreshing its digests"
     );
     let scratch = Scratch::new();
     let session = scratch.session();
@@ -339,7 +358,7 @@ fn an_uninterrupted_resume_matches_the_source_bound_journey() {
         resume_command(&session),
         supply("padded.zcve"),
         resume_command(&session),
-        run_command(&session, ProposerArg::Local, None, None),
+        run_command(&session, ProposerArg::Local, None, None, &[]),
         resume_command(&session),
     ];
     let statuses: Vec<&Value> = outputs.iter().map(|(_, value)| &value["status"]).collect();
@@ -371,9 +390,28 @@ fn an_uninterrupted_resume_matches_the_source_bound_journey() {
     assert_eq!(
         found,
         [
-            JOURNEY_LEDGER_SHA256,
-            JOURNEY_HEAD_SHA256,
-            JOURNEY_OUTPUTS_SHA256
+            METERED_LEDGER_SHA256,
+            METERED_HEAD_SHA256,
+            METERED_DIRECT_OUTPUTS_SHA256
         ]
+    );
+}
+
+#[test]
+fn a_replay_finishing_during_stage_grace_is_inconclusive_and_stays_charged() {
+    let scratch = Scratch::new();
+    session_with_replacement(&scratch, Limits::CEILING);
+    let before = durable_accounting(&scratch.session());
+    replay_probe::arm(|| std::thread::sleep(std::time::Duration::from_millis(2050)));
+    let (exit, report) = resume_command(&scratch.session());
+    assert_eq!(exit, crate::BLOCKED, "{report}");
+    assert_eq!(report["status"], "resume-inconclusive", "{report}");
+    assert_eq!(report["detail"]["reason"], "deadline", "{report}");
+    assert!(report["detail"]["trusted_incumbent"].is_null());
+    let after = durable_accounting(&scratch.session());
+    assert_eq!(after.replays, before.replays + 1);
+    assert_eq!(
+        after.work_reserved,
+        before.work_reserved + replay_work(Limits::CEILING)
     );
 }

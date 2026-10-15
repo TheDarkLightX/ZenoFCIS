@@ -10,6 +10,9 @@ use std::{
 };
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Envelope, Hash32, commitment, domains};
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_schema::{
+    FieldDef, FieldId, Schema, SchemaLimits, SumVariantDef, TypeDef, TypeId, TypeKind, VariantId,
+};
 use zeno_fcis_shell::{CommitStatus, MemoryDestination};
 use zeno_fcis_shell_sqlite::v2::{
     Error, Lineage, Opened, Step, Store, Superseded, V2SqliteShell,
@@ -17,8 +20,10 @@ use zeno_fcis_shell_sqlite::v2::{
     upgrade,
 };
 use zeno_fcis_synthesis::finite::{
-    v2_authority::{Authority, Publication, PublicationOutcome},
-    v2_catalog::BoundCatalog,
+    Domain as ScalarDomain, Op, Program, V2ScalarProgram,
+    canonical_v2::schema as s,
+    v2_authority::{self as authority, Authority, Publication, PublicationOutcome},
+    v2_catalog::{self as catalog, BoundCatalog},
     v2_composition::{self as c, Raw},
 };
 use zeno_fcis_value::{Field, Value};
@@ -55,6 +60,400 @@ fn with_versions(test: impl FnOnce(&BoundCatalog<'_>, &BoundCatalog<'_>)) {
     test(&v1, &v2);
 }
 
+#[derive(Clone, Copy)]
+enum SchemaChange {
+    Destination { bytes: bool, max: u32 },
+    PayloadType { max: i128 },
+    PayloadName,
+}
+
+fn schema_name(bytes: &[u8]) -> &str {
+    ok(std::str::from_utf8(bytes))
+}
+
+fn destination_lane<'a>(plans: &[c::DeliveryPlan<'a>], bytes: bool) -> Vec<c::DeliveryPlan<'a>> {
+    plans
+        .iter()
+        .map(|plan| {
+            let destination = match (bytes, plan.destination) {
+                (true, c::Expr::Constant(c::Atom::Text(value))) => {
+                    c::Expr::Constant(c::Atom::Bytes(value))
+                }
+                _ => plan.destination,
+            };
+            c::DeliveryPlan {
+                destination,
+                ..*plan
+            }
+        })
+        .collect()
+}
+
+/// Rebind actual original schema bytes and the complete immutable descriptor.
+/// The schema crate is the independent canonical encoding oracle here.
+fn with_schema_change(
+    source: &BoundCatalog<'_>,
+    change: SchemaChange,
+    test: impl FnOnce(&BoundCatalog<'_>),
+) {
+    let bytes = matches!(change, SchemaChange::Destination { bytes: true, .. });
+    let alias = [s::Field {
+        id: 145,
+        name: b"payment_tier",
+        type_id: 111,
+    }];
+    let renamed = [s::Field {
+        id: 145,
+        name: b"renamed_tier",
+        type_id: 105,
+    }];
+    let mut definitions = source.original_description().definitions.to_vec();
+    for definition in &mut definitions {
+        match (&change, definition.id) {
+            (SchemaChange::Destination { bytes, max }, 103) => {
+                definition.kind = if *bytes {
+                    s::Kind::Bytes { min: 1, max: *max }
+                } else {
+                    s::Kind::Text { min: 1, max: *max }
+                };
+            }
+            (SchemaChange::PayloadType { .. }, 104) => definition.kind = s::Kind::Record(&alias),
+            (SchemaChange::PayloadName, 104) => {
+                definition.name = b"RenamedPayment";
+                definition.kind = s::Kind::Record(&renamed);
+            }
+            _ => {}
+        }
+    }
+    if let SchemaChange::PayloadType { max } = change {
+        definitions.push(s::Definition {
+            id: 111,
+            name: b"TierAlias",
+            kind: s::Kind::I128 { min: 0, max },
+        });
+    }
+    let description = s::Description {
+        definitions: &definitions,
+        ..*source.original_description()
+    };
+    let limits = SchemaLimits::default();
+    let types = definitions
+        .iter()
+        .map(|definition| {
+            let kind = match definition.kind {
+                s::Kind::Bool => TypeKind::Bool,
+                s::Kind::I128 { min, max } => TypeKind::I128 { min, max },
+                s::Kind::Bytes { min, max } => TypeKind::Bytes {
+                    min_len: min,
+                    max_len: max,
+                },
+                s::Kind::Text { min, max } => TypeKind::Text {
+                    min_len: min,
+                    max_len: max,
+                },
+                s::Kind::Record(fields) => TypeKind::Record {
+                    fields: fields
+                        .iter()
+                        .map(|field| {
+                            ok(FieldDef::try_new(
+                                FieldId::new(field.id),
+                                schema_name(field.name),
+                                TypeId::new(field.type_id),
+                            ))
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                },
+                s::Kind::Sum(variants) => TypeKind::Sum {
+                    variants: variants
+                        .iter()
+                        .map(|variant| {
+                            ok(SumVariantDef::try_new(
+                                VariantId::new(variant.id),
+                                schema_name(variant.name),
+                                None,
+                            ))
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                },
+                other => panic!("unexpected migrated fixture kind: {other:?}"),
+            };
+            ok(TypeDef::try_new(
+                TypeId::new(definition.id),
+                schema_name(definition.name),
+                kind,
+                limits,
+            ))
+        })
+        .collect();
+    let schema = ok(Schema::try_new(
+        ok(std::str::from_utf8(description.profile)),
+        description.version,
+        TypeId::new(description.root),
+        types,
+        limits,
+    ));
+    let original = ok(schema.canonical_bytes());
+    let hash = ok(schema.schema_hash::<RustCryptoSha256>());
+    let mut framing = *source.framing();
+    framing.state.schema = *hash.as_bytes();
+    framing.command.schema = *hash.as_bytes();
+    framing.context.schema = *hash.as_bytes();
+    let old = source.descriptor();
+    let payload = [c::TypedField {
+        field: 145,
+        domain: c::Domain::I128 {
+            min: 0,
+            max: match change {
+                SchemaChange::PayloadType { max } => max,
+                _ => 3,
+            },
+        },
+    }];
+    let channels = old
+        .channels
+        .iter()
+        .map(|channel| c::Channel {
+            destination: if bytes {
+                c::Domain::Bytes
+            } else {
+                channel.destination
+            },
+            payload: if matches!(change, SchemaChange::PayloadType { .. }) && channel.id == 300 {
+                &payload
+            } else {
+                channel.payload
+            },
+            ..*channel
+        })
+        .collect::<Vec<_>>();
+    let effects = old
+        .branches
+        .iter()
+        .map(|branch| destination_lane(branch.effects, bytes))
+        .collect::<Vec<_>>();
+    let outboxes = old
+        .branches
+        .iter()
+        .map(|branch| destination_lane(branch.outbox, bytes))
+        .collect::<Vec<_>>();
+    let branches = old
+        .branches
+        .iter()
+        .enumerate()
+        .map(|(index, branch)| c::Branch {
+            effects: &effects[index],
+            outbox: &outboxes[index],
+            ..*branch
+        })
+        .collect::<Vec<_>>();
+    let descriptor = c::Descriptor {
+        state: old.state,
+        command: old.command,
+        context: old.context,
+        program: V2ScalarProgram {
+            inputs: old.program.inputs,
+            outputs: old.program.outputs,
+            nodes: old.program.nodes,
+            roots: old.program.roots,
+        },
+        bindings: old.bindings,
+        output_types: old.output_types,
+        decision_output: old.decision_output,
+        branches: &branches,
+        reasons: old.reasons,
+        channels: &channels,
+        laws: old.laws,
+        required: old.required,
+        limits: old.limits,
+    };
+    let policy = authority::policy_bytes(&descriptor, &original, &framing, source.channel_roots())
+        .unwrap_or_else(|| panic!("complete original policy encoding"));
+    let bound = ok(catalog::bind_original(
+        &original,
+        &description,
+        catalog::Limits {
+            schema: s::Limits {
+                bytes: u64::MAX,
+                types: u32::MAX,
+                fields: u32::MAX,
+                variants: u32::MAX,
+            },
+            contract_bytes: u64::MAX,
+        },
+        &policy,
+        &descriptor,
+        &framing,
+        source.channel_roots(),
+    ));
+    test(&bound);
+}
+
+fn refused_schema_upgrade(from: &BoundCatalog<'_>, to: &BoundCatalog<'_>) -> Error {
+    let fields = declared();
+    let steps = [Step::Migration {
+        migration: Migration { fields: &fields },
+        claims: &[],
+        review: b"schema comparison regression",
+    }];
+    let lineage = ok(Lineage::bind_steps(&[from, to], &steps));
+    let file = StoreFile::new();
+    let initial = request(from.framing(), EMPTY, 0, false, None);
+    let genesis = match lineage.authorities()[0].publish_genesis(&initial) {
+        PublicationOutcome::Commit(publication) => publication,
+        other => panic!("original genesis refused: {other:?}"),
+    };
+    drop(ok(V2SqliteShell::create(
+        &file.0,
+        &lineage.authorities()[0],
+        genesis,
+    )));
+    let before = ok(fs::read(&file.0));
+    let error = refused(superseded(ok(lineage.open(&file.0))).upgrade());
+    assert_eq!(ok(fs::read(&file.0)), before);
+    error
+}
+
+#[test]
+fn projected_destination_domains_do_not_erase_original_text_or_bytes_bounds() {
+    with_versions(|v1, v2| {
+        for bytes in [false, true] {
+            with_schema_change(v1, SchemaChange::Destination { bytes, max: 32 }, |old| {
+                with_schema_change(v2, SchemaChange::Destination { bytes, max: 31 }, |new| {
+                    let domains = (
+                        old.descriptor().channels[0].destination,
+                        new.descriptor().channels[0].destination,
+                    );
+                    assert!(matches!(
+                        domains,
+                        (c::Domain::Text, c::Domain::Text) | (c::Domain::Bytes, c::Domain::Bytes)
+                    ));
+                    assert_eq!(old.channel_roots(), new.channel_roots());
+                    assert!(matches!(
+                        refused_schema_upgrade(old, new),
+                        Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Shape))
+                    ));
+                });
+            });
+        }
+    });
+}
+
+#[test]
+fn original_payload_type_ids_need_a_map_but_names_allow_legacy_migration() {
+    with_versions(|v1, v2| {
+        with_schema_change(v2, SchemaChange::PayloadType { max: 3 }, |alias| {
+            assert!(matches!(
+                (
+                    v1.descriptor().channels[0].payload[0].domain,
+                    alias.descriptor().channels[0].payload[0].domain
+                ),
+                (
+                    c::Domain::I128 { min: 0, max: 3 },
+                    c::Domain::I128 { min: 0, max: 3 }
+                )
+            ));
+            assert_eq!(v1.channel_roots(), alias.channel_roots());
+            assert!(matches!(
+                refused_schema_upgrade(v1, alias),
+                Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Payload {
+                    channel: 300
+                }))
+            ));
+            let fields = declared();
+            let payment = [Target {
+                id: 145,
+                source: Source::Field(145),
+            }];
+            let payloads = [migration::Payload {
+                channel: 300,
+                fields: &payment,
+            }];
+            let old_authority = ok(authority::bind(v1));
+            let new_authority = ok(authority::bind(alias));
+            assert!(
+                migration::simulate_with_payloads(
+                    v1,
+                    &old_authority,
+                    alias,
+                    &new_authority,
+                    &Migration { fields: &fields },
+                    &payloads
+                )
+                .is_ok()
+            );
+        });
+        with_schema_change(v2, SchemaChange::PayloadName, |renamed| {
+            let fields = declared();
+            let old_authority = ok(authority::bind(v1));
+            let new_authority = ok(authority::bind(renamed));
+            assert!(
+                migration::simulate(
+                    v1,
+                    &old_authority,
+                    renamed,
+                    &new_authority,
+                    &Migration { fields: &fields }
+                )
+                .is_ok()
+            );
+            assert_eq!(
+                ok(Migration { fields: &fields }.encode())[b"ZFCIS-MIGRATION\0".len()],
+                1
+            );
+        });
+    });
+}
+
+#[test]
+fn explicit_payload_map_cap_refuses_without_partial_admission_or_writes() {
+    with_versions(|v1, v2| {
+        let change = SchemaChange::PayloadType {
+            max: i128::from(migration::MAX_PAYLOAD_TUPLES),
+        };
+        with_schema_change(v1, change, |old| {
+            with_schema_change(v2, change, |new| {
+                let fields = declared();
+                let payment = [Target {
+                    id: 145,
+                    source: Source::Field(145),
+                }];
+                let payloads = [migration::Payload {
+                    channel: 300,
+                    fields: &payment,
+                }];
+                let steps = [Step::PayloadMigration {
+                    migration: Migration { fields: &fields },
+                    payloads: &payloads,
+                    claims: &[],
+                    review: b"explicit map cap",
+                }];
+                let lineage = ok(Lineage::bind_steps(&[old, new], &steps));
+                let file = StoreFile::new();
+                let initial = request(old.framing(), EMPTY, 0, false, None);
+                let genesis = match lineage.authorities()[0].publish_genesis(&initial) {
+                    PublicationOutcome::Commit(publication) => publication,
+                    other => panic!("original genesis refused: {other:?}"),
+                };
+                drop(ok(V2SqliteShell::create(
+                    &file.0,
+                    &lineage.authorities()[0],
+                    genesis,
+                )));
+                let before = ok(fs::read(&file.0));
+                assert!(matches!(
+                    refused(superseded(ok(lineage.open(&file.0))).upgrade()),
+                    Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Payload {
+                        channel: 300
+                    }))
+                ));
+                assert_eq!(ok(fs::read(&file.0)), before);
+            });
+        });
+    });
+}
+
 /// The migration the application declares, as the shell takes it.
 fn declared() -> Vec<Target<'static>> {
     let Some((1, Some(fields))) = migrated::STATE_STEPS.first().copied() else {
@@ -77,7 +476,7 @@ fn declared() -> Vec<Target<'static>> {
 }
 
 /// The declared migration with the urgent flag's source replaced.
-fn with_urgent(source: Source<'static>) -> Vec<Target<'static>> {
+fn with_urgent(source: Source<'_>) -> Vec<Target<'_>> {
     declared()
         .into_iter()
         .map(|target| {
@@ -88,6 +487,286 @@ fn with_urgent(source: Source<'static>) -> Vec<Target<'static>> {
             }
         })
         .collect()
+}
+
+#[test]
+fn explicit_payload_metadata_and_split_programs_bind_reopen_and_relay() {
+    with_versions(|v1, v2| {
+        let program = ok(Program::try_new_extended(
+            vec![ScalarDomain::Int { min: 0, max: 3 }],
+            vec![ScalarDomain::Bool],
+            vec![Op::Input(0), Op::Int(0), Op::Lt(0, 1)],
+            vec![2],
+        ));
+        let fields = with_urgent(Source::Program {
+            fields: &[121],
+            program: &program,
+        });
+        let payment = [Target {
+            id: 145,
+            source: Source::Field(145),
+        }];
+        let payloads = [migration::Payload {
+            channel: 300,
+            fields: &payment,
+        }];
+        let steps = [Step::PayloadMigration {
+            migration: Migration { fields: &fields },
+            payloads: &payloads,
+            claims: &[],
+            review: b"same tier; explicit lossless representation",
+        }];
+        let lineage = ok(Lineage::bind_steps(&[v1, v2], &steps));
+        let file = StoreFile::new();
+        store_under(&file.0, &lineage.authorities()[0], 3);
+        let original = {
+            let mut old = ok(V2SqliteShell::open(&file.0, &lineage.authorities()[0]));
+            ok(old.export_pending())
+        };
+        let history = ok(lineage.audit_history_read_only(&file.0));
+        let (mut shell, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        assert_eq!(ok(shell.export_pending()), original);
+        assert_eq!(
+            receipt
+                .migration()
+                .unwrap_or_else(|| panic!("migration"))
+                .migration(),
+            <RustCryptoSha256 as CommitmentHasher>::hash(&ok(migration::encode_with_payloads(
+                &Migration { fields: &fields },
+                &payloads
+            )))
+        );
+        drop(shell);
+
+        // A fresh lineage revalidates the complete description before export
+        // and acknowledgment through the old delivery's historical contract.
+        let fresh = ok(Lineage::bind_steps(&[v1, v2], &steps));
+        let mut reopened = current(ok(fresh.open(&file.0)));
+        assert_eq!(ok(reopened.export_pending()), original);
+        let delivery = original.first().unwrap_or_else(|| panic!("payment"));
+        ok(zeno_fcis_shell_sqlite::v2::relay::acknowledge(
+            &mut reopened,
+            delivery.delivery_id(),
+            zeno_fcis_shell_sqlite::v2::relay::payload_sha256(delivery.payload()),
+        ));
+        assert!(ok(reopened.export_pending()).is_empty());
+        drop(reopened);
+        let after = ok(fresh.audit_history_read_only(&file.0));
+        assert_eq!(after.commits, history.commits);
+        assert_eq!(after.genesis, history.genesis);
+
+        // Another total/injective map with different canonical program bytes
+        // does not authorize replay of the upgrade record already stored.
+        let equivalent = ok(Program::try_new_extended(
+            vec![ScalarDomain::Int { min: 0, max: 3 }],
+            vec![ScalarDomain::Bool],
+            vec![Op::Input(0), Op::Int(4), Op::Lt(1, 0)],
+            vec![2],
+        ));
+        let other = with_urgent(Source::Program {
+            fields: &[121],
+            program: &equivalent,
+        });
+        let changed = [Step::PayloadMigration {
+            migration: Migration { fields: &other },
+            payloads: &payloads,
+            claims: &[],
+            review: b"same tier; explicit lossless representation",
+        }];
+        let changed = ok(Lineage::bind_steps(&[v1, v2], &changed));
+        let bytes = ok(fs::read(&file.0));
+        assert!(matches!(
+            refused(changed.audit_read_only(&file.0).map(|_| ())),
+            Error::Succession(upgrade::Unsupported::Migration)
+        ));
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+#[test]
+fn invalid_payload_maps_and_program_domains_refuse_without_writes() {
+    with_versions(|v1, v2| {
+        let fields = declared();
+        let file = StoreFile::new();
+        let setup = ok(Lineage::bind_steps(
+            &[v1, v2],
+            &[Step::Migration {
+                migration: Migration { fields: &fields },
+                claims: &[],
+                review: b"setup",
+            }],
+        ));
+        store_under(&file.0, &setup.authorities()[0], 3);
+        let before = ok(fs::read(&file.0));
+        let lossy = [Target {
+            id: 145,
+            source: Source::Table {
+                field: 145,
+                cases: &[(0, 0), (1, 0), (2, 0), (3, 0)],
+            },
+        }];
+        let partial = [Target {
+            id: 145,
+            source: Source::Table {
+                field: 145,
+                cases: &[(0, 0), (1, 1), (2, 2)],
+            },
+        }];
+        for payload_fields in [&lossy[..], &partial[..]] {
+            let payloads = [migration::Payload {
+                channel: 300,
+                fields: payload_fields,
+            }];
+            let steps = [Step::PayloadMigration {
+                migration: Migration { fields: &fields },
+                payloads: &payloads,
+                claims: &[],
+                review: b"invalid",
+            }];
+            let lineage = ok(Lineage::bind_steps(&[v1, v2], &steps));
+            assert!(matches!(
+                refused(superseded(ok(lineage.open(&file.0))).upgrade()),
+                Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Payload {
+                    channel: 300
+                }))
+            ));
+            assert_eq!(ok(fs::read(&file.0)), before);
+        }
+        for input in [
+            ScalarDomain::Int { min: 0, max: 2 },
+            ScalarDomain::Int { min: 0, max: 3 },
+        ] {
+            let nodes = if input.bounds().1 == 2 {
+                vec![Op::Input(0), Op::Int(0), Op::Lt(0, 1)]
+            } else {
+                vec![
+                    Op::Input(0),
+                    Op::Int(i64::MAX),
+                    Op::Add(0, 1),
+                    Op::Int(0),
+                    Op::Lt(2, 3),
+                ]
+            };
+            let root = u16::try_from(nodes.len() - 1).unwrap_or_else(|_| panic!("root"));
+            let program = ok(Program::try_new_extended(
+                vec![input],
+                vec![ScalarDomain::Bool],
+                nodes,
+                vec![root],
+            ));
+            let invalid = with_urgent(Source::Program {
+                fields: &[121],
+                program: &program,
+            });
+            let lineage = ok(Lineage::bind_steps(
+                &[v1, v2],
+                &[Step::Migration {
+                    migration: Migration { fields: &invalid },
+                    claims: &[],
+                    review: b"invalid",
+                }],
+            ));
+            assert!(matches!(
+                refused(superseded(ok(lineage.open(&file.0))).upgrade()),
+                Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Migration(
+                    migration::Defect::Program { field: 124 }
+                )))
+            ));
+            assert_eq!(ok(fs::read(&file.0)), before);
+        }
+    });
+}
+
+#[test]
+fn split_programs_check_source_tuples_excluded_by_every_state_law() {
+    with_versions(|v1, v2| {
+        let fields = declared();
+        let setup = ok(Lineage::bind_steps(
+            &[v1, v2],
+            &[Step::Migration {
+                migration: Migration { fields: &fields },
+                claims: &[],
+                review: b"setup",
+            }],
+        ));
+        let file = StoreFile::new();
+        store_under(&file.0, &setup.authorities()[0], 3);
+        let before = ok(fs::read(&file.0));
+        // Empty/tier>0 violates the old state law. All admitted states map
+        // identically, but these declared source tuples trap or leave the
+        // output domain, so neither program may be admitted.
+        let condition = vec![
+            Op::Input(0),
+            Op::Input(1),
+            Op::Int(150),
+            Op::Eq(0, 2),
+            Op::Int(0),
+            Op::Lt(4, 1),
+            Op::And(3, 5),
+        ];
+        for (field, output, suffix, root) in [
+            (
+                124,
+                ScalarDomain::Bool,
+                vec![
+                    Op::Int(i64::MAX),
+                    Op::Select(6, 7, 4),
+                    Op::Add(8, 1),
+                    Op::Lt(9, 4),
+                ],
+                10,
+            ),
+            (
+                121,
+                ScalarDomain::Int { min: 0, max: 3 },
+                vec![Op::Int(4), Op::Select(6, 7, 1)],
+                8,
+            ),
+        ] {
+            let mut nodes = condition.clone();
+            nodes.extend(suffix);
+            let program = ok(Program::try_new_extended(
+                vec![
+                    ScalarDomain::Int { min: 150, max: 154 },
+                    ScalarDomain::Int { min: 0, max: 3 },
+                ],
+                vec![output],
+                nodes,
+                vec![root],
+            ));
+            assert!(program.evaluate(&[150, 1]).is_err());
+            assert!(program.evaluate(&[151, 1]).is_ok());
+            let fields: Vec<Target<'_>> = declared()
+                .into_iter()
+                .map(|target| {
+                    if target.id == field {
+                        Target {
+                            id: field,
+                            source: Source::Program {
+                                fields: &[120, 121],
+                                program: &program,
+                            },
+                        }
+                    } else {
+                        target
+                    }
+                })
+                .collect();
+            let lineage = ok(Lineage::bind_steps(
+                &[v1, v2],
+                &[Step::Migration {
+                    migration: Migration { fields: &fields },
+                    claims: &[],
+                    review: b"invalid source tuple",
+                }],
+            ));
+            assert!(
+                matches!(refused(superseded(ok(lineage.open(&file.0))).upgrade()),
+                Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Migration(migration::Defect::Program { field: failed }))) if failed == field)
+            );
+            assert_eq!(ok(fs::read(&file.0)), before);
+        }
+    });
 }
 
 fn envelope(binding: c::FrameBinding, value: Value) -> Vec<u8> {
@@ -546,5 +1225,230 @@ fn an_audit_re_derives_the_migration_and_refuses_a_forged_or_undeclared_one() {
         ));
         // The intact store still opens under its own lineage.
         drop(current(ok(lineage.open(&file.0))));
+    });
+}
+
+/// The actual priority contract, as version 1 of a priority-to-base lineage.
+/// Only the framing and the unused urgent carry differ from store_under.
+fn priority_store_under(path: &Path, priority: &Authority<'_>, steps: usize) {
+    let framing = &migrated::FRAMING;
+    let initial = request(framing, EMPTY, 0, false, Some(false));
+    let genesis = match priority.publish_genesis(&initial) {
+        PublicationOutcome::Commit(publication) => publication,
+        other => panic!("priority genesis refused: {other:?}"),
+    };
+    let mut shell = ok(V2SqliteShell::create(path, priority, genesis));
+    let session = [
+        (
+            request(framing, EMPTY, 0, false, Some(false)),
+            command(framing, CREATE, 1),
+            context(framing, CLERK),
+        ),
+        (
+            request(framing, PENDING, 1, false, Some(false)),
+            command(framing, APPROVE, 0),
+            context(framing, CFO),
+        ),
+        (
+            request(framing, PENDING, 1, true, Some(false)),
+            command(framing, EXECUTE, 0),
+            context(framing, CLERK),
+        ),
+    ];
+    for (index, (state, cmd, ctx)) in session.iter().take(steps).enumerate() {
+        let receipt = ok(shell.commit(
+            key(u8::try_from(index + 1).unwrap_or_else(|_| panic!("commit key"))),
+            publication(priority, state, cmd, ctx),
+        ));
+        assert_eq!(receipt.status(), CommitStatus::Committed);
+    }
+}
+
+fn dropping_urgent() -> Vec<Target<'static>> {
+    declared()
+        .into_iter()
+        .filter(|target| target.id != 124)
+        .collect()
+}
+
+#[test]
+fn an_unused_field_drop_keeps_live_history_and_original_pending_payment_bytes() {
+    with_versions(|base, priority| {
+        let fields = dropping_urgent();
+        let steps = [Step::Migration {
+            migration: Migration { fields: &fields },
+            claims: &[],
+            review: b"remove unused urgent field; keep every observed behaviour",
+        }];
+        let lineage = ok(Lineage::bind_steps(&[priority, base], &steps));
+        let file = StoreFile::new();
+        priority_store_under(&file.0, &lineage.authorities()[0], 3);
+        let original = {
+            let mut shell = ok(V2SqliteShell::open(&file.0, &lineage.authorities()[0]));
+            ok(shell.export_pending())
+        };
+        assert_eq!(original.len(), 1);
+        let before = ok(fs::read(&file.0));
+        let original_history = ok(lineage.audit_history_read_only(&file.0));
+        let (version, head) = ok(lineage.audit_read_only(&file.0));
+        assert_eq!((version, head.version(), head.pending()), (1, 3, 1));
+        assert_eq!(ok(fs::read(&file.0)), before);
+
+        let (mut shell, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        assert_eq!(receipt.kind(), upgrade::Kind::Migration);
+        let simulated = receipt
+            .migration()
+            .unwrap_or_else(|| panic!("drop migration"))
+            .simulated();
+        assert_eq!(
+            (
+                simulated.states(),
+                simulated.admitted(),
+                simulated.genesis(),
+                simulated.tuples()
+            ),
+            (160, 114, 1, 29_184)
+        );
+        assert_eq!(ok(shell.export_pending()), original);
+        let expected = request(&migrated::v1::FRAMING, EXECUTED, 1, true, None);
+        let snapshot = ok(shell.snapshot());
+        assert_eq!(snapshot.state(), expected);
+        assert_eq!(
+            (snapshot.version(), snapshot.pending(), snapshot.upgrades()),
+            (3, 1, 1)
+        );
+        drop(shell);
+
+        // A fresh binding must replay the old segment before exporting and
+        // delivering its original bytes under its original contract.
+        let fresh = ok(Lineage::bind_steps(&[priority, base], &steps));
+        let mut shell = current(ok(fresh.open(&file.0)));
+        assert_eq!(ok(shell.export_pending()), original);
+        let mut destination = MemoryDestination::default();
+        let token = ok(shell.next_pending()).unwrap_or_else(|| panic!("historical payment"));
+        assert_eq!(token.delivery().delivery_id(), original[0].delivery_id());
+        ok(ok(token.deliver(&mut destination)).acknowledge());
+        assert!(ok(shell.next_pending()).is_none());
+        drop(shell);
+        let bytes = ok(fs::read(&file.0));
+        let replayed = ok(fresh.audit_history_read_only(&file.0));
+        assert_eq!(replayed.contract_version, 2);
+        assert_eq!(replayed.genesis, original_history.genesis);
+        assert_eq!(replayed.commits, original_history.commits);
+        assert_eq!(replayed.snapshot.state(), expected);
+        assert_eq!(
+            (replayed.snapshot.version(), replayed.snapshot.pending()),
+            (3, 0)
+        );
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+#[test]
+fn a_dropped_field_store_continues_committing_and_replays_both_contracts() {
+    with_versions(|base, priority| {
+        let fields = dropping_urgent();
+        let steps = [Step::Migration {
+            migration: Migration { fields: &fields },
+            claims: &[],
+            review: b"remove unused urgent; continue under base",
+        }];
+        let lineage = ok(Lineage::bind_steps(&[priority, base], &steps));
+        let file = StoreFile::new();
+        priority_store_under(&file.0, &lineage.authorities()[0], 1);
+        let (mut shell, _) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        let framing = &migrated::v1::FRAMING;
+        for (index, (state, cmd, ctx)) in [
+            (
+                request(framing, PENDING, 1, false, None),
+                command(framing, APPROVE, 0),
+                context(framing, CFO),
+            ),
+            (
+                request(framing, PENDING, 1, true, None),
+                command(framing, EXECUTE, 0),
+                context(framing, CLERK),
+            ),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let receipt = ok(shell.commit(
+                key(10 + u8::try_from(index).unwrap_or_else(|_| panic!("commit key"))),
+                publication(&lineage.authorities()[1], state, cmd, ctx),
+            ));
+            assert_eq!(receipt.status(), CommitStatus::Committed);
+        }
+        assert_eq!(ok(shell.export_pending()).len(), 1);
+        drop(shell);
+        let bytes = ok(fs::read(&file.0));
+        let replayed = ok(lineage.audit_history_read_only(&file.0));
+        assert_eq!(
+            replayed
+                .commits
+                .iter()
+                .map(|commit| commit.contract_version)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 2]
+        );
+        assert_eq!(
+            replayed.snapshot.state(),
+            request(framing, EXECUTED, 1, true, None)
+        );
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+#[test]
+fn dropping_a_read_approval_field_refuses_a_live_store_without_any_write() {
+    with_versions(|base, priority| {
+        let fields: Vec<Target<'static>> = dropping_urgent()
+            .into_iter()
+            .map(|target| {
+                if target.id == 123 {
+                    Target {
+                        id: 123,
+                        source: Source::Value(0),
+                    }
+                } else {
+                    target
+                }
+            })
+            .collect();
+        let steps = [Step::Migration {
+            migration: Migration { fields: &fields },
+            claims: &[],
+            review: b"invalid: forget read ceo_ok as well as unused urgent",
+        }];
+        let lineage = ok(Lineage::bind_steps(&[priority, base], &steps));
+        let file = StoreFile::new();
+        priority_store_under(&file.0, &lineage.authorities()[0], 3);
+        let before = ok(fs::read(&file.0));
+        let before_audit = ok(lineage.audit_history_read_only(&file.0));
+        let before_pending = {
+            let mut shell = ok(V2SqliteShell::open(&file.0, &lineage.authorities()[0]));
+            ok(shell.export_pending())
+        };
+        let error = refused(superseded(ok(lineage.open(&file.0))).upgrade());
+        assert!(
+            matches!(
+                error,
+                Error::Upgrade(upgrade::Refusal::Migration(Unsimulated::Differs {
+                    observation: Observation::Decision,
+                    ..
+                }))
+            ),
+            "{error:?}"
+        );
+        assert_eq!(ok(fs::read(&file.0)), before);
+        let after = ok(lineage.audit_history_read_only(&file.0));
+        assert_eq!(after.contract_version, 1);
+        assert_eq!(after.genesis, before_audit.genesis);
+        assert_eq!(after.commits, before_audit.commits);
+        assert_eq!(after.snapshot.state(), before_audit.snapshot.state());
+        let mut shell = ok(V2SqliteShell::open(&file.0, &lineage.authorities()[0]));
+        assert_eq!(ok(shell.export_pending()), before_pending);
+        drop(shell);
+        assert_eq!(ok(fs::read(&file.0)), before);
     });
 }

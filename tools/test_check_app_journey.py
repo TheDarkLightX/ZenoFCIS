@@ -15,11 +15,11 @@ class ReadmeTests(unittest.TestCase):
             (app / "README.md").write_text(readme)
             commands = journey.readme_commands(app)
             self.assertEqual(commands, [
-                ["cargo", "test", "--offline"],
-                ["cargo", "run", "--offline", "--", "NEW_DATABASE_PATH"],
+                ["cargo", "test", "--locked", "--offline"],
+                ["cargo", "run", "--locked", "--offline", "--", "NEW_DATABASE_PATH"],
             ])
             self.assertEqual(journey.as_written(commands[1], Path("/new/db.sqlite")),
-                             ["cargo", "run", "--offline", "--", "/new/db.sqlite"])
+                             ["cargo", "run", "--locked", "--offline", "--", "/new/db.sqlite"])
             for changed, message in ((readme.replace("## Build and run", "## Build"), "Build and run"),
                                      (readme.replace("```sh\n", "```\n", 1), "sh block")):
                 (app / "README.md").write_text(changed)

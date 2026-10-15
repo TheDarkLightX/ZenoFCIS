@@ -1,0 +1,49 @@
+name: Checker containment
+description: Establish and probe the systemd user manager needed by contained CLI checks.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        checker_uid="$(id -u)"
+        sudo loginctl enable-linger "$(id -un)"
+        sudo systemctl start "user@${checker_uid}.service"
+        export XDG_RUNTIME_DIR="/run/user/${checker_uid}"
+        export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+        printf 'XDG_RUNTIME_DIR=%s\nDBUS_SESSION_BUS_ADDRESS=%s\n' "$XDG_RUNTIME_DIR" "$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+        test -f /sys/fs/cgroup/cgroup.controllers
+        # A contained run's CPU quota is the tightest cpu.max on the caller's
+        # cgroup chain, as the CLI reads it: a group without the cpu
+        # controller has none and inherits; a present limit must be valid.
+        group="/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)"
+        while [ "$group" != /sys/fs/cgroup ]; do
+          case "$group" in
+            /sys/fs/cgroup/*) ;;
+            *) echo "caller cgroup outside the root: $group" >&2; exit 1 ;;
+          esac
+          test -f "$group/cgroup.procs"
+          if [ -e "$group/cpu.max" ]; then
+            read -r quota period rest < "$group/cpu.max"
+            case "$period" in ''|*[!0-9]*) echo "malformed $group/cpu.max" >&2; exit 1 ;; esac
+            test "$period" -gt 0
+            test -z "$rest"
+            if [ "$quota" != max ]; then
+              case "$quota" in ''|*[!0-9]*) echo "malformed $group/cpu.max" >&2; exit 1 ;; esac
+              test "$((quota * 100 / period))" -ge 1
+            fi
+            echo "caller cpu.max: $group $quota $period"
+          else
+            echo "caller cpu.max: $group none, inherited"
+          fi
+          group="${group%/*}"
+        done
+        # Expand the probe's variables in its child shell, not in systemd-run.
+        systemd-run --user --wait --pipe --quiet --collect --expand-environment=no \
+          -p MemoryMax=64M -p MemorySwapMax=0 -p TasksMax=64 \
+          /bin/sh -eu -c '
+            group=$(sed -n "s/^0:://p" /proc/self/cgroup)
+            test "$(cat "/sys/fs/cgroup${group}/memory.max")" = 67108864
+            test "$(cat "/sys/fs/cgroup${group}/memory.swap.max")" = 0
+            test "$(cat "/sys/fs/cgroup${group}/pids.max")" = 64
+          '

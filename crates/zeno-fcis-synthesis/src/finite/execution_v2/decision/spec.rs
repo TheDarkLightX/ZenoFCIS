@@ -6,6 +6,7 @@ verus! {
 pub(in super::super) open spec fn bytes_equal(a: Seq<u8>,b: Seq<u8>) -> bool { a == b }
 pub(in super::super) open spec fn equal(a: Atom,b: Atom) -> bool {
     match (a,b) {
+        (Atom::Canonical(a), Atom::Canonical(b)) => a.view() == b.view(),
 
         (Atom::Bool(a),Atom::Bool(b)) => a == b,
         (Atom::I128(a),Atom::I128(b)) => a == b,
@@ -60,6 +61,7 @@ pub(in super::super) open spec fn resolve<'a>(inputs:Inputs<'_, 'a>,output:Seq<A
 }
 pub(in super::super) open spec fn admitted(domain:Domain,value:Atom) -> bool {
     match (domain,value) {
+        (Domain::Canonical{schema,type_id},Atom::Canonical(v)) => schema@ == v.view().0 && type_id == v.view().1,
         (Domain::Bool,Atom::Bool(_)) | (Domain::Bytes,Atom::Bytes(_)) | (Domain::Text,Atom::Text(_)) => true,
         (Domain::I128{min,max},Atom::I128(v)) => min <= v <= max,
         (Domain::U128{min,max},Atom::U128(v)) => min <= v <= max,

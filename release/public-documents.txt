@@ -14,6 +14,7 @@ core-components/idempotency-slot/README.md
 core-components/logical-deadline/README.md
 core-components/retry-budget/README.md
 core-components/versioned-register/README.md
+crates/zeno-fcis-cli/contract-app/README.md.in
 crates/zeno-fcis-cli/templates/account-lockout/README.md
 crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md
 crates/zeno-fcis-cli/templates/compliance-gateway/README.md
@@ -107,6 +108,7 @@ docs/QUICKSTART.md
 docs/RC3_AUTHORING_CONTRACT.md
 docs/RELEASE_ASSURANCE.md
 docs/RELEASE_CANDIDATES.md
+docs/RELEASE_NOTES.md
 docs/RESERVED_DOMAIN_NAMESPACE.md
 docs/SCHEMA_BOUND_CATALOG.md
 docs/SCHEMA_BOUND_ENVELOPE.md
@@ -293,12 +295,14 @@ docs/zal/README.md
 docs/zal/SPECIFICATION.md
 examples/dual-approval/README.md
 experiments/proof-challenge/README.md
+llms.txt
 security/reviews/v1/opus-python-adapters-result.md
 security/reviews/v1/opus-python-shapes-result.md
 security/reviews/v1/opus-release-boundaries-result.md
 security/reviews/v1/opus-release-issues-result.md
 site/ABI.md
 site/README.md
+site/public/index.html
 skills/fixed-spec-proof-review/SKILL.md
 skills/handoff-completion-gate/SKILL.md
 skills/rust-typestate-newtype/SKILL.md
@@ -308,6 +312,8 @@ skills/rust-typestate-newtype/references/zenofcis.md
 skills/specification-non-vacuity/SKILL.md
 skills/zal-authoring/SKILL.md
 skills/zenofcis-synthesis-first/SKILL.md
+# The next 16 entries are frozen kernel-law oracle fixture copies: byte-identical
+# originals kept for regression tests, not user documentation.
 verification/kernel-laws/src/oracle/templates/account-lockout/README.md
 verification/kernel-laws/src/oracle/templates/account-lockout/original/README.md
 verification/kernel-laws/src/oracle/templates/agent-treasury-guard/README.md
@@ -325,3 +331,15 @@ verification/kernel-laws/src/oracle/templates/prepared-counter/original/README.m
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/README.md
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/README.md
 verification/verus/README.md
+core-apps/api-quota/README.md
+core-apps/document-release/README.md
+core-apps/equipment-booking/README.md
+core-apps/expense-approval/README.md
+core-apps/reliable-jobs/README.md
+core-apps/warehouse-reservation/README.md
+tools/test_data/g3_original_zusd/README.md
+docs/WIDE_VALUE_EXECUTION.md
+docs/TAU_KIT.md
+integrations/elite_archive/README.md
+integrations/ocaml/README.md
+crates/zeno-fcis-cli/tests/fixtures/order-fulfillment-split/README.md

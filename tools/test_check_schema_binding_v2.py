@@ -1,36 +1,42 @@
 """Refuse incomplete formal coverage and miswired semantic controls."""
+import copy
 import json
 import os
 import re
+import subprocess
 import unittest
+from pathlib import Path
 
 import check_schema_binding_v2 as gate
 import verus_contract_controls as contract_controls
 from test_verus_contract_controls import PIN, assert_strict_classification, report
 from verus_coverage import require_coverage
 
-# Excerpt of the retained hosted canonical-bytes stderr for this same admission.rs
-# omission (run 37404295156). The schema harness still needs its own selected run.
-HOSTED_OMIT = """error: postcondition not satisfied
-  --> /home/runner/work/_temp/v2-evidence/canonical-bytes/canonical-byte-run-nt4blh0_/omit_unused_getter_contract/verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:67:63
-   |
-67 |     #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result@ == self.view().0,))]
-   |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
-...
-71 |         self.checked.original()
-   |         ----------------------- at the end of the function body
+# Primary error/location excerpt of the retained local schema omission run at rlimit 80.
+# Diagnostic order and duplicate catalog postcondition are retained; paths are relative.
+# This fixture tests classification and is not a proof result.
+RETAINED_OMIT = """error: precondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs:133:13
 
 error: postcondition not satisfied
-   --> /home/runner/work/_temp/v2-evidence/canonical-bytes/canonical-byte-run-nt4blh0_/omit_unused_getter_contract/verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:120:5
-    |
-120 | /     (match result { Ok(bound) => Ok(bound.view()), Err(e) => Err(e) }) ==
+  --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:83:63
 
 error: postcondition not satisfied
-   --> /home/runner/work/_temp/v2-evidence/canonical-bytes/canonical-byte-run-nt4blh0_/omit_unused_getter_contract/verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:120:5
-    |
-120 | /     (match result { Ok(bound) => Ok(bound.view()), Err(e) => Err(e) }) ==
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:136:5
 
-error: aborting due to 3 previous errors
+error: postcondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:136:5
+
+error: postcondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs:345:56
+
+error: postcondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs:63:56
+
+error: precondition not satisfied
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs:542:60
+
+error: aborting due to 7 previous errors
 """
 
 
@@ -69,6 +75,60 @@ class SchemaCoverage(unittest.TestCase):
         self.assertIn(str(gate.ORDER_FIXTURE), targets)
         self.assertLessEqual(targets, units)
 
+
+    def test_proof_controls_refuse_inconclusive_and_unrelated_failures(self):
+        # Synthetic protocol tests; these are not proof results.
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+        mutants = gate.mutation_sources((gate.ROOT / gate.SUBJECT).read_text(),
+            (gate.ROOT / gate.ADMISSION).read_text(), (gate.ROOT / gate.SPEC).read_text())
+        self.assertEqual(set(gate.PROOF_FUNCTIONS),
+            {name for name, (_, _, kind) in mutants.items() if kind == "proof"})
+        report = {
+            "verus": {"version": pin["version"], "commit": pin["commit"],
+                      "toolchain": pin["rust_toolchain"]},
+            "verification-results": {"success": False, "errors": 1, "verified": 1160,
+                "encountered-error": True, "encountered-vir-error": False,
+                "is-verifying-entire-crate": True},
+            "func-details": {key: {} for key in profile["target_functions"]},
+        }
+        specimen = Path("/synthetic/schema-control")
+        for name, (path, changed, kind) in mutants.items():
+            if kind != "proof":
+                continue
+            start, end = gate.verifier.function_lines(changed, gate.PROOF_FUNCTIONS[name])
+            diagnostic = f"error: postcondition not satisfied\n --> {path}:{start}:1\n"
+            summary = "error: aborting due to 1 previous error\n"
+            def classify(stderr, current=report, code=1):
+                proc = subprocess.CompletedProcess([], code, "", stderr)
+                return gate.proof_rejected(proc, current, pin, profile, name, path, changed, specimen)
+            with self.subTest(name=name):
+                self.assertTrue(classify(diagnostic + summary))
+                loop = diagnostic.replace('postcondition not satisfied',
+                                          'invariant not satisfied before loop')
+                self.assertTrue(classify(loop + summary))
+                self.assertFalse(classify(loop.replace('before loop', 'before loop unrelated') + summary))
+                self.assertFalse(classify(loop.replace(str(path), 'unrelated.rs') + summary))
+                self.assertFalse(classify(loop + 'note: timeout\n' + summary))
+                for extra in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n",
+                              "note: timeout\n", "note: signal 9\n",
+                              "error[E0308]: mismatched types\n",
+                              "error: postcondition not satisfied\n --> unrelated.rs:1:1\n"):
+                    self.assertFalse(classify(diagnostic + extra + summary), extra)
+                self.assertFalse(classify(diagnostic.replace(str(path), "unrelated.rs") + summary))
+                self.assertFalse(classify(diagnostic.replace(f":{start}:1", f":{end + 1}:1") + summary))
+                self.assertFalse(classify(diagnostic))
+                for code in (0, 101, 124, -9):
+                    self.assertFalse(classify(diagnostic + summary, code=code))
+                for section, key, value in (("verus", "version", "other"),
+                        ("verus", "commit", "other"), ("verus", "toolchain", "other"),
+                        ("verification-results", "is-verifying-entire-crate", False),
+                        ("verification-results", "encountered-vir-error", True),
+                        ("verification-results", "errors", True)):
+                    current = copy.deepcopy(report); current[section][key] = value
+                    self.assertFalse(classify(diagnostic + summary, current))
+
+
     def test_getter_contract_controls_change_only_that_contract_and_classify_strictly(self):
         admission = (gate.ROOT / gate.ADMISSION).read_text()
         end = admission.index("    pub fn original(&self)")
@@ -84,7 +144,7 @@ class SchemaCoverage(unittest.TestCase):
             self.assertEqual(path, gate.ADMISSION)
             self.assertTrue(changed.startswith(admission[:start]) and changed.endswith(admission[end:]), name)
             assert_strict_classification(self, expected)
-        outcome = contract_controls.contract_rejected(1, report(errors=2), HOSTED_OMIT, PIN,
+        outcome = contract_controls.contract_rejected(1, report(errors=6), RETAINED_OMIT, PIN,
             gate.CONTRACT_REJECTIONS["omit_original_getter_contract"])
         self.assertTrue(outcome["accepted"], outcome)
 

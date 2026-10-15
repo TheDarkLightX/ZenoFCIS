@@ -13,7 +13,7 @@
 //! evaluator can report them as indeterminate and fail closed.
 
 use crate::ast::{
-    ClaimDecl, ClaimFormula, ClaimMode, CompareOp, LawDecl, ProjectionRoot, RelExpr,
+    ClaimDecl, ClaimFormula, ClaimMode, CompareOp, LawDecl, LawScope, ProjectionRoot, RelExpr,
     TemporalFormula, ValueExpr,
 };
 
@@ -33,8 +33,10 @@ pub enum Substance {
     /// no post-state, effect, outbox, or event for a single-step formula, and
     /// no observation at all for a temporal formula.
     IgnoresTransition,
-    /// The formula reads an observation that a transition can change. This is
-    /// necessary for a meaningful constraint; it does not establish one.
+    /// The formula reads an observation that a transition can change, or it
+    /// is a law on only some decisions that is not always true, which refuses
+    /// the decisions in its scope wherever it is false. This is necessary for
+    /// a meaningful constraint; it does not establish one.
     MayConstrainTransition,
 }
 
@@ -58,9 +60,24 @@ impl Substance {
 }
 
 /// Classifies one law. A law is a single-step relation over one transition.
+///
+/// A law declared on only some decisions (`on accept`, `on reject`, `on
+/// failure` or `on commit`) also decides which decision a pre-state and input
+/// may take: where it is false, every decision in its scope is refused. Such a
+/// law can therefore constrain a transition even when it reads no outcome or
+/// is always false; only an always-true law cannot.
 #[must_use]
 pub fn law_substance(law: &LawDecl) -> Substance {
-    relation_substance(law.formula())
+    let substance = relation_substance(law.formula());
+    let some_decisions = law
+        .applicability()
+        .is_some_and(|applicability| applicability.scope() != LawScope::Always);
+    match substance {
+        Substance::IgnoresTransition | Substance::Constant { value: false } if some_decisions => {
+            Substance::MayConstrainTransition
+        }
+        other => other,
+    }
 }
 
 /// Classifies one claim.

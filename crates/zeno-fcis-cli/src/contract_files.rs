@@ -5,7 +5,8 @@
 //! lists, and
 //! writes or checks `v2/schema.zcve`, `src/v2_contract.rs`, `v2/policy.zcve`
 //! and each superseded version's `src/v2_contract_v{k}.rs` and
-//! `v2/policy_v{k}.zcve`. `zeno-fcis new --contract` builds a new application
+//! `v2/policy_v{k}.zcve`, in the same directory or, with `--out`, in
+//! another. `zeno-fcis new --contract` builds a new application
 //! around them, and `zeno-fcis contract adopt` records one more adoption.
 //! Generation is the pure `crate::contract::generate_contract`; this module
 //! only reads and writes files.
@@ -348,16 +349,18 @@ pub(crate) fn outputs(generated: &GeneratedContract) -> Vec<(String, &[u8])> {
     files
 }
 
-/// `zeno-fcis generate contract`.
-pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
+/// `zeno-fcis generate contract`: reads the contract in `dir` and writes or
+/// checks the generated files in `out`, by default `dir` itself.
+pub(crate) fn run(dir: &Path, out: Option<&Path>, check_only: bool, format: OutputFormat) -> u8 {
     let generated = match Inputs::read(dir).and_then(|inputs| inputs.generate()) {
         Ok(generated) => generated,
         Err(failure) => return report_failure(dir, failure, format),
     };
+    let out = out.unwrap_or(dir);
     let files = outputs(&generated);
     let mut drift = Vec::new();
     for (name, bytes) in &files {
-        let path = dir.join(name);
+        let path = out.join(name);
         let result = if check_only {
             artifact_is_current(&path, bytes).map(|current| {
                 if !current {
@@ -370,10 +373,10 @@ pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
         if let Err(error) = result {
             let action = if check_only { "read" } else { "write" };
             let message = format!("{action} {name}: {error}");
-            return report_failure(dir, Failure::Read(message), format);
+            return report_failure(out, Failure::Read(message), format);
         }
     }
-    report(dir, check_only, &drift, &files, &generated, format);
+    report(out, check_only, &drift, &files, &generated, format);
     if drift.is_empty() { OK } else { INVALID }
 }
 
@@ -422,13 +425,14 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             .replace("{package}", &package)
             .replace("{version}", env!("CARGO_PKG_VERSION"));
         let binding = binding::bind(&manifest, source).map_err(Failure::Binding)?;
+        let manifest = format!("{manifest}{}", binding.patch);
+        let lock = binding
+            .application_lock(&manifest)
+            .map_err(Failure::Binding)?;
         let readme = README.replace("{package}", &package);
         let mut files: Vec<(String, Vec<u8>)> = vec![
-            (
-                "Cargo.toml".to_owned(),
-                format!("{manifest}{}", binding.patch).into_bytes(),
-            ),
-            ("Cargo.lock".to_owned(), binding.lock),
+            ("Cargo.toml".to_owned(), manifest.into_bytes()),
+            ("Cargo.lock".to_owned(), lock),
             ("README.md".to_owned(), readme.into_bytes()),
             (PROJECT.to_owned(), inputs.project.clone().into_bytes()),
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
@@ -568,6 +572,11 @@ pub(crate) fn summary_json(generated: &GeneratedContract) -> Value {
                                 })).collect::<Vec<_>>(),
                             }),
                         );
+                        if !migration.dropped.is_empty()
+                            && let Some(Value::Object(report)) = fields.get_mut("migration")
+                        {
+                            report.insert("dropped".to_owned(), json!(migration.dropped));
+                        }
                     }
                     entry
                 })

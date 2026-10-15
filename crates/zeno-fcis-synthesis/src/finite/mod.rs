@@ -11,13 +11,23 @@ pub mod completion;
 pub mod emit;
 mod evaluation;
 mod execution_v2;
+mod value;
 
+pub use evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
+pub use evaluation::typed::NumericOp as V2NumericOp;
 pub use execution_v2::composition as v2_composition;
+/// Immutable original-schema value witness; only checked ingress constructs it.
+pub use execution_v2::compound::Value as V2CanonicalValue;
 pub use execution_v2::continuation as v2_continuation;
 pub use execution_v2::laws as v2_laws;
+pub use execution_v2::numeric::{
+    Failure as V2NumericFailure, MAX_NUMERIC_INPUTS, MAX_NUMERIC_NODES, MAX_NUMERIC_OUTPUTS,
+    NumericProgram as V2NumericProgram, Outcome as V2NumericOutcome, execute as execute_numeric_v2,
+};
 #[cfg(test)]
 /// Unchanged emitted order fixture for complete-decision test comparisons.
 pub use execution_v2::order_fixture_transition as v2_order_fixture_transition;
+pub use value::{Atom as V2NumericAtom, Domain as V2NumericDomain, IntegerWidth as V2IntegerWidth};
 mod ir;
 
 #[cfg(test)]
@@ -31,13 +41,161 @@ pub use execution_v2::{
     Resource as V2Resource, ScalarProgram as V2ScalarProgram, Usage as V2Usage,
     execute as execute_v2, project_record as project_record_v2, zero_limits as v2_zero_limits,
 };
-pub use ir::{Domain, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program};
+pub use ir::{
+    Domain, EXTENDED_PROFILE, MAX_EXTENDED_INPUTS, MAX_EXTENDED_NODES, MAX_EXTENDED_OUTPUTS,
+    MAX_FIELDS, MAX_NODES, Op, PROFILE, Program,
+};
 
 /// V2 instruction-attempt accounting, separate from the scalar wire profile.
 pub const V2_EXECUTION_PROFILE: &str = "zeno-fcis/finite-instruction-meter/2";
 
 /// V2 ingress bytes and protected flat-record field attempts.
 pub const V2_RECORD_PROFILE: &str = "zeno-fcis/finite-protected-record/2";
+
+/// Every source file, relative to this directory, reachable from finite
+/// program admission, evaluation and metered execution, with its
+/// specifications and proofs, and its exact bytes.
+///
+/// The synthesis checker identity and `finite_runtime::evaluator_hash` both
+/// bind this list. A test compares it with the module tree, so a new file
+/// under these directories refuses until it is hashed or reviewed out.
+const SEMANTIC_SOURCES: &[(&str, &[u8])] = &[
+    (
+        "canonical_v2/mod.rs",
+        include_bytes!("canonical_v2/mod.rs") as &[u8],
+    ),
+    (
+        "canonical_v2/schema.rs",
+        include_bytes!("canonical_v2/schema.rs") as &[u8],
+    ),
+    (
+        "canonical_v2/schema/admission.rs",
+        include_bytes!("canonical_v2/schema/admission.rs") as &[u8],
+    ),
+    (
+        "canonical_v2/schema/admission/spec.rs",
+        include_bytes!("canonical_v2/schema/admission/spec.rs") as &[u8],
+    ),
+    (
+        "canonical_v2/schema/spec.rs",
+        include_bytes!("canonical_v2/schema/spec.rs") as &[u8],
+    ),
+    (
+        "canonical_v2/spec.rs",
+        include_bytes!("canonical_v2/spec.rs") as &[u8],
+    ),
+    (
+        "evaluation/admission/mod.rs",
+        include_bytes!("evaluation/admission/mod.rs") as &[u8],
+    ),
+    (
+        "evaluation/admission/spec.rs",
+        include_bytes!("evaluation/admission/spec.rs") as &[u8],
+    ),
+    (
+        "evaluation/mod.rs",
+        include_bytes!("evaluation/mod.rs") as &[u8],
+    ),
+    (
+        "evaluation/spec.rs",
+        include_bytes!("evaluation/spec.rs") as &[u8],
+    ),
+    (
+        "evaluation/typed.rs",
+        include_bytes!("evaluation/typed.rs") as &[u8],
+    ),
+    (
+        "evaluation/typed/admission.rs",
+        include_bytes!("evaluation/typed/admission.rs") as &[u8],
+    ),
+    (
+        "evaluation/typed/admission/spec.rs",
+        include_bytes!("evaluation/typed/admission/spec.rs") as &[u8],
+    ),
+    (
+        "evaluation/typed/spec.rs",
+        include_bytes!("evaluation/typed/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/compound.rs",
+        include_bytes!("execution_v2/compound.rs") as &[u8],
+    ),
+    (
+        "execution_v2/compound/spec.rs",
+        include_bytes!("execution_v2/compound/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/decision.rs",
+        include_bytes!("execution_v2/decision.rs") as &[u8],
+    ),
+    (
+        "execution_v2/decision/spec.rs",
+        include_bytes!("execution_v2/decision/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/input_view.rs",
+        include_bytes!("execution_v2/input_view.rs") as &[u8],
+    ),
+    (
+        "execution_v2/input_view/spec.rs",
+        include_bytes!("execution_v2/input_view/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/input_view/typed.rs",
+        include_bytes!("execution_v2/input_view/typed.rs") as &[u8],
+    ),
+    (
+        "execution_v2/input_view/typed/spec.rs",
+        include_bytes!("execution_v2/input_view/typed/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/meter.rs",
+        include_bytes!("execution_v2/meter.rs") as &[u8],
+    ),
+    (
+        "execution_v2/mod.rs",
+        include_bytes!("execution_v2/mod.rs") as &[u8],
+    ),
+    (
+        "execution_v2/nonbinding_step.rs",
+        include_bytes!("execution_v2/nonbinding_step.rs") as &[u8],
+    ),
+    (
+        "execution_v2/numeric.rs",
+        include_bytes!("execution_v2/numeric.rs") as &[u8],
+    ),
+    (
+        "execution_v2/numeric/spec.rs",
+        include_bytes!("execution_v2/numeric/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/spec.rs",
+        include_bytes!("execution_v2/spec.rs") as &[u8],
+    ),
+    (
+        "execution_v2/util.rs",
+        include_bytes!("execution_v2/util.rs") as &[u8],
+    ),
+    ("ir.rs", include_bytes!("ir.rs") as &[u8]),
+    ("ir/program.rs", include_bytes!("ir/program.rs") as &[u8]),
+    ("value/mod.rs", include_bytes!("value/mod.rs") as &[u8]),
+    ("value/spec.rs", include_bytes!("value/spec.rs") as &[u8]),
+    ("value/wide.rs", include_bytes!("value/wide.rs") as &[u8]),
+];
+
+/// The row count, then each path and its bytes, each preceded by its u64
+/// big-endian length, so distinct source lists cannot frame the same bytes.
+pub(crate) fn semantic_source_bytes() -> Vec<u8> {
+    let mut framed = Vec::new();
+    framed.extend_from_slice(&(SEMANTIC_SOURCES.len() as u64).to_be_bytes());
+    for (path, bytes) in SEMANTIC_SOURCES {
+        framed.extend_from_slice(&(path.len() as u64).to_be_bytes());
+        framed.extend_from_slice(path.as_bytes());
+        framed.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
+        framed.extend_from_slice(bytes);
+    }
+    framed
+}
 
 use crate::{
     Assignment, CandidateChecker, CheckResult, Hole, HoleId, SearchBudget, SearchResult,
@@ -634,25 +792,11 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
                 zeno_fcis_codec::domains::FINITE_CHECKER_SOURCE,
                 include_bytes!("mod.rs"),
             )?)?,
-            digest_value(hash_bytes(
-                zeno_fcis_codec::domains::FINITE_IR_SOURCE,
-                include_bytes!("ir.rs"),
-            )?)?,
+            // Covers the IR, admission and evaluation sources and their
+            // specifications, which earlier identities hashed file by file.
             digest_value(hash_bytes(
                 zeno_fcis_codec::domains::FINITE_EXECUTION_SOURCE,
-                include_bytes!("evaluation/mod.rs"),
-            )?)?,
-            digest_value(hash_bytes(
-                zeno_fcis_codec::domains::FINITE_EXECUTION_SPECIFICATION,
-                include_bytes!("evaluation/spec.rs"),
-            )?)?,
-            digest_value(hash_bytes(
-                zeno_fcis_codec::domains::FINITE_ADMISSION_SOURCE,
-                include_bytes!("evaluation/admission/mod.rs"),
-            )?)?,
-            digest_value(hash_bytes(
-                zeno_fcis_codec::domains::FINITE_ADMISSION_SPECIFICATION,
-                include_bytes!("evaluation/admission/spec.rs"),
+                &semantic_source_bytes(),
             )?)?,
             digest_value(Hash32::new(execution_v2::authority::EVALUATOR))?,
         ])?
@@ -834,3 +978,194 @@ impl CandidateChecker for Checker<'_> {
 pub use execution_v2::authority as v2_authority;
 
 pub use execution_v2::catalog as v2_catalog;
+
+#[cfg(all(test, not(miri)))]
+mod semantic_source_tests {
+    use super::SEMANTIC_SOURCES;
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::Path;
+
+    /// The Authority publication route. No program admission or evaluation
+    /// path reaches these files; both identities bind them only through the
+    /// generated `EVALUATOR` digest of the approved source closure.
+    const AUTHORITY_ROUTE: &[&str] = &[
+        "canonical_v2/envelope.rs",
+        "canonical_v2/envelope/spec.rs",
+        "canonical_v2/output.rs",
+        "canonical_v2/output/spec.rs",
+        "execution_v2/authority.rs",
+        "execution_v2/authority/bound.rs",
+        "execution_v2/authority/bound_spec.rs",
+        "execution_v2/authority/candidate.rs",
+        "execution_v2/authority/canonical.rs",
+        "execution_v2/authority/descriptor.rs",
+        "execution_v2/authority/descriptor_spec.rs",
+        "execution_v2/authority/family_spec.rs",
+        "execution_v2/authority/framing.rs",
+        "execution_v2/authority/metadata.rs",
+        "execution_v2/authority/metadata_spec.rs",
+        "execution_v2/authority/numeric_metadata.rs",
+        "execution_v2/authority/numeric_metadata_spec.rs",
+        "execution_v2/authority/observations.rs",
+        "execution_v2/authority/outcome.rs",
+        "execution_v2/authority/outcome_spec.rs",
+        "execution_v2/authority/policy.rs",
+        "execution_v2/authority/policy_spec.rs",
+        "execution_v2/authority/publication.rs",
+        "execution_v2/authority/publication/spec.rs",
+        "execution_v2/authority/refusal.rs",
+        "execution_v2/authority/spec.rs",
+        "execution_v2/catalog.rs",
+        "execution_v2/catalog/family_spec.rs",
+        "execution_v2/catalog/matching.rs",
+        "execution_v2/catalog/spec.rs",
+        "execution_v2/composition.rs",
+        "execution_v2/composition/admission.rs",
+        "execution_v2/composition/admission/numeric.rs",
+        "execution_v2/composition/admission/numeric/spec.rs",
+        "execution_v2/composition/admission/spec.rs",
+        "execution_v2/composition/descriptor.rs",
+        "execution_v2/composition/descriptor/spec.rs",
+        "execution_v2/composition/framed.rs",
+        "execution_v2/composition/framed/spec.rs",
+        "execution_v2/composition/ingress.rs",
+        "execution_v2/composition/ingress/original.rs",
+        "execution_v2/composition/ingress/original/spec.rs",
+        "execution_v2/composition/ingress/shared.rs",
+        "execution_v2/composition/ingress/shared_spec.rs",
+        "execution_v2/composition/ingress/spec.rs",
+        "execution_v2/composition/outcome.rs",
+        "execution_v2/composition/producer.rs",
+        "execution_v2/composition/producer/spec.rs",
+        "execution_v2/composition/schema_validation.rs",
+        "execution_v2/composition/schema_validation/spec.rs",
+        "execution_v2/composition/shared.rs",
+        "execution_v2/composition/shared_spec.rs",
+        "execution_v2/composition/spec.rs",
+        "execution_v2/continuation.rs",
+        "execution_v2/continuation/spec.rs",
+        "execution_v2/laws.rs",
+        "execution_v2/laws/atoms.rs",
+        "execution_v2/laws/frame.rs",
+        "execution_v2/laws/predicate.rs",
+        "execution_v2/laws/spec.rs",
+        "execution_v2/laws/types.rs",
+    ];
+    /// Modules rooted in `AUTHORITY_ROUTE`, which hashed files must not use.
+    const AUTHORITY_MODULES: &[&str] = &[
+        "authority",
+        "catalog",
+        "composition",
+        "continuation",
+        "envelope",
+        "laws",
+        "output",
+    ];
+    /// The generated digest, which both identities include by value.
+    const GENERATED: &[&str] = &["execution_v2/authority/evaluator.rs"];
+    /// Unit tests, compiled only under `cfg(test)`.
+    const TESTS: &[&str] = &[
+        "canonical_v2/envelope/tests.rs",
+        "canonical_v2/output/tests.rs",
+        "canonical_v2/schema/tests.rs",
+        "execution_v2/authority/invocation_tests.rs",
+        "execution_v2/authority/publication_tests.rs",
+        "execution_v2/authority/sealing_tests.rs",
+        "execution_v2/authority/tests.rs",
+        "execution_v2/catalog/tests.rs",
+        "execution_v2/composition/account_tests.rs",
+        "execution_v2/composition/record_tests.rs",
+        "execution_v2/composition/tests.rs",
+        "execution_v2/compound/tests.rs",
+        "execution_v2/continuation/tests.rs",
+        "execution_v2/decision/tests.rs",
+        "execution_v2/input_view/tests.rs",
+        "execution_v2/laws/tests.rs",
+        "execution_v2/numeric/tests.rs",
+        "execution_v2/tests.rs",
+        "value/tests.rs",
+    ];
+
+    fn collect(root: &Path, directory: &Path, files: &mut BTreeSet<String>) {
+        for entry in fs::read_dir(directory).unwrap_or_else(|e| panic!("{directory:?}: {e}")) {
+            let path = entry.unwrap_or_else(|e| panic!("{e}")).path();
+            if path.is_dir() {
+                collect(root, &path, files);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                let relative = path.strip_prefix(root).unwrap_or_else(|e| panic!("{e}"));
+                files.insert(
+                    relative
+                        .to_str()
+                        .unwrap_or_else(|| panic!("{path:?}"))
+                        .replace('\\', "/"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_evaluation_and_execution_file_is_hashed_or_reviewed_out() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/finite");
+        let mut tree = BTreeSet::from(["ir.rs".to_owned()]);
+        for directory in ["canonical_v2", "evaluation", "execution_v2", "ir", "value"] {
+            collect(&root, &root.join(directory), &mut tree);
+        }
+        assert!(
+            SEMANTIC_SOURCES.windows(2).all(|w| w[0].0 < w[1].0),
+            "sorted and unique"
+        );
+        for (path, bytes) in SEMANTIC_SOURCES {
+            assert_eq!(
+                fs::read(root.join(path)).ok().as_deref(),
+                Some(*bytes),
+                "{path}"
+            );
+        }
+        let mut reviewed = BTreeSet::new();
+        let hashed = SEMANTIC_SOURCES.iter().map(|(path, _)| path);
+        for path in hashed.chain(AUTHORITY_ROUTE).chain(GENERATED).chain(TESTS) {
+            assert!(
+                reviewed.insert((*path).to_owned()),
+                "{path} is listed twice"
+            );
+        }
+        let unreviewed: Vec<_> = tree.difference(&reviewed).collect();
+        let missing: Vec<_> = reviewed.difference(&tree).collect();
+        assert!(unreviewed.is_empty(), "hash or review out: {unreviewed:?}");
+        assert!(missing.is_empty(), "stale entries: {missing:?}");
+    }
+
+    #[test]
+    fn hashed_files_do_not_use_the_authority_route() {
+        let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+        let starts_word = |text: &str, at: usize| !text[..at].chars().next_back().is_some_and(word);
+        for (path, bytes) in SEMANTIC_SOURCES {
+            let text = core::str::from_utf8(bytes).unwrap_or_else(|e| panic!("{path}: {e}"));
+            let code: String = text
+                .lines()
+                .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+                .collect::<Vec<_>>()
+                .join("\n");
+            // Every `use` tree, including grouped and renamed imports.
+            let trees: Vec<&str> = code
+                .match_indices("use ")
+                .filter(|(at, _)| starts_word(&code, *at))
+                .filter_map(|(at, _)| code[at..].split_once(';').map(|(tree, _)| tree))
+                .collect();
+            for module in AUTHORITY_MODULES {
+                let as_path = format!("{module}::");
+                let path_use = code
+                    .match_indices(&as_path)
+                    .any(|(at, _)| starts_word(&code, at));
+                let item_use = trees
+                    .iter()
+                    .any(|tree| tree.split(|c: char| !word(c)).any(|item| item == *module));
+                assert!(
+                    !path_use && !item_use,
+                    "{path} uses {module}; hash its closure"
+                );
+            }
+        }
+    }
+}

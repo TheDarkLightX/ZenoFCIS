@@ -1,5 +1,8 @@
 """Native/API and protocol tests; simulated records are not proof results."""
+import copy
 import json
+from pathlib import Path
+import subprocess
 import os
 from pathlib import Path
 import tempfile
@@ -38,14 +41,14 @@ class MeteredCoverage(unittest.TestCase):
     def test_reviewed_inventory_and_mutation_anchors_are_complete(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile["functions"].items() if record["mode"] == "Exec"}
-        self.assertEqual(len(profile["functions"]), 1085)
-        self.assertEqual(len(runtime), 468)
+        self.assertEqual(len(profile["functions"]), 1569)
+        self.assertEqual(len(runtime), 635)
         self.assertEqual(set(profile["body_covered_functions"]), runtime)
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0
                             for record in profile["functions"].values() if record["mode"] == "Exec"))
         mutations = gate.mutation_sources((gate.ROOT / gate.SUBJECT).read_text(),
             (gate.ROOT / gate.METER).read_text(), (gate.ROOT / gate.SPEC).read_text(),
-            (gate.ROOT / gate.RESOURCE).read_text())
+            (gate.ROOT / gate.RESOURCE).read_text(), (gate.ROOT / gate.NUMERIC).read_text())
         self.assertEqual(len(mutations), 16)
         self.assertEqual(mutations["execute_before_charging"][2], "coverage")
         self.assertEqual(mutations["inject_caller_usage_argument"][2], "coverage")
@@ -73,11 +76,68 @@ class NativeMeteredExecution(unittest.TestCase):
             # The full gate already owns this name for its positive VIR logs.
             (Path(temporary) / "positive").mkdir()
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn("test result: ok. 128 passed; 0 failed", evidence["test_output"])
+        self.assertIn("test result: ok. 157 passed; 0 failed", evidence["test_output"])
         self.assertEqual(evidence["api_consumers"]["positive"]["exit_code"], 0)
         self.assertEqual(len(evidence["api_consumers"]), 5)
         self.assertTrue(all(record["exit_code"] != 0 for name, record in evidence["api_consumers"].items()
                             if name != "positive"))
+
+
+class MeteredRefusal(unittest.TestCase):
+    def setUp(self):
+        self.pin = json.loads((gate.ROOT / verifier.PIN).read_text())
+        self.path = gate.NUMERIC
+        self.changed = '#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\npub fn evaluate() {}\n'
+        self.profile = {"namespace": "example::", "target_functions": ["example::identity"],
+            "body_covered_functions": ["example::identity"],
+            "functions": coverage.inventory(FUNCTION + "\n" + SPEC, "example::", ("example::identity",))}
+        self.report = {"verus": {"version": self.pin["version"], "commit": self.pin["commit"],
+            "toolchain": self.pin["rust_toolchain"]}, "func-details": {"example::identity": {}},
+            "verification-results": {"success": False, "errors": 1, "verified": 1,
+                "encountered-error": True, "encountered-vir-error": False, "is-verifying-entire-crate": True}}
+        self.stderr = f'error: postcondition not satisfied\n --> {self.path}:2:1\nerror: aborting due to 1 previous error\n'
+
+    def classify(self, stderr=None, report=None, code=1, expected="proof", vir=None, name="omit_step_charge"):
+        report = self.report if report is None else report
+        proc = subprocess.CompletedProcess([], code, json.dumps(report), self.stderr if stderr is None else stderr)
+        return gate.classify_mutation(proc, report, name, self.path, self.changed,
+            Path("/private-specimen"), self.pin, self.profile, expected=expected, vir=vir)[0]
+
+    def test_complete_intended_refusal_and_mixed_errors(self):
+        self.assertTrue(self.classify())
+        for extra in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n", "note: timed out\n",
+                      "error[E0308]: mismatched types\n --> unrelated.rs:2:1\n",
+                      "error: assertion failed\n --> unrelated.rs:2:1\n"):
+            with self.subTest(extra=extra):
+                self.assertFalse(self.classify(self.stderr + extra))
+        for stderr in (self.stderr.replace(str(self.path), "unrelated.rs"),
+                       self.stderr.replace(":2:1", ":9:1"), self.stderr.replace("1 previous", "2 previous")):
+            self.assertFalse(self.classify(stderr))
+
+    def test_partial_malformed_and_unpinned_reports_refuse(self):
+        for report in ({}, {"verification-results": {}}):
+            self.assertFalse(self.classify(report=report))
+        for field, value in (("is-verifying-entire-crate", False), ("encountered-error", False),
+                             ("encountered-vir-error", True), ("verified", 0)):
+            report = copy.deepcopy(self.report); report["verification-results"][field] = value
+            self.assertFalse(self.classify(report=report))
+        report = copy.deepcopy(self.report); report["verus"]["commit"] = "wrong"
+        self.assertFalse(self.classify(report=report))
+        report = copy.deepcopy(self.report); report["func-details"] = {}
+        self.assertFalse(self.classify(report=report))
+        for code in (None, True, 0, 2, 137):
+            self.assertFalse(self.classify(code=code))
+
+    def test_coverage_requires_complete_success_and_clean_diagnostics(self):
+        report = copy.deepcopy(self.report)
+        report["verification-results"].update(success=True, errors=0, **{"encountered-error": False})
+        vir = FUNCTION.replace("Constant Int 7", "Constant Int 8") + "\n" + SPEC
+        self.assertTrue(self.classify("", report, 0, "coverage", vir))
+        for stderr in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n",
+                       "error[E0308]: mismatched types\n", self.stderr):
+            self.assertFalse(self.classify(stderr, report, 0, "coverage", vir))
+        report["verification-results"]["is-verifying-entire-crate"] = False
+        self.assertFalse(self.classify("", report, 0, "coverage", vir))
 
 
 if __name__ == "__main__":

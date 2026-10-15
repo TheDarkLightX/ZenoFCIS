@@ -12,9 +12,10 @@ use std::{
 };
 use zeno_fcis_codec::{CanonicalEncode, Envelope, Hash32};
 use zeno_fcis_shell::{CommitStatus, MemoryDestination};
-use zeno_fcis_shell_sqlite::{
-    CrashPoint,
-    v2::{Error, Lineage, Opened, Store, Superseded, V2SqliteShell, V9Store, equivalence, upgrade},
+#[cfg(feature = "crash-injection")]
+use zeno_fcis_shell_sqlite::CrashPoint;
+use zeno_fcis_shell_sqlite::v2::{
+    Error, Lineage, Opened, Store, Superseded, V2SqliteShell, V9Store, equivalence, upgrade,
 };
 
 /// The default comparison cap, as `Lineage::bind` sets it.
@@ -1236,6 +1237,7 @@ fn a_checkpoint_superseded_at_its_head_is_told_apart() {
 }
 
 #[test]
+#[cfg(feature = "crash-injection")]
 fn upgrade_and_migration_crashes_before_commit_write_nothing() {
     with_lineage(|_, lineage| {
         let v1 = &lineage.authorities()[0];
@@ -1964,6 +1966,7 @@ fn identical_programs_establish_equivalence_without_enumeration() {
 /// more. (`Lineage::establish` also asserts, in debug builds, that no
 /// transaction is open whenever a comparison could start.)
 #[test]
+#[cfg(feature = "crash-injection")]
 fn no_comparison_runs_inside_the_upgrade_transaction() {
     with_lineage(|_, lineage| {
         let v1 = &lineage.authorities()[0];

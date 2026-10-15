@@ -69,6 +69,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-authenticated": 2,
     "zeno-fcis-authenticated-authority": 5,
     "zeno-fcis-synthesis": 2,
+    "zeno-fcis-contract": 3,
     "zeno-fcis-backend": 3,
     "zeno-fcis-formal-tools": 4,
     "zeno-fcis-cli": 5,

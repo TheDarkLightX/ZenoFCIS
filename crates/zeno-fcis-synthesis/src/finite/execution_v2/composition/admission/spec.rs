@@ -1,9 +1,9 @@
 use super::*;
 use vstd::prelude::*;
 verus! {
-pub(in super::super) open spec fn domain_kind(d:Domain)->Kind{match d{Domain::Bool=>Kind::Bool,Domain::I128{..}=>Kind::I128,Domain::U128{..}=>Kind::U128,Domain::Enum{type_id,..}=>Kind::Enum(type_id),Domain::Sum{type_id,..}=>Kind::Sum(type_id),Domain::Bytes=>Kind::Bytes,Domain::Text=>Kind::Text}}
+pub(in super::super) open spec fn domain_kind(d:Domain)->Kind{match d{Domain::Bool=>Kind::Bool,Domain::I128{..}=>Kind::I128,Domain::U128{..}=>Kind::U128,Domain::Enum{type_id,..}=>Kind::Enum(type_id),Domain::Sum{type_id,..}=>Kind::Sum(type_id),Domain::Bytes=>Kind::Bytes,Domain::Text=>Kind::Text,Domain::Canonical{type_id,..}=>Kind::Canonical(type_id)}}
 pub(in super::super) open spec fn leaf_kind(d:InputLeaf)->Kind{match d{InputLeaf::Bool=>Kind::Bool,InputLeaf::I128{..}=>Kind::I128,InputLeaf::U128{..}=>Kind::U128,InputLeaf::Enum{type_id,..}=>Kind::Enum(type_id),InputLeaf::Sum{type_id,..}=>Kind::Sum(type_id)}}
-pub(in super::super) open spec fn atom_kind(d:Atom)->Kind{match d{Atom::Bool(_)=>Kind::Bool,Atom::I128(_)=>Kind::I128,Atom::U128(_)=>Kind::U128,Atom::Enum{type_id,..}=>Kind::Enum(type_id),Atom::Sum{type_id,..}=>Kind::Sum(type_id),Atom::Bytes(_)=>Kind::Bytes,Atom::Text(_)=>Kind::Text,}}
+pub(in super::super) open spec fn atom_kind(d:Atom)->Kind{match d{Atom::Bool(_)=>Kind::Bool,Atom::I128(_)=>Kind::I128,Atom::U128(_)=>Kind::U128,Atom::Enum{type_id,..}=>Kind::Enum(type_id),Atom::Sum{type_id,..}=>Kind::Sum(type_id),Atom::Bytes(_)=>Kind::Bytes,Atom::Text(_)=>Kind::Text,Atom::Canonical(v)=>Kind::Canonical(v.view().1),}}
 pub(in super::super) open spec fn schema<'a>(d:&Descriptor<'a>,source:Source)->Schema<'a>{match source{Source::State=>d.state,Source::Command=>d.command,Source::Context=>d.context}}
 pub(in super::super) open spec fn first(fields:Seq<InputField>,id:u16,i:int)->bool{0<=i<fields.len()&&fields[i].id==id&&(forall|j:int|0<=j<i==>fields[j].id!=id)}
 pub(in super::super) open spec fn field_leaf<'a>(fields:Seq<InputField>,id:u16)->Option<&'a InputLeaf>{
@@ -30,7 +30,7 @@ pub(in super::super) open spec fn matches_leaf(d:Domain,l:InputLeaf)->bool{match
     (Domain::Enum{type_id:a,variants:x},InputLeaf::Enum{type_id:b,variants:y,..})|(Domain::Sum{type_id:a,variants:x},InputLeaf::Sum{type_id:b,variants:y,..})=>a==b&&variants_match(x@,y@),_=>false,
 }}
 pub(in super::super) open spec fn same_binding(a:Binding,b:Binding)->bool{a.source==b.source&&a.selector==b.selector}
-pub(in super::super) open spec fn count(s:Schema)->usize{match s{Schema::Leaf(_)=>1,Schema::Record(f)=>f.len(),}}
+pub(in super::super) open spec fn count(s:Schema)->usize{match s{Schema::Original{..}=>0,Schema::Leaf(_)=>1,Schema::Record(f)=>f.len(),}}
 pub(in super::super) open spec fn same_domain(a:ScalarDomain,b:ScalarDomain)->bool{a==b}
 pub(in super::super) open spec fn input_domain(leaf:InputLeaf,domain:ScalarDomain)->bool{
     input_view::leaf_domain(leaf)==domain || match(leaf,domain){
@@ -76,9 +76,9 @@ pub(in super::super) open spec fn channel_fields(f:Seq<TypedField>)->bool{forall
 pub(in super::super) open spec fn channel_valid(c:Seq<Channel>,i:int)->bool{c[i].id!=0&&(i==0||c[i-1].id<c[i].id)&&domain_valid(c[i].destination)&&domain_valid(c[i].idempotency)&&channel_fields(c[i].payload@)}
 pub(in super::super) open spec fn channels(c:Seq<Channel>)->bool{forall|i:int|0<=i<c.len()==>channel_valid(c,i)}
 pub(in super::super) open spec fn admitted(d:&Descriptor)->bool{
-    match d.state{Schema::Leaf(_)=>false,Schema::Record(fields)=>
+    match d.state{Schema::Original{..}|Schema::Leaf(_)=>false,Schema::Record(fields)=>
     ingress::spec::schema_valid(d.state)&&ingress::spec::schema_valid(d.command)&&ingress::spec::schema_valid(d.context)&&(bindings(d)&&outputs(d))
-    &&super::super::super::super::evaluation::admission::spec::program(d.program.inputs@,d.program.outputs@,d.program.nodes@,d.program.roots@).is_ok()
+    &&super::super::super::super::evaluation::admission::spec::extended_program(d.program.inputs@,d.program.outputs@,d.program.nodes@,d.program.roots@).is_ok()
     &&reasons(d.reasons@)&&channels(d.channels@)&&branches(d,fields@)&&laws::spec::metadata(d.laws@,d.required@)&&schema_validation::spec::law_literals(d.laws@)}
 }
 }

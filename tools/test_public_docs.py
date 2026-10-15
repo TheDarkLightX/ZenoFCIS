@@ -41,6 +41,19 @@ class PublicDocsTests(unittest.TestCase):
         self.inventory.write_text("../private.md\n")
         self.assertTrue(any("invalid document inventory path" in item for item in check(self.root)))
 
+    def test_unlisted_published_document_without_document_suffix_is_refused(self):
+        (self.root / "llms.txt").write_text("# Agent index\n")
+        self.assertIn("unreviewed public document: llms.txt", check(self.root))
+        self.inventory.write_text("README.md\ndocs/API.md\nllms.txt\n")
+        self.assertEqual(check(self.root), [])
+
+    def test_workspace_link_in_the_site_page_is_refused(self):
+        page = self.root / "site/public/index.html"
+        page.parent.mkdir(parents=True)
+        page.write_text('<a href="https://chatgpt.com/share/private-record">notes</a>\n')
+        self.inventory.write_text("README.md\ndocs/API.md\nsite/public/index.html\n")
+        self.assertTrue(any("workspace link" in item for item in check(self.root)))
+
     def test_document_symlink_is_refused(self):
         (self.root / "docs/API.md").unlink()
         (self.root / "docs/API.md").symlink_to(self.root / "README.md")

@@ -29,29 +29,30 @@
 //! retained text.
 
 mod adoption;
-mod declarations;
-mod delivery;
+#[cfg(test)]
+#[path = "contract/delivery/tests.rs"]
+mod delivery_tests;
 pub(crate) mod diff;
 pub(crate) mod draft;
 #[cfg(test)]
 mod draft_tests;
-mod expr;
-mod graph;
 mod layout;
 mod migration;
-mod model;
-mod policy;
 mod render;
 pub(crate) mod review;
-mod rules;
-mod schema;
 pub(crate) mod symbolic;
+pub(crate) mod tau;
 #[cfg(test)]
 mod tests;
 
-use std::fmt;
+// The compiler core lives in the `zeno-fcis-contract` library; these
+// re-exports keep its modules at their former paths for this module's files.
+pub(crate) use zeno_fcis_contract::ContractError;
+use zeno_fcis_contract::internals::{
+    declarations, expr, graph, model, policy, program_bytes, rules, schema, schema_commitment,
+};
 
-use zeno_fcis_codec::{CommitmentHasher, commitment, domains};
+use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_synthesis::finite::{v2_authority as authority, v2_catalog as catalog};
 use zeno_fcis_synthesis::finite_runtime::import_program;
@@ -304,6 +305,8 @@ pub(crate) struct MigrationSummary {
     pub(crate) tuples: u64,
     /// Each shortcut: the version it starts at and the tuples compared.
     pub(crate) shortcuts: Vec<(u32, u64)>,
+    /// Explicit old state fields removed by this migration.
+    pub(crate) dropped: Vec<u16>,
 }
 
 /// One adoption, after its receipt replayed.
@@ -390,40 +393,6 @@ fn with_current<R>(
         generated,
     })
 }
-
-/// Why no contract was generated: the file and entry, and the reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ContractError {
-    place: String,
-    reason: String,
-}
-
-impl ContractError {
-    pub(crate) fn new(place: impl Into<String>, reason: impl Into<String>) -> Self {
-        Self {
-            place: place.into(),
-            reason: reason.into(),
-        }
-    }
-
-    /// The file, and entry within it, that the reason is about.
-    pub(crate) fn place(&self) -> &str {
-        &self.place
-    }
-
-    /// What is wrong there.
-    pub(crate) fn reason(&self) -> &str {
-        &self.reason
-    }
-}
-
-impl fmt::Display for ContractError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}: {}", self.place, self.reason)
-    }
-}
-
-impl std::error::Error for ContractError {}
 
 /// Generates `v2/schema.zcve`, `src/v2_contract.rs`, `v2/policy.zcve` and
 /// every superseded version from an application's declarations, rules and
@@ -791,6 +760,7 @@ fn generate(
                     ],
                     tuples: simulated.tuples(),
                     shortcuts: checked,
+                    dropped: compiled.dropped.clone(),
                 };
                 (
                     render::RenderedStep::Migration {
@@ -965,8 +935,33 @@ fn checked_shortcut(
             }
             Some(state)
         };
+        let route_targets: Vec<_> = steps
+            .iter()
+            .map(|step| step.map_or_else(Vec::new, migration::Compiled::payload_targets))
+            .collect();
+        let route_payloads: Vec<Vec<shell::Payload<'_>>> = route_targets
+            .iter()
+            .map(|targets| {
+                targets
+                    .iter()
+                    .map(|(channel, fields)| shell::Payload {
+                        channel: *channel,
+                        fields,
+                    })
+                    .collect()
+            })
+            .collect();
+        let payload_route: Vec<_> = route_payloads
+            .iter()
+            .enumerate()
+            .map(|(index, payloads)| shell::PayloadHop {
+                from: catalogs[index],
+                to: catalogs[index + 1],
+                payloads,
+            })
+            .collect();
         compiled
-            .with_shell(|shortcut| shell::agrees(from, to, &target, shortcut, route))
+            .with_payloads(|shortcut, payloads| shell::agrees_with_payloads(from, to, &target, shortcut, payloads, route, &payload_route))
             .map_err(|unsimulated| {
                 ContractError::new(
                     place,
@@ -1413,20 +1408,6 @@ fn unchanged(place: &str, directory: &str, version: usize) -> ContractError {
     )
 }
 
-/// The canonical bytes of an admitted program: what receipts name.
-fn program_bytes(program: &zeno_fcis_synthesis::finite::Program) -> Result<Vec<u8>, ContractError> {
-    use zeno_fcis_codec::CanonicalEncode;
-    program
-        .value()
-        .and_then(|value| value.canonical_bytes())
-        .map_err(|error| {
-            ContractError::new(
-                "v2/policy.json",
-                format!("the decision program has no canonical encoding: {error:?}"),
-            )
-        })
-}
-
 /// `usage.usage_preserved` of a receipt whose bytes replayed.
 fn receipt_usage_preserved(receipt: &[u8]) -> Option<bool> {
     let value: serde_json::Value = serde_json::from_slice(receipt).ok()?;
@@ -1461,14 +1442,6 @@ fn replay_reason(replay: &Replay) -> String {
         },
         Replay::NotEquivalent(Rejection::Refused(refusal)) => format!("refused: {refusal:?}"),
     }
-}
-
-/// The schema commitment envelopes carry: the domain-separated SHA-256 of
-/// the original schema bytes.
-fn schema_commitment(schema: &[u8]) -> Result<[u8; 32], ContractError> {
-    commitment::<RustCryptoSha256>(domains::SCHEMA, schema)
-        .map(|hash| *hash.as_bytes())
-        .map_err(|_| ContractError::new("v2/schema.zcve", "is too large to commit to"))
 }
 
 /// The origin record's byte count, SHA-256 and commitment must all describe

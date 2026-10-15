@@ -1,4 +1,5 @@
 //! Exact typed atom operations.
+use super::super::super::value::{self, ArithmeticOp, IntegerWidth};
 #[cfg(verus_keep_ghost)]
 use super::spec;
 use super::{Atom, Failure};
@@ -15,6 +16,11 @@ fn bytes_equal(left: &[u8], right: &[u8]) -> bool {
 ))]
 pub(super) fn equal(left: Atom<'_>, right: Atom<'_>) -> bool {
     match (left, right) {
+        (Atom::Canonical(a), Atom::Canonical(b)) => {
+            a.type_id() == b.type_id()
+                && bytes_equal(a.schema(), b.schema())
+                && bytes_equal(a.wire(), b.wire())
+        }
         (Atom::Bool(a), Atom::Bool(b)) => a == b,
         (Atom::I128(a), Atom::I128(b)) => a == b,
         (Atom::U128(a), Atom::U128(b)) => a == b,
@@ -48,6 +54,9 @@ pub(super) fn equal(left: Atom<'_>, right: Atom<'_>) -> bool {
 ))]
 pub(super) fn same_type(left: Atom<'_>, right: Atom<'_>) -> bool {
     match (left, right) {
+        (Atom::Canonical(a), Atom::Canonical(b)) => {
+            a.type_id() == b.type_id() && bytes_equal(a.schema(), b.schema())
+        }
         (Atom::Bool(_), Atom::Bool(_))
         | (Atom::I128(_), Atom::I128(_))
         | (Atom::U128(_), Atom::U128(_))
@@ -67,21 +76,41 @@ pub(super) fn binary<'a>(kind: u8, left: Atom<'a>, right: Atom<'a>) -> Result<At
         return Ok(Atom::Bool(equal(left, right)));
     }
     match (kind, left, right) {
-        (0, Atom::I128(a), Atom::I128(b)) => match a.checked_add(b) {
-            Some(x) => Ok(Atom::I128(x)),
-            None => Err(Failure::Undefined),
+        (0, Atom::I128(a), Atom::I128(b)) => match value::arithmetic(
+            IntegerWidth::Signed128,
+            ArithmeticOp::Add,
+            Atom::I128(a),
+            Atom::I128(b),
+        ) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Failure::Undefined),
         },
-        (1, Atom::I128(a), Atom::I128(b)) => match a.checked_sub(b) {
-            Some(x) => Ok(Atom::I128(x)),
-            None => Err(Failure::Undefined),
+        (1, Atom::I128(a), Atom::I128(b)) => match value::arithmetic(
+            IntegerWidth::Signed128,
+            ArithmeticOp::Sub,
+            Atom::I128(a),
+            Atom::I128(b),
+        ) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Failure::Undefined),
         },
-        (0, Atom::U128(a), Atom::U128(b)) => match a.checked_add(b) {
-            Some(x) => Ok(Atom::U128(x)),
-            None => Err(Failure::Undefined),
+        (0, Atom::U128(a), Atom::U128(b)) => match value::arithmetic(
+            IntegerWidth::Unsigned128,
+            ArithmeticOp::Add,
+            Atom::U128(a),
+            Atom::U128(b),
+        ) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Failure::Undefined),
         },
-        (1, Atom::U128(a), Atom::U128(b)) => match a.checked_sub(b) {
-            Some(x) => Ok(Atom::U128(x)),
-            None => Err(Failure::Undefined),
+        (1, Atom::U128(a), Atom::U128(b)) => match value::arithmetic(
+            IntegerWidth::Unsigned128,
+            ArithmeticOp::Sub,
+            Atom::U128(a),
+            Atom::U128(b),
+        ) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Failure::Undefined),
         },
         (5, Atom::I128(a), Atom::I128(b)) => match a.checked_mul(b) {
             Some(x) => Ok(Atom::I128(x)),
@@ -190,6 +219,58 @@ pub(super) fn to_i128<'a>(value: Atom<'a>) -> Result<Atom<'a>, Failure> {
                 Err(Failure::Undefined)
             }
         }
+        _ => Err(Failure::Undefined),
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures spec::value_result(result) == spec::mul_div(ceiling,
+        spec::atom(a), spec::atom(b), spec::atom(denominator)),
+))]
+pub(super) fn mul_div<'a>(
+    ceiling: bool,
+    a: Atom<'a>,
+    b: Atom<'a>,
+    denominator: Atom<'a>,
+) -> Result<Atom<'a>, Failure> {
+    match (a, b, denominator) {
+        (Atom::U128(x), Atom::U128(y), Atom::U128(den)) => {
+            let quotient = if ceiling {
+                value::wide::mul_div_ceil(x, y, den)
+            } else {
+                value::wide::mul_div_floor(x, y, den)
+            };
+            match quotient {
+                Some(q) => Ok(Atom::U128(q)),
+                None => Err(Failure::Undefined),
+            }
+        }
+        _ => Err(Failure::Undefined),
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures spec::value_result(result) == spec::product_compare(
+        spec::atom(a), spec::atom(b), spec::atom(c),
+        spec::atom(d), spec::atom(e), spec::atom(f)),
+))]
+pub(super) fn product_compare<'a>(
+    a: Atom<'a>,
+    b: Atom<'a>,
+    c: Atom<'a>,
+    d: Atom<'a>,
+    e: Atom<'a>,
+    f: Atom<'a>,
+) -> Result<Atom<'a>, Failure> {
+    match (a, b, c, d, e, f) {
+        (
+            Atom::U128(a),
+            Atom::U128(b),
+            Atom::U128(c),
+            Atom::U128(d),
+            Atom::U128(e),
+            Atom::U128(f),
+        ) => Ok(Atom::Bool(value::wide::products_ge(a, b, c, d, e, f))),
         _ => Err(Failure::Undefined),
     }
 }

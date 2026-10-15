@@ -1,14 +1,16 @@
 //! Exact mathematical semantics of immutable frames, eager predicates and law order.
+use super::super::super::value::wide;
 use super::*;
 use vstd::prelude::*;
 verus! {
 pub(in super::super) enum Value {
     Bool(bool), I128(i128), U128(u128), Enum(u32,u16), Sum(u32,u16),
-    Bytes(Seq<u8>), Text(Seq<u8>),
+    Bytes(Seq<u8>), Text(Seq<u8>), Canonical(Seq<u8>,u32,Seq<u8>),
 }
 pub(in super::super) open spec fn atom(value:Atom) -> Value {
     match value {
 
+        Atom::Canonical(v)=>Value::Canonical(v.view().0,v.view().1,v.view().2),
         Atom::Bool(v)=>Value::Bool(v), Atom::I128(v)=>Value::I128(v), Atom::U128(v)=>Value::U128(v),
         Atom::Enum{type_id,variant}=>Value::Enum(type_id,variant),
         Atom::Sum{type_id,variant}=>Value::Sum(type_id,variant),
@@ -21,6 +23,7 @@ pub(in super::super) open spec fn value_result(result:Result<Atom,Failure>) -> R
 pub(in super::super) open spec fn same_type(a:Value,b:Value)->bool {
     match (a,b) {
 
+        (Value::Canonical(a,t,_),Value::Canonical(b,u,_))=>a==b&&t==u,
         (Value::Bool(_),Value::Bool(_)) | (Value::I128(_),Value::I128(_)) |
         (Value::U128(_),Value::U128(_)) | (Value::Bytes(_),Value::Bytes(_)) |
         (Value::Text(_),Value::Text(_)) => true,
@@ -52,7 +55,7 @@ pub(in super::super) open spec fn binary(kind:u8,a:Value,b:Value)->Result<Value,
 verus! {
 /// Exact protected-observation selector tag; a root never aliases a field.
 pub(in super::super) open spec fn selector_id(s:Selector)->u32 {
-    match s { Selector::Root=>65536, Selector::Field(id)=>id as u32 }
+    match s { Selector::Root=>65536, Selector::Field(id)=>id as u32, Selector::PayloadField(id)=>(65537+id as int) as u32 }
 }
 /// One (source tag, stable ID, permission) triple of an actual attempt.
 pub type AttemptView=(u8,u32,bool);
@@ -145,6 +148,22 @@ pub(in super::super) open spec fn values(v:Seq<Atom>)->Seq<Value> {v.map(|i:int,
 pub(in super::super) open spec fn at(v:Seq<Value>,i:usize)->Result<Value,Failure> {
     if i<v.len(){Ok(v[i as int])}else{Err(Failure::Undefined)}
 }
+pub(in super::super) open spec fn mul_div(ceiling:bool,a:Value,b:Value,den:Value)->Result<Value,Failure> {
+    match (a,b,den) {
+        (Value::U128(a),Value::U128(b),Value::U128(den)) => {
+            let q=if ceiling {wide::ceiling_value(a,b,den)} else {wide::floor_value(a,b,den)};
+            match q {Some(q)=>Ok(Value::U128(q)),None=>Err(Failure::Undefined)}
+        },
+        _=>Err(Failure::Undefined),
+    }
+}
+pub(in super::super) open spec fn product_compare(a:Value,b:Value,c:Value,d:Value,e:Value,f:Value)->Result<Value,Failure> {
+    match (a,b,c,d,e,f) {
+        (Value::U128(a),Value::U128(b),Value::U128(c),Value::U128(d),Value::U128(e),Value::U128(f))=>
+            Ok(Value::Bool(a as int*b as int*c as int >= d as int*e as int*f as int)),
+        _=>Err(Failure::Undefined),
+    }
+}
 pub(in super::super) open spec fn pure_node(op:&Op,v:Seq<Value>)->Result<Value,Failure> {
     match *op {
         Op::Literal(x)=>Ok(atom(x)),Op::Observe(_)|Op::ObserveWhen(..)=>Err(Failure::Undefined),
@@ -153,6 +172,16 @@ pub(in super::super) open spec fn pure_node(op:&Op,v:Seq<Value>)->Result<Value,F
             match at(v,a) {Err(e)=>Err(e),Ok(x)=>match at(v,b){Err(e)=>Err(e),Ok(y)=>binary(kind,x,y)}}
         },
         Op::Div(mode,a,b)=>match at(v,a){Err(e)=>Err(e),Ok(x)=>match at(v,b){Err(e)=>Err(e),Ok(y)=>division(mode,x,y)}},
+        Op::MulDivFloor(a,b,den)|Op::MulDivCeil(a,b,den)=>
+            match (at(v,a),at(v,b),at(v,den)) {
+                (Ok(x),Ok(y),Ok(d))=>mul_div(matches!(*op,Op::MulDivCeil(..)),x,y,d),
+                _=>Err(Failure::Undefined),
+            },
+        Op::ProductsGe(a,b)=>
+            match (at(v,a[0]),at(v,a[1]),at(v,a[2]),at(v,b[0]),at(v,b[1]),at(v,b[2])) {
+                (Ok(a),Ok(b),Ok(c),Ok(d),Ok(e),Ok(f))=>product_compare(a,b,c,d,e,f),
+                _=>Err(Failure::Undefined),
+            },
         Op::ToI128(a)=>match at(v,a){Err(e)=>Err(e),Ok(x)=>to_i128(x)},
         Op::Not(a)=>match at(v,a){Ok(Value::Bool(b))=>Ok(Value::Bool(!b)),_=>Err(Failure::Undefined)},
         Op::Select(a,b,c)=>match at(v,a) {Err(e)=>Err(e),Ok(condition)=>
@@ -172,7 +201,9 @@ pub(in super::super) open spec fn node_shape(op:Op,index:nat)->bool {
         Op::ObserveWhen(guard,_,default)=>guard<index&&default_valid(default),
         Op::Add(a,b)|Op::Sub(a,b)|Op::Mul(a,b)|Op::Div(_,a,b)|Op::Eq(a,b)|Op::Lt(a,b)|Op::And(a,b)=>a<index&&b<index,
         Op::Not(a)|Op::ToI128(a)=>a<index,
-        Op::Select(a,b,c)=>a<index&&b<index&&c<index,
+        Op::Select(a,b,c)|Op::MulDivFloor(a,b,c)|Op::MulDivCeil(a,b,c)=>a<index&&b<index&&c<index,
+        Op::ProductsGe(a,b)=>a[0]<index&&a[1]<index&&a[2]<index
+            &&b[0]<index&&b[1]<index&&b[2]<index,
     }
 }
 pub(in super::super) open spec fn shape(p:&Program)->bool {

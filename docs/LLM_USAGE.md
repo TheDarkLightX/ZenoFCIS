@@ -6,8 +6,8 @@ declare its own output verified.
 
 ## Start with the machine interface
 
-The development CLI exposes a versioned command description for agents such as
-Astra, Fable, and other coding models. From this exact checkout:
+The development CLI exposes a versioned command description for coding agents
+and models. From this exact checkout:
 
 ```bash
 cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- describe

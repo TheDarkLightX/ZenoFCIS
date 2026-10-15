@@ -1,0 +1,13 @@
+# Finite allowance accounting: grant, reserve, finalize and cancel.
+# Amounts use unsigned bv256; the finite import profile explicitly scales them.
+# i3 is an authority predicate supplied by the host.
+# Invalid inputs preserve the old state and return decision zero.
+type Amount = bv[256].
+type Ledger = {available:Amount, reserved:Amount, spent:Amount}.
+type Command = {kind:bv[8], amount:Amount, actual:Amount}.
+i1:Ledger := in console.
+i2:Command := in console.
+i3:bv[8] := in console.
+o1:Ledger := out console.
+o2:bv[8] := out console.
+always (i3[t] = {1}:bv[8] && i2[t].amount > {0}:bv[256] && i1[t].available <= ({115792089237316195423570985008687907853269984665640564039457584007913129639935}:bv[256] - i1[t].reserved) && (i1[t].available + i1[t].reserved) <= ({115792089237316195423570985008687907853269984665640564039457584007913129639935}:bv[256] - i1[t].spent)) ? ((i2[t].kind = {0}:bv[8] && i2[t].actual = {0}:bv[256] && (i1[t].available + i1[t].reserved + i1[t].spent) <= ({115792089237316195423570985008687907853269984665640564039457584007913129639935}:bv[256] - i2[t].amount)) ? (o1[t].available = (i1[t].available + i2[t].amount) && o1[t].reserved = i1[t].reserved && o1[t].spent = i1[t].spent && o2[t] = {1}:bv[8]) : ((i2[t].kind = {1}:bv[8] && i2[t].actual = {0}:bv[256] && i1[t].available >= i2[t].amount) ? (o1[t].available = (i1[t].available - i2[t].amount) && o1[t].reserved = (i1[t].reserved + i2[t].amount) && o1[t].spent = i1[t].spent && o2[t] = {1}:bv[8]) : ((i2[t].kind = {2}:bv[8] && i2[t].actual <= i2[t].amount && i1[t].reserved >= i2[t].amount) ? (o1[t].available = (i1[t].available + (i2[t].amount - i2[t].actual)) && o1[t].reserved = (i1[t].reserved - i2[t].amount) && o1[t].spent = (i1[t].spent + i2[t].actual) && o2[t] = {1}:bv[8]) : ((i2[t].kind = {3}:bv[8] && i2[t].actual = {0}:bv[256] && i1[t].reserved >= i2[t].amount) ? (o1[t].available = (i1[t].available + i2[t].amount) && o1[t].reserved = (i1[t].reserved - i2[t].amount) && o1[t].spent = i1[t].spent && o2[t] = {1}:bv[8]) : (o1[t].available = i1[t].available && o1[t].reserved = i1[t].reserved && o1[t].spent = i1[t].spent && o2[t] = {0}:bv[8]))))) : (o1[t].available = i1[t].available && o1[t].reserved = i1[t].reserved && o1[t].spent = i1[t].spent && o2[t] = {0}:bv[8]).

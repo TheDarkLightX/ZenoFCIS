@@ -380,14 +380,18 @@ possible deployment.
 
 ## How ZenoFCIS built and checked this
 
-Every step below ran on 2026-09-24 from a fresh copy of this template's
-directory with the CLI built from the ZenoFCIS checkout
-(`cargo +1.97.1 build -p zeno-fcis-cli --locked`; `zeno-fcis --version`
-prints `zeno-fcis 1.1.0`), Rust 1.97.1, Python 3.12.3, and Node.js v22.23.1.
-Outputs are quoted as observed. The gate,
-`python3 tools/check_generated_application.py`, repeats the `check`,
-`synth`, `purity`, and `cargo` steps on a fresh copy; the `prove` steps need
-the pinned solvers, which the gate does not require.
+The current command observations below were recorded on 2026-10-12 in a
+fresh CLI-generated application bound to the matching source checkout,
+using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1, Python 3.12.3, and
+Node.js v22.23.1.
+The common pinned-tool admission below was run once with the identical
+local tools manifest used by all three examples. These are local command
+observations, not release-binary qualification. Earlier native authoring
+counterexamples and explanations below retain their historical scope.
+The current application uses library-owned Authority with `src/v2_contract.rs`;
+these authoring and synthesis records do not qualify the whole runtime.
+Application commands run from this application's directory; tool admission
+is shared.
 
 1. `zeno-fcis check project.zeno --require-substantive --require-resolved-paths`
    checked the project: 9 laws and 2 claims, every formula able to constrain
@@ -398,7 +402,17 @@ the pinned solvers, which the gate does not require.
    checked project.zeno: project=1 components=1 claims=2 unresolved_obligations=2 semantic_program_hash=20c1c5476833ac25dd033b13ec8b8359a96fc622edce9cec201ff5184b3042d9
    ```
 
-2. `cargo +1.97.1 build` ran `build.rs`, which lowered the schema with the
+   The current run also printed what each counted obligation asks for,
+   after the summary. These observed lines describe evidence this authoring
+   check does not establish; they are not errors:
+
+   ```text
+   unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
+     complete-footprint: component 400 needs evidence that it reads and writes only what its footprint declares
+     sequential-parity: the merge needs evidence that the merged components decide as they would one after another
+   ```
+
+2. `cargo +1.97.1 build --locked --offline` ran `build.rs`, which lowered the schema with the
    bounds above and generated the typed bindings in `OUT_DIR`. Nothing in
    `src/` restates what generation provides.
 3. `zeno-fcis synth run synthesis.json --out synthesized` selected the core:
@@ -413,8 +427,20 @@ the pinned solvers, which the gate does not require.
    and `--target javascript` did the same for `transition.py` under Python 3
    and `transition.mjs` under Node 22, with the same certificate and the same
    output digest as Rust.
-5. `zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs`
-   checked the decision code statically.
+5. **Observe the static detector in the generated package context.**
+
+   The 2.3.0 command refused the compiler-tool attribute `rustfmt::skip`
+   because the application's source-binding Cargo manifest replaces
+   dependency sources. No current purity pass is claimed:
+
+   ```text
+   $ zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
+   purity: violations (1 errors, 0 warnings) in 3 files
+   (exit 1)
+   ```
+
+   The earlier 1.1.0 native run recorded the following clean result,
+   retained as historical evidence:
 
    ```text
    $ zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
@@ -441,7 +467,8 @@ the pinned solvers, which the gate does not require.
    ZenoFCIS classifies that as a proposal and exits with code 2, because the
    proof output is not checked independently: each step is attested, not
    kernel-checked. The scope line says what else the application must
-   check, which `tests/claims.rs` does.
+   check. The original native `tests/claims.rs` checks are retained in the
+   nonpublished reference suite; these commands do not record a run of it.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend cvc5 --tools zeno-fcis.tools.json
@@ -456,7 +483,7 @@ the pinned solvers, which the gate does not require.
    (exit 2)
    ```
 
-   Before laws 500, 505, and 507 were completed, the same command on claim
+   In the historical 1.1.0 authoring run, before laws 500, 505, and 507 were completed, the same command on claim
    600 printed `cvc5 claim 600: replayed counterexample retained`, with the
    scope line `a transition that satisfies the assumed laws breaks the
    invariant; its starting state may be unreachable, so strengthen the
@@ -468,10 +495,10 @@ the pinned solvers, which the gate does not require.
    law 508 in its `failure` group, a committed failure could carry a
    proposal, since only the laws in a claim's groups constrain that kind.
 
-8. Z3 also answered `unsat` for both steps. RC3 has no Z3 proof checker, so
+8. Z3 also answered `unsat` for both steps. Z3 proof checking is unsupported for these inductive claims, so
    each run is recorded as blocked evidence, with exit code 2. There is no
    Lean export for inductive claims yet, so `--backend lean` selects
-   nothing, and Lean was not run.
+   nothing; Lean proof execution was not selected.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
@@ -491,6 +518,11 @@ the pinned solvers, which the gate does not require.
 9. `zeno-fcis graph project.zeno --format mermaid` prints one node,
    `c400[treasury]`: the project has a single component, so no diagram is
    included here.
+
+Historical native application explanation. The original `tests/claims.rs`
+and full native conformance regressions referenced below are retained in the
+nonpublished reference suite. The fresh generated-app commands above do not
+record a run of that suite.
 
 What the claims say, and what they do not. Claim 600 says: take any
 treasury that satisfies law 500's invariant, any command and context whose

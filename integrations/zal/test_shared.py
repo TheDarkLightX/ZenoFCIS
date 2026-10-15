@@ -38,7 +38,7 @@ class SharedTests(unittest.TestCase):
         state = self.propose()
         self.assertEqual(state["agreement"], "seed-example")
         p = state["proposal"]
-        self.store.use(lambda session: command(session, "accept " + p["base_revision"] + " " + p["revision"]))
+        self.store.use(lambda session: command(session, "accept " + p["base_revision"] + " " + p["revision"] + " " + p["examples_digest"]))
         next_state = self.bridge.call("zal_read", {})
         self.assertEqual(next_state["agreement"], "human-accepted")
         self.assertEqual(next_state["realization"], "not-run")
@@ -146,7 +146,8 @@ class SharedTests(unittest.TestCase):
         self.assertGreater(observed["version"], initial["version"])
         self.assertEqual(observed["workspace_mode"], "shared terminal/MCP workspace")
         browser.action("accept", {"base_revision": proposal["base_revision"],
-                                  "candidate_revision": proposal["revision"]})
+                                  "candidate_revision": proposal["revision"],
+                                  "examples_digest": browser.view()["examples_digest"]})
         terminal = self.store.use(lambda s: command(s, "show"))
         self.assertEqual(terminal["revision"], proposal["revision"])
         self.assertEqual(self.bridge.call("zal_read", {})["model"]["revision"], proposal["revision"])
@@ -168,7 +169,7 @@ class SharedTests(unittest.TestCase):
         browser.running = "pending"
         browser.turn_base = browser.view()["model"]["revision"]
         staged = self.propose()["proposal"]
-        self.store.use(lambda s: command(s, "accept " + staged["base_revision"] + " " + staged["revision"]))
+        self.store.use(lambda s: command(s, "accept " + staged["base_revision"] + " " + staged["revision"] + " " + staged["examples_digest"]))
         browser.messages["pending"] = json.dumps({"act": "explain", "base_revision": browser.turn_base,
             "object_ids": ["default"], "message": "Old meaning", "syntax": "symbolic", "surface": None})
         browser.notify({"method": "turn/completed", "params": {"threadId": "shared-turn",

@@ -1,0 +1,30 @@
+zeno 1;
+project 1 ocaml_endpoints;
+namespace 2 consumer;
+type 100 state Endpoints;
+type 101 command Move;
+type 102 context Operator;
+type 105 int Low in -9223372036854775808..=-9223372036854775807;
+type 106 int High in 9223372036854775806..=9223372036854775807;
+type 107 data Action;
+type 108 bool Authorized;
+field 110 100 low 105;
+field 111 100 high 106;
+field 120 101 action 107;
+field 121 101 probe 106;
+field 130 102 authorized 108;
+variant 150 107 Up none;
+variant 151 107 Down none;
+reason 200 not_authorized precedence 0;
+reason 201 at_boundary precedence 1;
+component 400 endpoints {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 512;
+}
+merge [400];
+law 500 signed_endpoints on commit, genesis = post.100.110 < 0 && post.100.111 > 0;
+law 501 authorized on accept = context.102.130 == 1;
+law 502 exact_step on accept = (command.101.120 == 150 -> post.100.110 - pre.100.110 == 1 && post.100.111 - pre.100.111 == 1) && (command.101.120 == 151 -> pre.100.110 - post.100.110 == 1 && pre.100.111 - post.100.111 == 1);

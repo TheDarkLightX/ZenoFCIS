@@ -6,8 +6,8 @@ use super::{canonical::Part, metadata_spec as metadata};
 use vstd::prelude::*;
 verus! {
 #[verifier::opaque]
-pub open spec fn schema<'a>(s:Schema<'a>)->Seq<Part<'a>>{match s{Schema::Leaf(leaf)=>seq![Part::Word(0)]+metadata::leaf(*leaf),Schema::Record(fields)=>seq![Part::Word(1)]+metadata::input_fields(fields@),}}
-pub open spec fn selector<'a>(s:Selector)->Seq<Part<'a>>{match s{Selector::Root=>seq![Part::Word(0)],Selector::Field(id)=>seq![Part::Word(1),Part::Word(id as u128)],}}
+pub open spec fn schema<'a>(s:Schema<'a>)->Seq<Part<'a>>{match s{Schema::Original{checked,root,projection}=>super::numeric_metadata_spec::original(checked,root,projection),Schema::Leaf(leaf)=>seq![Part::Word(0)]+metadata::leaf(*leaf),Schema::Record(fields)=>seq![Part::Word(1)]+metadata::input_fields(fields@),}}
+pub open spec fn selector<'a>(s:Selector)->Seq<Part<'a>>{match s{Selector::Root=>seq![Part::Word(0)],Selector::PayloadField(id)=>seq![Part::Word(2),Part::Word(id as u128)],Selector::Field(id)=>seq![Part::Word(1),Part::Word(id as u128)],}}
 pub open spec fn bindings_prefix<'a>(values:Seq<Binding>,n:nat)->Seq<Part<'a>>
     recommends n<=values.len(),decreases n,
 {if n==0{Seq::empty()}else{let b=values[n-1];bindings_prefix(values,(n-1) as nat)+metadata::source(b.source)+selector(b.selector)}}

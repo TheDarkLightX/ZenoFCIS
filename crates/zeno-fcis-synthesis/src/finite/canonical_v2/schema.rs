@@ -7,7 +7,7 @@ pub use admission::{Checked, Failure, Limits, admit};
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
-mod spec;
+pub(crate) mod spec;
 
 /// One complete named payload-free variant in canonical ID order.
 #[cfg_attr(verus_keep_ghost, verus_verify)]

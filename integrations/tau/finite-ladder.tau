@@ -1,0 +1,12 @@
+# A pointwise finite example. It makes no temporal or authentication claim.
+type Amount = bv[3].
+type Ledger = {available:Amount}.
+type Command = {amount:Amount}.
+i1:Ledger := in console.
+i2:Command := in console.
+i3:bv[1] := in console.
+o1:Ledger := out console.
+o2:bv[1] := out console.
+always (i3[t] = {1}:bv[1])
+ ? (o1[t].available = i1[t].available + i2[t].amount && o2[t] = {1}:bv[1])
+ : (o1[t].available = i1[t].available && o2[t] = {0}:bv[1]).

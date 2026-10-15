@@ -7,6 +7,7 @@ import html
 import os
 import shutil
 import subprocess
+import sys
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "assets" / "marketing"
 WIDTH = 1600
 HEIGHT = 1000
+
+MINI_CHECK_WARNINGS = (
+    b'warning: law 400 worker_isolation is always true, so it can never detect a faulty transition\n'
+    b'warning: claim 500 finite_state_reflexivity is always true, so proving it says nothing about this system\n'
+    b'warning: claim 501 unbounded_state_reflexivity is always true, so proving it says nothing about this system\n'
+)
 
 
 @dataclass(frozen=True)
@@ -31,7 +38,7 @@ class Capture:
     visual: str | None = None
 
 
-def run(command: list[str]) -> str:
+def run(command: list[str], *, expected_stderr: bytes = b"") -> str:
     environment = os.environ.copy()
     environment["CARGO_TERM_COLOR"] = "never"
     environment["NO_COLOR"] = "1"
@@ -41,16 +48,21 @@ def run(command: list[str]) -> str:
         env=environment,
         check=True,
         capture_output=True,
-        text=True,
     )
-    if completed.stderr:
+    if completed.stderr != expected_stderr:
         raise RuntimeError(
-            f"capture command wrote to stderr: {' '.join(command)}\n{completed.stderr}"
+            f"capture stderr differs from the expected stream: {' '.join(command)}\n"
+            + completed.stderr.decode("utf-8", errors="replace")
         )
-    return completed.stdout.rstrip()
+    if completed.stderr:
+        sys.stderr.buffer.write(
+            b"capture stderr (warnings omitted from artwork; full stream follows):\n"
+            + completed.stderr
+        )
+    return completed.stdout.decode("utf-8")
 
 
-def cli(*arguments: str) -> str:
+def cli(*arguments: str, expected_stderr: bytes = b"") -> str:
     return run(
         [
             "cargo",
@@ -62,7 +74,8 @@ def cli(*arguments: str) -> str:
             "--locked",
             "--",
             *arguments,
-        ]
+        ],
+        expected_stderr=expected_stderr,
     )
 
 
@@ -120,7 +133,8 @@ def escaped(value: str) -> str:
     return html.escape(value, quote=True)
 
 
-def terminal_lines(output: str, width: int = 112) -> list[str]:
+def terminal_lines(output: str, width: int = 108) -> list[str]:
+    # 108 columns of 20 px DejaVu Sans Mono fit the terminal panel from x=164.
     lines: list[str] = []
     for line in output.splitlines():
         if not line:
@@ -180,21 +194,23 @@ def check_markup() -> str:
         ("CLAIMS", "2"),
         ("OBLIGATIONS", "3"),
     )
+    # Placed below the eight output lines: the wrapped summary and what each
+    # obligation asks for.
     parts: list[str] = []
     for index, (label, value) in enumerate(metrics):
         x = 236 + index * 282
         parts.append(
-            f'<rect x="{x}" y="570" width="236" height="132" rx="20" '
+            f'<rect x="{x}" y="620" width="236" height="132" rx="20" '
             'fill="#0c1827" stroke="#254056"/>'
-            f'<text x="{x + 24}" y="612" class="metric-label">{label}</text>'
-            f'<text x="{x + 24}" y="672" class="metric-value">{value}</text>'
+            f'<text x="{x + 24}" y="662" class="metric-label">{label}</text>'
+            f'<text x="{x + 24}" y="722" class="metric-value">{value}</text>'
         )
     parts.append(
-        '<rect x="236" y="735" width="1082" height="76" rx="18" '
+        '<rect x="236" y="785" width="1082" height="76" rx="18" '
         'fill="#07131f" stroke="#1e4957"/>'
-        '<circle cx="270" cy="773" r="9" fill="#5eead4"/>'
-        '<text x="298" y="766" class="metric-label">SEMANTIC PROGRAM ID</text>'
-        '<text x="298" y="792" class="hash">e6a3d0e0c030…bca316bb</text>'
+        '<circle cx="270" cy="823" r="9" fill="#5eead4"/>'
+        '<text x="298" y="816" class="metric-label">SEMANTIC PROGRAM ID</text>'
+        '<text x="298" y="842" class="hash">e6a3d0e0c030…bca316bb</text>'
     )
     return "".join(parts)
 
@@ -232,7 +248,8 @@ def render(capture: Capture) -> None:
     lines = terminal_lines(capture.output)
     output_markup = []
     start_y = 413
-    line_height = 25
+    line_height = min(25, 450 // max(1, len(lines) - 1))
+    font_size = min(20, line_height - 3)
     for index, line in enumerate(lines):
         output_markup.append(
             f'<text x="164" y="{start_y + index * line_height}" class="terminal">'
@@ -240,6 +257,11 @@ def render(capture: Capture) -> None:
         )
 
     visual = visual_markup(capture.visual).strip()
+    terminal_title = "DETERMINISTIC CLI RENDER"
+    if capture.slug == "mini-determinator-check":
+        terminal_title = (
+            "STDOUT ONLY · STDERR OMITTED: LAW 400 AND CLAIMS 500/501 ALWAYS TRUE"
+        )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}"
          viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label="{escaped(capture.title)}">
   <defs>
@@ -267,7 +289,7 @@ def render(capture: Capture) -> None:
     .eyebrow {{ font-family: Inter, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: 3px; fill: {capture.accent}; }}
     .title {{ font-family: 'Inter Display', Inter, sans-serif; font-size: 52px; font-weight: 600; fill: #f4f8fd; }}
     .subtitle {{ font-family: Inter, sans-serif; font-size: 22px; font-weight: 400; fill: #9db0c8; }}
-    .terminal {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 20px; font-weight: 400; fill: #dce7f4; }}
+    .terminal {{ font-family: 'DejaVu Sans Mono', monospace; font-size: {font_size}px; font-weight: 400; fill: #dce7f4; }}
     .prompt {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 20px; font-weight: 600; fill: #6ee7c7; }}
     .terminal-title {{ font-family: Inter, sans-serif; font-size: 15px; font-weight: 500; fill: #70849e; letter-spacing: 1px; }}
     .badge {{ font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; fill: #b9c9dc; }}
@@ -285,7 +307,7 @@ def render(capture: Capture) -> None:
   <rect x="0" y="0" width="9" height="1000" fill="{capture.accent}"/>
 
   <text x="128" y="72" class="brand">ZENOFCIS</text>
-  <text x="1457" y="72" text-anchor="end" class="release">1.0.0-RC.3</text>
+  <text x="1457" y="72" text-anchor="end" class="release">2.3.0</text>
   <text x="128" y="132" class="eyebrow">{escaped(capture.eyebrow.upper())}</text>
   <text x="128" y="197" class="title">{escaped(capture.title)}</text>
   <text x="128" y="238" class="subtitle">{escaped(capture.subtitle)}</text>
@@ -298,7 +320,7 @@ def render(capture: Capture) -> None:
     <circle cx="170" cy="317" r="8" fill="#ff6b6b"/>
     <circle cx="198" cy="317" r="8" fill="#f6c85f"/>
     <circle cx="226" cy="317" r="8" fill="#58d68d"/>
-    <text x="800" y="323" text-anchor="middle" class="terminal-title">DETERMINISTIC CLI RENDER</text>
+    <text x="800" y="323" text-anchor="middle" class="terminal-title">{escaped(terminal_title)}</text>
   </g>
   <text x="164" y="382" class="prompt">$ {escaped(capture.prompt)}</text>
   {''.join(output_markup)}
@@ -358,7 +380,11 @@ def main() -> int:
             title="A complete project check in one command.",
             subtitle="Typed components, claims, obligations, and semantic identity are reported together.",
             prompt="zeno-fcis check examples/mini-determinator/project.zeno",
-            output=cli("check", "examples/mini-determinator/project.zeno"),
+            output=cli(
+                "check",
+                "examples/mini-determinator/project.zeno",
+                expected_stderr=MINI_CHECK_WARNINGS,
+            ),
             badges=("2 components", "2 claims", "Content-bound identity"),
             accent="#67e8f9",
             visual="check",

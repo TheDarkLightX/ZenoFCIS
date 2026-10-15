@@ -71,8 +71,10 @@ def fingerprint(node: list) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = ()) -> dict:
+def _inventory(source: str, namespace: str, body_functions: tuple[str, ...],
+               declaration_modes: dict[str, str]) -> tuple[dict, dict]:
     functions = {}
+    declarations = {}
     for node in parse_vir(source):
         if not node or node[0] != "Function":
             continue
@@ -93,22 +95,94 @@ def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = ())
         mode = fields[":mode"]
         requires, ensures, body = fields[":require"], fields[":ensure"], fields[":body"]
         if (mode not in ("Exec", "Spec", "Proof") or not isinstance(requires, list)
-                or not isinstance(ensures, list) or not isinstance(body, list) or not body):
+                or not isinstance(ensures, list)):
             raise ValueError(f"missing contract fields or executable/specification body: {name}")
-        if name in functions:
+        if name in functions or name in declarations:
             raise ValueError(f"duplicate VIR function: {name}")
-        functions[name] = {
+        record = {
             "mode": mode,
             "signature_sha256": fingerprint([fields[":typ_bounds"], fields[":params"], fields[":ret"]]),
             "requires": len(requires), "ensures": len(ensures),
             "requires_sha256": fingerprint(requires),
             "ensures_sha256": fingerprint(ensures),
         }
+        if name in declaration_modes:
+            if (body != "None" or mode != declaration_modes[name] or requires
+                    or len(ensures) != (1 if mode == "Exec" else 0)):
+                raise ValueError(f"unexpected descriptor declaration contract: {name}")
+            declarations[name] = {**record, "kind": "abstract-declaration",
+                                  "raw_vir": node, "raw_vir_sha256": fingerprint(node)}
+            continue
+        if not isinstance(body, list) or not body:
+            raise ValueError(f"missing contract fields or executable/specification body: {name}")
+        functions[name] = record
         if mode == "Spec" or name in body_functions:
             functions[name]["body_sha256"] = fingerprint(body)
     if not functions:
         raise ValueError("VIR log has no functions from the required namespace")
-    return dict(sorted(functions.items()))
+    if set(declarations) != set(declaration_modes):
+        raise ValueError("missing descriptor declaration")
+    return dict(sorted(functions.items())), dict(sorted(declarations.items()))
+
+
+def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = ()) -> dict:
+    """Strict concrete-body inventory; abstract declarations are refused."""
+    return _inventory(source, namespace, body_functions, {})[0]
+
+
+def descriptor_inventory(source: str, namespace: str, descriptor_prefix: str,
+                         body_functions: tuple[str, ...] = ()) -> tuple[dict, dict]:
+    """Retain the two closed descriptor declarations separately from real bodies.
+
+    The pinned VIR names both sealed implementations explicitly. Missing bodies,
+    a changed declaration shape, or any other bodyless function still refuse.
+    Raw declaration records are retained without rewriting their fingerprints.
+    """
+    if not descriptor_prefix.startswith(namespace) or not descriptor_prefix.endswith("::"):
+        raise ValueError("descriptor prefix is outside the required namespace")
+    declarations = {descriptor_prefix + "DescriptorData::model": "Spec",
+                    descriptor_prefix + "DescriptorData::project": "Exec"}
+    # The pinned production VIR assigns slots 0/1 to the inherent projection
+    # methods and slots 2/3 to the closed Legacy/Numeric trait implementations.
+    # Keep those concrete bodies mandatory; a changed slot needs source review.
+    implementations = {descriptor_prefix + f"impl&%{index}::{method}": mode
+                       for index in (2, 3) for method, mode in (("model", "Spec"), ("project", "Exec"))}
+    bodies = tuple(dict.fromkeys((*body_functions, *implementations)))
+    functions, abstract = _inventory(source, namespace, bodies, declarations)
+    for name, mode in implementations.items():
+        record = functions.get(name)
+        if (record is None or record["mode"] != mode or "body_sha256" not in record
+                or record["requires"] != 0 or (mode == "Exec" and record["ensures"] != 1)):
+            raise ValueError(f"missing or changed concrete descriptor implementation: {name}")
+    return functions, abstract
+
+
+DESCRIPTOR_MODULE = "execution_v2::composition::descriptor::"
+
+
+def observed_inventory(source: str, namespace: str,
+                       body_functions: tuple[str, ...] = ()) -> tuple[dict, dict | None]:
+    """Fresh inventory for a profile; abstract declarations are None when absent.
+
+    A namespace that holds the closed descriptor module retains its two
+    declarations separately, exactly as `descriptor_inventory` does; any other
+    namespace uses the strict concrete-body inventory.
+    """
+    prefix = namespace + DESCRIPTOR_MODULE
+    names = {node[1][2] for node in parse_vir(source)
+             if node and node[0] == "Function" and isinstance(node[1], list) and len(node[1]) == 3}
+    if prefix + "DescriptorData::project" in names or prefix + "DescriptorData::model" in names:
+        return descriptor_inventory(source, namespace, prefix, body_functions)
+    return inventory(source, namespace, body_functions), None
+
+
+def profile_inventory(source: str, profile: dict) -> dict:
+    """Concrete inventory under the profile's own declaration rule."""
+    bodies = tuple(profile["body_covered_functions"])
+    if "abstract_declarations" in profile:
+        return descriptor_inventory(source, profile["namespace"],
+                                    profile["namespace"] + DESCRIPTOR_MODULE, bodies)[0]
+    return inventory(source, profile["namespace"], bodies)
 
 
 def require_coverage(source: str, profile: dict) -> dict:
@@ -121,7 +195,18 @@ def require_coverage(source: str, profile: dict) -> dict:
             or any(not isinstance(name, str) for name in body_functions)
             or len(set(body_functions)) != len(body_functions)):
         raise ValueError("malformed operational body coverage")
-    observed = inventory(source, profile["namespace"], tuple(body_functions))
+    if "abstract_declarations" in profile:
+        declarations = profile["abstract_declarations"]
+        if not isinstance(declarations, dict):
+            raise ValueError("malformed descriptor declaration coverage")
+        prefix = profile["namespace"] + "execution_v2::composition::descriptor::"
+        observed, actual_declarations = descriptor_inventory(
+            source, profile["namespace"], prefix, tuple(body_functions)
+        )
+        if actual_declarations != declarations:
+            raise ValueError("translated descriptor declarations changed")
+    else:
+        observed = inventory(source, profile["namespace"], tuple(body_functions))
     if any(name not in observed or observed[name]["mode"] != "Exec" for name in body_functions):
         raise ValueError("operational body coverage names a missing or non-runtime function")
     expected = profile["functions"]

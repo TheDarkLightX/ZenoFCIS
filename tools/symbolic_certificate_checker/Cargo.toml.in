@@ -1,0 +1,7 @@
+[package]
+name = "zfcis-carcara-root-check"
+version = "0.1.1"
+edition = "2021"
+[workspace]
+[dependencies]
+carcara = { path = "../carcara/carcara" }

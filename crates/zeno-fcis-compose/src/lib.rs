@@ -16,7 +16,10 @@
 
 extern crate alloc;
 
+pub use source::{SOURCE_FILES, source_digest};
 pub use zeno_fcis_codec::EvidenceArtifact;
+
+mod source;
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;

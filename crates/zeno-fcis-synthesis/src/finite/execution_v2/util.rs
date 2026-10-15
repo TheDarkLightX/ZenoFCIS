@@ -3,7 +3,7 @@
 use vstd::prelude::*;
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == (left@ == right@),))]
-pub(super) fn bytes_equal(left: &[u8], right: &[u8]) -> bool {
+pub(crate) fn bytes_equal(left: &[u8], right: &[u8]) -> bool {
     if left.len() != right.len() {
         return false;
     }
@@ -38,14 +38,5 @@ pub(super) fn ascii(bytes: &[u8]) -> bool {
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == values@.contains(id),))]
 pub(super) fn contains(values: &[u16], id: u16) -> bool {
-    let mut i = 0usize;
-    #[cfg_attr(verus_keep_ghost, verus_spec(invariant i <= values.len(),
-        forall|j:int| 0 <= j < i ==> values@[j] != id, decreases values.len() - i,))]
-    while i < values.len() {
-        if values[i] == id {
-            return true;
-        }
-        i += 1;
-    }
-    false
+    super::super::value::contains(values, id)
 }

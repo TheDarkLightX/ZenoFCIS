@@ -17,7 +17,7 @@ use super::request::{
 };
 use super::session::{
     AdmissionRefusal, CheckJob, CheckReport, Outcome, Prepared, Proposal, ProposerFailure,
-    ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, Stored, WorkerFailure,
+    ResumeHeader, ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, WorkerFailure,
     replay_probe,
 };
 use super::strategy::{NoEngine, SearchReport, Strategy, StrategyEngine, StrategyRefusal};
@@ -367,6 +367,153 @@ fn functional_bool_v1_admits_only_the_total_boolean_subset() {
         Some(Profile::CheckedI64V1)
     );
     assert_eq!(Profile::parse("FunctionalBoolV1"), None);
+}
+
+#[test]
+fn work_ceilings_scale_with_the_domain_under_hard_caps() {
+    // The check ceiling is the work itself, at least the compiled ceiling and
+    // at most the hard cap; the session funds eight attempts in invocations of
+    // their own: two checks each (its own and the incumbent's replay) and the
+    // largest intake, preparation and witness replays.
+    assert_eq!(
+        Limits::ATTEMPT_OVERHEAD,
+        (2 * crate::neural_loop::acquisition::JSON_BYTES
+            + 2 * crate::loop_proposers::CONFIG_LIMIT
+            + 4096)
+            + 635_904
+            + 8 * (2 * u64::from(u16::MAX) + 2)
+    );
+    assert_eq!(Limits::ATTEMPT_OVERHEAD, 4_310_016);
+    let floor = Limits::scaled(0);
+    assert_eq!(Limits::scaled(1_000_000), floor);
+    assert_eq!(
+        (floor.check_work, floor.session_work),
+        (1_000_000, 50_480_128)
+    );
+    let mid = Limits::scaled(3_000_000);
+    assert_eq!((mid.check_work, mid.session_work), (3_000_000, 82_480_128));
+    assert_eq!(
+        Limits {
+            check_work: 1_000_000,
+            session_work: 8_000_000,
+            ..mid
+        },
+        Limits::CEILING
+    );
+    assert_eq!(Limits::scaled(u64::MAX), Limits::HARD);
+    assert_eq!(
+        (Limits::HARD.check_work, Limits::HARD.session_work),
+        (268_435_456, 4_329_447_424)
+    );
+    // Stored limits are read against the hard ceilings; admission then holds
+    // a request to its own.
+    assert_eq!(Limits::from_json(&mid.json()), Some(mid));
+    assert_eq!(Limits::from_json(&Limits::HARD.json()), Some(Limits::HARD));
+    let mut above = Limits::HARD;
+    above.check_work += 1;
+    assert_eq!(Limits::from_json(&above.json()), None);
+    assert_eq!(
+        Limits::try_within(mid, Limits::CEILING),
+        Err(LimitRefusal::AboveCeiling {
+            field: "check_work",
+            requested: 3_000_000,
+            ceiling: 1_000_000
+        })
+    );
+}
+
+#[test]
+fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
+    let sum = |high: i64| {
+        bytes_of(&program(
+            vec![
+                Domain::Int { min: 0, max: 999 },
+                Domain::Int { min: 0, max: high },
+            ],
+            vec![FULL],
+            vec![Op::Input(0), Op::Input(1), Op::Add(0, 1)],
+            vec![2],
+        ))
+    };
+    // 100,000 tuples: more work than the compiled check ceiling.
+    let wide = sum(99);
+    let scaled = Request::admit_work(
+        &wide,
+        Profile::CheckedI64V1,
+        Limits::CEILING,
+        None,
+        None,
+        Policy::DISABLED,
+    )
+    .unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    let needed = scaled
+        .check_work(scaled.cost())
+        .unwrap_or_else(|| panic!("check work"));
+    assert!(needed > Limits::CEILING.check_work, "{needed}");
+    assert_eq!(scaled.limits().check_work, needed);
+    assert_eq!(
+        scaled.limits().session_work,
+        8 * (2 * needed + Limits::ATTEMPT_OVERHEAD)
+    );
+    assert!(matches!(
+        Request::admit(
+            &wide,
+            Profile::CheckedI64V1,
+            Limits::CEILING,
+            Policy::DISABLED
+        ),
+        Err(RequestRefusal::WorkInfeasible {
+            limit: 1_000_000,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Request::admit_work(
+            &wide,
+            Profile::CheckedI64V1,
+            Limits::CEILING,
+            Some(needed + 1),
+            None,
+            Policy::DISABLED,
+        ),
+        Err(RequestRefusal::Limits(LimitRefusal::AboveCeiling {
+            field: "check_work",
+            ..
+        }))
+    ));
+    let lower = Request::admit_work(
+        &wide,
+        Profile::CheckedI64V1,
+        Limits::CEILING,
+        None,
+        Some(2 * needed),
+        Policy::DISABLED,
+    )
+    .unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    assert_eq!(
+        (lower.limits().check_work, lower.limits().session_work),
+        (needed, 2 * needed)
+    );
+    // The stored request is readmitted under the same scaled ceilings.
+    let readmitted = Request::readmit(scaled.canonical_bytes(), &wide)
+        .unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    assert_eq!(readmitted.id(), scaled.id());
+    // 100,000,000 tuples: past the hard cap, so no ceiling can check it.
+    let widest = sum(99_999);
+    assert!(matches!(
+        Request::admit_work(
+            &widest,
+            Profile::CheckedI64V1,
+            Limits::CEILING,
+            None,
+            None,
+            Policy::DISABLED,
+        ),
+        Err(RequestRefusal::WorkInfeasible {
+            limit: Limits::HARD_CHECK_WORK,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -1117,15 +1264,19 @@ fn check_work_is_precharged_and_exhaustion_is_inconclusive_not_a_difference() {
     let candidate = artifact("boolean-kernel-candidate");
     let request = request(original, Profile::FunctionalBoolV1);
     let candidate_cost = Cost::measure(&import(candidate), candidate);
-    // 16 tuples * (16 + 7 + 2) + 1063 + 763 + 1024 receipt work.
-    assert_eq!(
-        request.check_work(candidate_cost),
-        Some(16 * 25 + 1_063 + 763 + 1_024)
-    );
+    // Whole-plan policy includes setup, unranking, exact output comparison,
+    // bounded scheduling and finalization, beyond evaluator instruction work.
+    assert_eq!(request.check_work(candidate_cost), Some(282_871));
+    let candidate_work = 282_871;
     let self_check = request.check_work(request.cost()).unwrap_or_default();
     let mut limits = Limits::CEILING;
     limits.check_work = self_check;
-    limits.session_work = self_check;
+    // Three attempts must fund their nonrefundable preparation before this
+    // test can reach the checker-work limit. Reserve exactly one check too.
+    let preparation_work =
+        9 * u64::from(limits.artifact_bytes) + 16 * 2048 + 16 * (32 + 16 + 256 + 16) + 8192;
+    assert_eq!(preparation_work, 635_904);
+    limits.session_work = 3 * preparation_work + candidate_work;
     let mut session = Session::open(request_with(original, Profile::FunctionalBoolV1, limits));
     // The padded candidate needs more than the per-check limit.
     let padded = attempt(
@@ -1137,7 +1288,11 @@ fn check_work_is_precharged_and_exhaustion_is_inconclusive_not_a_difference() {
         "{padded:?}"
     );
     assert_eq!(session.ledger().accounting().checks, 0);
-    // The smaller candidate fits and is checked; afterwards the session work is spent.
+    assert_eq!(
+        session.ledger().accounting().work_reserved,
+        preparation_work
+    );
+    // The smaller candidate fits; only the final preparation allowance remains.
     assert!(matches!(
         attempt(&mut session, Proposal::Candidate(candidate.to_vec())),
         Outcome::Equivalent {
@@ -1146,7 +1301,7 @@ fn check_work_is_precharged_and_exhaustion_is_inconclusive_not_a_difference() {
         }
     ));
     let reserved = session.ledger().accounting().work_reserved;
-    assert_eq!(reserved, 16 * 25 + 1_063 + 763 + 1_024);
+    assert_eq!(reserved, 2 * preparation_work + candidate_work);
     let swapped = {
         let incumbent = import(candidate);
         let mut roots = incumbent.roots().to_vec();
@@ -1160,14 +1315,16 @@ fn check_work_is_precharged_and_exhaustion_is_inconclusive_not_a_difference() {
     };
     let exhausted = attempt(&mut session, Proposal::Candidate(swapped));
     assert!(
-        matches!(exhausted, Outcome::WorkExhausted { session_remaining, .. } if session_remaining < reserved),
+        matches!(exhausted, Outcome::WorkExhausted { needed: Some(work), session_remaining: 0, .. } if work > 0),
         "{exhausted:?}"
     );
     assert_eq!(
         session.ledger().accounting().work_reserved,
-        reserved,
-        "no refund, no new charge"
+        reserved + preparation_work,
+        "preparation stays charged; an unfunded check adds no checker charge"
     );
+    assert_eq!(session.ledger().accounting().checks, 1);
+    assert_eq!(session.ledger().accounting().attempts, 3);
     assert_eq!(replacement(&session).bytes(), candidate);
 }
 
@@ -1669,6 +1826,34 @@ impl Persisted {
     }
 }
 
+// Raw-input controls still perform the complete admission before the same
+// production resume entry. This test fixture carries no cached verdict.
+/// Persisted session data the shell loaded (NSR-007).
+struct Stored<'a> {
+    /// The canonical request record.
+    request: &'a [u8],
+    /// The exact original bytes.
+    original: &'a [u8],
+    /// The ledger, one canonical entry per line.
+    ledger: &'a [u8],
+    /// The separately kept head, if any.
+    head: Option<Head>,
+    /// The latest replacement's candidate and receipt bytes, if retained.
+    replacement: Option<(&'a [u8], &'a [u8])>,
+    /// Stored witnesses, each with its attempt and the candidate bytes it
+    /// names.
+    witnesses: Vec<(u8, Value, Vec<u8>)>,
+}
+
+fn prepare_resume(stored: Stored<'_>, elapsed_ms: u64) -> ResumePlan {
+    Session::prepare_resume(
+        ResumeHeader::admit(stored.request, stored.original, stored.ledger, stored.head),
+        stored.replacement,
+        stored.witnesses,
+        elapsed_ms,
+    )
+}
+
 /// What a resume of persisted data came to, as the shell sees it.
 #[derive(Debug)]
 enum Resume {
@@ -1685,7 +1870,7 @@ enum Resume {
 /// write, modeled here by keeping a copy, before the replay runs. A resumed
 /// session's ledger must be exactly what that write received.
 fn resume(persisted: &Persisted, elapsed_ms: u64) -> Resume {
-    let pending = match Session::prepare_resume(persisted.stored(), elapsed_ms) {
+    let pending = match prepare_resume(persisted.stored(), elapsed_ms) {
         ResumePlan::Replay(pending) => pending,
         ResumePlan::Refused(reason) => return Resume::Refused(reason),
         ResumePlan::Inconclusive(reason) => return Resume::Inconclusive(reason),
@@ -1913,10 +2098,19 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
         .unwrap_or_default();
     let mut limits = Limits::CEILING;
     limits.check_work = self_check;
-    limits.session_work = self_check;
+    // This fixture must fund preparation and one successful check, then leave
+    // no work for replay. The earlier successful session records that total.
+    let attempt_work = session.ledger().accounting().work_reserved;
+    let checked_work = session
+        .request()
+        .check_work(replacement(&session).cost())
+        .unwrap_or_else(|| panic!("replacement check work"));
+    assert!(attempt_work > checked_work, "preparation stays charged");
+    limits.session_work = attempt_work;
     let mut tight = Session::open(request_with(original, Profile::FunctionalBoolV1, limits));
     attempt(&mut tight, Proposal::Candidate(candidate.to_vec()));
     assert!(tight.incumbent().replacement().is_some());
+    assert_eq!(tight.ledger().accounting().work_reserved, attempt_work);
     assert_eq!(
         resume_refusal(&Persisted::of(&tight)),
         ResumeRefusal::InsufficientReplayAllowance
@@ -1944,7 +2138,7 @@ fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() 
     let probe = std::rc::Rc::clone(&replayed);
     replay_probe::arm(move || probe.set(true));
     // Preparing runs no replay work and reserves exactly the replay.
-    let ResumePlan::Replay(pending) = Session::prepare_resume(persisted.stored(), 0) else {
+    let ResumePlan::Replay(pending) = prepare_resume(persisted.stored(), 0) else {
         panic!("expected a replay plan");
     };
     assert!(!replayed.get());
@@ -1956,7 +2150,7 @@ fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() 
     assert!(!replayed.get());
     // A written reservation whose replay never runs (an interruption) stays
     // charged: the next resume pays for a replay of its own.
-    let ResumePlan::Replay(pending) = Session::prepare_resume(persisted.stored(), 0) else {
+    let ResumePlan::Replay(pending) = prepare_resume(persisted.stored(), 0) else {
         panic!("expected a replay plan");
     };
     let mut written = None;
@@ -1995,8 +2189,7 @@ fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() 
     limits.session_work = before.work_reserved + work;
     let mut tight = Session::open(request_with(original, Profile::FunctionalBoolV1, limits));
     attempt(&mut tight, Proposal::Candidate(candidate.to_vec()));
-    let ResumePlan::Replay(pending) = Session::prepare_resume(Persisted::of(&tight).stored(), 0)
-    else {
+    let ResumePlan::Replay(pending) = prepare_resume(Persisted::of(&tight).stored(), 0) else {
         panic!("expected a replay plan");
     };
     let mut written = None;
@@ -2013,7 +2206,7 @@ fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() 
     spent.ledger = written.entries().iter().flat_map(Entry::line).collect();
     spent.head = Some(written.head());
     assert!(matches!(
-        Session::prepare_resume(spent.stored(), 0),
+        prepare_resume(spent.stored(), 0),
         ResumePlan::Inconclusive(ResumeRefusal::InsufficientReplayAllowance)
     ));
 }

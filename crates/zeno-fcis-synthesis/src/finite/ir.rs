@@ -6,10 +6,16 @@ use super::Error;
 use super::evaluation::admission::{self, AdmissionFailure};
 use super::evaluation::{self, Failure};
 
-pub use super::evaluation::{Domain, MAX_FIELDS, MAX_NODES, Op};
+pub use super::evaluation::{
+    Domain, MAX_EXTENDED_INPUTS, MAX_EXTENDED_NODES, MAX_EXTENDED_OUTPUTS, MAX_FIELDS, MAX_NODES,
+    Op,
+};
 
 /// Versioned eager, acyclic, checked-i64 semantic profile.
 pub const PROFILE: &str = "zeno-fcis/finite-i64/1";
+
+/// Larger bounded profile with the same checked-i64, eager semantics.
+pub const EXTENDED_PROFILE: &str = "zeno-fcis/finite-i64/2";
 
 impl Domain {
     pub(super) fn value(self) -> Result<Value, EncodeError> {
@@ -49,14 +55,8 @@ impl Op {
     }
 }
 
-/// Structurally validated, closed expression graph; construction is not a proof.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Program {
-    inputs: Vec<Domain>,
-    outputs: Vec<Domain>,
-    nodes: Vec<Op>,
-    roots: Vec<u16>,
-}
+mod program;
+pub use program::Program;
 
 impl Program {
     /// Validates bounds, types, topological references, and complete result shape.
@@ -74,25 +74,38 @@ impl Program {
             roots,
         })
     }
-    /// Input domains in ABI order.
-    #[must_use]
-    pub fn inputs(&self) -> &[Domain] {
-        &self.inputs
+    /// Admits up to 64 inputs, 64 outputs and 4,096 instructions.
+    ///
+    /// Graphs within the original bounds retain profile 1 and its bytes.
+    /// Larger graphs use profile 2. This constructor grants no transform
+    /// certificate or transition authority; profile-1-only importers refuse
+    /// profile 2 rather than applying their smaller coverage budget to it.
+    pub fn try_new_extended(
+        inputs: Vec<Domain>,
+        outputs: Vec<Domain>,
+        nodes: Vec<Op>,
+        roots: Vec<u16>,
+    ) -> Result<Self, Error> {
+        admission::validate_extended_program(&inputs, &outputs, &nodes, &roots)
+            .map_err(admission_error)?;
+        Ok(Self {
+            inputs,
+            outputs,
+            nodes,
+            roots,
+        })
     }
-    /// Output domains in ABI order.
+    /// The shape-selected semantic profile included in canonical program data.
     #[must_use]
-    pub fn outputs(&self) -> &[Domain] {
-        &self.outputs
-    }
-    /// Typed topological instructions.
-    #[must_use]
-    pub fn nodes(&self) -> &[Op] {
-        &self.nodes
-    }
-    /// Result nodes in ABI order.
-    #[must_use]
-    pub fn roots(&self) -> &[u16] {
-        &self.roots
+    pub fn profile(&self) -> &'static str {
+        if self.inputs.len() > 2 * MAX_FIELDS
+            || self.outputs.len() > MAX_FIELDS
+            || self.nodes.len() > MAX_NODES
+        {
+            EXTENDED_PROFILE
+        } else {
+            PROFILE
+        }
     }
     /// Evaluates explicit inputs without any ambient state or effects.
     pub fn evaluate(&self, input: &[i64]) -> Result<Vec<i64>, Error> {
@@ -147,7 +160,7 @@ impl Program {
     /// Canonical, language-neutral program data, including the semantic profile.
     pub fn value(&self) -> Result<Value, EncodeError> {
         tuple(vec![
-            Value::text_ascii_with_limits(PROFILE.into(), ValueLimits::default())
+            Value::text_ascii_with_limits(self.profile().into(), ValueLimits::default())
                 .map_err(EncodeError::InvalidValue)?,
             schema_value(&self.inputs, &self.outputs)?,
             tuple(

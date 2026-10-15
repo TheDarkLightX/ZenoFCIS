@@ -65,7 +65,8 @@ remain the trusted shell boundary. No privacy or exclusive-handle claim is made.
 
 Normal tests retain the original216 decision inputs and independently run all216
 through scoped history/preparation, all68 successful commits and each one-under
-aggregate refusal, four successful partitions, original seven crash boundaries,
+aggregate refusal, four successful partitions, original seven crash boundaries
+through the store's dev-only `crash-injection` feature,
 retry/meter exhaustion/cancellation/incomplete, stale/ABA/second-handle checks,
 exact replay/reopen/import and interrupted delivery. Checked finite-model exit
 plans retain the original domains and also execute their chosen exits through
@@ -80,3 +81,7 @@ profile metadata, delivery adapter and checked authority construction. `create`,
 `journey`, `prepare` and the demonstration binary require SQLite. Strict native,
 Clippy and no-default evidence is source-pinned separately. Independent review,
 whole-workspace/full-V2 acceptance and fresh Wasm qualification remain separate.
+
+`PreparedBatch::publish` takes the shell, authority, current context and byte
+limit. Normal builds expose no interruption parameter or store crash API;
+`cargo test` enables the store's feature through the dev dependency.

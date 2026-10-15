@@ -1,0 +1,210 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "document-release",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "content": "pre.100.110",
+    "version": "pre.100.111",
+    "phase": "pre.100.112",
+    "v0": "pre.100.113",
+    "v1": "pre.100.114",
+    "v2": "pre.100.115",
+    "votes": "v0 + v1 + v2",
+    "action": "command.101.120",
+    "expected_version": "command.101.121",
+    "new_content": "command.101.122",
+    "principal": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {
+      "rule": "1 invalid prestate",
+      "when": "!((version != 0 || content == 0) && (phase != 0 || votes == 0) && (phase != 2 || votes >= 2))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 not authorized",
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "3 idempotent release retry: no component transition",
+      "when": "phase == 2 && action == 163 && expected_version == version",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "content",
+        "111": "version",
+        "112": "phase",
+        "113": "v0",
+        "114": "v1",
+        "115": "v2"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "4 wrong phase",
+      "when": "phase == 2 || ((action == 160 || action == 161) && phase != 0) || ((action == 162 || action == 163) && phase != 1)",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "5 stale version; Approve ignores expected_version",
+      "when": "action != 162 && expected_version != version",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 version limit",
+      "when": "action == 160 && version == 2",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 duplicate vote",
+      "when": "action == 162 && ((principal == 0 && v0) || (principal == 1 && v1) || (principal == 2 && v2))",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "8 missing quorum",
+      "when": "action == 163 && votes < 2",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "9 Edit: register Write only",
+      "when": "action == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "new_content",
+        "111": "version + 1",
+        "112": "phase",
+        "113": "v0",
+        "114": "v1",
+        "115": "v2"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "9 Submit: review Enqueue only; the register is read for the version",
+      "when": "action == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "content",
+        "111": "version",
+        "112": 1,
+        "113": false,
+        "114": false,
+        "115": false
+      },
+      "outbox": []
+    },
+    {
+      "rule": "9 Approve: review Vote only",
+      "when": "action == 162",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "content",
+        "111": "version",
+        "112": "phase",
+        "113": "v0 || principal == 0",
+        "114": "v1 || principal == 1",
+        "115": "v2 || principal == 2"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "9 Release: review Execute; the register is read, not written",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "content",
+        "111": "version",
+        "112": 2,
+        "113": "v0",
+        "114": "v1",
+        "115": "v2"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "publisher",
+          "payload": {
+            "140": "content",
+            "141": "version"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": false,
+    "114": false,
+    "115": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality",
+    "504": "AssetConservation"
+  },
+  "delivery_laws": {
+    "503": {
+      "max_deliveries": 2,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    }
+  }
+}

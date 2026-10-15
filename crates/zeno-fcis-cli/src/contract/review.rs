@@ -11,12 +11,13 @@
 //! nothing and changes no application file; its packet is canonical JSON,
 //! byte-identical on repeat.
 
-pub(super) mod domain;
-pub(super) mod evaluate;
+// The review's input domains and its evaluation live in the library.
+pub(super) use zeno_fcis_contract::internals::review::{domain, evaluate};
 mod examples;
 mod mutants;
 mod packet;
 mod refusals;
+pub(crate) mod seeds;
 mod table;
 #[cfg(test)]
 mod tests;

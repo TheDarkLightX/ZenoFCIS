@@ -143,13 +143,14 @@ class TransformToolsTest(unittest.TestCase):
         # A session that does not exist is an I/O refusal from the CLI, not a verdict.
         missing = tools.transform_replay(str(Path(self.temporary) / "absent"))
         self.assertEqual((missing["exit_code"], missing["report"]["status"]), (3, "io-error"))
-        # The controller is outside the Boolean profile and inside checked-i64.
+        # The controller is outside the Boolean profile and inside checked-i64, the default.
         controller = str(ARTIFACTS / "retained-controller-original.zcve")
-        outside = tools.transform_request(controller, self.session)
+        outside = tools.transform_request(controller, self.session, profile="functional-bool-v1")
         self.assertEqual((outside["exit_code"], outside["report"]["status"]), (1, "refused"))
         self.assertEqual(outside["report"]["detail"]["reason"], "profile-inputs")
-        inside = tools.transform_request(controller, self.session, profile="checked-i64-v1", attempts=2)
+        inside = tools.transform_request(controller, self.session, attempts=2)
         self.assertEqual(inside["exit_code"], 0)
+        self.assertEqual(inside["report"]["detail"]["request"]["profile"], "checked-i64-v1")
         self.assertEqual(inside["report"]["detail"]["request"]["domain"]["size"], 384)
         improved = tools.transform_candidate(
             self.session, candidate_path=str(ARTIFACTS / "retained-controller-candidate.zcve"))

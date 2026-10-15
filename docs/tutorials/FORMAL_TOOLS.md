@@ -1,6 +1,6 @@
 # Tutorial: run formal tools and read each result
 
-List the exact backend versions supported by RC3:
+List the pinned backend versions:
 
 ```bash
 cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- backend list
@@ -12,34 +12,12 @@ z3 4.16.0
 lean 4.30.0
 ```
 
-## See the successful path
+The list includes Lean's pinned identity, but the current public Lean exporter
+refuses `UnsupportedMode`. `prove --backend lean` remains blocked (exit `2`).
+For independently checked scalar program equivalence, use the
+[certificate route](#check-scalar-program-certificates) below.
 
-With the qualified Lean distribution and tools manifest prepared below, this
-command asks Lean to check claim 501 from the Mini Determinator:
-
-```bash
-cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
-  prove examples/mini-determinator/project.zeno --claim 501 --backend lean \
-  --tools zeno-fcis.tools.lean.json
-```
-
-The successful path prints:
-
-```text
-lean claim 501: generated theorem kernel checked with the qualified RC3 toolchain identity and exact axiom report; production authority unchanged
-lean claim 501 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
-```
-
-This result covers the exact generated theorem, qualified Lean tree, and axiom
-report. It leaves production authority unchanged. The `scope:` line matters:
-claim 501 is `always atom(pre.100 == pre.100)`, which is true for every
-observation assignment. The exported obligation contains no transition
-relation, so a proof says nothing specific about the Mini Determinator.
-`zeno-fcis check` reports this claim as `constant-true`. See
-[law and claim substance](../CLAIM_SUBSTANCE.md). The next sections show how
-to prepare the tool identity and how blocked solver results appear.
-
-## Ask CVC5 about one finite claim
+## Ask CVC5 about one relational claim
 
 First find the executable hash:
 
@@ -107,114 +85,76 @@ examples/minimal/.zeno-fcis/evidence/<content-hash>/
 Exit code `2` tells automation that the requested proof remains blocked. The
 retained source and solver output let a reviewer inspect exactly what ran.
 
-## Ask Lean to check one generated theorem
+Read the `scope:` line: claim 500 is `pre.100 == pre.100`, true for every
+observation assignment. No transition relation was exported, so the solver
+result says nothing specific about the application. `check` reports the claim
+as `constant-true`; see [law and claim substance](../CLAIM_SUBSTANCE.md).
 
-Download the official Lean `4.30.0` Linux x86-64 archive, verify its recorded
-archive checksum, and unpack it. RC3 qualifies this exact distribution:
+Before each run, the adapter checks the executable's file type, hash and exact
+reported version. It runs a private copy with fixed arguments, a cleared
+environment, a timeout and an output bound.
 
-```bash
-curl --fail --location --output lean-4.30.0-linux.zip \
-  https://github.com/leanprover/lean4/releases/download/v4.30.0/lean-4.30.0-linux.zip
-printf '%s  %s\n' \
-  3ffb3dc406912936a6b30885ce47a349c7ed8ee7e4e4dfac7361a497608bc8d1 \
-  lean-4.30.0-linux.zip | sha256sum --check -
-unzip lean-4.30.0-linux.zip
-```
+## Use Z3 and request a counterexample
 
-The same archive checksum is recorded in
-`release/formal-tools-linux-x86_64.sha256`. Compute both manifest hashes, then
-compare the tree inventory with RC3's recorded trust anchor:
-
-```bash
-sha256sum /absolute/path/to/lean-4.30.0/bin/lean
-cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
-  backend inventory-lean /absolute/path/to/lean-4.30.0
-test "$(cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
-  backend inventory-lean /absolute/path/to/lean-4.30.0 | \
-  awk '/^lean tree_sha256 / { print $3 }')" = \
-  "$(tr -d '\n' < release/lean-4.30.0-tree.sha256)"
-```
-
-The inventory command prints values in this form:
-
-```text
-lean tree_sha256 <tree-sha256>
-files <file-count>
-total_bytes <byte-count>
-```
-
-For the qualified archive, the tree hash is
-`5dc9cab14b1a15fc8d6cfc3f1c1b627c0c74facb23465fb9463c42554a807f5b`.
-The counts depend on the distribution. Copy the verified tree hash into
-`zeno-fcis.tools.lean.json`:
-
-```json
-{
-  "format": "zeno-fcis/tools/2",
-  "tools": [
-    {
-      "backend": "lean",
-      "path": "/absolute/path/to/lean-4.30.0/bin/lean",
-      "version": "4.30.0",
-      "sha256": "64-lowercase-hex-characters-from-sha256sum",
-      "runtime": {
-        "root": "/absolute/path/to/lean-4.30.0",
-        "tree_sha256": "5dc9cab14b1a15fc8d6cfc3f1c1b627c0c74facb23465fb9463c42554a807f5b"
-      },
-      "timeout_ms": 30000,
-      "max_output_bytes": 1048576,
-      "allowed_axioms": ["Quot.sound", "propext"]
-    }
-  ]
-}
-```
-
-Check the distribution and run the unbounded claim from the Mini Determinator
-project:
+Create `zeno-fcis.tools.z3.json` with the same fields, setting `backend` to
+`z3`, `version` to `4.16.0`, and using Z3's own executable path and hash.
+Claim 500 in the Mini Determinator selects both SMT backends:
 
 ```bash
 cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
-  doctor --tools zeno-fcis.tools.lean.json
+  prove examples/mini-determinator/project.zeno --claim 500 --backend z3 \
+  --tools zeno-fcis.tools.z3.json
 cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
-  prove examples/mini-determinator/project.zeno --claim 501 --backend lean \
-  --tools zeno-fcis.tools.lean.json
-printf 'exit %s\n' "$?"
+  counterexample examples/mini-determinator/project.zeno --claim 500 --backend z3 \
+  --tools zeno-fcis.tools.z3.json
 ```
 
-A successful kernel check prints the first line below. The `printf` command
-prints the exit code on the second line:
+This reflexive claim has no counterexample; Z3's UNSAT answer stays blocked
+(exit `2`) for either command. For a refutable claim, a SAT model counts only
+after the library evaluator replays it. That replay exits `1` from `prove`
+and `0` from `counterexample`. Use `--backend cvc5` and the CVC5 manifest to
+request a counterexample for a claim that selects CVC5.
 
-```text
-lean claim 501: generated theorem kernel checked with the qualified RC3 toolchain identity and exact axiom report; production authority unchanged
-lean claim 501 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
-exit 0
+## Check scalar program certificates
+
+`transform check-certificates` independently checks complete Alethe
+certificates with the pinned Carcara checker. It compares admitted scalar
+programs whose domain exceeds the enumeration cap, within the quantifier-free
+Boolean and linear integer fragment over eager checked-i64 programs. The
+Step limit must never bind.
+
+Follow the [symbolic checks guide](../SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
+to build and identify the checker, create `checker.json`, and supply exactly
+`0.alethe`, `1.alethe`, and so on in regenerated difference-query order.
+The checker builder does not generate those proofs. With the matching tools
+manifest and certificates prepared, run:
+
+```bash
+cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
+  transform check-certificates --original original.zcve --candidate candidate.zcve \
+  --tools zeno-fcis.tools.cvc5.json --checker checker.json \
+  --certificates certificates --out certificate-receipt.json
+cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
+  transform replay-certificates --receipt certificate-receipt.json \
+  --original original.zcve --candidate candidate.zcve \
+  --tools zeno-fcis.tools.cvc5.json --checker checker.json --certificates certificates
 ```
 
-The retained directory contains the generated theorem and the full checked
-toolchain inventory:
+A complete check exits `0` with `certificate-checked-equivalent`, evidence
+`CarcaraChecked`, and receipt schema `zeno-fcis/transform-certificate-receipt/1`.
+Successful replay exits `0` with `certificate-replayed` after regenerating the
+queries, independently rechecking every certificate and requiring byte-identical
+receipt contents. Missing, corrupt, unsupported or incomplete proofs, undecided
+queries and failed controls prevent a passing receipt.
 
-```text
-examples/mini-determinator/.zeno-fcis/evidence/<content-hash>/
-  formal-run-record.bin
-  record.json
-  source
-  stderr
-  stdout
-  toolchain.json
-  transcript-01-kernel-input
-  transcript-01-kernel-stderr
-  transcript-01-kernel-stdout
-```
-
-Before each run, ZenoFCIS checks the file type, hash, and exact reported
-version. It starts the tool with a fixed argument list and an empty environment.
-Lean runs from a checked private copy of its distribution. Commands go directly
-to the selected executable.
-
-`backend inventory-lean` can also describe a custom Lean tree. That hash gives
-repeatable local consistency and lets `doctor` detect later changes. A custom
-tree is outside the qualified RC3 identity, so its successful kernel output
-remains blocked and `prove` returns exit code `2`.
+The result covers ordered outputs and exact eager failures on the declared
+domain under the scalar query/runtime refinement and the named trusted base:
+Carcara and its parser/fragment guard, SMT-LIB meaning, the compiler, loader and
+operating system. It does not establish Step-usage equality, source-rule meaning,
+Lean kernel checking or verified compilation. The receipt grants no application
+or adoption authority. `transform replay`, `contract adopt`, contract generation
+and `contract refresh-receipts` require the exhaustive receipt format and refuse
+this separate schema.
 
 ## See missing configuration fail closed
 
@@ -241,7 +181,9 @@ tools manifest blocked: WrongFormat { expected: "zeno-fcis/tools/2", actual: "ze
 ```
 
 Change the top-level `format` value to `zeno-fcis/tools/2`. CVC5 and Z3 need no
-other field changes. Lean also needs the `runtime` object shown above. Check the
+other field changes. Retained Lean manifest entries need `runtime.root` and
+`runtime.tree_sha256` as described in the [tools-manifest reference](../CLI_REFERENCE.md#tools-manifest);
+these fields do not enable the unsupported public Lean exporter. Check the
 result with:
 
 ```bash
@@ -249,26 +191,28 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
   backend inspect --tools zeno-fcis.tools.json
 ```
 
-## Read solver and kernel outcomes
+## Read solver and certificate outcomes
 
 | Result | Command exit | What ZenoFCIS keeps |
 | --- | ---: | --- |
 | CVC5 UNSAT proposal | `2` | Exact SMT-LIB, checked tool identity, and proof-shaped output |
-| Z3 UNSAT | `2` | A blocked process result because RC3 has no Z3 proof checker |
+| Z3 UNSAT | `2` | A blocked process result because `prove` has no Z3 proof checker |
 | Replayed CVC5 or Z3 SAT model | `1` from `prove`, `0` from `counterexample` | Normalized counterexample and exact run |
-| Lean `KernelChecked` | `0` from `prove` | Generated theorem, exact axiom report, and Lean tree inventory |
+| Public Lean export | `2` | Export is unsupported (`UnsupportedMode`); no theorem is generated |
+| Complete scalar certificate check | `0` | `CarcaraChecked` receipt binding programs, domains, queries, certificates and checker identity |
 
-CVC5 and Z3 receive relational or finite claims. Finite SMT covers every
-nonempty trace length through the stated horizon and keeps checked `i128`
-arithmetic visible. Lean receives unbounded proof requests. Its generated
-source contains the original projection paths and relational formula.
+For relational and finite claims, CVC5 and Z3 check exported formulas. Finite
+SMT covers every nonempty trace length through the stated horizon and keeps
+checked `i128` arithmetic visible. These translated claims do not include an
+application transition relation.
 
 A missing tool, wrong hash, wrong version, timeout, crash, oversized output,
-`unknown`, mismatched claim, failed model replay, or rejected Lean axiom report
-stays blocked or fails with a nonzero exit.
+`unknown`, mismatched claim or failed model replay stays blocked or fails with a
+nonzero exit.
 
-These runs supply reviewable evidence for the translated claim. A separate
-backend verifier is responsible for creating any ZenoFCIS certificate types.
+Solver runs supply reviewable evidence for the translated claim and its printed
+scope. The scalar certificate route separately requires complete independent
+checking; it does not turn solver-only results into checked certificates.
 
 The [formal-tools reference](../FORMAL_TOOLS_RC3.md) gives the full JSON
 schema, fixed arguments, output rules, retained-file layout, and exact scope of

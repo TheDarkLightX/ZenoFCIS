@@ -6,36 +6,8 @@ use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 pub(super) mod spec;
 
-/// Complete typed value used by decision expressions and candidates.
-#[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum Atom<'a> {
-    /// Boolean value.
-    Bool(bool),
-    /// Signed 128-bit value.
-    I128(i128),
-    /// Unsigned 128-bit value.
-    U128(u128),
-    /// Original declared Enum type and variant.
-    Enum {
-        /// Original type identifier.
-        type_id: u32,
-        /// Original variant identifier.
-        variant: u16,
-    },
-    /// Original declared payload-free Sum type and variant.
-    Sum {
-        /// Original type identifier.
-        type_id: u32,
-        /// Original variant identifier.
-        variant: u16,
-    },
-    /// Complete uninterpreted bytes.
-    Bytes(&'a [u8]),
-    /// Complete text bytes, validated by the consuming schema profile.
-    Text(&'a [u8]),
-}
+pub use super::super::value::{Atom, Domain};
+
 /// Original declared field and its complete typed value.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,46 +63,6 @@ pub enum Expr<'a> {
     Output(usize),
     /// Complete declared literal value.
     Constant(Atom<'a>),
-}
-/// Complete allowed value domain for a decision slot.
-#[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub enum Domain<'a> {
-    /// Both Boolean values.
-    Bool,
-    /// Inclusive signed range.
-    I128 {
-        /// Inclusive lower bound.
-        min: i128,
-        /// Inclusive upper bound.
-        max: i128,
-    },
-    /// Inclusive unsigned range.
-    U128 {
-        /// Inclusive lower bound.
-        min: u128,
-        /// Inclusive upper bound.
-        max: u128,
-    },
-    /// Original Enum type and complete allowed variant identifier set.
-    Enum {
-        /// Original type identifier.
-        type_id: u32,
-        /// Complete allowed variants; ordering has no semantic significance.
-        variants: &'a [u16],
-    },
-    /// Original payload-free Sum type and complete variant identifier set.
-    Sum {
-        /// Original type identifier.
-        type_id: u32,
-        /// Complete allowed variants; ordering has no semantic significance.
-        variants: &'a [u16],
-    },
-    /// Complete uninterpreted byte values.
-    Bytes,
-    /// Complete text values, subject to the consuming schema profile.
-    Text,
 }
 /// A declared complete successor field.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -354,6 +286,11 @@ impl<'a> Candidate<'a> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::equal(a, b),))]
 fn equal(a: Atom<'_>, b: Atom<'_>) -> bool {
     match (a, b) {
+        (Atom::Canonical(a), Atom::Canonical(b)) => {
+            a.type_id() == b.type_id()
+                && super::util::bytes_equal(a.schema(), b.schema())
+                && super::util::bytes_equal(a.wire(), b.wire())
+        }
         (Atom::Bool(a), Atom::Bool(b)) => a == b,
         (Atom::I128(a), Atom::I128(b)) => a == b,
         (Atom::U128(a), Atom::U128(b)) => a == b,
@@ -471,28 +408,7 @@ fn resolve<'a>(inputs: Inputs<'_, 'a>, output: &[Atom<'a>], expr: Expr<'a>) -> O
 }
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::admitted(domain,value),))]
 fn admitted(domain: Domain<'_>, value: Atom<'_>) -> bool {
-    match (domain, value) {
-        (Domain::Bool, Atom::Bool(_))
-        | (Domain::Bytes, Atom::Bytes(_))
-        | (Domain::Text, Atom::Text(_)) => true,
-        (Domain::I128 { min, max }, Atom::I128(v)) => min <= v && v <= max,
-        (Domain::U128 { min, max }, Atom::U128(v)) => min <= v && v <= max,
-        (
-            Domain::Enum { type_id, variants },
-            Atom::Enum {
-                type_id: t,
-                variant,
-            },
-        )
-        | (
-            Domain::Sum { type_id, variants },
-            Atom::Sum {
-                type_id: t,
-                variant,
-            },
-        ) => type_id == t && super::util::contains(variants, variant),
-        _ => false,
-    }
+    super::super::value::admitted(domain, value)
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>

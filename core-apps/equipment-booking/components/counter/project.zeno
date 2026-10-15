@@ -1,0 +1,32 @@
+zeno 1;
+project 1 bounded_counter;
+namespace 2 core;
+type 100 state Counter;
+type 101 command Change;
+type 102 context Operator;
+type 105 int Units in 0..=2;
+type 107 data Action;
+type 108 bool Authorized;
+field 110 100 value 105;
+field 120 101 action 107;
+field 130 102 authorized 108;
+variant 150 107 Inc none;
+variant 151 107 Dec none;
+reason 200 not_authorized precedence 0;
+reason 201 at_capacity precedence 1;
+reason 202 at_zero precedence 2;
+component 400 counter {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 2;
+law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 2;
+law 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);
+// Core seed bounded-counter/1; parameters {"C": 2}.
+// Instance source-set SHA256 3ec6f6eb601fbed759721e8fde42878710e629d8f62c0a947db924a92f27de06.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/bounded-counter.json SHA256 383aa1cc2d2233b3f26bba1dc41d0cfb4543a0e2085ef01608c74a11b77790e4; replay required; no KernelChecked claim.
+// Qualification procedure: tools/check_core_components.py in the source tree.

@@ -14,7 +14,7 @@ jobs:
   interpret:
     name: interpret (${{ matrix.group }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -48,6 +48,12 @@ jobs:
           {"group": "synthesis-v2-laws", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_laws"},
           {"group": "synthesis-v2-authority", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_authority"},
           {"group": "synthesis-v2-evaluator-identity", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_evaluator_identity"},
+          {"group": "synthesis-v2-numeric-capacity", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_numeric_capacity"},
+          {"group": "synthesis-v2-numeric-execution", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_numeric_execution"},
+          {"group": "synthesis-v2-numeric-wide-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_numeric_wide_arithmetic"},
+          {"group": "synthesis-v2-original-compound", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound"},
+          {"group": "synthesis-v2-original-compound-patch-replay", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound", "test": "original_compounds_patch_carry_forward_and_replay_without_reencoding_loss"},
+          {"group": "synthesis-v2-original-compound-parser-refusals", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_compound", "test": "original_parser_denied_reads_and_steps_remain_refusals"},
           {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "miri_skip": ["all_original_small_domains_and_unlawful_order_states", "account_complete_clock_boundaries_without_domain_narrowing", "withdrawal_complete_raw_domain_and_certified_controller", "treasury_guard_arithmetic_callbacks_and_unlawful_prestates"]},
           {"group": "synthesis-v2-template-retained-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_durable_counter"},
           {"group": "synthesis-v2-template-retained-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_inventory_reservation"},
@@ -94,7 +100,9 @@ jobs:
           {"group": "synthesis-graphs-28-to-31", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_28_to_31"}
         ]
     env:
-      MIRIFLAGS: -Zmiri-strict-provenance
+      # The spec and compose source-identity tests read the checked-out crates.
+      # Keep them interpreted; only their groups need host filesystem access.
+      MIRIFLAGS: -Zmiri-strict-provenance ${{ (matrix.group == 'specification' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
       MIRI_TEST_ARGS: ""
     steps:
       - name: Checkout exact source

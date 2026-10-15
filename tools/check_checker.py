@@ -16,10 +16,11 @@ import subprocess
 import tomllib
 
 import check_verus as verifier
+import checker_controls as g10
 from check_finite_execution import once
 from v2_proof_sources import execution_sources
 from v2_native_dependencies import native_dependency_args
-from verus_coverage import inventory, parse_vir, require_coverage
+from verus_coverage import inventory, observed_inventory, parse_vir, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/checker.rs')
@@ -29,12 +30,16 @@ SPEC = SUBJECT.with_name('checker_spec.rs')
 EQUALITY = SUBJECT.with_name('checker_equality.rs')
 TESTS = SUBJECT.with_name('checker_tests.rs')
 API = SUBJECT.with_name('checker_api.rs')
+RANGES = SUBJECT.with_name('checker_ranges.rs')
+RANGE_SPEC = SUBJECT.with_name('checker_range_spec.rs')
+RANGE_TESTS = SUBJECT.with_name('checker_range_tests.rs')
+MEMBERSHIP = Path('crates/zeno-fcis-cli/src/neural_loop/ledger_membership.rs')
 CLI = Path('crates/zeno-fcis-cli/src/transform.rs')
 SHELL = SUBJECT.parent.parent / 'equivalence.rs'
 ROUTE_INPUTS = (CLI, SHELL, API, HARNESS, Path('crates/zeno-fcis-cli/src/main.rs'),
                 Path('crates/zeno-fcis-cli/src/shell_v2.rs'),
                 Path('crates/zeno-fcis-cli/Cargo.toml'), Path('Cargo.lock'),
-                Path('release/package-set.toml'))
+                Path('release/package-set.toml'), Path('Cargo.toml'))
 
 # Each planted operational fault owns one declared proof region. A failure in
 # another function is a broken qualification run, not evidence against it.
@@ -63,10 +68,12 @@ SEMANTIC_FAILURES = frozenset((
     'requires not satisfied', 'invariant not satisfied at end of loop body',
     'loop invariant not satisfied', 'invariant not satisfied',
     'possible arithmetic underflow/overflow',
+    'possible division by zero',
+    'constructed value may fail to meet its declared type invariant',
 ))
 ERROR_HEADER = re.compile(r'^error(?:\[[A-Za-z0-9]+\])?: (.*)$', re.M)
 NON_SEMANTIC = re.compile(
-    r'resource limit|\brlimit\b|timed? out|\btimeout\b|out of memory|memory exhausted|'
+    r'\bunknown\b|resource limit|\brlimit\b|timed? out|\btimeout\b|out of memory|memory exhausted|'
     r'\bkilled\b|\bpanic(?:ked)?\b|internal compiler error|segmentation fault|'
     r'\bsignal\b|transport error|failed to (?:start|execute)', re.I)
 
@@ -74,7 +81,17 @@ NON_SEMANTIC = re.compile(
 def source_paths(root: Path = ROOT, *, profile: bool = True) -> tuple[Path, ...]:
     paths = set(execution_sources(root))
     paths.update(ROUTE_INPUTS)
-    paths.update((HARNESS, SUBJECT, SPEC, EQUALITY, TESTS, API, CLI, SHELL, verifier.PIN,
+    paths.update(Path('crates/zeno-fcis-cli/src/neural_loop') / name for name in (
+        'value_types.rs', 'ledger_accounting.rs', 'ledger.rs', 'incumbent.rs',
+        'request.rs', 'session.rs', 'mod.rs', 'ledger_accounting_tests.rs'))
+    paths.update(Path('crates/zeno-fcis-cli/src') / name for name in (
+        'loop_command.rs', 'transform_plan.rs', 'transform_parallel.rs',
+        'transform_parallel_tests.rs', 'transform_command.rs', 'checker_process.rs',
+        'loop_command_intake_tests.rs', 'neural_loop/acquisition.rs'))
+    paths.add(Path('crates/zeno-fcis-cli/tests/loop_cli.rs'))
+    paths.update(Path('tools') / name for name in (
+        'checker_controls.py', 'checker_native_controls.py', 'compare_checker_profiles.py'))
+    paths.update((HARNESS, SUBJECT, SPEC, EQUALITY, TESTS, API, RANGES, RANGE_SPEC, RANGE_TESTS, MEMBERSHIP, CLI, SHELL, verifier.PIN,
                   Path('crates/zeno-fcis-cli/src/main.rs'),
                   Path('crates/zeno-fcis-cli/src/transform_tests.rs'),
                   Path('crates/zeno-fcis-cli/tests/transform_cli.rs'),
@@ -91,6 +108,9 @@ def source_paths(root: Path = ROOT, *, profile: bool = True) -> tuple[Path, ...]
                   Path('tools/v2_proof_sources.py'), Path('tools/v2_native_dependencies.py'),
                   Path('tools/verus_coverage.py'), Path('tools/atdd.py'),
                   Path('.github/workflows/verus.yml'),
+                  Path('.github/workflows/ci.yml'),
+                  Path('.github/workflows/adopter-acceptance.yml'),
+                  Path('.github/actions/checker-containment/action.yml'),
                   Path('Cargo.toml'), Path('Cargo.lock'), Path('rust-toolchain.toml'),
                   Path('.cargo/config.toml')))
     for name in ('zeno-fcis-cli', 'zeno-fcis-shell-sqlite', 'zeno-fcis-synthesis', 'zeno-fcis-codec', 'zeno-fcis-value'):
@@ -120,7 +140,8 @@ def check_routes(root: Path = ROOT) -> None:
     harness = (root / HARNESS).read_text()
     manifest = tomllib.loads((root / 'crates/zeno-fcis-cli/Cargo.toml').read_text())
     dependency = manifest['dependencies'].get('zeno-fcis-shell-sqlite', {})
-    if dependency != {'version': '=1.1.0', 'path': '../zeno-fcis-shell-sqlite'}:
+    version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
+    if dependency != {'version': '=' + version, 'path': '../zeno-fcis-shell-sqlite'}:
         raise ValueError('CLI lacks the exact published shell library dependency')
     if 'pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;' not in main:
         raise ValueError('CLI no longer uses the shared library checker API')
@@ -148,6 +169,24 @@ def check_routes(root: Path = ROOT) -> None:
         raise ValueError('publication order puts CLI before its shell dependency')
     if 'crate::finite_checker::compare_with_usage(' not in cli or 'checker::compare_equal(' not in shell:
         raise ValueError('a shipped adapter bypasses its shared comparison route')
+    # Pin both construction sites, and the data returned by the range authority.
+    # This source-route guard is deliberately conservative, not a Rust proof.
+    finish = cli.split('    pub(crate) fn finish(', 1)[1].split('/// Admits both', 1)[0]
+    compact = re.sub(r'\s+', '', finish)
+    route = ('letcomplete=crate::finite_checker::finish_range('
+             '&a,&b,self.limits.input_tuples,self.limits.steps,report,)')
+    if (not compact.startswith("&self,report:crate::finite_checker::RangeReport<'_,'_>,)")
+            or route not in compact or compact.count('letcomplete=') != 1
+            or 'inputs_checked:complete.0,' not in compact
+            or 'usage:complete.1,' not in compact):
+        raise ValueError('PreparedCheck::finish bypasses the shared range completion route')
+    sites = list(re.finditer(r'\bEquivalence\s*\{', cli))
+    constructors = [site for site in sites
+                    if not re.search(r'(?:\b(?:struct|impl)\s+|->\s*&?\s*)$', cli[:site.start()])]
+    serial = cli.split('pub(crate) fn check(', 1)[1].split('fn admit(', 1)[0]
+    if (len(constructors) != 2 or finish.count('Ok(Equivalence {') != 1
+            or serial.count('Ok(Equivalence {') != 1):
+        raise ValueError('unexpected Equivalence construction site')
     for name, text in [('CLI', cli), ('SQLite', shell)]:
         if 'execute_v2(' in text or 'fn advance(' in text or 'fn domain_size(' in text:
             raise ValueError(f'{name} contains an independent evaluator or enumeration implementation')
@@ -355,7 +394,7 @@ def coverage_refusal(vir: str, profile: dict, target: str, field: str,
                      *, original_vir: str | None = None) -> tuple[bool, dict]:
     evidence = {'function': target, 'field': field, 'refusal': None}
     try:
-        actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
+        actual = profile_inventory(vir, profile)
     except ValueError as error:
         evidence['parse_error'] = str(error)
         return False, evidence
@@ -393,26 +432,31 @@ def coverage_refusal(vir: str, profile: dict, target: str, field: str,
 def candidate_profile(vir: str, report: dict, pin: dict) -> dict:
     if not proof_succeeded(report, pin):
         raise ValueError('cannot inventory a failed or differently pinned proof')
-    observed = inventory(vir, 'checker::')
+    observed, _declarations = observed_inventory(vir, 'checker::')
     bodies = sorted(k for k, v in observed.items() if v['mode'] == 'Exec')
-    return {'namespace': 'checker::', 'reviewed': False,
-            'expected_verified': report['verification-results']['verified'],
-            'target_functions': sorted(k for k in report['func-details'] if k.startswith('checker::')),
-            'body_covered_functions': bodies,
-            'functions': inventory(vir, 'checker::', tuple(bodies))}
+    functions, declarations = observed_inventory(vir, 'checker::', tuple(bodies))
+    profile = {'namespace': 'checker::', 'reviewed': False,
+               'expected_verified': report['verification-results']['verified'],
+               'target_functions': sorted(k for k in report['func-details'] if k.startswith('checker::')),
+               'body_covered_functions': bodies,
+               'functions': functions}
+    if declarations is not None:
+        profile['abstract_declarations'] = declarations
+    return profile
 
 
-def run_logged(command: list[str], cwd: Path, environment: dict, output: Path) -> tuple[subprocess.CompletedProcess, dict]:
+def run_logged(command: list[str], cwd: Path, environment: dict, output: Path,
+               *, timeout: int = 600) -> tuple[subprocess.CompletedProcess, dict]:
     output.mkdir(parents=True, exist_ok=False)
-    (output / 'command.json').write_text(json.dumps({'argv': command, 'cwd': str(cwd)}, indent=2) + '\n')
+    (output / 'command.json').write_text(json.dumps({'argv': command, 'cwd': str(cwd), 'timeout_seconds': timeout}, indent=2) + '\n')
     try:
-        run = verifier.run(command, cwd, environment, timeout=600)
+        run = verifier.run(command, cwd, environment, timeout=timeout)
     except subprocess.TimeoutExpired as error:
         def decoded(value):
             return value.decode(errors='replace') if isinstance(value, bytes) else value or ''
         (output / 'stdout.json').write_text(decoded(error.stdout))
         (output / 'stderr.log').write_text(decoded(error.stderr))
-        (output / 'exit.json').write_text(json.dumps({'status': 'timeout', 'timeout_seconds': 600}) + '\n')
+        (output / 'exit.json').write_text(json.dumps({'status': 'timeout', 'timeout_seconds': timeout}) + '\n')
         raise
     (output / 'stdout.json').write_text(run.stdout)
     (output / 'stderr.log').write_text(run.stderr)
@@ -448,13 +492,18 @@ def native(directory: Path, pin: dict, environment: dict) -> dict:
         ('shell_core', ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p', 'zeno-fcis-shell-sqlite', '--lib', 'equivalence::']),
         ('shell_upgrade', ['cargo', '+1.97.1', 'test', '--locked', '--offline', '-p', 'zeno-fcis-shell-sqlite', '--test', 'upgrade']),
     ):
-        run, _ = run_logged(command, ROOT, environment, directory / name)
+        # Default upgrades exceeded 600s; the all-feature smoke took 1,618s.
+        timeout = 3600 if name == 'shell_upgrade' else 600
+        run, _ = run_logged(command, ROOT, environment, directory / name, timeout=timeout)
         verifier.require_success(run)
         runs[name] = {'command': command, 'exit_code': run.returncode, 'stdout': run.stdout}
     return runs
 
 
-def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
+def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
+          candidate_controls: bool = False) -> dict:
+    if candidate_controls and (positive_only or not refresh):
+        raise ValueError('candidate controls require --refresh-coverage and forbid --positive-only')
     if out.exists():
         raise ValueError('evidence output already exists; preserve previous attempts')
     out.mkdir(parents=True)
@@ -479,6 +528,10 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
         profile = candidate_profile(vir, report, pin)
         (out / 'candidate-profile.json').write_text(json.dumps(profile, indent=2, sort_keys=True) + '\n')
         status, coverage, native_report = 'profile-review-required', {}, {}
+        if candidate_controls:
+            coverage = require_coverage(vir, profile)
+            native_report = native(out, pin, environment)
+            status = 'candidate-controls-passed-review-required'
     else:
         profile = json.loads((ROOT / PROFILE).read_text())
         if profile.get('reviewed') is not True:
@@ -489,8 +542,13 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
         native_report = native(out, pin, environment)
         status = 'passed-positive-only' if positive_only else 'passed'
     controls = []
-    if not positive_only and not refresh:
-        for name, (path, changed, expected) in mutations((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(), (ROOT / EQUALITY).read_text(), (ROOT / API).read_text()).items():
+    if not positive_only and (not refresh or candidate_controls):
+        all_controls = mutations((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(),
+                                 (ROOT / EQUALITY).read_text(), (ROOT / API).read_text())
+        all_controls.update(g10.mutations(ROOT))
+        for name, (path, changed, expected) in all_controls.items():
+            if expected == 'native':
+                continue
             specimen = out / ('control-' + name)
             for relative in source_paths():
                 target = specimen / relative
@@ -498,26 +556,45 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
                 target.write_text(changed) if relative == path else shutil.copyfile(ROOT / relative, target)
             specimen_before = snapshot(specimen)
             (specimen / 'source-before.json').write_text(json.dumps(specimen_before, indent=2) + '\n')
+            if expected == 'route':
+                try:
+                    check_routes(specimen)
+                except ValueError as error:
+                    killed = 'PreparedCheck::finish bypasses' in str(error)
+                    attribution = {'refusal': str(error)}
+                else:
+                    killed, attribution = False, {}
+                classified = {'name': name, 'expected': expected, 'killed': killed,
+                              'source_stable': specimen_before == snapshot(specimen),
+                              'attribution': attribution}
+                (specimen / 'classification.json').write_text(json.dumps(classified, indent=2) + '\n')
+                controls.append(classified)
+                if not killed or not classified['source_stable']:
+                    raise ValueError(f'route control {name} survived or source changed')
+                continue
             run, record = run_logged([*command, '--log-dir', str(specimen / 'vir'), str(HARNESS)], specimen, environment, specimen / 'run')
             specimen_after = snapshot(specimen)
             (specimen / 'source-after.json').write_text(json.dumps(specimen_after, indent=2) + '\n')
             if specimen_before != specimen_after:
                 raise ValueError(f'control {name} source changed during proof')
             if expected == 'coverage':
-                target, field = COVERAGE_TARGETS[name]
+                target, field = {**COVERAGE_TARGETS, **g10.COVERAGE_TARGETS}[name]
                 killed, attribution = coverage_refusal((specimen / 'vir/crate.vir').read_text(), profile, target, field,
                                                        original_vir=vir)
                 killed = (killed and run.returncode == 0 and proof_succeeded(record, pin)
                           and not ERROR_HEADER.search(run.stderr) and not NON_SEMANTIC.search(run.stderr))
             else:
                 killed, attribution = semantic_refusal(run, record, pin, profile, path, changed,
-                                                       SEMANTIC_TARGETS[name], specimen)
+                                                       {**SEMANTIC_TARGETS, **g10.SEMANTIC_TARGETS}[name], specimen)
             classified = {'name': name, 'expected': expected, 'killed': killed,
                           'source_stable': True, 'attribution': attribution}
             (specimen / 'classification.json').write_text(json.dumps(classified, indent=2) + '\n')
             controls.append(classified)
             if not killed:
                 raise ValueError(f'control {name} survived or failed for another reason')
+        from checker_native_controls import run_controls
+        controls.extend(run_controls(ROOT, out / 'native-controls', environment,
+                                     all_controls, run_logged))
     verifier.verify_tool_files(tool, pin)
     after = snapshot(profile=not refresh)
     (out / 'source-after.json').write_text(json.dumps(after, indent=2) + '\n')
@@ -528,6 +605,7 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
             'working_tree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
             'source_sha256': before, 'toolchain': pin, 'verus_report': report,
             'translated_function_coverage': coverage, 'native': native_report, 'mutations': controls,
+            'review_accepted': not refresh and profile.get('reviewed') is True,
             'unproved': ['canonical byte importer and scalar adapter refinement', 'compiler correctness and binary equivalence',
                         'whole contract upgrade soundness', 'unlimited semantics of malformed raw programs',
                         'installed source archive journey is a separate release gate']}
@@ -539,9 +617,11 @@ def main() -> int:
     parser.add_argument('--out', type=Path, required=True, help='new retained evidence directory')
     parser.add_argument('--positive-only', action='store_true')
     parser.add_argument('--refresh-coverage', action='store_true', help='emit an unreviewed candidate, never acceptance')
+    parser.add_argument('--candidate-controls', action='store_true',
+                        help='with refresh, run all controls; never grants review acceptance')
     args = parser.parse_args()
     try:
-        receipt = check(args.cache, args.out.resolve(), args.positive_only, args.refresh_coverage)
+        receipt = check(args.cache, args.out.resolve(), args.positive_only, args.refresh_coverage, args.candidate_controls)
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as error:
         receipt = {'schema': 'zeno-fcis/shared-checker-evidence/1', 'status': 'failed', 'error': str(error)}
     args.out.mkdir(parents=True, exist_ok=True)

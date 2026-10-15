@@ -122,9 +122,8 @@ def finish_step(completed: list[str], name: str, evidence: str) -> None:
 
 
 def built(app: Path, packages: dict[str, Path], version: str) -> Path:
-    # Evolving this owned fixture changes its package name. Start each version
-    # from the reviewed lock before admitting its newly resolved local graph.
-    shutil.copyfile(ROOT / "Cargo.lock", app / "Cargo.lock")
+    # Creation and evolution generate the application's resolved lock. Admit
+    # that exact binding before building; do not replace it with the workspace graph.
     upgrades.prepare(app, packages, version)
     compiled = upgrades.build_app(app)
     contract_version = operate(compiled, "version")["contract_version"]

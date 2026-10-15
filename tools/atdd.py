@@ -47,10 +47,23 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "wide-value-applications": AcceptanceScenario(
+        "Execute wide values and larger scalar contracts through checked publication",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--locked", "--offline",
+          "--test", "v2_numeric_capacity", "--test", "v2_numeric_execution",
+          "--test", "v2_numeric_wide_arithmetic", "--test", "v2_original_compound",
+          "--test", "v2_evaluator_identity"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked", "--offline",
+          "--test", "v2_original_compound", "--test", "v2_original_zusd", "--test", "v2_original_zusd_authority"),
+         ("python3", "tools/check_g3_fixture.py"),
+         ("python3", "tools/check_g3_app.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked", "--offline",
+          "--test", "contract_capacity")),
+    ),
     "delivery-accounting-laws": AcceptanceScenario(
         "Enforce bounded delivery counts and amounts on actual candidates",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
-          "contract::delivery::tests::"),
+          "contract::delivery_tests::"),
          ("python3", "tools/check_delivery_laws.py")),
     ),
     "bounded-collections-pipes": AcceptanceScenario(
@@ -133,6 +146,23 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/check_core_components.py", "--finite-proof", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) /
               "x86_64-unknown-linux-gnu" / "debug" / "zeno-fcis"))),
+    ),
+    "coupled-applications": AcceptanceScenario(
+        "Check six coupled applications against independent references and refuse planted composition defects",
+        # The independent references' own checks against their briefs come first:
+        # unlike the checker's tests, they do not depend on current certificates.
+        (("python3", "-m", "unittest", "discover", "-s", "tools/test_data/core_apps", "-p", "test_*_reference.py"),
+         ("python3", "tools/test_check_core_app.py"),
+         *(("python3", "tools/check_core_app.py", "--app", app, "--static")
+           for app in ("warehouse-reservation", "expense-approval", "reliable-jobs",
+                       "document-release", "api-quota", "equipment-booking"))),
+    ),
+    "ocaml-scalar-consumer": AcceptanceScenario(
+        "Consume actual generated Rust applications from the pinned OCaml client",
+        (("python3", "tools/test_qualify_ocaml_consumer.py"),
+         ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"),
+         ("python3", "tools/qualify_ocaml_consumer.py", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
     ),
     "bounded-completion": AcceptanceScenario(
         "Verify finite exits and prepare bounded chunks without publication authority",
@@ -245,6 +275,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "transform::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "transform_cli", "--locked")),
     ),
+    "parallel-transform-parity": AcceptanceScenario(
+        "Check large domains in parallel with the serial checker's exact verdicts",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "transform_parallel::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "equivalence::checker::ranges::"),
+         ("python3", "tools/check_transform_parallel.py")),
+    ),
     "checked-optimizer": AcceptanceScenario(
         "Propose smaller programs and accept only checked ones",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
@@ -281,7 +319,19 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "symbolic_cli", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--locked",
           "smt_sessions_"),
-         ("python3", "tools/symbolic_solver_tests.py")),
+         ("python3", "tools/test_symbolic_solver_tests.py"),
+         ("python3", "tools/symbolic_solver_tests.py"),
+         ("python3", "tools/check_symbolic_certificates.py")),
+    ),
+    "tau-finite-kit": AcceptanceScenario(
+        "Translate finite ladders and retain exact independent check inputs",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "--offline",
+          "contract::tau::tests::", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "--offline",
+          "tau_command::tests::", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "tau_kit", "--locked", "--offline",
+          "--", "--test-threads=1"),
+         ("python3", "-B", "integrations/tau/test_kit.py")),
     ),
     "checked-upgrade": AcceptanceScenario(
         "Adopt a checked candidate and upgrade a live store under its lineage",
@@ -294,7 +344,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "v2::equivalence::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "transform::tests::the_shells_comparison_agrees"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked",
+          "--features", "crash-injection"),
          ("python3", "tools/check_contract_upgrade.py")),
     ),
     "rule-change-upgrade": AcceptanceScenario(
@@ -366,7 +417,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked"),
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked",
+          "--features", "crash-injection"),
          ("python3", "tools/test_check_compile_fail.py"),
          ("python3", "tools/check_compile_fail.py")),
     ),
@@ -374,8 +426,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Run the local V1 release gate",
         (
             ("python3", "tools/check_assurance.py", "--self-test"),
+            ("python3", "tools/test_resolved_assurance.py"),
             ("python3", "tools/check_assurance.py"),
             ("python3", "tools/check_library_docs.py"),
+            # Negative controls for the publication gate `rc_package.py check` runs.
+            ("python3", "tools/test_public_docs.py"),
             ("cargo", "+1.97.1", "fmt", "--all", "--", "--check"),
             (
                 "cargo",
@@ -440,7 +495,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "verus-integration": AcceptanceScenario(
         "Check Verus evidence admission and shared runtime arithmetic boundaries",
-        (("python3", "tools/test_check_verus.py"),),
+        (("python3", "tools/test_check_verus.py"),
+         ("python3", "tools/test_verus_coverage.py")),
     ),
     "finite-execution-proof": AcceptanceScenario(
         "Preserve complete finite execution and reject missing proof contracts",
@@ -1012,6 +1068,7 @@ def main() -> int:
                 print(f"{scenario_id}\t{path}:{line}\t{title}")
             return 0
         run_command(("python3", "tools/test_atdd_registry.py"))
+        run_command(("python3", "tools/test_scaffold_versions.py"))
         run_command(("python3", "tools/check_authority_v2.py", "--check-sources"))
         run_command(("cargo", "+1.97.1", "test", "--locked", "--offline", "-p",
                      "zeno-fcis-synthesis", "--test", "v2_evaluator_identity"))

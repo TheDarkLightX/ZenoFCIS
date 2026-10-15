@@ -248,6 +248,10 @@ impl fmt::Display for Premise {
                 f,
                 "premise 3: input {position} of the decision programs has an empty domain"
             ),
+            Self::Equivalence(Unestablished::ProgramTooLarge { nodes, budget }) => write!(
+                f,
+                "premise 3: a decision program has {nodes} nodes, more than the comparison's full budget of {budget} Steps, so the comparison cannot run"
+            ),
             Self::Equivalence(Unestablished::CoverageMismatch { expected, visited }) => write!(
                 f,
                 "premise 3: the comparison of the decision programs visited {visited} tuples, not the {expected} of their domain"
@@ -417,6 +421,7 @@ pub(super) fn premises(
                         | Unestablished::OutputAbi
                         | Unestablished::EmptyInputDomain { .. }
                         | Unestablished::DomainTooLarge { .. }
+                        | Unestablished::ProgramTooLarge { .. }
                 ),
             ),
         },

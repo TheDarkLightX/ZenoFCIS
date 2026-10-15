@@ -1,8 +1,14 @@
 # Public release candidates
 
+The V2.3 candidate packages declare Rust workspace version `2.3.0-rc.1`.
+The 2.3.0 stable release line combines the V2.2 and V2.3 work; published
+artifacts must pass their release-source qualification. See
+[installation](INSTALLATION.md).
+
 Status: 10 October 2026. Both candidates below are public prereleases. Each
 advertises one host executable: the **Linux x86_64 GNU `zeno-fcis` CLI**, with
-offline Rustdoc. They do not complete the original stable V2.2/V2.3 scope.
+offline Rustdoc. Both Linux executables require glibc 2.39 or later. They do
+not complete the original stable V2.2/V2.3 scope.
 
 | Candidate | Release page | Source checkout revision | Binary build revision |
 |---|---|---|---|
@@ -12,9 +18,8 @@ offline Rustdoc. They do not complete the original stable V2.2/V2.3 scope.
 Runtime, proof, test, and dependency files are unchanged between each
 candidate's source checkout revision and its binary build revision.
 
-Use the source matching your installed binary. The development `main` workspace
-still declares Cargo version `1.1.0`; neither that version string nor a plain
-checkout of `main` identifies a candidate's exact source. The current V2 API
+Use the source matching your installed binary. A plain checkout of `main`
+does not identify a candidate's exact source; use the recorded source pin. The current V2 API
 requires pinned source/path dependencies, rather than the historical `1.1.0`
 package. Follow [installation](INSTALLATION.md) for commands and generated-app
 source binding. No candidate crates.io publication or macOS/Windows executable

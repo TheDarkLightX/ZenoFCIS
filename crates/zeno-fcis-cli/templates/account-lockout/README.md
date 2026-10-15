@@ -205,11 +205,17 @@ declared ranges, but rests on the solver's unchecked `unsat`.
 
 ## How ZenoFCIS built and checked this
 
-Every step below was run with `zeno-fcis` 1.1.0 built from this checkout
-with Rust 1.97.1, and the pinned solvers CVC5 1.3.3 and Z3 4.16.0. Lean
-4.30.0 is pinned in the same tools manifest, but there is no Lean export for
-inductive claims, so it was not run. Commands run from this application's
-directory.
+The current command observations below were recorded on 2026-10-12 in a
+fresh CLI-generated application bound to the matching source checkout,
+using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1.
+The common pinned-tool admission below was run once with the identical
+local tools manifest used by all three examples. These are local command
+observations, not release-binary qualification. Earlier native authoring
+counterexamples and explanations below retain their historical scope.
+The current application uses library-owned Authority with `src/v2_contract.rs`;
+these authoring and synthesis records do not qualify the whole runtime.
+Application commands run from this application's directory; tool admission
+is shared.
 
 1. `zeno-fcis check project.zeno --require-substantive
    --require-resolved-paths` checked the project: 4 laws and 1 claim, every
@@ -220,12 +226,25 @@ directory.
    checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=0dd2278f6e14d63604e8de1951743928d79ccabe0e35be8cd3ca1abc5a22965e
    ```
 
-2. `cargo +1.97.1 build` ran `build.rs`, which lowered the schema from the
+   The current run also printed what each counted obligation asks for,
+   after the summary. These observed lines describe evidence this authoring
+   check does not establish; they are not errors:
+
+   ```text
+   unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
+     complete-footprint: component 400 needs evidence that it reads and writes only what its footprint declares
+     sequential-parity: the merge needs evidence that the merged components decide as they would one after another
+   ```
+
+2. `cargo +1.97.1 build --locked --offline` ran `build.rs`, which lowered the schema from the
    declared ranges and the text bound, and generated the typed bindings in
    `OUT_DIR`. Nothing in `src/` restates what generation provides.
 
 3. `zeno-fcis purity src/program.rs src/laws.rs` reported
-   `purity: clean (0 errors, 0 warnings) in 2 files`.
+   `purity: clean (0 errors, 0 warnings) in 2 files`. These two files now
+   contain notices retiring the original native implementation; this
+   two-file observation does not establish purity of the whole checked V2
+   runtime.
 
 4. Proofs. The solvers are not part of the default gate. They need a tools
    manifest naming the installed binaries by path, version, and SHA-256; the
@@ -253,7 +272,7 @@ directory.
    (exit 2)
    ```
 
-   Z3 also answered `unsat`. RC3 has no Z3 proof checker, so the run is
+   Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
    recorded as blocked evidence, with exit code 2. There is no Lean export
    for inductive claims, so `--backend lean` selects nothing.
 
@@ -268,7 +287,7 @@ directory.
    (exit 2)
    ```
 
-   As a control, the same command on a copy whose three integer types
+   In the historical 1.1.0 run, the same control command on a copy whose three integer types
    declare no range printed, for CVC5:
 
    ```text
@@ -288,6 +307,11 @@ directory.
 5. `zeno-fcis graph project.zeno --format mermaid` prints one node,
    `c400[account]`: the project has a single component, so no diagram is
    included here.
+
+Historical native application explanation. The original `tests/claims.rs`
+and full native conformance regressions referenced below are retained in the
+nonpublished reference suite. The fresh generated-app commands above do not
+record a run of that suite.
 
 What the claim says, and what it does not. Claim 600 says: take any account
 within the declared ranges that satisfies law 500's invariant, any command
@@ -313,7 +337,7 @@ It does not say:
   committed account leaves them is the schema's doing, which the authority
   checks at admission, at genesis, and on every transition.
 
-Policy identity. Declaring the ranges and the claim changed the canonical
+Historical policy identity. Declaring the ranges and the claim changed the canonical
 bytes of `project.zeno`, so `check` printed a new semantic program hash: the
 previous version of this template printed
 `dc9109009626bd19beace495618ceadad10aeb2c5c5de5ecbf609dd01f629ff8`, and the

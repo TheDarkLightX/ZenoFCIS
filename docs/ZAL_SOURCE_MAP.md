@@ -1,12 +1,14 @@
 # ZAL prototype source map
 
-Inspection revision: `3245e62dc0b9fed5e87f4e55e9465fb44a03381c`,
-`agent/v21-factory-20261004`, 2026-10-06. This is a development branch,
-not a released V2.1 API. Remote `main` was
-`b3b6bbf03315e89288b8d3ab119242152887e513`. V2 PR 119's
-`8eda3096cab51ea69601a6e6c5c34ee60e86e840` is an ancestor of this revision.
-Factory PR 120 remains open. The prototype is a separate branch and does not
-change a running application, release, database or publication route.
+This map records the ZenoFCIS source as the ZAL prototype inspected it on
+2026-10-06, during V2.1 development and before the V2 release candidates.
+File and line references point to that inspection revision and may have
+moved since. The prototype is separate from the library and does not change
+a running application, release, database or publication route.
+
+The paths below are those of the inspection revision. Of the files named
+there, `contract/rules.rs`, `contract/model.rs` and `contract/expr.rs` are in
+`crates/zeno-fcis-contract/src/internals/` in this release.
 
 ## Implemented surfaces
 
@@ -15,7 +17,7 @@ change a running application, release, database or publication route.
 | Original declarations | `crates/zeno-fcis-spec/src/{lexer,parser,ast,elaborate,logic}.rs` | `.zeno` already describes types, reasons, channels, scoped laws and claims. It is not an unrestricted programming language. |
 | Factory inputs | `crates/zeno-fcis-cli/src/contract.rs:68`, `contract/rules.rs:19` | `project.zeno`, `v2/policy.json`, optional schema origin, and retained adoption artifacts form a contract. Rules use schema `zeno-fcis/template-declarative-policy/2`; unknown and duplicate keys are refused. |
 | Contract generation | `crates/zeno-fcis-cli/src/contract.rs:255`, `contract_files.rs:188` | Pure generation consumes supplied contents, checks catalog binding, emits schema, Rust declarations and library-encoded policy. The file shell writes them. Generation does not certify human intent. |
-| Factory finite profile | `crates/zeno-fcis-cli/src/contract/model.rs:22`, `contract/expr.rs` | At most 32 inputs, 16 outputs and 256 eager scalar nodes. Boolean and checked i64 computations are supported. Context facts are explicit inputs. Eager overflow/refusal is observable. |
+| Factory finite profile | Historical `contract/model.rs:22`, `contract/expr.rs`; [current model source](../crates/zeno-fcis-contract/src/internals/model.rs) | At most 32 inputs, 16 outputs and 256 eager scalar nodes. Boolean and checked i64 computations are supported. Context facts are explicit inputs. Eager overflow/refusal is observable. |
 | Meaning review | `crates/zeno-fcis-cli/src/review_command.rs:58`, `contract/review.rs`, `contract/review/packet.rs:43` | Decision tables, example disagreements, mutations and replayable distinguishing inputs. Reports distinguish full-domain and boundary-set searches and have `authority: none`. Findings and law refusals affect the command result. |
 | Export and scaffolding | `crates/zeno-fcis-cli/src/contract_files.rs:227`, `:317` | `new --contract --source` builds a generated application around the existing route; `contract export-program` emits the current canonical decision graph. |
 | Executable scalar program | `crates/zeno-fcis-synthesis/src/finite/ir.rs:54`, `:110` | Owned admitted DAG; `execute_v2` uses the actual metered evaluator. A surface renderer cannot substitute its own evaluator for factory evidence. |
@@ -25,7 +27,7 @@ change a running application, release, database or publication route.
 | Normal public API | `crates/zeno-fcis/src/program.rs:36` | Reexports the existing `bind_catalog`, `bind_program`, `ProgramDefinition`, `Invocation`, `Program`, and `Publication` family. Declarations and `policy_bytes` remain untrusted proposals. |
 | Authority | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs:79`, `:186`, `:222` | Exact catalog binding, original-envelope evaluation, required laws/genesis, and private publication custody. No application callback supplies the decision. |
 | Publication | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication.rs:49` | Private non-Clone capability carrying the actual committing evaluation, original poststate and ordered deliveries. Reports or serialized subjects cannot construct it. |
-| Persistence and upgrade | `crates/zeno-fcis-shell-sqlite/src/v2.rs:452`, `v2/upgrade.rs:93`, `:364` | Mandatory capability-based SQLite route, exact identity/replay, and same-schema upgrade premises. Data migration and changed-business-rule evolution are future features. |
+| Persistence and upgrade | `crates/zeno-fcis-shell-sqlite/src/v2.rs:452`, `v2/upgrade.rs:93`, `:364` | Mandatory capability-based SQLite route, exact identity/replay, and same-schema upgrade premises. Data migration and changed-business-rule evolution were added later as `contract evolve` (see [rule changes](CLI_REFERENCE.md#rule-changes-for-live-stores) and [data migrations](CLI_REFERENCE.md#data-migrations-and-renames)). |
 | Existing agent bridge | `integrations/mcp/zeno_fcis_synthesis.py`, `zeno_fcis_transform.py` | Fixed authoring/check/synthesis/loop commands with no publication claim. Existing MCP registration is optional; the ZAL MVP need not modify accounts or MCP configuration. |
 
 `docs/CONTRACT_RULES.md` describes ordered cases: the first matching case wins
@@ -35,21 +37,14 @@ that choice in its versioned profile. It must not silently inherit precedence.
 `crates/zeno-fcis-cli/contract-app/tests/decisions.rs` tests each independent
 decision example against the real Authority, genesis and a persistent journey.
 
-## V2.2 is a plan, not an installed API
+## Later releases
 
-`docs/V2_1_V2_2_PLAN.md` is the 2026-10-05 plan of record and supersedes
-`V2_1_FACTORY_PLAN.md`. F1-F7 implementations are present in the inspected
-tree (F7 commit `1c60424`), while exact-head review, CI and release status remain
-separate. G1-G14 describe future V2.2 capabilities. In particular:
-
-- G7, examples-first authoring and owner labels, directly motivates behavioral dialogue.
-- G8, structural change classification and plain-language diff, motivates revision views.
-- G3 owns wider and compound values and is the only planned core-changing feature.
-- G10/G11 own stronger checker work accounting and a verified checker core.
-- G14 covers behavior-changing evolution, symbolic checks and operational app tools.
-
-No separate V2.2 branch or production entry point was identified in the remote
-branch inventory. Planning prose is not evidence that these features execute.
+This inspection predates the public V2.2 and V2.3 release candidates. They add,
+among other things, examples-first contract drafting (`contract draft`),
+change classification (`contract diff`), store evolution (`contract evolve`),
+a delivery relay and a catalogue of finite core components. See the
+[changelog](../CHANGELOG.md) and the [candidate record](RELEASE_CANDIDATES.md);
+this map does not re-inspect them.
 
 ## Additive prototype implemented for review
 
@@ -161,7 +156,7 @@ revision/checker-bound declaration export and exact regeneration check. Terminal
 review now supports explicit acceptance of a displayed initial model. It does
 not add an acceptance tool or change the Rust core. Earlier cloud/harness evidence
 above remains historical; current native configuration and live model results
-must be reported separately. This track leaves the fixed 2.2 journey unchanged.
+must be reported separately.
 
 ## Definition of done for the prototype
 
@@ -170,6 +165,6 @@ revision-bound dialogue are present for review. Completion still requires
 exact-source validation of terminal/MCP behavior and optional UI, actual factory
 qualification, independent review, and inspection of the required repository
 checks. Keep fixture transport, installed protocol, live model and stock-harness
-evidence separate. Recheck the factory branch head before the authorized stacked
-draft PR. No merge, release, deployment, persistent account/configuration change
-or live application adoption is part of this prototype.
+evidence separate. No merge, release, deployment, persistent
+account/configuration change or live application adoption is part of this
+prototype.

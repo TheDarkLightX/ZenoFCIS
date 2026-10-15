@@ -1,11 +1,8 @@
-# ZAL: a behavior dialogue layer for a future ZenoFCIS 2.3/2.4
+# ZAL: a behavior dialogue layer for ZenoFCIS (research prototype)
 
 Status: design proposal and additive research prototype, 2026-10-06.
-Executable profile: `zal/finite-fsm/1`. Repository baseline:
-`3245e62dc0b9fed5e87f4e55e9465fb44a03381c` on
-`agent/v21-factory-20261004`. This is an unreleased development branch.
+Executable profile: `zal/finite-fsm/1`.
 The actual source and capability map is [ZAL_SOURCE_MAP.md](../ZAL_SOURCE_MAP.md).
-V2.2 G1–G14 remain planned at this inspected revision.
 
 ## Purpose and research basis
 
@@ -354,9 +351,9 @@ eager evaluation, traps and inactive-expression behavior before any lowering.
 This specification covers the Boolean control-FSM profile; it does not qualify
 a wider checked-integer application language.
 
-A future 2.3 gate should qualify profiles and lowering on actual source, add
+A later release gate should qualify profiles and lowering on actual source, add
 revision-bound evidence replay and test human comprehension against canonical
-paraphrases/witnesses. A future 2.4 gate may add solver-assisted synthesis or
+paraphrases/witnesses. A further gate may add solver-assisted synthesis or
 proof backends only behind explicit scopes, budgets, counterexample replay,
 independent checks and human agreement. No convergence, optimality, intent
 certification, unbounded liveness or neurosymbolic synthesis guarantee is made

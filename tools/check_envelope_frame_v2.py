@@ -47,7 +47,7 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("tools/check_finite_execution.py"), Path("Cargo.toml"),
            Path("rust-toolchain.toml"), Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
-           Path("docs/V2_ENVELOPE_ADMISSION_STAGE.md"))
+           Path("README.md"))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
@@ -98,6 +98,38 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
     mutations["add_uncontracted_function"] = (SUBJECT,
         source + "\npub fn uncontracted_frame_length(length: usize) -> usize { length }\n", "coverage")
     return mutations
+
+
+def classify_mutation(proc, report, name, path, changed, specimen, pin, profile,
+                      *, expected, vir=None):
+    """Require complete pinned evidence and only intended semantic diagnostics."""
+    if type(proc.returncode) is not int or proc.returncode not in (0, 1) or verifier.NON_SEMANTIC.search(proc.stderr):
+        return False, None, None
+    if expected == "proof":
+        if path != SUBJECT:
+            return False, None, None
+        try:
+            region = verifier.function_lines(changed, "frame")
+        except ValueError:
+            return False, None, None
+        return verifier.semantic_refusal(proc, report, pin, SUBJECT, specimen,
+            region=region, target_functions=profile["target_functions"]), None, None
+    if expected == "proof_contract":
+        expected_diagnostics = CONTRACT_REJECTIONS.get(name)
+        if path != SUBJECT or expected_diagnostics is None:
+            return False, None, None
+        outcome = contract_rejected(proc.returncode, proc.stdout, proc.stderr, pin, expected_diagnostics)
+        killed = outcome["accepted"] and verifier.semantic_refusal(proc, report, pin,
+            Path(FRAMED), specimen, target_functions=profile["target_functions"])
+        return bool(killed), None, outcome
+    if (expected != "coverage" or proc.returncode != 0 or vir is None
+            or not verifier.proof_succeeded(report, pin) or verifier.ERROR_HEADER.search(proc.stderr)):
+        return False, None, None
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        return True, str(error), None
+    return False, None, None
 
 
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
@@ -152,33 +184,21 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(changed if unit == path else (ROOT / unit).read_text())
+                target.write_bytes(changed.encode("utf-8") if unit == path else (ROOT / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
             mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(specimen / HARNESS)]
             mutant = verifier.run(mutant_command, ROOT, environment)
             (specimen / "verus.json").write_text(mutant.stdout)
             (specimen / "verus.stderr").write_text(mutant.stderr)
             try:
-                result = json.loads(mutant.stdout).get("verification-results", {})
+                mutant_report = json.loads(mutant.stdout)
             except ValueError:
-                result = {}
-            refusal = None
-            outcome = None
-            if expected == "proof":
-                killed = (mutant.returncode != 0 and result.get("errors", 0) > 0
-                          and result.get("encountered-vir-error") is False)
-            elif expected == "proof_contract":
-                outcome = contract_rejected(mutant.returncode, mutant.stdout, mutant.stderr,
-                                            pin, CONTRACT_REJECTIONS[name])
-                killed = outcome["accepted"]
-            else:
-                if mutant.returncode == 0:
-                    try:
-                        require_coverage((specimen / "logs/crate.vir").read_text(), profile)
-                    except ValueError as error:
-                        refusal = str(error)
-                killed = (mutant.returncode == 0 and result.get("success") is True
-                          and result.get("errors") == 0 and refusal is not None)
+                mutant_report = {}
+            result = mutant_report.get("verification-results", {})
+            vir = ((specimen / "logs/crate.vir").read_text()
+                   if expected == "coverage" and mutant.returncode == 0 else None)
+            killed, refusal, outcome = classify_mutation(mutant, mutant_report, name, path,
+                changed, specimen, pin, profile, expected=expected, vir=vir)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
                               "changed_source": str(path), "original_sha256": before[str(path)],
                               "changed_sha256": verifier.digest(specimen / path), "command": mutant_command,

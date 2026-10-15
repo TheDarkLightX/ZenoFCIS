@@ -25,6 +25,15 @@ Feature: Check a candidate program before the factory may use it
     And the first differing tuple is reported as a counterexample and no receipt is written
     And a binding Step limit, a domain above the cap or a changed ABI never yields an equivalence
 
+  @atdd-parallel-transform-parity
+  Scenario: Check large domains in parallel with the serial checker's exact verdicts
+    Given every seeded benchmark pair and the withdrawal-queue programs
+    When the transform checker runs serially and with 1, 2 and 4 offline workers
+    Then every mode gives the same exit status, report and receipt bytes
+    And the least-ordinal counterexample is the one the serial checker reports
+    And a binding tuple cap or an expired deadline is inconclusive and writes no receipt
+    And measured speed-up is recorded as a local measurement, not a guarantee
+
   @atdd-checked-optimizer
   Scenario: Propose smaller programs and accept only checked ones
     Given a canonical finite program and a strategy from the closed phase set
@@ -94,6 +103,9 @@ Feature: Check a candidate program before the factory may use it
     And a later rename of the flag is admitted at any state, after which all three segments replay
     And a migration that breaks a delivery, one that changes a decision, one whose genesis does not map, one that maps a state the old laws allow to one a new state law forbids, a shortcut that disagrees with the composed route of consecutive migrations, a domain above the cap of 2^20 tuples and a layout change without a migration are each refused with nothing written
     And a forged migrated state, and a lineage that declares another migration, a rename or an adoption for the step, refuse the store
+    And the shipped order-fulfillment contract consumes its status into paid and progress fields through closed expressions, while payment requests map Capture and Void to a Boolean without losing any payload value
+    And a committed payment decline, a second checkout and a capture leave mapped payment and unchanged shipping deliveries pending; after read-only audit and upgrade both keep their original bytes and IDs, dispatch and delivery commit under the new version, and old and new segments replay
+    And checkout followed by an upgrade and cancellation keeps an old Capture and a new-format Void pending together; an unused urgent field drops from a live priority store with history and payment intact, while harmful drops, non-closed or non-total splits and disagreeing split/drop shortcuts refuse with no writes
 
   @atdd-contract-diff
   Scenario: Classify a contract change and name every changed item

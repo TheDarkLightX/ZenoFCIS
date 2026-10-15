@@ -17,6 +17,11 @@ Two commands ask the pinned CVC5 and Z3 instead, one SMT query per rule case:
 Their results keep the formal-tools evidence classes
 ([ADR 0003](adr/0003-epistemic-status.md), [formal tools](FORMAL_TOOLS_RC3.md)):
 
+For independently checked **scalar program equivalence**, use the separate
+`transform check-certificates` and `transform replay-certificates` commands
+below. Their `CarcaraChecked` receipts do not change the evidence class of
+either solver-only command or of `contract check-symbolic`.
+
 | Result | Evidence | Exit | What it rests on |
 | --- | --- | ---: | --- |
 | A counterexample | Checked | 1 | A solver's model, replayed through the library: the decision program evaluator, the law evaluator and the bound Authority. The replay alone decides; the solver's word does not. |
@@ -44,7 +49,9 @@ After `sat` the solver is asked again for its model, after CVC5's `unsat` for
 its proof; two runs of one query that disagree give no answer.
 
 The pinned binaries are the ones inside the archives that
-`release/formal-tools-linux-x86_64.sha256` lists:
+`release/formal-tools-linux-x86_64.sha256` lists. They are Linux x86-64
+binaries; on macOS, solver-backed commands run only binaries that an
+exact-hash tools manifest names, and that route is not qualified:
 
 ```text
 cvc5 1.3.3   e8d7870d57ab55e81619d2373b043da05ea1d37ca393931bdb5d8b9788cd64c4
@@ -228,6 +235,145 @@ evaluator digest). It states `"evidence": "attested"`.
 only `zeno-fcis/transform-receipt/1` and refuse it as unreadable, so a
 candidate checked only symbolically cannot be adopted.
 
+## Independently checked scalar certificates
+
+```text
+zeno-fcis transform check-certificates --original FILE --candidate FILE
+    --tools FILE --checker FILE --certificates DIR
+    [--step-limit N] [--max-input-tuples N] [--out RECEIPT] [--queries DIR]
+zeno-fcis transform replay-certificates --receipt FILE --original FILE --candidate FILE
+    --tools FILE --checker FILE --certificates DIR [--max-input-tuples N]
+```
+
+The commands compare admitted scalar programs on a domain larger than the
+enumeration cap. They regenerate the existing difference queries, require
+CVC5 to decide every piece, and replay the planted different-output control
+through the actual evaluator. They then independently check a complete Alethe
+certificate for **every** difference query. A missing, corrupt, unsupported or
+incomplete proof prevents a receipt. Undecided pieces, failed processes and
+unresolved disagreements prevent a passing receipt. A concrete counterexample
+still counts only after the actual evaluator confirms the difference.
+
+The supported certificate fragment is quantifier-free Boolean and linear
+integer reasoning over eager checked-i64 programs. Every unused node and
+unselected arm is still evaluated. Ordered outputs, inclusive domain bounds,
+`Arithmetic` and `OutputDomain` failures are part of equivalence. The Step
+limit must never bind. Equal resource usage is a separate obligation and is
+not established here.
+
+`DIR` must contain exactly `0.alethe`, `1.alethe`, and so on, in the order
+of the regenerated comparison pieces. It must contain no control proof,
+extra files or missing pieces. Each certificate may be at most 32 MiB.
+The independently checked receipt may be at most 1 MiB; the legacy exhaustive
+receipt retains its separate 64 KiB limit.
+
+The complete-root wrapper calls the pinned Carcara checker and requires a
+top-level empty conclusion. It refuses holes, nested subproofs, non-Boolean
+assertions and stateful or multiple-query SMT scripts. A solver's exit code,
+an empty clause in a local proof, or a proof-shaped string is insufficient.
+
+### Build and identify the checker
+
+The checker is built separately from the application runtime. Use a new disk
+directory; the builder refuses an existing directory:
+
+```sh
+python3 tools/symbolic_certificate_checker/build.py --build-dir /absolute/path/to/checker-build
+```
+
+The builder verifies the source archive against `PIN.json`, uses the pinned
+Rust toolchain and dependency lock, checks source stability around compilation,
+and writes `BUILD.json`. `--archive FILE --offline` uses the same pinned
+archive and already cached dependencies. An unchanged qualified checker build
+can be reused; fresh queries and proofs must still be checked.
+
+Create a checker manifest using `executable` and `sha256` from that build:
+
+```json
+{
+  "schema": "zeno-fcis/certificate-checker/1",
+  "path": "/absolute/path/to/zfcis-carcara-root-check",
+  "sha256": "64-lowercase-hex-characters-from-BUILD.json",
+  "timeout_ms": 10000,
+  "max_output_bytes": 1048576
+}
+```
+
+The command admits the exact binary hash and wrapper version, then executes a
+private copy with fixed arguments, a cleared environment and bounded execution.
+The query and certificate are supplied as privately owned files. Build identity
+is a trusted input, not a proof that the compiler produced the intended binary.
+The receipt labels its source revision, archive, wrapper and dependency-lock
+hashes as `build_inputs_status: "claimed-build-inputs"` and records
+`build_provenance_verified: false`. Hash and version admission do not establish
+that those inputs produced the admitted executable; retain the separate build
+record when assessing that trusted assumption.
+
+### Receipt and replay
+
+Success exits 0 with `certificate-checked-equivalent` and evidence
+`CarcaraChecked`. The new receipt schema is
+`zeno-fcis/transform-certificate-receipt/1`. It binds the canonical programs,
+input and output domains, ordered pieces and exact query/certificate hashes,
+nonbinding Step limit, evaluator identity, refinement-source hashes, admitted
+checker binary identity and claimed build inputs, and the actual checker-command executable.
+Replay regenerates and checks those bindings before requiring byte-identical
+receipt contents. Changed bounds invalidate old receipts even when both
+programs are changed together. Supplied certificates are checked against the
+regenerated queries.
+
+`cli_refinement_sources.harness_include_closure` lists every source in the
+scalar refinement harness's non-test module graph, including the native owned
+program getters and `symbolic/unsupported.rs`. `runtime_sources` additionally
+binds the registered evaluator source list and native adapters. Both source
+maps are packaged with the CLI and checked against the current files. The
+registered evaluator list includes `finite/ir/program.rs` and is checked
+against the owned program's actual module graph. After
+source edits, formatting or evaluator regeneration, refresh their manifest
+before rebuilding the CLI:
+
+```sh
+cargo +1.97.1 test --locked --offline -p zeno-fcis-cli --bin zeno-fcis \
+  regenerate_scalar_refinement_source_manifest -- --ignored
+cargo +1.97.1 test --locked --offline -p zeno-fcis-cli --bin zeno-fcis \
+  receipt_source_list_equals_harness_closure_and_runtime_sources
+```
+
+These hashes identify the proof and runtime sources; trusted compilation still
+connects those sources to the bound checker-command executable.
+
+Under the scalar runtime/query refinement and the named trusted base, a complete
+check establishes the specified program equivalence over the declared domain.
+The trusted base includes Carcara and its parser/fragment guard, SMT-LIB meaning,
+the compiler, loader and operating system. This is independent certificate
+checking, not Lean kernel checking or a verified compilation result.
+
+The receipt proves neither source-rule interpretation nor whole-application
+behavior. It grants no publication or adoption authority. `transform replay`,
+`contract adopt`, contract generation and `contract refresh-receipts` continue
+to require the exhaustive receipt format and refuse this separate schema.
+
+### Run the mandatory qualification
+
+```sh
+ZENO_FCIS_CVC5=/absolute/path/to/pinned/cvc5 \
+ZENO_FCIS_CERTIFICATE_CHECKER=/absolute/path/to/checker.json \
+  python3 tools/check_symbolic_certificates.py
+```
+
+This checks a program-equivalence claim covering all 2^64 possible i64 inputs
+using three complete proof pieces, checks and replays non-identical programs
+that differ by an unused constant node, and exercises changed outputs, bounds, eager
+unused overflow, corrupt/missing proofs, receipt tampering and refusal by the
+legacy replay command. Missing tool configuration fails; it is not a passing
+skip. The formal-tools and full adopter-acceptance workflows build the pinned
+checker and run this real-tool qualification.
+
+The fixture certificates are untrusted inputs. `PROVENANCE.json` records their
+producer and proposal transform. The optional `elaborate.py` proposes replacements
+for a limited set of unsupported proof steps; every proposed step still needs
+the independent check. It is not a general proof generator.
+
 ## Encoding
 
 Both commands translate exactly what the library runs, never rule text: the
@@ -257,9 +403,11 @@ divisors, `i128` overflow, `choose`, negation) with the law evaluator.
 
 ## Limits and trusted base
 
-- An `unsat` rests on CVC5 and on this encoding. CVC5's proof is not
-  checked, and no Lean certificate is produced. The sampled tests check the
-  encoding at points, not everywhere.
+- The solver-only commands' `unsat` results rest on CVC5 and their encoding;
+  they do not independently check its proof. The separate scalar certificate
+  route above has its own refinement and complete-checker requirements.
+  Contract encoding samples are evidence at those points, not a general proof
+  of source-rule meaning. No route described here produces a Lean certificate.
 - A refutation rests on the library evaluators only.
 - The check covers the declared state laws and clauses on committing cases.
   It says nothing about laws over the command, context or decision, which
@@ -302,4 +450,7 @@ pinned tests when both variables are set; otherwise it prints
 atdd: SKIP pinned symbolic solver tests: ZENO_FCIS_CVC5 and ZENO_FCIS_Z3 are not both set (docs/SYMBOLIC_CHECKS.md)
 ```
 
-and passes. The `formal-tools` workflow sets both variables and runs them.
+That message skips only the optional legacy solver tests. The overall ATDD
+scenario also runs the mandatory certificate journey and fails unless
+`ZENO_FCIS_CVC5` and `ZENO_FCIS_CERTIFICATE_CHECKER` are supplied. The
+`formal-tools` workflow supplies the pinned tools and runs both paths.

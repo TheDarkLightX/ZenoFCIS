@@ -99,6 +99,7 @@ fn ascii(bytes: &[u8]) -> bool {
 ))]
 fn atom_size(value: Atom<'_>) -> Result<usize, Failure> {
     match value {
+        Atom::Canonical(v) => Ok(v.wire().len()),
         Atom::Bool(_) => Ok(1),
         Atom::I128(_) | Atom::U128(_) => Ok(17),
         Atom::Enum { .. } => Ok(7),
@@ -161,6 +162,7 @@ pub fn encode_atom(value: Atom<'_>, max_bytes: usize) -> Result<Vec<u8>, Failure
     }
     let mut out = Vec::new();
     match value {
+        Atom::Canonical(v) => append(&mut out, v.wire())?,
         Atom::Bool(v) => out.push(if v { 0x02 } else { 0x01 }),
         Atom::I128(v) => {
             out.push(0x04);

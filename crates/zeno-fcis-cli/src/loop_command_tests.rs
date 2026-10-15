@@ -1,27 +1,41 @@
 //! Shell tests: the supervisor, the session store, the driver with each
 //! proposer, crash recovery and the hosted adapter's silence.
 
-use super::{OptimizeEngine, Store, drive, strategy_engine, supervise};
+#[cfg(target_os = "linux")]
+use super::drive;
+use super::{OptimizeEngine, Store, strategy_engine, supervise};
+#[cfg(target_os = "linux")]
 use crate::loop_proposers::{Fake, Hosted, HostedConfig, Local, Proposer, SCRIPT_SCHEMA};
+use crate::neural_loop::acquisition::{Acquisition, Mode as AcquisitionMode};
+#[cfg(target_os = "linux")]
 use crate::neural_loop::incumbent::Incumbent;
 use crate::neural_loop::limits::Limits;
 use crate::neural_loop::profiles::Profile;
 use crate::neural_loop::request::{Policy, Request};
-use crate::neural_loop::session::{
-    ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, WorkerFailure,
-};
-use crate::neural_loop::strategy::{NoEngine, SearchReport, Strategy, StrategyEngine};
+#[cfg(target_os = "linux")]
+use crate::neural_loop::session::{ResumePlan, ResumeRefusal, Resumed, Status, StopReason};
+use crate::neural_loop::session::{Session, WorkerFailure};
+#[cfg(target_os = "linux")]
+use crate::neural_loop::strategy::NoEngine;
+use crate::neural_loop::strategy::{SearchReport, Strategy, StrategyEngine};
 use crate::optimize::strategy::{DEFAULT_STRATEGY_JSON, Phase};
 use serde_json::{Value, json};
+#[cfg(target_os = "linux")]
 use std::convert::Infallible;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+// Successful replay requires the Linux containment backend.
+#[cfg(target_os = "linux")]
 #[path = "loop_command_resume_tests.rs"]
 mod resume;
+
+#[path = "loop_command_intake_tests.rs"]
+mod intake;
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -57,6 +71,7 @@ const ORIGINAL: &[u8] = include_bytes!(
 const CANDIDATE: &[u8] = include_bytes!(
     "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve"
 );
+#[cfg(target_os = "linux")]
 const PADDED: &[u8] = include_bytes!(
     "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve"
 );
@@ -71,6 +86,7 @@ fn request() -> Request {
     .unwrap_or_else(|refusal| panic!("{refusal:?}"))
 }
 
+#[cfg(target_os = "linux")]
 fn engine() -> Arc<dyn StrategyEngine + Send + Sync> {
     Arc::new(NoEngine)
 }
@@ -87,9 +103,12 @@ fn open_store(dir: &Path) -> (Store, Session) {
 /// Resumes a stored session in memory. The replay reservation goes to a
 /// write that keeps nothing, so the directory stays exactly as the test left
 /// it; `load_session` is the durable route, which `resume_tests` covers.
+#[cfg(target_os = "linux")]
 fn reopen(dir: &Path) -> Result<Session, ResumeRefusal> {
-    let (_, loaded) = Store::open(dir).unwrap_or_else(|error| panic!("{error}"));
-    match Session::prepare_resume(loaded.stored(), 0) {
+    let mut acquisition = Acquisition::reserve(AcquisitionMode::Resume);
+    let (_, loaded) =
+        Store::acquire(dir, &mut acquisition).unwrap_or_else(|error| panic!("{error}"));
+    match loaded.prepare(0) {
         ResumePlan::Replay(pending) => {
             let reserved = pending
                 .reserve(|_| Ok::<(), Infallible>(()))
@@ -103,10 +122,12 @@ fn reopen(dir: &Path) -> Result<Session, ResumeRefusal> {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn resumed(dir: &Path) -> Session {
     reopen(dir).unwrap_or_else(|reason| panic!("expected a session: {reason:?}"))
 }
 
+#[cfg(target_os = "linux")]
 fn script(dir: &Directory, steps: Value) -> Fake {
     let value = json!({"schema": SCRIPT_SCHEMA, "steps": steps});
     Fake::from_script(&value, &dir.0).unwrap_or_else(|error| panic!("{error:?}"))
@@ -129,9 +150,12 @@ fn the_supervisor_reports_panics_and_deadlines_without_propagating() {
         }),
         Err(WorkerFailure::Timeout)
     );
-    assert!(started.elapsed() < Duration::from_millis(350));
+    // Cooperative checking retains the worker until it finishes; actual return-time
+    // enforcement is tested through the contained production process.
+    assert!(started.elapsed() >= Duration::from_millis(400));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_panicking_or_slow_check_worker_leaves_the_incumbent_unchanged() {
     let directory = Directory::new();
@@ -197,6 +221,7 @@ fn a_panicking_or_slow_check_worker_leaves_the_incumbent_unchanged() {
     assert_eq!(resumed.ledger().accounting().attempts, 2);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_store_round_trips_a_session_and_keeps_crash_pending_charges() {
     let directory = Directory::new();
@@ -291,6 +316,7 @@ fn the_store_round_trips_a_session_and_keeps_crash_pending_charges() {
     assert_eq!(recovered.report()["accounting"]["complete"], false);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     let directory = Directory::new();
@@ -334,6 +360,7 @@ fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     ));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_local_proposer_drives_to_exhaustion_and_the_hosted_adapter_stays_silent() {
     let directory = Directory::new();
@@ -422,6 +449,7 @@ fn the_local_proposer_drives_to_exhaustion_and_the_hosted_adapter_stays_silent()
     assert_eq!(enabled.unavailable_reason(), "hosted-provider-unapproved");
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_fake_provider_is_metered_as_a_model_and_its_claims_are_ignored() {
     let directory = Directory::new();
@@ -536,6 +564,7 @@ fn the_wired_engine_is_the_optimizer_and_admits_exactly_its_phases() {
     assert_eq!(phases.len(), 6);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn an_optimizer_strategy_improves_the_kernel_only_through_the_loops_own_check() {
     let document: Value = serde_json::from_str(DEFAULT_STRATEGY_JSON)
@@ -708,4 +737,344 @@ fn the_engine_fuses_the_loops_checked_candidates() {
     let program = zeno_fcis_synthesis::finite_runtime::import_program(&bytes)
         .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(program.nodes(), &[Op::Input(0)]);
+}
+
+#[test]
+fn malformed_bootstrap_retains_separate_acquisition_charge() {
+    let directory = Directory::new();
+    open_store(&directory.0);
+    fs::write(directory.0.join("request.json"), b"malformed request")
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    let (exit, report) = super::resume_command(&directory.0);
+    assert_eq!(exit, crate::BLOCKED, "{report}");
+    assert_eq!(report["status"], "resume-refused");
+    assert!(
+        report["acquisition"]["reserved_units"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("required test value"))
+            > 0
+    );
+    assert!(
+        report["acquisition"]["observed_intake"]["bytes"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("required test value"))
+            > 0
+    );
+    assert_eq!(
+        report["acquisition"]["separate_from_session_check_work"],
+        true
+    );
+    assert!(report["detail"].get("report").is_none());
+}
+
+#[test]
+fn bootstrap_directory_cap_refuses_before_unbounded_collection() {
+    let directory = Directory::new();
+    open_store(&directory.0);
+    for index in 0..=crate::neural_loop::acquisition::DIRECTORY_ENTRIES {
+        fs::write(
+            directory.0.join("witnesses").join(format!("extra-{index}")),
+            b"",
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    }
+    let ledger_before =
+        fs::read(directory.0.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error:?}"));
+    let (exit, report) = super::resume_command(&directory.0);
+    assert_eq!(exit, crate::BLOCKED, "{report}");
+    assert_eq!(report["status"], "inconclusive");
+    assert_eq!(
+        report["detail"]["reason"],
+        "invocation-acquisition-exhausted"
+    );
+    assert_eq!(report["acquisition"]["exhausted"], true);
+    assert_eq!(
+        report["acquisition"]["observed_intake"]["directory_entries"],
+        crate::neural_loop::acquisition::DIRECTORY_ENTRIES + 1
+    );
+    assert_eq!(
+        fs::read(directory.0.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error:?}")),
+        ledger_before
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn leftover_checker_staging_is_skipped_reported_and_bounded() {
+    let directory = Directory::new();
+    open_store(&directory.0);
+    // Interrupted contained runs can leave their private staging directories.
+    for index in 0..crate::neural_loop::acquisition::STAGING_LEFTOVERS + 2 {
+        fs::create_dir(directory.0.join("receipts").join(format!(
+            "{}1-{index}",
+            crate::checker_process::STAGING_PREFIX
+        )))
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    }
+    let (exit, report) = super::resume_command(&directory.0);
+    assert_eq!(exit, crate::OK, "{report}");
+    assert_eq!(report["status"], "resumed");
+    assert_eq!(
+        report["acquisition"]["leftover_checker_staging"],
+        crate::neural_loop::acquisition::STAGING_LEFTOVERS
+    );
+    // Beyond the fixed allowance they count as ordinary entries, so enough
+    // of them still meet the directory cap instead of an unbounded listing.
+    for index in 0..crate::neural_loop::acquisition::DIRECTORY_ENTRIES {
+        fs::create_dir(directory.0.join("receipts").join(format!(
+            "{}2-{index}",
+            crate::checker_process::STAGING_PREFIX
+        )))
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    }
+    let (exit, report) = super::resume_command(&directory.0);
+    assert_eq!(exit, crate::BLOCKED, "{report}");
+    assert_eq!(
+        report["detail"]["reason"],
+        "invocation-acquisition-exhausted"
+    );
+}
+
+#[test]
+fn acquisition_regular_file_eof_and_sentinel_preserve_input_and_accounting() {
+    let directory = Directory::new();
+    for (index, input) in [b"".as_slice(), b"abc", b"abcd", b"abcde"]
+        .into_iter()
+        .enumerate()
+    {
+        let path = directory.write(&format!("input-{index}"), input);
+        let mut acquisition = Acquisition::reserve(AcquisitionMode::Open);
+        let reserved = acquisition.json()["reserved_units"].clone();
+        let bytes = super::acquire_read(&mut acquisition, &path, 3)
+            .unwrap_or_else(|error| panic!("read test input: {error}"));
+        assert_eq!(bytes, input[..input.len().min(4)]);
+        assert_eq!(
+            fs::read(path).unwrap_or_else(|error| panic!("reread test input: {error}")),
+            input
+        );
+        let report = acquisition.json();
+        assert_eq!(report["reserved_units"], reserved);
+        assert_eq!(report["exhausted"], false);
+        assert_eq!(report["observed_intake"]["attempted_reads"], 1);
+        assert_eq!(report["observed_intake"]["bytes"], bytes.len());
+        let calls = report["observed_intake"]["read_calls"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("missing read-call count"));
+        assert!((1..=4).contains(&calls));
+    }
+}
+
+#[test]
+fn acquisition_exhaustion_precedes_file_open_and_failed_open_can_be_followed() {
+    let directory = Directory::new();
+    let missing = directory.0.join("missing");
+    let mut exhausted = Acquisition::reserve(AcquisitionMode::Resume);
+    exhausted.stop();
+    let before = exhausted.json();
+    let error = match super::acquire_read(&mut exhausted, &missing, 3) {
+        Err(error) => error,
+        Ok(_) => panic!("exhausted acquisition must refuse before open"),
+    };
+    assert_eq!(error.kind(), std::io::ErrorKind::Other);
+    assert_eq!(error.to_string(), "invocation-acquisition-exhausted");
+    assert_eq!(exhausted.json(), before);
+
+    let mut acquisition = Acquisition::reserve(AcquisitionMode::Resume);
+    let error = match super::acquire_read(&mut acquisition, &missing, 3) {
+        Err(error) => error,
+        Ok(_) => panic!("missing input must fail"),
+    };
+    assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    let path = directory.write("empty", b"");
+    assert!(
+        super::acquire_read(&mut acquisition, &path, 3)
+            .unwrap_or_else(|error| panic!("read after missing optional file: {error}"))
+            .is_empty()
+    );
+    let report = acquisition.json();
+    assert_eq!(report["exhausted"], false);
+    assert_eq!(report["observed_intake"]["attempted_reads"], 2);
+    assert_eq!(report["observed_intake"]["read_calls"], 1);
+    assert_eq!(report["observed_intake"]["bytes"], 0);
+}
+
+#[test]
+fn retained_file_comparison_stops_at_the_payload_and_one_sentinel() {
+    struct PrefixReader<'a> {
+        expected: &'a [u8],
+        position: usize,
+        calls: usize,
+        bytes: usize,
+    }
+    impl std::io::Read for PrefixReader<'_> {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            assert!(!output.is_empty());
+            output[0] = self.expected.get(self.position).copied().unwrap_or(0xff);
+            self.position += 1;
+            self.calls += 1;
+            self.bytes += 1;
+            Ok(1)
+        }
+    }
+    let expected = vec![0xa5; 8193];
+    let mut reader = PrefixReader {
+        expected: &expected,
+        position: 0,
+        calls: 0,
+        bytes: 0,
+    };
+    assert!(
+        !super::retained_contents_match(&mut reader, &expected)
+            .unwrap_or_else(|error| panic!("{error}"))
+    );
+    assert_eq!(reader.bytes, expected.len() + 1);
+    assert_eq!(reader.calls, expected.len() + 1);
+}
+
+#[test]
+fn retained_file_comparison_requires_exact_bytes_and_propagates_interrupts() {
+    for (input, expected, matches) in [
+        (b"".as_slice(), b"".as_slice(), true),
+        (b"abc".as_slice(), b"abc".as_slice(), true),
+        (b"ab".as_slice(), b"abc".as_slice(), false),
+        (b"abd".as_slice(), b"abc".as_slice(), false),
+        (b"abcd".as_slice(), b"abc".as_slice(), false),
+        (b"a".as_slice(), b"".as_slice(), false),
+    ] {
+        assert_eq!(
+            super::retained_contents_match(&mut std::io::Cursor::new(input), expected)
+                .unwrap_or_else(|error| panic!("{error}")),
+            matches,
+        );
+    }
+    struct Interrupted;
+    impl std::io::Read for Interrupted {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::Interrupted.into())
+        }
+    }
+    assert_eq!(
+        super::retained_contents_match(&mut Interrupted, b"abc")
+            .err()
+            .unwrap_or_else(|| panic!("expected interrupted read"))
+            .kind(),
+        std::io::ErrorKind::Interrupted,
+    );
+}
+
+#[test]
+fn retained_receipt_idempotency_and_oversized_collision_preserve_the_store() {
+    let directory = Directory::new();
+    let (mut store, _) = open_store(&directory.0);
+    store
+        .store_receipt(0, b"receipt")
+        .unwrap_or_else(|error| panic!("{error}"));
+    let stored_before = store.stored_bytes;
+    store
+        .store_receipt(0, b"receipt")
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(store.stored_bytes, stored_before);
+    let path = directory.0.join("receipts/0.json");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .open(&path)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let oversized = 16 * 1024 * 1024;
+    file.set_len(oversized)
+        .unwrap_or_else(|error| panic!("{error}"));
+    drop(file);
+    let error = store
+        .store_receipt(0, b"receipt")
+        .err()
+        .unwrap_or_else(|| panic!("expected collision"));
+    assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+    assert_eq!(
+        fs::metadata(path)
+            .unwrap_or_else(|error| panic!("{error}"))
+            .len(),
+        oversized
+    );
+    assert_eq!(store.stored_bytes, stored_before);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_check_finalized_after_its_deadline_cannot_update_the_incumbent() {
+    let directory = Directory::new();
+    let (mut store, mut session) = open_store(&directory.0.join("session"));
+    let ticket = session
+        .reserve_attempt(0)
+        .unwrap_or_else(|reason| panic!("{reason:?}"));
+    let super::Prepared::Check(job) = session.prepare(
+        ticket,
+        crate::neural_loop::session::Proposal::Candidate(CANDIDATE.to_vec()),
+    ) else {
+        panic!("expected check job");
+    };
+    super::CHECK_COMPLETION_DELAY.with(|delay| delay.set(Duration::from_millis(150)));
+    let report = super::run_check(&job, Duration::from_millis(100), &mut store);
+    let outcome = session.conclude(job, report);
+    assert_eq!(outcome.name(), "check-failed:timeout");
+    assert!(session.incumbent().replacement().is_none());
+}
+
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn contained_loop_entry_points_refuse_without_a_supported_backend() {
+    type Invocation = fn(&Path, &Path) -> (u8, Value);
+    let entry_points: [(&str, Invocation); 3] = [
+        ("resume", |session, _| super::resume_command(session)),
+        ("candidate", |session, candidate| {
+            super::candidate_command(session, Some(candidate), None, None)
+        }),
+        ("run", |session, _| {
+            super::run_command(session, super::ProposerArg::Local, None, None, &[])
+        }),
+    ];
+    for (name, command) in entry_points {
+        let directory = Directory::new();
+        let session = directory.0.join(name);
+        let original = directory.write("original.zcve", ORIGINAL);
+        let (exit, opened) = super::open(
+            &original,
+            &session,
+            Profile::FunctionalBoolV1,
+            Limits::CEILING,
+        );
+        assert_eq!(exit, crate::OK, "{opened}");
+        assert_eq!(opened["status"], "opened");
+        let original_ledger =
+            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
+        let candidate = directory.write("candidate.zcve", CANDIDATE);
+        let (exit, report) = command(&session, &candidate);
+        assert_eq!(exit, crate::BLOCKED, "{report}");
+        assert_eq!(report["status"], "resume-inconclusive");
+        assert_eq!(
+            report["detail"]["reason"],
+            "containment-unavailable:platform"
+        );
+        assert_eq!(report["authority"], "none");
+        assert!(report["detail"]["trusted_incumbent"].is_null());
+        let bytes =
+            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(
+            bytes, original_ledger,
+            "{name}: an empty session has nothing to replay"
+        );
+        let ledger = crate::neural_loop::ledger::Ledger::parse_lines(&bytes)
+            .and_then(crate::neural_loop::ledger::Ledger::from_entries)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let totals = ledger.accounting();
+        assert_eq!((totals.attempts, totals.checks, totals.replays), (0, 0, 0));
+        assert_eq!(totals.work_reserved, 0);
+        for subdirectory in ["receipts", "artifacts", "witnesses"] {
+            assert_eq!(
+                fs::read_dir(session.join(subdirectory))
+                    .unwrap_or_else(|error| panic!("{error}"))
+                    .count(),
+                0,
+                "{name}: no checked artifact after containment refusal"
+            );
+        }
+    }
 }

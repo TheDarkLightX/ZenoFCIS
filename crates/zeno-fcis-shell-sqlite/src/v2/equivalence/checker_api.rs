@@ -8,6 +8,9 @@
 extern crate alloc;
 use super::checker;
 use alloc::vec::Vec;
+pub use checker::ranges::{
+    RangeError, RangeReport, compare_two_ranges, finish_range, merge_adjacent, scan_range,
+};
 pub use checker::{FULL_BUDGET, Failure, Observation, Usage};
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;

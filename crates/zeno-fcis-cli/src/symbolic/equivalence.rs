@@ -30,18 +30,17 @@ use zeno_fcis_synthesis::finite::{
 };
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
-use super::program::{self, Encoded};
-use super::smt::{Script, Term};
+use super::program;
+
+mod queries;
 use super::verdict::{Answers, Judgment, Query, Solve, judge};
 use crate::transform::{self, Refusal, Side};
+use queries::{Prepared, Queries};
 
 /// Version of the receipt format.
 pub(crate) const RECEIPT_SCHEMA: &str = "zeno-fcis/transform-symbolic-receipt/1";
 /// The semantics of this check: its pieces, queries, control and replay.
 pub(crate) const CHECKER: &str = "zeno-fcis/transform-symbolic/1";
-/// The most values of the original's first output that get a piece each; a
-/// wider first output is checked as one piece.
-const MAX_CASE_PIECES: u128 = 256;
 /// The commands that never read a symbolic receipt.
 const NOT_ACCEPTED_BY: [&str; 4] = [
     "transform replay",
@@ -211,7 +210,10 @@ pub(crate) fn check(
             limits.steps
         ));
     }
-    let queries = match Queries::build(&original, &candidate) {
+    let queries = match Queries::build(
+        program::Program::of(&original),
+        program::Program::of(&candidate),
+    ) {
         Ok(queries) => queries,
         Err(unsupported) => return inconclusive(format!("unsupported: {}", unsupported.reason())),
     };
@@ -284,26 +286,7 @@ pub(crate) fn check(
     }
 }
 
-/// One query of a check, ready to run.
-struct Prepared {
-    label: String,
-    meaning: String,
-    #[cfg(test)]
-    script: Script,
-    source: String,
-}
-
 impl Prepared {
-    fn new(label: String, meaning: String, script: Script) -> Self {
-        Self {
-            label,
-            meaning,
-            source: script.source(),
-            #[cfg(test)]
-            script,
-        }
-    }
-
     fn query(&self) -> Query<'_> {
         Query {
             label: &self.label,
@@ -311,110 +294,6 @@ impl Prepared {
             script: &self.script,
             source: &self.source,
         }
-    }
-}
-
-/// The queries of one check.
-struct Queries {
-    /// One query per piece of the domain, in order.
-    pieces: Vec<Prepared>,
-    control: Prepared,
-}
-
-impl Queries {
-    fn build(original: &Program, candidate: &Program) -> Result<Self, super::Unsupported> {
-        let base = |purpose: &str| -> Result<(Script, Encoded, Encoded), super::Unsupported> {
-            let mut script = Script::default();
-            script.comment(&format!("zeno-fcis/transform-symbolic/1 {purpose}"));
-            for (index, domain) in original.inputs().iter().enumerate() {
-                script.constant(&format!("x{index}"), program::input_values(*domain)?);
-            }
-            let input = |index: usize| Term::name(&format!("x{index}"));
-            let left = program::encode(&mut script, "p", program::Program::of(original), &input)?;
-            let right = program::encode(&mut script, "q", program::Program::of(candidate), &input)?;
-            Ok((script, left, right))
-        };
-        let same = |left: &Encoded, right: &Encoded| {
-            Term::and(
-                std::iter::once(right.ok()).chain(
-                    left.outputs
-                        .iter()
-                        .zip(&right.outputs)
-                        .map(|(a, b)| Term::eq(a.clone(), b.clone())),
-                ),
-            )
-        };
-        let mut pieces = Vec::new();
-        let first = original
-            .outputs()
-            .first()
-            .map(|domain| domain.bounds())
-            .map(|(min, max)| (i128::from(min), i128::from(max)));
-        match first {
-            Some((min, max))
-                if u128::try_from(max - min).is_ok_and(|width| width < MAX_CASE_PIECES) =>
-            {
-                for value in min..=max {
-                    let (mut script, left, right) = base(&format!("case {value}"))?;
-                    script.assert(left.ok());
-                    script.assert(Term::eq(left.outputs[0].clone(), Term::Int(value)));
-                    script.assert(Term::not(same(&left, &right)));
-                    pieces.push(Prepared::new(
-                        format!("case-{value}"),
-                        format!(
-                            "inputs on which the original returns outputs with first output {value}"
-                        ),
-                        script,
-                    ));
-                }
-            }
-            _ => {
-                let (mut script, left, right) = base("defined outputs")?;
-                script.assert(left.ok());
-                script.assert(Term::not(same(&left, &right)));
-                pieces.push(Prepared::new(
-                    "outputs".to_owned(),
-                    "inputs on which the original returns outputs".to_owned(),
-                    script,
-                ));
-            }
-        }
-        let (mut script, left, right) = base("arithmetic failure")?;
-        script.assert(left.trap.clone());
-        script.assert(Term::not(right.trap.clone()));
-        pieces.push(Prepared::new(
-            "arithmetic-failure".to_owned(),
-            "inputs on which the original fails with Arithmetic".to_owned(),
-            script,
-        ));
-        let (mut script, left, right) = base("output domain failure")?;
-        script.assert(left.out_of_domain());
-        script.assert(Term::not(right.out_of_domain()));
-        pieces.push(Prepared::new(
-            "output-domain-failure".to_owned(),
-            "inputs on which the original fails with OutputDomain".to_owned(),
-            script,
-        ));
-        let (mut script, left, right) =
-            base("planted control: the candidate's first output plus one")?;
-        script.assert(left.ok());
-        script.assert(right.ok());
-        if let (Some(a), Some(b)) = (left.outputs.first(), right.outputs.first()) {
-            script.observe("original_first", a.clone());
-            script.observe("candidate_first", b.clone());
-            script.assert(Term::not(Term::eq(
-                Term::add(b.clone(), Term::Int(1)),
-                a.clone(),
-            )));
-        }
-        Ok(Self {
-            pieces,
-            control: Prepared::new(
-                "control-shifted-first-output".to_owned(),
-                "the candidate with its first output plus one".to_owned(),
-                script,
-            ),
-        })
     }
 }
 

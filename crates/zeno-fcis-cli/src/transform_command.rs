@@ -17,9 +17,52 @@ const RESULT_SCHEMA: &str = "zeno-fcis/transform-result/1";
 /// is refused here before it is hashed or decoded.
 const PROGRAM_LIMIT: u64 = 64 * 1024;
 const RECEIPT_LIMIT: u64 = 64 * 1024;
+mod certificates;
 
 #[derive(Subcommand)]
 pub(super) enum Command {
+    /// Independently check complete certificates for every regenerated symbolic piece.
+    CheckCertificates {
+        #[arg(long)]
+        original: PathBuf,
+        #[arg(long)]
+        candidate: PathBuf,
+        #[arg(long)]
+        tools: PathBuf,
+        /// Pinned complete-root checker manifest (zeno-fcis/certificate-checker/1).
+        #[arg(long)]
+        checker: PathBuf,
+        /// Certificate files 0.alethe, 1.alethe, ... in regenerated piece order.
+        #[arg(long)]
+        certificates: PathBuf,
+        #[arg(long, default_value_t = transform::DEFAULT_STEP_LIMIT)]
+        step_limit: u64,
+        #[arg(long, default_value_t = transform::DEFAULT_MAX_INPUT_TUPLES)]
+        max_input_tuples: u64,
+        /// Create a new distinct checked receipt after every check succeeds.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Retain regenerated queries and solver transcripts in a new directory.
+        #[arg(long)]
+        queries: Option<PathBuf>,
+    },
+    /// Regenerate all bindings and recheck every certificate before matching a receipt.
+    ReplayCertificates {
+        #[arg(long)]
+        receipt: PathBuf,
+        #[arg(long)]
+        original: PathBuf,
+        #[arg(long)]
+        candidate: PathBuf,
+        #[arg(long)]
+        tools: PathBuf,
+        #[arg(long)]
+        checker: PathBuf,
+        #[arg(long)]
+        certificates: PathBuf,
+        #[arg(long, default_value_t = transform::DEFAULT_MAX_INPUT_TUPLES)]
+        max_input_tuples: u64,
+    },
     /// Compare a candidate program with the original on every declared input tuple.
     Check {
         /// Canonical original program (program.zcve encoding).
@@ -50,6 +93,25 @@ pub(super) enum Command {
         /// Write every query's SMT-LIB text and each solver's output to this new directory; for --symbolic.
         #[arg(long, requires = "symbolic")]
         queries: Option<PathBuf>,
+        /// Use bounded parallel windows under the explicit offline profile.
+        /// This profile is separate from the loop's 2s/64MiB checker profile.
+        #[arg(long, conflicts_with = "symbolic")]
+        offline_parallel: bool,
+        /// Worker count (1..8) for --offline-parallel; default 4.
+        #[arg(long, requires = "offline_parallel")]
+        workers: Option<u64>,
+        /// Tuples per range (1..4096); default 4096.
+        #[arg(long, requires = "offline_parallel")]
+        chunk_tuples: Option<u64>,
+        /// Maximum number of ranges (1..65536); default 65536.
+        #[arg(long, requires = "offline_parallel")]
+        max_chunks: Option<u64>,
+        /// Complete logical work reservation ceiling, distinct from Steps.
+        #[arg(long, requires = "offline_parallel")]
+        work_units: Option<u64>,
+        /// Offline deadline in milliseconds (1..60000); default 60000.
+        #[arg(long, requires = "offline_parallel")]
+        deadline_ms: Option<u64>,
     },
     /// Recompute a receipt from both programs and compare it byte for byte.
     Replay {
@@ -71,6 +133,46 @@ pub(super) enum Command {
 
 pub(super) fn run(command: Command) -> u8 {
     let (exit, report) = match command {
+        Command::CheckCertificates {
+            original,
+            candidate,
+            tools,
+            checker,
+            certificates,
+            step_limit,
+            max_input_tuples,
+            out,
+            queries,
+        } => certificates::check(
+            &original,
+            &candidate,
+            Limits {
+                steps: step_limit,
+                input_tuples: max_input_tuples,
+            },
+            &tools,
+            &checker,
+            &certificates,
+            out.as_deref(),
+            queries.as_deref(),
+        ),
+        Command::ReplayCertificates {
+            receipt,
+            original,
+            candidate,
+            tools,
+            checker,
+            certificates,
+            max_input_tuples,
+        } => certificates::replay(
+            &receipt,
+            &original,
+            &candidate,
+            max_input_tuples,
+            &tools,
+            &checker,
+            &certificates,
+        ),
         Command::Check {
             original,
             candidate,
@@ -81,6 +183,12 @@ pub(super) fn run(command: Command) -> u8 {
             tools,
             symbolic_receipt,
             queries,
+            offline_parallel,
+            workers,
+            chunk_tuples,
+            max_chunks,
+            work_units,
+            deadline_ms,
         } => {
             let limits = Limits {
                 steps: step_limit,
@@ -95,7 +203,17 @@ pub(super) fn run(command: Command) -> u8 {
                     symbolic_receipt.as_deref(),
                     queries.as_deref(),
                 ),
-                None => check(&original, &candidate, limits, receipt.as_deref()),
+                None => {
+                    let defaults = crate::transform_plan::RunLimits::offline();
+                    let run = offline_parallel.then_some(crate::transform_plan::RunLimits {
+                        workers: workers.unwrap_or(defaults.workers),
+                        chunk_tuples: chunk_tuples.unwrap_or(defaults.chunk_tuples),
+                        max_chunks: max_chunks.unwrap_or(defaults.max_chunks),
+                        work_units: work_units.unwrap_or(defaults.work_units),
+                        deadline_ms: deadline_ms.unwrap_or(defaults.deadline_ms),
+                    });
+                    check(&original, &candidate, limits, receipt.as_deref(), run)
+                }
             }
         }
         Command::Replay {
@@ -109,28 +227,172 @@ pub(super) fn run(command: Command) -> u8 {
     exit
 }
 
-fn check(original: &Path, candidate: &Path, limits: Limits, receipt: Option<&Path>) -> (u8, Value) {
+fn without_receipt(value: (u8, Value)) -> (u8, Value, Option<Vec<u8>>) {
+    (value.0, value.1, None)
+}
+
+#[cfg(test)]
+thread_local! {
+    static CHECK_COMPLETION_DELAY: std::cell::Cell<std::time::Duration> = const { std::cell::Cell::new(std::time::Duration::ZERO) };
+}
+
+fn check(
+    original: &Path,
+    candidate: &Path,
+    limits: Limits,
+    receipt: Option<&Path>,
+    run: Option<crate::transform_plan::RunLimits>,
+) -> (u8, Value) {
+    // The run's own deadline starts before its stage is requested, so it
+    // passes before the supervisor's stage deadline and records progress.
+    let started = std::time::Instant::now();
+    if let Some(run) = run
+        && let Err(reason) = crate::checker_process::start(
+            std::time::Duration::from_millis(run.deadline_ms.clamp(1, 60_000)),
+            false,
+        )
+    {
+        return result(crate::BLOCKED, "inconclusive", json!({"reason":reason}));
+    }
+    let (mut exit, mut report, bytes) =
+        check_value(original, candidate, limits, receipt, run, started);
+    let staged = match (receipt, bytes) {
+        (Some(path), Some(bytes)) => match crate::checker_process::StagedReceipt::new(path, &bytes)
+        {
+            Ok(staged) => Some(staged),
+            Err(error) => {
+                (exit, report) = retain_check_diagnostics(io_failure(&error), &report);
+                None
+            }
+        },
+        _ => None,
+    };
+    #[cfg(test)]
+    CHECK_COMPLETION_DELAY.with(|slot| {
+        let delay = slot.replace(std::time::Duration::ZERO);
+        if !delay.is_zero() {
+            assert_eq!(report["status"], "equivalent");
+            assert!(staged.is_some());
+            std::thread::sleep(delay);
+        }
+    });
+    if run.is_some()
+        && let Err(reason) = crate::checker_process::finish()
+    {
+        return retain_check_diagnostics(
+            result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({"reason":reason,"accounting_complete":false}),
+            ),
+            &report,
+        );
+    }
+    // Staging and the finish acknowledgement are part of the checking stage.
+    // Supervisor grace permits reporting lateness, never handing over a late receipt.
+    if run.is_some_and(|run| {
+        started.elapsed() >= std::time::Duration::from_millis(run.deadline_ms.clamp(1, 60_000))
+    }) {
+        return retain_check_diagnostics(
+            result(crate::BLOCKED, "inconclusive", json!({"reason":"deadline"})),
+            &report,
+        );
+    }
+    publish_check(staged, (exit, report))
+}
+
+/// The final publication seam remains after actual checking and its permit.
+/// Keeping it explicit lets controls force an I/O race after completed work.
+/// A contained run hands the staged receipt to its supervisor, which links
+/// it only after accepting how the whole run ended.
+fn publish_check(
+    staged: Option<crate::checker_process::StagedReceipt>,
+    checked: (u8, Value),
+) -> (u8, Value) {
+    if let Some(staged) = staged
+        && let Err(error) = staged.publish_after_supervision()
+    {
+        return retain_check_diagnostics(io_failure(&error), &checked.1);
+    }
+    checked
+}
+
+/// Retain spent-work diagnostics when terminal I/O or the publication fence
+/// fails. Failure status/detail/authority remain those of the failed operation;
+/// receipt, witness and verdict fields never cross this boundary.
+fn retain_check_diagnostics(mut failure: (u8, Value), checked: &Value) -> (u8, Value) {
+    for key in ["progress", "limits", "original_sha256", "candidate_sha256"] {
+        if let Some(value) = checked.get(key) {
+            failure.1[key] = value.clone();
+        }
+    }
+    failure
+}
+
+fn check_value(
+    original: &Path,
+    candidate: &Path,
+    limits: Limits,
+    receipt: Option<&Path>,
+    run: Option<crate::transform_plan::RunLimits>,
+    started: std::time::Instant,
+) -> (u8, Value, Option<Vec<u8>>) {
     // Unlike `exists`, `symlink_metadata` also sees a dangling link, which
     // exclusive creation would refuse after the whole check.
     if let Some(path) = receipt.filter(|path| path.symlink_metadata().is_ok()) {
-        return result(
+        return without_receipt(result(
             crate::INVALID,
             "receipt-exists",
             json!({"path": path.display().to_string()}),
-        );
+        ));
+    }
+    if let Some(limits) = run {
+        if let Err(reason) = limits.validate() {
+            return without_receipt(result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({"reason":reason.code()}),
+            ));
+        }
+        if limits.work_units < crate::transform_plan::ACQUISITION_WORK {
+            return without_receipt(result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({"reason":"work-exhausted","reserved_work":0}),
+            ));
+        }
     }
     let (original, candidate) = match read_programs(original, candidate) {
         Ok(pair) => pair,
-        Err(failure) => return failure,
+        Err(failure) => return without_receipt(failure),
     };
-    let (exit, mut report) = match transform::check(&original, &candidate, limits) {
+    let (checked, diagnostics) = match run {
+        Some(run) => {
+            let outcome =
+                crate::transform_parallel::check(&original, &candidate, limits, run, started);
+            let p = outcome.progress;
+            let diagnostics = json!({"profile":"offline-parallel-v1",
+                "work_policy":crate::transform_plan::WORK_POLICY,
+                "scheduling":crate::checker_process::scheduling_evidence(),
+                "workers":run.workers,"chunk_tuples":run.chunk_tuples,
+                "planned_chunks":p.planned_chunks,"active_workers":p.active_workers,
+                "reserved_work":p.reserved,"setup_reserved":p.setup_reserved,
+                "evaluated_pairs":p.evaluated,"equal_prefix":p.equal_prefix,
+                "measured_steps":[p.measured_steps[0].to_string(),p.measured_steps[1].to_string()],
+                "completed_chunks":p.completed_chunks,"accounting_complete":p.accounting_complete});
+            (outcome.result, Some(diagnostics))
+        }
+        None => (
+            transform::check(&original, &candidate, limits)
+                .map_err(crate::transform_parallel::Failure::Semantic),
+            None,
+        ),
+    };
+    let mut receipt_bytes = None;
+    let (exit, mut report) = match checked {
         Ok(equivalence) => {
             let bytes = equivalence.receipt();
-            if let Some(path) = receipt
-                && let Err(error) = crate::atomic_create(path, &bytes)
-            {
-                return io_failure(&error);
-            }
+            receipt_bytes = Some(bytes.clone());
             result(
                 crate::OK,
                 "equivalent",
@@ -141,12 +403,22 @@ fn check(original: &Path, candidate: &Path, limits: Limits, receipt: Option<&Pat
                 }),
             )
         }
-        Err(rejection) => rejection_result(&rejection),
+        Err(crate::transform_parallel::Failure::Semantic(rejection)) => {
+            rejection_result(&rejection)
+        }
+        Err(crate::transform_parallel::Failure::Stopped(reason)) => result(
+            crate::BLOCKED,
+            "inconclusive",
+            json!({"reason":reason.code()}),
+        ),
     };
+    if let Some(diagnostics) = diagnostics {
+        report["progress"] = diagnostics;
+    }
     report["limits"] = json!({"steps": limits.steps, "input_tuples": limits.input_tuples});
     report["original_sha256"] = json!(transform::sha256_hex(&original));
     report["candidate_sha256"] = json!(transform::sha256_hex(&candidate));
-    (exit, report)
+    (exit, report, receipt_bytes)
 }
 
 /// `transform check --symbolic`: the pure `symbolic::equivalence` check
@@ -192,6 +464,9 @@ fn symbolic_check(
     let outcome = equivalence::check(&original, &candidate, limits, &mut |query| {
         solvers.solve(query)
     });
+    if let Some(message) = solvers.retention_failure() {
+        return result(crate::FAILURE, "io-error", json!({"message": message}));
+    }
     let identities = solvers.identities();
     let (exit, mut report) = match outcome {
         Outcome::Refused(refusal) => result(crate::INVALID, "refused", refusal_json(&refusal)),
@@ -250,9 +525,6 @@ fn symbolic_check(
             }),
         ),
     };
-    if let Some(message) = solvers.retention_failure() {
-        return result(crate::FAILURE, "io-error", json!({"message": message}));
-    }
     report["mode"] = json!("symbolic");
     report["limits"] = json!({"steps": limits.steps, "input_tuples": limits.input_tuples});
     report["original_sha256"] = json!(transform::sha256_hex(&original));
@@ -456,5 +728,198 @@ fn refusal_json(refusal: &Refusal) -> Value {
         Refusal::EmptyInputDomain { position } => {
             json!({"reason": "empty-input-domain", "position": position})
         }
+    }
+}
+
+#[cfg(test)]
+mod terminal_io_tests {
+    use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn receipt_staging_failure_retains_actual_completed_work_without_verdict() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let original = fixtures.join("boolean-kernel-original.zcve");
+        let candidate = fixtures.join("boolean-kernel-candidate.zcve");
+        let missing = std::env::temp_dir().join(format!(
+            "zeno-missing-receipt-parent-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        ));
+        assert!(!missing.exists());
+        let receipt = missing.join("receipt.json");
+        let (exit, report) = check(
+            &original,
+            &candidate,
+            Limits {
+                steps: 256,
+                input_tuples: 1000,
+            },
+            Some(&receipt),
+            Some(crate::transform_plan::RunLimits::offline()),
+        );
+        assert_eq!(exit, crate::FAILURE, "{report}");
+        assert_eq!(report["status"], "io-error");
+        assert_eq!(report["authority"], "none");
+        assert_eq!(report["progress"]["evaluated_pairs"], 16);
+        assert!(
+            report["progress"]["reserved_work"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("required test value"))
+                > 0
+        );
+        assert!(
+            report["progress"]["measured_steps"][0]
+                .as_str()
+                .unwrap_or_else(|| panic!("required test value"))
+                .parse::<u128>()
+                .unwrap_or_else(|error| panic!("{error:?}"))
+                > 0
+        );
+        assert_eq!(report["progress"]["accounting_complete"], true);
+        assert!(report["original_sha256"].is_string());
+        assert!(report["candidate_sha256"].is_string());
+        assert!(report["detail"].get("receipt").is_none());
+        assert!(report["detail"].get("ordinal").is_none());
+        assert!(!receipt.exists());
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_receipt_staged_after_the_deadline_is_dropped_without_handover() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let directory = std::env::temp_dir().join(format!(
+            "zeno-late-receipt-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&directory).unwrap_or_else(|error| panic!("{error}"));
+        let receipt = directory.join("receipt.json");
+        CHECK_COMPLETION_DELAY.with(|delay| delay.set(std::time::Duration::from_millis(150)));
+        let (exit, report) = check(
+            &fixtures.join("boolean-kernel-original.zcve"),
+            &fixtures.join("boolean-kernel-candidate.zcve"),
+            Limits {
+                steps: 256,
+                input_tuples: 1000,
+            },
+            Some(&receipt),
+            Some(crate::transform_plan::RunLimits {
+                deadline_ms: 100,
+                ..crate::transform_plan::RunLimits::offline()
+            }),
+        );
+        assert_eq!(exit, crate::BLOCKED, "{report}");
+        assert_eq!(report["status"], "inconclusive");
+        assert_eq!(report["detail"]["reason"], "deadline");
+        assert_eq!(report["progress"]["evaluated_pairs"], 16);
+        assert!(!receipt.exists());
+        assert_eq!(
+            std::fs::read_dir(&directory)
+                .unwrap_or_else(|error| panic!("{error}"))
+                .count(),
+            0
+        );
+        std::fs::remove_dir(directory).unwrap_or_else(|error| panic!("{error}"));
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn offline_parallel_refuses_without_containment_while_serial_check_remains_available() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let directory = std::env::temp_dir().join(format!(
+            "zeno-unsupported-containment-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        ));
+        std::fs::create_dir(&directory).unwrap_or_else(|error| panic!("{error}"));
+        let receipt = directory.join("receipt.json");
+        let original = fixtures.join("boolean-kernel-original.zcve");
+        let candidate = fixtures.join("boolean-kernel-candidate.zcve");
+        let limits = Limits {
+            steps: 256,
+            input_tuples: 1000,
+        };
+        let (exit, report) = check(
+            &original,
+            &candidate,
+            limits,
+            Some(&receipt),
+            Some(crate::transform_plan::RunLimits::offline()),
+        );
+        assert_eq!(exit, crate::BLOCKED, "{report}");
+        assert_eq!(report["status"], "inconclusive");
+        assert_eq!(report["authority"], "none");
+        assert_eq!(
+            report["detail"]["reason"],
+            "containment-unavailable:platform"
+        );
+        assert_eq!(
+            std::fs::read_dir(&directory)
+                .unwrap_or_else(|error| panic!("{error}"))
+                .count(),
+            0
+        );
+        let (exit, report) = check(&original, &candidate, limits, Some(&receipt), None);
+        assert_eq!(exit, crate::OK, "{report}");
+        assert_eq!(report["status"], "equivalent");
+        assert!(receipt.is_file());
+        std::fs::remove_dir_all(directory).unwrap_or_else(|error| panic!("{error}"));
+    }
+
+    #[test]
+    fn publication_collision_after_completed_check_retains_work_and_existing_bytes() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let directory = std::env::temp_dir().join(format!(
+            "zeno-post-check-collision-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        ));
+        std::fs::create_dir(&directory).unwrap_or_else(|error| panic!("{error:?}"));
+        let receipt = directory.join("receipt.json");
+        let (exit, report, bytes) = check_value(
+            &fixtures.join("boolean-kernel-original.zcve"),
+            &fixtures.join("boolean-kernel-candidate.zcve"),
+            Limits {
+                steps: 256,
+                input_tuples: 1000,
+            },
+            Some(&receipt),
+            Some(crate::transform_plan::RunLimits::offline()),
+            std::time::Instant::now(),
+        );
+        assert_eq!(exit, crate::OK, "{report}");
+        assert_eq!(report["status"], "equivalent");
+        assert_eq!(report["progress"]["evaluated_pairs"], 16);
+        let progress = report["progress"].clone();
+        let staged = crate::checker_process::StagedReceipt::new(
+            &receipt,
+            &bytes.unwrap_or_else(|| panic!("completed receipt bytes")),
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"));
+        // The collision occurs after evaluation and staging, so early
+        // path checks cannot satisfy this failure-path regression.
+        std::fs::write(&receipt, b"other complete receipt")
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let (exit, failed) = publish_check(Some(staged), (exit, report));
+        assert_eq!(exit, crate::FAILURE);
+        assert_eq!(failed["status"], "io-error");
+        assert_eq!(failed["authority"], "none");
+        assert_eq!(failed["progress"], progress);
+        assert!(failed["detail"].get("receipt").is_none());
+        assert_eq!(
+            std::fs::read(&receipt).unwrap_or_else(|error| panic!("{error:?}")),
+            b"other complete receipt"
+        );
+        assert_eq!(
+            std::fs::read_dir(&directory)
+                .unwrap_or_else(|error| panic!("{error:?}"))
+                .count(),
+            1
+        );
+        std::fs::remove_dir_all(directory).unwrap_or_else(|error| panic!("{error:?}"));
     }
 }

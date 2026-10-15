@@ -8,8 +8,10 @@ pub use decision::{
     Assignment, Atom, Attempt, Branch, Candidate, Class, DeliveryPlan, Domain, Expr, Field,
     PayloadField, Source,
 };
-mod ingress;
-pub use ingress::{Read as ReadAttempt, Schema, Selector};
+pub(crate) mod ingress;
+pub use ingress::{Projection, Read as ReadAttempt, Schema, Selector};
+pub(crate) mod descriptor;
+pub use descriptor::{DescriptorData, DescriptorProjection};
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -66,19 +68,19 @@ pub struct Reason {
 /// Complete borrowed execution descriptor; binding checks every declaration.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug)]
-pub struct Descriptor<'a> {
+pub struct Descriptor<'a, P = super::ScalarProgram<'a>, L = InputLeaf> {
     /// Original state schema.
-    pub state: Schema<'a>,
+    pub state: Schema<'a, L>,
     /// Original command schema, including scalar roots.
-    pub command: Schema<'a>,
+    pub command: Schema<'a, L>,
     /// Original context schema, including scalar roots.
-    pub context: Schema<'a>,
+    pub context: Schema<'a, L>,
     /// Actual eagerly evaluated scalar control graph.
-    pub program: super::ScalarProgram<'a>,
+    pub program: P,
     /// Complete scalar input ABI in program order.
     pub bindings: &'a [Binding],
     /// Typed inverse maps for each program output.
-    pub output_types: &'a [InputLeaf],
+    pub output_types: &'a [L],
     /// Program output selecting the complete decision branch.
     pub decision_output: usize,
     /// Complete branch family, including every unused branch.
@@ -94,6 +96,8 @@ pub struct Descriptor<'a> {
     /// Limits for the one meter shared by every execution stage.
     pub limits: Limits,
 }
+/// Full-width numeric descriptor data, admitted through the same composition boundary.
+pub type NumericDescriptor<'a> = Descriptor<'a, super::numeric::NumericProgram<'a>, Domain<'a>>;
 /// Exact received invocation bytes. Framed execution retains entire envelopes.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug)]
@@ -132,8 +136,8 @@ pub enum Failure {
 /// Privately bound immutable descriptor with library-owned execution methods.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug)]
-pub struct BoundCore<'a> {
-    descriptor: &'a Descriptor<'a>,
+pub struct BoundCore<'a, D: DescriptorData<'a> + 'a = Descriptor<'a>> {
+    descriptor: &'a D,
 }
 mod admission;
 #[cfg(verus_keep_ghost)]
@@ -142,19 +146,22 @@ mod spec;
 mod outcome;
 mod producer;
 mod schema_validation;
-pub use outcome::{Outcome, bind};
+pub(crate) mod shared;
+pub(crate) use outcome::bind_family;
+pub use outcome::{Outcome, bind, bind_numeric};
 mod framed;
 pub use framed::{Failure as FrameFailure, FrameBinding, Framing};
 #[cfg(verus_keep_ghost)]
 verus! {
-impl<'p> BoundCore<'p>{pub closed spec fn descriptor_view(&self)->&'p Descriptor<'p>{self.descriptor}
+impl<'p,D:DescriptorData<'p>+'p> BoundCore<'p,D>{pub closed spec fn descriptor_view(&self)->&'p D{self.descriptor}
     #[verifier::type_invariant]
-    spec fn well_formed(&self)->bool{admission::spec::admitted(self.descriptor)}}
+    spec fn well_formed(&self)->bool{self.descriptor.model().admitted()}}
 impl<'a> Outcome<'a>{pub closed spec fn kind_view(&self)->Kind{self.kind}
 pub closed spec fn view(&self)->spec::OutcomeView<'a>{
     ((match &self.result{Ok(c)=>Ok(decision::spec::candidate_view(*c)),Err(e)=>Err(*e)}),spec::raw(self.raw),producer::spec::trace(&self.trace),self.usage.view(),self.diagnostics@,self.law_reads@)
 }}
 pub closed spec fn descriptor_admitted(d:&Descriptor)->bool{admission::spec::admitted(d)}
+pub closed spec fn numeric_descriptor_admitted(d:&NumericDescriptor)->bool{admission::numeric::spec::admitted(d)}
 pub open spec fn raw_view(r:Raw)->(Seq<u8>,Seq<u8>,Seq<u8>){(r.state@,r.command@,r.context@)}
 pub open spec fn optional_usage(u:Option<Usage>)->Option<Seq<u64>>{match u{Some(u)=>Some(u.view()),None=>None}}
 pub open spec fn candidate_result<'a>(r:Result<&Candidate<'a>,Failure>)->Result<decision::spec::CandidateView<'a>,Failure>{match r{
@@ -166,6 +173,63 @@ pub closed spec fn execution(d:&Descriptor,r:Raw,limits:Seq<u64>,used:Seq<u64>,t
 pub closed spec fn genesis_execution(d:&Descriptor,initial:Seq<u8>,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool{spec::genesis(d,initial,limits,used,trace,diagnostics,reads,finished)}
 pub closed spec fn framed_execution(d:&Descriptor,r:Raw,f:&Framing,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool{framed::spec::execution(d,r,f,limits,used,trace,diagnostics,reads,finished)}
 pub closed spec fn framed_genesis(d:&Descriptor,initial:Seq<u8>,f:&FrameBinding,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool{framed::spec::genesis(d,initial,f,limits,used,trace,diagnostics,reads,finished)}
+pub closed spec fn numeric_execution(d:&NumericDescriptor,r:Raw,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool {
+    shared::spec::execution(&d.model(),r,limits,used,trace,diagnostics,reads,finished)
+}
+pub closed spec fn numeric_genesis(d:&NumericDescriptor,initial:Seq<u8>,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool {
+    shared::spec::genesis(&d.model(),initial,limits,used,trace,diagnostics,reads,finished)
+}
+
+pub closed spec fn numeric_framed(d:&NumericDescriptor,kind:Kind,r:Raw,f:&Framing,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool {
+    shared::spec::framed(&d.model(),kind,r,f,limits,used,trace,diagnostics,reads,finished)
+}
+
+#[verifier::opaque]
+pub open(in super) spec fn family_framed(d:&DescriptorProjection,kind:Kind,r:Raw,f:&Framing,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool {
+    shared::spec::framed(d,kind,r,f,limits,used,trace,diagnostics,reads,finished)
+}
+pub closed spec fn family_genesis(d:&DescriptorProjection,initial:Seq<u8>,f:&FrameBinding,limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)->bool {
+    shared::spec::framed_genesis(d,initial,f,limits,used,trace,diagnostics,reads,finished)
+}
+
+/// Framed Genesis ignores command/context and uses the identical initial-state relation.
+pub(crate) proof fn family_framed_genesis(d:&DescriptorProjection,r:Raw,f:&Framing,
+    limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,
+    diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)
+    ensures family_framed(d,Kind::Genesis,r,f,limits,used,trace,diagnostics,reads,finished)
+        ==family_genesis(d,r.state@,&f.state,limits,used,trace,diagnostics,reads,finished),
+{
+    reveal(family_framed);
+    reveal(family_genesis);
+}
+
+/// Public-family transition relation specializes to the unchanged legacy wrapper.
+/// Ghost meter-shape premises are not executable admission restrictions.
+pub(crate) proof fn legacy_family_transition(d:&Descriptor,r:Raw,f:&Framing,
+    limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,
+    diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)
+    requires limits.len()==8,used.len()==8,
+    ensures family_framed(&d.model(),Kind::Transition,r,f,limits,used,trace,diagnostics,reads,finished)
+        ==framed_execution(d,r,f,limits,used,trace,diagnostics,reads,finished),
+{
+    reveal(family_framed);
+    reveal(framed_execution);
+    shared::spec::legacy_framed(d,Kind::Transition,r,f,limits,used,trace,diagnostics,reads,finished);
+}
+
+/// Genesis keeps arbitrary original bytes and the complete old framing relation.
+pub(crate) proof fn legacy_family_genesis(d:&Descriptor,initial:Seq<u8>,f:&FrameBinding,
+    limits:Seq<u64>,used:Seq<u64>,trace:producer::spec::TraceView,
+    diagnostics:Seq<laws::Diagnostic>,reads:Seq<laws::ReadAttempt>,finished:spec::Finished)
+    requires limits.len()==8,used.len()==8,
+    ensures family_genesis(&d.model(),initial,f,limits,used,trace,diagnostics,reads,finished)
+        ==framed_genesis(d,initial,f,limits,used,trace,diagnostics,reads,finished),
+{
+    reveal(family_genesis);
+    reveal(framed_genesis);
+    shared::spec::legacy_framed_genesis(d,initial,f,limits,used,trace,diagnostics,reads,finished);
+}
+
 }
 
 #[cfg(test)]

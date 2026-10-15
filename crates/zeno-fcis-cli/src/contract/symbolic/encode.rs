@@ -297,6 +297,7 @@ impl Decision {
         }
         let mut inputs = Vec::with_capacity(positions.len());
         let mut sources = Vec::with_capacity(positions.len());
+        let mut wires = Vec::with_capacity(positions.len());
         let mut admitted = Vec::new();
         for (index, (binding, position)) in descriptor.bindings.iter().zip(positions).enumerate() {
             let source = match binding.source {
@@ -327,6 +328,7 @@ impl Decision {
             }
             inputs.push(typed);
             sources.push((source, field));
+            wires.push(code.clone());
         }
         let program = program::encode(
             script,
@@ -337,7 +339,7 @@ impl Decision {
                 nodes: descriptor.program.nodes,
                 roots: descriptor.program.roots,
             },
-            &|index| Term::name(&format!("x{index}")),
+            &wires,
         )?;
         if descriptor.output_types.len() != program.outputs.len() {
             return Err(Unsupported::new(
@@ -543,7 +545,7 @@ fn delivery(
         }
         _ => emitted.push(Term::Bool(false)),
     }
-    Ok(Term::or([Term::not(enabled), Term::and(emitted)]))
+    Ok(Term::or(vec![Term::not(enabled), Term::and(emitted)]))
 }
 
 /// Defines one law program over a state and returns its satisfaction: every
@@ -647,7 +649,7 @@ pub(super) fn law(
             },
             l::Op::And(a, b) => match (operand(a)?, operand(b)?) {
                 (Typed::Bool(a), Typed::Bool(b)) => {
-                    Typed::Bool(script.define(&name, Sort::Bool, Term::and([a, b])))
+                    Typed::Bool(script.define(&name, Sort::Bool, Term::and(vec![a, b])))
                 }
                 _ => return Err(ill_typed()),
             },
@@ -676,7 +678,10 @@ pub(super) fn law(
         values.push(value);
     }
     match values.get(root) {
-        Some(Typed::Bool(root)) => Ok(Term::and(defined.into_iter().chain([root.clone()]))),
+        Some(Typed::Bool(root)) => {
+            defined.push(root.clone());
+            Ok(Term::and(defined))
+        }
         _ => Err(Unsupported::new("the law's root is not a Boolean")),
     }
 }

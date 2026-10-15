@@ -23,6 +23,20 @@ fn pure_node<'a>(op: &Op<'a>, values: &[Atom<'a>]) -> Result<Atom<'a>, Failure> 
         Op::Add(a, b) => super::atoms::binary(0, at(values, a)?, at(values, b)?),
         Op::Mul(a, b) => super::atoms::binary(5, at(values, a)?, at(values, b)?),
         Op::Div(mode, a, b) => super::atoms::divide(mode, at(values, a)?, at(values, b)?),
+        Op::MulDivFloor(a, b, den) => {
+            super::atoms::mul_div(false, at(values, a)?, at(values, b)?, at(values, den)?)
+        }
+        Op::MulDivCeil(a, b, den) => {
+            super::atoms::mul_div(true, at(values, a)?, at(values, b)?, at(values, den)?)
+        }
+        Op::ProductsGe(left, right) => super::atoms::product_compare(
+            at(values, left[0])?,
+            at(values, left[1])?,
+            at(values, left[2])?,
+            at(values, right[0])?,
+            at(values, right[1])?,
+            at(values, right[2])?,
+        ),
         Op::ToI128(a) => super::atoms::to_i128(at(values, a)?),
         Op::Sub(a, b) => super::atoms::binary(1, at(values, a)?, at(values, b)?),
         Op::Eq(a, b) => super::atoms::binary(2, at(values, a)?, at(values, b)?),
@@ -148,7 +162,12 @@ pub(super) fn shape(program: &Program<'_>) -> bool {
             | Op::Lt(a, b)
             | Op::And(a, b) => a < i && b < i,
             Op::Not(a) | Op::ToI128(a) => a < i,
-            Op::Select(a, b, c) => a < i && b < i && c < i,
+            Op::Select(a, b, c) | Op::MulDivFloor(a, b, c) | Op::MulDivCeil(a, b, c) => {
+                a < i && b < i && c < i
+            }
+            Op::ProductsGe(a, b) => {
+                a[0] < i && a[1] < i && a[2] < i && b[0] < i && b[1] < i && b[2] < i
+            }
         };
         if !valid {
             return false;

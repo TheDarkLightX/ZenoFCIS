@@ -14,6 +14,7 @@
 
 use std::ffi::OsString;
 use std::fmt::Write as _;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
 use zeno_fcis_codec::{DecodeLimits, decode_value};
@@ -47,7 +48,7 @@ pub const ZENO_FCIS_VERSION: &str = "{zeno_fcis_version}";
 
 /// The operational commands, by name.
 pub const COMMANDS: &[&str] = &[
-    "init", "submit", "decide", "state", "history", "pending", "deliver", "version",
+    "init", "submit", "decide", "frame", "state", "history", "pending", "deliver", "version",
 ];
 
 /// The usage text of the operational commands.
@@ -55,7 +56,7 @@ pub const COMMANDS: &[&str] = &[
 pub fn usage() -> String {
     let name = env!("CARGO_PKG_NAME");
     format!(
-        "usage: {name} init DATABASE_PATH [--format human|json]\n       {name} submit DATABASE_PATH NAME=VALUE... [--format human|json]\n       {name} decide DATABASE_PATH NAME=VALUE... [--format human|json]\n       {name} state DATABASE_PATH [--format human|json]\n       {name} history DATABASE_PATH [--format human|json]\n       {name} pending DATABASE_PATH [--format human|json]\n       {name} deliver DATABASE_PATH (--to FILE | --relay CONFIG) [--format human|json]\n       {name} version [--format human|json]"
+        "usage: {name} init DATABASE_PATH [--format human|json]\n       {name} submit DATABASE_PATH NAME=VALUE... [--format human|json]\n       {name} decide DATABASE_PATH NAME=VALUE... [--format human|json]\n       {name} frame NAME=VALUE... [--format json]\n       {name} submit|decide DATABASE_PATH --frame FILE [--format human|json]\n       {name} state DATABASE_PATH [--format human|json]\n       {name} history DATABASE_PATH [--format human|json]\n       {name} pending DATABASE_PATH [--format human|json]\n       {name} deliver DATABASE_PATH (--to FILE | --relay CONFIG) [--format human|json]\n       {name} version [--format human|json]"
     )
 }
 
@@ -88,6 +89,7 @@ pub fn run(arguments: &[OsString]) -> Option<Outcome> {
     let mut format = Format::Human;
     let mut to = None;
     let mut relay = None;
+    let mut frame = None;
     let mut words = Vec::new();
     let mut rest = rest.iter();
     while let Some(word) = rest.next() {
@@ -105,6 +107,15 @@ pub fn run(arguments: &[OsString]) -> Option<Outcome> {
                 Some(file) => relay = Some(PathBuf::from(file)),
                 None => return Some(usage_error(format, "--relay takes a configuration path")),
             },
+            Some("--frame") if matches!(command, "submit" | "decide") => {
+                if frame.is_some() {
+                    return Some(usage_error(format, "--frame is given twice"));
+                }
+                match rest.next() {
+                    Some(file) => frame = Some(PathBuf::from(file)),
+                    None => return Some(usage_error(format, "--frame takes a file path")),
+                }
+            }
             Some(flag) if flag.starts_with("--") => {
                 return Some(usage_error(format, &format!("unknown option {flag}")));
             }
@@ -117,14 +128,21 @@ pub fn run(arguments: &[OsString]) -> Option<Outcome> {
             "deliver takes either --to FILE or --relay CONFIG",
         ));
     }
+    if frame.is_some() && words.len() != 1 {
+        return Some(usage_error(
+            format,
+            "--frame takes one database and no NAME=VALUE words",
+        ));
+    }
     let database = words.first().map(PathBuf::from);
     let outcome = match (command, database, words.len()) {
         ("version", None, 0) => version(),
         ("init", Some(path), 1) => {
             session::init(&path).map(|head| report_head("initialized", &head))
         }
-        ("submit", Some(path), _) => decide_command(&path, &words[1..], true),
-        ("decide", Some(path), _) => decide_command(&path, &words[1..], false),
+        ("submit", Some(path), _) => decide_command(&path, &words[1..], frame.as_deref(), true),
+        ("decide", Some(path), _) => decide_command(&path, &words[1..], frame.as_deref(), false),
+        ("frame", _, _) => frame_command(&words),
         ("state", Some(path), 1) => session::current(&path).map(|current| report_state(&current)),
         ("history", Some(path), 1) => {
             session::history(&path).and_then(|history| report_history(&history))
@@ -600,6 +618,15 @@ fn version() -> Result<Report, Failure> {
             ("contract_version", v2_contract::VERSION.to_string()),
             ("identity", quote(&identity)),
             ("zeno_fcis", quote(ZENO_FCIS_VERSION)),
+            ("host_abi", quote(session::HOST_FRAME_SCHEMA)),
+            (
+                "host_profile",
+                if session::scalar_profile().is_ok() {
+                    quote(session::HOST_PROFILE)
+                } else {
+                    "null".to_owned()
+                },
+            ),
         ],
         human: format!(
             "{name}: contract version {}, identity {identity}, ZenoFCIS {ZENO_FCIS_VERSION}\n",
@@ -608,8 +635,38 @@ fn version() -> Result<Report, Failure> {
     })
 }
 
-fn decide_command(path: &Path, words: &[OsString], commit: bool) -> Result<Report, Failure> {
+fn frame_command(words: &[OsString]) -> Result<Report, Failure> {
+    session::scalar_profile()?;
     let (command, context) = command_numbers(words)?;
+    let bytes = session::scalar_frame(&command, &context)?;
+    let frame = hex(&bytes);
+    Ok(Report {
+        exit: OK,
+        members: vec![
+            ("schema", quote(session::HOST_FRAME_SCHEMA)),
+            ("profile", quote(session::HOST_PROFILE)),
+            ("frame", quote(&frame)),
+        ],
+        human: format!("{frame}\n"),
+    })
+}
+
+fn decide_command(
+    path: &Path,
+    words: &[OsString],
+    frame: Option<&Path>,
+    commit: bool,
+) -> Result<Report, Failure> {
+    let (command, context) = if let Some(frame) = frame {
+        let file = std::fs::File::open(frame).map_err(|error| Failure::Io(error.to_string()))?;
+        let mut bytes = Vec::new();
+        file.take((session::HOST_MAX_FRAME_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|error| Failure::Io(error.to_string()))?;
+        session::scalar_frame_inputs(&bytes)?
+    } else {
+        command_numbers(words)?
+    };
     let decision = if commit {
         session::submit(path, &command, &context)?
     } else {

@@ -16,6 +16,8 @@ use zeno_fcis_shell_sqlite::{
     },
 };
 use zeno_fcis_synthesis::finite::{
+    Domain as ScalarDomain, Op, Program, V2InputLeaf as InputLeaf,
+    canonical_v2::schema as s,
     v2_authority::{Authority, PublicationOutcome},
     v2_catalog::BoundCatalog,
     v2_composition as c, v2_laws as l,
@@ -23,7 +25,9 @@ use zeno_fcis_synthesis::finite::{
 
 use zeno_fcis_value::ValueRef;
 
-use crate::{AppResult, Example, authority, compare, genesis, genesis_numbers, v2_contract, wire};
+use crate::{
+    AppResult, Example, authority, check, compare, genesis, genesis_numbers, v2_contract, wire,
+};
 
 /// The audited head of a store.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,6 +224,21 @@ type Evolutions<'a> = &'a [(u32, &'a str, &'a [(u32, &'a [l::Op<'static>], usize
 /// value, and the table; `None` for a rename.
 type StateSteps<'a> = &'a [(u32, Option<&'a [(u16, u8, i128, &'a [(i128, i128)])]>)];
 
+/// Closed split expression metadata from the generated contract.
+type MappingProgram<'a> = (&'a [u16], &'a [ScalarDomain], ScalarDomain, &'a [Op], u16);
+type MappingField<'a> = (
+    u16,
+    u8,
+    i128,
+    &'a [(i128, i128)],
+    Option<MappingProgram<'a>>,
+);
+type RecordSteps<'a> = &'a [(
+    u32,
+    &'a [MappingField<'a>],
+    &'a [(u32, &'a [MappingField<'a>])],
+)];
+
 /// What the generated `with_lineage` passes: the checked catalogs alone
 /// while the contract has no adoption, then also each adoption's receipt
 /// digest, after an evolution also the behaviour changes, and after a
@@ -233,6 +252,7 @@ trait Generated<'a, 'p> {
         &'a [&'a str],
         Evolutions<'a>,
         StateSteps<'a>,
+        RecordSteps<'a>,
     );
 }
 
@@ -244,8 +264,9 @@ impl<'a, 'b: 'a, 'p> Generated<'a, 'p> for &'a [&'b BoundCatalog<'p>] {
         &'a [&'a str],
         Evolutions<'a>,
         StateSteps<'a>,
+        RecordSteps<'a>,
     ) {
-        (self, &[], &[], &[])
+        (self, &[], &[], &[], &[])
     }
 }
 
@@ -257,8 +278,9 @@ impl<'a, 'b: 'a, 'p> Generated<'a, 'p> for (&'a [&'b BoundCatalog<'p>], &'a [&'a
         &'a [&'a str],
         Evolutions<'a>,
         StateSteps<'a>,
+        RecordSteps<'a>,
     ) {
-        (self.0, self.1, &[], &[])
+        (self.0, self.1, &[], &[], &[])
     }
 }
 
@@ -272,8 +294,9 @@ impl<'a, 'b: 'a, 'p> Generated<'a, 'p>
         &'a [&'a str],
         Evolutions<'a>,
         StateSteps<'a>,
+        RecordSteps<'a>,
     ) {
-        (self.0, self.1, self.2, &[])
+        (self.0, self.1, self.2, &[], &[])
     }
 }
 
@@ -292,6 +315,29 @@ impl<'a, 'b: 'a, 'p> Generated<'a, 'p>
         &'a [&'a str],
         Evolutions<'a>,
         StateSteps<'a>,
+        RecordSteps<'a>,
+    ) {
+        (self.0, self.1, self.2, self.3, &[])
+    }
+}
+
+impl<'a, 'b: 'a, 'p> Generated<'a, 'p>
+    for (
+        &'a [&'b BoundCatalog<'p>],
+        &'a [&'a str],
+        Evolutions<'a>,
+        StateSteps<'a>,
+        RecordSteps<'a>,
+    )
+{
+    fn parts(
+        self,
+    ) -> (
+        &'a [&'a BoundCatalog<'p>],
+        &'a [&'a str],
+        Evolutions<'a>,
+        StateSteps<'a>,
+        RecordSteps<'a>,
     ) {
         self
     }
@@ -321,13 +367,81 @@ fn target<'a>(
     Ok(migration::Target { id: *id, source })
 }
 
+/// Reconstructs the library's admitted immutable scalar program. The shell
+/// separately checks totality over the complete declared source domain.
+fn mapping_program(field: &MappingField<'_>) -> AppResult<Option<Program>> {
+    let (id, tag, operand, table, program) = field;
+    match (*tag, program) {
+        (0 | 1, None) if table.is_empty() => Ok(None),
+        (2, None) => Ok(None),
+        (3, Some((sources, inputs, output, nodes, root))) if *operand == 0 && table.is_empty() => {
+            if sources.len() != inputs.len() {
+                return Err(format!(
+                    "catalog: migration field {id} has inconsistent program inputs"
+                ));
+            }
+            Program::try_new_extended(inputs.to_vec(), vec![*output], nodes.to_vec(), vec![*root])
+                .map(Some)
+                .map_err(|error| format!("catalog: migration field {id} program: {error:?}"))
+        }
+        _ => Err(format!(
+            "catalog: migration field {id} has invalid source metadata"
+        )),
+    }
+}
+
+fn record_targets<'a>(
+    fields: &'a [MappingField<'a>],
+    programs: &'a [Option<Program>],
+) -> AppResult<Vec<migration::Target<'a>>> {
+    fields
+        .iter()
+        .zip(programs)
+        .map(|(field, program)| {
+            let (id, tag, operand, table, metadata) = field;
+            let source = match (*tag, program, metadata) {
+                (3, Some(program), Some((fields, ..))) => {
+                    migration::Source::Program { fields, program }
+                }
+                (0..=2, None, None) => {
+                    let legacy = (*id, *tag, *operand, *table);
+                    // Borrow the original table, rather than the temporary tuple.
+                    match legacy.1 {
+                        0 => migration::Source::Field(u16::try_from(legacy.2).map_err(|_| {
+                            format!("catalog: migration field {id} names old field {operand}")
+                        })?),
+                        1 => migration::Source::Value(legacy.2),
+                        2 => migration::Source::Table {
+                            field: u16::try_from(legacy.2).map_err(|_| {
+                                format!("catalog: migration field {id} names old field {operand}")
+                            })?,
+                            cases: table,
+                        },
+                        _ => {
+                            return Err(format!(
+                                "catalog: migration field {id} has invalid source tag"
+                            ));
+                        }
+                    }
+                }
+                _ => {
+                    return Err(format!(
+                        "catalog: migration field {id} has invalid program metadata"
+                    ));
+                }
+            };
+            Ok(migration::Target { id: *id, source })
+        })
+        .collect()
+}
+
 /// Binds every version's catalog and Authority, oldest first, with the
 /// step that made each later version: an adoption's receipt digest, a
 /// behaviour change with its review and claims, a data migration, or a
 /// rename, for `f`.
 pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) -> AppResult<R> {
     v2_contract::with_lineage(|generated| {
-        let (catalogs, receipts, evolutions, state_steps) = generated.parts();
+        let (catalogs, receipts, evolutions, state_steps, record_steps) = generated.parts();
         let mut receipts = receipts
             .iter()
             .map(|receipt| digest(receipt))
@@ -355,6 +469,27 @@ pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) 
                 Ok((*after, fields))
             })
             .collect::<AppResult<_>>()?;
+        if record_steps.windows(2).any(|pair| pair[0].0 >= pair[1].0)
+            || record_steps.iter().any(|(after, _, _)| {
+                *after == 0 || usize::try_from(*after).map_or(true, |after| after >= catalogs.len())
+                    || state_steps.iter().any(|(legacy, _)| legacy == after)
+            })
+        {
+            return Err("catalog: invalid or duplicate record migration version".to_owned());
+        }
+        type Programs = (Vec<Option<Program>>, Vec<Vec<Option<Program>>>);
+        let programs: Vec<Programs> = record_steps.iter().map(|(_, state, payloads)| {
+            Ok((state.iter().map(mapping_program).collect::<AppResult<_>>()?,
+                payloads.iter().map(|(_, fields)| fields.iter().map(mapping_program)
+                    .collect::<AppResult<_>>()).collect::<AppResult<_>>()?))
+        }).collect::<AppResult<_>>()?;
+        let records = record_steps.iter().zip(&programs).map(|((after, state, payloads), (state_programs, payload_programs))| {
+            Ok((*after, record_targets(state, state_programs)?,
+                payloads.iter().zip(payload_programs).map(|((channel, fields), programs)|
+                    Ok((*channel, record_targets(fields, programs)?))).collect::<AppResult<Vec<_>>>()?))
+        }).collect::<AppResult<Vec<_>>>()?;
+        let payloads: Vec<Vec<migration::Payload<'_>>> = records.iter().map(|(_, _, payloads)|
+            payloads.iter().map(|(channel, fields)| migration::Payload { channel: *channel, fields }).collect()).collect();
         let mut steps = Vec::new();
         for version in 1..catalogs.len() {
             let after = |declared: u32| usize::try_from(declared) == Ok(version);
@@ -363,6 +498,16 @@ pub(crate) fn with_lineage<R>(f: impl FnOnce(&Lineage<'_, '_>) -> AppResult<R>) 
                 .zip(&claims)
                 .find(|((declared, _, _), _)| after(*declared));
             let moved = migrations.iter().find(|(declared, _)| after(*declared));
+            if let Some(((_, fields, _), payloads)) = records.iter().zip(&payloads).find(|((declared, _, _), _)| after(*declared)) {
+                let Some(((_, review, _), claims)) = evolution else {
+                    return Err(format!("catalog: no target claim metadata for record migration to version {}: regenerate the application", version + 1));
+                };
+                steps.push(Step::PayloadMigration {
+                    migration: migration::Migration { fields }, payloads, claims,
+                    review: review.as_bytes(),
+                });
+                continue;
+            }
             steps.push(match (moved, evolution) {
                 (Some((_, Some(fields))), Some(((_, review, _), claims))) => Step::Migration {
                     migration: migration::Migration { fields },
@@ -521,7 +666,11 @@ pub fn migrate(path: &Path) -> AppResult<Head> {
 /// What a session did.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Summary {
-    /// Each decision's class, in order.
+    /// Examples checked: every example in the file. Those the session did not
+    /// reach are each decided on their own, without the store, so no
+    /// example's check depends on where the file lists it.
+    pub examples: usize,
+    /// Each session decision's class, in order.
     pub decisions: Vec<&'static str>,
     /// Committed decisions in the store; genesis is not counted.
     pub bundles: u64,
@@ -541,7 +690,8 @@ impl Summary {
             .map(|decision| format!("\"{decision}\""))
             .collect();
         format!(
-            "{{\"status\":\"passed\",\"decisions\":[{}],\"bundles\":{},\"pending\":{},\"deliveries\":{}}}",
+            "{{\"status\":\"passed\",\"examples\":{},\"decisions\":[{}],\"bundles\":{},\"pending\":{},\"deliveries\":{}}}",
+            self.examples,
             decisions.join(","),
             self.bundles,
             self.pending,
@@ -579,7 +729,8 @@ fn class_name(class: c::Class) -> &'static str {
 /// remains, the first example whose pre-state is the current state:
 /// rejects must publish nothing, and each other decision is committed, then
 /// recomputed from the same inputs and committed again as an idempotent
-/// replay. Returns the store and each decision's class.
+/// replay. Each example the session does not reach is then decided on its
+/// own. Returns the store and each session decision's class.
 fn session<'a, 'p>(
     path: &Path,
     authority: &'a Authority<'p>,
@@ -604,7 +755,17 @@ fn session<'a, 'p>(
         }
         decisions.push(class_name(example.class));
     }
+    check_unreached(authority, &remaining)?;
     Ok((shell, decisions))
+}
+
+/// Decides each example a session did not reach on its own, as `check`
+/// does: which examples a session reaches depends on the order the file
+/// lists them in, but whether each one holds does not.
+fn check_unreached(authority: &Authority<'_>, unreached: &[&Example]) -> AppResult<()> {
+    unreached
+        .iter()
+        .try_for_each(|example| check(authority, example))
 }
 
 /// Decides one example on the store, whose state must be the example's
@@ -691,6 +852,7 @@ pub fn journey(path: &Path, examples: &[Example]) -> AppResult<Summary> {
     }
     let snapshot = shell.snapshot().map_err(store)?;
     Ok(Summary {
+        examples: examples.len(),
         decisions,
         bundles: snapshot.bundle_count(),
         pending: snapshot.pending(),
@@ -704,7 +866,8 @@ pub fn journey(path: &Path, examples: &[Example]) -> AppResult<Summary> {
 /// this build's version, after `--upgrade` when it ran an earlier one; the
 /// session then continues from the store's state: while one remains, the
 /// first example whose pre-state is that state is decided, a commit and its
-/// replay recorded under a key of its own.
+/// replay recorded under a key of its own. Each example the session does
+/// not reach is then decided on its own.
 ///
 /// # Errors
 /// Returns the first refusal, difference or store failure, or a store at
@@ -722,6 +885,7 @@ pub fn decide(path: &Path, examples: &[Example]) -> AppResult<Summary> {
     let (mut shell, decisions) = session(path, &authority, examples)?;
     let snapshot = shell.snapshot().map_err(store)?;
     Ok(Summary {
+        examples: examples.len(),
         decisions,
         bundles: snapshot.bundle_count(),
         pending: snapshot.pending(),
@@ -752,8 +916,10 @@ fn resume(path: &Path, examples: &[Example]) -> AppResult<Summary> {
                 decide_example(&mut shell, authority, example, replay)?;
                 decisions.push(class_name(example.class));
             }
+            check_unreached(authority, &remaining)?;
             let snapshot = shell.snapshot().map_err(store)?;
             Ok(Summary {
+                examples: examples.len(),
                 decisions,
                 bundles: snapshot.bundle_count(),
                 pending: snapshot.pending(),
@@ -846,7 +1012,15 @@ fn state_numbers(descriptor: &c::Descriptor<'_>, framed: &[u8]) -> AppResult<Vec
 }
 
 fn root_numbers(schema: c::Schema<'_>, framed: &[u8]) -> AppResult<Vec<i128>> {
-    let envelope = decode_envelope(framed, DecodeLimits::default())
+    root_numbers_with_limits(schema, framed, DecodeLimits::default())
+}
+
+fn root_numbers_with_limits(
+    schema: c::Schema<'_>,
+    framed: &[u8],
+    limits: DecodeLimits,
+) -> AppResult<Vec<i128>> {
+    let envelope = decode_envelope(framed, limits)
         .map_err(|error| format!("the stored state does not decode: {error:?}"))?;
     match (schema, envelope.value().view()) {
         (c::Schema::Record(fields), ValueRef::Record(values)) => fields
@@ -862,6 +1036,182 @@ fn root_numbers(schema: c::Schema<'_>, framed: &[u8]) -> AppResult<Vec<i128>> {
         (c::Schema::Leaf(_), view) => Ok(vec![value_number(view)?]),
         _ => Err("the stored state does not have the contract's state schema".to_owned()),
     }
+}
+
+/// The supported foreign scalar-consumer profile, independent of CLI release versions.
+pub const HOST_PROFILE: &str = "zeno-fcis/native-scalar-consumer/1";
+/// The deterministic JSON report schema carrying opaque canonical request bytes.
+pub const HOST_FRAME_SCHEMA: &str = "zeno-fcis/native-scalar-frame/1";
+/// Maximum complete binary request size, including the 16-byte header.
+pub const HOST_MAX_FRAME_BYTES: usize = 65_536;
+const HOST_MAGIC: &[u8; 8] = b"ZFCISL1\0";
+
+/// Checks the declared flat-record i64/Bool/payload-free-Sum consumer subset.
+///
+/// # Errors
+/// Refuses wider integers, unsigned/Enum/byte/text/compound fields, nonidentity
+/// Sum codes, nonrecord roots and more than 16 command/context fields in total.
+pub fn scalar_profile() -> AppResult<()> {
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let description = &v2_contract::DESCRIPTION;
+    let name_fits = |name: &[u8], limit| {
+        !name.is_empty()
+            && name.len() <= limit
+            && name
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+    };
+    let mut request_fields = 0;
+    for (index, (schema, binding)) in [
+        (descriptor.state, &v2_contract::FRAMING.state),
+        (descriptor.command, &v2_contract::FRAMING.command),
+        (descriptor.context, &v2_contract::FRAMING.context),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let c::Schema::Record(fields) = schema else {
+            return Err("the scalar consumer requires flat record roots".to_owned());
+        };
+        let original = description
+            .definitions
+            .iter()
+            .find(|definition| definition.id == binding.root)
+            .map(|definition| &definition.kind);
+        let Some(s::Kind::Record(original)) = original else {
+            return Err("the scalar consumer requires original record roots".to_owned());
+        };
+        if fields.len() > 16 || fields.len() != original.len() {
+            return Err("the scalar consumer root field count is unsupported".to_owned());
+        }
+        if index != 0 {
+            request_fields += fields.len();
+        }
+        for (field, original) in fields.iter().zip(*original) {
+            let kind = description
+                .definitions
+                .iter()
+                .find(|definition| definition.id == original.type_id)
+                .map(|definition| &definition.kind);
+            let supported = field.id == original.id
+                && name_fits(original.name, 120)
+                && match (&field.leaf, kind) {
+                    (InputLeaf::Bool, Some(s::Kind::Bool)) => true,
+                    (
+                        InputLeaf::I128 { min, max },
+                        Some(s::Kind::I128 {
+                            min: lower,
+                            max: upper,
+                        }),
+                    ) => min <= max && i128::from(*min) == *lower && i128::from(*max) == *upper,
+                    (
+                        InputLeaf::Sum {
+                            type_id, variants, ..
+                        },
+                        Some(s::Kind::Sum(declared)),
+                    ) => {
+                        *type_id == original.type_id
+                            && variants.len() == declared.len()
+                            && declared.iter().all(|variant| name_fits(variant.name, 128))
+                            && variants.iter().all(|variant| {
+                                variant.code == i64::from(variant.id)
+                                    && declared.iter().any(|item| item.id == variant.id)
+                            })
+                    }
+                    _ => false,
+                };
+            if !supported {
+                return Err(format!("field {} is outside {HOST_PROFILE}", field.id));
+            }
+        }
+    }
+    if request_fields > 16 {
+        return Err("the scalar consumer reads at most 16 command/context fields".to_owned());
+    }
+    Ok(())
+}
+
+/// Builds an opaque binary command/context request through the native wire owner.
+///
+/// # Errors
+/// Refuses an unsupported profile, wrong counts or values outside native domains.
+pub fn scalar_frame(command: &[i128], context: &[i128]) -> AppResult<Vec<u8>> {
+    scalar_profile()?;
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    if command.len() != crate::width(descriptor.command)?
+        || context.len() != crate::width(descriptor.context)?
+    {
+        return Err("scalar request command/context field counts do not match".to_owned());
+    }
+    let shape = crate::examples::Shape::of(&descriptor)?;
+    let mut numbers = genesis_numbers()?;
+    numbers.extend_from_slice(command);
+    numbers.extend_from_slice(context);
+    for (index, value) in numbers.iter().enumerate() {
+        shape.check_input(index, *value)?;
+    }
+    let raw = wire(&descriptor, &numbers)?;
+    let size = 16 + raw[1].len() + raw[2].len();
+    if size > HOST_MAX_FRAME_BYTES {
+        return Err("the scalar request exceeds 65536 bytes".to_owned());
+    }
+    let mut framed = Vec::with_capacity(size);
+    framed.extend_from_slice(HOST_MAGIC);
+    for part in &raw[1..] {
+        let length = u32::try_from(part.len()).map_err(|_| "scalar request length overflow")?;
+        framed.extend_from_slice(&length.to_le_bytes());
+    }
+    framed.extend_from_slice(&raw[1]);
+    framed.extend_from_slice(&raw[2]);
+    Ok(framed)
+}
+
+/// Admits complete canonical request bytes before returning native scalar inputs.
+///
+/// # Errors
+/// Refuses malformed, oversized, aliased or wrong-contract envelopes and domains.
+/// Full native reconstruction detects extra fields, UInt/Enum substitutions and
+/// Sum payloads that the existing number projection alone would discard.
+pub fn scalar_frame_inputs(framed: &[u8]) -> AppResult<(Vec<i128>, Vec<i128>)> {
+    scalar_profile()?;
+    if framed.len() < 16 || framed.len() > HOST_MAX_FRAME_BYTES || &framed[..8] != HOST_MAGIC {
+        return Err("invalid scalar request header or size".to_owned());
+    }
+    let read_length = |offset| -> AppResult<usize> {
+        let bytes = framed[offset..offset + 4]
+            .try_into()
+            .map_err(|_| "invalid scalar request length")?;
+        usize::try_from(u32::from_le_bytes(bytes))
+            .map_err(|_| "scalar request length overflow".to_owned())
+    };
+    let command_end = 16_usize
+        .checked_add(read_length(8)?)
+        .ok_or("scalar request length overflow")?;
+    let end = command_end
+        .checked_add(read_length(12)?)
+        .ok_or("scalar request length overflow")?;
+    if end != framed.len() || command_end > end {
+        return Err("scalar request lengths do not match its complete bytes".to_owned());
+    }
+    let limits = DecodeLimits {
+        max_input_bytes: HOST_MAX_FRAME_BYTES as u64,
+        value: zeno_fcis_value::ValueLimits {
+            max_depth: 2,
+            max_nodes: 64,
+            max_payload_bytes: 0,
+            max_collection_len: 16,
+        },
+    };
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let command = root_numbers_with_limits(descriptor.command, &framed[16..command_end], limits)?;
+    let context = root_numbers_with_limits(descriptor.context, &framed[command_end..], limits)?;
+    if scalar_frame(&command, &context)? != framed {
+        return Err("scalar request is not the contract's complete canonical framing".to_owned());
+    }
+    Ok((command, context))
 }
 
 /// The Authority's decision on `candidate`, made on the state `pre`.
@@ -1849,5 +2199,208 @@ mod tests {
             matches!(after_delivering(&[], Failure::Io("disk".to_owned())),
             Failure::Io(message) if message == "disk")
         );
+    }
+}
+
+#[cfg(test)]
+mod scalar_consumer_tests {
+    #[test]
+    fn scalar_frames_preserve_native_envelopes_and_refuse_aliases() {
+        use crate::{examples, session, v2_contract, wire};
+        use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Envelope, Hash32, decode_envelope};
+        use zeno_fcis_synthesis::finite::{V2InputLeaf as InputLeaf, v2_composition as c};
+        use zeno_fcis_value::{Field, Value, ValueRef};
+        if session::scalar_profile().is_err() {
+            assert!(session::scalar_frame(&[], &[]).is_err());
+            return;
+        }
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let written = examples(include_str!("../tests/decision-examples.txt")).unwrap();
+        let state = crate::width(descriptor.state).unwrap();
+        let command_width = crate::width(descriptor.command).unwrap();
+        for example in &written {
+            let (command, context) = example.inputs[state..].split_at(command_width);
+            let framed = session::scalar_frame(command, context).unwrap();
+            let native = wire(&descriptor, &example.inputs).unwrap();
+            assert_eq!(&framed[..8], b"ZFCISL1\0");
+            assert_eq!(&framed[8..12], &(native[1].len() as u32).to_le_bytes());
+            assert_eq!(&framed[12..16], &(native[2].len() as u32).to_le_bytes());
+            assert_eq!(&framed[16..16 + native[1].len()], native[1]);
+            assert_eq!(&framed[16 + native[1].len()..], native[2]);
+            assert_eq!(
+                session::scalar_frame_inputs(&framed).unwrap(),
+                (command.to_vec(), context.to_vec())
+            );
+        }
+        let Some(example) = written.first() else {
+            return;
+        };
+        let native = wire(&descriptor, &example.inputs).unwrap();
+        let pack = |command: &[u8], context: &[u8]| {
+            let mut bytes = b"ZFCISL1\0".to_vec();
+            bytes.extend_from_slice(&(command.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(&(context.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(command);
+            bytes.extend_from_slice(context);
+            bytes
+        };
+        // Optional qualification artifacts are authored by the real Rust codec,
+        // then consumed unchanged by the native CLI and compiled OCaml client.
+        let directory = std::env::var_os("ZENO_OCAML_NEGATIVE_DIR").map(std::path::PathBuf::from);
+        if let Some(directory) = &directory {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        let refuse = |name: &str, bytes: &[u8]| {
+            assert!(session::scalar_frame_inputs(bytes).is_err(), "{name}");
+            if let Some(directory) = &directory {
+                std::fs::write(directory.join(format!("{name}.frame")), bytes).unwrap();
+            }
+        };
+        let original = pack(&native[1], &native[2]);
+        let mut changed = original.clone();
+        changed[0] ^= 1;
+        refuse("bad-magic", &changed);
+        refuse("truncated-header", &original[..15]);
+        refuse(
+            "truncated-envelope",
+            &pack(&native[1][..native[1].len() - 1], &native[2]),
+        );
+        let mut changed = original.clone();
+        changed.push(0);
+        refuse("trailing-frame-byte", &changed);
+        let oversized = vec![0; session::HOST_MAX_FRAME_BYTES + 1];
+        refuse("oversized-frame", &oversized);
+        let mut changed = original;
+        changed[8] ^= 1;
+        refuse("length-mismatch", &changed);
+        let envelope = decode_envelope(&native[1], DecodeLimits::default()).unwrap();
+        let mut aliases = vec![
+            (
+                "wrong-command-root",
+                Envelope::new(
+                    envelope.type_id().wrapping_add(1),
+                    envelope.schema_hash(),
+                    envelope.value().clone(),
+                ),
+            ),
+            (
+                "wrong-command-schema",
+                Envelope::new(
+                    envelope.type_id(),
+                    Hash32::new([0; 32]),
+                    envelope.value().clone(),
+                ),
+            ),
+        ];
+        let ValueRef::Record(fields) = envelope.value().view() else {
+            panic!("flat profile")
+        };
+        let mut extra = fields.to_vec();
+        let id = (0..=u16::MAX)
+            .rev()
+            .find(|id| !fields.iter().any(|field| field.id() == *id))
+            .unwrap();
+        extra.push(Field::new(id, Value::boolean(false)));
+        extra.sort_by_key(Field::id);
+        let extra = Envelope::new(
+            envelope.type_id(),
+            envelope.schema_hash(),
+            Value::record_canonical(extra).unwrap(),
+        );
+        if let ValueRef::Record(fields) = extra.value().view() {
+            let mut duplicate = extra.canonical_bytes().unwrap();
+            let header = duplicate.len() - extra.value().canonical_bytes().unwrap().len();
+            let second = header + 5 + 2 + fields[0].value().canonical_bytes().unwrap().len();
+            duplicate[second..second + 2].copy_from_slice(&fields[0].id().to_be_bytes());
+            refuse("duplicate-field", &pack(&duplicate, &native[2]));
+        }
+        aliases.push(("extra-field", extra));
+        if let Some(first) = fields.first()
+            && let ValueRef::Sum {
+                type_id, variant, ..
+            } = first.value().view()
+        {
+            let unknown = (0..=u16::MAX)
+                .find(|id| {
+                    let c::Schema::Record(fields) = descriptor.command else {
+                        return false;
+                    };
+                    let InputLeaf::Sum { variants, .. } = &fields[0].leaf else {
+                        return false;
+                    };
+                    !variants.iter().any(|variant| variant.id == *id)
+                })
+                .unwrap();
+            for (name, replacement) in [
+                (
+                    "sum-with-payload",
+                    Value::sum(type_id, variant, Some(Value::unit())),
+                ),
+                ("enum-instead-of-sum", Value::enumeration(type_id, variant)),
+                ("unknown-variant", Value::sum(type_id, unknown, None)),
+                ("unsupported-byte-profile", Value::bytes(vec![0]).unwrap()),
+                (
+                    "unsupported-uint-profile",
+                    Value::unsigned(u128::from(variant)),
+                ),
+            ] {
+                let mut changed = fields.to_vec();
+                changed[0] = Field::new(first.id(), replacement);
+                aliases.push((
+                    name,
+                    Envelope::new(
+                        envelope.type_id(),
+                        envelope.schema_hash(),
+                        Value::record_canonical(changed).unwrap(),
+                    ),
+                ));
+            }
+        }
+        for (name, alias) in aliases {
+            refuse(name, &pack(&alias.canonical_bytes().unwrap(), &native[2]));
+        }
+        let envelope = decode_envelope(&native[2], DecodeLimits::default()).unwrap();
+        for (name, alias) in [
+            (
+                "wrong-context-root",
+                Envelope::new(
+                    envelope.type_id().wrapping_add(1),
+                    envelope.schema_hash(),
+                    envelope.value().clone(),
+                ),
+            ),
+            (
+                "wrong-context-schema",
+                Envelope::new(
+                    envelope.type_id(),
+                    Hash32::new([0; 32]),
+                    envelope.value().clone(),
+                ),
+            ),
+        ] {
+            refuse(name, &pack(&native[1], &alias.canonical_bytes().unwrap()));
+        }
+        let ValueRef::Record(fields) = envelope.value().view() else {
+            panic!("flat profile")
+        };
+        if let Some(first) = fields.first()
+            && let ValueRef::Bool(value) = first.value().view()
+        {
+            let mut changed = fields.to_vec();
+            changed[0] = Field::new(first.id(), Value::unsigned(u128::from(value)));
+            let changed = Envelope::new(
+                envelope.type_id(),
+                envelope.schema_hash(),
+                Value::record_canonical(changed).unwrap(),
+            )
+            .canonical_bytes()
+            .unwrap();
+            refuse("uint-instead-of-bool", &pack(&native[1], &changed));
+        }
+        let (command, context) = example.inputs[state..].split_at(command_width);
+        let mut extra = command.to_vec();
+        extra.push(0);
+        assert!(session::scalar_frame(&extra, context).is_err());
     }
 }

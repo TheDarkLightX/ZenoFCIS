@@ -2,11 +2,10 @@
 
 ## Design preflight
 
-Baseline: `1ca59259d6de09a37834c2858a275f0759c41705`. This is an
-additive authoring feature. The existing canonical search, nominal commit
-authority, catalog checker, and durable outbox remain its acceptance boundaries.
-Fable 5.1 is a source-informed design reviewer; its suggestions confer no
-verification or release authority.
+This is an additive authoring feature. The existing canonical search, nominal
+commit authority, catalog checker, and durable outbox remain its acceptance
+boundaries. A separate language-model design review informed this design; its
+suggestions confer no verification or release authority.
 
 The problem is that ZenoFCIS already has a bounded hole-search kernel and a
 checked external-backend protocol, but neither produces a checked, usable
@@ -60,11 +59,10 @@ completeness of the user's requirements.
 
 ## Required evidence
 
-Fable's design review completed on 2026-09-08 using the actual
-`claude-fable-5-1` model with tools disabled. The retained request digest is
-`a2ef0c66b349fa6d10df80c89f41b27d87513cb8ff4b171ef84fee00c4885e9d`.
-The design adopts a relational contract, a bounded realizability precheck,
-typed expression alternatives, and a separate target-conformance result.
+The language-model design review, run with tools disabled, completed on
+2026-09-08. The design adopts a relational contract, a bounded realizability
+precheck, typed expression alternatives, and a separate target-conformance
+result.
 It uses a flat, topologically ordered expression graph to bound traversal and
 avoid recursive parser/evaluator depth. Boolean and checked i64 arithmetic are
 the initial theory; enum and temporal theories need separate profile work.
@@ -314,8 +312,8 @@ composition or the shell lifecycle. Those retain their existing checks.
 
 ## Validation and design review
 
-Fable 5.1 supplied the source-informed design review, with a retained tool-free
-request and response. Its realizability, relational-contract, target-adapter,
+A separate language model supplied the source-informed design review, without
+tool access. Its realizability, relational-contract, target-adapter,
 and separate-conformance recommendations were implemented. A second source
 review found and prompted fixes for replay budgeting, contract schema
 partition binding, admission allocations, subprocess cleanup, final output

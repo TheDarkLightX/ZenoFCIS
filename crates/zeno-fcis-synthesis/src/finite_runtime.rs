@@ -11,22 +11,13 @@ use zeno_fcis_value::{Value, ValueLimits, ValueRef};
 
 /// Binds a mounted runtime to the exact importer and finite evaluator source.
 pub fn evaluator_hash() -> Result<Hash32, SynthesisError> {
-    let mut source = Vec::new();
-    source.extend_from_slice(include_bytes!("finite/ir.rs"));
-    source.extend_from_slice(include_bytes!("finite/evaluation/mod.rs"));
-    source.extend_from_slice(include_bytes!("finite/evaluation/spec.rs"));
-    source.extend_from_slice(include_bytes!("finite/evaluation/admission/mod.rs"));
-    source.extend_from_slice(include_bytes!("finite/evaluation/admission/spec.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/mod.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/meter.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/spec.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/input_view.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/input_view/spec.rs"));
-    source.extend_from_slice(include_bytes!("finite/canonical_v2/mod.rs"));
-    source.extend_from_slice(include_bytes!("finite/canonical_v2/spec.rs"));
+    let mut source = crate::finite::semantic_source_bytes();
     source.extend_from_slice(crate::finite::V2_EXECUTION_PROFILE.as_bytes());
     source.extend_from_slice(crate::finite::V2_RECORD_PROFILE.as_bytes());
     source.extend_from_slice(include_bytes!("finite_runtime.rs"));
+    // The generated digest also binds the approved closure outside these
+    // files, including the value and codec crates the importer decodes with.
+    source.extend_from_slice(&crate::finite::v2_authority::EVALUATOR);
     crate::hash_bytes(zeno_fcis_codec::domains::FINITE_RUNTIME_SOURCE, &source)
 }
 

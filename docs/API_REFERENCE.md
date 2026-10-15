@@ -1,6 +1,10 @@
 # API reference
 
-The V2 development branch uses the checked program family by default. `zeno_fcis::Program` is the existing private Authority; `bind_catalog` and `bind_program` perform actual admission. Original envelopes enter `Program::publish`/`publish_genesis`; only successful library evaluation returns a private publication capability. See [migration](V2_PROGRAM_API_MIGRATION.md) for declaration modules, refusal/replay behavior and remaining lower-level obligations.
+This guide documents the `2.3.0` source. Its retained V1
+protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
+for the current checked API and assurance boundaries.
+
+The 2.3.0 source uses the checked program family by default. `zeno_fcis::Program` is the existing private Authority; `bind_catalog` and `bind_program` perform actual admission. Original envelopes enter `Program::publish`/`publish_genesis`; only successful library evaluation returns a private publication capability. See [migration](V2_PROGRAM_API_MIGRATION.md) for declaration modules, refusal/replay behavior and remaining lower-level obligations.
 
 | Normal goal | Entry point |
 |---|---|
@@ -82,7 +86,9 @@ strict plan reauthorization, and nominal authenticated publication.
 ## Stability
 
 This development branch intentionally changes the 1.1.0 execution API. It has
-not been released as V2. Protocol identifiers remain versioned; SQLite schema
-9 refuses older stores rather than silently migrating them. Final application,
-proof, CI and release checks have the limits stated in the
+no stable V2 release yet; the public V2 candidates are prereleases. Protocol
+identifiers remain versioned. SQLite stores use schema 10: a schema-9 store
+opens only for an explicit migration after a complete audit, and older stores
+are refused rather than silently migrated. Final application, proof, CI and
+release checks have the limits stated in the
 [candidate record](RELEASE_CANDIDATES.md).

@@ -9,55 +9,16 @@
 
 #[cfg(test)]
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 
-/// The sort of a term or definition.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Sort {
-    Int,
-    Bool,
-}
-
-/// A term. Integer terms denote unbounded integers, as SMT-LIB's `Int` does.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Term {
-    Int(i128),
-    Bool(bool),
-    /// A declared constant or an earlier definition.
-    Name(String),
-    Add(Box<Term>, Box<Term>),
-    Sub(Box<Term>, Box<Term>),
-    Mul(Box<Term>, Box<Term>),
-    /// SMT-LIB's `div`: the quotient whose remainder lies in `0..|divisor|`.
-    /// Its value for a zero divisor is unspecified, so every user guards the
-    /// divisor.
-    Div(Box<Term>, Box<Term>),
-    Eq(Box<Term>, Box<Term>),
-    Lt(Box<Term>, Box<Term>),
-    Le(Box<Term>, Box<Term>),
-    Not(Box<Term>),
-    And(Vec<Term>),
-    Or(Vec<Term>),
-    Ite(Box<Term>, Box<Term>, Box<Term>),
-}
+#[path = "smt/term.rs"]
+mod term;
+pub(crate) use term::names::indexed_name;
+pub(crate) use term::{Sort, Term};
+#[path = "smt/script.rs"]
+mod script;
+pub(crate) use script::{Script, Values};
 
 impl Term {
-    pub(crate) fn name(name: &str) -> Self {
-        Self::Name(name.to_owned())
-    }
-
-    pub(crate) fn add(left: Self, right: Self) -> Self {
-        Self::Add(Box::new(left), Box::new(right))
-    }
-
-    pub(crate) fn sub(left: Self, right: Self) -> Self {
-        Self::Sub(Box::new(left), Box::new(right))
-    }
-
-    pub(crate) fn mul(left: Self, right: Self) -> Self {
-        Self::Mul(Box::new(left), Box::new(right))
-    }
-
     /// The quotient rounded toward negative infinity: `div` for a positive
     /// divisor, and `floor(a / b) = floor(-a / -b)` otherwise.
     pub(crate) fn floor_div(left: Self, right: Self) -> Self {
@@ -77,116 +38,14 @@ impl Term {
         )
     }
 
-    pub(crate) fn eq(left: Self, right: Self) -> Self {
-        Self::Eq(Box::new(left), Box::new(right))
-    }
-
-    pub(crate) fn lt(left: Self, right: Self) -> Self {
-        Self::Lt(Box::new(left), Box::new(right))
-    }
-
-    pub(crate) fn le(left: Self, right: Self) -> Self {
-        Self::Le(Box::new(left), Box::new(right))
-    }
-
-    pub(crate) fn not(inner: Self) -> Self {
-        match inner {
-            Self::Bool(value) => Self::Bool(!value),
-            Self::Not(inner) => *inner,
-            inner => Self::Not(Box::new(inner)),
-        }
-    }
-
-    /// The conjunction, without literal `true` items; `false` absorbs it.
-    pub(crate) fn and(items: impl IntoIterator<Item = Self>) -> Self {
-        let mut kept = Vec::new();
-        for item in items {
-            match item {
-                Self::Bool(true) => {}
-                Self::Bool(false) => return Self::Bool(false),
-                item => kept.push(item),
-            }
-        }
-        match kept.len() {
-            0 => Self::Bool(true),
-            1 => kept.pop().unwrap_or(Self::Bool(true)),
-            _ => Self::And(kept),
-        }
-    }
-
-    /// The disjunction, without literal `false` items; `true` absorbs it.
-    pub(crate) fn or(items: impl IntoIterator<Item = Self>) -> Self {
-        let mut kept = Vec::new();
-        for item in items {
-            match item {
-                Self::Bool(false) => {}
-                Self::Bool(true) => return Self::Bool(true),
-                item => kept.push(item),
-            }
-        }
-        match kept.len() {
-            0 => Self::Bool(false),
-            1 => kept.pop().unwrap_or(Self::Bool(false)),
-            _ => Self::Or(kept),
-        }
-    }
-
-    pub(crate) fn ite(condition: Self, then: Self, otherwise: Self) -> Self {
-        match condition {
-            Self::Bool(true) => then,
-            Self::Bool(false) => otherwise,
-            condition => Self::Ite(Box::new(condition), Box::new(then), Box::new(otherwise)),
-        }
-    }
-
-    /// `min <= term <= max`.
-    pub(crate) fn within(term: &Self, min: i128, max: i128) -> Self {
-        Self::and([
-            Self::le(Self::Int(min), term.clone()),
-            Self::le(term.clone(), Self::Int(max)),
-        ])
-    }
-
     /// The term is one of `values`.
     pub(crate) fn member(term: &Self, values: &[i128]) -> Self {
         Self::or(
             values
                 .iter()
-                .map(|value| Self::eq(term.clone(), Self::Int(*value))),
+                .map(|value| Self::eq(term.clone(), Self::Int(*value)))
+                .collect(),
         )
-    }
-
-    fn write(&self, out: &mut String) {
-        let list = |operator: &str, items: &[&Self], out: &mut String| {
-            out.push('(');
-            out.push_str(operator);
-            for item in items {
-                out.push(' ');
-                item.write(out);
-            }
-            out.push(')');
-        };
-        match self {
-            Self::Int(value) if *value < 0 => {
-                let _ = write!(out, "(- {})", value.unsigned_abs());
-            }
-            Self::Int(value) => {
-                let _ = write!(out, "{value}");
-            }
-            Self::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
-            Self::Name(name) => out.push_str(name),
-            Self::Add(a, b) => list("+", &[a, b], out),
-            Self::Sub(a, b) => list("-", &[a, b], out),
-            Self::Mul(a, b) => list("*", &[a, b], out),
-            Self::Div(a, b) => list("div", &[a, b], out),
-            Self::Eq(a, b) => list("=", &[a, b], out),
-            Self::Lt(a, b) => list("<", &[a, b], out),
-            Self::Le(a, b) => list("<=", &[a, b], out),
-            Self::Not(a) => list("not", &[a], out),
-            Self::And(items) => list("and", &items.iter().collect::<Vec<_>>(), out),
-            Self::Or(items) => list("or", &items.iter().collect::<Vec<_>>(), out),
-            Self::Ite(c, a, b) => list("ite", &[c, a, b], out),
-        }
     }
 
     /// Evaluates the term; `None` when a value it needs is unknown.
@@ -346,15 +205,6 @@ pub(crate) enum Value {
     Bool(bool),
 }
 
-/// The values one declared constant may take.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Values {
-    /// Every integer from `min` to `max` inclusive.
-    Range { min: i128, max: i128 },
-    /// Exactly these integers.
-    Set(Vec<i128>),
-}
-
 impl Values {
     #[cfg(test)]
     pub(crate) fn contains(&self, value: i128) -> bool {
@@ -363,98 +213,9 @@ impl Values {
             Self::Set(values) => values.contains(&value),
         }
     }
-
-    fn term(&self, name: &str) -> Term {
-        let constant = Term::name(name);
-        match self {
-            Self::Range { min, max } => Term::within(&constant, *min, *max),
-            Self::Set(values) => Term::member(&constant, values),
-        }
-    }
-}
-
-/// One query: declared integer constants with their value sets, named
-/// definitions in order, and assertions.
-#[derive(Clone, Debug, Default)]
-pub(crate) struct Script {
-    comments: Vec<String>,
-    constants: Vec<(String, Values)>,
-    definitions: Vec<(String, Sort, Term)>,
-    /// Integer constants asserted equal to a term, so that a model reports
-    /// the term's value.
-    observations: Vec<(String, Term)>,
-    assertions: Vec<Term>,
 }
 
 impl Script {
-    /// A comment line at the top of the query.
-    pub(crate) fn comment(&mut self, text: &str) {
-        self.comments.extend(text.lines().map(str::to_owned));
-    }
-
-    /// Declares an integer constant restricted to `values`. Solvers print
-    /// the value of every declared constant in their models.
-    pub(crate) fn constant(&mut self, name: &str, values: Values) -> Term {
-        self.constants.push((name.to_owned(), values));
-        Term::name(name)
-    }
-
-    /// Defines `name` as `term` and returns a reference to it.
-    pub(crate) fn define(&mut self, name: &str, sort: Sort, term: Term) -> Term {
-        self.definitions.push((name.to_owned(), sort, term));
-        Term::name(name)
-    }
-
-    pub(crate) fn assert(&mut self, term: Term) {
-        self.assertions.push(term);
-    }
-
-    /// Declares an integer constant equal to `term`, so that a model reports
-    /// the term's value for replay to compare with the library's.
-    pub(crate) fn observe(&mut self, name: &str, term: Term) {
-        self.observations.push((name.to_owned(), term));
-    }
-
-    /// The SMT-LIB text: the constants, their value sets, the definitions,
-    /// the assertions and `(check-sat)`.
-    pub(crate) fn source(&self) -> String {
-        let mut out = String::new();
-        for comment in &self.comments {
-            let _ = writeln!(out, "; {comment}");
-        }
-        out.push_str("(set-logic ALL)\n(set-option :produce-models true)\n");
-        for (name, values) in &self.constants {
-            let _ = writeln!(out, "(declare-const {name} Int)");
-            out.push_str("(assert ");
-            values.term(name).write(&mut out);
-            out.push_str(")\n");
-        }
-        for (name, _) in &self.observations {
-            let _ = writeln!(out, "(declare-const {name} Int)");
-        }
-        for (name, sort, term) in &self.definitions {
-            let sort = match sort {
-                Sort::Int => "Int",
-                Sort::Bool => "Bool",
-            };
-            let _ = write!(out, "(define-fun {name} () {sort} ");
-            term.write(&mut out);
-            out.push_str(")\n");
-        }
-        for (name, term) in &self.observations {
-            let _ = write!(out, "(assert (= {name} ");
-            term.write(&mut out);
-            out.push_str("))\n");
-        }
-        for assertion in &self.assertions {
-            out.push_str("(assert ");
-            assertion.write(&mut out);
-            out.push_str(")\n");
-        }
-        out.push_str("(check-sat)\n");
-        out
-    }
-
     /// Every definition's value at an assignment of the constants; `None`
     /// when a constant is unassigned or outside its value set.
     #[cfg(test)]
@@ -659,7 +420,7 @@ mod tests {
         assert_eq!(inside.boolean("fits"), Some(true));
         assert_eq!(inside.int("again"), Some(1));
         // A known false item decides a conjunction with an unknown one.
-        script.assert(Term::and([
+        script.assert(Term::and(vec![
             Term::name("fits"),
             Term::eq(Term::name("again"), Term::Int(1)),
         ]));
@@ -687,5 +448,182 @@ mod tests {
                 .evaluate(&BTreeMap::from([("x".to_owned(), 151)]))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn deep_clone_keeps_nested_query_fragments_independent_and_ordered() {
+        let leaf = || Term::Name("x_é_变量".to_owned());
+        let boxed = |value| Box::new(value);
+        let original = Term::And(vec![
+            Term::Int(i128::MIN),
+            Term::Bool(false),
+            leaf(),
+            Term::Add(boxed(leaf()), boxed(Term::Int(1))),
+            Term::Sub(boxed(Term::Int(1)), boxed(leaf())),
+            Term::Mul(boxed(leaf()), boxed(Term::Int(-1))),
+            Term::Div(boxed(leaf()), boxed(Term::Int(2))),
+            Term::Eq(boxed(leaf()), boxed(Term::Int(0))),
+            Term::Lt(boxed(Term::Int(0)), boxed(leaf())),
+            Term::Le(boxed(leaf()), boxed(Term::Int(0))),
+            Term::Not(boxed(Term::Bool(true))),
+            Term::And(vec![]),
+            Term::Or(vec![leaf(), Term::Bool(true), leaf()]),
+            Term::Ite(boxed(Term::Bool(false)), boxed(leaf()), boxed(Term::Int(7))),
+        ]);
+        let mut cloned = original.clone();
+        assert_eq!(cloned, original);
+        let mut before = String::new();
+        original.write(&mut before);
+        let mut after = String::new();
+        cloned.write(&mut after);
+        assert_eq!(after, before);
+
+        let Term::And(children) = &mut cloned else {
+            unreachable!()
+        };
+        let Term::Name(name) = &mut children[2] else {
+            unreachable!()
+        };
+        name.push_str("_changed");
+        children.swap(0, 1);
+        assert_ne!(cloned, original);
+        let mut unchanged = String::new();
+        original.write(&mut unchanged);
+        assert_eq!(unchanged, before);
+    }
+
+    #[test]
+    fn numeral_writer_preserves_standard_decimal_bytes_and_existing_prefix() {
+        let boundary = [
+            i128::MIN,
+            i128::MIN + 1,
+            i64::MIN as i128,
+            -10,
+            -1,
+            0,
+            1,
+            10,
+            i64::MAX as i128,
+            i128::MAX - 1,
+            i128::MAX,
+        ];
+        for value in boundary
+            .into_iter()
+            .chain((i16::MIN..=i16::MAX).map(i128::from))
+        {
+            let mut actual = "prefix: ".to_owned();
+            Term::Int(value).write(&mut actual);
+            let expected = if value < 0 {
+                format!("prefix: (- {})", value.unsigned_abs())
+            } else {
+                format!("prefix: {value}")
+            };
+            assert_eq!(actual, expected, "numeral {value}");
+        }
+    }
+
+    #[test]
+    fn complete_script_preserves_empty_singleton_and_ordered_value_sets() {
+        let mut script = Script::default();
+        script.comment("first\nsecond");
+        script.constant("empty", Values::Set(vec![]));
+        let singleton = script.constant("one", Values::Set(vec![-1]));
+        let many = script.constant("many", Values::Set(vec![2, -3, 2]));
+        script.define("selected", Sort::Int, Term::add(singleton, many));
+        script.observe("observed", Term::name("selected"));
+        script.assert(Term::Bool(true));
+        assert_eq!(
+            script.source(),
+            "; first\n; second\n(set-logic ALL)\n(set-option :produce-models true)\n\
+             (declare-const empty Int)\n(assert false)\n\
+             (declare-const one Int)\n(assert (= one (- 1)))\n\
+             (declare-const many Int)\n(assert (or (= many 2) (= many (- 3)) (= many 2)))\n\
+             (declare-const observed Int)\n\
+             (define-fun selected () Int (+ one many))\n\
+             (assert (= observed selected))\n(assert true)\n(check-sat)\n"
+        );
+    }
+}
+
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
+
+    fn assert_comment_append_matches_lines(text: &str) {
+        let mut actual = Script::default();
+        let x = actual.constant("x", Values::Set(vec![0, 1]));
+        let selected = actual.define("selected", Sort::Int, Term::add(x, Term::Int(1)));
+        actual.observe("observed", selected);
+        actual.assert(Term::Bool(true));
+        let mut reference = actual.clone();
+
+        let prior = "retained\r\r\n\nλ雪🙂";
+        actual.comment(prior);
+        reference.comments.extend(prior.lines().map(str::to_owned));
+        assert_eq!(actual.comments, reference.comments, "before {text:?}");
+        assert_eq!(actual.source(), reference.source(), "before {text:?}");
+
+        let retained = actual.comments.clone();
+        actual.comment(text);
+        reference.comments.extend(text.lines().map(str::to_owned));
+        assert_eq!(actual.comments, reference.comments, "after {text:?}");
+        assert_eq!(
+            &actual.comments[..retained.len()],
+            retained.as_slice(),
+            "retained prefix for {text:?}"
+        );
+        assert_eq!(actual.constants, reference.constants);
+        assert_eq!(actual.definitions, reference.definitions);
+        assert_eq!(actual.observations, reference.observations);
+        assert_eq!(actual.assertions, reference.assertions);
+        assert_eq!(actual.source(), reference.source(), "after {text:?}");
+    }
+
+    #[test]
+    fn comment_supplied_edges_append_exact_standard_lines_and_query_bytes() {
+        let cases: [(&str, &[&str]); 16] = [
+            ("", &[]),
+            ("a", &["a"]),
+            ("\n", &[""]),
+            ("\n\n", &["", ""]),
+            ("a\n", &["a"]),
+            ("a\n\n", &["a", ""]),
+            ("\r\n", &[""]),
+            ("\r\n\r\n", &["", ""]),
+            ("a\r\nb", &["a", "b"]),
+            ("\r", &["\r"]),
+            ("a\rb", &["a\rb"]),
+            ("a\r", &["a\r"]),
+            ("a\r\r\n", &["a\r"]),
+            ("a\n\rb", &["a", "\rb"]),
+            ("λ\r\n雪🙂", &["λ", "雪🙂"]),
+            ("λ\u{2028}雪", &["λ\u{2028}雪"]),
+        ];
+        for (text, expected) in cases {
+            assert_eq!(
+                text.lines().collect::<Vec<_>>().as_slice(),
+                expected,
+                "supplied expectation for {text:?}"
+            );
+            assert_comment_append_matches_lines(text);
+        }
+    }
+
+    #[test]
+    fn comment_short_alphabet_exhaustively_preserves_standard_lines_and_query_bytes() {
+        let alphabet = ['\n', '\r', 'a', 'λ', '🙂', '\u{2028}'];
+        let mut checked = 0;
+        for length in 0..=4u32 {
+            for mut ordinal in 0..alphabet.len().pow(length) {
+                let mut text = String::new();
+                for _ in 0..length {
+                    text.push(alphabet[ordinal % alphabet.len()]);
+                    ordinal /= alphabet.len();
+                }
+                assert_comment_append_matches_lines(&text);
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 1_555);
     }
 }

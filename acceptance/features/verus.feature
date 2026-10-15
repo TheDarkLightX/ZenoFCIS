@@ -11,6 +11,7 @@ Feature: Bind Verus evidence to shared executable Rust
     And malformed, incomplete, failed or wrong-version verifier reports are refused
     And a changed tool file fails its pinned digest check
     And the deliberate mutation anchors still apply to the runtime source
+    And the coverage tool admits only the reviewed bodyless declarations and refuses omitted or weakened ones
 
   @atdd-finite-execution-proof
   Scenario: Preserve complete finite execution and reject missing proof contracts

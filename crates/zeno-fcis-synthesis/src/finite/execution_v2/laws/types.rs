@@ -164,6 +164,13 @@ pub enum Op<'a> {
     Mul(usize, usize),
     /// Checked same-type integer division with declared rounding.
     Div(Division, usize, usize),
+    /// Unsigned floor of an exact 256-bit product divided by a nonzero U128.
+    /// Refuses when the quotient cannot be represented as U128.
+    MulDivFloor(usize, usize, usize),
+    /// Unsigned ceiling with the same exact intermediate and overflow checks.
+    MulDivCeil(usize, usize, usize),
+    /// Compare two exact products of three U128 operands without overflow.
+    ProductsGe([usize; 3], [usize; 3]),
     /// Explicit numeric projection of Bool, enum/sum variant, or representable integer.
     ToI128(usize),
     /// Exact typed equality.

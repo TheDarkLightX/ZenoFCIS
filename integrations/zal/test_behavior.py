@@ -77,6 +77,8 @@ class BehaviorTests(unittest.TestCase):
         for state, event, given in self.model.inputs():
             result = explain(self.model, state, event, given)
             self.assertEqual(result["outcome"], self.model.decide(state, event, given))
+            self.assertEqual(result["supplied_assumptions"], {"observations": given})
+            self.assertEqual(result["authenticated_facts"], [])
             self.assertEqual(sum(r["enabled"] for r in result["rules"]), 0 if result["used_default"] else 1)
         for bad in [{}, None, [], {"authorized": 0}, {"authorized": False, "extra": False}]:
             with self.subTest(context=bad), self.assertRaises(Refusal):
@@ -166,6 +168,8 @@ class BehaviorTests(unittest.TestCase):
                                     {"event": "cancel", "context": {"authorized": True}}])
         self.assertEqual([r["outcome"]["class"] for r in trace], ["Accept", "Reject", "Accept"])
         self.assertEqual(trace[-1]["outcome"]["state"], "cancelled")
+        self.assertEqual([r["supplied_assumptions"]["observations"]["authorized"] for r in trace], [False, False, True])
+        self.assertTrue(all(r["authenticated_facts"] == [] for r in trace))
         for mutated in [SOURCE.replace("[authorized]", "[!authorized]"),
                         SOURCE.replace("accept approved", "accept cancelled"),
                         SOURCE.replace("not_enabled", "different_reason")]:
@@ -275,12 +279,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(proposal["diff"]["witnesses"][0]["state"], "approved")
         with patch("workflow.checker_identity", return_value="changed"):
             with self.assertRaises(Refusal):
-                self.session.accept_human(proposal["base_revision"], proposal["revision"])
-        self.session.accept_human(proposal["base_revision"], proposal["revision"])
+                self.session.accept_human(proposal["base_revision"], proposal["revision"], self.session.view()["examples_digest"])
+        self.session.accept_human(proposal["base_revision"], proposal["revision"], self.session.view()["examples_digest"])
         self.assertEqual(self.session.agreement, "human-accepted")
         self.assertEqual(self.session.realization, "not-run")
         with self.assertRaises(Refusal):
-            self.session.accept_human(proposal["base_revision"], proposal["revision"])
+            self.session.accept_human(proposal["base_revision"], proposal["revision"], self.session.view()["examples_digest"])
 
     def test_refused_events_do_not_change_state_and_views_are_owned(self):
         with self.assertRaises(Refusal):
@@ -301,7 +305,7 @@ class WorkflowTests(unittest.TestCase):
         self.session.agent_act(self.act("propose", SOURCE + "unresolved fairness: pending requests eventually resolve;\n"))
         proposal = self.session.proposal
         self.assertEqual(proposal["evidence"]["status"], "unsupported")
-        self.session.accept_human(proposal["base_revision"], proposal["revision"])
+        self.session.accept_human(proposal["base_revision"], proposal["revision"], self.session.view()["examples_digest"])
         self.assertEqual(self.session.agreement, "human-accepted")
         self.assertEqual(self.session.evidence["status"], "unsupported")
         self.assertEqual(self.session.realization, "not-run")

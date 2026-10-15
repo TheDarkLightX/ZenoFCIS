@@ -41,7 +41,7 @@ CONTRACT_REJECTIONS = {
 }
 TESTS = SUBJECT.parent / 'output/tests.rs'
 PUBLIC_TEST = Path('crates/zeno-fcis-synthesis/tests/v2_original_output.rs')
-STAGE = Path('docs/V2_ORIGINAL_OUTPUT_STAGE.md')
+STAGE = Path('README.md')
 FINITE = Path('crates/zeno-fcis-synthesis/src/finite')
 UNIT_SOURCES = tuple(sorted({HARNESS, *(p.relative_to(ROOT) for folder in
     ['canonical_v2', 'evaluation', 'execution_v2'] for p in (ROOT / FINITE / folder).rglob('*.rs')),

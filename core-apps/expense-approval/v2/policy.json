@@ -1,0 +1,34 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "expense-approval",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {"103": ["Text", 1, 32], "108": ["Bool"]},
+  "variables": {
+    "remaining": "pre.100.110",
+    "phase": "pre.100.111",
+    "v0": "pre.100.112",
+    "v1": "pre.100.113",
+    "v2": "pre.100.114",
+    "votes": "v0 + v1 + v2",
+    "action": "command.101.120",
+    "requested": "command.101.121",
+    "key": "command.101.122",
+    "principal": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {"when": "!((phase == 0 && remaining == 7 && votes == 0) || (phase == 1 && remaining == 7) || (phase == 2 && remaining == 4 && votes >= 2))", "class": "Reject", "reason": 204, "post": {}, "outbox": []},
+    {"when": "!authorized", "class": "Reject", "reason": 200, "post": {}, "outbox": []},
+    {"when": "requested != 3 || key != 1", "class": "Reject", "reason": 205, "post": {}, "outbox": []},
+    {"when": "phase == 2 && action == 162", "class": "Accept", "reason": null, "post": {"110": "remaining", "111": "phase", "112": "v0", "113": "v1", "114": "v2"}, "outbox": []},
+    {"when": "phase == 2 || (action == 160 && phase != 0) || (action != 160 && phase != 1)", "class": "Reject", "reason": 202, "post": {}, "outbox": []},
+    {"when": "action == 161 && ((principal == 0 && v0) || (principal == 1 && v1) || (principal == 2 && v2))", "class": "Reject", "reason": 201, "post": {}, "outbox": []},
+    {"when": "action == 162 && votes < 2", "class": "Reject", "reason": 203, "post": {}, "outbox": []},
+    {"when": "action == 160", "class": "Accept", "reason": null, "post": {"110": "remaining", "111": 1, "112": false, "113": false, "114": false}, "outbox": []},
+    {"when": "action == 161", "class": "Accept", "reason": null, "post": {"110": "remaining", "111": "phase", "112": "v0 || principal == 0", "113": "v1 || principal == 1", "114": "v2 || principal == 2"}, "outbox": []},
+    {"when": "true", "class": "Accept", "reason": null, "post": {"110": "remaining - 3", "111": 2, "112": "v0", "113": "v1", "114": "v2"}, "outbox": [{"ordinal": 0, "channel": 300, "destination": "bank", "payload": {"140": 3, "141": 1}, "idempotency_ordinal": 0}]}
+  ],
+  "genesis": {"110": 7, "111": 0, "112": false, "113": false, "114": false},
+  "law_kinds": {"500": "StateInvariant", "501": "AuthoritySubjectRecipient", "502": "AssetConservation", "503": "DebitCreditEffectEquality"},
+  "delivery_laws": {"503": {"max_deliveries": 2, "observations": {"outbox.104": {"channel": 300}, "outbox.104.140": {"channel": 300, "field": 140}, "outbox.104.141": {"channel": 300, "field": 141}}}}
+}

@@ -64,11 +64,11 @@ pub enum Leaf {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
 /// A canonical field ID and its complete closed leaf descriptor.
-pub struct Field {
+pub struct Field<L = Leaf> {
     /// Expected wire field ID; record descriptors must be strictly increasing.
     pub id: u16,
     /// Complete closed schema of this field.
-    pub leaf: Leaf,
+    pub leaf: L,
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
@@ -224,54 +224,16 @@ fn decode_variant(
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::scalar(bytes@, offset, *leaf),
 ))]
+#[cfg(any(test, verus_keep_ghost))]
 pub(super) fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i64, usize)> {
-    let (tag, payload_offset) = read_big_endian(bytes, offset, 1)?;
-    match leaf {
-        Leaf::U128 { min, max } => {
-            if tag != 0x03 {
-                return None;
-            }
-            let (value, end) = read_big_endian(bytes, payload_offset, 16)?;
-            if value < *min || value > *max || value > i64::MAX as u128 {
-                return None;
-            }
+    let (value, end) = typed::decode_value(bytes, offset, typed::LeafView::Legacy(leaf))?;
+    match value {
+        super::super::value::Atom::I128(value)
+            if value >= i64::MIN as i128 && value <= i64::MAX as i128 =>
+        {
             Some((value as i64, end))
         }
-        Leaf::I128 { min, max } => {
-            if tag != 0x04 {
-                return None;
-            }
-            let (value, end) = read_signed_128(bytes, payload_offset)?;
-            if value < *min as i128 || value > *max as i128 {
-                return None;
-            }
-            Some((value as i64, end))
-        }
-        Leaf::Bool => {
-            if tag == 0x01 {
-                Some((0, payload_offset))
-            } else if tag == 0x02 {
-                Some((1, payload_offset))
-            } else {
-                None
-            }
-        }
-        Leaf::Enum {
-            type_id, variants, ..
-        } => {
-            if tag != 0x07 {
-                return None;
-            }
-            decode_variant(bytes, payload_offset, *type_id, variants, false)
-        }
-        Leaf::Sum {
-            type_id, variants, ..
-        } => {
-            if tag != 0x0a {
-                return None;
-            }
-            decode_variant(bytes, payload_offset, *type_id, variants, true)
-        }
+        _ => None,
     }
 }
 
@@ -377,6 +339,17 @@ pub closed spec fn projection(bytes: Seq<u8>, fields: Seq<Field>,
     -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
     spec::projection(bytes, fields, limits, used)
 }
+pub(super) proof fn projection_usage(bytes: Seq<u8>, fields: Seq<Field>,
+    limits: Seq<u64>, used: Seq<u64>)
+    requires limits.len() == 8, used.len() == 8,
+    ensures projection(bytes, fields, limits, used).1.len() == 8,
+{
+    reveal(projection);
+    let charged = super::spec::charge(limits, used, super::Resource::Byte, bytes.len() as u64);
+    if let Some(offset) = spec::header(bytes, fields.len() as usize) {
+        spec::prefix_usage(bytes, fields, fields.len(), offset, limits, charged.1);
+    }
+}
 pub closed spec fn schema_valid(fields: Seq<Field>) -> bool {
     spec::schema_valid(fields)
 }
@@ -430,6 +403,7 @@ pub(super) fn scalar_domain(leaf: &Leaf) -> super::super::evaluation::Domain {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::field(bytes@, offset, *field),
 ))]
+#[cfg(any(test, verus_keep_ghost))]
 fn decode_field(bytes: &[u8], offset: usize, field: &Field) -> Option<(i64, usize)> {
     let (id, payload_offset) = read_big_endian(bytes, offset, 2)?;
     if id != field.id as u128 {
@@ -455,80 +429,6 @@ fn decode_header(bytes: &[u8], field_count: usize) -> Option<usize> {
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures final(meter).limits == old(meter).limits,
-        (match result { Ok(end) => Ok((final(output)@, end)), Err(error) => Err(error) },
-            final(meter).used.counters@,
-            final(attempts)@) == {
-                let projected = spec::prefix(bytes@, fields@, fields@.len(), offset,
-                    old(meter).limits.counters@, old(meter).used.counters@);
-                (projected.0, projected.1, old(attempts)@ + projected.2)
-            },
-))]
-fn project_fields(
-    bytes: &[u8],
-    fields: &[Field],
-    offset: usize,
-    meter: &mut super::meter::Meter,
-    output: &mut Vec<i64>,
-    attempts: &mut Vec<AccessAttempt>,
-) -> Result<usize, Failure> {
-    #[cfg(verus_keep_ghost)]
-    proof_decl! {
-        let ghost initial_used = meter.used.counters@;
-        let ghost initial_attempts = attempts@;
-    }
-    output.clear();
-    let mut index = 0usize;
-    let mut position = offset;
-    #[cfg_attr(verus_keep_ghost, verus_spec(
-        invariant index <= fields.len(),
-            meter.limits == old(meter).limits,
-            initial_used == old(meter).used.counters@, initial_used.len() == 8,
-            initial_attempts == old(attempts)@,
-            spec::prefix(bytes@, fields@, index as nat, offset,
-                meter.limits.counters@, initial_used).0 == Ok((output@, position)),
-            spec::prefix(bytes@, fields@, index as nat, offset,
-                meter.limits.counters@, initial_used).1 == meter.used.counters@,
-            attempts@ == initial_attempts + spec::prefix(bytes@, fields@, index as nat,
-                offset, meter.limits.counters@, initial_used).2,
-        decreases fields.len() - index,
-    ))]
-    while index < fields.len() {
-        let charged = meter.charge(super::Resource::Read, 1);
-        attempts.push(AccessAttempt {
-            field_id: fields[index].id,
-            permitted: charged.is_ok(),
-        });
-        if let Err(error) = charged {
-            #[cfg(verus_keep_ghost)]
-            proof! {
-                spec::prefix_failure(bytes@, fields@, (index + 1) as nat,
-                    fields@.len() as nat, offset, meter.limits.counters@,
-                    initial_used, Failure::Budget(error));
-            }
-            return Err(Failure::Budget(error));
-        }
-        match decode_field(bytes, position, &fields[index]) {
-            Some((value, end)) => {
-                output.push(value);
-                position = end;
-            }
-            None => {
-                #[cfg(verus_keep_ghost)]
-                proof! {
-                    spec::prefix_failure(bytes@, fields@, (index + 1) as nat,
-                        fields@.len() as nat, offset, meter.limits.counters@,
-                        initial_used, Failure::Field(fields@[index as int].id));
-                }
-                return Err(Failure::Field(fields[index].id));
-            }
-        }
-        index += 1;
-    }
-    Ok(position)
-}
-
-#[cfg_attr(verus_keep_ghost, verus_spec(result =>
-    ensures final(meter).limits == old(meter).limits,
         (match result { Ok(()) => Ok(final(output)@), Err(error) => Err(error) },
             final(meter).used.counters@, final(attempts)@) == {
                 let projected = projection(bytes@, fields@,
@@ -545,31 +445,35 @@ pub(super) fn project_into(
     attempts: &mut Vec<AccessAttempt>,
 ) -> Result<(), Failure> {
     #[cfg(verus_keep_ghost)]
-    proof! { reveal(projection); reveal(schema_valid); }
+    proof_decl! { let ghost projected = projection(bytes@,fields@,meter.limits.counters@,meter.used.counters@); }
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        reveal(projection);
+        typed::spec::legacy_projection(bytes@,fields,meter.limits.counters@,meter.used.counters@);
+    }
     output.clear();
-    if !validate_schema(fields) {
+    let mut values = Vec::new();
+    typed::project_into(
+        bytes,
+        typed::FieldsView::Legacy(fields),
+        meter,
+        &mut values,
+        attempts,
+    )?;
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        assert(projected.0.is_ok());
+        let codes = match projected.0 { Ok(codes) => codes, Err(_) => Seq::<i64>::empty() };
+        assert(values@ == typed::spec::lift(codes));
+        assert(typed::spec::lift(codes) =~= super::super::evaluation::typed::spec::lift(codes));
+        super::numeric::spec::lift_projects(codes);
+        assert(super::numeric::spec::project_all(values@) == Some(codes));
+    }
+    if !super::numeric::project_legacy(&values, output) {
+        output.clear();
         return Err(Failure::Schema);
     }
-    if let Err(error) = meter.charge(super::Resource::Byte, bytes.len() as u64) {
-        return Err(Failure::Budget(error));
-    }
-    let Some(offset) = decode_header(bytes, fields.len()) else {
-        return Err(Failure::Header);
-    };
-    let result = project_fields(bytes, fields, offset, meter, output, attempts);
-    match result {
-        Ok(end) => {
-            if end != bytes.len() {
-                output.clear();
-                return Err(Failure::Trailing);
-            }
-            Ok(())
-        }
-        Err(error) => {
-            output.clear();
-            Err(error)
-        }
-    }
+    Ok(())
 }
 
 /// Projects one canonical flat record with a fresh private V2 meter.
@@ -603,3 +507,5 @@ pub fn project(bytes: &[u8], fields: &[Field], limits: super::Limits) -> Project
 
 #[cfg(test)]
 pub(super) mod tests;
+
+pub(super) mod typed;

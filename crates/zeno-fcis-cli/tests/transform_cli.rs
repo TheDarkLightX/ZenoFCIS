@@ -16,6 +16,174 @@ use zeno_fcis_synthesis::finite_runtime::import_program;
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const CLI: &str = env!("CARGO_BIN_EXE_zeno-fcis");
 
+#[test]
+fn offline_parallel_receipts_match_serial_and_caps_publish_nothing() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let candidate = artifact("boolean-kernel-candidate");
+    let serial = directory.0.join("serial.json");
+    let (exit, _) = check(
+        &original,
+        &candidate,
+        &[
+            "--receipt",
+            serial
+                .to_str()
+                .unwrap_or_else(|| panic!("serial receipt path must be UTF-8")),
+        ],
+    );
+    assert_eq!(exit, Some(0));
+    for workers in ["1", "2", "4"] {
+        let receipt = directory.0.join(format!("parallel-{workers}.json"));
+        let (exit, report) = check(
+            &original,
+            &candidate,
+            &[
+                "--offline-parallel",
+                "--workers",
+                workers,
+                "--chunk-tuples",
+                "3",
+                "--receipt",
+                receipt
+                    .to_str()
+                    .unwrap_or_else(|| panic!("receipt path must be UTF-8")),
+            ],
+        );
+        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(read(&serial), read(&receipt));
+        assert_eq!(report["progress"]["accounting_complete"], true);
+        assert!(
+            report["progress"]["reserved_work"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("reserved_work must be a u64: {report}"))
+                > 0
+        );
+    }
+    for extra in [
+        ["--work-units", "0"],
+        ["--workers", "9"],
+        ["--max-chunks", "1"],
+    ] {
+        let receipt = directory.0.join("absent.json");
+        let (exit, report) = check(
+            &original,
+            &candidate,
+            &[
+                "--offline-parallel",
+                "--chunk-tuples",
+                "1",
+                extra[0],
+                extra[1],
+                "--receipt",
+                receipt
+                    .to_str()
+                    .unwrap_or_else(|| panic!("receipt path must be UTF-8")),
+            ],
+        );
+        assert_eq!(exit, Some(2), "{report}");
+        assert!(!receipt.exists());
+    }
+}
+
+#[test]
+fn offline_parallel_containment_does_not_depend_on_tmpdir_length() {
+    let directory = Directory::new();
+    // Longer than a Unix socket path may be (108 bytes): the control channel
+    // is the child's inherited standard input, never a socket under TMPDIR.
+    let long = directory.0.join("t".repeat(120));
+    fs::create_dir(&long).unwrap_or_else(|error| panic!("create long TMPDIR: {error}"));
+    assert!(long.as_os_str().len() > 108);
+    let original = artifact("boolean-kernel-original");
+    let candidate = artifact("boolean-kernel-candidate");
+    let serial = directory.0.join("serial.json");
+    let receipt = directory.0.join("parallel.json");
+    let mut outputs = Vec::new();
+    for extra in [vec![], vec!["--offline-parallel", "--workers", "2"]] {
+        let path = if extra.is_empty() { &serial } else { &receipt };
+        let output = Command::new(CLI)
+            .env("TMPDIR", &long)
+            .args(["transform", "check", "--original"])
+            .arg(&original)
+            .arg("--candidate")
+            .arg(&candidate)
+            .arg("--receipt")
+            .arg(path)
+            .args(&extra)
+            .output()
+            .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"));
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        outputs.push(output);
+    }
+    assert_eq!(read(&serial), read(&receipt));
+}
+
+#[test]
+fn an_interrupted_offline_check_tears_down_and_publishes_nothing() {
+    // Signal at once (usually before the unit is in custody) and after half a
+    // second (while the multi-second contained check is under way).
+    for delay in [Duration::ZERO, Duration::from_millis(500)] {
+        let directory = Directory::new();
+        let receipt = directory.0.join("receipt.json");
+        let child = Command::new(CLI)
+            .args(["transform", "check", "--original"])
+            .arg(artifact("current-decision-scalars-original"))
+            .arg("--candidate")
+            .arg(artifact("current-decision-scalars-candidate"))
+            .args(["--offline-parallel", "--workers", "1", "--receipt"])
+            .arg(&receipt)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"));
+        // The supervisor creates its staging directory after it starts
+        // watching for signals and before it starts the unit.
+        let started = Instant::now();
+        while fs::read_dir(&directory.0)
+            .unwrap_or_else(|error| panic!("list receipt directory: {error}"))
+            .count()
+            == 0
+        {
+            assert!(started.elapsed() < Duration::from_secs(10), "no staging");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        std::thread::sleep(delay);
+        nix::sys::signal::kill(
+            nix::unistd::Pid::from_raw(
+                i32::try_from(child.id()).unwrap_or_else(|error| panic!("pid: {error}")),
+            ),
+            nix::sys::signal::Signal::SIGTERM,
+        )
+        .unwrap_or_else(|error| panic!("signal: {error}"));
+        let output = child
+            .wait_with_output()
+            .unwrap_or_else(|error| panic!("wait: {error}"));
+        let report: Value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|error| panic!("stdout is one JSON document: {error}: {output:?}"));
+        assert_eq!(output.status.code(), Some(2), "{report}");
+        assert_eq!(report["status"], "inconclusive");
+        let reason = report["reason"]
+            .as_str()
+            .unwrap_or_else(|| panic!("reason: {report}"));
+        assert!(reason.starts_with("interrupted:SIGTERM"), "{reason}");
+        // No receipt, no staging entry, and no surviving contained group.
+        assert_eq!(
+            fs::read_dir(&directory.0)
+                .unwrap_or_else(|error| panic!("list receipt directory: {error}"))
+                .count(),
+            0
+        );
+        let group = reason
+            .lines()
+            .find_map(|line| line.strip_prefix("ObservedControlGroup="))
+            .unwrap_or_else(|| panic!("observed group line: {reason}"));
+        if !delay.is_zero() {
+            assert!(group.starts_with("/sys/fs/cgroup/"), "{reason}");
+        }
+        assert!(group.is_empty() || !Path::new(group).exists(), "{reason}");
+    }
+}
+
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
@@ -366,16 +534,57 @@ fn describe_declares_transform_effects() {
         .iter()
         .map(|command| command["name"].clone())
         .collect();
-    assert_eq!(names, [json!("check"), json!("replay")]);
+    assert_eq!(
+        names,
+        [
+            json!("check"),
+            json!("check-certificates"),
+            json!("replay"),
+            json!("replay-certificates")
+        ]
+    );
     assert_eq!(
         group["subcommands"][0]["effects"],
         json!({
             "classification": "declared", "executes_tools": true, "read_only_flag": null,
-            "reads": ["original-program", "candidate-program", "optional-tools-manifest", "optional-toolchain-files"],
-            "writes": ["optional-equivalence-receipt", "optional-symbolic-receipt", "optional-query-directory", "temporary-files"]
+            "reads": ["original-program", "candidate-program", "optional-tools-manifest", "optional-toolchain-files",
+                      "optional-caller-cpu-limits"],
+            "writes": ["optional-equivalence-receipt", "optional-symbolic-receipt", "optional-query-directory",
+                       "temporary-files", "optional-transient-user-unit"]
         })
     );
-    let replay = &group["subcommands"][1];
+    // Both certificate commands run CVC5, optionally Z3, and the pinned
+    // checker from private temporary copies, and hash this executable into
+    // the receipt; only a check writes the receipt and retained queries.
+    let certificate_reads = [
+        "original-program",
+        "candidate-program",
+        "tools-manifest",
+        "toolchain-files",
+        "certificate-checker-manifest",
+        "certificate-checker-executable",
+        "certificate-directory",
+        "cli-executable",
+    ];
+    assert_eq!(
+        group["subcommands"][1]["effects"],
+        json!({
+            "classification": "declared", "executes_tools": true, "read_only_flag": null,
+            "reads": certificate_reads,
+            "writes": ["optional-certificate-receipt", "optional-query-directory", "temporary-files"]
+        })
+    );
+    let mut replay_reads = vec!["certificate-receipt"];
+    replay_reads.extend(certificate_reads);
+    assert_eq!(
+        group["subcommands"][3]["effects"],
+        json!({
+            "classification": "declared", "executes_tools": true, "read_only_flag": null,
+            "reads": replay_reads,
+            "writes": ["temporary-files"]
+        })
+    );
+    let replay = &group["subcommands"][2];
     assert_eq!(replay["effects"]["writes"], json!([]));
     let cap = replay["arguments"]
         .as_array()

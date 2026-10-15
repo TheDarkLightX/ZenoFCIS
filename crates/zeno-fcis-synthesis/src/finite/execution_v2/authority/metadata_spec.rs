@@ -102,6 +102,7 @@ Domain::I128{min,max}=>seq![Part::Word(1),Part::Word(min as u128),Part::Word(max
 Domain::U128{min,max}=>seq![Part::Word(2),Part::Word(min),Part::Word(max)],
 Domain::Enum{type_id,variants}=>seq![Part::Word(3),Part::Word(type_id as u128)]+variants_ids(variants@),
 Domain::Sum{type_id,variants}=>seq![Part::Word(4),Part::Word(type_id as u128)]+variants_ids(variants@),
+Domain::Canonical{schema,type_id}=>seq![Part::Word(7),Part::Bytes(schema),Part::Word(type_id as u128)],
 Domain::Bytes=>seq![Part::Word(5)],Domain::Text=>seq![Part::Word(6)],
 } }
 
@@ -141,6 +142,7 @@ laws::Atom::I128(v)=>seq![Part::Word(1),Part::Word(v as u128)],
 laws::Atom::U128(v)=>seq![Part::Word(2),Part::Word(v)],
 laws::Atom::Enum{type_id,variant}=>seq![Part::Word(3),Part::Word(type_id as u128),Part::Word(variant as u128)],
 laws::Atom::Sum{type_id,variant}=>seq![Part::Word(4),Part::Word(type_id as u128),Part::Word(variant as u128)],
+laws::Atom::Canonical(v)=>seq![Part::Word(7),Part::Bytes(v.raw().0),Part::Word(v.raw().1 as u128),Part::Bytes(v.raw().2)],
 laws::Atom::Bytes(v)=>seq![Part::Word(5),Part::Bytes(v)],laws::Atom::Text(v)=>seq![Part::Word(6),Part::Bytes(v)],
 
 } }
@@ -165,6 +167,9 @@ laws::Op::Lt(a,b)=>seq![Part::Word(8)]+seq![Part::Word(a as u128),Part::Word(b a
 laws::Op::And(a,b)=>seq![Part::Word(9)]+seq![Part::Word(a as u128),Part::Word(b as u128)],
 laws::Op::Not(a)=>seq![Part::Word(10)]+seq![Part::Word(a as u128)],
 laws::Op::Select(c,a,b)=>seq![Part::Word(11)]+seq![Part::Word(c as u128),Part::Word(a as u128),Part::Word(b as u128)],
+laws::Op::MulDivFloor(a,b,den)=>seq![Part::Word(13),Part::Word(a as u128),Part::Word(b as u128),Part::Word(den as u128)],
+laws::Op::MulDivCeil(a,b,den)=>seq![Part::Word(14),Part::Word(a as u128),Part::Word(b as u128),Part::Word(den as u128)],
+laws::Op::ProductsGe(a,b)=>seq![Part::Word(15),Part::Word(a[0] as u128),Part::Word(a[1] as u128),Part::Word(a[2] as u128),Part::Word(b[0] as u128),Part::Word(b[1] as u128),Part::Word(b[2] as u128)],
 } }
 
 pub open spec fn law_ops_prefix<'a>(values:Seq<laws::Op<'a>>,n:nat)->Seq<Part<'a>>

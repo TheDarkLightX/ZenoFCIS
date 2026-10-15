@@ -6,7 +6,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 // Generate owned fixtures through the actual domain; no provider or network.
-const fixture = JSON.parse(execFileSync('python3', ['-c', `
+const fixture = JSON.parse(process.env.ZAL_TEST_FIXTURES ? fs.readFileSync(process.env.ZAL_TEST_FIXTURES, 'utf8') : execFileSync('python3', ['-c', `
 import json
 from pathlib import Path
 from server import Workspace
@@ -17,12 +17,29 @@ def fixtures(model):
     topics = ['', 'rule:approve_order', 'rule:submit_order', 'event:approve', 'context:authorized', 'state:pending', 'and', 'grammar:&', 'grammar:default']
     return {'help': {topic: help_topic(model, topic) for topic in topics},
             'explain': explain(model, 'pending', 'approve', {'authorized': False}),
-            'initial_explain': explain(model, model.initial, 'approve', {'authorized': False})}
+            'explain_true': explain(model, 'pending', 'approve', {'authorized': True}),
+            'initial_explain': explain(model, model.initial, 'approve', {'authorized': False}),
+            'initial_explain_true': explain(model, model.initial, 'approve', {'authorized': True})}
 seed_fixtures = fixtures(work.session.model)
 work.discuss('Show the disclosed cancellation example', seed['model']['revision'], demo=True)
 proposal = work.view()['proposal']
-work.action('accept', {'base_revision': proposal['base_revision'], 'candidate_revision': proposal['revision']})
-print(json.dumps({'seed': seed, 'accepted': work.view(), 'seed_data': seed_fixtures, 'accepted_data': fixtures(work.session.model)}))
+work.action('accept', {'base_revision': proposal['base_revision'], 'candidate_revision': proposal['revision'], 'examples_digest': seed['examples_digest']})
+labeled = Workspace(Path('examples/order.zal').read_text(), Path.cwd())
+for identifier, authorized, expected in [
+    ('simulated_allow', True, {'class': 'Accept', 'state': 'approved', 'reason': None}),
+    ('simulated_deny', False, {'class': 'Reject', 'state': 'pending', 'reason': 'not_enabled'}),
+]:
+    labeled.session.supply_owner_example({'id': identifier,
+        'input': {'state': 'pending', 'event': 'approve', 'context': {'authorized': authorized}},
+        'expected': expected, 'provenance': 'simulated owner input fixture'}, labeled.session.model.revision)
+labeled_seed = labeled.view()
+labeled.session.propose_human(labeled.session.model.render().replace('[authorized]', '[true]'), 'symbolic', labeled.session.model.revision)
+labeled_candidate = labeled.view()
+labeled.session.evidence['checker'] = 'simulated-older-checker'
+labeled.session.proposal['evidence']['checker'] = 'simulated-older-checker'
+labeled.session.proposal['examples_digest'] = 'simulated-stale-corpus'
+print(json.dumps({'seed': seed, 'accepted': work.view(), 'seed_data': seed_fixtures, 'accepted_data': fixtures(work.session.model),
+                 'labeled': labeled_seed, 'labeled_candidate': labeled_candidate, 'labeled_stale': labeled.view()}))
 `], {cwd: __dirname, encoding: 'utf8', env: {...process.env, PYTHONDONTWRITEBYTECODE: '1'}}));
 // A small DOM double executes the actual script/event handlers, not browser defaults.
 class Element {
@@ -58,6 +75,17 @@ const check=(name,condition)=>{assert(condition,name);checks.push(name);};
   const oldBase=fixture.seed.model.revision;
   const current=load(path.join(root,'integrations/zal/workspace.html'));
   current.apply(fixture.seed);
+  const labeled=load(path.join(root,'integrations/zal/workspace.html'));labeled.apply(fixture.labeled_candidate);
+  check('owner labels retain independent expected outcomes and supplied provenance',labeled.get('candidateExamples').textContent.includes('simulated_deny')&&labeled.get('candidateExamples').textContent.includes('candidate: conflict')&&labeled.get('candidateExamples').textContent.includes('simulated owner input fixture')&&labeled.get('candidateExamples').textContent.includes('not authenticated'));
+  check('freshness separates checks review and unrun factory',labeled.get('freshness').textContent.includes('checks: current')&&labeled.get('freshness').textContent.includes('review: missing')&&labeled.get('freshness').textContent.includes('factory: not-run'));
+  const labeledCalls=[];labeled.context.apiStub=async(route,data)=>{labeledCalls.push({route,data});return {};};labeled.run('api=(route,data)=>apiStub(route,data)');await labeled.get('accept').onclick();
+  check('candidate acceptance transmits the displayed owner corpus digest',labeledCalls.find(call=>call.route==='accept').data.examples_digest===fixture.labeled_candidate.examples_digest);
+  const exporting=load(path.join(root,'integrations/zal/workspace.html'));exporting.apply(fixture.accepted);
+  exporting.run('api=(route,data)=>{globalThis.exportSubmitted={route,data};return Promise.resolve({revision:view.model.revision,files:{}})};download=()=>{};');
+  await exporting.get('export').onclick();
+  check('browser export transmits its displayed revision and owner corpus digest',exporting.context.exportSubmitted.route==='export'&&exporting.context.exportSubmitted.data.revision===fixture.accepted.model.revision&&exporting.context.exportSubmitted.data.examples_digest===fixture.accepted.examples_digest);
+  const staleEvidence=load(path.join(root,'integrations/zal/workspace.html'));staleEvidence.apply(fixture.labeled_stale);
+  check('stale evidence preview disables acceptance and export with recovery guidance',staleEvidence.get('candidateFreshness').textContent.includes('Candidate checks: stale')&&staleEvidence.get('candidateFreshness').textContent.includes('owner corpus: stale')&&staleEvidence.get('candidateFreshness').textContent.includes('propose again')&&staleEvidence.get('accept').disabled&&staleEvidence.get('export').disabled&&staleEvidence.get('status').textContent==='Stored checks · stale');
   check('workspace mode is visible',current.get('workspaceMode').textContent==='Workspace: isolated browser session');
   const nav=current.get('modelNav').children.map(e=>e.dataset.object);
   const model=fixture.seed.model;
@@ -113,7 +141,7 @@ const check=(name,condition)=>{assert(condition,name);checks.push(name);};
     ui.context.apiStub=async(route,data)=>{
       calls.push({route,data:clone(data)});
       if(route==='help')return clone(fixture.seed_data.help[data.topic]);
-      if(route==='explain')return clone(data.state==='pending'?fixture.seed_data.explain:fixture.seed_data.initial_explain);
+      if(route==='explain')return clone(data.state==='pending'?(data.context.authorized?fixture.seed_data.explain_true:fixture.seed_data.explain):(data.context.authorized?fixture.seed_data.initial_explain_true:fixture.seed_data.initial_explain));
       return {};
     };
     ui.run('api=(route,data)=>apiStub(route,data)');ui.apply(fixture.seed);return {ui,calls};
@@ -123,6 +151,10 @@ const check=(name,condition)=>{assert(condition,name);checks.push(name);};
   await local.get('why').onclick();
   check('primary Explain routes locally with every explicit observation',localCalls.at(-1).route==='explain'&&localCalls.at(-1).data.revision===oldBase&&localCalls.at(-1).data.context.authorized===false&&!localCalls.some(call=>call.route==='discuss'||call.route==='connect'));
   check('local inspector renders exact tuple default frame guard and scope',local.get('explanation').textContent.includes('Default used: true')&&local.get('explanation').textContent.includes('Frame: control unchanged')&&local.get('explanation').textContent.includes('observed false')&&local.get('explanation').textContent.includes('no language model'));
+  check('false observation remains supplied assumption with no authenticated facts',local.get('explanation').textContent.includes('Supplied assumptions: {"authorized":false}')&&local.get('explanation').textContent.includes('Authenticated facts: none'));
+  const assumedFact=local.get('factInputs').querySelector('input');assumedFact.checked=true;assumedFact.dispatch('input');await local.get('why').onclick();
+  check('true authorized observation is not promoted to authentication',local.get('explanation').textContent.includes('Supplied assumptions: {"authorized":true}')&&local.get('explanation').textContent.includes('Authenticated facts: none'));
+  assumedFact.checked=false;assumedFact.dispatch('input');
   local.get('question').value='An explicit live discussion';await local.get('askLive').onclick();
   check('only explicit Ask Codex routes to non-demo discussion',localCalls.at(-1).route==='discuss'&&localCalls.at(-1).data.demo===false&&localCalls.at(-1).data.message==='An explicit live discussion');
   local.context.recorded=clone({pre:'pending',event:'approve',context:{authorized:false},outcome:fixture.seed_data.explain.outcome});

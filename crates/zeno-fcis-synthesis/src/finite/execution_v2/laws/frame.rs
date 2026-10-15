@@ -27,6 +27,7 @@ fn field<'a>(fields: &'a [Field<'a>], id: u16) -> Option<Atom<'a>> {
 fn selector_id(selector: Selector) -> u32 {
     match selector {
         Selector::Root => 65536,
+        Selector::PayloadField(id) => 65537 + id as u32,
         Selector::Field(id) => id as u32,
     }
 }
