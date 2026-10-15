@@ -1,7 +1,7 @@
 {
   "schema": "zeno-fcis/certificate-checker-source/1",
   "revision": "5f9f77bf83c52748dccc12829ce5e80903de0c99",
-  "archive_url": "https://codeload.github.com/hanielb/carcara/tar.gz/5f9f77bf83c52748dccc12829ce5e80903de0c99",
+  "archive_url": "https://codeload.github.com/ufmg-smite/carcara/tar.gz/5f9f77bf83c52748dccc12829ce5e80903de0c99",
   "archive_sha256": "cf5ea2addf31fcd17dd4bf783fd6b37eb96d0265b8fb088d936e35369df1dd42",
   "rust": "1.97.1",
   "fragment": "quantifier-free Bool/Int linear terms; no subproofs, Real, uninterpreted functions, non-linear multiplication or incomplete rules; flat single check-sat command profile with Boolean assertions",

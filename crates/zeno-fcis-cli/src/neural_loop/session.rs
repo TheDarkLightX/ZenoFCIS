@@ -194,6 +194,7 @@ impl AdmissionRefusal {
 pub(crate) enum WorkerFailure {
     Timeout,
     Panicked,
+    #[cfg(any(target_os = "linux", test))]
     Died,
     Unavailable(String),
 }
@@ -203,6 +204,7 @@ impl WorkerFailure {
         match self {
             WorkerFailure::Timeout => "timeout".to_owned(),
             WorkerFailure::Panicked => "panicked".to_owned(),
+            #[cfg(any(target_os = "linux", test))]
             WorkerFailure::Died => "died".to_owned(),
             WorkerFailure::Unavailable(reason) => format!("unavailable:{reason}"),
         }

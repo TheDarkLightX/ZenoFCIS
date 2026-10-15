@@ -38,7 +38,8 @@ runs:
           fi
           group="${group%/*}"
         done
-        systemd-run --user --wait --pipe --quiet --collect \
+        # Expand the probe's variables in its child shell, not in systemd-run.
+        systemd-run --user --wait --pipe --quiet --collect --expand-environment=no \
           -p MemoryMax=64M -p MemorySwapMax=0 -p TasksMax=64 \
           /bin/sh -eu -c '
             group=$(sed -n "s/^0:://p" /proc/self/cgroup)

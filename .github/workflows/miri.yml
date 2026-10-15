@@ -100,7 +100,9 @@ jobs:
           {"group": "synthesis-graphs-28-to-31", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_28_to_31"}
         ]
     env:
-      MIRIFLAGS: -Zmiri-strict-provenance
+      # The spec and compose source-identity tests read the checked-out crates.
+      # Keep them interpreted; only their groups need host filesystem access.
+      MIRIFLAGS: -Zmiri-strict-provenance ${{ (matrix.group == 'specification' || matrix.group == 'publication') && '-Zmiri-disable-isolation' || '' }}
       MIRI_TEST_ARGS: ""
     steps:
       - name: Checkout exact source

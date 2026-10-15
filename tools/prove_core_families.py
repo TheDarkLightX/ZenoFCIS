@@ -26,7 +26,7 @@ RUNTIME_SCHEMA = 'zeno-fcis/core-family-runtime-source/1'
 GENERATED_TEST_OUTPUT = 'crates/zeno-fcis-generated-code-tests/python'
 INPUTS = ('tools/instantiate_core.py', 'tools/check_core_components.py',
           'tools/prove_core_families.py', 'tools/test_data/core_components/reference.py')
-NATIVE_REPORT_SHA256 = '4ff299330d30cf71d352db0ac21423087dc7a8abdaac1944f33f9a7465fdcf1a'
+NATIVE_REPORT_SHA256 = '6fbda9edf2e9d9d4c50c7fdca5cbcc0729eab85b6180bfac18ba179f5631d005'
 COUNTS = {'reservation-pool': (9, 2216), 'rate-limiter': (9, 2646), 'approval-queue': (3, 1296),
           'bounded-counter': (8, 176), 'consumable-budget': (8, 568),
           'versioned-register': (8, 30664), 'idempotency-slot': (8, 61328),

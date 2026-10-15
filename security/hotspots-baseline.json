@@ -1787,32 +1787,32 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1285,
+      "production_lines": 1287,
       "rank": 15,
       "score": 89,
       "signals": [
         {
           "id": "cryptographic-verification",
           "lines": [
-            708,
-            863,
-            1082
+            710,
+            865,
+            1084
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            986
+            988
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            836,
-            1142,
-            1159,
-            1227,
-            1276
+            838,
+            1144,
+            1161,
+            1229,
+            1278
           ]
         }
       ],
@@ -5767,9 +5767,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 9906340,
+    "admitted_bytes": 9906702,
     "admitted_files": 649,
-    "inventory_sha256": "bd1c36352c8ea756ccae30c2ff25ed34e19ccc3cbcb956046fc604278f287180",
+    "inventory_sha256": "d04ad8cdedf01248b5f4e8e3377449593f83902410c51d365bc22529af985f7c",
     "ranked_above_minimum": 553,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
