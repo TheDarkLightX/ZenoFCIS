@@ -24,8 +24,8 @@ worker 2 returned 20
 ```
 
 Before printing, the program runs the workers in completion orders `[2, 1]`
-and `[1, 2]`. It compares the full result from each run, including state,
-return values, decisions, and worker traces. The completion order is checked as
+and `[1, 2]`. It compares the full result of each run, including state, return
+values, decisions, and worker traces. The completion order is checked as
 input, then left out of the returned `MiniRun`.
 
 ## See the two private calculations
@@ -55,8 +55,8 @@ fn worker(id: u32, output: u32, operation: WorkerInstruction) -> WorkerProgram {
 }
 ```
 
-`vec![1]` declares the slot the worker may read. `vec![output]` declares the
-slot it may write. ZenoFCIS checks both declarations while it executes the
+`vec![1]` declares the slot the worker may read, and `vec![output]` declares
+the slot it may write. ZenoFCIS checks both declarations while it executes the
 finite instruction list.
 
 Worker 1 cannot see worker 2's private value, and worker 2 cannot see worker
@@ -113,8 +113,8 @@ slot 4 conflicts between workers 1 and 2
 ```
 
 Reversing the input list produces the same slot number and the same worker
-order. No next state is returned. The caller still holds the exact starting
-state.
+order. No next state is returned, and the caller still holds the exact
+starting state.
 
 ```bash
 cargo +1.97.1 test -p zeno-fcis-spec \
@@ -149,8 +149,8 @@ That property supports several engineering jobs:
 | Safe retries | A repeated request can return the retained result without applying the change twice. |
 
 Determinism covers declared inputs and declared rules. A missing real-world
-input still makes the model incomplete. An incorrect rule can produce the same
-incorrect answer on every replay. ZenoFCIS keeps those concerns visible as
+input still makes the model incomplete, and an incorrect rule can produce the
+same incorrect answer on every replay. ZenoFCIS keeps those concerns visible as
 separate checks.
 
 ## Follow one decision through the assurance chain
@@ -171,9 +171,9 @@ admitted inputs
 ```
 
 Each arrow has a public Rust type or constructor. Generated source, diagrams,
-solver output, and passing checks cannot grant permission to update trusted state.
-The publishing layer accepts only the specific values and evidence required by its
-public constructors.
+solver output, and passing checks cannot grant permission to update trusted
+state. The publishing layer accepts only the specific values and evidence its
+public constructors require.
 
 This combined path is ZenoFCIS's distinct contribution. Rust has strong tools
 for neighboring jobs: [Stateright](https://docs.rs/stateright/latest/stateright/)
