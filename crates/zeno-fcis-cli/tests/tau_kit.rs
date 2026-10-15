@@ -20,18 +20,21 @@ fn path_text(path: &Path) -> &str {
         .unwrap_or_else(|| panic!("test path is not UTF-8: {path:?}"))
 }
 
+#[cfg(target_os = "linux")]
 fn array(value: &Value) -> &[Value] {
     value
         .as_array()
         .unwrap_or_else(|| panic!("expected a JSON array: {value}"))
 }
 
+#[cfg(target_os = "linux")]
 fn text(value: &Value) -> &str {
     value
         .as_str()
         .unwrap_or_else(|| panic!("expected a JSON string: {value}"))
 }
 
+#[cfg(target_os = "linux")]
 fn read_json(path: impl AsRef<Path>) -> Value {
     fixture_result(serde_json::from_slice(&fixture_result(fs::read(path))))
 }
@@ -79,6 +82,7 @@ fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../integrations/tau/finite-ladder.tau")
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn tau_import_export_uses_actual_authority_and_retains_source_pairs() {
     let temp = Temp::new();
@@ -155,6 +159,7 @@ fn tau_import_export_uses_actual_authority_and_retains_source_pairs() {
     assert_eq!(wrapped["post"]["120"], "0");
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn tau_import_refuses_unscaled_256_and_stale_metadata_without_output() {
     let temp = Temp::new();
@@ -216,6 +221,7 @@ fn tau_commands_describe_external_parser_and_new_files() {
     assert!(import.to_string().contains("new-contract-directory"));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn tau_allowance_profile_uses_source_derived_eleven_cases_and_finite_enum() {
     let temp = Temp::new();
@@ -328,4 +334,38 @@ fn tau_allowance_profile_uses_source_derived_eleven_cases_and_finite_enum() {
         .success()
     );
     assert!(!bad_kit.exists());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn tau_import_refuses_without_its_required_parser_memory_limit() {
+    // The hosted macOS Python process cannot lower its existing address
+    // space to the importer's 256 MiB cap. Refusal must not create an app.
+    let temp = Temp::new();
+    let app = temp.path().join("app");
+    let output = zeno(&[
+        "contract",
+        "import",
+        "--tau",
+        path_text(&fixture()),
+        "--out",
+        path_text(&app),
+        "--format",
+        "json",
+    ]);
+    assert!(!output.status.success());
+    let report: Value = fixture_result(serde_json::from_slice(&output.stdout));
+    assert_eq!(report["status"], "refused");
+    assert_eq!(report["authority"], "none");
+    assert_eq!(
+        report["reason"],
+        "Tau parser refused the source; see its diagnostic on stderr"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("Tau import refused: current limit exceeds maximum limit"),
+        "unexpected refusal: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!app.exists());
 }

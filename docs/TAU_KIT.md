@@ -21,7 +21,12 @@ python3 tau-kit/runner.py tau-kit/queries.json \
   --out tau-run --jobs 1 --timeout 60 --memory-mb 768
 ```
 
-Import requires local Python 3. The supported source has flat scalar records,
+Import requires local Python 3 and a host that can enforce the parser's
+256 MiB address-space limit. Import and source-correspondence export are
+qualified on Linux. On the macOS release host, Python cannot establish that
+limit; these operations refuse without creating an output directory.
+
+The supported source has flat scalar records,
 exactly `i1`, `i2`, `i3`, `o1` and `o2` console streams, one `always` ladder,
 current `[t]` projections, same-width unsigned comparisons, Boolean operations,
 and modular addition/subtraction. Every leaf assigns all state outputs and

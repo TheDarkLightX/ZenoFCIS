@@ -125,6 +125,11 @@ On macOS these features are unavailable or unqualified:
   solver-backed commands run only binaries that an exact-hash tools manifest
   names, and that route is not qualified.
 
+- **Tau import and export of an imported Tau policy**: the Python parser
+  requires a 256 MiB address-space limit. The hosted macOS Python process
+  cannot establish that limit, so these operations refuse without creating
+  their output directory. The limit is not disabled on macOS.
+
 The OCaml scalar consumer profile, the Tau kit runner and the repository's
 acceptance, proof and packaged-workspace gates are checked only on Linux
 x86-64; they are not part of the macOS evidence.
