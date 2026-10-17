@@ -2,7 +2,7 @@
 pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     (
         "crates/zeno-fcis-cli/src/symbolic/equivalence/queries.rs",
-        "171b00ea9d64e19aeca07c290e86e98ef7d62756b653c8b519325229f719c15f",
+        "af82b1586ca7c044e9ed5cec425486150f0b553ebd5d63d8aee4cf379b52df17",
     ),
     (
         "crates/zeno-fcis-cli/src/symbolic/equivalence/queries/base.rs",
