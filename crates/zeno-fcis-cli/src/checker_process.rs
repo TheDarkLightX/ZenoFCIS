@@ -218,6 +218,13 @@ mod linux {
     const UNIT: &str = "ZENO_FCIS_CHECKER_UNIT";
     const CALLER_CPUS: &str = "ZENO_FCIS_CHECKER_CPUS";
     const CALLER_NICE: &str = "ZENO_FCIS_CHECKER_NICE";
+    const CALLER_SCHEDULER: &str = "ZENO_FCIS_CHECKER_SCHEDULER";
+    const CALLER_PRIORITY: &str = "ZENO_FCIS_CHECKER_PRIORITY";
+    const CALLER_QUOTA: &str = "ZENO_FCIS_CHECKER_QUOTA";
+    const CALLER_PERIOD: &str = "ZENO_FCIS_CHECKER_PERIOD";
+    const HOST_POLICY_MODE: &str = "ZENO_FCIS_CHECKER_HOST_POLICY_MODE";
+    const CALLER_LIMITS: &str = "ZENO_FCIS_CHECKER_LIMITS";
+    use super::host_policy::context::{CpuQuota, Scheduler};
     /// The control channel is the inherited standard input socket. It has no
     /// file system name, so TMPDIR length and other same-user processes
     /// cannot reach it; SO_PEERCRED of a socket pair names only its creator.
@@ -263,6 +270,9 @@ mod linux {
             .lines()
             .find_map(|s| s.strip_prefix("0::"))
             .ok_or("cgroup-v2-unavailable")?;
+        if !relative.starts_with('/') || relative.split('/').any(|s| matches!(s, "." | "..")) {
+            return Err("cgroup-path-malformed".into());
+        }
         Ok(Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/')))
     }
 
@@ -353,6 +363,30 @@ mod linux {
         }
         if own_nice < caller_nice {
             return Err(format!("nice-escaped:{own_nice}"));
+        }
+        if !super::posix::is_worker() {
+            let policy = std::env::var(CALLER_SCHEDULER).map_err(|_| "missing-caller-scheduler")?;
+            let priority = std::env::var(CALLER_PRIORITY).map_err(|_| "missing-caller-priority")?;
+            Scheduler::parse(&policy, &priority)?.verify(scheduler()?)?;
+            let quota = std::env::var(CALLER_QUOTA).map_err(|_| "missing-caller-quota")?;
+            let period = std::env::var(CALLER_PERIOD).map_err(|_| "missing-caller-period")?;
+            let expected = CpuQuota {
+                quota: super::host_policy::context::decimal(&quota)?,
+                period: super::host_policy::context::decimal(&period)?,
+            };
+            expected.verify(
+                &fs::read_to_string(group()?.join("cpu.max"))
+                    .map_err(|_| "cpu-quota-readback-unavailable")?,
+            )?;
+            let mode = std::env::var(HOST_POLICY_MODE).map_err(|_| "missing-host-policy-mode")?;
+            let caller_limits = std::env::var(CALLER_LIMITS).ok();
+            let actual_limits = fs::read_to_string("/proc/self/limits")
+                .map_err(|_| "rlimits-readback-unavailable")?;
+            super::host_policy::context::verify_service_limits(
+                &mode,
+                caller_limits.as_deref(),
+                &actual_limits,
+            )?;
         }
         Ok(())
     }
@@ -979,76 +1013,40 @@ mod linux {
         }
     }
 
-    /// Respect the effective enclosing qualification quota when creating a
-    /// systemd sibling unit. A four-CPU benchmark therefore needs a four-CPU
-    /// parent allocation; the ordinary AUX lane remains one CPU.
-    fn quota_percent(text: &str) -> Result<Option<u64>, String> {
-        let fields: Vec<_> = text.split_whitespace().collect();
-        if fields.len() != 2 {
-            return Err("caller-cpu-quota-malformed".into());
-        }
-        let period = fields[1]
-            .parse::<u64>()
-            .ok()
-            .filter(|v| *v != 0)
-            .ok_or("caller-cpu-quota-malformed")?;
-        if fields[0] == "max" {
-            return Ok(None);
-        }
-        let quota = fields[0]
-            .parse::<u64>()
-            .ok()
-            .filter(|v| *v != 0)
-            .ok_or("caller-cpu-quota-malformed")?;
-        // Integer percentages round down conservatively. Refuse a quota
-        // smaller than our representable unit rather than rounding it up.
-        let percent = u128::from(quota) * 100 / u128::from(period);
-        if percent == 0 {
-            return Err("caller-cpu-quota-below-one-percent".into());
-        }
-        Ok(Some(u64::try_from(percent).unwrap_or(u64::MAX)))
+    pub(super) fn cpu_quota(workers: u64) -> Result<CpuQuota, String> {
+        super::host_policy::context::chain_quota(Path::new("/sys/fs/cgroup"), group()?, workers)
     }
 
-    pub(super) fn cpu_percent(workers: u64) -> Result<u64, String> {
-        let path = group().map_err(|error| format!("caller-cpu-quota-unavailable:{error}"))?;
-        chain_percent(Path::new("/sys/fs/cgroup"), path, workers)
+    pub(super) fn scheduler() -> Result<Scheduler, String> {
+        Scheduler::read(
+            &fs::read_to_string("/proc/self/stat").map_err(|_| "cpu-scheduler-unreadable")?,
+        )
     }
 
-    /// The tightest `cpu.max` from the caller's group up to the cgroup-v2
-    /// root, which has none. A group without the cpu controller has no
-    /// `cpu.max` and inherits its ancestors' limits; a missing group, or an
-    /// unreadable or malformed limit, refuses.
-    fn chain_percent(root: &Path, mut path: PathBuf, workers: u64) -> Result<u64, String> {
-        let mut percent = workers.clamp(1, 8) * 100;
-        while path != root {
-            if !path.starts_with(root) {
-                return Err("caller-cpu-quota-group-outside-root".into());
-            }
-            if !path.join("cgroup.procs").is_file() {
-                return Err(format!(
-                    "caller-cpu-quota-unavailable:{}:not a cgroup",
-                    path.display()
-                ));
-            }
-            match fs::read_to_string(path.join("cpu.max")) {
-                Ok(text) => {
-                    if let Some(quota) = quota_percent(&text)? {
-                        percent = percent.min(quota);
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(format!(
-                        "caller-cpu-quota-unavailable:{}:{error}",
-                        path.display()
-                    ));
-                }
-            }
-            if !path.pop() {
-                return Err("caller-cpu-quota-group-outside-root".into());
-            }
+    pub(super) fn host_observations() -> Result<super::host_policy::context::Observations, String> {
+        let mut query = Command::new("/usr/bin/busctl");
+        query.args([
+            "--user",
+            "call",
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            "GetConnectionUnixProcessID",
+            "s",
+            "org.freedesktop.systemd1",
+        ]);
+        let response = control_process(query, Instant::now() + Duration::from_secs(1), 8192)
+            .map_err(|_| "manager-pid-unavailable")?;
+        if !response.status.success() {
+            return Err("manager-pid-unavailable".into());
         }
-        Ok(percent)
+        let response = String::from_utf8(response.stdout).map_err(|_| "manager-pid-malformed")?;
+        super::host_policy::context::acquire(
+            response,
+            Path::new("/proc"),
+            Path::new("/sys/fs/cgroup"),
+            group()?,
+        )
     }
 
     /// Where the contained run may stage and, for an offline check, the
@@ -1076,6 +1074,15 @@ mod linux {
         supervise_backend(args, false, 4, receipts, Some(guardian), None)
     }
 
+    /// The caller exclusively owns this unspawned command. Arguments are owned
+    /// copies; this preparation grants neither admission nor startup authority.
+    fn carry_service_limits(child: &mut Command, caller: &str) -> Result<(), String> {
+        child
+            .args(super::host_policy::context::limit_properties(caller)?)
+            .arg(format!("--setenv={CALLER_LIMITS}={caller}"));
+        Ok(())
+    }
+
     fn supervise_backend(
         args: &[std::ffi::OsString],
         offline: bool,
@@ -1100,7 +1107,20 @@ mod linux {
         interrupted()?;
         let sequence = crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let (caller_cpus, caller_nice) = scheduling().map_err(setup_error)?;
-        let cpu_quota = if is_posix { 0 } else { cpu_percent(workers)? };
+        let cpu_quota = if is_posix {
+            None
+        } else {
+            Some(cpu_quota(workers)?)
+        };
+        let caller_scheduler = if is_posix { None } else { Some(scheduler()?) };
+        let caller_limits = if host_policy.is_some() {
+            let limits = fs::read_to_string("/proc/self/limits")
+                .map_err(|_| "caller-rlimits-unreadable".to_owned())?;
+            super::host_policy::context::limit_properties(&limits)?;
+            Some(limits)
+        } else {
+            None
+        };
         let mut dir = Directory {
             staging: None,
             writers_gone: true,
@@ -1134,7 +1154,24 @@ mod linux {
                 caller_nice,
             )
         } else {
+            let cpu_quota = cpu_quota.ok_or_else(|| "cpu-quota-unavailable".to_owned())?;
+            let caller_scheduler =
+                caller_scheduler.ok_or_else(|| "cpu-scheduler-unavailable".to_owned())?;
             let mut child = Command::new("/usr/bin/systemd-run");
+            child
+                .args(cpu_quota.properties()?)
+                .args(caller_scheduler.properties());
+            child.arg(format!(
+                "--setenv={HOST_POLICY_MODE}={}",
+                if host_policy.is_some() {
+                    "automatic"
+                } else {
+                    "explicit"
+                }
+            ));
+            if let Some(limits) = &caller_limits {
+                carry_service_limits(&mut child, limits)?;
+            }
             child
                 .args(["--user", "--wait", "--pipe", "--quiet"])
                 .arg("--working-directory")
@@ -1148,12 +1185,21 @@ mod linux {
                     "--property=TimeoutStopSec=1",
                 ])
                 .arg(format!("--property=RuntimeMaxSec={}", whole.as_secs() + 2))
-                .arg(format!("--property=CPUQuota={cpu_quota}%"))
                 // The user manager would otherwise run the child on every CPU
                 // at its own priority, outside the caller's scheduling policy.
                 .arg(format!("--property=CPUAffinity={caller_cpus}"))
                 .arg(format!("--setenv={CONTROL}={STDIN_CHANNEL}"))
                 .arg(format!("--setenv={UNIT}={unit}"))
+                .arg(format!(
+                    "--setenv={CALLER_SCHEDULER}={}",
+                    caller_scheduler.policy
+                ))
+                .arg(format!(
+                    "--setenv={CALLER_PRIORITY}={}",
+                    caller_scheduler.priority
+                ))
+                .arg(format!("--setenv={CALLER_QUOTA}={}", cpu_quota.quota))
+                .arg(format!("--setenv={CALLER_PERIOD}={}", cpu_quota.period))
                 .arg(format!("--setenv={CALLER_CPUS}={caller_cpus}"))
                 .arg(format!("--setenv={CALLER_NICE}={}", caller_nice.max(0)));
             if caller_nice > 0 {
@@ -1561,6 +1607,20 @@ mod linux {
         use crate::checker_process::{test_err, test_ok};
 
         #[test]
+        fn systemd_command_carries_every_limit_and_the_same_snapshot() {
+            let caller = super::super::host_policy::context::fixture().caller_limits;
+            let mut command = Command::new("/usr/bin/systemd-run");
+            test_ok(carry_service_limits(&mut command, &caller));
+            let arguments: Vec<_> = command.get_args().map(|s| s.to_string_lossy()).collect();
+            assert_eq!(arguments.len(), 17);
+            let properties = test_ok(super::super::host_policy::context::limit_properties(
+                &caller,
+            ));
+            assert_eq!(arguments[..16], properties);
+            assert_eq!(arguments[16], format!("--setenv={CALLER_LIMITS}={caller}"));
+        }
+
+        #[test]
         fn missing_user_manager_is_primary_and_cleanup_is_a_separate_unverified_failure() {
             use std::os::unix::process::ExitStatusExt;
             let primary = startup_failure(
@@ -1596,19 +1656,11 @@ mod linux {
 
         #[test]
         fn caller_cpu_quota_is_explicit_conservative_and_fail_closed() {
-            assert_eq!(test_ok(quota_percent("max 100000")), None);
-            assert_eq!(test_ok(quota_percent("400000 100000")), Some(400));
-            assert_eq!(test_ok(quota_percent("1999 100000")), Some(1));
+            assert_eq!(test_ok(CpuQuota::parse("max 100000")), (None, 100000));
             assert_eq!(
-                test_ok(quota_percent("18446744073709551615 1")),
-                Some(u64::MAX)
+                test_ok(CpuQuota::parse("50000 100000")),
+                (Some(50000), 100000)
             );
-            for text in ["1000 200000", "1000 1000000"] {
-                assert_eq!(
-                    test_err(quota_percent(text)),
-                    "caller-cpu-quota-below-one-percent"
-                );
-            }
             for text in [
                 "",
                 "max",
@@ -1619,79 +1671,85 @@ mod linux {
                 "-1 100000",
                 "oops 100000",
                 "1 2 3",
+                "1000 1000000",
             ] {
-                assert_eq!(
-                    test_err(quota_percent(text)),
-                    "caller-cpu-quota-malformed",
-                    "{text}"
-                );
+                assert!(CpuQuota::parse(text).is_err(), "{text}");
             }
+            let quota = CpuQuota {
+                quota: 50000,
+                period: 100000,
+            };
+            assert_eq!(
+                test_ok(quota.properties()),
+                [
+                    "--property=CPUQuota=50%",
+                    "--property=CPUQuotaPeriodSec=100000us"
+                ]
+            );
+            assert_eq!(quota.verify("50000 100000"), Ok(()));
+            assert!(quota.verify("50000 200000").is_err());
         }
 
         #[test]
         fn a_group_without_the_cpu_controller_inherits_its_ancestors_quota() {
             let root = std::env::temp_dir().join(format!(
-                "zeno-cgroup-chain-{}-{}",
+                "zeno-quota-{}-{}",
                 std::process::id(),
                 crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
             ));
-            // A terminal scope without the cpu controller has no cpu.max.
-            let groups = [
-                "user.slice",
-                "user.slice/app.slice",
-                "user.slice/app.slice/vte.scope",
-            ];
-            let leaf = root.join(groups[2]);
+            let leaf = root.join("caller.scope/leaf");
             test_ok(fs::create_dir_all(&leaf));
-            for group in groups {
-                test_ok(fs::write(root.join(group).join("cgroup.procs"), ""));
+            for at in [&root, &root.join("caller.scope"), &leaf] {
+                test_ok(fs::write(at.join("cgroup.procs"), ""));
             }
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 400);
-            test_ok(fs::write(
-                root.join(groups[0]).join("cpu.max"),
-                "max 100000",
-            ));
-            test_ok(fs::write(
-                root.join(groups[1]).join("cpu.max"),
-                "200000 100000",
-            ));
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 200);
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 1)), 100);
-            // Every limit that is present still has to be readable and valid.
-            test_ok(fs::write(leaf.join("cpu.max"), "oops 100000"));
             assert_eq!(
-                test_err(chain_percent(&root, leaf.clone(), 4)),
-                "caller-cpu-quota-malformed"
+                test_err(super::super::host_policy::context::chain_quota(
+                    &root,
+                    leaf.clone(),
+                    4
+                )),
+                "caller-cpu-quota-unobserved"
             );
-            test_ok(fs::write(leaf.join("cpu.max"), "50000 100000"));
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 50);
-            {
-                use std::os::unix::fs::PermissionsExt as _;
-                let limit = leaf.join("cpu.max");
-                test_ok(fs::set_permissions(
-                    &limit,
-                    fs::Permissions::from_mode(0o000),
-                ));
-                let unreadable = fs::read_to_string(&limit).is_err();
-                let refusal = chain_percent(&root, leaf.clone(), 4);
-                test_ok(fs::set_permissions(
-                    &limit,
-                    fs::Permissions::from_mode(0o600),
-                ));
-                if unreadable {
-                    assert!(test_err(refusal).starts_with("caller-cpu-quota-unavailable:"));
+            test_ok(fs::write(root.join("cpu.max"), "50000 100000"));
+            assert_eq!(
+                test_ok(super::super::host_policy::context::chain_quota(
+                    &root,
+                    leaf.clone(),
+                    4
+                )),
+                CpuQuota {
+                    quota: 50000,
+                    period: 100000
                 }
-            }
-            // A group that is not a cgroup, or outside the root, refuses.
-            assert!(
-                test_err(chain_percent(&root, root.join("missing.scope"), 4))
-                    .starts_with("caller-cpu-quota-unavailable:")
             );
             assert_eq!(
-                test_err(chain_percent(&root, PathBuf::from("/elsewhere"), 4)),
-                "caller-cpu-quota-group-outside-root"
+                test_ok(super::super::host_policy::context::chain_quota(
+                    &root,
+                    root.clone(),
+                    4
+                )),
+                CpuQuota {
+                    quota: 50000,
+                    period: 100000
+                }
             );
-            let _ = fs::remove_dir_all(&root);
+            test_ok(fs::write(leaf.join("cpu.max"), "oops 100000"));
+            assert!(
+                super::super::host_policy::context::chain_quota(&root, leaf.clone(), 4).is_err()
+            );
+            assert!(
+                super::super::host_policy::context::chain_quota(&root, root.join("missing"), 4)
+                    .is_err()
+            );
+            assert!(
+                super::super::host_policy::context::chain_quota(
+                    &root,
+                    PathBuf::from("/elsewhere"),
+                    4
+                )
+                .is_err()
+            );
+            test_ok(fs::remove_dir_all(root));
         }
 
         fn python(script: &str) -> Command {
@@ -2121,7 +2179,8 @@ pub(crate) fn preflight(
                     probe_manager,
                     || std::fs::read_to_string("/proc/self/status"),
                     linux::scheduling,
-                    || linux::cpu_percent(contained_profile(command).map_or(4, |p| p.1)),
+                    || linux::cpu_quota(contained_profile(command).map_or(4, |p| p.1)),
+                    linux::host_observations,
                 ) {
                     Ok(evidence) => host_policy = Some(evidence),
                     Err(refusal) => {
@@ -2365,6 +2424,7 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
             let mut label = label;
             if let Some(evidence) = &failure.host_policy {
                 label["host_policy"] = serde_json::json!(evidence);
+                label["residuals"] = serde_json::json!(host_policy::context::RESIDUALS);
                 if evidence.qualified {
                     label["final"]["application_work_started"] = serde_json::Value::Null;
                 } else {

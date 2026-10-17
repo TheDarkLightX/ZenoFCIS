@@ -205,21 +205,45 @@ dependency in the graph bound to the same release source.
 
 The default `--containment-backend auto` uses POSIX for `finite-data/1`.
 For `python-reference/1` (capture open/whole) and `group-resources/1`
-(including offline parallel transform checks), it uses systemd only when
-the read-only user-manager probe succeeds, `/proc/self/status` reports
-`NoNewPrivs: 0` and `Seccomp: 0`, and the caller's CPU affinity, nice value
-and enclosing cgroup CPU quota are known. The launcher retains those CPU
-restrictions and its existing startup and cleanup checks. Missing, malformed
-or unreadable policy inputs refuse with
-`containment-unavailable:systemd:host-policy:<failed-check>`; a sandbox is
-never escaped automatically. The `containment-result/1` record includes
-the attempted host-policy checks and their results, also on refusal.
+(including offline parallel transform checks), automatic systemd selection
+requires the read-only manager probe and manager-PID query to succeed,
+`NoNewPrivs: 0` and `Seccomp: 0`, and equal caller/manager mount, user, PID,
+network, IPC, UTS and cgroup namespace identities and LSM labels.
+Unreadable labels or identities refuse. Automatic services carry all 16 caller
+soft:hard rlimits as exact systemd properties, preserving infinity. The manager
+process's own limits are not unit defaults. Before startup acknowledgement or
+work, every service limit is read back: a missing, malformed or looser soft or
+hard value refuses. Values systemd cannot represent refuse with the property
+and soft/hard side identified.
+Each visible enclosing memory and
+swap limit must permit the unit's 64 MiB/no-swap policy, and each task limit
+must permit its 64 tasks. Missing or malformed resource observations refuse;
+the initial cgroup root's absent limit files are not treated as observations.
+A caller at `/` in a non-initial cgroup namespace refuses.
 
-Use `zeno-fcis --containment-backend systemd ...` or
-`zeno-fcis --containment-backend posix ...` to request a backend explicitly.
-Explicit selection keeps that backend's checks and never falls back to a
-weaker profile. POSIX currently refuses Python and group-resource profiles.
-These integration-source rules do not establish release qualification.
+The launcher preserves affinity and nice, carries the tightest CPU quota
+ratio with its period, and carries `CPUSchedulingPolicy` and
+`CPUSchedulingPriority`. Kernel quota/period and scheduler readbacks must
+match before application work; unsupported or unrepresentable settings
+refuse. The quota reader includes the visible root and refuses if it has
+read no CPU limit. Existing startup and cleanup checks remain required.
+Refusals use `containment-unavailable:systemd:host-policy:<failed-check>`.
+The `containment-result/1` record includes attempted checks and residuals.
+
+Two limits remain: concurrent checker services are not charged to the
+caller's aggregate cgroup budget, so copying a per-service quota does not
+preserve a shared ceiling. Privileged Landlock installed with `NoNewPrivs=0`
+inside the same namespaces and LSM label remains unobserved by these checks;
+namespace and label equality do not establish its absence. Ordinary
+unprivileged Landlock requires `NoNewPrivs=1` and is refused by that check.
+
+Use `zeno-fcis --containment-backend systemd ...` for the owner's explicit
+override of automatic host qualification, or
+`zeno-fcis --containment-backend posix ...` to select POSIX.
+Explicit systemd retains resource, scheduling, startup and cleanup checks.
+Backend selection never falls back to a weaker profile; POSIX currently
+refuses Python and group-resource profiles. These integration-source rules
+do not establish release qualification or complete sandbox equivalence.
 
 ### Released-source requirements
 

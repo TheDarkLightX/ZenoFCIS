@@ -2,6 +2,9 @@
 //! pure; the pipeline invokes one-shot shell acquisitions and owns its
 //! diagnostic results. It supplies no semantic or publication authority.
 
+#[path = "checker_host_context.rs"]
+pub(super) mod context;
+
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(super) struct Evidence {
     pub(super) qualified: bool,
@@ -64,7 +67,8 @@ pub(super) fn qualify(
     manager: impl FnOnce() -> Result<(), String>,
     status: impl FnOnce() -> std::io::Result<String>,
     scheduling: impl FnOnce() -> Result<(String, i64), String>,
-    quota: impl FnOnce() -> Result<u64, String>,
+    quota: impl FnOnce() -> Result<context::CpuQuota, String>,
+    observations: impl FnOnce() -> Result<context::Observations, String>,
 ) -> Result<Evidence, Refusal> {
     fn record<T>(
         checks: &mut Vec<Check>,
@@ -119,8 +123,78 @@ pub(super) fn qualify(
         record(
             &mut checks,
             "cpu-quota",
-            quota().map_err(|_| "cpu-quota".to_owned()),
-            u64::to_string,
+            quota()
+                .and_then(|q| {
+                    q.properties()?;
+                    Ok(q)
+                })
+                .map_err(|_| "cpu-quota".to_owned()),
+            |q| format!("{}/{}", q.quota, q.period),
+        )?;
+        let observed = record(&mut checks, "host-observations", observations(), |_| {
+            "readable".into()
+        })?;
+        record(
+            &mut checks,
+            "manager-pid",
+            context::manager_pid(&observed.manager_pid),
+            |_| "observed".into(),
+        )?;
+        record(
+            &mut checks,
+            "manager-identity",
+            context::stable_manager(&observed.manager_stat),
+            |_| "stable".into(),
+        )?;
+        for (name, pair) in context::NAMESPACES.iter().zip(&observed.namespaces) {
+            record(
+                &mut checks,
+                &format!("namespace-{name}"),
+                context::namespace_equal(name, pair),
+                |_| "equal".into(),
+            )?;
+        }
+        record(
+            &mut checks,
+            "lsm-label",
+            context::labels_equal(&observed.labels),
+            |_| "equal".into(),
+        )?;
+        record(
+            &mut checks,
+            "cgroup-root",
+            context::cgroup_root(&observed.cgroup_path, &observed.namespaces[6].0),
+            |_| "visible".into(),
+        )?;
+        record(
+            &mut checks,
+            "memory.max",
+            context::budget(&observed.memory, 64 * 1024 * 1024, "memory.max"),
+            |_| "at-least-unit".into(),
+        )?;
+        record(
+            &mut checks,
+            "memory.swap.max",
+            context::budget(&observed.swap, 0, "memory.swap.max"),
+            |_| "at-least-unit".into(),
+        )?;
+        record(
+            &mut checks,
+            "pids.max",
+            context::budget(&observed.tasks, 64, "pids.max"),
+            |_| "at-least-unit".into(),
+        )?;
+        record(
+            &mut checks,
+            "rlimits",
+            context::limit_properties(&observed.caller_limits),
+            |_| "representable;startup-readback-required".into(),
+        )?;
+        record(
+            &mut checks,
+            "cpu-scheduler",
+            context::Scheduler::read(&observed.scheduler_stat),
+            |s| format!("{}:{}", s.name(), s.priority),
         )?;
         Ok(())
     })();
@@ -154,7 +228,7 @@ pub(super) fn label_output(
     result["containment"] = serde_json::json!({
         "schema":"zeno-fcis/containment-result/1",
         "backend":"systemd", "required_profile":profile,
-        "evidence":"inline-host-policy-checks", "host_policy":evidence
+        "evidence":"inline-host-policy-checks", "host_policy":evidence, "residuals":context::RESIDUALS
     });
     let mut bytes = serde_json::to_vec(&result).map_err(|e| e.to_string())?;
     bytes.push(b'\n');
@@ -173,7 +247,13 @@ mod tests {
             || Ok(()),
             || Ok(status.to_owned()),
             || Ok(("0-3".to_owned(), 5)),
-            || Ok(200),
+            || {
+                Ok(context::CpuQuota {
+                    quota: 200000,
+                    period: 100000,
+                })
+            },
+            || Ok(context::fixture()),
         )
     }
 
@@ -188,12 +268,12 @@ mod tests {
     fn host_policy_records_each_successful_check() {
         let evidence = test_ok(evaluate(CLEAR));
         assert!(evidence.qualified);
-        assert_eq!(evidence.checks.len(), 6);
+        assert_eq!(evidence.checks.len(), 23);
         assert!(evidence.checks.iter().all(|c| c.passed));
         assert_eq!(evidence.checks[2].detail, "0");
         assert_eq!(evidence.checks[3].detail, "0");
         assert_eq!(evidence.checks[4].detail, "affinity=0-3;nice=5");
-        assert_eq!(evidence.checks[5].detail, "200");
+        assert_eq!(evidence.checks[5].detail, "200000/100000");
     }
 
     #[test]
@@ -204,6 +284,7 @@ mod tests {
                 || panic!("status read after manager refusal"),
                 || panic!("scheduling read after refusal"),
                 || panic!("quota read after refusal"),
+                || panic!("observations read after refusal"),
             ),
             "systemd-user-manager",
         );
@@ -217,6 +298,7 @@ mod tests {
                 || Err(std::io::Error::other("denied")),
                 || panic!("scheduling read after status refusal"),
                 || panic!("quota read after refusal"),
+                || panic!("observations read after refusal"),
             ),
             "status-unreadable",
         );
@@ -285,6 +367,7 @@ mod tests {
                 || Ok(CLEAR.to_owned()),
                 || Err("unreadable affinity or nice".to_owned()),
                 || panic!("quota read after scheduling refusal"),
+                || panic!("observations read after refusal"),
             ),
             "cpu-scheduling",
         );
@@ -298,6 +381,7 @@ mod tests {
                 || Ok(CLEAR.to_owned()),
                 || Ok(("0".to_owned(), 0)),
                 || Err("unknown ancestor quota".to_owned()),
+                || panic!("observations read after refusal"),
             ),
             "cpu-quota",
         );
@@ -346,3 +430,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "checker_host_policy_tests.rs"]
+mod round2_tests;
