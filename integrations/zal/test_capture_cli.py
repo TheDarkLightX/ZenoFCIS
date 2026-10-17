@@ -3,12 +3,27 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import capture_workspace as W
 import loop_language as Z
 
 
 class CaptureCliGrammarTests(unittest.TestCase):
+    def setUp(self):
+        run = W.D.run
+
+        def selected_run(cli, arguments, cwd=None):
+            # Only acquisition needs systemd; frozen-table operations keep
+            # their finite-data POSIX profile even in a systemd CI environment.
+            backend = "systemd" if arguments[:3] in (["loop", "capture", "open"],
+                                                     ["loop", "capture", "whole"]) else "auto"
+            return run(cli, ["--containment-backend", backend, *arguments], cwd)
+
+        selection = patch.object(W.D, "run", selected_run)
+        selection.start()
+        self.addCleanup(selection.stop)
+
     def test_real_cli_accepts_paired_int_bool_equality_and_conditionals(self):
         cli = os.environ.get('ZENO_CAPTURE_TEST_CLI')
         if not cli:

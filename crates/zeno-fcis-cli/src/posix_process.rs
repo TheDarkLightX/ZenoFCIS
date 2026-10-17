@@ -254,6 +254,7 @@ mod runtime {
         pub(in super::super) fn new(
             command: &crate::Command,
             actual: Vec<Guarantee>,
+            source: super::super::SelectionSource,
         ) -> Result<Self, String> {
             let mut nonce = [0; 32];
             fs::File::open("/dev/urandom")
@@ -318,6 +319,7 @@ mod runtime {
             super::super::set_public_label(
                 serde_json::json!({"schema":"zeno-fcis/containment-result/1",
                 "backend":"posix","required_profile":"finite-data/1",
+                "selection_source":source,
                 "evidence":"private-append-only-journal"}),
             );
             Ok(this)
@@ -517,15 +519,19 @@ mod runtime {
 
     // All three readback boundaries use this pure validation; callers retain
     // observed values rather than copying a required cap into evidence.
+    fn tightened_limits(soft: u64, hard: u64, target: u64) -> (u64, u64) {
+        (soft.min(target), hard.min(target))
+    }
+
     fn checked_limit(
         control: Control,
         requested: u64,
-        expected: Option<u64>,
+        expected: Option<(u64, u64)>,
         soft: u64,
         hard: u64,
         unit: Unit,
     ) -> Result<Guarantee, String> {
-        if soft != hard || hard > requested || expected.is_some_and(|e| hard != e) {
+        if soft > hard || hard > requested || expected.is_some_and(|e| (soft, hard) != e) {
             return Err(format!("{}:readback", control.name()));
         }
         Ok(observed_limit(control, requested, hard, unit))
@@ -536,8 +542,8 @@ mod runtime {
         for (control, resource, requested, unit) in limits() {
             let (soft, hard) =
                 getrlimit(resource).map_err(|e| format!("{}:{e}", control.name()))?;
-            let effective = soft.min(hard).min(requested);
-            setrlimit(resource, effective, effective)
+            let effective = tightened_limits(soft, hard, requested);
+            setrlimit(resource, effective.0, effective.1)
                 .map_err(|e| format!("{}:{e}", control.name()))?;
             let (soft, hard) = getrlimit(resource).map_err(|e| e.to_string())?;
             guarantees.push(checked_limit(
@@ -550,6 +556,42 @@ mod runtime {
             )?);
         }
         Ok(guarantees)
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn leaf_limits_preserve_inherited_soft_and_hard_independently() {
+        for (soft, hard, target, expected) in [
+            (1024, u64::MAX, 65536, (1024, 65536)),
+            (1024, 1024, 65536, (1024, 1024)),
+            (1, u64::MAX, 25, (1, 25)),
+            (16, 16, 64, (16, 16)),
+            (32 << 20, 48 << 20, 64 << 20, (32 << 20, 48 << 20)),
+        ] {
+            assert_eq!(tightened_limits(soft, hard, target), expected);
+            assert!(
+                checked_limit(
+                    Control::FileSize,
+                    target,
+                    Some(expected),
+                    expected.0,
+                    expected.1,
+                    Unit::Bytes
+                )
+                .is_ok()
+            );
+            assert!(
+                checked_limit(
+                    Control::FileSize,
+                    target,
+                    Some(expected),
+                    expected.0 + 1,
+                    expected.1,
+                    Unit::Bytes
+                )
+                .is_err()
+            );
+        }
     }
 
     pub(in super::super) fn write_protocol(

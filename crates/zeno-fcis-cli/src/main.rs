@@ -136,9 +136,9 @@ claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pr
     disable_help_subcommand = true
 )]
 struct Cli {
-    /// Required containment backend; auto uses direct POSIX for eligible finite data.
-    #[arg(long, global = true, value_enum, default_value_t = containment_policy::Backend::Auto)]
-    containment_backend: containment_policy::Backend,
+    /// Backend override; otherwise ZENO_FCIS_CONTAINMENT_BACKEND, then auto (finite data only).
+    #[arg(long, global = true, value_enum)]
+    containment_backend: Option<containment_policy::Backend>,
     /// Ordered external KB files; omission consults ZENO_FCIS_KB for loop sessions.
     #[arg(long, global = true)]
     kb: Vec<PathBuf>,

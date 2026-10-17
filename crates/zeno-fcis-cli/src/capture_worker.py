@@ -13,6 +13,15 @@ import resource
 import sys
 
 
+def tighten_limit(key, target):
+    inherited = resource.getrlimit(key)
+    expected = tuple(target if value == resource.RLIM_INFINITY else min(value, target)
+                     for value in inherited)
+    resource.setrlimit(key, expected)
+    if resource.getrlimit(key) != expected:
+        raise RuntimeError("containment-rlimit-readback")
+
+
 def contain():
     if sys.version_info < (3, 11) or sys.platform != "linux" or os.uname().machine != "x86_64":
         raise RuntimeError("unsupported-runtime")
@@ -22,7 +31,7 @@ def contain():
     for key, limit in ((resource.RLIMIT_CPU, 2), (resource.RLIMIT_AS, 48 << 20),
                        (resource.RLIMIT_FSIZE, 65536), (resource.RLIMIT_CORE, 0),
                        (resource.RLIMIT_NOFILE, 32)):
-        resource.setrlimit(key, (limit, limit))
+        tighten_limit(key, limit)
     libc = ctypes.CDLL(None, use_errno=True)
     libc.prctl.argtypes = [ctypes.c_int] + [ctypes.c_ulong] * 4
     libc.prctl.restype = ctypes.c_int

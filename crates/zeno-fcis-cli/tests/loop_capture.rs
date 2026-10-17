@@ -39,7 +39,16 @@ impl Drop for Directory {
     }
 }
 fn run(args: &[&str]) -> (i32, Value) {
+    let backend = if args
+        .windows(2)
+        .any(|pair| pair == ["capture", "open"] || pair == ["capture", "whole"])
+    {
+        "systemd"
+    } else {
+        "auto"
+    };
     let done = Command::new(CLI)
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", backend)
         .args(args)
         .output()
         .unwrap_or_else(|e| panic!("CLI unavailable: {e}"));
@@ -407,6 +416,7 @@ fn capture_confinement_closes_injected_parent_descriptor_and_environment() {
     // CLOEXEC and would make an inheritance control vacuous.
     let helper = "import os,subprocess,sys\nwith open(sys.argv[2],'rb') as f:\n r=subprocess.run([sys.argv[1],*sys.argv[3:]],pass_fds=(f.fileno(),),env={**os.environ,'CAPTURE_CONTROL_SECRET':'parent-control'},capture_output=True,timeout=35)\n sys.stdout.buffer.write(r.stdout)\n sys.stderr.buffer.write(r.stderr)\n sys.exit(r.returncode)\n";
     let done = Command::new("python3")
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
         .args([
             "-B",
             "-c",
@@ -523,6 +533,7 @@ fn capture_zal_real_cli_expression_grammar_round_trips() {
         .unwrap_or_else(|| panic!("repository root"))
         .to_path_buf();
     let done = Command::new("python3")
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
         .args([
             "-B",
             "-m",

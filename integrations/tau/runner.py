@@ -188,10 +188,14 @@ def answer(kind, output, returncode, failure):
 
 CHILD = """import os, resource, sys
 memory, cpu, output = map(int, sys.argv[1:4])
-resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
-resource.setrlimit(resource.RLIMIT_FSIZE, (output, output))
-resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+for key, target in ((resource.RLIMIT_AS, memory), (resource.RLIMIT_CPU, cpu),
+                    (resource.RLIMIT_FSIZE, output), (resource.RLIMIT_CORE, 0)):
+    inherited = resource.getrlimit(key)
+    expected = tuple(target if value == resource.RLIM_INFINITY else min(value, target)
+                     for value in inherited)
+    resource.setrlimit(key, expected)
+    if resource.getrlimit(key) != expected:
+        raise RuntimeError("rlimit-readback")
 os.execv(sys.argv[4], sys.argv[4:])
 """
 

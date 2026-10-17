@@ -102,6 +102,7 @@ fn offline_parallel_containment_does_not_depend_on_tmpdir_length() {
     for extra in [vec![], vec!["--offline-parallel", "--workers", "2"]] {
         let path = if extra.is_empty() { &serial } else { &receipt };
         let output = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
             .env("TMPDIR", &long)
             .args(["transform", "check", "--original"])
             .arg(&original)
@@ -126,6 +127,7 @@ fn an_interrupted_offline_check_tears_down_and_publishes_nothing() {
         let directory = Directory::new();
         let receipt = directory.0.join("receipt.json");
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
             .args(["transform", "check", "--original"])
             .arg(artifact("current-decision-scalars-original"))
             .arg("--candidate")
@@ -220,6 +222,7 @@ fn read(path: &Path) -> Vec<u8> {
 
 fn run(arguments: &[&std::ffi::OsStr]) -> (Option<i32>, Value) {
     let output: Output = Command::new(CLI)
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
         .args(arguments)
         .output()
         .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"));

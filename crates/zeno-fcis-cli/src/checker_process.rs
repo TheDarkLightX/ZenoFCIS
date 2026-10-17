@@ -10,29 +10,203 @@ use std::time::Duration;
 mod posix;
 
 #[cfg(target_os = "linux")]
-#[path = "checker_host_policy.rs"]
-mod host_policy;
+#[path = "checker_limits.rs"]
+mod limits;
+
+const BACKEND_ENV: &str = "ZENO_FCIS_CONTAINMENT_BACKEND";
+const EXPLICIT_BACKEND_REQUIRED: &str = "containment-unavailable:auto:explicit-backend-required";
+const BACKEND_MESSAGE: &str = "Choose --containment-backend systemd or set ZENO_FCIS_CONTAINMENT_BACKEND=systemd only when the sibling service may run outside the caller's restrictions; auto keeps finite data on POSIX.";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum SelectionSource {
+    Flag,
+    Environment,
+    Default,
+}
+
+fn select_backend(
+    flag: Option<Backend>,
+    environment: Option<&std::ffi::OsStr>,
+) -> Result<(Backend, SelectionSource), String> {
+    if let Some(backend) = flag {
+        return Ok((backend, SelectionSource::Flag));
+    }
+    let Some(environment) = environment else {
+        return Ok((Backend::Auto, SelectionSource::Default));
+    };
+    let backend = match environment.to_str() {
+        Some("systemd") => Backend::Systemd,
+        Some("posix") => Backend::Posix,
+        Some("auto") => Backend::Auto,
+        _ => {
+            return Err(format!(
+                "containment-unavailable:environment:invalid-{BACKEND_ENV}"
+            ));
+        }
+    };
+    Ok((backend, SelectionSource::Environment))
+}
+
+fn selected_backend(profile: Profile, requested: Backend) -> Result<Backend, String> {
+    match (requested, profile) {
+        (Backend::Auto, Profile::FiniteData) => Ok(Backend::Posix),
+        (Backend::Auto, _) => Err(EXPLICIT_BACKEND_REQUIRED.into()),
+        (backend, _) => Ok(backend),
+    }
+}
+
+#[cfg(test)]
+mod backend_tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn backend_flag_then_environment_then_default() {
+        assert_eq!(
+            select_backend(None, None),
+            Ok((Backend::Auto, SelectionSource::Default))
+        );
+        for (text, backend) in [
+            ("auto", Backend::Auto),
+            ("systemd", Backend::Systemd),
+            ("posix", Backend::Posix),
+        ] {
+            assert_eq!(
+                select_backend(None, Some(OsStr::new(text))),
+                Ok((backend, SelectionSource::Environment))
+            );
+            for flag in [Backend::Auto, Backend::Posix, Backend::Systemd] {
+                assert_eq!(
+                    select_backend(Some(flag), Some(OsStr::new(text))),
+                    Ok((flag, SelectionSource::Flag))
+                );
+                assert_eq!(
+                    select_backend(Some(flag), Some(OsStr::new("malformed"))),
+                    Ok((flag, SelectionSource::Flag))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_backend_environment_refuses() {
+        for text in [
+            "",
+            "SYSTEMD",
+            " systemd",
+            "systemd ",
+            "systemd|posix",
+            "invalid",
+        ] {
+            assert!(select_backend(None, Some(OsStr::new(text))).is_err());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            assert!(select_backend(None, Some(OsStr::from_bytes(b"\xff"))).is_err());
+        }
+    }
+
+    #[test]
+    fn automatic_never_selects_systemd_and_finite_data_stays_posix() {
+        assert_eq!(
+            selected_backend(Profile::FiniteData, Backend::Auto),
+            Ok(Backend::Posix)
+        );
+        for profile in [Profile::PythonReference, Profile::GroupResources] {
+            assert_eq!(
+                selected_backend(profile, Backend::Auto),
+                Err(EXPLICIT_BACKEND_REQUIRED.into())
+            );
+            assert_eq!(
+                selected_backend(profile, Backend::Systemd),
+                Ok(Backend::Systemd)
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn explicit_result_uses_supervisor_selection_and_preserves_semantics() {
+        let original = serde_json::json!({"receipt":{"canonical":"unchanged"},"authority":"none","containment":{"selection_source":"worker"}});
+        let bytes = test_ok(serde_json::to_vec(&original));
+        let wrapped = test_ok(label_systemd_output(
+            &bytes,
+            Profile::PythonReference,
+            SelectionSource::Environment,
+            serde_json::json!({"caller_nice":3}),
+        ));
+        let result: serde_json::Value = test_ok(serde_json::from_slice(&wrapped));
+        assert_eq!(result["receipt"], original["receipt"]);
+        assert_eq!(result["authority"], "none");
+        assert_eq!(result["containment"]["selection_source"], "environment");
+        assert_eq!(result["containment"]["observations"]["caller_nice"], 3);
+        assert_eq!(
+            result["containment"]["residuals"].as_array().map(Vec::len),
+            Some(3)
+        );
+        for bad in [b"not-json".as_slice(), b"[]", b"{}{}"] {
+            assert!(
+                label_systemd_output(
+                    bad,
+                    Profile::PythonReference,
+                    SelectionSource::Flag,
+                    serde_json::Value::Null
+                )
+                .is_err()
+            );
+        }
+    }
+}
+
+/// Operational supervisor evidence; worker fields cannot select a backend or
+/// grant receipt authority. Canonical semantic receipt bytes stay untouched.
+#[cfg(target_os = "linux")]
+fn label_systemd_output(
+    bytes: &[u8],
+    profile: Profile,
+    source: SelectionSource,
+    observations: serde_json::Value,
+) -> Result<Vec<u8>, String> {
+    let mut result: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| "containment-output-not-json".to_owned())?;
+    if !result.is_object() {
+        return Err("containment-output-not-object".into());
+    }
+    result["backend"] = serde_json::json!("systemd");
+    result["required_profile"] = serde_json::json!(profile);
+    result["containment"] = serde_json::json!({
+        "schema":"zeno-fcis/containment-result/1", "backend":"systemd",
+        "required_profile":profile, "selection_source":source,
+        "evidence":"explicit-systemd-resource-readback", "observations":observations,
+        "residuals":["sibling-service-does-not-inherit-caller-sandbox-or-cgroup-hierarchy",
+            "detached-work-and-existing-caller-usage-are-not-jointly-charged",
+            "copied-cpu-ratio-and-period-do-not-preserve-every-ancestor-burst-limit"]
+    });
+    let mut bytes = serde_json::to_vec(&result).map_err(|e| e.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
 
 const STAGING: &str = "ZENO_FCIS_CHECKER_STAGING";
 #[cfg(target_os = "linux")]
 const MAX_STAGED_RECEIPTS: usize = 16;
-/// Shell diagnostic only: neither field supplies a verdict or cleanup authority.
+/// Shell diagnostics supply neither a verdict nor cleanup authority.
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SupervisorFailure {
     reason: String,
     cleanup: Option<String>,
-    #[cfg(target_os = "linux")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    host_policy: Option<host_policy::Evidence>,
+    selection_source: Option<SelectionSource>,
 }
 impl From<String> for SupervisorFailure {
     fn from(reason: String) -> Self {
         Self {
             reason,
             cleanup: None,
-            #[cfg(target_os = "linux")]
-            host_policy: None,
+            selection_source: None,
         }
     }
 }
@@ -51,7 +225,7 @@ impl SupervisorFailure {
         Self {
             reason: primary.unwrap_or_else(|| "process-group-cleanup-incomplete".into()),
             cleanup: Some(physical),
-            host_policy: None,
+            selection_source: None,
         }
     }
     fn report(&self, offline: bool) -> serde_json::Value {
@@ -222,9 +396,8 @@ mod linux {
     const CALLER_PRIORITY: &str = "ZENO_FCIS_CHECKER_PRIORITY";
     const CALLER_QUOTA: &str = "ZENO_FCIS_CHECKER_QUOTA";
     const CALLER_PERIOD: &str = "ZENO_FCIS_CHECKER_PERIOD";
-    const HOST_POLICY_MODE: &str = "ZENO_FCIS_CHECKER_HOST_POLICY_MODE";
     const CALLER_LIMITS: &str = "ZENO_FCIS_CHECKER_LIMITS";
-    use super::host_policy::context::{CpuQuota, Scheduler};
+    use super::limits::{CpuQuota, Scheduler};
     /// The control channel is the inherited standard input socket. It has no
     /// file system name, so TMPDIR length and other same-user processes
     /// cannot reach it; SO_PEERCRED of a socket pair names only its creator.
@@ -371,22 +544,18 @@ mod linux {
             let quota = std::env::var(CALLER_QUOTA).map_err(|_| "missing-caller-quota")?;
             let period = std::env::var(CALLER_PERIOD).map_err(|_| "missing-caller-period")?;
             let expected = CpuQuota {
-                quota: super::host_policy::context::decimal(&quota)?,
-                period: super::host_policy::context::decimal(&period)?,
+                quota: super::limits::decimal(&quota)?,
+                period: super::limits::decimal(&period)?,
             };
             expected.verify(
                 &fs::read_to_string(group()?.join("cpu.max"))
                     .map_err(|_| "cpu-quota-readback-unavailable")?,
             )?;
-            let mode = std::env::var(HOST_POLICY_MODE).map_err(|_| "missing-host-policy-mode")?;
-            let caller_limits = std::env::var(CALLER_LIMITS).ok();
+            let caller_limits =
+                std::env::var(CALLER_LIMITS).map_err(|_| "missing-caller-rlimits")?;
             let actual_limits = fs::read_to_string("/proc/self/limits")
                 .map_err(|_| "rlimits-readback-unavailable")?;
-            super::host_policy::context::verify_service_limits(
-                &mode,
-                caller_limits.as_deref(),
-                &actual_limits,
-            )?;
+            super::limits::verify_service_limits(&caller_limits, &actual_limits)?;
         }
         Ok(())
     }
@@ -1014,38 +1183,12 @@ mod linux {
     }
 
     pub(super) fn cpu_quota(workers: u64) -> Result<CpuQuota, String> {
-        super::host_policy::context::chain_quota(Path::new("/sys/fs/cgroup"), group()?, workers)
+        super::limits::chain_quota(Path::new("/sys/fs/cgroup"), group()?, workers)
     }
 
     pub(super) fn scheduler() -> Result<Scheduler, String> {
         Scheduler::read(
             &fs::read_to_string("/proc/self/stat").map_err(|_| "cpu-scheduler-unreadable")?,
-        )
-    }
-
-    pub(super) fn host_observations() -> Result<super::host_policy::context::Observations, String> {
-        let mut query = Command::new("/usr/bin/busctl");
-        query.args([
-            "--user",
-            "call",
-            "org.freedesktop.DBus",
-            "/org/freedesktop/DBus",
-            "org.freedesktop.DBus",
-            "GetConnectionUnixProcessID",
-            "s",
-            "org.freedesktop.systemd1",
-        ]);
-        let response = control_process(query, Instant::now() + Duration::from_secs(1), 8192)
-            .map_err(|_| "manager-pid-unavailable")?;
-        if !response.status.success() {
-            return Err("manager-pid-unavailable".into());
-        }
-        let response = String::from_utf8(response.stdout).map_err(|_| "manager-pid-malformed")?;
-        super::host_policy::context::acquire(
-            response,
-            Path::new("/proc"),
-            Path::new("/sys/fs/cgroup"),
-            group()?,
         )
     }
 
@@ -1056,14 +1199,16 @@ mod linux {
         pub(super) receipt: Option<&'a Path>,
     }
 
+    /// Public CLI calls supply a result label; raw protocol tests may omit it.
+    /// This diagnostic option never gates resource carry or startup readback.
     pub(super) fn supervise(
         args: &[std::ffi::OsString],
         offline: bool,
         workers: u64,
         receipts: Receipts<'_>,
-        host_policy: Option<(&super::host_policy::Evidence, super::Profile)>,
+        result_label: Option<(super::Profile, super::SelectionSource)>,
     ) -> Result<u8, super::SupervisorFailure> {
-        supervise_backend(args, offline, workers, receipts, None, host_policy)
+        supervise_backend(args, offline, workers, receipts, None, result_label)
     }
 
     pub(super) fn supervise_posix(
@@ -1078,7 +1223,7 @@ mod linux {
     /// copies; this preparation grants neither admission nor startup authority.
     fn carry_service_limits(child: &mut Command, caller: &str) -> Result<(), String> {
         child
-            .args(super::host_policy::context::limit_properties(caller)?)
+            .args(super::limits::limit_properties(caller)?)
             .arg(format!("--setenv={CALLER_LIMITS}={caller}"));
         Ok(())
     }
@@ -1089,7 +1234,7 @@ mod linux {
         workers: u64,
         receipts: Receipts<'_>,
         mut guardian: Option<&mut super::posix::Guardian>,
-        host_policy: Option<(&super::host_policy::Evidence, super::Profile)>,
+        result_label: Option<(super::Profile, super::SelectionSource)>,
     ) -> Result<u8, super::SupervisorFailure> {
         let is_posix = guardian.is_some();
         let setup_error = |error: String| {
@@ -1113,10 +1258,10 @@ mod linux {
             Some(cpu_quota(workers)?)
         };
         let caller_scheduler = if is_posix { None } else { Some(scheduler()?) };
-        let caller_limits = if host_policy.is_some() {
+        let caller_limits = if !is_posix {
             let limits = fs::read_to_string("/proc/self/limits")
                 .map_err(|_| "caller-rlimits-unreadable".to_owned())?;
-            super::host_policy::context::limit_properties(&limits)?;
+            super::limits::limit_properties(&limits)?;
             Some(limits)
         } else {
             None
@@ -1161,14 +1306,6 @@ mod linux {
             child
                 .args(cpu_quota.properties()?)
                 .args(caller_scheduler.properties());
-            child.arg(format!(
-                "--setenv={HOST_POLICY_MODE}={}",
-                if host_policy.is_some() {
-                    "automatic"
-                } else {
-                    "explicit"
-                }
-            ));
             if let Some(limits) = &caller_limits {
                 carry_service_limits(&mut child, limits)?;
             }
@@ -1544,10 +1681,17 @@ mod linux {
                 accepted_exit(waited, reported, loaded, &physical)?
             };
             interrupted()?;
-            // Prepare diagnostic wrapping after accepting exit/cleanup and
-            // before publication. Worker JSON cannot supply policy evidence.
-            if let Some((evidence, profile)) = host_policy {
-                stdout.bytes = super::host_policy::label_output(&stdout.bytes, profile, evidence)?;
+            // Only supervisor observations label the output, before publication.
+            if let Some((profile, source)) = result_label {
+                let observations = serde_json::json!({
+                    "caller_affinity":caller_cpus,"caller_nice":caller_nice,
+                    "caller_rlimits":caller_limits,
+                    "cpu_quota":cpu_quota.map(|q| (q.quota,q.period)),
+                    "cpu_scheduler":caller_scheduler.map(|s| (s.policy,s.priority)),
+                    "startup_readback":"rlimits-no-looser;scheduler-and-quota-equal"
+                });
+                stdout.bytes =
+                    super::label_systemd_output(&stdout.bytes, profile, source, observations)?;
                 if stdout.bytes.len() > OUTPUT_LIMIT {
                     return Err("contained-output-cap".to_owned());
                 }
@@ -1608,14 +1752,12 @@ mod linux {
 
         #[test]
         fn systemd_command_carries_every_limit_and_the_same_snapshot() {
-            let caller = super::super::host_policy::context::fixture().caller_limits;
+            let caller = super::super::limits::limit_fixture();
             let mut command = Command::new("/usr/bin/systemd-run");
             test_ok(carry_service_limits(&mut command, &caller));
             let arguments: Vec<_> = command.get_args().map(|s| s.to_string_lossy()).collect();
             assert_eq!(arguments.len(), 17);
-            let properties = test_ok(super::super::host_policy::context::limit_properties(
-                &caller,
-            ));
+            let properties = test_ok(super::super::limits::limit_properties(&caller));
             assert_eq!(arguments[..16], properties);
             assert_eq!(arguments[16], format!("--setenv={CALLER_LIMITS}={caller}"));
         }
@@ -1703,51 +1845,29 @@ mod linux {
                 test_ok(fs::write(at.join("cgroup.procs"), ""));
             }
             assert_eq!(
-                test_err(super::super::host_policy::context::chain_quota(
-                    &root,
-                    leaf.clone(),
-                    4
-                )),
+                test_err(super::super::limits::chain_quota(&root, leaf.clone(), 4)),
                 "caller-cpu-quota-unobserved"
             );
             test_ok(fs::write(root.join("cpu.max"), "50000 100000"));
             assert_eq!(
-                test_ok(super::super::host_policy::context::chain_quota(
-                    &root,
-                    leaf.clone(),
-                    4
-                )),
+                test_ok(super::super::limits::chain_quota(&root, leaf.clone(), 4)),
                 CpuQuota {
                     quota: 50000,
                     period: 100000
                 }
             );
             assert_eq!(
-                test_ok(super::super::host_policy::context::chain_quota(
-                    &root,
-                    root.clone(),
-                    4
-                )),
+                test_ok(super::super::limits::chain_quota(&root, root.clone(), 4)),
                 CpuQuota {
                     quota: 50000,
                     period: 100000
                 }
             );
             test_ok(fs::write(leaf.join("cpu.max"), "oops 100000"));
+            assert!(super::super::limits::chain_quota(&root, leaf.clone(), 4).is_err());
+            assert!(super::super::limits::chain_quota(&root, root.join("missing"), 4).is_err());
             assert!(
-                super::super::host_policy::context::chain_quota(&root, leaf.clone(), 4).is_err()
-            );
-            assert!(
-                super::super::host_policy::context::chain_quota(&root, root.join("missing"), 4)
-                    .is_err()
-            );
-            assert!(
-                super::super::host_policy::context::chain_quota(
-                    &root,
-                    PathBuf::from("/elsewhere"),
-                    4
-                )
-                .is_err()
+                super::super::limits::chain_quota(&root, PathBuf::from("/elsewhere"), 4).is_err()
             );
             test_ok(fs::remove_dir_all(root));
         }
@@ -1969,8 +2089,7 @@ pub(crate) struct Admission {
     required_profile: Profile,
     #[cfg(target_os = "linux")]
     invocation: Option<posix::Invocation>,
-    #[cfg(target_os = "linux")]
-    host_policy: Option<host_policy::Evidence>,
+    selection_source: SelectionSource,
 }
 
 static PUBLIC_LABEL: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
@@ -2086,14 +2205,32 @@ fn admit_capabilities(
 
 pub(crate) fn preflight(
     command: &crate::Command,
-    requested: Backend,
+    flag: Option<Backend>,
 ) -> Result<Option<Admission>, SupervisorFailure> {
-    if contained_profile(command).is_none() {
+    // Re-exec selection belongs to the supervisor. Its child still validates
+    // the inherited channel and installed controls before ACK; markers grant
+    // no authority and manager environment cannot override the bound choice.
+    if std::env::var_os("ZENO_FCIS_CHECKER_CONTROL").is_some() {
         return Ok(None);
     }
-    // Re-exec children still validate their inherited channel and installed
-    // controls before receiving startup ACK; a marker supplies no authority.
-    if std::env::var_os("ZENO_FCIS_CHECKER_CONTROL").is_some() {
+    let (requested, source) = select_backend(flag, std::env::var_os(BACKEND_ENV).as_deref())
+        .map_err(|reason| SupervisorFailure {
+            reason,
+            cleanup: None,
+            selection_source: Some(SelectionSource::Environment),
+        })?;
+    preflight_selected(command, requested, source).map_err(|mut failure| {
+        failure.selection_source = Some(source);
+        failure
+    })
+}
+
+fn preflight_selected(
+    command: &crate::Command,
+    requested: Backend,
+    source: SelectionSource,
+) -> Result<Option<Admission>, SupervisorFailure> {
+    if contained_profile(command).is_none() {
         return Ok(None);
     }
     let profile = required_profile(command).map_err(|missing| {
@@ -2103,18 +2240,12 @@ pub(crate) fn preflight(
         }
         .to_string()
     })?;
-    let backend = match requested {
-        Backend::Auto if profile == Profile::FiniteData => Backend::Posix,
-        Backend::Auto => Backend::Systemd,
-        backend => backend,
-    };
+    let backend = selected_backend(profile, requested)?;
     // Injection can remove a control but cannot invent one. On POSIX the
     // comparator consumes observations from the disposable setup/cleanup run.
     let missing = std::env::var("ZENO_FCIS_CONTAINMENT_MISSING").unwrap_or_default();
     #[cfg(target_os = "linux")]
     let mut invocation = None;
-    #[cfg(target_os = "linux")]
-    let mut host_policy = None;
     #[cfg(target_os = "linux")]
     match backend {
         Backend::Posix if profile == Profile::FiniteData => {
@@ -2122,7 +2253,7 @@ pub(crate) fn preflight(
             actual.retain(|g| !missing.split(',').any(|s| s == g.control.name()));
             admit_capabilities(command, backend, &actual).map_err(|e| e.to_string())?;
             invocation = Some(
-                posix::Invocation::new(command, actual)
+                posix::Invocation::new(command, actual, source)
                     .map_err(|e| format!("containment-unavailable:posix:evidence:{e}"))?,
             );
         }
@@ -2146,8 +2277,8 @@ pub(crate) fn preflight(
                 .to_string()
                 .into());
             }
-            // This stage preserves the legacy launcher verbatim. Its general
-            // environment/FD policy cannot satisfy the new finite-data profile.
+            // The legacy launcher's environment/FD policy cannot satisfy the
+            // finite-data profile, even when the backend is chosen explicitly.
             if profile == Profile::FiniteData {
                 return Err(Unavailable {
                     backend,
@@ -2158,45 +2289,19 @@ pub(crate) fn preflight(
             }
             // Disposable, read-only prerequisite probe. Never create a unit
             // to discover a missing bus, or repair/widen the caller's sandbox.
-            let probe_manager = || {
-                let shown = linux::manager(
-                    &[
-                        "--user",
-                        "show",
-                        "--property=LoadState",
-                        "zeno-containment-preflight.service",
-                    ],
-                    std::time::Instant::now() + Duration::from_secs(1),
-                );
-                if shown.as_ref().is_ok_and(|s| linux::unit_loaded(s).is_ok()) {
-                    Ok(())
-                } else {
-                    Err("systemd-user-manager".to_owned())
-                }
-            };
-            if requested == Backend::Auto {
-                match host_policy::qualify(
-                    probe_manager,
-                    || std::fs::read_to_string("/proc/self/status"),
-                    linux::scheduling,
-                    || linux::cpu_quota(contained_profile(command).map_or(4, |p| p.1)),
-                    linux::host_observations,
-                ) {
-                    Ok(evidence) => host_policy = Some(evidence),
-                    Err(refusal) => {
-                        let mut failure = SupervisorFailure::from(
-                            Unavailable {
-                                backend,
-                                missing: format!("host-policy:{}", refusal.failed_check),
-                            }
-                            .to_string(),
-                        );
-                        failure.host_policy = Some(refusal.evidence);
-                        return Err(failure);
-                    }
-                }
-            } else {
-                probe_manager().map_err(|missing| Unavailable { backend, missing }.to_string())?;
+            let shown = linux::manager(
+                &[
+                    "--user",
+                    "show",
+                    "--property=LoadState",
+                    "zeno-containment-preflight.service",
+                ],
+                std::time::Instant::now() + Duration::from_secs(1),
+            );
+            if !shown.as_ref().is_ok_and(|s| linux::unit_loaded(s).is_ok()) {
+                return Err("containment-unavailable:systemd:systemd-user-manager"
+                    .to_owned()
+                    .into());
             }
         }
         Backend::Auto => return Err("containment-unavailable:auto:unselected".to_owned().into()),
@@ -2213,7 +2318,7 @@ pub(crate) fn preflight(
         backend,
         required_profile: profile,
         invocation,
-        host_policy,
+        selection_source: source,
     }))
 }
 
@@ -2310,26 +2415,28 @@ pub(crate) fn dispatch(
                 invocation: Some(invocation),
                 ..
             }) => posix::supervise(command, &args, invocation),
-            admission => {
-                let host_policy =
-                    admission.and_then(|a| a.host_policy.map(|e| (e, a.required_profile)));
-                let result = linux::supervise(
-                    &args,
-                    profile.0,
-                    profile.1,
-                    linux::Receipts {
-                        staging_parent: staging_parent.as_deref(),
-                        receipt,
-                    },
-                    host_policy
-                        .as_ref()
-                        .map(|(evidence, profile)| (evidence, *profile)),
-                );
-                result.map_err(|mut failure| {
-                    failure.host_policy = host_policy.map(|(evidence, _)| evidence);
-                    failure
-                })
-            }
+            Some(Admission {
+                backend: Backend::Systemd,
+                required_profile,
+                selection_source,
+                ..
+            }) => linux::supervise(
+                &args,
+                profile.0,
+                profile.1,
+                linux::Receipts {
+                    staging_parent: staging_parent.as_deref(),
+                    receipt,
+                },
+                Some((required_profile, selection_source)),
+            )
+            .map_err(|mut failure| {
+                failure.selection_source = Some(selection_source);
+                failure
+            }),
+            _ => Err("containment-unavailable:admission-missing"
+                .to_owned()
+                .into()),
         },
         Err(error) => {
             // The supervisor quotes the child's stderr in its refusal.
@@ -2390,11 +2497,14 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
                         "attempt_spent":if unavailable {serde_json::json!(false)}else{serde_json::Value::Null},"accounting_complete":false}});
         if reason.starts_with("containment-unavailable:systemd-user-manager:")
             || reason == "containment-unavailable:systemd:systemd-user-manager"
-            || reason == "containment-unavailable:systemd:host-policy:systemd-user-manager"
         {
             report["detail"]["prerequisite"] = serde_json::json!("systemd-user-manager");
         }
         failure.add_cleanup(&mut report, true);
+    }
+    if reason == EXPLICIT_BACKEND_REQUIRED {
+        report["reason"] = serde_json::json!(EXPLICIT_BACKEND_REQUIRED);
+        report["message"] = serde_json::json!(BACKEND_MESSAGE);
     }
     if let Some(acquisition) = acquisition {
         let mut intake = acquisition.json();
@@ -2419,22 +2529,12 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
             "startup":{"guarantees":[],"admitted":false},
             "final":{"termination":"stopped","reason":if let crate::Command::Loop { command } = command && crate::loop_command::is_capture(command) { report["detail"]["reason"].clone() } else { serde_json::json!(failure.reason) },"application_work_started":false,
                 "cleanup":"unknown","absence_verified":false}});
-        #[cfg(target_os = "linux")]
-        let label = {
-            let mut label = label;
-            if let Some(evidence) = &failure.host_policy {
-                label["host_policy"] = serde_json::json!(evidence);
-                label["residuals"] = serde_json::json!(host_policy::context::RESIDUALS);
-                if evidence.qualified {
-                    label["final"]["application_work_started"] = serde_json::Value::Null;
-                } else {
-                    // Policy reasons are fixed nonsecret check names. Keep the
-                    // precise refusal even when capture sanitizes its detail.
-                    label["host_policy_refusal"] = serde_json::json!(failure.reason);
-                }
-            }
-            label
-        };
+        let mut label = label;
+        label["selection_source"] = serde_json::json!(failure.selection_source);
+        if reason == EXPLICIT_BACKEND_REQUIRED {
+            label["message"] = serde_json::json!(BACKEND_MESSAGE);
+            label["final"]["reason"] = serde_json::json!(EXPLICIT_BACKEND_REQUIRED);
+        }
         set_public_label(label);
     }
     crate::print_json(&report);

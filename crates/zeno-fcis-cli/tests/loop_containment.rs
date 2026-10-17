@@ -9,6 +9,21 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 const CLI: &str = env!("CARGO_BIN_EXE_zeno-fcis");
 static NEXT: AtomicU64 = AtomicU64::new(0);
+
+#[test]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn python_leaf_limits_preserve_inheritance_and_readback() {
+    let done = Command::new("/usr/bin/python3")
+        .args(["-I", "-S", "-B"])
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test-data/capture_limits.py"))
+        .output()
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(done.status.success(), "{done:?}");
+    assert!(
+        String::from_utf8_lossy(&done.stderr).contains("Ran 3 tests"),
+        "{done:?}"
+    );
+}
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
@@ -275,7 +290,7 @@ fn entries<'a>(session: &'a str, original: &'a str, output: &'a str) -> Vec<Vec<
 
 #[test]
 #[cfg(target_os = "linux")]
-fn automatic_systemd_manager_refusal_records_policy_before_input_or_session_work() {
+fn automatic_strong_profiles_require_explicit_backend_before_input_or_session_work() {
     let d = Directory::new();
     let session = d.path("session");
     let input = d.path("must-not-be-read");
@@ -317,16 +332,11 @@ fn automatic_systemd_manager_refusal_records_policy_before_input_or_session_work
     ];
     let before = snapshot(&d.0);
     for args in cases {
-        // A nonexistent bus exercises the real read-only probe on every host.
-        // No backend flag: these are the automatic production entry points.
+        // Automatic selection refuses without a manager probe or input work.
         let out = Command::new(CLI)
             .args(&args)
             .args(["--no-kb"])
-            .env(
-                "DBUS_SESSION_BUS_ADDRESS",
-                format!("unix:path={}", d.path("absent-bus")),
-            )
-            .env("XDG_RUNTIME_DIR", &d.0)
+            .env_remove("ZENO_FCIS_CONTAINMENT_BACKEND")
             .output()
             .unwrap_or_else(|e| panic!("{e}"));
         let report = json(&out);
@@ -337,18 +347,17 @@ fn automatic_systemd_manager_refusal_records_policy_before_input_or_session_work
             "{report}"
         );
         assert_eq!(report["authority"], "none");
-        assert_eq!(report["backend"], "systemd");
+        assert_eq!(report["backend"], "auto");
         assert_eq!(
-            report["containment"]["host_policy_refusal"],
-            "containment-unavailable:systemd:host-policy:systemd-user-manager"
+            report["reason"],
+            "containment-unavailable:auto:explicit-backend-required"
         );
-        assert_eq!(
-            report["containment"]["host_policy"],
-            serde_json::json!({
-                "qualified": false,
-                "checks": [{"check":"systemd-user-manager","passed":false,"detail":"systemd-user-manager"}]
-            })
-        );
+        assert_eq!(report["containment"]["selection_source"], "default");
+        let message = report["message"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{report}"));
+        assert!(message.contains("--containment-backend"));
+        assert!(message.contains("ZENO_FCIS_CONTAINMENT_BACKEND"));
         assert_eq!(report["containment"]["startup"]["admitted"], false);
         assert_eq!(
             report["containment"]["final"]["application_work_started"],
@@ -360,11 +369,10 @@ fn automatic_systemd_manager_refusal_records_policy_before_input_or_session_work
                 "capture-containment-unavailable"
             );
             assert_eq!(report["detail"]["attempt_spent"], false);
-            assert_eq!(report["detail"]["prerequisite"], "systemd-user-manager");
         } else {
             assert_eq!(
                 report["reason"],
-                "containment-unavailable:systemd:host-policy:systemd-user-manager"
+                "containment-unavailable:auto:explicit-backend-required"
             );
         }
         assert_eq!(
@@ -391,6 +399,7 @@ fn contained_loop_entry_points_refuse_without_a_supported_backend() {
         let out = Command::new(CLI)
             .args(&args)
             .env("ZENO_FCIS_CONTAINMENT_MISSING", "wall")
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
             .output()
             .unwrap_or_else(|e| panic!("{e}"));
         let report = json(&out);
@@ -430,6 +439,103 @@ fn contained_loop_entry_points_refuse_without_a_supported_backend() {
             "{args:?}: refusal must preserve every session/ledger/artifact byte and directory"
         );
     }
+}
+
+#[test]
+fn backend_precedence_and_malformed_environment_are_observed_by_real_cli() {
+    let d = Directory::new();
+    let before = snapshot(&d.0);
+    for (flag, environment, backend, source) in [
+        (None, None, "auto", "default"),
+        (None, Some("auto"), "auto", "environment"),
+        (None, Some("systemd"), "systemd", "environment"),
+        (None, Some("posix"), "posix", "environment"),
+        (Some("auto"), Some("systemd"), "auto", "flag"),
+        (Some("systemd"), Some("posix"), "systemd", "flag"),
+        (Some("posix"), Some("systemd"), "posix", "flag"),
+        (Some("systemd"), Some("invalid"), "systemd", "flag"),
+    ] {
+        let mut command = Command::new(CLI);
+        command.args([
+            "--no-kb",
+            "transform",
+            "check",
+            "--offline-parallel",
+            "--original",
+            "/must-not-read",
+            "--candidate",
+            "/must-not-read",
+            "--receipt",
+            &d.path("absent"),
+        ]);
+        command
+            .env_remove("ZENO_FCIS_CONTAINMENT_BACKEND")
+            .env("ZENO_FCIS_CONTAINMENT_MISSING", "wall");
+        if let Some(value) = environment {
+            command.env("ZENO_FCIS_CONTAINMENT_BACKEND", value);
+        }
+        if let Some(value) = flag {
+            command.args(["--containment-backend", value]);
+        }
+        let out = command.output().unwrap_or_else(|e| panic!("{e}"));
+        let report = json(&out);
+        assert_eq!(out.status.code(), Some(2), "{report}");
+        assert_eq!(report["backend"], backend, "{report}");
+        assert_eq!(
+            report["containment"]["selection_source"], source,
+            "{report}"
+        );
+        assert_eq!(snapshot(&d.0), before);
+    }
+    for bad in ["", "invalid", "SYSTEMD", " systemd", "systemd "] {
+        let out = Command::new(CLI)
+            .args([
+                "transform",
+                "check",
+                "--offline-parallel",
+                "--original",
+                "/must-not-read",
+                "--candidate",
+                "/must-not-read",
+            ])
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", bad)
+            .output()
+            .unwrap_or_else(|e| panic!("{e}"));
+        let report = json(&out);
+        assert_eq!(out.status.code(), Some(2));
+        assert_eq!(
+            report["reason"],
+            "containment-unavailable:environment:invalid-ZENO_FCIS_CONTAINMENT_BACKEND"
+        );
+        assert_eq!(report["containment"]["selection_source"], "environment");
+        assert_eq!(snapshot(&d.0), before);
+    }
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn automatic_finite_data_still_selects_posix_before_work() {
+    let d = Directory::new();
+    let before = snapshot(&d.0);
+    let out = Command::new(CLI)
+        .args([
+            "--no-kb",
+            "loop",
+            "open",
+            "--original",
+            "/must-not-read",
+            "--session",
+            &d.path("absent"),
+        ])
+        .env_remove("ZENO_FCIS_CONTAINMENT_BACKEND")
+        .env("ZENO_FCIS_CONTAINMENT_MISSING", "wall")
+        .output()
+        .unwrap_or_else(|e| panic!("{e}"));
+    let report = json(&out);
+    assert_eq!(report["reason"], "containment-unavailable:posix:wall");
+    assert_eq!(report["containment"]["required_profile"], "finite-data/1");
+    assert_eq!(report["containment"]["selection_source"], "default");
+    assert_eq!(snapshot(&d.0), before);
 }
 
 #[cfg(target_os = "linux")]
@@ -602,6 +708,7 @@ mod posix_controls {
             .set_nonblocking(true)
             .unwrap_or_else(|e| panic!("{e}"));
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["--no-kb", "loop", "question", "--contract", input])
             .env_clear()
             .env("LC_ALL", "C")
@@ -638,7 +745,7 @@ mod posix_controls {
         let sentinel = d.path("inherited-secret-fd");
         // The trusted harness deliberately passes an inheritable descriptor to
         // the public CLI. It must disappear on re-exec into guardian/worker.
-        let child = Command::new("/usr/bin/python3")
+        let child = Command::new("/usr/bin/python3").env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["-c", "import os,sys\nf=os.open(sys.argv[1],os.O_CREAT|os.O_RDWR,0o600)\nos.set_inheritable(f,True)\nos.execv(sys.argv[2],sys.argv[2:])", &sentinel, CLI,
                 "--no-kb", "loop", "question", "--contract", &input])
             .env("ZENO_FCIS_TEST_SECRET", "outside-secret-must-be-absent")
@@ -791,6 +898,7 @@ mod posix_controls {
             })
             .unwrap_or_else(|| panic!("affinity"));
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args([
                 "--no-kb",
                 "loop",
@@ -828,6 +936,7 @@ mod posix_controls {
         let d = Directory::new();
         let before = snapshot(&d.0);
         let out = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args([
                 "--no-kb",
                 "loop",
@@ -888,6 +997,7 @@ mod posix_controls {
             .unwrap_or_else(|e| panic!("{e}"));
         let run = |args: &[&str]| {
             let out = Command::new(CLI)
+                .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
                 .args(["--containment-backend", "posix", "--no-kb"])
                 .args(args)
                 .output()
@@ -953,6 +1063,7 @@ mod posix_controls {
                 .success()
         );
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["--no-kb", "loop", "resume", "--session", &session])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -991,6 +1102,7 @@ mod posix_controls {
         for role in ["guardian", "worker"] {
             let (_caller, channel) = UnixStream::pair().unwrap_or_else(|e| panic!("{e}"));
             let child = Command::new(CLI)
+                .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
                 .args([
                     "--no-kb",
                     "loop",
@@ -1034,6 +1146,7 @@ mod posix_controls {
         let d = Directory::new();
         let input = contract(&d);
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["--no-kb", "loop", "question", "--contract", &input])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -1084,7 +1197,7 @@ mod posix_controls {
         let session = d.path("session");
         let original = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve");
-        let out = Command::new("/usr/bin/python3").args(["-c", "import os,resource,sys\nresource.setrlimit(resource.RLIMIT_CPU,(8,8))\nresource.setrlimit(resource.RLIMIT_FSIZE,(8192,8192))\nresource.setrlimit(resource.RLIMIT_NOFILE,(32,32))\nos.execv(sys.argv[1],sys.argv[1:])", CLI, "--no-kb", "loop", "open", "--original", &original.to_string_lossy(), "--session", &session])
+        let out = Command::new("/usr/bin/python3").env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto").args(["-c", "import os,resource,sys\nresource.setrlimit(resource.RLIMIT_CPU,(8,8))\nresource.setrlimit(resource.RLIMIT_FSIZE,(8192,8192))\nresource.setrlimit(resource.RLIMIT_NOFILE,(32,32))\nos.execv(sys.argv[1],sys.argv[1:])", CLI, "--no-kb", "loop", "open", "--original", &original.to_string_lossy(), "--session", &session])
             .output().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(out.status.code(), Some(0), "{out:?}");
         assert_eq!(json(&out)["authority"], "none");
@@ -1205,6 +1318,7 @@ mod posix_controls {
     }
     fn ordinary(args: &[&str]) -> InvocationOutput {
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["--no-kb", "--containment-backend", "posix"])
             .args(args)
             .stdout(Stdio::piped())
@@ -1222,6 +1336,7 @@ mod posix_controls {
         let script =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test-data/containment_seccomp.py");
         let child = Command::new("/usr/bin/python3")
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .arg(script)
             .arg(mode)
             .arg(CLI)
@@ -1428,6 +1543,7 @@ mod posix_controls {
         for attempt in 0..3 {
             let started = Instant::now();
             let mut launcher = Command::new(CLI);
+            launcher.env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto");
             launcher.args(["--no-kb", "loop", "question", "--contract", &input]);
             // Bounded argv parsing gives the harness a startup observation
             // window. --no-kb prevents these inert path arguments being opened.
@@ -1475,6 +1591,7 @@ mod posix_controls {
         let d = Directory::new();
         let input = contract(&d);
         let child = Command::new(CLI)
+            .env("ZENO_FCIS_CONTAINMENT_BACKEND", "auto")
             .args(["--no-kb", "loop", "question", "--contract", &input])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
