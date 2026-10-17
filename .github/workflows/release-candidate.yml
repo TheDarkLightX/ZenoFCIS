@@ -1,10 +1,10 @@
-name: release-candidate-mac-process-repair
+name: release-candidate-mac-cleanup-diagnostic
 'on':
   workflow_dispatch: null
 permissions:
   contents: read
 jobs:
-  macos-process-repair:
+  macos-cleanup-diagnostic:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -14,41 +14,13 @@ jobs:
         ref: 32a0960048741f6e6faab030fde14a5dbf3eae7a
         persist-credentials: false
     - name: Install pinned Rust
-      run: rustup toolchain install 1.97.1 --profile minimal --component clippy
-    - name: Apply exact process repair
-      run: "git apply <<'PATCH'\ndiff --git a/crates/zeno-fcis-formal-tools/src/lib.rs b/crates/zeno-fcis-formal-tools/src/lib.rs\n\
-        index 4fdef09..7a7a935 100644\n--- a/crates/zeno-fcis-formal-tools/src/lib.rs\n+++ b/crates/zeno-fcis-formal-tools/src/lib.rs\n\
-        @@ -3172,11 +3172,15 @@ impl ContainedChild {\n \n         let group_result = killpg(self.process_group,\
-        \ Signal::SIGKILL);\n         let _ = self.child.kill();\n-        let _ = self.child.wait();\n+       \
-        \ let waited = self.child.wait();\n         self.armed = false;\n         match group_result {\n       \
-        \      Ok(()) => Ok(()),\n-            Err(Errno::ESRCH) if observed_exit => Ok(()),\n+            // The\
-        \ group can disappear after the child exits but before the\n+            // caller's first try_wait (notably\
-        \ on macOS). A successful wait\n+            // also establishes that the owned child has been reaped. Every\n\
-        +            // other group error still refuses containment.\n+            Err(Errno::ESRCH) if observed_exit\
-        \ || waited.is_ok() => Ok(()),\n             Err(_) => Err(ToolFailure::ProcessContainmentFailed),\n   \
-        \      }\n     }\n@@ -4650,6 +4654,32 @@ mod tests {\n \n     #[test]\n     #[cfg(unix)]\n+    fn cleanup_accepts_an_exit_before_the_first_status_observation()\
-        \ {\n+        use std::os::unix::process::CommandExt as _;\n+\n+        for _ in 0..8 {\n+            let\
-        \ mut command = Command::new(\"/bin/sh\");\n+            command.args([\"-c\", \"exit 0\"]).process_group(0);\n\
-        +            let child = command\n+                .spawn()\n+                .unwrap_or_else(|error| panic!(\"\
-        spawn helper: {error}\"));\n+            let mut owned = ContainedChild::new(child).unwrap_or_else(|_| unreachable!());\n\
-        +            thread::sleep(Duration::from_millis(30));\n+            owned\n+                .terminate(false)\n\
-        +                .unwrap_or_else(|error| panic!(\"cleanup exited helper: {error:?}\"));\n+            assert!(\n\
-        +                owned\n+                    .child\n+                    .try_wait()\n+               \
-        \     .unwrap_or_else(|_| unreachable!())\n+                    .is_some()\n+            );\n+        }\n\
-        +    }\n+\n+    #[test]\n+    #[cfg(target_os = \"linux\")]\n     fn busy_executables_are_retried_briefly_then_fail_closed()\
-        \ {\n         use std::os::unix::fs::PermissionsExt as _;\n \n@@ -5171,21 +5201,23 @@ mod tests {\n    \
-        \         ToolRunStatus::Failed(ToolFailure::Crash(Some(23)))\n         );\n \n-        assert!(matches!(\n\
-        -            run_fixed(\n-                &executable,\n-                &[\n-                    \"--ignored\"\
-        ,\n-                    \"--exact\",\n-                    \"tests::process_helper_output_limit\",\n-  \
-        \                  \"--nocapture\",\n-                ],\n-                None,\n-                1_000,\n\
-        -                64,\n-            ),\n-            Err(ToolFailure::OutputLimit)\n-        ));\n+     \
-        \   let overflow = run_fixed(\n+            &executable,\n+            &[\n+                \"--ignored\"\
-        ,\n+                \"--exact\",\n+                \"tests::process_helper_output_limit\",\n+          \
-        \      \"--nocapture\",\n+            ],\n+            None,\n+            1_000,\n+            64,\n+ \
-        \       );\n+        assert!(\n+            matches!(&overflow, Err(ToolFailure::OutputLimit)),\n+     \
-        \       \"unexpected output-limit result: {:?}\",\n+            overflow.map(|output| output.status)\n+\
-        \        );\n     }\n \n     #[test]\nPATCH\n"
-    - name: Run all formal-tools unit tests
-      run: cargo +1.97.1 test --locked -p zeno-fcis-formal-tools --lib
-    - name: Check strict formal-tools Clippy
-      run: cargo +1.97.1 clippy --locked -p zeno-fcis-formal-tools --all-targets -- -D warnings
+      run: rustup toolchain install 1.97.1 --profile minimal
+    - name: Apply source patch and typed diagnostic
+      run: "git apply <<'PATCH'\nPATCH\npython3 - <<'PYCODE'\nfrom pathlib import Path\np=Path('crates/zeno-fcis-formal-tools/src/lib.rs')\n\
+        s=p.read_text()\na='''        let waited = self.child.wait();\n        self.armed = false;'''\nb='''   \
+        \     let waited = self.child.wait();\n        eprintln!(\"CLEANUP-DIAGNOSTIC group={:?} wait={:?} observed={}\"\
+        , group_result, waited, observed_exit);\n        self.armed = false;'''\nif s.count(a)!=1:raise SystemExit('diagnostic\
+        \ context changed')\np.write_text(s.replace(a,b))\nPYCODE\n"
+    - name: Report actual group and wait result
+      run: cargo +1.97.1 test --locked -p zeno-fcis-formal-tools --lib tests::cleanup_accepts_an_exit_before_the_first_status_observation
+        -- --exact --nocapture
