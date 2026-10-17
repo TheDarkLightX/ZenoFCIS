@@ -143,7 +143,7 @@ and a nearby negative or boundary case. The structured statement excludes the
 self-referential evidence and lifecycle hashes; changing scope, effect, limits,
 or preferences invalidates its old validation.
 
-`kb replay --recipe recipe.json --out validation.json` runs an approved bounded
+`kb replay --recipe recipe.json --out ./validation.json` runs an approved bounded
 shell adapter. It never executes a raw lesson command string and never promotes
 a lesson. The first external runner, `zeno-fcis-readonly-v1`, admits fixed native
 `transform check --original FILE --candidate FILE` and
@@ -151,9 +151,32 @@ a lesson. The first external runner, `zeno-fcis-readonly-v1`, admits fixed nativ
 tools, and free-form command flags. Cases have bounded input/output sizes and
 process deadlines. Missing inputs, changed hashes, timeouts, and assertion
 mismatches remain distinct failures. Declare the full relevant source and
-policy dependencies; the recipe does not infer that dependency inventory.
+policy dependencies, including files outside the command's subjects.
 Both transform subjects must be hashed case inputs. Contract review requires
 its `project.zeno`, `v2/policy.json`, and examples file when present as inputs.
+
+Each case runs in a fresh private snapshot containing its declared dependencies
+and inputs, both transform files or the entire contract directory. Undeclared
+contract files and empty directories are included. Hashes are checked on the
+copies, and the dependency digest binds both complete snapshot inventories
+and the checker binary. The child reads those copies; source changes cannot
+replace the bytes it consumes. A final live inventory check also refuses
+changes that persist after replay.
+
+Copied paths must be relative to the recipe directory. Absolute paths, `..`,
+non-UTF-8 names, symlinks and special files refuse. Each snapshot admits at most
+64 MiB of file data, 4,096 entries counting files and every created directory
+(including implicit parents, excluding the staging root), and depth 128.
+Declared inputs retain their 1 MiB per-file limit. Snapshot preparation
+requires Unix; other platforms refuse. Child scratch is removed with staging;
+no child output is written back to the source tree.
+
+Choose a new `--out` file in an existing parent directory, outside the checkout
+and both copied contract trees, including their subdirectories. Destinations
+inside either tree refuse with `kb-evidence-output-subject`, including aliases
+through a symlinked parent.
+The receipt is the only replay output retained on disk. Creating it inside a
+subject would immediately invalidate the inventory it records.
 
 A recipe uses schema `zeno-fcis/kb-recipe/1`, `runner`, `lesson`, `family`, `mode`,
 `checker_sha256`, `dependencies`, `statement`, `positive`, and `negative`.
@@ -169,6 +192,10 @@ bindings and current dependencies. A change makes that validation stale pending
 explicit replay. There is no global age decay. Validation files are local
 curator evidence, not authenticated receipts or program publication authority.
 A replay validates the recorded cases, not an empirical generalization.
+Receipts with the older declared-input-only dependency identity require
+explicit replay under the current checker. Rebind the recipe's
+`checker_sha256` and refresh the layer's validation-file hash after replay;
+the recipe and validation schema identifiers remain unchanged.
 
 The compiled example has a separate `compiled-public-policy-v1` runner. It
 replays fixed positive and boundary fixtures against the actual pure engine

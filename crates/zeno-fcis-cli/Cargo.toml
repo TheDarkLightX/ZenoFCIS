@@ -32,7 +32,7 @@ zeno-fcis-loop-doors = { version = "=2.4.0", path = "../zeno-fcis-loop-doors" }
 zeno-fcis-program-search = { version = "=2.4.0", path = "../zeno-fcis-program-search" }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.30.1", default-features = false, features = ["process", "signal", "resource", "user"] }
+nix = { version = "=0.30.1", default-features = false, features = ["process", "signal", "resource", "user", "fs", "dir"] }
 
 [lints]
 workspace = true
