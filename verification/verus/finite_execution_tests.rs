@@ -252,3 +252,57 @@ fn structural_admission_rejects_bad_shape_types_and_topology_in_order() {
         Err(TypeMismatch)
     );
 }
+
+#[test]
+fn scalar_arithmetic_matches_independent_fraction_vectors_and_clears_refusals() {
+    let mut count = 0;
+    for line in include_str!("../../tools/test-data/scalar-arithmetic/vectors.tsv").lines() {
+        let fields: Vec<_> = line.split('\t').collect();
+        let input: Vec<i64> = fields[1..fields.len() - 1]
+            .iter()
+            .map(|v| v.parse().expect("integer oracle operand"))
+            .collect();
+        let mut nodes: Vec<Op> = (0..input.len()).map(|i| Op::Input(i as u16)).collect();
+        let op = match fields[0] {
+            "mul" => Op::Mul(0, 1),
+            "div_floor" => Op::DivFloor(0, 1),
+            "div_ceil" => Op::DivCeil(0, 1),
+            "mul_div_floor" => Op::MulDivFloor(0, 1, 2),
+            "mul_div_ceil" => Op::MulDivCeil(0, 1, 2),
+            "products_ge" if input.len() == 4 => {
+                nodes.push(Op::Int(1));
+                Op::ProductsGe([0, 1, 4], [2, 3, 4])
+            }
+            "products_ge" if input.len() == 6 => Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+            _ => panic!("independent oracle operation/arity"),
+        };
+        nodes.push(op);
+        let roots = [(nodes.len() - 1) as u16];
+        let inputs = vec![INTEGER; input.len()];
+        let outputs = [if fields[0] == "products_ge" {
+            Domain::Bool
+        } else {
+            INTEGER
+        }];
+        assert_eq!(validate_program(&inputs, &outputs, &nodes, &roots), Ok(()));
+        let (actual, scratch, output) = execute(&inputs, &outputs, &nodes, &roots, &input);
+        if fields[fields.len() - 1] == "arithmetic" {
+            assert_eq!(
+                actual,
+                Err(Failure::Arithmetic),
+                "oracle row {count}: {line}"
+            );
+            assert!(scratch.is_empty());
+            assert!(output.is_empty());
+        } else {
+            let expected = fields[fields.len() - 1]
+                .parse::<i64>()
+                .expect("integer oracle result");
+            assert_eq!(actual, Ok(()), "oracle row {count}: {line}");
+            assert_eq!(output, [expected], "oracle row {count}: {line}");
+            assert_eq!(scratch.len(), nodes.len());
+        }
+        count += 1;
+    }
+    assert_eq!(count, 1165);
+}

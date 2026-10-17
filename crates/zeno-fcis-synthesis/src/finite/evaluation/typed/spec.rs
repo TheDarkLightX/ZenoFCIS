@@ -36,6 +36,12 @@ pub(crate) open spec fn legacy_instruction(op:Op)->Instruction {
         Op::Eq(a,b)=>Instruction::Eq(e,a,b),Op::Lt(a,b)=>Instruction::Lt(e,a,b),
         Op::And(a,b)=>Instruction::And(e,a,b),Op::Not(a)=>Instruction::Not(e,a),
         Op::Select(c,a,b)=>Instruction::Select(e,c,a,b),
+        Op::Mul(a,b)=>Instruction::ScalarMul(a,b),
+        Op::DivFloor(a,b)=>Instruction::ScalarDiv(false,a,b),
+        Op::DivCeil(a,b)=>Instruction::ScalarDiv(true,a,b),
+        Op::MulDivFloor(a,b,d)=>Instruction::ScalarMulDiv(false,a,b,d),
+        Op::MulDivCeil(a,b,d)=>Instruction::ScalarMulDiv(true,a,b,d),
+        Op::ProductsGe(a,b)=>Instruction::ScalarProductsGe(a,b),
     }
 }
 pub(crate) open spec fn typed_instruction(op:NumericOp)->Instruction {
@@ -55,12 +61,35 @@ pub(crate) open spec fn typed_instruction(op:NumericOp)->Instruction {
         NumericOp::ProductsGe(left,right)=>Instruction::ProductsGe(left,right),
     }
 }
+pub(crate) open spec fn scalar_result<'a>(value:Option<i64>)->Result<Atom<'a>,Failure> {
+    match value {Some(v)=>Ok(Atom::I128(v as i128)),None=>Err(Failure::Arithmetic)}
+}
 pub(crate) open spec fn node<'a>(op:Instruction,input:Seq<Atom<'a>>,values:Seq<Atom<'a>>)->Result<Atom<'a>,Failure> {
     match op {
         Instruction::Input(i)=>match at(input,i as nat) {
             None=>Err(Failure::Reference),Some(v)=>if kind(v).is_some(){Ok(v)}else{Err(Failure::Kind)},
         },
         Instruction::Literal(v,_)=>Ok(v),
+        Instruction::ScalarMul(a,b)|Instruction::ScalarDiv(_,a,b)=>match(at(values,a as nat),at(values,b as nat)) {
+            (Some(a),Some(b))=>match(project(a),project(b)) {
+                (Some(a),Some(b))=>scalar_result(match op {
+                    Instruction::ScalarMul(..)=>value::scalar::multiply_value(a,b),
+                    Instruction::ScalarDiv(up,_,_)=>value::scalar::division_value(up,a,b),_=>None,
+                }),_=>Err(Failure::Arithmetic),
+            },_=>Err(Failure::Reference),
+        },
+        Instruction::ScalarMulDiv(up,a,b,d)=>match(at(values,a as nat),at(values,b as nat),at(values,d as nat)) {
+            (Some(a),Some(b),Some(d))=>match(project(a),project(b),project(d)) {
+                (Some(a),Some(b),Some(d))=>scalar_result(value::scalar::mul_div_value(up,a,b,d)),_=>Err(Failure::Arithmetic),
+            },_=>Err(Failure::Reference),
+        },
+        Instruction::ScalarProductsGe(a,b)=>match(at(values,a[0] as nat),at(values,a[1] as nat),at(values,a[2] as nat),at(values,b[0] as nat),at(values,b[1] as nat),at(values,b[2] as nat)) {
+            (Some(a),Some(b),Some(c),Some(d),Some(e),Some(f))=>match(project(a),project(b),project(c),project(d),project(e),project(f)) {
+                (Some(a),Some(b),Some(c),Some(d),Some(e),Some(f))=>match value::scalar::products_ge_value(a,b,c,d,e,f) {
+                    Some(v)=>Ok(boolean(BooleanEncoding::LegacyInteger01,v)),None=>Err(Failure::Arithmetic),
+                },_=>Err(Failure::Arithmetic),
+            },_=>Err(Failure::Reference),
+        },
         Instruction::MulDiv(up,a,b,den)=>match(at(values,a as nat),at(values,b as nat),at(values,den as nat)) {
             (Some(Atom::U128(a)),Some(Atom::U128(b)),Some(Atom::U128(den)))=>{
                 let result=if up{value::wide::ceiling_value(a,b,den)}else{value::wide::floor_value(a,b,den)};
@@ -128,7 +157,14 @@ pub(crate) proof fn legacy_node_embedding(op:Op,input:Seq<i64>,values:Seq<i64>)
             if a<values.len()&&b<values.len() {
                 value::spec::legacy_embedding(if matches!(op,Op::Add(..)){ArithmeticOp::Add}else{ArithmeticOp::Sub},values[a as int],values[b as int]);
             }
-        },_=>{},
+        },
+        Op::Input(_)=>{}, Op::Int(_)=>{}, Op::Bool(_)=>{},
+        Op::Eq(_,_)=>{}, Op::Lt(_,_)=>{}, Op::And(_,_)=>{}, Op::Not(_)=>{},
+        Op::Select(_,_,_)=>{},
+        Op::Mul(a,b)=>{},
+        Op::DivFloor(a,b)=>{}, Op::DivCeil(a,b)=>{},
+        Op::MulDivFloor(a,b,d)=>{}, Op::MulDivCeil(a,b,d)=>{},
+        Op::ProductsGe(a,b)=>{},
     }
 }
 }

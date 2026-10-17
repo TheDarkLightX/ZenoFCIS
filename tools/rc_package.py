@@ -26,6 +26,9 @@ import tomllib
 import check_generated_application as generated_application
 import check_release_custody as custody
 import check_release_privacy
+# BEGIN public knowledge example packaging guard.
+import check_knowledge_files as knowledge_files
+# END public knowledge example packaging guard.
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_SET_PATH = ROOT / "release" / "package-set.toml"
@@ -41,7 +44,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "ae97905ed4b70541bbdc089f6ef468a1d23d4aeb96bcb0022cd9ff7e8acb9664"
+    "7c575de932dde9ab36ed0cd164dd8b42f1ae678c0dbab69e848ff3704ae9dc52"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -386,6 +389,10 @@ def validate_package_documents(
 
 
 def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
+    # BEGIN refuse unlisted knowledge before invoking Cargo.
+    if knowledge_files.check(ROOT):
+        raise RcError("knowledge file include policy failed")
+    # END knowledge include preflight.
     configured, metadata = validate_package_documents(
         package_set(), cargo_metadata(complete=False)
     )
@@ -1126,6 +1133,17 @@ def extract_checked_crate(archive_path: Path, destination: Path) -> None:
                 raise RcError(
                     f"crate archive contains an unsafe member: {archive_path.name}:{member.name}"
                 )
+            # BEGIN crate knowledge member include policy.
+            if knowledge_files.is_knowledge(member.name):
+                if not member.isfile() or not knowledge_files.listed_location(member.name):
+                    raise RcError("crate contains an unlisted knowledge file")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise RcError("crate knowledge file is unreadable")
+                with stream:
+                    if not knowledge_files.public_content(stream.read(65537)):
+                        raise RcError("crate knowledge example content changed")
+            # END crate knowledge member include policy.
             seen.add(relative)
         archive.extractall(destination, members=members, filter="data")
 

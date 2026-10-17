@@ -10,13 +10,27 @@
 //! binds it. Nothing here decides or interprets a rule. A review grants
 //! nothing and changes no application file; its packet is canonical JSON,
 //! byte-identical on repeat.
+//!
+//! Beside it, the judges of this module read the whole declared domain
+//! through the same Authority: the specification-gap judge (`--gaps`, packet
+//! version 3 with the extended mutant catalog), the state profile, the lemma
+//! judge, scenario replay and probes. Each is exhaustive within its limit and
+//! inconclusive over it, never a pass.
 
 // The review's input domains and its evaluation live in the library.
 pub(super) use zeno_fcis_contract::internals::review::{domain, evaluate};
 mod examples;
+pub(crate) mod gaps;
+#[cfg(test)]
+mod judge_tests;
+pub(crate) mod lemma;
+mod machine;
 mod mutants;
 mod packet;
+pub(crate) mod probe;
+pub(crate) mod profile;
 mod refusals;
+pub(crate) mod scenario;
 pub(crate) mod seeds;
 mod table;
 #[cfg(test)]
@@ -40,6 +54,9 @@ use refusals::{Group, Tally};
 use table::{Row, Table};
 
 pub(crate) const PACKET_SCHEMA: &str = "zeno-fcis/contract-review/2";
+/// The packet with the specification-gap judge and the extended catalog.
+pub(crate) const PACKET_SCHEMA_GAPS: &str = "zeno-fcis/contract-review/3";
+pub(crate) use machine::Inconclusive;
 /// The largest input set a review enumerates or probes by default.
 pub(crate) const DEFAULT_MAX_TUPLES: u64 = 1 << 20;
 /// Decision table rows are written out up to this many inputs; the table's
@@ -58,6 +75,12 @@ distinguish. Whether a pre-state is reachable from genesis is not decided: a pre
 satisfies every state law may still be unreachable. An undistinguished mutant on a boundary \
 set is not equivalent; equivalence is claimed only over a fully enumerated domain.";
 
+const ADVISORY_GAPS: &str = "The specification-gap section measures only the laws \
+project.zeno declares, over the declared domain: it proposes every decision a contract of \
+this schema could make without deliveries and asks the library's law evaluator which the laws \
+admit. A determined tuple says that the declared laws admit one decision there, not that the \
+decision is the intended one. Over its limits the section is inconclusive and claims nothing.";
+
 /// The application files a review reads.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ReviewSources<'a> {
@@ -75,6 +98,7 @@ pub(crate) struct Review {
     packet: String,
     summary: Summary,
     law_refusals: Vec<LawRefusal>,
+    gaps: Option<gaps::Gaps>,
 }
 
 impl Review {
@@ -85,6 +109,11 @@ impl Review {
 
     pub(crate) fn summary(&self) -> &Summary {
         &self.summary
+    }
+
+    /// The specification-gap judge's result, when it ran.
+    pub(crate) fn gaps(&self) -> Option<&gaps::Gaps> {
+        self.gaps.as_ref()
     }
 
     /// One line for each law-refusal finding.
@@ -111,11 +140,13 @@ pub(crate) struct Summary {
     /// Findings of law refusals on pre-states that satisfy every state law.
     pub(crate) law_refusals: usize,
     pub(crate) findings: usize,
+    /// The specification-gap judge's counts, when it ran.
+    pub(crate) gaps: Option<Value>,
 }
 
 impl Summary {
     pub(crate) fn json(&self) -> Value {
-        json!({
+        let mut value = json!({
             "application": self.application,
             "inputs": {"construction": self.construction, "count": self.inputs},
             "examples": {"compared": self.examples, "disagreements": self.disagreements},
@@ -130,7 +161,11 @@ impl Summary {
             "refusals": self.refusals.json(),
             "law_refusal_findings": self.law_refusals,
             "findings": self.findings,
-        })
+        });
+        if let Some(gaps) = &self.gaps {
+            value["gaps"] = gaps.clone();
+        }
+        value
     }
 
     /// One line on the refused inputs: their count by class, and how many
@@ -261,6 +296,26 @@ impl LawRefusal {
 /// Returns the first declaration, rule or example with no contract form, or
 /// the library's refusal of the contract itself.
 pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Review, ContractError> {
+    review_with(sources, max_tuples, None)
+}
+
+/// Reviews a contract with the specification-gap judge and the extended
+/// mutant catalog: packet version 3. The result is advisory.
+///
+/// # Errors
+/// As [`review`], and a proposed law with no contract form.
+pub(crate) fn review_with_gaps(
+    sources: ReviewSources<'_>,
+    options: gaps::Options<'_>,
+) -> Result<Review, ContractError> {
+    review_with(sources, options.max_tuples, Some(options))
+}
+
+fn review_with(
+    sources: ReviewSources<'_>,
+    max_tuples: u64,
+    gap_options: Option<gaps::Options<'_>>,
+) -> Result<Review, ContractError> {
     let rules = Rules::read(sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
@@ -339,7 +394,14 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
         .map(|(example, outcome)| examples::agrees(example, outcome, state_width))
         .collect();
 
-    let catalog = mutants::catalog(&rules, &declarations);
+    let catalog = if gap_options.is_some() {
+        mutants::extended_catalog(&rules, &declarations)
+    } else {
+        mutants::catalog(&rules, &declarations)
+    };
+    let gap_result = gap_options
+        .map(|options| gaps::judge(sources.project, sources.rules, options))
+        .transpose()?;
     let context = Context {
         declarations: &declarations,
         commitment,
@@ -412,6 +474,7 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
         refusals: Tally::of(&table, &groups),
         law_refusals: law_refusals.len(),
         findings: findings.len(),
+        gaps: gap_result.as_ref().map(gaps::Gaps::summary),
     };
     let sha256 = |bytes: &[u8]| evaluate::hex(&evaluate::digest(bytes));
     let report = packet::Report {
@@ -438,11 +501,33 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
         summary: &summary,
         state_width,
     };
+    let mut packet = packet::build(&report);
+    if let Some(result) = &gap_result {
+        packet["schema"] = json!(PACKET_SCHEMA_GAPS);
+        packet["advisory"] = json!(format!("{ADVISORY} {ADVISORY_GAPS}"));
+        packet["tool"]["mutant_catalog"] = json!(mutants::CATALOG_V2);
+        packet["mutants"]["catalog"] = json!(mutants::CATALOG_V2);
+        packet["mutants"]["operators"] = mutants::OPERATORS
+            .iter()
+            .chain(&mutants::ADDED)
+            .map(|(name, changes)| json!({"name": name, "changes": changes}))
+            .collect();
+        packet["gaps"] = result.json();
+    }
     Ok(Review {
-        packet: crate::transform::canonical_json(&packet::build(&report)),
+        packet: crate::transform::canonical_json(&packet),
         summary,
         law_refusals,
+        gaps: gap_result,
     })
+}
+
+/// The application a rules file names.
+///
+/// # Errors
+/// The rules file's refusal.
+pub(crate) fn application(rules: &str) -> Result<String, ContractError> {
+    Ok(Rules::read(rules)?.template)
 }
 
 /// Drafting uses the same example grammar, framing and observation comparison

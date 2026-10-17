@@ -1,10 +1,28 @@
 # ZenoFCIS quickstart
 
-The normal V2 route is `use zeno_fcis::prelude::*;` with complete checked declarations, `bind_catalog`, `bind_program` and genuine publication capabilities. It needs no optional authority feature. Follow [normal program migration](V2_PROGRAM_API_MIGRATION.md) and run `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`. This development-branch cutover is intentionally breaking; combined V2 qualification remains tracked separately.
+## The normal V2 route
+
+The normal V2 route starts with `use zeno_fcis::prelude::*;` and uses complete
+checked declarations, `bind_catalog`, `bind_program` and genuine publication
+capabilities. It needs no optional authority feature. Follow the
+[normal program migration guide](V2_PROGRAM_API_MIGRATION.md), then run the
+smallest example:
+
+```bash
+cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core
+```
+
+This V2 cutover was introduced in 2.3.0 and is intentionally breaking. Its
+[2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
+state that source line's assurance scope and limits.
 
 ## Retained V1 compatibility journey
 
-The rest of this guide preserves the original compatibility workflow and independent oracles. Its traits, budget reports, candidate builders and law engines are not the normal V2 authority route. Explicit umbrella imports use `legacy`; direct older subcrates keep their separately documented migration obligations.
+The rest of this guide keeps the original compatibility workflow and its
+independent oracles. Its traits, budget reports, candidate builders and law
+engines are not the normal V2 authority route. Explicit umbrella imports use
+`legacy`; direct older subcrates keep their separately documented migration
+obligations.
 
 ZenoFCIS helps a project express authoritative state changes as deterministic,
 inspectable values:
@@ -39,7 +57,7 @@ Use the curated imports in application code:
 use zeno_fcis::legacy::prelude::*;
 ```
 
-To start from `.zeno`, create and check a project in one command sequence:
+To start from `.zeno`, create, check and generate a project:
 
 ```bash
 cargo +1.97.1 run -p zeno-fcis-cli --locked -- new /tmp/zeno-quickstart --template minimal
@@ -52,20 +70,25 @@ For a complete development application with typed transitions, reviewed laws,
 SQLite restart/replay, and outbox delivery, follow the
 [generated durable-counter journey](GENERATED_APPLICATION_MILESTONE.md). Its
 local acceptance command validates an isolated consumer against this checkout;
-release-package qualification is a separate v1 gate. Six more complete
-examples show common patterns: `account-lockout` (time as an input and
-committed failures), `order-fulfillment` (idempotent external requests),
-`inventory-reservation` (a synthesized core and a conservation law),
-`compliance-gateway` (a rule base as the synthesis contract),
-`withdrawal-queue` (a synthesized controller step whose table is checked
-for every input sequence, and a refinement law that ties each tick to it),
-and `agent-treasury-guard` (an AI agent as an untrusted proposer, guarded by
-a budget, a reserve, and a slippage bound, with a synthesized precedence
-core and inductive claims, attested by CVC5 through `prove`, that its
-action laws keep the reserve and the daily budget). Create one with
-`new DIR --template account-lockout` and start from its README.
+release-package qualification is a separate v1 gate.
 
-Use umbrella feature `authoring` for the pure parser, typed AST, builders,
+Six more complete examples show common patterns:
+
+- `account-lockout`: time as an input, and committed failures;
+- `order-fulfillment`: idempotent external requests;
+- `inventory-reservation`: a synthesized core and a conservation law;
+- `compliance-gateway`: a rule base as the synthesis contract;
+- `withdrawal-queue`: a synthesized controller step whose table is checked
+  for every input sequence, and a refinement law that ties each tick to it;
+- `agent-treasury-guard`: an AI agent as an untrusted proposer, guarded by a
+  budget, a reserve, and a slippage bound, with a synthesized precedence core
+  and inductive claims, attested by CVC5 through `prove`, that its action laws
+  keep the reserve and the daily budget.
+
+Create one with `new DIR --template account-lockout` and start from its
+README.
+
+Use the umbrella feature `authoring` for the pure parser, typed AST, builders,
 logic evaluator, derived composition, and Mini Determinator APIs.
 
 Run the two compiled introductory examples:
@@ -82,8 +105,8 @@ python3 tools/atdd.py list
 python3 tools/atdd.py run --all
 ```
 
-The scenario registry is closed and executes fixed argument arrays. Feature
-prose cannot inject commands. See [V1 product contract](V1_PRODUCT_CONTRACT.md)
+The scenario registry is closed and runs fixed argument arrays, so feature
+prose cannot inject commands. See the [V1 product contract](V1_PRODUCT_CONTRACT.md)
 and [BDD and acceptance testing](ACCEPTANCE_TESTING.md).
 
 `composed-program` enables the schema, catalog, transition, laws, authority,
@@ -99,12 +122,12 @@ zeno-fcis = { version = "=1.1.0", features = ["bootstrap"] }
 # Crash-atomic SQLite publication
 zeno-fcis = { version = "=1.1.0", features = ["sqlite-shell"] }
 
-# Checked external engines such as an SMT, Lean, CVC5, or private ESSO adapter
+# Checked external engines such as an SMT, Lean, CVC5, or private checker adapter
 zeno-fcis = { version = "=1.1.0", default-features = false, features = ["backend"] }
 ```
 
 Avoid `full` in reusable libraries. It includes project-specific and reference
-surfaces that most consumers do not need. See [Feature matrix](FEATURE_MATRIX.md).
+surfaces that most consumers do not need. See the [feature matrix](FEATURE_MATRIX.md).
 
 ## 2. Establish canonical byte identity
 
@@ -113,8 +136,8 @@ internal shape as protocol identity. ZCVE/1 defines one encoding for every
 admitted semantic value.
 
 Treat external bytes as untrusted. Decode them with explicit limits, require
-complete input consumption, and let the codec re-encode and byte-compare the
-result before admission:
+the whole input to be consumed, and let the codec re-encode and byte-compare
+the result before admission:
 
 ```text
 bytes
@@ -131,10 +154,10 @@ Compute roots, candidate identities, receipts, and evidence commitments from
 canonical admitted data, never from JSON, debug output, Serde layout, or
 database-native bytes.
 
-Byte-level canonicality provides deterministic identity and malleability
-resistance. It does not prove that a transfer is authorized, conserved, or
-correct. Those claims require the remaining schema, catalog, law, authority,
-and shell steps in this guide.
+Byte-level canonicality gives deterministic identity and resistance to
+malleability. It does not prove that a transfer is authorized, conserved, or
+correct; those claims need the remaining schema, catalog, law, authority, and
+shell steps in this guide.
 
 Read [Canonical bytes and admission](CANONICAL_BYTES.md).
 
@@ -156,10 +179,10 @@ Start with closed values and identifiers:
 These are protocol decisions. A generator, LLM, solver, or runtime must not
 invent or renumber them.
 
-For a new project, `zeno-fcis-bootstrap::generate_project` can turn an already
+For a new project, `zeno-fcis-bootstrap::generate_project` can turn a
 reviewed catalog into inspectable Rust/Python starter files, typed
 reason/effect/channel APIs, negative vectors, adapter skeletons, and a CI
-template. It does not choose the catalog or business rules.
+template. It does not choose the catalog or the business rules.
 
 Read:
 
@@ -170,9 +193,9 @@ Read:
 ## 4. Implement the transition
 
 For one bounded domain, use the generated private-inner transition API or
-`CataloguedTransitionBuilder`. The generated API is preferred because it fixes
-the reviewed paths, reason dispositions, effect IDs, channel IDs, and payload
-types in ordinary Rust types.
+`CataloguedTransitionBuilder`. Prefer the generated API: it fixes the reviewed
+paths, reason dispositions, effect IDs, channel IDs, and payload types in
+ordinary Rust types.
 
 For several domains:
 
@@ -183,10 +206,11 @@ For several domains:
 4. Construct an `ExecutableComposition`.
 5. Construct one authority-owned `ComposedDomainProgram`.
 
-`ComposedDomainProgram` projects the exact root state, command, and context into
-fixed machine rows, executes the canonical sequential composition, and projects
-one successor patch, non-executable commit-evidence plan, and durable outbox plan. It returns an ordinary
-`TransitionDecision`; it grants no commit authority.
+`ComposedDomainProgram` projects the exact root state, command, and context
+into fixed machine rows, executes the canonical sequential composition, and
+projects one successor patch, one non-executable commit-evidence plan, and one
+durable outbox plan. It returns an ordinary `TransitionDecision` and grants no
+commit authority.
 
 Read:
 
@@ -208,7 +232,7 @@ the authority and recipient are the reviewed ones
 ```
 
 Create a complete `LawManifest`, implement a pure `ProjectLawEngine`, retain
-the evidence required by the manifest, and call `verify_project_laws`.
+the evidence the manifest requires, and call `verify_project_laws`.
 Successful verification produces `VerifiedProjectLaws`; each invocation still
 receives a fresh bounded law evaluation.
 
@@ -220,8 +244,8 @@ the exact reviewed initial state is checked before a shell can be created.
 Formal tools are optional adapters:
 
 - public users can mount Lean, SMT/Z3, CVC5, Kani, Flux, or another checker;
-- private ESSO users can implement the same public verifier/backend traits in a
-  private crate;
+- users of a private checker can implement the same public verifier/backend
+  traits in a private crate;
 - timeout, crash, unsupported input, disagreement, and `unknown` grant no
   authority.
 
@@ -230,21 +254,22 @@ Read [Project relational laws](PROJECT_RELATIONAL_LAWS.md) and
 
 ## 6. Own production authority
 
-Construct one `CatalogCommitAuthority` at application startup. The authority,
-not the request caller, owns:
+Construct one `CatalogCommitAuthority` when the application starts. The
+authority, not the request caller, owns:
 
 - the exact `ProjectCatalog`;
-- approved commitment provider;
-- transition program and build identity;
-- verified law set and exact law-engine type;
-- state domain, outbox-delivery interpreter, deployment, and replay-policy bindings;
+- the approved commitment provider;
+- the transition program and its build identity;
+- the verified law set and the exact law-engine type;
+- the state domain, outbox-delivery interpreter, deployment, and replay-policy
+  bindings;
 - one `GenesisPolicyBinding` containing the expected initial root, reviewed
   source/configuration/evidence commitments, and unique deployment instance;
-- transition resource limits.
+- the transition resource limits.
 
 First admit the reviewed initial state and call
 `CatalogCommitAuthority::authorize_genesis`. This produces the only nominal
-`CatalogAuthorizedGenesis` accepted by an authorized shell constructor.
+`CatalogAuthorizedGenesis` that an authorized shell constructor accepts.
 
 For each request, admit the exact pre-state, command, authenticated context,
 principal, authentication evidence, and replay identity into an
@@ -257,7 +282,8 @@ The result is:
   `CommittedFailure`.
 
 Do not accept a caller-created `CommitBundle`, `TransitionDecision`,
-`NormalizedDecision`, law result, provider, or delivery interpreter at this boundary.
+`NormalizedDecision`, law result, provider, or delivery interpreter at this
+boundary.
 
 Read [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md).
 
@@ -276,7 +302,7 @@ initial-state argument and revalidates the persisted genesis authorization.
 as reference semantics. It is not a production commit port.
 
 External delivery stays in the imperative shell. It must interpret the exact
-committed outbox entry idempotently and under the authority-owned delivery
+committed outbox entry idempotently, under the authority-owned delivery
 interpreter. `CommitPlan` records are published as evidence and never executed.
 
 ## Project adoption checklist
@@ -308,12 +334,12 @@ Read [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL
 
 ZenoFCIS does not currently provide:
 
-- Cargo API stability or a completed official V1 release;
 - a concurrent scheduler, threaded shell, or production parallel runtime;
-- a bundled proof that project-specific handwritten footprints are complete;
+- a bundled proof that project-specific footprints written by a person or an
+  LLM are complete;
 - automatic invention of project schemas, identifiers, laws, or policies;
-- a bundled universal solver, theorem prover, ESSO installation, or proof of a
-  checker implementation;
+- a bundled universal solver, theorem prover, private checker installation, or
+  proof of a checker implementation;
 - automatic economic correctness, requirement completeness, or deployment
   qualification;
 - general production qualification for authenticated state, SQLite delivery,

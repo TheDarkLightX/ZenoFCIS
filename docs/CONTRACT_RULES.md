@@ -121,7 +121,7 @@ integer, or expression text. Expression text has:
 | `>=` | at least |
 | `+` | add |
 | `-` | subtract; also prefix negation |
-| `*` | multiply; law formulas only |
+| `*` | checked signed multiply: i64 in rules, i128 in signed laws |
 
   Prefix `!` negates a boolean. Other binary operators group to the left.
 
@@ -131,21 +131,39 @@ integer, or expression text. Expression text has:
 | Function | Meaning |
 |---|---|
 | `choose` | `choose(c, a, b)` is `a` when `c` holds, else `b`. |
-| `div_floor` | `div_floor(a, b)`: `a / b` rounded down; law formulas only. |
-| `div_ceil` | `div_ceil(a, b)`: `a / b` rounded up; law formulas only. |
+| `div_floor` | `div_floor(a, b)`: mathematical division rounded down, including negative divisors. |
+| `div_ceil` | `div_ceil(a, b)`: mathematical division rounded up, including negative divisors. |
+| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative i64 factors, positive denominator, exact intermediate product and final i64 fit. |
+| `mul_div_ceil` | `mul_div_ceil(a, b, d)`: the same fused rule operation rounded up. |
+| `products_ge` | `products_ge(a, b, c, d)` compares `a*b >= c*d`. Every factor is nonnegative; products are exact, with no intermediate narrowing. Rules and laws support this predicate. |
+| `products_ge` | `products_ge(a, b, c, d, e, f)` compares `a*b*c >= d*e*f`, with the same nonnegative domain and exact products. |
 
-Rules compile to the decision program, which adds, subtracts, compares and
-selects. It has no multiplication or division, so `*`, `div_floor` and
-`div_ceil` in a rule are refused. They exist because law formulas, written
-in `project.zeno`'s own syntax, become the same expression tree and may use
-them. A variant is its ID: `status == 151`.
+These arithmetic extensions describe development source whose native and
+source-proof qualification is pending. Rules compile to the same library
+program evaluated by generated applications and the Authority. Standalone
+multiplication must fit i64. Division by zero and an out-of-range quotient
+refuse, including `div_floor(-9223372036854775808, -1)`. The signed minimum is a
+legal literal; its positive magnitude is not an i64 value. With a positive divisor, `div_floor(-1, 2)`
+is -1 and `div_ceil(-1, 2)` is 0; negative divisors follow mathematical rounding.
+
+`div_floor(a * b, d)` and `mul_div_floor(a, b, d)` are distinct graphs. The
+first checks and can refuse the narrow multiplication; the second preserves
+the exact product and narrows only the quotient. For `M = 2^63 - 1`, the fused
+`mul_div_floor(M, M, M)` has result M while the standalone product refuses.
+Negative fused factors and a nonpositive denominator refuse even when a zero
+factor would make the mathematical product zero. A variant is its ID:
+`status == 151`.
 A boolean used as a number is 0 or 1, and a number used as a boolean holds
 when it equals 1. Decision arithmetic is 64-bit, and the program evaluates
 every node, both branches of `choose` included, so an overflow anywhere
 refuses the decision. A contract has at most 4,096 program nodes and 64
-program outputs: the case selection and each distinct computed value. A
-program past 256 nodes, 16 outputs or 32 inputs uses a larger profile that
-the program-file commands do not read; see
+program outputs: the case selection and each distinct computed value. A graph
+using an arithmetic extension has profile `zeno-fcis/finite-i64/3` within the
+original 256-node, 16-output, 32-input caps, or `/4` beyond those caps. Old
+operation-only graphs keep `/1` or `/2` and their canonical program bytes.
+Program-file commands admit `/1` and `/3`; they refuse the larger `/2` and `/4`
+profiles. Legacy search, optimizer, migration and linear certificate consumers
+refuse the arithmetic extension. See
 [Contract program export](CLI_REFERENCE.md#contract-program-export).
 
 ## Cases
@@ -215,7 +233,13 @@ failures) or `on commit` (accepts and committed failures), and `, genesis`
 adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
-use `*`, `div_floor` and `div_ceil`. Quantifiers, sums, named predicates,
+use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
+Signed law multiplication/division retains its existing checked i128 meaning.
+Product predicates explicitly convert nonnegative values to U128 and use the
+existing exact wide comparison, including the constant-one factors of a
+two-factor comparison. The fused rule functions are not additional `.zeno`
+value-function syntax; generated conformance laws use the existing fused law
+opcodes. Quantifiers, sums, other named predicates,
 free variables, `div_exact` and effect and event projections have
 no contract form. Outbox projections require the explicit delivery-law bindings below. The library Authority evaluates every law that applies on
 every decision, and a decision that breaks one is not committed.

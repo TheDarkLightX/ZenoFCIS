@@ -31,10 +31,12 @@ pub type Projection =
 ```
 
 This file fixes the number of machines, state slots, and ports in Rust's type
-system. It also records two checks that still need evidence. `CompleteFootprint`
-means the component must account for every state location it can touch.
-`SequentialParity` means the composed execution still needs a comparison with
-the reviewed sequential meaning.
+system. It also records two checks that still need evidence:
+
+- `CompleteFootprint`: the component must account for every state location it
+  can touch.
+- `SequentialParity`: the composed execution still needs a comparison with the
+  reviewed sequential meaning.
 
 ## See the connection graph
 
@@ -50,8 +52,8 @@ flowchart LR
   c300[machine]
 ```
 
-For a larger project, each `wire A.P -> B.Q;` line appears as a directed
-connection. The graph is a view of the checked project. It cannot change the
+In a larger project, each `wire A.P -> B.Q;` line appears as a directed
+connection. The graph is a view of the checked project; it cannot change the
 project or approve a transition.
 
 ## Check generated files in continuous integration
@@ -74,9 +76,9 @@ A changed or missing file returns exit code `1`. The check writes nothing.
 ## Why checked composition matters
 
 A machine can be correct for its own state and still be connected incorrectly.
-A wrong port type, forgotten state owner, incomplete merge list, or hidden
-write can invalidate the whole system. ZenoFCIS checks those boundaries
-together and reports all independent problems it can find within its limits.
+A wrong port type, a forgotten state owner, an incomplete merge list, or a
+hidden write can invalidate the whole system. ZenoFCIS checks those boundaries
+together and reports every independent problem it can find within its limits.
 
 The generated Rust still needs concrete machines and reviewed evidence.
 `ComposedDomainProgram::try_new` is the public gate for that step. Generated

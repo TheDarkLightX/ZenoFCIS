@@ -57,6 +57,9 @@ impl LocalProposer {
 
 /// Rewrites to a fixpoint; `None` when the result would not admit.
 pub(crate) fn simplify(program: &Program, aggressive: bool) -> Option<Program> {
+    if program.nodes().iter().any(Op::requires_arithmetic_profile) {
+        return None;
+    }
     let mut current = program.clone();
     for _ in 0..MAX_PASSES {
         let next = pass(&current, aggressive)?;

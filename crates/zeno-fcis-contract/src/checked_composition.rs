@@ -82,6 +82,27 @@
 //! records the checker's source-bound identity and the SHA-256 of every
 //! table it ran; [`CheckedComposition::receipt`] is its canonical receipt
 //! and [`replay`] runs every check again and requires the same receipt.
+//!
+//! A `zeno-fcis/checked-composition/3` manifest selects the composed-domain
+//! profile instead, which [`check_domain`] checks: components step together
+//! in merge order on one pre-state, each reading the request and earlier
+//! components' pre-state through bindings; a Reject or any refusal ends the
+//! step with no change, the first CommittedFailure commits the successors
+//! up to and including its own, and otherwise every successor commits
+//! ([`joint`]). The checker plans three kinds of obligation, `local`,
+//! `assume` and `couple`, each an exhaustive finite check that never
+//! enumerates the global product, computes every size before evaluating
+//! anything, refuses a plan over budget with nothing evaluated, and checks a
+//! plan within budget exhaustively ([`obligations`]). Its verdict is
+//! `proved`, `violated` with the first witness, or `refused`. A component may
+//! own no state: its state fields are then read-only bindings of earlier
+//! components' pre-state, which no committing decision may change. The
+//! claim, [`DOMAIN_CLAIM`], rests on exhaustive finite checks and an
+//! induction argument stated in `docs/COMPOSED_DOMAIN_COMPOSITION.md`, not
+//! on a machine-checked proof; [`DOMAIN_TRUSTED_BASE`] lists what it rests
+//! on. [`JointComposition`] exposes the joint step itself, from in-memory
+//! sources. This profile's code is LLM-generated, as is the rest of this
+//! crate, and checked by its tests and by an independent reference.
 
 mod aggregate;
 mod assembly;
@@ -92,16 +113,26 @@ mod assembly_tests;
 mod compose;
 #[cfg(test)]
 mod compose_tests;
+pub mod domain;
+#[cfg(test)]
+mod domain_tests;
+mod formula;
 mod hierarchy;
 #[cfg(test)]
 mod hierarchy_tests;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
+pub mod joint;
+#[cfg(test)]
+mod joint_tests;
 #[cfg(test)]
 mod journal_tests;
 mod leaf;
 mod manifest;
+pub mod obligations;
+#[cfg(test)]
+mod obligations_tests;
 mod predicate;
 mod receipt;
 #[cfg(test)]
@@ -127,14 +158,22 @@ use crate::internals::declarations::Source;
 pub use aggregate::AggregateSources;
 use assembly::Assembly;
 pub use compose::{CheckedAssumeGuarantee, ComposeRefusal, require_checked};
+pub use domain::{DOMAIN_CHECKER, FieldDomain, MAX_OBLIGATION, MAX_TOTAL, domain_paths};
 pub use hierarchy::{ClaimKind, Condition};
 use identity::Identity;
+pub use joint::{
+    JointComposition, JointInputError, JointOutcome, JointRow, OutcomeKind, RefusedClass,
+    RequestSlot, StateSlot,
+};
 pub use leaf::LeafCertificate;
 use leaf::{Compiled, sha256};
 use manifest::Manifest;
-pub use manifest::{CHECKER, HIERARCHY_SCHEMA, MANIFEST_SCHEMA, leaf_paths};
+pub use manifest::{CHECKER, DOMAIN_SCHEMA, HIERARCHY_SCHEMA, MANIFEST_SCHEMA, leaf_paths};
+pub use obligations::{DOMAIN_RESULT_SCHEMA, DomainResult, Verdict, check_domain};
 use predicate::Truth;
-pub use receipt::{RECEIPT_SCHEMA, ReceiptForm, ReplayRefusal, replay};
+pub use receipt::{
+    DOMAIN_RECEIPT_SCHEMA, RECEIPT_SCHEMA, ReceiptForm, ReplayRefusal, replay, replay_domain,
+};
 pub use refusal::{
     AuthorityRefusal, ComposeFinding, ExecutionRefusal, LawRefusal, MeterRefusal, Obligation,
     Refusal, Stage,
@@ -171,6 +210,39 @@ const NONCLAIMS: [&str; 10] = [
     "Finite declared domains only; a table with more than 1048576 rows is refused, not sampled.",
     "An aggregate has at most 64 inputs, 64 outputs and 4,096 program nodes; a register ring fits at most 61 leaves.",
 ];
+
+/// The claim a `proved` composed-domain result makes, at its true strength.
+pub const DOMAIN_CLAIM: &str = "If every obligation holds, every reachable global state satisfies every component invariant and coupling invariant, and every input delivered to a component, with a read-only component's delivered state, is inside its domains and satisfies its assumption and invariant. This rests on an induction argument over executions from genesis, stated in docs/COMPOSED_DOMAIN_COMPOSITION.md, and on exhaustive finite checks of each obligation; it is not machine-checked.";
+
+/// What a composed-domain claim rests on that is tested, not proved.
+pub const DOMAIN_TRUSTED_BASE: [&str; 6] = [
+    "The induction argument from the three obligations to the claim, stated in docs/COMPOSED_DOMAIN_COMPOSITION.md; it is not machine-checked.",
+    "The planner's exact sizes and the checker's exhaustive enumeration of every obligation's planned space.",
+    "Each component's decisions, made once by its bound Authority on every input of its complete local domain and looked up by the checks and the joint step.",
+    "Each formula's table over the complete product of the domains it reads: a predicate decided by the library's law evaluator, with no value read as false, and a binding computed by the library's program evaluator from its compiled rule expression.",
+    "The joint step's implementation, compared with an independent reference; it follows the retained composed-domain oracle's merge order, provisional Accepts, Rejects and CommittedFailure prefix, with participation, no-change refusals and pre-state bindings in place of ports, and is not proved equal to it.",
+    "The coupling check's treatment of a component outside the coupling: a Reject or refusal changes nothing, and one with a CommittedFailure case may end the step before the next member.",
+];
+
+/// What a composed-domain result does not claim.
+pub const DOMAIN_NONCLAIMS: [&str; 7] = [
+    "Nothing here is machine-checked; every item of the trusted base is tested, not proved.",
+    "A plan over budget is refused before anything is evaluated, never sampled.",
+    "No contextual refinement, adoption path or aggregate contract.",
+    "Nothing about storage atomicity, concurrency, delivery, effects or outbox.",
+    "No runtime authority, publication or store of a composed application is granted.",
+    "Finite declared domains only; states not reachable from genesis keep only each obligation's conditional statement.",
+    "No liveness, fairness or trace property.",
+];
+
+/// The composed-domain manifest and each component's files, in merge order.
+#[derive(Clone, Copy, Debug)]
+pub struct DomainSources<'a> {
+    /// The manifest's bytes.
+    pub manifest: &'a str,
+    /// Each component's files, in merge order.
+    pub components: &'a [LeafSources],
+}
 
 /// The manifest, every leaf's files in manifest leaf order and, to check an
 /// assembly, the aggregate contract's files.

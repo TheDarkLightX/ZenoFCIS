@@ -49,12 +49,13 @@ claim 501 unbounded_state_reflexivity lean unbounded =
   always atom(pre.100 == pre.100);
 ```
 
-The equality in these two claims is reflexive. It gives a small, easy-to-read
-example of the finite SMT translation and the unbounded Lean translation. The
-Mini Determinator's schedule-independence result comes from the executable Rust
-model, where opposite worker completion orders produce byte-identical runs.
-Run `cargo +1.97.1 test -p zeno-fcis-spec mini_determinator --locked` to check
-that behavior.
+The equality in these two claims is reflexive, which makes them small,
+easy-to-read examples of the finite SMT translation and the unbounded Lean
+translation. The Mini Determinator's schedule-independence result comes from
+the executable Rust model, where opposite worker completion orders produce
+byte-identical runs. Run
+`cargo +1.97.1 test -p zeno-fcis-spec mini_determinator --locked` to check that
+behavior.
 
 Check both declarations:
 
@@ -76,7 +77,8 @@ Finite claims are useful for bounded workflows such as:
 - every event in a retained replay keeps a balance nonnegative.
 
 Overflow, missing observed data, missing named calculations, an empty trace,
-and exceeded limits return `Indeterminate`. A release or deployment remains blocked.
+and exceeded limits return `Indeterminate`, and a release or deployment stays
+blocked.
 
 The [temporal reference](../TEMPORAL_LOGIC_V1.md) defines `next`, `always`,
 `eventually`, and `until`, including every final-step rule and limit. The

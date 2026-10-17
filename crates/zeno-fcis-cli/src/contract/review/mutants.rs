@@ -7,10 +7,15 @@
 //! site in rules-file order: variables by name, then each case's `when`,
 //! `post` fields and payload fields; within an expression, nodes in prefix
 //! order. The numbering is therefore fixed by the rules file alone.
+//!
+//! The extended catalog, version 2, appends four operators after every
+//! operator of version 1, so each version 1 mutant keeps its number.
 
-use super::super::declarations::Declarations;
+use std::collections::BTreeMap;
+
+use super::super::declarations::{Declarations, Kind};
 use super::super::expr::{Ast, Binary, Rounding};
-use super::super::rules::Rules;
+use super::super::rules::{Case, Class, Rules};
 
 /// The catalog this module implements; a new operator is a new version.
 pub(super) const CATALOG: &str = "zeno-fcis/contract-review-mutants/1";
@@ -46,6 +51,26 @@ pub(super) const OPERATORS: [(&str, &str); 8] = [
         "a case takes the next declared reason of its class",
     ),
     ("drop-outbox-entry", "one delivery of a case is dropped"),
+];
+
+/// The extended catalog: version 1, then [`ADDED`].
+pub(super) const CATALOG_V2: &str = "zeno-fcis/contract-review-mutants/2";
+
+/// The operators version 2 adds after version 1's, in catalog order.
+pub(super) const ADDED: [(&str, &str); 4] = [
+    (
+        "negate-guard",
+        "a case before the final catch-all takes the negation of its `when`",
+    ),
+    ("drop-case", "a case before the final catch-all is removed"),
+    (
+        "flip-class",
+        "a reject becomes an accept that keeps every state field; an accept or a committed failure becomes a reject with the least reason a reject case uses; a committed failure also becomes an accept with its successor",
+    ),
+    (
+        "perturb-successor",
+        "one state field a committing case sets moves: an integer or variant by one up, then by one down; a boolean is negated",
+    ),
 ];
 
 #[derive(Debug)]
@@ -85,10 +110,177 @@ pub(super) fn catalog(rules: &Rules, declarations: &Declarations) -> Vec<Mutant>
     swap_reasons(rules, &mut mutants);
     change_reasons(rules, declarations, &mut mutants);
     drop_outbox_entries(rules, &mut mutants);
+    number(&mut mutants);
+    mutants
+}
+
+/// Every mutant of the extended catalog, numbered in catalog order: the
+/// version 1 catalog, then the added operators.
+pub(super) fn extended_catalog(rules: &Rules, declarations: &Declarations) -> Vec<Mutant> {
+    let mut mutants = catalog(rules, declarations);
+    negate_guards(rules, &mut mutants);
+    drop_cases(rules, &mut mutants);
+    flip_classes(rules, declarations, &mut mutants);
+    perturb_successors(rules, declarations, &mut mutants);
+    number(&mut mutants);
+    mutants
+}
+
+fn number(mutants: &mut [Mutant]) {
     for (index, mutant) in mutants.iter_mut().enumerate() {
         mutant.id = format!("m{:04}", index + 1);
     }
-    mutants
+}
+
+/// Each case before the final catch-all with its `when` negated.
+fn negate_guards(rules: &Rules, out: &mut Vec<Mutant>) {
+    for index in 0..rules.cases.len().saturating_sub(1) {
+        let before = &rules.cases[index].when;
+        let after = Ast::Not(Box::new(before.clone()));
+        let mut mutated = rules.clone();
+        mutated.cases[index].when = after.clone();
+        out.push(Mutant {
+            id: String::new(),
+            operator: "negate-guard",
+            site: format!("cases[{index}].when"),
+            change: format!("`{}` -> `{}`", render(before), render(&after)),
+            rules: mutated,
+        });
+    }
+}
+
+/// Each case before the final catch-all removed.
+fn drop_cases(rules: &Rules, out: &mut Vec<Mutant>) {
+    for index in 0..rules.cases.len().saturating_sub(1) {
+        let mut mutated = rules.clone();
+        mutated.cases.remove(index);
+        out.push(Mutant {
+            id: String::new(),
+            operator: "drop-case",
+            site: format!("cases[{index}]"),
+            change: format!(
+                "case {index} `{}` is removed",
+                render(&rules.cases[index].when)
+            ),
+            rules: mutated,
+        });
+    }
+}
+
+/// Every state field, each reading its own pre-state value: the successor
+/// of a decision that changes nothing. Rules as read give a committing case
+/// every field, so a mutant that becomes committing does too.
+fn unchanged(declarations: &Declarations) -> BTreeMap<u16, Ast> {
+    let root = super::super::declarations::ROOTS[0].1;
+    declarations
+        .state_fields()
+        .unwrap_or_default()
+        .iter()
+        .map(|field| (field.id, Ast::Name(format!("pre.{root}.{}", field.id))))
+        .collect()
+}
+
+/// Each case with its class flipped: a reject accepts and keeps the state;
+/// an accept or committed failure rejects with the least reason a reject
+/// case uses; a committed failure also accepts with its own successor.
+fn flip_classes(rules: &Rules, declarations: &Declarations, out: &mut Vec<Mutant>) {
+    let reject_reason = rules
+        .cases
+        .iter()
+        .filter(|case| case.class == Class::Reject)
+        .filter_map(|case| case.reason)
+        .min();
+    for (index, case) in rules.cases.iter().enumerate() {
+        let mut flipped: Vec<(Case, String)> = Vec::new();
+        match case.class {
+            Class::Reject => flipped.push((
+                Case {
+                    class: Class::Accept,
+                    reason: None,
+                    post: unchanged(declarations),
+                    ..case.clone()
+                },
+                "Reject -> Accept keeping every state field".to_owned(),
+            )),
+            Class::Accept | Class::CommittedFailure => {
+                if let Some(reason) = reject_reason {
+                    flipped.push((
+                        Case {
+                            class: Class::Reject,
+                            reason: Some(reason),
+                            post: BTreeMap::new(),
+                            outbox: Vec::new(),
+                            ..case.clone()
+                        },
+                        format!("{} -> Reject {reason}", case.class.name()),
+                    ));
+                }
+                if case.class == Class::CommittedFailure {
+                    flipped.push((
+                        Case {
+                            class: Class::Accept,
+                            reason: None,
+                            ..case.clone()
+                        },
+                        "CommittedFailure -> Accept".to_owned(),
+                    ));
+                }
+            }
+        }
+        for (after, change) in flipped {
+            let mut mutated = rules.clone();
+            mutated.cases[index] = after;
+            out.push(Mutant {
+                id: String::new(),
+                operator: "flip-class",
+                site: format!("cases[{index}].class"),
+                change,
+                rules: mutated,
+            });
+        }
+    }
+}
+
+/// Each state field a committing case sets, moved: an integer or a variant
+/// by one up and by one down, a boolean negated.
+fn perturb_successors(rules: &Rules, declarations: &Declarations, out: &mut Vec<Mutant>) {
+    let boolean = |field: u16| {
+        declarations
+            .state_fields()
+            .unwrap_or_default()
+            .iter()
+            .find(|declared| declared.id == field)
+            .and_then(|declared| declarations.kind(declared.type_id).ok())
+            .is_some_and(|kind| matches!(kind, Kind::Bool))
+    };
+    for (index, case) in rules.cases.iter().enumerate() {
+        if case.class == Class::Reject {
+            continue;
+        }
+        for (field, before) in &case.post {
+            let moved: Vec<Ast> = if boolean(*field) {
+                vec![Ast::Not(Box::new(before.clone()))]
+            } else {
+                [Binary::Add, Binary::Sub]
+                    .into_iter()
+                    .map(|operator| {
+                        Ast::Binary(operator, Box::new(before.clone()), Box::new(Ast::Int(1)))
+                    })
+                    .collect()
+            };
+            for after in moved {
+                let mut mutated = rules.clone();
+                mutated.cases[index].post.insert(*field, after.clone());
+                out.push(Mutant {
+                    id: String::new(),
+                    operator: "perturb-successor",
+                    site: format!("cases[{index}].post.{field}"),
+                    change: format!("`{}` -> `{}`", render(before), render(&after)),
+                    rules: mutated,
+                });
+            }
+        }
+    }
 }
 
 /// A rule expression's place in the rules file.
@@ -422,6 +614,8 @@ fn children(ast: &Ast) -> Vec<&Ast> {
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
         Ast::Choose(condition, then, otherwise) => vec![condition, then, otherwise],
+        // Arithmetic mutation coverage belongs to its explicit control suite.
+        Ast::MulDiv(..) | Ast::ProductsGe(..) => Vec::new(),
     }
 }
 
@@ -455,6 +649,7 @@ pub(super) fn render(ast: &Ast) -> String {
         _ => render(inner),
     };
     match ast {
+        Ast::MulDiv(..) | Ast::ProductsGe(..) => super::super::expr::render(ast),
         Ast::Bool(value) => value.to_string(),
         Ast::Int(value) => value.to_string(),
         Ast::Name(name) => name.clone(),

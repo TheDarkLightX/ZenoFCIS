@@ -221,6 +221,8 @@ pub(crate) struct Completed {
 }
 
 /// What the shell delivers for a check stage.
+// Keep the existing owned report representation and its allocation behavior.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum CheckReport {
     Completed(Completed),

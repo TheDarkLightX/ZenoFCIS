@@ -52,6 +52,9 @@ impl Op {
                 require(node(b)?, kind)?;
                 Ok(kind)
             }
+            // This historical oracle is restricted to its original ten kinds.
+            // New arithmetic has a separate independent oracle and controls.
+            _ => Err(Error::Invalid("unsupported-instruction")),
         }
     }
 }

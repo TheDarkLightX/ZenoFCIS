@@ -329,17 +329,17 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// receipt and ledger digests, and adding the reviewed `seeds: 0` run field.
 /// The resulting ledger, head and transcript were then replayed exactly.
 const METERED_LEDGER_SHA256: &str =
-    "b7bc9af48501ceccdb6d2b17cabe89c2e443256d936ac9116d0a5b519c9e59fa";
+    "d6080fbff7c9b053e6811ce722707bd12043243d2b95b5d698c72d75dc18eb3a";
 const METERED_HEAD_SHA256: &str =
-    "bd9278fedb3b15b6b5b0453de3a27001cded4d02b50e710a94fbd33ef05230e2";
+    "77772e7f40b25f2fd5c084b8964283e29e9102938c975235123e1ab8d0e85f6a";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "bbf82c2f3313102ba613a10b34b5ec4b376c5d3e5f13fa4acdbefff68b6b09b9";
+    "aeced3d993eb28ea0d317c63237ba6c99abe75c93286a1cf2938a2b0f9b2a97d";
 
 #[test]
 fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
     assert_eq!(
         crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
-        "e660f24a1f06ce644e03b4a832bffea31e1b001f54c4745034b3111a39f195f5",
+        "86f516bef89978cb43d3a063deea156a138ab2a3d5ea777de34309bd9282d4ff",
         "checker identity changed: replay the recorded metered journey before refreshing its digests"
     );
     let scratch = Scratch::new();

@@ -2,7 +2,7 @@
 //!
 //! JSON is a bounded shell interchange format only. Protocol meaning remains the
 //! complete [`NormalizedDecision`] and its canonical component bytes. The same
-//! adapter can mount Rust, Python, ESSO-generated, Morph-generated, or other
+//! adapter can mount Rust, Python, or other generated
 //! runtimes without granting transport authority over transition semantics.
 
 #![forbid(unsafe_code)]

@@ -1,0 +1,29 @@
+{
+  "authority": "none",
+  "candidate_sha256": "ef11dd8b64fd139fb67feb755124520631eee6bc1b8dfecef10e79de9752e0bb",
+  "detail": {
+    "candidate": {
+      "ok": [
+        "4"
+      ],
+      "steps": 5
+    },
+    "input": [
+      "3"
+    ],
+    "ordinal": 7,
+    "original": {
+      "ok": [
+        "3"
+      ],
+      "steps": 1
+    }
+  },
+  "limits": {
+    "input_tuples": 100000000,
+    "steps": 256
+  },
+  "original_sha256": "9ce0c88c4f2b768cb490a1db73d30d19202d2e9bb9757f5a6ddac91e16c2e8c0",
+  "schema": "zeno-fcis/transform-result/1",
+  "status": "counterexample"
+}

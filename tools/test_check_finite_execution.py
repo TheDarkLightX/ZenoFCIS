@@ -13,7 +13,7 @@ import check_verus as verifier
 import verus_coverage as coverage
 
 # All three gates share these mocked diagnostic-retention regressions.
-from test_negative_retention import NegativeRetentionTests
+from test_negative_retention import NegativeRetentionTests, StrictGateMutationTests
 
 
 FUNCTION = """(Function (Fun :path example::identity) :mode Exec :typ_bounds ()
@@ -84,11 +84,16 @@ class TranslatedCoverage(unittest.TestCase):
     def test_runtime_inventory_and_mutation_anchors_are_explicit(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = [record for record in profile["functions"].values() if record["mode"] == "Exec"]
-        self.assertEqual(len(runtime), 44)
+        self.assertEqual(len(runtime), 641)
+        executable_names = {n for n, r in profile['functions'].items() if r['mode'] == 'Exec'}
+        self.assertEqual(executable_names, set(profile['body_covered_functions']))
+        self.assertTrue(all('body_sha256' in profile['functions'][n] for n in executable_names))
+        self.assertIn('finite_execution::value::scalar::mul_div', executable_names)
+        self.assertIn('finite_execution::value::wide::products_ge', executable_names)
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0 for record in runtime))
         mutations = gate.mutation_sources(*((gate.ROOT / path).read_text() for path in
                                             (gate.SUBJECT, gate.ADMISSION, gate.TYPED, gate.VALUE)))
-        self.assertEqual(len(mutations), 16)
+        self.assertEqual(len(mutations), 24)
         for path, changed, expected in mutations.values():
             self.assertNotEqual(changed, (gate.ROOT / path).read_text())
             self.assertIn(expected, ("proof", "coverage"))
@@ -156,6 +161,27 @@ class TranslatedCoverage(unittest.TestCase):
             self.assertFalse(gate.coverage_control(vir, profile, 'add_uncontracted_function')[0])
         self.assertFalse(gate.coverage_control(function(target, 'false') + unchecked,
                                               profile, 'weaken_execution_contract')[0])
+
+    def test_intended_contract_fault_survives_an_earlier_descriptor_diagnostic(self):
+        target = 'finite_execution::evaluation::evaluate_into'
+        def function(ensures):
+            return (f'(Function (Fun :path {target}) :mode Exec :typ_bounds () '
+                ':params () :ret () :require () '
+                f':ensure {ensures} :d () :body (Int 0))')
+        original = function('((Bool true))')
+        profile = {'namespace': 'finite_execution::', 'body_covered_functions': [target],
+            'functions': coverage.inventory(original, 'finite_execution::', (target,))}
+        from unittest import mock
+        with mock.patch.object(gate, 'require_coverage',
+                side_effect=ValueError('translated descriptor declarations changed')):
+            self.assertTrue(gate.coverage_control(function('()'), profile,
+                'omit_execution_contract')[0])
+            self.assertTrue(gate.coverage_control(function('((Bool false))'), profile,
+                'weaken_execution_contract')[0])
+            self.assertFalse(gate.coverage_control(original, profile,
+                'omit_execution_contract')[0])
+            self.assertFalse(gate.coverage_control(original, profile,
+                'weaken_execution_contract')[0])
 
     def test_verifier_report_requires_this_units_complete_coverage(self):
         pin = json.loads((gate.ROOT / verifier.PIN).read_text())

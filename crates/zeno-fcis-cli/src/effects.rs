@@ -111,6 +111,7 @@ effects! { crate::Command {
         "loop" => Self::Loop { command } => command: crate::loop_command::Command;
         "contract" => Self::Contract { command } => command: crate::ContractCommand;
         "backend" => Self::Backend { command } => command: crate::BackendCommand;
+        "kb" => Self::Kb { operation } => operation: crate::knowledge_command::Operation;
     }
     flat {
     }
@@ -301,6 +302,7 @@ effects! { crate::loop_command::Command {
                 &[
                     "session-directory",
                     "candidate-program",
+                    "optional-expressions-document",
                     "caller-cpu-limits",
                 ],
                 &["session-directory", "transient-user-unit"],
@@ -334,6 +336,7 @@ effects! { crate::loop_command::Command {
     groups {
     }
     flat {
+        Self::Doors(command) => command: crate::loop_command::doors::DoorCommand;
     }
     optional {
     }
@@ -352,6 +355,7 @@ effects! { crate::ContractCommand {
     }
     flat {
         Self::Review(command) => command: crate::review_command::Command;
+        Self::Judge(command) => command: crate::judge_command::Command;
         Self::Composition(command) => command: crate::composition_command::Command;
         Self::Draft(command) => command: crate::draft_command::Command;
         Self::Adopt(command) => command: crate::contract_adopt::Command;
@@ -367,7 +371,7 @@ effects! { crate::ContractCommand {
 effects! { crate::review_command::Command {
     leaves {
         "review" => Self::Review { .. } => declared((
-                &["application-contract", "decision-examples"],
+                &["application-contract", "decision-examples", "optional-proposed-laws"],
                 &["optional-review-packet", "optional-seed-programs"],
                 false,
                 None,
@@ -586,9 +590,339 @@ pub(super) fn describe(path: &[String]) -> Value {
         .unwrap_or_else(|| panic!("validated command path has no effect declaration: {path:?}"))
     {
         Effect::Group => json!({"classification": "command-group"}),
-        Effect::Declared(reads, writes, executes_tools, read_only_flag) => json!({
-            "classification": "declared", "reads": reads, "writes": writes,
-            "executes_tools": executes_tools, "read_only_flag": read_only_flag,
-        }),
+        Effect::Declared(reads, writes, executes_tools, read_only_flag) => {
+            let mut result = json!({
+                "classification": "declared", "reads": reads, "writes": writes,
+                "executes_tools": executes_tools, "read_only_flag": read_only_flag,
+            });
+            if path.first() == Some(&"loop") && path.get(1) != Some(&"encode") {
+                if let Some(reads) = result["reads"].as_array_mut() {
+                    reads.push(json!("optional-knowledge-layers-and-session-binding"));
+                }
+                if let Some(writes) = result["writes"].as_array_mut() {
+                    writes.extend([
+                        json!("optional-private-knowledge-inbox"),
+                        json!("optional-session-knowledge-binding"),
+                    ]);
+                }
+                result["automatic_knowledge_disabled_by"] = json!("--no-kb");
+            }
+            result
+        }
     }
 }
+
+effects! { crate::loop_command::doors::DoorCommand {
+    leaves {
+        "pipeline" => Self::Pipeline { .. } => declared((
+                &[
+                    "original-program",
+                    "optional-pipeline-proposal",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit", "optional-pipeline-export"],
+                true,
+                None,
+            ));
+        "strategy" => Self::Strategy { .. } => declared((
+                &[
+                    "strategy-task-manifest",
+                    "task-original-programs",
+                    // BEGIN typed strategy mode input effects.
+                    "optional-strategy-problem",
+                    "optional-case-reference-program",
+                    // END typed strategy mode input effects.
+                    // BEGIN structural knowledge strategy input effects.
+                    "compiled-public-knowledge-example",
+                    "optional-external-knowledge-file",
+                    // END structural knowledge strategy input effects.
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit", "optional-strategy-export"],
+                true,
+                None,
+            ));
+        "rules" => Self::Rules { .. } => declared((
+                &[
+                    "original-program",
+                    "optional-term-corpus",
+                    "optional-rule-bank",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit", "optional-rule-export"],
+                true,
+                None,
+            ));
+        "learn" => Self::Learn { .. } => declared((
+                &["learn-declaration-and-examples", "optional-native-reference", "caller-cpu-limits"],
+                &["transient-user-unit", "optional-learn-export"],
+                true,
+                None,
+            ));
+        "sketch" => Self::Sketch { .. } => declared((
+                &["session-directory", "sketch-document", "caller-cpu-limits"],
+                &["session-directory", "transient-user-unit"],
+                true,
+                None,
+            ));
+        "family" => Self::Family { .. } => declared((
+                &[
+                    "family-manifest",
+                    "family-program",
+                    "instance-programs",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "transfer" => Self::Transfer { .. } => declared((
+                &[
+                    "source-expressions",
+                    "family-manifest",
+                    "instance-programs",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "meaning" => Self::Meaning { .. } => declared((
+                &[
+                    "original-program",
+                    "optional-expressions-document",
+                    "optional-candidate-program",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "question" => Self::Question { .. } => declared((
+                &[
+                    "optional-application-contract",
+                    "optional-version-space-specification",
+                    "optional-owner-answers",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "teach-back" => Self::TeachBack { .. } => declared((
+                &[
+                    "application-contract",
+                    "loop-door-document",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "decompose" => Self::Decompose { .. } => declared((
+                &[
+                    "application-contract",
+                    "loop-door-document",
+                    "caller-cpu-limits",
+                ],
+                &["transient-user-unit", "optional-composition-export"],
+                true,
+                None,
+            ));
+    }
+    groups {
+        "capture" => Self::Capture { command } => command: crate::loop_command::doors::capture::Command;
+    }
+    flat {
+
+    }
+    optional {}
+}}
+
+effects! { crate::loop_command::doors::capture::Command {
+    leaves {
+        "open" => Self::Open { .. } => declared((
+                &[
+                    "capture-spec",
+                    "owner-reference-source",
+                    "caller-cpu-limits",
+                ],
+                &[
+                    "new-private-capture-session",
+                    "transient-user-unit",
+                    "bounded-scratch-file",
+                ],
+                true,
+                None,
+            ));
+        "packet" => Self::Packet { .. } => declared((
+                &["private-capture-session", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+        "candidate" => Self::Candidate { .. } => declared((
+                &[
+                    "private-capture-session",
+                    "candidate-json-or-expressions",
+                    "caller-cpu-limits",
+                ],
+                &[
+                    "private-capture-session",
+                    "exclusive-session-lock",
+                    "transient-user-unit",
+                ],
+                true,
+                None,
+            ));
+        "status" => Self::Status { .. } => declared((
+                &["private-capture-session", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
+    }
+    groups {
+
+    }
+    flat {
+
+    }
+    optional {}
+}}
+
+effects! { crate::judge_command::Command {
+    leaves {
+        "profile" => Self::Profile { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "lemma" => Self::Lemma { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "scenario" => Self::Scenario { .. } => declared((
+                &["application-contract", "decision-scenarios"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+    }
+    groups {
+        "probe" => Self::Probe { question } => question: crate::judge_command::ProbeCommand;
+    }
+    flat {
+
+    }
+    optional {}
+}}
+
+effects! { crate::judge_command::ProbeCommand {
+    leaves {
+        "explain" => Self::Explain { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "reachable" => Self::Reachable { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "count" => Self::Count { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "implies" => Self::Implies { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "decisions" => Self::Decisions { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+        "depends" => Self::Depends { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
+    }
+    groups {
+
+    }
+    flat {
+
+    }
+    optional {}
+}}
+
+effects! { crate::knowledge_command::Operation {
+    leaves {
+        "advise" => Self::Advise { .. } => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "plan" => Self::Plan { .. } => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "replan" => Self::Replan { .. } => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "explain" => Self::Explain { .. } => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "check" => Self::Check => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "query" => Self::Query { .. } => declared((
+                &["explicit-knowledge-layers", "explicit-validation-records"],
+                &[],
+                false,
+                None,
+            ));
+        "replay" => Self::Replay { .. } => declared((
+                &[
+                    "explicit-versioned-recipe",
+                    "bound-inputs",
+                    "pinned-checker",
+                ],
+                &["new-private-validation-file", "temporary-checker-files"],
+                true,
+                None,
+            ));
+    }
+    groups {
+
+    }
+    flat {
+
+    }
+    optional {}
+}}

@@ -1,0 +1,3 @@
+# A narrow product overflows, while the exact fused quotient fits.
+0 9223372036854775807 9223372036854775807 9223372036854775807 0 | accept - 9223372036854775807 | -
+0 5 1 2 0 | accept - 2 | -

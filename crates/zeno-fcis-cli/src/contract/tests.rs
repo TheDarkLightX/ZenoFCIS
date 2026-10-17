@@ -591,8 +591,8 @@ fn planted_rule_errors_are_refused_where_they_are() {
         ),
         (
             "v2/policy.json cases[2].post.110",
-            Box::new(|rules| rules["cases"][2]["post"]["110"] = "count * 2".into()),
-            "decision rules have no multiplication",
+            Box::new(|rules| rules["cases"][2]["post"]["110"] = "mul_div_floor(count, 2)".into()),
+            "`mul_div_floor` with 2 arguments is not",
         ),
         (
             "v2/policy.json cases[2].post.110",

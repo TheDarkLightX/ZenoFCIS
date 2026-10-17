@@ -659,16 +659,35 @@ fn describe_declares_loop_effects() {
         names,
         [
             json!("candidate"),
+            json!("capture"),
+            json!("decompose"),
             json!("encode"),
+            json!("family"),
+            json!("learn"),
+            json!("meaning"),
             json!("open"),
+            json!("pipeline"),
+            json!("question"),
             json!("resume"),
-            json!("run")
+            json!("rules"),
+            json!("run"),
+            json!("sketch"),
+            json!("strategy"),
+            json!("teach-back"),
+            json!("transfer")
         ]
     );
-    for command in group["subcommands"]
-        .as_array()
-        .unwrap_or_else(|| panic!("subcommands"))
-    {
+    fn check_effects(command: &Value) {
+        let children = command["subcommands"]
+            .as_array()
+            .unwrap_or_else(|| panic!("subcommands"));
+        if !children.is_empty() {
+            assert_eq!(command["effects"]["classification"], "command-group");
+            for child in children {
+                check_effects(child);
+            }
+            return;
+        }
         assert_eq!(
             command["effects"]["classification"], "declared",
             "{}",
@@ -692,4 +711,5 @@ fn describe_declares_loop_effects() {
             command["name"]
         );
     }
+    check_effects(group);
 }

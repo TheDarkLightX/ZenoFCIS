@@ -254,6 +254,13 @@ incomplete proof prevents a receipt. Undecided pieces, failed processes and
 unresolved disagreements prevent a passing receipt. A concrete counterexample
 still counts only after the actual evaluator confirms the difference.
 
+The scalar arithmetic extension (`finite-i64/3` and `/4`) does not enlarge
+this certificate fragment. Variable multiplication, signed division, fused
+mul-div and product comparison return an explicit unsupported result from
+the program encoder, before a certificate can be produced. They are never
+represented as linear terms or unconstrained fresh symbols. Complete finite
+execution remains a separate supported route within its tuple and node caps.
+
 The supported certificate fragment is quantifier-free Boolean and linear
 integer reasoning over eager checked-i64 programs. Every unused node and
 unselected arm is still evaluated. Ordered outputs, inclusive domain bounds,

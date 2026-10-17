@@ -227,7 +227,7 @@
   "adoptions": [
     {
       "candidate_sha256": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89",
-      "receipt_sha256": "1a07b93a8eff56ea2718f7fc8109c0af18c0a89881eca3882614a9d1807fa417",
+      "receipt_sha256": "61c16303ce0c4704db8af8fcc253698009ec72f6777873376322f86652e94f7e",
       "usage": "new-version",
       "superseded_policy_sha256": "be3f9e42ea9e2e41f069f81a99db1e98050a3ea3761b7a08f23949909682fb61"
     }

@@ -9,12 +9,14 @@ use std::path::{Path, PathBuf};
 use clap::Subcommand;
 use serde_json::{Value, json};
 
-use crate::contract::review::{self, DEFAULT_MAX_TUPLES, PACKET_SCHEMA, Review, ReviewSources};
+use crate::contract::review::{
+    self, DEFAULT_MAX_TUPLES, PACKET_SCHEMA, PACKET_SCHEMA_GAPS, Review, ReviewSources, gaps,
+};
 use crate::contract_files::read_input;
 use crate::transform::sha256_hex;
 use crate::{
-    FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, USAGE, atomic_create, atomic_replace,
-    print_json,
+    BLOCKED, FAILURE, INVALID, JSON_SCHEMA, MALFORMED, OK, OutputFormat, USAGE, atomic_create,
+    atomic_replace, print_json,
 };
 
 const PROJECT: &str = "project.zeno";
@@ -42,6 +44,15 @@ pub(super) enum Command {
         /// --with-candidate` and `loop run --seed`; each is marked with the transform checker's verdict.
         #[arg(long)]
         mutant_programs: Option<PathBuf>,
+        /// Also run the specification-gap judge over the whole declared domain and use the extended mutant catalog: packet version 3. A domain over --max-tuples, or law checks over --max-work, is inconclusive (exit 2).
+        #[arg(long)]
+        gaps: bool,
+        /// With --gaps: a file of proposed laws, one `project.zeno` law declaration per line, checked against the contract's decisions and then measured.
+        #[arg(long, requires = "gaps")]
+        gaps_laws: Option<PathBuf>,
+        /// With --gaps: the largest number of law checks, tuples times candidate decisions times declared laws.
+        #[arg(long, requires = "gaps", default_value_t = gaps::DEFAULT_MAX_WORK)]
+        max_work: u64,
     },
 }
 
@@ -53,13 +64,23 @@ pub(super) fn run(command: Command) -> u8 {
             max_tuples,
             format,
             mutant_programs,
-        } => review_directory(
-            &dir,
-            out.as_deref(),
-            max_tuples,
-            format,
-            mutant_programs.as_deref(),
-        ),
+            gaps,
+            gaps_laws,
+            max_work,
+        } => {
+            let gaps = gaps.then_some(Gaps {
+                laws: gaps_laws,
+                max_work,
+            });
+            review_directory(
+                &dir,
+                out.as_deref(),
+                max_tuples,
+                format,
+                mutant_programs.as_deref(),
+                gaps.as_ref(),
+            )
+        }
     }
 }
 
@@ -71,12 +92,19 @@ enum Failure {
     Invalid { place: String, reason: String },
 }
 
+/// The specification-gap judge's settings.
+struct Gaps {
+    laws: Option<PathBuf>,
+    max_work: u64,
+}
+
 fn review_directory(
     dir: &Path,
     out: Option<&Path>,
     max_tuples: u64,
     format: OutputFormat,
     mutant_programs: Option<&Path>,
+    gap_settings: Option<&Gaps>,
 ) -> u8 {
     if max_tuples == 0 {
         eprintln!("--max-tuples must be at least 1");
@@ -101,11 +129,33 @@ fn review_directory(
             rules: &rules,
             examples: examples.as_deref(),
         };
+        let reviewed = match gap_settings {
+            None => review::review(sources, max_tuples),
+            Some(settings) => {
+                let laws = match &settings.laws {
+                    None => None,
+                    Some(path) => {
+                        let bytes = read_input(path).map_err(|error| {
+                            Failure::Read(format!("read {}: {error}", path.display()))
+                        })?;
+                        Some(text(&path.display().to_string(), bytes)?)
+                    }
+                };
+                review::review_with_gaps(
+                    sources,
+                    gaps::Options {
+                        max_tuples,
+                        max_work: settings.max_work,
+                        proposals: laws.as_deref(),
+                    },
+                )
+            }
+        };
         let invalid = |error: crate::contract::ContractError| Failure::Invalid {
             place: error.place().to_owned(),
             reason: error.reason().to_owned(),
         };
-        let review = review::review(sources, max_tuples).map_err(invalid)?;
+        let review = reviewed.map_err(invalid)?;
         let seeds = match mutant_programs {
             Some(path) => Some(write_seeds(
                 path,
@@ -121,12 +171,18 @@ fn review_directory(
         Err(failure) => return report_failure(dir, failure, format),
     };
     let summary = review.summary();
+    let gap_status = review.gaps().map(gaps::Gaps::status);
     let status = if summary.disagreements > 0 {
         "disagreement"
     } else if summary.law_refusals > 0 {
         "law-refusal"
     } else {
-        "reviewed"
+        review.gaps().map_or("reviewed", gaps::Gaps::review_status)
+    };
+    let packet_schema = if review.gaps().is_some() {
+        PACKET_SCHEMA_GAPS
+    } else {
+        PACKET_SCHEMA
     };
     match out {
         Some(path) => {
@@ -144,7 +200,7 @@ fn review_directory(
                     let mut report = json!({
                         "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
                         "authority": "none", "evidence": "advisory-review",
-                        "packet": path.display().to_string(), "packet_schema": PACKET_SCHEMA,
+                        "packet": path.display().to_string(), "packet_schema": packet_schema,
                         "summary": summary.json(),
                     });
                     if let Some(seeds) = &seeds {
@@ -173,7 +229,16 @@ fn review_directory(
             }
         }
     }
-    if summary.findings == 0 { OK } else { INVALID }
+    if summary.findings > 0 {
+        return INVALID;
+    }
+    match gap_status {
+        Some("proposal-false-alarm") => INVALID,
+        Some("inconclusive" | "out-of-scope") => BLOCKED,
+        Some("withheld") => FAILURE,
+        Some("invalid-proposals") => MALFORMED,
+        _ => OK,
+    }
 }
 
 /// Writes each seed as `<id>.zcve` into the new directory `path` and
@@ -247,6 +312,17 @@ fn lines(review: &Review, status: &str) -> Vec<String> {
         ),
     ];
     lines.extend(review.law_refusal_lines());
+    lines.push(format!(
+        "original decisions: {} example disagreements, {} law refusals",
+        summary.disagreements, summary.law_refusals
+    ));
+    if let Some(gaps) = review.gaps() {
+        lines.push(gaps_line(gaps));
+    }
+    lines.push(
+        "scenario coverage: run contract scenario to measure decision examples and mutant kills"
+            .into(),
+    );
     lines.push(format!("findings {}", summary.findings));
     lines
 }
@@ -277,4 +353,41 @@ fn read_text(dir: &Path, name: &str) -> Result<String, Failure> {
 
 fn text(name: &str, bytes: Vec<u8>) -> Result<String, Failure> {
     String::from_utf8(bytes).map_err(|error| Failure::Read(format!("read {name}: {error}")))
+}
+
+/// One line on the specification-gap judge.
+fn gaps_line(gaps: &gaps::Gaps) -> String {
+    let summary = gaps.summary();
+    match gaps {
+        gaps::Gaps::Measured(_) => format!(
+            "gaps: {} of {} tuples determined by the declared laws ({} of {} on valid pre-states); mutants admitted {}, caught {}; inactive laws {}; reject-everything core admitted where the contract decides: {}",
+            summary["full"]["determined"],
+            summary["full"]["tuples"],
+            summary["valid"]["determined"],
+            summary["valid"]["tuples"],
+            summary["full"]["mutants_admitted"],
+            summary["full"]["mutants_caught"],
+            summary["inactive_laws"],
+            summary["reject_everything_admitted"],
+        ),
+        gaps::Gaps::FalseAlarm(value) => format!(
+            "gaps: proposed law {} fails on the contract's decision at input {}",
+            value["false_alarm"]["law"], value["false_alarm"]["input"]
+        ),
+        gaps::Gaps::Inconclusive(inconclusive) => format!(
+            "gaps: inconclusive, {} ({} over the limit {}); nothing is claimed",
+            inconclusive.reason,
+            inconclusive
+                .size
+                .map_or_else(|| "a size past 2^128".to_owned(), |size| size.to_string()),
+            inconclusive.limit
+        ),
+        gaps::Gaps::OutOfScope(reason) => {
+            format!("gaps: out of scope, {reason}; nothing is claimed")
+        }
+        gaps::Gaps::Withheld(reason) => format!("gaps: withheld, {reason}"),
+        gaps::Gaps::InvalidProposals { place, reason } => {
+            format!("gaps: the proposed laws have no contract form: {place}: {reason}")
+        }
+    }
 }

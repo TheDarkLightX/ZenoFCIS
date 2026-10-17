@@ -1,23 +1,31 @@
 # ZenoFCIS feature matrix
 
-This matrix covers the current `zeno-fcis` umbrella source API. The development
-workspace declares `2.3.0`, but the breaking V2 API below requires a pinned
-source dependency. The historical `1.1.0` package and its API stability promise
-have their own scope. Use the matching source tag for the public
-[2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md), as described in
-[installation](INSTALLATION.md). Their only advertised host executable is the
-Linux x86_64 GNU CLI, which needs glibc 2.39 or later; crates.io and other host
-binaries are not claimed for them.
+This matrix covers the current `zeno-fcis` umbrella source API. The workspace
+declares `2.4.0`, the current release source, and the breaking V2 API below
+needs a pinned source dependency on the matching tag, as the
+[installation guide](INSTALLATION.md) describes. The historical `1.1.0`
+package and its API stability promise have their own scope. The earlier public
+[2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md) advertised only
+the Linux x86_64 GNU CLI, which needs glibc 2.39 or later; crates.io and other
+host binaries were not claimed for them.
+
+The normal application API is `zeno_fcis::program`, which needs no optional
+features. It binds complete declarations to the library-owned evaluator and to
+private publication capabilities. Historical reference surfaces live under
+`zeno_fcis::legacy`. Enabling a dependency feature does not restore a retired
+native authoring API.
 
 ## Host platforms
 
-The 2.3.0 release workflow builds two required host executables: Linux
-x86_64 GNU on Ubuntu 24.04 and macOS on Apple silicon
-(`aarch64-apple-darwin`, minimum-version field macOS 11.0) on GitHub's
-macOS 15 arm64 image. Its release-set job requires both host jobs and their
-installed-binary records. The table describes configured workflow checks;
-only a completed run bound to the release source and artifact qualifies a
-host executable.
+The 2.4.0 release workflow builds two required host executables:
+
+- Linux x86_64 GNU, on Ubuntu 24.04;
+- macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
+  macOS 11.0), on GitHub's macOS 15 arm64 image.
+
+Its release-set job requires both host jobs and their installed-binary
+records. The table lists the configured workflow checks. Only a completed run
+bound to the release source and artifact qualifies a host executable.
 
 | Workflow check | Linux x86_64 | macOS arm64 |
 |---|---|---|
@@ -32,19 +40,13 @@ Linux evidence is not claimed for macOS. Intel Macs, Windows and other hosts
 have no executable and are not qualified. See
 [supported hosts](INSTALLATION.md#supported-hosts).
 
-The normal application API is `zeno_fcis::program`, available without optional
-features. It binds complete declarations to the library-owned evaluator and
-private publication capabilities. Historical reference surfaces live under
-`zeno_fcis::legacy`; enabling a dependency feature does not restore a retired
-native authoring API.
-
 ## Environment labels
 
 - **`no_std + alloc`**: supported by the umbrella feature path with default
   features disabled.
-- **Host `std`**: intentionally uses or requires the standard library.
-- **Mixed**: semantic values are portable, while concrete providers or
-  adapters may require a host.
+- **Host `std`**: deliberately uses or requires the standard library.
+- **Mixed**: semantic values are portable, but concrete providers or adapters
+  may require a host.
 
 ## Base and cryptography
 
@@ -56,9 +58,9 @@ native authoring API.
 | `verified-sha256` | `no_std + alloc` | Core provider | Independent libcrux SHA-256 provider |
 | `sha256-parity` | `no_std + alloc` | Assurance | Both providers and parity evidence |
 
-V2 program binding derives the library identity; applications cannot supply a
-hasher or decision callback to obtain publication authority. Cryptographic
-provider features also serve the historical reference APIs.
+V2 program binding derives the library identity. Applications cannot supply a
+hasher or a decision callback to obtain publication authority. The
+cryptographic provider features also serve the historical reference APIs.
 
 ## Project construction
 
@@ -69,19 +71,19 @@ provider features also serve the historical reference APIs.
 | `catalog` | `no_std + alloc` | Core | Schema plus project reasons, effects, channels, authority rules, and limits |
 | `transition` | `no_std + alloc` | Historical | Native transition authoring is retired; normal transitions use `program` |
 | `laws` | `no_std + alloc` | Metadata | Law declarations and evidence subjects; the checked evaluator is reached through `program::law` |
-| `authority` | `no_std + alloc` | Core authority | Library-owned V2 authority and publication reexports |
+| `authority` | `no_std + alloc` | Core authority | Library-owned V2 authority and publication re-exports |
 | `domain-machines` | `no_std + alloc` | Historical | Native domain-machine authoring is retired |
 | `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
 
-Start both single- and multi-domain applications with complete declarations
-through `zeno_fcis::program`. V2.2 has three finite component families;
-V2.3 expands the [catalogue](../core-components/README.md) to ten families,
-77 declared instances and 107,518 raw inputs. Stored references are Identified;
-successful exhaustive replay supports Proved for the closed finite scope under
-the [named trusted base](../core-components/FINITE_PROOFS.md). Six closed coupled
-application profiles are in `core-apps/`; their combined qualification and
-composition obligations are pending.
-The retired crates do not supply a composed runtime or discharge those obligations.
+Start both single-domain and multi-domain applications with complete
+declarations through `zeno_fcis::program`. V2.2 has three finite component
+families; V2.3 expands the [catalogue](../core-components/README.md) to ten
+families, 77 declared instances and 107,518 raw inputs. Stored references are
+Identified; successful exhaustive replay supports Proved for the closed finite
+scope under the [named trusted base](../core-components/FINITE_PROOFS.md).
+Six closed coupled application profiles are in `core-apps/`; their combined
+qualification and composition obligations are pending. The retired crates do
+not supply a composed runtime or discharge those obligations.
 
 ## Tooling and mounted runtimes
 
@@ -93,9 +95,9 @@ The retired crates do not supply a composed runtime or discharge those obligatio
 | `zenodex-profile` | `no_std + alloc` | Project-specific | Initial ZenoDEX zUSD profile |
 | `mounted-zenodex` | Host `std` | Project-specific shell | ZenoDEX profile plus concrete Python/Rust mount |
 
-Generation synchronizes source and documentation with reviewed inputs. It is
-not a proof or authority grant. Mounted comparison establishes only the stated
-bounded refinement evidence.
+Generation keeps source and documentation in step with reviewed inputs. It is
+not a proof or a grant of authority. Mounted comparison establishes only the
+stated bounded refinement evidence.
 
 ## Formal and search integrations
 
@@ -105,9 +107,9 @@ bounded refinement evidence.
 | `synthesis` | `no_std + alloc` | Formal/search kernel | Complete-within-bounds canonical candidate enumeration |
 | `backend` | `no_std + alloc` protocol | Formal adapter | Synthesis plus checked engine/verifier requests, responses, and certificates |
 
-The backend protocol can be implemented by public Lean, SMT/Z3, CVC5, Kani,
-Flux, or other adapters. Users with private ESSO access can implement it in a
-private crate. No backend decides release or commit authority by itself.
+Public Lean, SMT/Z3, CVC5, Kani, Flux, or other adapters can implement the
+backend protocol. Users with a private checker can implement it in a private
+crate. No backend decides release or commit authority by itself.
 
 Checked transform and optimization commands operate within their declared finite
 domains. Search proposals do not grant publication authority.
@@ -122,9 +124,9 @@ domains. Search proposals do not grant publication authority.
 | `persistent-collections` | Host `std` | Reference/optimization | `collections` plus `rpds` and `OrderedMap` backends |
 | `sqlite-shell` | Host `std` | Concrete shell | Authorized crash-atomic SQLite publication and delivery |
 
-The pure reference shell is part of the base exports and needs no feature. Raw
-reference-shell acceptance of `CommitBundle` is not a production authorization
-path.
+The pure reference shell is part of the base exports and needs no feature.
+The reference shell's acceptance of a raw `CommitBundle` is not a production
+authorization path.
 
 ## Security surfaces
 
@@ -143,8 +145,8 @@ code constant-time or eliminate physical side/covert channels.
 | `full` | Host `std` | Development/integration | All major generic, reference, ZenoDEX, backend, and persistent-collection surfaces |
 
 `full` is useful for workspace CI and exploration. Reusable libraries should
-select explicit features to keep their dependency, trusted-computing, and API
-surface small.
+select explicit features, which keeps their dependencies, trusted computing
+base, and API surface small.
 
 The repository's BDD/ATDD and Probity configuration are development and
 acceptance tooling, not Cargo features. They do not enter any crate dependency
@@ -153,8 +155,8 @@ graph or production authority.
 ## Common selections
 
 These are alternative dependency declarations against a checkout of
-`v2.3.0` at `../ZenoFCIS`. Select one declaration with the features your
-application needs; the current API is not supplied by `version = "=1.1.0"`.
+`v2.4.0` at `../ZenoFCIS`. Select the one declaration whose features your
+application needs. `version = "=1.1.0"` does not supply the current API.
 
 ```toml
 # Project-neutral semantic values and reference semantics
@@ -186,8 +188,8 @@ commutativity and sequential-versus-composed parity. Its external evidence
 verifier is a named trust boundary. Native domain and composed-program execution
 are retired; the normal route evaluates one complete checked program.
 
-ZenoFCIS does not yet ship a production parallel component runtime. The
-2.3.0 source includes an offline parallel exhaustive checker whose
-qualification is bound to its release-source checks. That checker is separate from parallel application
-execution. Component composition needs its own coupled invariants, binding and
-atomic publication evidence.
+ZenoFCIS does not yet ship a production parallel component runtime. The 2.4.0
+source includes an offline parallel exhaustive checker whose qualification is
+bound to its release-source checks. That checker is separate from parallel
+application execution. Component composition needs its own coupled
+invariants, binding and atomic publication evidence.

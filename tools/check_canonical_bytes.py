@@ -270,6 +270,11 @@ def classify_mutation(proc, report: dict, name: str, changed: str, specimen: Pat
     if timed_out or verifier.NON_SEMANTIC.search(proc.stderr) or proc.returncode not in (0, 1):
         return False, "inconclusive", None
     refusal = None
+    loop_entries = [m.group(1) for m in verifier.ERROR_HEADER.finditer(proc.stderr)
+                    if m.group(1).startswith("invariant not satisfied before loop")]
+    if loop_entries and (name != "permit_excessive_width" or any(
+            text != "invariant not satisfied before loop" for text in loop_entries)):
+        return False, "survived-or-unrelated-failure", None
     if name in SEMANTIC_TARGETS:
         path, function = SEMANTIC_TARGETS[name]
         source = changed if path == SUBJECT else (specimen / path).read_text()
@@ -427,7 +432,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

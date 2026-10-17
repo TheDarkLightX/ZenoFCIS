@@ -83,7 +83,7 @@ def intended_refusal(vir: str, profile: dict, name: str, refusal: str | None) ->
     target, field = INTENDED_COVERAGE[name]
     actual = profile_inventory(vir, profile)
     expected = profile['functions']
-    intended = (refusal is not None and target in refusal and target in actual and target in expected
+    intended = (refusal is not None and target in actual and target in expected
                 and actual[target][field] != expected[target][field])
     return intended, {'function': target, 'field': field, 'intended_refusal': intended}
 
@@ -244,13 +244,13 @@ def check(out: Path, positive_only=False):
     pin = json.loads((ROOT/verifier.PIN).read_text())
     profile = json.loads((ROOT/PROFILE).read_text())
     report_pin = {**pin, 'expected_verified': profile['expected_verified'], 'target_functions': profile['target_functions']}
-    tool = verifier.prepare_tools(Path.home()/'.cache/zeno-fcis/verus', pin, False)
+    tool = verifier.prepare_tools(verifier.cache_directory(), pin, False)
     env = {k: v for k, v in os.environ.items() if not k.startswith(('VERUS_', 'VARGO_'))
            and k not in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTC', 'RUSTDOC', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER', 'RUSTC_BOOTSTRAP')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'], VERUS_Z3_PATH=str(tool/'z3'),
                CARGO_TARGET_DIR=CARGO_TARGET, CARGO_NET_OFFLINE='true', CARGO_BUILD_JOBS='1', RUST_TEST_THREADS='1')
     command = [str(tool/'verus'), '--crate-type=lib', '--edition=2024', '--no-cheating',
-               '--no-external-by-default', '--num-threads', '2', "-V", "spinoff-all", '--output-json', '--triggers-mode', 'silent',
+               '--no-external-by-default', '--num-threads', verifier.proof_threads('2'), "-V", "spinoff-all", '--output-json', '--triggers-mode', 'silent',
                '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
     positive = recorded([*command, '--log-dir', str(directory/'positive'), str(HARNESS)], ROOT, env, directory, 'proof')
     verifier.require_success(positive)

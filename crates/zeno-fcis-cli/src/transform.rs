@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_synthesis::finite::{
-    Domain, Error, PROFILE, Program, V2_EXECUTION_PROFILE, V2ExecutionFailure, V2ScalarProgram,
+    Domain, Error, Program, V2_EXECUTION_PROFILE, V2ExecutionFailure, V2ScalarProgram,
     v2_authority::EVALUATOR,
 };
 use zeno_fcis_synthesis::finite_runtime::import_program;
@@ -43,7 +43,7 @@ pub(crate) const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
 /// `tests/fixtures/transform-check/`, which the tests compare with this
 /// checker's output; refactoring the source, or a new crate version, changes
 /// no receipt.
-pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/1";
+pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/3";
 
 /// Limits that fix the meaning of one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -138,6 +138,7 @@ struct Artifact {
     sha256: String,
     bytes: usize,
     nodes: usize,
+    profile: &'static str,
 }
 
 impl Artifact {
@@ -146,6 +147,7 @@ impl Artifact {
             sha256: sha256_hex(bytes),
             bytes: bytes.len(),
             nodes: program.nodes().len(),
+            profile: program.profile(),
         }
     }
 
@@ -368,7 +370,7 @@ impl Equivalence {
             "verdict": "equivalent",
             "authority": "none",
             "claim": "Functionally equal on the full declared input domain: every tuple gives identical outputs or identical failures. The Step limit never binds: no tuple needs more Steps than the limit in either program.",
-            "profile": {"program": PROFILE, "execution": V2_EXECUTION_PROFILE},
+            "profile": {"program": self.original.profile, "execution": V2_EXECUTION_PROFILE},
             "original": self.original.json(),
             "candidate": self.candidate.json(),
             "domain": {

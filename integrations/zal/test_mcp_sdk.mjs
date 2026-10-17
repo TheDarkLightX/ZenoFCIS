@@ -36,7 +36,9 @@ try {
     args: configuration.args, env: environment, stderr: 'pipe' });
   await client.connect(transport);
   assert.equal(client.getServerVersion().name, 'zenofcis-zal');
-  const expected = ['zal_read', 'zal_check', 'zal_explain', 'zal_help', 'zal_propose', 'zal_compare', 'zal_trace'];
+  const expected = ['zal_read', 'zal_check', 'zal_explain', 'zal_help', 'zal_propose', 'zal_compare', 'zal_trace',
+    'zal_loop_read', 'zal_loop_packet', 'zal_loop_submit', 'zal_loop_translate', 'zal_loop_legend',
+    'zal_capture_read', 'zal_capture_packet', 'zal_capture_submit', 'zal_capture_translate', 'zal_capture_legend'];
   assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), expected.sort());
   const read = await call('zal_read', {});
   const revision = read.model.revision;

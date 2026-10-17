@@ -90,7 +90,7 @@ impl Domain {
 }
 
 /// One typed instruction with operands referring to earlier graph nodes.
-/// Evaluation is eager, including both arms of `Select`; add/sub are checked.
+/// Evaluation is eager, including both arms of `Select`; arithmetic is checked.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -115,6 +115,37 @@ pub enum Op {
     Not(u16),
     /// Select between equal-kind values using a Boolean condition.
     Select(u16, u16, u16),
+    /// Checked signed i64 product, independent of fused multiply-divide.
+    Mul(u16, u16),
+    /// Mathematical floor division; zero divisor and out-of-range result refuse.
+    DivFloor(u16, u16),
+    /// Mathematical ceiling division, including negative divisors.
+    DivCeil(u16, u16),
+    /// Nonnegative exact product, positive denominator, final checked i64 floor.
+    MulDivFloor(u16, u16, u16),
+    /// Nonnegative exact product, positive denominator, final checked i64 ceiling.
+    MulDivCeil(u16, u16, u16),
+    /// Nonnegative exact three-factor comparison; no intermediate narrowing.
+    ProductsGe([u16; 3], [u16; 3]),
+}
+
+impl Op {
+    /// Whether this instruction needs the separately admitted arithmetic profile.
+    #[must_use]
+    #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == matches!(*self,
+        Self::Mul(..) | Self::DivFloor(..) | Self::DivCeil(..) | Self::MulDivFloor(..)
+            | Self::MulDivCeil(..) | Self::ProductsGe(..)),))]
+    pub fn requires_arithmetic_profile(&self) -> bool {
+        matches!(
+            self,
+            Self::Mul(..)
+                | Self::DivFloor(..)
+                | Self::DivCeil(..)
+                | Self::MulDivFloor(..)
+                | Self::MulDivCeil(..)
+                | Self::ProductsGe(..)
+        )
+    }
 }
 
 impl Clone for Op {
@@ -133,6 +164,12 @@ impl Clone for Op {
             Self::And(a, b) => Self::And(a, b),
             Self::Not(a) => Self::Not(a),
             Self::Select(c, a, b) => Self::Select(c, a, b),
+            Self::Mul(a, b) => Self::Mul(a, b),
+            Self::DivFloor(a, b) => Self::DivFloor(a, b),
+            Self::DivCeil(a, b) => Self::DivCeil(a, b),
+            Self::MulDivFloor(a, b, d) => Self::MulDivFloor(a, b, d),
+            Self::MulDivCeil(a, b, d) => Self::MulDivCeil(a, b, d),
+            Self::ProductsGe(a, b) => Self::ProductsGe(a, b),
         }
     }
 }

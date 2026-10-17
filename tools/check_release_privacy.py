@@ -15,6 +15,9 @@ import subprocess
 import tarfile
 from typing import BinaryIO
 import zipfile
+# BEGIN public knowledge example release guard.
+import check_knowledge_files as knowledge_files
+# END public knowledge example release guard.
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FILE_BYTES = 128 * 1024 * 1024
@@ -81,6 +84,11 @@ class Scan:
         basename = location.replace("\\", "/").rsplit("!", 1)[-1].rsplit("/", 1)[-1]
         if basename.lower() in PRIVATE_FILENAMES:
             self.findings.append({"location": safe_location(location, self.patterns), "code": "private-file-name"})
+        # BEGIN public knowledge example member guard (before content deduplication).
+        if knowledge_files.is_knowledge(location):
+            if not knowledge_files.listed_location(location) or not knowledge_files.public_content(data):
+                self.findings.append({"location": "knowledge-file", "code": "unlisted-or-changed-knowledge-file"})
+        # END public knowledge example member guard.
         if len(data) > MAX_FILE_BYTES:
             raise ValueError("byte-limit")
         zipped = zipfile.is_zipfile(io.BytesIO(data))
@@ -157,6 +165,11 @@ class Scan:
         if self.files > MAX_FILES:
             return
         try:
+            # BEGIN refuse unlisted source KB names without reading their bytes.
+            if knowledge_files.is_knowledge(location) and not knowledge_files.listed_location(location):
+                self.findings.append({"location": "knowledge-file", "code": "unlisted-or-changed-knowledge-file"})
+                return
+            # END refuse unlisted source KB names.
             if path.is_symlink() or not path.is_file():
                 self.error(location, "not-a-regular-file")
                 return
@@ -212,6 +225,10 @@ def main() -> int:
             return 1
     try:
         if not args.paths:
+            # BEGIN include ignored and untracked knowledge files in release refusal.
+            for failure in knowledge_files.check(ROOT):
+                scan.error("knowledge-files", failure)
+            # END knowledge tree guard.
             tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
             for name in tracked:
                 if scan.files > MAX_FILES:
@@ -227,7 +244,14 @@ def main() -> int:
                         if not child.is_dir() or child.is_symlink():
                             scan.file(child, path.name + "/" + str(child.relative_to(path)))
                 else:
-                    scan.file(path, path.name)
+                    # BEGIN preserve the canonical explicit example location.
+                    location = path.name
+                    if knowledge_files.is_knowledge(str(path)):
+                        resolved = path.absolute()
+                        if resolved.is_relative_to(ROOT):
+                            location = resolved.relative_to(ROOT).as_posix()
+                    scan.file(path, location)
+                    # END explicit knowledge location.
     except (OSError, ValueError, subprocess.CalledProcessError):
         scan.error("input", "inventory-failed")
     report = scan.report()

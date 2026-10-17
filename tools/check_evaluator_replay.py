@@ -33,12 +33,20 @@ fn retained_evaluator_subjects() {
             let g=std::fs::read(genesis).unwrap_or_else(|e| panic!("read: {e}"));
             let tr=authority.replay(raw(&values),&t);
             let gr=authority.replay_genesis(&values.0,&g);
-            if mode=="accept" { assert!(tr.result().is_ok()); assert_eq!(gr.result(),Ok(())); }
-            else { assert!(matches!(tr.result(),Err(authority::Refusal::ReplayMismatch))); assert_eq!(gr.result(),Err(authority::Refusal::ReplayMismatch)); }
+            if mode=="accept" { assert!(tr.result().is_ok()); assert!(gr.result().is_ok()); }
+            else { assert!(matches!(tr.result(),Err(authority::Refusal::ReplayMismatch))); assert!(matches!(gr.result(),Err(authority::Refusal::ReplayMismatch))); }
         }
     });
 }
 '''
+
+
+def flip_digest(original: str) -> str:
+    changed, count = re.subn(r'(= \[\s*0x)([0-9a-f]{2})',
+        lambda m: m[1] + f'{int(m[2], 16) ^ 1:02x}', original, count=1)
+    if count != 1 or changed == original:
+        raise ValueError('digest flip must change exactly the first compiled byte')
+    return changed
 
 
 def main():
@@ -80,8 +88,8 @@ def main():
     retained={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [out/'transition.bin',out/'genesis.bin']}
     generated=specimen/gate.EVALUATOR
     original=generated.read_text()
-    changed=re.sub(r'(= \[)(\d+)u8',lambda m:m[1]+str(int(m[2])^1)+'u8',original,count=1)
-    assert changed!=original;generated.write_text(changed)
+    changed=flip_digest(original)
+    generated.write_text(changed)
     mutant=out/'mutant-native'
     run('mutant-build',rust+['--test',str(gate.HARNESS),'-o',str(mutant)])
     refused=run('mutant-replay',[str(mutant),*filter_args],mode='refuse')

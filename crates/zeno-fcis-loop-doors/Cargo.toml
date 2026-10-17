@@ -1,0 +1,24 @@
+[package]
+name = "zeno-fcis-loop-doors"
+description = "Untrusted proposer-side doors for the ZenoFCIS bounded loop: expressions, repair, sketches, families and transfer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+# BEGIN public knowledge example package include list.
+include = ["Cargo.toml", "README.md", "src/**", "tests/**", "examples/strategy-example.kb"]
+# Other knowledge files are refused by the release include guard before Cargo.
+# END public knowledge example package include list.
+
+[dependencies]
+# Only workspace crates: the library program type and evaluator, and the
+# program-search crate's top-down synthesis.
+zeno-fcis-program-search = { version = "=2.4.0", path = "../zeno-fcis-program-search" }
+zeno-fcis-synthesis = { version = "=2.4.0", path = "../zeno-fcis-synthesis", default-features = false }
+
+[lints]
+workspace = true

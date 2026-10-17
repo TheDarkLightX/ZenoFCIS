@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from test_negative_retention import StrictGateMutationTests
 
 import check_metered_execution as gate
 import check_verus as verifier
@@ -41,8 +42,8 @@ class MeteredCoverage(unittest.TestCase):
     def test_reviewed_inventory_and_mutation_anchors_are_complete(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile["functions"].items() if record["mode"] == "Exec"}
-        self.assertEqual(len(profile["functions"]), 1569)
-        self.assertEqual(len(runtime), 635)
+        self.assertEqual(len(profile["functions"]), 1586)
+        self.assertEqual(len(runtime), 641)
         self.assertEqual(set(profile["body_covered_functions"]), runtime)
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0
                             for record in profile["functions"].values() if record["mode"] == "Exec"))
@@ -76,7 +77,8 @@ class NativeMeteredExecution(unittest.TestCase):
             # The full gate already owns this name for its positive VIR logs.
             (Path(temporary) / "positive").mkdir()
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn("test result: ok. 157 passed; 0 failed", evidence["test_output"])
+        self.assertIn("test result: ok. 158 passed; 0 failed", evidence["test_output"])
+        self.assertIn("new_arithmetic_matches_independent_oracle_at_all_step_boundaries ... ok", evidence["test_output"])
         self.assertEqual(evidence["api_consumers"]["positive"]["exit_code"], 0)
         self.assertEqual(len(evidence["api_consumers"]), 5)
         self.assertTrue(all(record["exit_code"] != 0 for name, record in evidence["api_consumers"].items()
@@ -129,15 +131,26 @@ class MeteredRefusal(unittest.TestCase):
             self.assertFalse(self.classify(code=code))
 
     def test_coverage_requires_complete_success_and_clean_diagnostics(self):
+        # Name the declared operational target; unrelated body drift is not a kill.
+        target = "example::execution_v2::numeric::evaluate"
+        function = FUNCTION.replace("example::identity", target)
+        self.profile = {"namespace": "example::", "target_functions": [target],
+            "body_covered_functions": [target],
+            "functions": coverage.inventory(function + "\n" + SPEC, "example::", (target,))}
         report = copy.deepcopy(self.report)
+        report["func-details"] = {target: {}}
         report["verification-results"].update(success=True, errors=0, **{"encountered-error": False})
-        vir = FUNCTION.replace("Constant Int 7", "Constant Int 8") + "\n" + SPEC
-        self.assertTrue(self.classify("", report, 0, "coverage", vir))
+        vir = function.replace("Constant Int 7", "Constant Int 8") + "\n" + SPEC
+        name = "execute_before_charging"
+        self.assertTrue(self.classify("", report, 0, "coverage", vir, name))
+        unrelated = function + "\n" + SPEC.replace("Constant Int 7", "Constant Int 8")
+        self.assertFalse(self.classify("", report, 0, "coverage", unrelated, name))
         for stderr in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n",
                        "error[E0308]: mismatched types\n", self.stderr):
-            self.assertFalse(self.classify(stderr, report, 0, "coverage", vir))
+            self.assertFalse(self.classify(stderr, report, 0, "coverage", vir, name))
         report["verification-results"]["is-verifying-entire-crate"] = False
-        self.assertFalse(self.classify("", report, 0, "coverage", vir))
+        self.assertFalse(self.classify("", report, 0, "coverage", vir, name))
+
 
 
 if __name__ == "__main__":

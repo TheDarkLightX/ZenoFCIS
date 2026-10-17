@@ -13,6 +13,7 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from zeno_fcis_transform import TOOLS as TRANSFORM_TOOLS, TransformToolError
+from zeno_fcis_knowledge import TOOLS as KNOWLEDGE_TOOLS, ANNOTATIONS as KNOWLEDGE_ANNOTATIONS, KnowledgeToolError
 
 
 mcp = MCPServer("ZenoFCIS synthesis")
@@ -169,14 +170,14 @@ def _transform_tool(handler):
     def tool(*arguments, **keywords):
         try:
             return handler(*arguments, **keywords)
-        except TransformToolError as error:
+        except (TransformToolError, KnowledgeToolError) as error:
             raise ToolError(str(error)) from error
-    return mcp.tool()(tool)
+    return mcp.tool(annotations=KNOWLEDGE_ANNOTATIONS)(tool) if handler in KNOWLEDGE_TOOLS else mcp.tool()(tool)
 
 
 # transform_request, transform_candidate and transform_replay drive the bounded
 # optimization loop (`zeno-fcis loop`); see docs/LLM_SYNTHESIS.md.
-for _handler in TRANSFORM_TOOLS:
+for _handler in (*TRANSFORM_TOOLS, *KNOWLEDGE_TOOLS):
     _transform_tool(_handler)
 
 

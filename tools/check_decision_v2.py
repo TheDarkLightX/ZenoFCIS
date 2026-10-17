@@ -7,13 +7,12 @@ import os
 import re
 from pathlib import Path
 import subprocess
-import tempfile
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_metered_execution import UNIT_SOURCES as BASE
 from verus_contract_controls import contract_rejected
-from verus_coverage import require_coverage
+from verus_coverage import profile_inventory, require_coverage
 
 ROOT=Path(__file__).resolve().parents[1]
 HARNESS=Path('verification/verus/decision.rs')
@@ -58,6 +57,18 @@ def once(source,before,after):
     found=matches[0]
     return source[:found.start()]+after+source[found.end():]
 
+SEMANTIC_TARGETS = {'branch': 'select_branch',
+ 'class': 'construct',
+ 'reason': 'construct',
+ 'outbox': 'construct',
+ 'meter': 'construct',
+ 'post_state': 'assignments',
+ 'patch': 'assignments',
+ 'footprint': 'assignments',
+ 'effect_order': 'deliveries',
+ 'domain': 'admitted'}
+
+
 def snapshot():
     for p in SOURCES:
         if (ROOT/p).is_symlink():raise RuntimeError(f'symlink proof source: {p}')
@@ -99,11 +110,40 @@ def mutations(source,specification,value=None):
     rows['resolve_before_write_charge']=(SUBJECT,cached,'coverage',False)
     return rows
 
+def coverage_control(vir, profile, name):
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = profile['namespace'] + 'execution_v2::decision::'
+    if name == 'uncontracted_helper':
+        target = prefix + 'uncontracted_decision_probe'
+        intended = (set(actual) == set(expected) | {target}
+            and target not in expected and actual[target]['mode'] == 'Exec'
+            and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        relative = {'specification_body': 'spec::construct',
+                    'resolve_before_write_charge': 'assignments'}[name]
+        target = prefix + relative
+        intended = (set(actual) == set(expected)
+            and actual[target]['body_sha256'] != expected[target]['body_sha256'])
+        if name == 'resolve_before_write_charge':
+            intended = intended and all(actual[target][f] == expected[target][f]
+                for f in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
+    return intended, refusal
+
+
 def native(directory,environment,root,filtered=False):
     binary=directory/'native-tests'
     args=['rustc','+1.97.1','--edition=2024','--test','--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(HARNESS),'-o',str(binary)]
     args += native_dependency_args(ROOT, directory, environment)
     build=verifier.run(args,root,environment,timeout=180)
+    (directory/'native-build.stdout').write_text(build.stdout)
+    (directory/'native-build.stderr').write_text(build.stderr)
     verifier.require_success(build)
     command=[str(binary),'--test-threads=1']
     if filtered: command.append('execution_v2::decision::tests')
@@ -112,12 +152,15 @@ def native(directory,environment,root,filtered=False):
 def check(out:Path,positive_only=False):
     pin=json.loads((ROOT/verifier.PIN).read_text());profile=json.loads((ROOT/PROFILE).read_text())
     report_pin={**pin,'expected_verified':profile['expected_verified'],'target_functions':profile['target_functions']}
-    before=snapshot(); tool=verifier.prepare_tools(Path.home()/'.cache/zeno-fcis/verus',pin,False)
+    before=snapshot(); tool=verifier.prepare_tools(verifier.cache_directory(),pin,False)
     env={k:v for k,v in os.environ.items() if not k.startswith(('VERUS_','VARGO_')) and k not in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'],VERUS_Z3_PATH=str(tool/'z3'),CARGO_BUILD_JOBS='1',RUST_TEST_THREADS='1')
-    command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2', "-V", "spinoff-all",'--output-json','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
+    command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads',verifier.proof_threads('2'), "-V", "spinoff-all",'--output-json','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
     evidence=out.parent; evidence.mkdir(parents=True,exist_ok=True)
-    positive=verifier.run([*command,'--log-dir',str(evidence/'positive'),str(HARNESS)],ROOT,env,timeout=600)
+    (evidence/'source_sha256.json').write_text(json.dumps(before,indent=2,sort_keys=True)+'\n')
+    positive_command=[*command,'--log-dir',str(evidence/'positive'),str(HARNESS)]
+    positive=verifier.run(positive_command,ROOT,env,timeout=600)
+    (evidence/'positive-process.json').write_text(json.dumps({'command':positive_command,'cwd':str(ROOT),'returncode':positive.returncode},indent=2)+'\n')
     (evidence/'positive.stdout').write_text(positive.stdout);(evidence/'positive.stderr').write_text(positive.stderr)
     verifier.require_success(positive);report=json.loads(positive.stdout)
     if not verifier.accepted(report,report_pin):raise RuntimeError('unaccepted whole-crate proof/toolchain/inventory count')
@@ -128,37 +171,42 @@ def check(out:Path,positive_only=False):
     print('Complete decision positive proof, coverage and native tests passed',flush=True)
     results=[]
     if not positive_only:
-        with tempfile.TemporaryDirectory(prefix='zeno-decision-mutations-') as temporary:
-            for name,(path,changed,expected,native_control) in mutations((ROOT/SUBJECT).read_text(),(ROOT/SPEC).read_text()).items():
-                specimen=Path(temporary)/name
-                for unit in (*UNIT_SOURCES,*TEST_SOURCES):
-                    target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
-                    target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
-                adjust_specimen_source_lengths(specimen)
-                proof_command=[*command,'--log-dir',str(specimen/'logs'),str(HARNESS)]
-                proof=verifier.run(proof_command,specimen,env,timeout=600)
-                (evidence/f'{name}.stdout').write_text(proof.stdout);(evidence/f'{name}.stderr').write_text(proof.stderr)
-                parsed=json.loads(proof.stdout).get('verification-results',{})
-                refusal=None
-                outcome=None
-                if expected=='proof':
-                    killed=proof.returncode!=0 and parsed.get('success') is False and parsed.get('errors',0)>0 and parsed.get('encountered-vir-error') is False
-                elif expected=='proof_contract':
-                    outcome=contract_rejected(proof.returncode,proof.stdout,proof.stderr,pin,CONTRACT_REJECTIONS[name])
-                    killed=outcome['accepted']
-                else:
-                    try:require_coverage((specimen/'logs/crate.vir').read_text(),profile)
-                    except ValueError as e:refusal=str(e)
-                    killed=proof.returncode==0 and parsed.get('success') is True and refusal is not None
-                native_status=None
-                if native_control:
-                    n=native(specimen,env,specimen,True);native_status=n.returncode
-                    (evidence/f'{name}.native.stdout').write_text(n.stdout);(evidence/f'{name}.native.stderr').write_text(n.stderr)
-                    killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout
-                results.append(dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status,
-                    command=proof_command,changed_source=str(path),original_sha256=before[str(path)],changed_sha256=verifier.digest(specimen/path),contract_outcome=outcome))
-                if not killed:raise RuntimeError(f'mutation {name} survived or failed for unrelated reason: {results[-1]}')
-                print(f'Caught {name} ({expected}; native={native_status})',flush=True)
+        for name,(path,changed,expected,native_control) in mutations((ROOT/SUBJECT).read_text(),(ROOT/SPEC).read_text()).items():
+            specimen=evidence/'specimens'/name
+            if specimen.exists():raise ValueError('use a fresh evidence directory')
+            for unit in (*UNIT_SOURCES,*TEST_SOURCES):
+                target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
+            adjust_specimen_source_lengths(specimen)
+            proof_command=[*command,'--log-dir',str(specimen/'logs'),str(HARNESS)]
+            proof=verifier.run(proof_command,specimen,env,timeout=600)
+            (evidence/f'{name}.stdout').write_text(proof.stdout);(evidence/f'{name}.stderr').write_text(proof.stderr)
+            mutant_report=json.loads(proof.stdout)
+            parsed=mutant_report.get('verification-results',{})
+            refusal=None
+            outcome=None
+            if expected=='proof':
+                region=verifier.function_lines(changed,SEMANTIC_TARGETS[name])
+                killed=verifier.semantic_refusal(proof,mutant_report,pin,path,specimen,
+                    region=region,target_functions=profile['target_functions'])
+            elif expected=='proof_contract':
+                outcome=contract_rejected(proof.returncode,proof.stdout,proof.stderr,pin,CONTRACT_REJECTIONS[name])
+                killed=outcome['accepted']
+            else:
+                intended,refusal=coverage_control((specimen/'logs/crate.vir').read_text(),profile,name)
+                killed=(proof.returncode==0 and verifier.proof_succeeded(mutant_report,pin)
+                    and intended and not verifier.ERROR_HEADER.search(proof.stderr)
+                    and not verifier.NON_SEMANTIC.search(proof.stderr))
+            native_status=None
+            if native_control:
+                n=native(specimen,env,specimen,True);native_status=n.returncode
+                (evidence/f'{name}.native.stdout').write_text(n.stdout);(evidence/f'{name}.native.stderr').write_text(n.stderr)
+                killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout
+            results.append(dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status,
+                command=proof_command,changed_source=str(path),original_sha256=before[str(path)],changed_sha256=verifier.digest(specimen/path),contract_outcome=outcome))
+            (evidence/'mutations.json').write_text(json.dumps(results,indent=2,sort_keys=True)+'\n')
+            if not killed:raise RuntimeError(f'mutation {name} survived or failed for unrelated reason: {results[-1]}')
+            print(f'Caught {name} ({expected}; native={native_status})',flush=True)
     if before!=snapshot():raise RuntimeError('source drift during gate')
     verifier.verify_tool_files(tool,pin)
     return dict(schema='zeno-fcis/decision-v2-evidence/1',status='passed',revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),source_sha256=before,verus_report=report,translated_function_coverage=coverage,mutations=results,native_exit_code=base_native.returncode,proof_exit_code=positive.returncode,positive_only=positive_only,

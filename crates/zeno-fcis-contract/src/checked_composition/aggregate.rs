@@ -288,6 +288,9 @@ impl Layout {
                 Box::new(self.renamed(leaf, then)?),
                 Box::new(self.renamed(leaf, otherwise)?),
             ),
+            Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+                return Err("arithmetic extension is outside the assembly profile".to_owned());
+            }
             Ast::Div(rounding, left, right) => Ast::Div(
                 *rounding,
                 Box::new(self.renamed(leaf, left)?),

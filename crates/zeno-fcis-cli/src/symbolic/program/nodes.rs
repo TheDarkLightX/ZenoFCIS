@@ -54,7 +54,8 @@ pub(super) struct Failure {
             && (forall|count: nat| count <= nodes@.len() ==>
                 spec::guards(nodes@, count) <= encoded.checked@.len()),
         Err(failure) => failure.index < nodes@.len()
-            && failure.cause != node::Failure::Instruction
+            && (failure.cause == node::Failure::Instruction
+                ==> crate::evaluation::spec::new_arithmetic(nodes@[failure.index as int]))
             && final(script).definitions@.len()
                 == old(script).definitions@.len() + failure.index
             && exists|prefix_kinds: Seq<Kind>, prefix_terms: Seq<Term>, prefix_checked: Seq<Term>|
@@ -69,10 +70,13 @@ pub(super) struct Failure {
         Ok(encoded) => admission::prefix(domains@, nodes@, nodes@.len())
             == Ok(node::static_kinds(encoded.kinds@)),
         Err(failure) => admission::prefix(domains@, nodes@, failure.index as nat).is_ok()
-            && admission::prefix(domains@, nodes@, (failure.index + 1) as nat).is_err(),
+            && (failure.cause == node::Failure::Instruction
+                || admission::prefix(domains@, nodes@, (failure.index + 1) as nat).is_err()),
     },
     input@.len() == domains@.len()
-        && admission::prefix(domains@, nodes@, nodes@.len()).is_ok() ==> result.is_ok(),
+        && admission::prefix(domains@, nodes@, nodes@.len()).is_ok()
+        && (forall|i:int| 0<=i<nodes@.len() ==> !crate::evaluation::spec::new_arithmetic(nodes@[i]))
+        ==> result.is_ok(),
     match result {
         Ok(encoded) => forall|environment: Map<Seq<char>, denotation::Value>,
             raw_input: Seq<i64>, count: nat|
@@ -145,7 +149,7 @@ pub(super) fn encode_nodes(
                         && spec::bodies(script.definitions@, base@, domains@, nodes@, input@,
                             prefix_kinds, prefix_terms)
                         && spec::guarded(nodes@, prefix_terms, prefix_checked));
-                    if input@.len() == domains@.len() {
+                    if input@.len() == domains@.len() && cause != node::Failure::Instruction {
                         assert(admission::kind(*op, domains@, node::static_kinds(kinds@)).is_err());
                         match admission::kind(*op, domains@, node::static_kinds(kinds@)) {
                             Err(error) => {
@@ -217,21 +221,8 @@ pub(super) fn encode_nodes(
                 =~= node::static_kinds(previous@.0).push(node::boolean(kind)));
             assert forall|j: int| 0 <= j < terms@.len() implies
                 #[trigger] script.definitions@[base@ as int + j].0@
-                    == crate::term::names::generated(prefix@, j as nat) by {
-                if j < index {
-                    assert(previous@.0[j] == kinds@[j]);
-                    assert(previous@.1[j] == terms@[j]);
-                    assert(previous@.3[base@ as int + j].0@
-                        == crate::term::names::generated(prefix@, j as nat));
-                    assert(script.definitions@[base@ as int + j] == previous@.3[base@ as int + j]);
-                } else {
-                    assert(j == index);
-                    assert(name@ == crate::term::names::generated(prefix@, index as nat));
-                    assert(script.definitions@[base@ as int + j].0@ == name@);
-                }
-            }
-            assert forall|j: int| 0 <= j < terms@.len() implies
-                script.definitions@[base@ as int + j].1
+                    == crate::term::names::generated(prefix@, j as nat)
+                && script.definitions@[base@ as int + j].1
                     == if node::boolean(kinds@[j]) { Sort::Bool } else { Sort::Int }
                 && match terms@[j] {
                     Term::Name(name) => name@ == script.definitions@[base@ as int + j].0@,
@@ -241,8 +232,11 @@ pub(super) fn encode_nodes(
                     assert(script.definitions@[base@ as int + j] == previous@.3[base@ as int + j]);
                     assert(terms@[j] == previous@.1[j]);
                     assert(kinds@[j] == previous@.0[j]);
+                    assert(previous@.3[base@ as int + j].0@
+                        == crate::term::names::generated(prefix@, j as nat));
                 } else {
                     assert(j == index);
+                    assert(script.definitions@[base@ as int + j].0@ == name@);
                     assert(terms@[j] == defined);
                     assert(kinds@[j] == kind);
                 }
@@ -310,6 +304,36 @@ pub(super) fn encode_nodes(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn arithmetic_extension_is_unsupported_without_a_fresh_symbol_or_certificate_term() {
+        for op in [
+            Op::Mul(0, 1),
+            Op::DivFloor(0, 1),
+            Op::DivCeil(0, 1),
+            Op::MulDivFloor(0, 1, 2),
+            Op::MulDivCeil(0, 1, 2),
+            Op::ProductsGe([0, 1, 2], [0, 1, 2]),
+        ] {
+            let mut script = Script::default();
+            let result = encode_nodes(
+                &mut script,
+                "p",
+                &[],
+                &[Op::Int(5), Op::Int(2), Op::Int(1), op],
+                &[],
+            );
+            assert!(matches!(
+                result,
+                Err(Failure {
+                    index: 3,
+                    cause: node::Failure::Instruction
+                })
+            ));
+            assert_eq!(script.definitions.len(), 3);
+            assert!(script.constants.is_empty());
+        }
+    }
 
     #[test]
     fn retains_prior_definitions_and_stops_at_first_bad_operand() {

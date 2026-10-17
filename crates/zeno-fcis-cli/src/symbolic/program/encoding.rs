@@ -164,8 +164,7 @@ pub(crate) fn encode(
                     format!("node {index} reads node {id}, which is later or of another kind")
                 }
                 node::Failure::Instruction => {
-                    let op = &program.nodes[index];
-                    format!("node {index} is an instruction this encoding does not know: {op:?}")
+                    format!("node {index} is an instruction this encoding does not know")
                 }
             }));
         }

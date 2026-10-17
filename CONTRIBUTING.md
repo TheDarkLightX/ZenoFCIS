@@ -1,7 +1,7 @@
 # Contributing to ZenoFCIS
 
 ZenoFCIS accepts small, bounded changes that preserve its functional-core /
-imperative-shell architecture and explicit protocol identities.
+imperative-shell architecture and its explicit protocol identities.
 
 ## Architecture rule
 
@@ -10,7 +10,7 @@ bytes -> bounded canonical values -> pure transition -> immutable decision
       -> nominal authorization -> atomic imperative interpreter
 ```
 
-Semantic crates use `#![forbid(unsafe_code)]` and contain no ambient clock,
+Semantic crates use `#![forbid(unsafe_code)]`. They contain no ambient clock,
 randomness, filesystem, network, database, process, thread, async runtime,
 global mutable state, or executable effect closure. Operational mechanisms
 belong in an explicit outer adapter or shell.
@@ -18,7 +18,7 @@ belong in an explicit outer adapter or shell.
 ## Development setup
 
 Use pinned Rust `1.97.1` and the committed `Cargo.lock`. Direct external
-dependencies require exact `=version` pins. Optional coding-agent guardrails
+dependencies need exact `=version` pins. The optional coding-agent guardrails
 use exact Node `22.23.1`, Probity `1.10.0`, and the committed
 `package-lock.json`:
 
@@ -27,14 +27,19 @@ npm ci --ignore-scripts
 python3 tools/check_probity.py
 ```
 
-Before submitting an ordinary change, run checks appropriate to its scope.
-Documentation changes need the documentation guard, affected-link checks and
-`git diff --check`. Code and tooling changes need relevant tests, formatting,
-linting and any affected proof or source-identity checks. Record the checks
-performed and their limits. A full acceptance run is not a prerequisite for
-every commit or push.
+## Checks to run
 
-When preparing a new version for release, including a release candidate, run
+Before you submit an ordinary change, run the checks its scope calls for:
+
+- Documentation changes need the documentation guard, checks of the affected
+  links, and `git diff --check`.
+- Code and tooling changes need the relevant tests, formatting, linting, and
+  any affected proof or source-identity checks.
+
+Record the checks you ran and their limits. A full acceptance run is not a
+prerequisite for every commit or push.
+
+When you prepare a new version for release, including a release candidate, run
 the complete suite on the exact release source and inspect every result:
 
 ```bash
@@ -51,16 +56,16 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 python3 tools/atdd.py run --all
 ```
 
-Changes to packaging or a public crate must also run:
+Changes to packaging or to a public crate must also run:
 
 ```bash
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
 ```
 
-Permanent CI adds `no_std`, Miri, fuzz-build, kernel-laws, supply-chain, source-manifest,
-mounted-runtime, persistence, adopter-acceptance, deterministic developer
-guardrails, and assurance-specific gates. See
+Permanent CI adds `no_std`, Miri, fuzz-build, kernel-laws, supply-chain,
+source-manifest, mounted-runtime, persistence, adopter-acceptance,
+deterministic developer guardrails, and assurance-specific gates. See
 [`docs/ACCEPTANCE_TESTING.md`](docs/ACCEPTANCE_TESTING.md) and
 [`docs/DEVELOPER_GUARDRAILS.md`](docs/DEVELOPER_GUARDRAILS.md).
 
@@ -86,35 +91,42 @@ identity and reviewed migration evidence.
 
 Keep one conceptual change per PR. Describe:
 
-- exact base and head commits;
+- the exact base and head commits;
 - public API and dependency changes;
-- authority boundary and resource bounds;
-- laws, negative cases, and validation performed;
+- the authority boundary and resource bounds;
+- laws, negative cases, and the validation performed;
 - assumptions, nonclaims, and unresolved blockers.
 
 Do not commit generated caches, target directories, diagnostic archives,
 temporary assembly scripts, write-enabled workflows, credentials, or retained
 CI payload fragments. Generated source that is part of the public contract must
-have a deterministic generator, retained manifest, and compile/replay gate.
-
-Before committing or publishing evidence, run
-`python3 tools/check_release_privacy.py check`. For release attachments, pass
-their complete directory as the final argument. The check inspects nested
-archives and reports categories and locations without echoing private data.
-For known private identifiers such as a personal email or workstation name,
-set `ZENO_FCIS_PRIVATE_MARKERS_FILE` to a file outside Git and the upload
-directory, with one literal identifier per line (at least four bytes each,
-at most 128 identifiers and 64 KiB). Packaging checks inherit this setting.
-The standalone check also accepts `--private-markers-file <private-file>`.
-Use a public or GitHub noreply identity for public commits. Do not upload raw
-GitHub workflow responses without checking their author and committer metadata.
-Review logs and metadata as well: pattern checks cannot detect every secret.
-Public evidence copies use neutral paths and document redactions; their hashes
-must describe the redacted bytes. Keep original local records outside Git.
+have a deterministic generator, a retained manifest, and a compile or replay
+gate.
 
 CODEOWNERS declares repository review ownership. Repository settings must
 separately enforce protected branches and required approvals. A passing CI run
-does not replace independent review for authority-bearing or protocol changes.
+does not replace independent review of authority-bearing or protocol changes.
+
+## Privacy checks for commits and evidence
+
+Before you commit or publish evidence, run
+`python3 tools/check_release_privacy.py check`. For release attachments, pass
+their complete directory as the final argument. The check inspects nested
+archives and reports categories and locations without echoing private data.
+
+For known private identifiers, such as a personal email or workstation name,
+set `ZENO_FCIS_PRIVATE_MARKERS_FILE` to a file outside Git and the upload
+directory. The file holds one literal identifier per line: each at least four
+bytes, with at most 128 identifiers and 64 KiB in total. Packaging checks
+inherit this setting. The standalone check also accepts
+`--private-markers-file <private-file>`.
+
+Use a public or GitHub noreply identity for public commits. Do not upload raw
+GitHub workflow responses without checking their author and committer metadata.
+Review logs and metadata as well, because pattern checks cannot detect every
+secret. Public evidence copies use neutral paths and document their
+redactions, and their hashes must describe the redacted bytes. Keep the
+original local records outside Git.
 
 ## Security reports
 

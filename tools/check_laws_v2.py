@@ -243,7 +243,7 @@ def check(cache,install,evidence):
             'unproved':['catalog and .zeno lowering','complete candidate-to-frame producer correspondence','mandatory authority and replay','canonical hashing','physical-cost and shell behavior']}
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--cache',type=Path,default=Path.home()/'.cache/zeno-fcis/verus');p.add_argument('--install',action='store_true');p.add_argument('--out',required=True,type=Path);p.add_argument('--evidence-dir',type=Path)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--cache',type=Path,default=verifier.cache_directory());p.add_argument('--install',action='store_true');p.add_argument('--out',required=True,type=Path);p.add_argument('--evidence-dir',type=Path)
     args=p.parse_args();args.out.parent.mkdir(parents=True,exist_ok=True)
     evidence=args.evidence_dir or Path(tempfile.mkdtemp(prefix='laws-gate-',dir=args.out.parent));evidence.mkdir(parents=True,exist_ok=True)
     try:receipt=check(args.cache.resolve(),args.install,evidence.resolve())

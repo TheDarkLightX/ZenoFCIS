@@ -740,6 +740,10 @@ impl Scope {
                 Ast::Choose(recurse(condition), recurse(then), recurse(otherwise))
             }
             Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
+            Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+            Ast::ProductsGe(arguments) => {
+                Ast::ProductsGe(arguments.iter().map(|a| *recurse(a)).collect())
+            }
         }
     }
 

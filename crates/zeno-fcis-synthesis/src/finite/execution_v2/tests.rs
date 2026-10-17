@@ -24,6 +24,26 @@ pub(super) fn domains_match(domains: &[Domain], values: &[i64]) -> bool {
     domains.len() == values.len() && domains.iter().zip(values).all(|(d, v)| contains(*d, *v))
 }
 
+// Independent base-2^32 product: six words cover every three-factor i64 product.
+// This test oracle never calls the production wide/scalar arithmetic helpers.
+fn reference_product(factors: [i64; 3]) -> Result<[u32; 6], Failure> {
+    if factors.iter().any(|v| *v < 0) {
+        return Err(Failure::Arithmetic);
+    }
+    let mut words = [0u32; 6];
+    words[0] = 1;
+    for factor in factors {
+        let mut carry = 0u128;
+        for word in &mut words {
+            let product = u128::from(*word) * factor as u128 + carry;
+            *word = product as u32;
+            carry = product >> 32;
+        }
+        assert_eq!(carry, 0, "three nonnegative i64 factors fit 192 bits");
+    }
+    Ok(words)
+}
+
 pub(super) fn reference_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
     let read = |id: u16| {
         values
@@ -54,6 +74,51 @@ pub(super) fn reference_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i
                 left - right
             };
             i64::try_from(value).map_err(|_| Failure::Arithmetic)
+        }
+        Op::Mul(a, b) => {
+            let left = i128::from(read(a)?);
+            let right = i128::from(read(b)?);
+            i64::try_from(left * right).map_err(|_| Failure::Arithmetic)
+        }
+        Op::DivFloor(a, b) | Op::DivCeil(a, b) => {
+            let left = i128::from(read(a)?);
+            let right = i128::from(read(b)?);
+            if right == 0 {
+                return Err(Failure::Arithmetic);
+            }
+            // Euclidean remainder is nonnegative even with a negative divisor.
+            let q = left.div_euclid(right);
+            let r = left.rem_euclid(right);
+            let value = if r == 0 {
+                q
+            } else if matches!(op, Op::DivFloor(..)) && right < 0 {
+                q - 1
+            } else if matches!(op, Op::DivCeil(..)) && right > 0 {
+                q + 1
+            } else {
+                q
+            };
+            i64::try_from(value).map_err(|_| Failure::Arithmetic)
+        }
+        Op::MulDivFloor(a, b, den) | Op::MulDivCeil(a, b, den) => {
+            let left = i128::from(read(a)?);
+            let right = i128::from(read(b)?);
+            let den = i128::from(read(den)?);
+            if left < 0 || right < 0 || den <= 0 {
+                return Err(Failure::Arithmetic);
+            }
+            let product = left * right;
+            let value =
+                product / den + i128::from(matches!(op, Op::MulDivCeil(..)) && product % den != 0);
+            i64::try_from(value).map_err(|_| Failure::Arithmetic)
+        }
+        Op::ProductsGe(a, b) => {
+            // Resolve every reference before checking nonnegative operands.
+            let left = [read(a[0])?, read(a[1])?, read(a[2])?];
+            let right = [read(b[0])?, read(b[1])?, read(b[2])?];
+            let left = reference_product(left)?;
+            let right = reference_product(right)?;
+            Ok(i64::from(left.iter().rev().cmp(right.iter().rev()).is_ge()))
         }
         Op::Eq(a, b) => Ok(if read(a)? == read(b)? { 1 } else { 0 }),
         Op::Lt(a, b) => Ok(if read(a)? < read(b)? { 1 } else { 0 }),
@@ -399,4 +464,82 @@ fn shared_arithmetic_preserves_budget_before_unused_overflow() {
     .into_parts();
     assert_eq!(result, Err(Failure::Reference));
     assert_eq!(usage.used(Resource::Step), 1);
+}
+
+#[test]
+fn new_arithmetic_matches_independent_oracle_at_all_step_boundaries() {
+    let full = Domain::Int {
+        min: i64::MIN,
+        max: i64::MAX,
+    };
+    for (op, input, expected) in [
+        (Op::Mul(0, 1), vec![i64::MAX, 2], Err(Failure::Arithmetic)),
+        (Op::Mul(0, 1), vec![i64::MIN, 1], Ok(i64::MIN)),
+        (Op::DivFloor(0, 1), vec![-1, 2], Ok(-1)),
+        (Op::DivCeil(0, 1), vec![-1, 2], Ok(0)),
+        (Op::DivFloor(0, 1), vec![1, -2], Ok(-1)),
+        (Op::DivCeil(0, 1), vec![1, -2], Ok(0)),
+        (Op::DivFloor(0, 1), vec![-1, -2], Ok(0)),
+        (Op::DivCeil(0, 1), vec![-1, -2], Ok(1)),
+        (
+            Op::DivFloor(0, 1),
+            vec![i64::MIN, -1],
+            Err(Failure::Arithmetic),
+        ),
+        (Op::DivCeil(0, 1), vec![1, 0], Err(Failure::Arithmetic)),
+        (
+            Op::MulDivFloor(0, 1, 2),
+            vec![i64::MAX, i64::MAX, i64::MAX],
+            Ok(i64::MAX),
+        ),
+        (Op::MulDivCeil(0, 1, 2), vec![5, 1, 2], Ok(3)),
+        (
+            Op::MulDivCeil(0, 1, 2),
+            vec![-1, 0, 2],
+            Err(Failure::Arithmetic),
+        ),
+        (
+            Op::MulDivFloor(0, 1, 2),
+            vec![i64::MAX, i64::MAX, 1],
+            Err(Failure::Arithmetic),
+        ),
+        (
+            Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+            vec![i64::MAX; 6],
+            Ok(1),
+        ),
+        (
+            Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+            vec![
+                i64::MAX - 1,
+                i64::MAX,
+                i64::MAX,
+                i64::MAX,
+                i64::MAX,
+                i64::MAX,
+            ],
+            Ok(0),
+        ),
+        (
+            Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+            vec![-1, 0, 0, 0, 0, 0],
+            Err(Failure::Arithmetic),
+        ),
+    ] {
+        assert_eq!(reference_node(&op, &input, &input), expected);
+        let mut nodes: Vec<Op> = (0..input.len()).map(|i| Op::Input(i as u16)).collect();
+        nodes.push(op);
+        let output = if matches!(nodes.last(), Some(Op::ProductsGe(..))) {
+            Domain::Bool
+        } else {
+            full
+        };
+        compare(
+            &vec![full; input.len()],
+            &[output],
+            &nodes,
+            &[(nodes.len() - 1) as u16],
+            &input,
+        );
+    }
 }

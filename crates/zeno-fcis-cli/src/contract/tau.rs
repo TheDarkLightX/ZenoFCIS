@@ -670,6 +670,11 @@ fn ast(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
+        Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+            return Err(refused(
+                "arithmetic extension is outside the Tau export profile",
+            ));
+        }
     })
 }
 
@@ -855,6 +860,11 @@ fn ast_ranges(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
+        Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+            return Err(refused(
+                "arithmetic extension is outside the Tau export profile",
+            ));
+        }
     };
     if interval.0 < i128::from(i64::MIN) || interval.1 > i128::from(i64::MAX) {
         return Err(refused(

@@ -1,0 +1,24 @@
+zeno 1;
+project 1 arithmetic_fee;
+namespace 2 core;
+type 100 state FeeState;
+type 101 command FeeCommand;
+type 102 context FeeContext;
+type 105 int Amount in 0..=20;
+type 106 int Rate in 0..=3;
+field 110 100 fee 105;
+field 111 100 net 105;
+field 120 101 amount 105;
+field 121 101 rate 106;
+component 400 fee {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded_state on commit, genesis = post.100.110 >= 0 && post.100.111 >= 0;
+law 501 rounded_fee on accept = post.100.110 == div_ceil(command.101.120 * command.101.121, 10);
+law 502 split_amount on accept = post.100.110 + post.100.111 == command.101.120;
+law 503 fee_upper on accept = products_ge(post.100.110, 10, command.101.120, command.101.121);

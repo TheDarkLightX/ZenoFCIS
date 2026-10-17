@@ -60,8 +60,8 @@ def _bounded(name: str, value: Any, low: int, high: int) -> str:
 def _loop(arguments: list[str]) -> dict[str, Any]:
     """Runs one fixed `zeno-fcis loop` subcommand; no shell, no free-form arguments."""
     try:
-        result = subprocess.run([_cli(), "loop", *arguments], capture_output=True, text=True,
-                                timeout=120, check=False)
+        result = subprocess.run([_cli(), "--no-kb", "loop", *arguments], capture_output=True, text=True,
+                                timeout=120, check=False, env={k:v for k,v in os.environ.items() if k!="ZENO_FCIS_KB"})
     except (OSError, subprocess.TimeoutExpired) as error:
         raise TransformToolError(f"loop process did not complete: {error}") from error
     try:
@@ -120,7 +120,7 @@ def _draft(operation: str, arguments: list[str]) -> dict[str, Any]:
     """Fixed CLI operation; all parsing, evaluation and state transitions stay in Rust."""
     try:
         result = subprocess.run([_cli(), "contract", "draft", operation, *arguments],
-                                capture_output=True, text=True, timeout=120, check=False)
+                                capture_output=True, text=True, timeout=120, check=False, env={k:v for k,v in os.environ.items() if k!="ZENO_FCIS_KB"})
     except (OSError, subprocess.TimeoutExpired) as error:
         raise TransformToolError(f"draft process did not complete: {error}") from error
     try:

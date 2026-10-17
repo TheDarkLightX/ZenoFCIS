@@ -17,7 +17,7 @@ pub(crate) enum Profile {
     /// 0–6 Boolean inputs, 1–16 Boolean outputs, 1–256 Input/Bool/And/Not/
     /// Select nodes; at most 64 input tuples. Total after admission.
     FunctionalBoolV1,
-    /// The full finite-i64 instruction set with eager traps, on a complete
+    /// The original finite-i64/1 instruction set with eager traps, on a complete
     /// declared domain of at most F3's tuple cap.
     CheckedI64V1,
 }
@@ -105,6 +105,14 @@ impl Profile {
                 return Err(ProfileRefusal::Opcode { node, opcode });
             }
         }
+        for (node, op) in program.nodes().iter().enumerate() {
+            if op.requires_arithmetic_profile() {
+                return Err(ProfileRefusal::Opcode {
+                    node,
+                    opcode: opcode_name(op),
+                });
+            }
+        }
         let size = domain_size(program.inputs())
             .map_err(|position| ProfileRefusal::EmptyInputDomain { position })?;
         let max = self.max_tuples();
@@ -128,6 +136,12 @@ pub(crate) fn opcode_name(op: &Op) -> &'static str {
         Op::And(..) => "And",
         Op::Not(_) => "Not",
         Op::Select(..) => "Select",
+        Op::Mul(..) => "Mul",
+        Op::DivFloor(..) => "DivFloor",
+        Op::DivCeil(..) => "DivCeil",
+        Op::MulDivFloor(..) => "MulDivFloor",
+        Op::MulDivCeil(..) => "MulDivCeil",
+        Op::ProductsGe(..) => "ProductsGe",
         _ => "Unclassified",
     }
 }

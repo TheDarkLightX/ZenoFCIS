@@ -1,4 +1,5 @@
 //! Shared immutable typed leaves and width-explicit checked arithmetic.
+pub(crate) mod scalar;
 pub(crate) mod wide;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;

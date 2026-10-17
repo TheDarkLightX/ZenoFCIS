@@ -183,6 +183,7 @@ pub(in super::super) open spec fn pure_node(op:&Op,v:Seq<Value>)->Result<Value,F
                 _=>Err(Failure::Undefined),
             },
         Op::ToI128(a)=>match at(v,a){Err(e)=>Err(e),Ok(x)=>to_i128(x)},
+        Op::ToU128(a)=>match at(v,a){Err(e)=>Err(e),Ok(x)=>to_u128(x)},
         Op::Not(a)=>match at(v,a){Ok(Value::Bool(b))=>Ok(Value::Bool(!b)),_=>Err(Failure::Undefined)},
         Op::Select(a,b,c)=>match at(v,a) {Err(e)=>Err(e),Ok(condition)=>
             match at(v,b){Err(e)=>Err(e),Ok(yes)=>match at(v,c){Err(e)=>Err(e),Ok(no)=>
@@ -200,7 +201,7 @@ pub(in super::super) open spec fn node_shape(op:Op,index:nat)->bool {
         Op::Literal(_)|Op::Observe(_)=>true,
         Op::ObserveWhen(guard,_,default)=>guard<index&&default_valid(default),
         Op::Add(a,b)|Op::Sub(a,b)|Op::Mul(a,b)|Op::Div(_,a,b)|Op::Eq(a,b)|Op::Lt(a,b)|Op::And(a,b)=>a<index&&b<index,
-        Op::Not(a)|Op::ToI128(a)=>a<index,
+        Op::Not(a)|Op::ToI128(a)|Op::ToU128(a)=>a<index,
         Op::Select(a,b,c)|Op::MulDivFloor(a,b,c)|Op::MulDivCeil(a,b,c)=>a<index&&b<index&&c<index,
         Op::ProductsGe(a,b)=>a[0]<index&&a[1]<index&&a[2]<index
             &&b[0]<index&&b[1]<index&&b[2]<index,
@@ -387,6 +388,12 @@ pub(in super::super) open spec fn division(mode:Division,left:Value,right:Value)
         _=>Err(Failure::Undefined),
     }
 }
+pub(in super::super) open spec fn to_u128(value:Value)->Result<Value,Failure> {
+    match value {
+        Value::I128(v)=>if v>=0{Ok(Value::U128(v as u128))}else{Err(Failure::Undefined)},
+        Value::U128(v)=>Ok(Value::U128(v)),_=>Err(Failure::Undefined),
+    }
+}
 pub(in super::super) open spec fn to_i128(value:Value)->Result<Value,Failure> {
     match value {
         Value::I128(v)=>Ok(Value::I128(v)),Value::Bool(v)=>Ok(Value::I128(if v{1}else{0})),
@@ -434,6 +441,29 @@ pub(in super::super) open spec fn matching_roots(pre:RootView,post:RootView)->bo
         (RootView::Record(a),RootView::Record(b))=>matching_fields(a@,b@),
         (RootView::Leaf(a),RootView::Leaf(b))=>same_type(atom(a),atom(b)),
         _=>false,
+    }
+}
+}
+
+verus! {
+/// Exact projection of the existing signed law division onto the scalar width.
+/// A fitting law quotient agrees; a wider quotient becomes a scalar refusal.
+pub(in super::super) proof fn scalar_division_projection(up:bool,a:i64,b:i64)
+    ensures super::super::super::value::scalar::division_value(up,a,b) ==
+        match division(if up{Division::Ceil}else{Division::Floor},
+            Value::I128(a as i128),Value::I128(b as i128)) {
+            Ok(Value::I128(v))=>super::super::super::value::scalar::narrow(v as int),
+            _=>None::<i64>,
+        },
+{
+    if b != 0 {
+        let x=magnitude(a as int);let y=magnitude(b as int);
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod(x,y);
+        vstd::arithmetic::div_mod::lemma_mod_bound(x,y);
+        assert(0 <= x/y <= x) by(nonlinear_arith)
+            requires 0<=x,y>0,x==x/y*y+x%y,0<=x%y<y;
+        assert(x <= 9_223_372_036_854_775_808int);
+        assert(x/y+1 <= i128::MAX);
     }
 }
 }

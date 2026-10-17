@@ -1,0 +1,24 @@
+zeno 1;
+project 1 guard;
+namespace 2 fixtures;
+// An authorization guard. It accepts an authorized request and rejects any
+// other, and changes nothing: its one state field has a single value, so a
+// composition can bind it read-only, and its command has one value too.
+type 100 state Guard;
+type 101 command Request;
+type 102 context Operator;
+type 105 int Mark in 0..=0;
+type 108 bool Authorized;
+field 110 100 mark 105;
+field 120 101 request 105;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+component 400 guard {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 unmarked on commit, genesis = post.100.110 == 0;

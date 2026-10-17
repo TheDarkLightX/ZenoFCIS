@@ -578,6 +578,16 @@ fn collect(
             collect(left, &with(right), positions, found);
             collect(right, &with(left), positions, found);
         }
+        Ast::MulDiv(_, a, b, d) => {
+            collect(a, expected, positions, found);
+            collect(b, expected, positions, found);
+            collect(d, expected, positions, found);
+        }
+        Ast::ProductsGe(arguments) => {
+            for a in arguments.iter() {
+                collect(a, expected, positions, found);
+            }
+        }
         Ast::Choose(condition, then, otherwise) => {
             collect(condition, &[], positions, found);
             collect(then, &with(otherwise), positions, found);

@@ -1,0 +1,1 @@
+{"schema": "zeno-fcis/loop-expressions/1", "vocabulary": {"inputs": ["start", "used", "command", "now", "authorized"], "variants": {"command": {"Acquire": 150}}, "cases": 5}, "outputs": ["!authorized ? 0 : now < start ? 1 : now < start + (?c - 4998) && used == 1 ? 2 : !(now < start + (?c - 4998)) ? 3 : 4", "keep"]}

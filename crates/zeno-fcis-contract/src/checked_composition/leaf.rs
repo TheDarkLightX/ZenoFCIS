@@ -152,21 +152,39 @@ impl Compiled {
     }
 }
 
-/// Checks a leaf's files against its pins and compiles it as `contract
-/// review` and `generate contract` do.
+/// A component's files checked against their pins and compiled through the
+/// ordinary contract route, in the profile's boundaries: record roots, no
+/// channel and no delivery. `/1` leaves and `/3` components are both bound
+/// here.
+#[derive(Debug)]
+pub(crate) struct Bound {
+    pub(crate) declarations: Declarations,
+    pub(crate) rules: Rules,
+    pub(crate) schema: Vec<u8>,
+    pub(crate) commitment: [u8; 32],
+    pub(crate) positions: Vec<Position>,
+}
+
+/// Checks a component's two files against their pins and compiles them as
+/// `contract review` and `generate contract` do; `label` names the
+/// component in every refusal. `record_roots` also requires record command
+/// and context roots, as `/1` does; the state root is always a record.
 ///
 /// # Errors
-/// A pin the files differ from, the contract route's refusal, a profile
-/// boundary, or a formula that does not compile.
-pub(crate) fn compile(
-    entry: &manifest::Leaf,
+/// A pin the files differ from, the contract route's refusal, or a profile
+/// boundary.
+pub(crate) fn bind(
+    label: &str,
+    record_roots: bool,
+    project_sha256: &[u8; 32],
+    policy_sha256: &[u8; 32],
     project: &str,
     rules: &str,
-) -> Result<Compiled, Refusal> {
-    let place = |file: &str| format!("leaf {} `{}` {file}", entry.id, entry.name);
+) -> Result<Bound, Refusal> {
+    let place = |file: &str| format!("{label} {file}");
     for (file, text, pinned) in [
-        ("project.zeno", project, &entry.project_sha256),
-        ("v2/policy.json", rules, &entry.policy_sha256),
+        ("project.zeno", project, project_sha256),
+        ("v2/policy.json", rules, policy_sha256),
     ] {
         let actual = sha256(text.as_bytes());
         if actual != *pinned {
@@ -211,11 +229,13 @@ pub(crate) fn compile(
             reason.to_owned(),
         )
     };
-    for (_, root) in ROOTS {
-        if !matches!(
-            declarations.get(root).map_err(route)?.form,
-            TypeForm::Record(_)
-        ) {
+    for (source, root) in ROOTS {
+        if (record_roots || source == Source::State)
+            && !matches!(
+                declarations.get(root).map_err(route)?.form,
+                TypeForm::Record(_)
+            )
+        {
             return Err(profile(
                 "the profile needs record state, command and context roots",
             ));
@@ -227,6 +247,48 @@ pub(crate) fn compile(
         ));
     }
     let positions = domain::positions(&declarations).map_err(route)?;
+    Ok(Bound {
+        declarations,
+        rules,
+        schema,
+        commitment,
+        positions,
+    })
+}
+
+/// Checks a leaf's files against its pins and compiles it as `contract
+/// review` and `generate contract` do.
+///
+/// # Errors
+/// A pin the files differ from, the contract route's refusal, a profile
+/// boundary, or a formula that does not compile.
+pub(crate) fn compile(
+    entry: &manifest::Leaf,
+    project: &str,
+    rules: &str,
+) -> Result<Compiled, Refusal> {
+    let Bound {
+        declarations,
+        rules,
+        schema,
+        commitment,
+        positions,
+    } = bind(
+        &format!("leaf {} `{}`", entry.id, entry.name),
+        true,
+        &entry.project_sha256,
+        &entry.policy_sha256,
+        project,
+        rules,
+    )?;
+    let profile = |reason: &str| {
+        Refusal::new(
+            Stage::Binding,
+            Obligation::CheckedProfile,
+            format!("leaf {} `{}` project.zeno", entry.id, entry.name),
+            reason.to_owned(),
+        )
+    };
     let ids = |source: Source| -> Vec<u16> {
         positions
             .iter()
@@ -1069,7 +1131,7 @@ pub(crate) fn atom(domain: &LeafDomain, value: i64) -> c::Atom<'static> {
     }
 }
 
-fn number(atom: &Atom) -> Option<i64> {
+pub(crate) fn number(atom: &Atom) -> Option<i64> {
     match atom {
         Atom::Bool(value) => Some(i64::from(*value)),
         Atom::I128(value) => i64::try_from(*value).ok(),

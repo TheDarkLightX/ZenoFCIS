@@ -24,6 +24,8 @@ pub const MANIFEST_SCHEMA: &str = "zeno-fcis/checked-composition/1";
 pub const HIERARCHY_SCHEMA: &str = "zeno-fcis/checked-composition/2";
 /// The check algorithm a manifest asks for; any other is refused.
 pub const CHECKER: &str = "zeno-fcis/checked-composition-checker/1";
+/// The composed-domain manifest schema, which [`super::domain`] reads.
+pub const DOMAIN_SCHEMA: &str = "zeno-fcis/checked-composition/3";
 const MAGIC: &[u8] = b"ZFCIS-CHECKED-COMPOSITION\0";
 /// Leaves, edges and groups one manifest may name.
 const MAX_LEAVES: usize = 4_096;
@@ -894,7 +896,7 @@ fn ids(place: &str, values: &[u32]) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn pin(place: &str, text: &str) -> Result<[u8; 32], Refusal> {
+pub(crate) fn pin(place: &str, text: &str) -> Result<[u8; 32], Refusal> {
     let bytes = text.as_bytes();
     let malformed = || invalid(place, "must be 64 lowercase hexadecimal digits");
     if bytes.len() != 64 {
@@ -915,7 +917,7 @@ fn pin(place: &str, text: &str) -> Result<[u8; 32], Refusal> {
     Ok(out)
 }
 
-fn safe_path(path: &str) -> bool {
+pub(crate) fn safe_path(path: &str) -> bool {
     !path.is_empty()
         && path.split('/').all(|part| {
             !part.is_empty()

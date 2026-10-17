@@ -111,6 +111,7 @@
     "crates/zeno-fcis-synthesis/src/finite/mod.rs",
     "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
     "crates/zeno-fcis-synthesis/src/finite/value/mod.rs",
+    "crates/zeno-fcis-synthesis/src/finite/value/scalar.rs",
     "crates/zeno-fcis-synthesis/src/finite/value/spec.rs",
     "crates/zeno-fcis-synthesis/src/finite/value/wide.rs",
     "crates/zeno-fcis-synthesis/src/finite_runtime.rs",

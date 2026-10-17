@@ -35,12 +35,26 @@ pub(crate) open spec fn kind(op: Op, inputs: Seq<Domain>, previous: Seq<bool>)
         } else { Err(AdmissionFailure::InputReference) },
         Op::Int(_) => Ok(false),
         Op::Bool(_) => Ok(true),
-        Op::Add(a, b) | Op::Sub(a, b) | Op::Lt(a, b) => {
+        Op::Add(a, b) | Op::Sub(a, b) | Op::Mul(a, b)
+        | Op::DivFloor(a, b) | Op::DivCeil(a, b) | Op::Lt(a, b) => {
             if a >= previous.len() { Err(AdmissionFailure::NodeReference) }
             else if previous[a as int] { Err(AdmissionFailure::TypeMismatch) }
             else if b >= previous.len() { Err(AdmissionFailure::NodeReference) }
             else if previous[b as int] { Err(AdmissionFailure::TypeMismatch) }
             else { Ok(matches!(op, Op::Lt(..))) }
+        },
+        Op::MulDivFloor(a,b,d) | Op::MulDivCeil(a,b,d) => {
+            match required_node(previous,a,false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,b,false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,d,false) { Err(e)=>Err(e), Ok(())=>Ok(false) } } }
+        },
+        Op::ProductsGe(a,b) => {
+            match required_node(previous,a[0],false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,a[1],false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,a[2],false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,b[0],false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,b[1],false) { Err(e)=>Err(e), Ok(())=>
+            match required_node(previous,b[2],false) { Err(e)=>Err(e), Ok(())=>Ok(true) } } } } } }
         },
         Op::And(a, b) => {
             if a >= previous.len() { Err(AdmissionFailure::NodeReference) }

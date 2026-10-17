@@ -150,6 +150,7 @@ impl<'a> ProgramView<'a> {
             Self::Typed(p) => Domains::Typed(p.outputs),
         }
     }
+    #[inline(always)]
     #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result==spec::instruction(self,index as nat),))]
     pub(crate) fn instruction(self, index: usize) -> Option<Instruction> {
         match self {
@@ -218,6 +219,9 @@ fn node_failure(error: typed::Failure) -> Failure {
 }
 
 /// The single V2 eager driver. Step is charged before instruction conversion/access.
+// Each caller selects a closed program/input adapter. Expose those choices to
+// optimization without preparing another graph or changing the execution API.
+#[inline(always)]
 #[cfg_attr(verus_keep_ghost,verus_spec(result => ensures final(meter).limits==old(meter).limits,
     (match result {Ok(())=>Ok(final(output)@),Err(e)=>Err(e)},final(meter).used.counters@)
         ==spec::execution(program,input.view(),old(meter).limits.counters@,old(meter).used.counters@),

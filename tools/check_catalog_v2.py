@@ -187,6 +187,25 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
     return intended, refusal, {"function": target, "field": field, "intended_refusal": intended}
 
 
+def require_reviewed_profile(profile):
+    if 'reviewed' in profile and profile['reviewed'] is not True:
+        raise ValueError('profile requires independent technical review')
+
+def candidate_profile(vir, positive, pin):
+    if positive['exit_code'] != 0 or not verifier.proof_succeeded(positive['report'], pin):
+        raise ValueError('cannot inventory a failed or differently pinned whole proof')
+    functions, _ = observed_inventory(vir, 'catalog_v2::')
+    bodies = sorted(name for name, record in functions.items() if record['mode'] == 'Exec')
+    observed, declarations = observed_inventory(vir, 'catalog_v2::', tuple(bodies))
+    proposal = {'namespace': 'catalog_v2::', 'reviewed': False,
+        'expected_verified': positive['report']['verification-results']['verified'],
+        'target_functions': sorted(name for name in positive['report']['func-details']
+            if name.startswith('catalog_v2::')),
+        'body_covered_functions': bodies, 'functions': observed}
+    if declarations is not None:
+        proposal['abstract_declarations'] = declarations
+    return proposal
+
 def check(args) -> dict:
     before = snapshot(ROOT)
     pin = json.loads((ROOT/verifier.PIN).read_text())
@@ -226,6 +245,7 @@ def check(args) -> dict:
         receipt["status"]="development_positive_unfrozen_coverage"
         return receipt
     profile = json.loads((ROOT/PROFILE).read_text())
+    require_reviewed_profile(profile)
     require_coverage(vir,profile)
     if profile["expected_verified"] != positive["report"]["verification-results"]["verified"]:
         raise ValueError("verification count differs from reviewed profile")
@@ -272,7 +292,7 @@ def check(args) -> dict:
 def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out",type=Path,required=True)
-    parser.add_argument("--cache",type=Path,default=Path.home()/".cache/zeno-fcis/verus")
+    parser.add_argument("--cache",type=Path,default=verifier.cache_directory())
     parser.add_argument("--development",action="store_true")
     args=parser.parse_args()
     if args.out.exists() or args.out.is_symlink():

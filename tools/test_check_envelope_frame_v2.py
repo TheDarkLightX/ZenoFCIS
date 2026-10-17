@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import unittest
+from test_negative_retention import StrictGateMutationTests
 
 import check_envelope_frame_v2 as gate
 import check_verus as verifier
@@ -103,15 +104,23 @@ class EnvelopeRefusal(unittest.TestCase):
             self.assertFalse(self.classify(code=code))
 
     def test_coverage_requires_complete_success_and_clean_diagnostics(self):
+        # Cover the declared frame specification, not an arbitrary synthetic body.
+        spec = SPEC.replace("example::semantics", "example::envelope::spec::frame")
+        self.profile = {"namespace": "example::", "target_functions": ["example::identity"],
+            "body_covered_functions": ["example::identity"],
+            "functions": coverage.inventory(FUNCTION + "\n" + spec, "example::", ("example::identity",))}
         report = copy.deepcopy(self.report)
         report["verification-results"].update(success=True, errors=0, **{"encountered-error": False})
-        vir = FUNCTION.replace("Constant Int 7", "Constant Int 8") + "\n" + SPEC
+        vir = FUNCTION + "\n" + spec.replace("Constant Int 7", "Constant Int 8")
         self.assertTrue(self.classify("", report, 0, "coverage", vir))
+        unrelated = FUNCTION.replace("Constant Int 7", "Constant Int 8") + "\n" + spec
+        self.assertFalse(self.classify("", report, 0, "coverage", unrelated))
         for stderr in ("note: Resource limit (rlimit) exceeded\n", "note: UNKNOWN\n",
                        "error[E0308]: mismatched types\n", self.stderr):
             self.assertFalse(self.classify(stderr, report, 0, "coverage", vir))
         report["verification-results"]["is-verifying-entire-crate"] = False
         self.assertFalse(self.classify("", report, 0, "coverage", vir))
+
 
 
 if __name__ == "__main__":

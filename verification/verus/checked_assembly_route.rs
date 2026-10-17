@@ -15,8 +15,8 @@
 //! it is not proved.
 
 use crate::evaluation::spec::{admitted, execution, node, prefix, projection};
-use alloc::boxed::Box;
 use crate::evaluation::{Domain, Failure, Op};
+use alloc::boxed::Box;
 use vstd::prelude::*;
 
 verus! {
@@ -28,6 +28,12 @@ pub(crate) enum Term {
     Bool(bool),
     Add(Box<Term>, Box<Term>),
     Sub(Box<Term>, Box<Term>),
+    Mul(Box<Term>, Box<Term>),
+    DivFloor(Box<Term>, Box<Term>),
+    DivCeil(Box<Term>, Box<Term>),
+    MulDivFloor(Box<Term>, Box<Term>, Box<Term>),
+    MulDivCeil(Box<Term>, Box<Term>, Box<Term>),
+    ProductsGe(Box<(Term, Term, Term)>, Box<(Term, Term, Term)>),
     Eq(Box<Term>, Box<Term>),
     Lt(Box<Term>, Box<Term>),
     And(Box<Term>, Box<Term>),
@@ -48,6 +54,22 @@ pub(crate) open spec fn binary(op: Op, left: Result<i64, Failure>, right: Result
     }
 }
 
+/// A three-operand D1 operator, retaining operand refusal order.
+pub(crate) open spec fn ternary(op: Op, first: Result<i64, Failure>,
+    second: Result<i64, Failure>, third: Result<i64, Failure>) -> Result<i64, Failure>
+{
+    match first {
+        Err(error) => Err(error),
+        Ok(a) => match second {
+            Err(error) => Err(error),
+            Ok(b) => match third {
+                Err(error) => Err(error),
+                Ok(c) => node(op, Seq::empty(), seq![a, b, c]),
+            },
+        },
+    }
+}
+
 /// The value of a term on the aggregate's input `env`, operator by
 /// operator as the evaluator specification computes it.
 pub(crate) open spec fn denote(term: Term, env: Seq<i64>) -> Result<i64, Failure>
@@ -59,6 +81,33 @@ pub(crate) open spec fn denote(term: Term, env: Seq<i64>) -> Result<i64, Failure
         Term::Bool(value) => node(Op::Bool(value), env, Seq::empty()),
         Term::Add(a, b) => binary(Op::Add(0, 1), denote(*a, env), denote(*b, env)),
         Term::Sub(a, b) => binary(Op::Sub(0, 1), denote(*a, env), denote(*b, env)),
+        Term::Mul(a, b) => binary(Op::Mul(0, 1), denote(*a, env), denote(*b, env)),
+        Term::DivFloor(a, b) => binary(Op::DivFloor(0, 1), denote(*a, env), denote(*b, env)),
+        Term::DivCeil(a, b) => binary(Op::DivCeil(0, 1), denote(*a, env), denote(*b, env)),
+        Term::MulDivFloor(a, b, d) => ternary(Op::MulDivFloor(0, 1, 2),
+            denote(*a, env), denote(*b, env), denote(*d, env)),
+        Term::MulDivCeil(a, b, d) => ternary(Op::MulDivCeil(0, 1, 2),
+            denote(*a, env), denote(*b, env), denote(*d, env)),
+        Term::ProductsGe(a, b) => match denote((*a).0, env) {
+            Err(error) => Err(error),
+            Ok(va) => match denote((*a).1, env) {
+                Err(error) => Err(error),
+                Ok(vb) => match denote((*a).2, env) {
+                    Err(error) => Err(error),
+                    Ok(vc) => match denote((*b).0, env) {
+                        Err(error) => Err(error),
+                        Ok(vd) => match denote((*b).1, env) {
+                            Err(error) => Err(error),
+                            Ok(ve) => match denote((*b).2, env) {
+                                Err(error) => Err(error),
+                                Ok(vf) => node(Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+                                    Seq::empty(), seq![va, vb, vc, vd, ve, vf]),
+                            },
+                        },
+                    },
+                },
+            },
+        },
         Term::Eq(a, b) => binary(Op::Eq(0, 1), denote(*a, env), denote(*b, env)),
         Term::Lt(a, b) => binary(Op::Lt(0, 1), denote(*a, env), denote(*b, env)),
         Term::And(a, b) => binary(Op::And(0, 1), denote(*a, env), denote(*b, env)),
@@ -90,6 +139,8 @@ pub(crate) open spec fn boolean(term: Term, bools: spec_fn(u16) -> bool) -> bool
         Term::Int(_) => false,
         Term::Add(_, _) => false,
         Term::Sub(_, _) => false,
+        Term::Mul(_, _) | Term::DivFloor(_, _) | Term::DivCeil(_, _)
+            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _) => false,
         Term::Select(_, a, b) => boolean(*a, bools) && boolean(*b, bools),
         _ => true,
     }
@@ -122,6 +173,30 @@ pub(crate) open spec fn sub(a: Term, b: Term) -> Term {
         },
         _ => Term::Sub(Box::new(a), Box::new(b)),
     }
+}
+
+pub(crate) open spec fn mul(a: Term, b: Term) -> Term {
+    Term::Mul(Box::new(a), Box::new(b))
+}
+
+pub(crate) open spec fn div_floor(a: Term, b: Term) -> Term {
+    Term::DivFloor(Box::new(a), Box::new(b))
+}
+
+pub(crate) open spec fn div_ceil(a: Term, b: Term) -> Term {
+    Term::DivCeil(Box::new(a), Box::new(b))
+}
+
+pub(crate) open spec fn mul_div_floor(a: Term, b: Term, d: Term) -> Term {
+    Term::MulDivFloor(Box::new(a), Box::new(b), Box::new(d))
+}
+
+pub(crate) open spec fn mul_div_ceil(a: Term, b: Term, d: Term) -> Term {
+    Term::MulDivCeil(Box::new(a), Box::new(b), Box::new(d))
+}
+
+pub(crate) open spec fn products_ge(a: Term, b: Term, c: Term, d: Term, e: Term, f: Term) -> Term {
+    Term::ProductsGe(Box::new((a, b, c)), Box::new((d, e, f)))
 }
 
 pub(crate) open spec fn eq(a: Term, b: Term) -> Term {
@@ -194,6 +269,13 @@ pub(crate) open spec fn canonical_node(op: Op, input: spec_fn(u16) -> Term,
         Op::Bool(value) => Term::Bool(value),
         Op::Add(a, b) => add(operand(terms, a), operand(terms, b)),
         Op::Sub(a, b) => sub(operand(terms, a), operand(terms, b)),
+        Op::Mul(a, b) => mul(operand(terms, a), operand(terms, b)),
+        Op::DivFloor(a, b) => div_floor(operand(terms, a), operand(terms, b)),
+        Op::DivCeil(a, b) => div_ceil(operand(terms, a), operand(terms, b)),
+        Op::MulDivFloor(a, b, d) => mul_div_floor(operand(terms, a), operand(terms, b), operand(terms, d)),
+        Op::MulDivCeil(a, b, d) => mul_div_ceil(operand(terms, a), operand(terms, b), operand(terms, d)),
+        Op::ProductsGe(a, b) => products_ge(operand(terms, a[0]), operand(terms, a[1]),
+            operand(terms, a[2]), operand(terms, b[0]), operand(terms, b[1]), operand(terms, b[2])),
         Op::Eq(a, b) => eq(operand(terms, a), operand(terms, b)),
         Op::Lt(a, b) => lt(operand(terms, a), operand(terms, b)),
         Op::And(a, b) => and(operand(terms, a), operand(terms, b), bools),
@@ -273,6 +355,8 @@ pub(crate) proof fn boolean_values(term: Term, env: Seq<i64>, bools: spec_fn(u16
     ensures 0 <= value <= 1,
     decreases term,
 {
+    hide(denote);
+    reveal_with_fuel(denote, 1);
     match term {
         Term::Input(id) => {
             assert(bools(id) && (id as int) < env.len());
@@ -281,6 +365,19 @@ pub(crate) proof fn boolean_values(term: Term, env: Seq<i64>, bools: spec_fn(u16
         Term::Bool(_) => {},
         Term::Add(_, _) => {},
         Term::Sub(_, _) => {},
+        Term::Mul(_, _) | Term::DivFloor(_, _) | Term::DivCeil(_, _)
+            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _) => {},
+        Term::ProductsGe(a, b) => {
+            match (denote((*a).0, env), denote((*a).1, env), denote((*a).2, env),
+                denote((*b).0, env), denote((*b).1, env), denote((*b).2, env)) {
+                (Ok(va), Ok(vb), Ok(vc), Ok(vd), Ok(ve), Ok(vf)) => {
+                    let operands = seq![va, vb, vc, vd, ve, vf];
+                    assert(operands[0] == va && operands[1] == vb && operands[2] == vc
+                        && operands[3] == vd && operands[4] == ve && operands[5] == vf);
+                },
+                _ => {},
+            }
+        },
         Term::Eq(a, b) => {
             match denote(*a, env) {
                 Ok(va) => match denote(*b, env) {
@@ -334,12 +431,10 @@ pub(crate) proof fn boolean_values(term: Term, env: Seq<i64>, bools: spec_fn(u16
     }
 }
 
-/// Each constructor gives the value the evaluator computes for its
-/// operator on the operands' values.
-pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env: Seq<i64>,
-    bools: spec_fn(u16) -> bool, x: i64, y: i64, z: i64)
+/// Constant folds and selection identities retain the evaluator's values.
+pub(crate) proof fn folded_constructors_preserve_values(a: Term, b: Term, c: Term,
+    env: Seq<i64>, x: i64, y: i64, z: i64)
     requires
-        booleans_hold(bools, env),
         denote(a, env) == Ok::<i64, Failure>(x),
         denote(b, env) == Ok::<i64, Failure>(y),
         denote(c, env) == Ok::<i64, Failure>(z),
@@ -348,24 +443,46 @@ pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env:
         denote(sub(a, b), env) == node(Op::Sub(0, 1), Seq::empty(), seq![x, y]),
         denote(eq(a, b), env) == node(Op::Eq(0, 1), Seq::empty(), seq![x, y]),
         denote(lt(a, b), env) == node(Op::Lt(0, 1), Seq::empty(), seq![x, y]),
-        denote(and(a, b, bools), env) == node(Op::And(0, 1), Seq::empty(), seq![x, y]),
-        denote(not(a, bools), env) == node(Op::Not(0), Seq::empty(), seq![x]),
         denote(select(c, a, b), env) == node(Op::Select(0, 1, 2), Seq::empty(), seq![z, x, y]),
 {
+    hide(denote);
+    reveal_with_fuel(denote, 1);
     assert(seq![x, y][0] == x && seq![x, y][1] == y);
-    assert(seq![x][0] == x);
     assert(seq![z, x, y][0] == z && seq![z, x, y][1] == x && seq![z, x, y][2] == y);
-    // `true && b` and `b && true` keep a Boolean operand's 0 or 1.
-    if a == Term::Bool(true) && boolean(b, bools) {
-        boolean_values(b, env, bools, y);
-    }
-    if b == Term::Bool(true) && boolean(a, bools) {
-        boolean_values(a, env, bools, x);
-    }
-    if a == b && boolean(a, bools) {
-        boolean_values(a, env, bools, x);
-    }
-    // `!!inner` is `inner` for a Boolean `inner`.
+}
+
+/// D1 constructors retain their operands and delegate to the exact D1 node.
+pub(crate) proof fn arithmetic_constructors_preserve_values(a: Term, b: Term, c: Term,
+    env: Seq<i64>, x: i64, y: i64, z: i64)
+    requires
+        denote(a, env) == Ok::<i64, Failure>(x),
+        denote(b, env) == Ok::<i64, Failure>(y),
+        denote(c, env) == Ok::<i64, Failure>(z),
+    ensures
+        denote(mul(a, b), env) == node(Op::Mul(0, 1), Seq::empty(), seq![x, y]),
+        denote(div_floor(a, b), env) == node(Op::DivFloor(0, 1), Seq::empty(), seq![x, y]),
+        denote(div_ceil(a, b), env) == node(Op::DivCeil(0, 1), Seq::empty(), seq![x, y]),
+        denote(mul_div_floor(a, b, c), env) == node(Op::MulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
+        denote(mul_div_ceil(a, b, c), env) == node(Op::MulDivCeil(0, 1, 2), Seq::empty(), seq![x, y, z]),
+{
+    // Operand success is already known; no arithmetic expansion is needed.
+    hide(node);
+    hide(denote);
+    reveal_with_fuel(denote, 1);
+}
+
+/// Double negation retains its operand only when that operand is Boolean.
+pub(crate) proof fn negation_preserves_value(a: Term, env: Seq<i64>,
+    bools: spec_fn(u16) -> bool, x: i64)
+    requires
+        booleans_hold(bools, env),
+        denote(a, env) == Ok::<i64, Failure>(x),
+    ensures
+        denote(not(a, bools), env) == node(Op::Not(0), Seq::empty(), seq![x]),
+{
+    hide(denote);
+    reveal_with_fuel(denote, 1);
+    assert(seq![x][0] == x);
     match a {
         Term::Not(inner) => {
             if boolean(*inner, bools) {
@@ -382,17 +499,93 @@ pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env:
     }
 }
 
+/// Each constructor gives the value the evaluator computes for its
+/// operator on the operands' values.
+pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env: Seq<i64>,
+    bools: spec_fn(u16) -> bool, x: i64, y: i64, z: i64)
+    requires
+        booleans_hold(bools, env),
+        denote(a, env) == Ok::<i64, Failure>(x),
+        denote(b, env) == Ok::<i64, Failure>(y),
+        denote(c, env) == Ok::<i64, Failure>(z),
+    ensures
+        denote(add(a, b), env) == node(Op::Add(0, 1), Seq::empty(), seq![x, y]),
+        denote(sub(a, b), env) == node(Op::Sub(0, 1), Seq::empty(), seq![x, y]),
+        denote(mul(a, b), env) == node(Op::Mul(0, 1), Seq::empty(), seq![x, y]),
+        denote(div_floor(a, b), env) == node(Op::DivFloor(0, 1), Seq::empty(), seq![x, y]),
+        denote(div_ceil(a, b), env) == node(Op::DivCeil(0, 1), Seq::empty(), seq![x, y]),
+        denote(mul_div_floor(a, b, c), env) == node(Op::MulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
+        denote(mul_div_ceil(a, b, c), env) == node(Op::MulDivCeil(0, 1, 2), Seq::empty(), seq![x, y, z]),
+        denote(eq(a, b), env) == node(Op::Eq(0, 1), Seq::empty(), seq![x, y]),
+        denote(lt(a, b), env) == node(Op::Lt(0, 1), Seq::empty(), seq![x, y]),
+        denote(and(a, b, bools), env) == node(Op::And(0, 1), Seq::empty(), seq![x, y]),
+        denote(not(a, bools), env) == node(Op::Not(0), Seq::empty(), seq![x]),
+        denote(select(c, a, b), env) == node(Op::Select(0, 1, 2), Seq::empty(), seq![z, x, y]),
+{
+    hide(node);
+    hide(denote);
+    // When no Boolean identity applies, retain the explicit conjunction.
+    if a != Term::Bool(false) && b != Term::Bool(false)
+        && !(a == Term::Bool(true) && boolean(b, bools))
+        && !(b == Term::Bool(true) && boolean(a, bools))
+        && !(a == b && boolean(a, bools)) {
+        assert(and(a, b, bools) == Term::And(Box::new(a), Box::new(b)));
+    }
+    folded_constructors_preserve_values(a, b, c, env, x, y, z);
+    arithmetic_constructors_preserve_values(a, b, c, env, x, y, z);
+    negation_preserves_value(a, env, bools, x);
+    // Keep the Boolean conjunction obligation here, including the gate's
+    // deliberately invalid unguarded-conjunction control.
+    assert(denote(and(a, b, bools), env) == node(Op::And(0, 1), Seq::empty(), seq![x, y])) by {
+        reveal_with_fuel(denote, 1);
+        reveal(node);
+        assert(seq![x, y][0] == x && seq![x, y][1] == y);
+        if a == Term::Bool(true) && boolean(b, bools) {
+            boolean_values(b, env, bools, y);
+        }
+        if b == Term::Bool(true) && boolean(a, bools) {
+            boolean_values(a, env, bools, x);
+        }
+        if a == b && boolean(a, bools) {
+            boolean_values(a, env, bools, x);
+        }
+    }
+}
+
+/// All six product factors retain their values before D1 compares the exact products.
+pub(crate) proof fn products_ge_preserves_values(a: Term, b: Term, c: Term,
+    d: Term, e: Term, f: Term, env: Seq<i64>, u: i64, v: i64, w: i64, x: i64, y: i64, z: i64)
+    requires
+        denote(a, env) == Ok::<i64, Failure>(u),
+        denote(b, env) == Ok::<i64, Failure>(v),
+        denote(c, env) == Ok::<i64, Failure>(w),
+        denote(d, env) == Ok::<i64, Failure>(x),
+        denote(e, env) == Ok::<i64, Failure>(y),
+        denote(f, env) == Ok::<i64, Failure>(z),
+    ensures
+        denote(products_ge(a, b, c, d, e, f), env) ==
+            node(Op::ProductsGe([0, 1, 2], [3, 4, 5]), Seq::empty(), seq![u, v, w, x, y, z]),
+{
+    let operands = seq![u, v, w, x, y, z];
+    assert(operands[0] == u && operands[1] == v && operands[2] == w
+        && operands[3] == x && operands[4] == y && operands[5] == z);
+}
+
 /// A node of the program on its operand values is the same operator on
-/// the operands' positions 0, 1 and 2.
+/// canonical operand positions, including all six product factors.
 pub(crate) proof fn node_on_operands(op: Op, input: Seq<i64>, values: Seq<i64>)
     ensures
         match op {
-            Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) =>
+            Op::Add(a, b) | Op::Sub(a, b) | Op::Mul(a, b) | Op::DivFloor(a, b)
+                | Op::DivCeil(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) =>
                 (a as int) < values.len() && (b as int) < values.len() ==>
                 node(op, input, values) == node(
                     match op {
                         Op::Add(_, _) => Op::Add(0, 1),
                         Op::Sub(_, _) => Op::Sub(0, 1),
+                        Op::Mul(_, _) => Op::Mul(0, 1),
+                        Op::DivFloor(_, _) => Op::DivFloor(0, 1),
+                        Op::DivCeil(_, _) => Op::DivCeil(0, 1),
                         Op::Eq(_, _) => Op::Eq(0, 1),
                         Op::Lt(_, _) => Op::Lt(0, 1),
                         _ => Op::And(0, 1),
@@ -404,11 +597,24 @@ pub(crate) proof fn node_on_operands(op: Op, input: Seq<i64>, values: Seq<i64>)
                 (c as int) < values.len() && (a as int) < values.len() && (b as int) < values.len() ==>
                 node(op, input, values) == node(Op::Select(0, 1, 2), Seq::empty(),
                     seq![values[c as int], values[a as int], values[b as int]]),
+            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) =>
+                (a as int) < values.len() && (b as int) < values.len() && (d as int) < values.len() ==>
+                node(op, input, values) == node(
+                    if op is MulDivCeil { Op::MulDivCeil(0, 1, 2) } else { Op::MulDivFloor(0, 1, 2) },
+                    Seq::empty(), seq![values[a as int], values[b as int], values[d as int]]),
+            Op::ProductsGe(a, b) =>
+                (a[0] as int) < values.len() && (a[1] as int) < values.len()
+                    && (a[2] as int) < values.len() && (b[0] as int) < values.len()
+                    && (b[1] as int) < values.len() && (b[2] as int) < values.len() ==>
+                node(op, input, values) == node(Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+                    Seq::empty(), seq![values[a[0] as int], values[a[1] as int], values[a[2] as int],
+                        values[b[0] as int], values[b[1] as int], values[b[2] as int]]),
             _ => true,
         },
 {
     match op {
-        Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
+        Op::Add(a, b) | Op::Sub(a, b) | Op::Mul(a, b) | Op::DivFloor(a, b)
+            | Op::DivCeil(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
             let operands = seq![values[a as int], values[b as int]];
             assert(operands[0] == values[a as int] && operands[1] == values[b as int]);
         },
@@ -420,6 +626,18 @@ pub(crate) proof fn node_on_operands(op: Op, input: Seq<i64>, values: Seq<i64>)
             let operands = seq![values[c as int], values[a as int], values[b as int]];
             assert(operands[0] == values[c as int] && operands[1] == values[a as int]
                 && operands[2] == values[b as int]);
+        },
+        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+            let operands = seq![values[a as int], values[b as int], values[d as int]];
+            assert(operands[0] == values[a as int] && operands[1] == values[b as int]
+                && operands[2] == values[d as int]);
+        },
+        Op::ProductsGe(a, b) => {
+            let operands = seq![values[a[0] as int], values[a[1] as int], values[a[2] as int],
+                values[b[0] as int], values[b[1] as int], values[b[2] as int]];
+            assert(operands[0] == values[a[0] as int] && operands[1] == values[a[1] as int]
+                && operands[2] == values[a[2] as int] && operands[3] == values[b[0] as int]
+                && operands[4] == values[b[1] as int] && operands[5] == values[b[2] as int]);
         },
         _ => {},
     }
@@ -467,7 +685,8 @@ pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<
                             Op::Input(id) => {},
                             Op::Int(value) => {},
                             Op::Bool(value) => {},
-                            Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
+                            Op::Add(a, b) | Op::Sub(a, b) | Op::Mul(a, b) | Op::DivFloor(a, b)
+                                | Op::DivCeil(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
                                 assert(node_value(terms, env, previous, a as int));
                                 assert(node_value(terms, env, previous, b as int));
                                 constructors_preserve_values(terms[a as int], terms[b as int], terms[b as int],
@@ -484,6 +703,25 @@ pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<
                                 assert(node_value(terms, env, previous, b as int));
                                 constructors_preserve_values(terms[a as int], terms[b as int], terms[c as int],
                                     env, bools, previous[a as int], previous[b as int], previous[c as int]);
+                            },
+                            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+                                assert(node_value(terms, env, previous, a as int));
+                                assert(node_value(terms, env, previous, b as int));
+                                assert(node_value(terms, env, previous, d as int));
+                                constructors_preserve_values(terms[a as int], terms[b as int], terms[d as int],
+                                    env, bools, previous[a as int], previous[b as int], previous[d as int]);
+                            },
+                            Op::ProductsGe(a, b) => {
+                                assert(node_value(terms, env, previous, a[0] as int));
+                                assert(node_value(terms, env, previous, a[1] as int));
+                                assert(node_value(terms, env, previous, a[2] as int));
+                                assert(node_value(terms, env, previous, b[0] as int));
+                                assert(node_value(terms, env, previous, b[1] as int));
+                                assert(node_value(terms, env, previous, b[2] as int));
+                                products_ge_preserves_values(terms[a[0] as int], terms[a[1] as int],
+                                    terms[a[2] as int], terms[b[0] as int], terms[b[1] as int], terms[b[2] as int],
+                                    env, previous[a[0] as int], previous[a[1] as int], previous[a[2] as int],
+                                    previous[b[0] as int], previous[b[1] as int], previous[b[2] as int]);
                             },
                         }
                         assert(denote(term, env) == Ok::<i64, Failure>(v));

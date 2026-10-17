@@ -1,0 +1,1 @@
+{"schema": "zeno-fcis/loop-expressions/1", "vocabulary": {"inputs": ["seen", "key", "value", "command_key", "command_value", "authorized"], "cases": 3}, "outputs": ["!authorized ? 0 : seen && key == command_key && ?{value == command_value | value != command_value} ? 1 : 2"]}

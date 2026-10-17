@@ -1,0 +1,22 @@
+zeno 1;
+project 1 arithmetic_quote;
+namespace 2 core;
+type 100 state QuoteState;
+type 101 command QuoteCommand;
+type 102 context QuoteContext;
+type 105 int Value in 0..=20;
+type 106 int Denominator in 1..=10;
+field 110 100 required_input 105;
+field 120 101 requested_output 105;
+field 121 101 divisor 106;
+component 400 quote {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded_state on commit, genesis = post.100.110 >= 0;
+law 501 ceiling_quote on accept = post.100.110 == div_ceil(command.101.120, command.101.121);
+law 502 sufficient_input on accept = products_ge(post.100.110, command.101.121, command.101.120, 1);

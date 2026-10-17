@@ -1,12 +1,12 @@
 # ZenoFCIS crate map
 
-This guide documents the `2.3.0` source. Its retained V1
+This guide documents the `2.4.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All public workspace crates are version `2.3.0`.
+All public workspace crates are version `2.4.0`.
 
 ## Dependency direction
 
@@ -23,8 +23,8 @@ external tools and runtimes
 ```
 
 Semantic crates must not depend on databases, networks, clocks, randomness,
-threads, or process state. Shell and tooling crates may perform effects but may
-not redefine semantic decisions.
+threads, or process state. Shell and tooling crates may perform effects, but
+they may not redefine semantic decisions.
 
 ## Foundational semantic crates
 
@@ -65,20 +65,24 @@ The recommended production path ends in a privately constructed
 
 ## Formal, refinement, and synthesis surfaces
 
-These are tool-neutral assurance protocols. They do not make a tool result
-authoritative without an independent checker and release policy.
+These are tool-neutral assurance protocols. A tool result does not become
+authoritative through them without an independent checker and a release
+policy.
 
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-refine` | Exact normalized-decision comparison and promotion reports |
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
+| `zeno-fcis-program-search` | Untrusted, deterministic search for smaller equivalent finite programs (resubstitution, top-down synthesis, folding, decision-diagram resynthesis); proposes only, `transform check` decides |
+| `zeno-fcis-loop-doors` | Untrusted proposer-side doors of the bounded loop: the loop expression language with holes and family parameters, lowering, inverse semantics, failing regions, repair sites and repairs, sketch completion and family fits and transfer; proposes only, `transform check` decides |
 | `zeno-fcis-contract` | Application-contract compiler core shared with the `zeno-fcis` binary, and the checked assume-guarantee composition checker with its groups, aggregate generation and assembly validation, receipt and replay |
-| `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private ESSO, compilers, and other tools |
+| `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private checkers, compilers, and other tools |
 | `zeno-fcis-formal-tools` | Deterministic CVC5, Z3, and Lean exporters, checked process execution, model replay, and content-addressed diagnostic retention |
 
-Concrete tool clients normally live in a separate `std` shell crate. ESSO is
-private and optional; it is not a public dependency or universal requirement.
+Concrete tool clients normally live in a separate `std` shell crate. Private
+checkers are optional; none is a public dependency or a universal
+requirement.
 
 ## Security-support surfaces
 
@@ -94,9 +98,9 @@ themselves.
 
 ## Reference implementations
 
-Reference crates provide executable or differential oracles. They are useful
-for tests, refinement, and adapter development. They are not automatically
-production backends.
+Reference crates provide executable or differential oracles for tests,
+refinement, and adapter development. They are not automatically production
+backends.
 
 | Crate | Responsibility |
 |---|---|
@@ -117,9 +121,9 @@ publication uses the nominal authorization boundary instead.
 | `zeno-fcis-bootstrap` | Deterministic project starter generation from a reviewed catalog |
 | `zeno-fcis-cli` | Published `zeno-fcis` authoring, generation, graph, explanation, proof, counterexample, doctor, and backend-inspection binary |
 
-These crates may use `std` because they access a host runtime, database, files,
-or generated source. They must preserve the decisions produced by the semantic
-core.
+These crates may use `std` because they access a host runtime, database,
+files, or generated source. They must preserve the decisions the semantic core
+produces.
 
 ## Project-specific crates and generated-code tests
 
@@ -137,7 +141,7 @@ framework's meaning.
 
 `zeno-fcis` re-exports the project-neutral primitives and gates higher layers
 behind features. Prefer it for application dependencies. Depend on individual
-crates when publishing a narrowly scoped adapter or when a dependency ring
-must remain explicit.
+crates when you publish a narrowly scoped adapter or when a dependency ring
+must stay explicit.
 
-See [Feature matrix](FEATURE_MATRIX.md) and [Quickstart](QUICKSTART.md).
+See the [feature matrix](FEATURE_MATRIX.md) and the [quickstart](QUICKSTART.md).

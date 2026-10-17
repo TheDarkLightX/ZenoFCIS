@@ -78,10 +78,30 @@ pub(crate) fn kind(
         }
         Op::Int(_) => Ok(false),
         Op::Bool(_) => Ok(true),
-        Op::Add(a, b) | Op::Sub(a, b) | Op::Lt(a, b) => {
+        Op::Add(a, b)
+        | Op::Sub(a, b)
+        | Op::Mul(a, b)
+        | Op::DivFloor(a, b)
+        | Op::DivCeil(a, b)
+        | Op::Lt(a, b) => {
             require_node(previous, a, false)?;
             require_node(previous, b, false)?;
             Ok(matches!(op, Op::Lt(..)))
+        }
+        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+            require_node(previous, a, false)?;
+            require_node(previous, b, false)?;
+            require_node(previous, d, false)?;
+            Ok(false)
+        }
+        Op::ProductsGe(a, b) => {
+            require_node(previous, a[0], false)?;
+            require_node(previous, a[1], false)?;
+            require_node(previous, a[2], false)?;
+            require_node(previous, b[0], false)?;
+            require_node(previous, b[1], false)?;
+            require_node(previous, b[2], false)?;
+            Ok(true)
         }
         Op::And(a, b) => {
             require_node(previous, a, true)?;

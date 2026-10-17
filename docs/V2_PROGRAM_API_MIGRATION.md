@@ -1,8 +1,9 @@
 # V2 normal program API migration
 
-The [candidate record](RELEASE_CANDIDATES.md) defines the supported scope.
-Simplification is in progress; the current implementation and intermediate
-checks do not constitute final combined qualification or a released API.
+This guide describes the V2 API cutover introduced in 2.3.0 and retained in
+the current 2.4.0 release source. The historical
+[2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
+define that source line's supported scope and limits.
 
 The default `zeno-fcis` root and `prelude` now select the existing checked declarative execution family. This is an intentional breaking API cutover, available with default features and with `default-features = false`. Optional legacy features do not restore the old root exports.
 
@@ -67,7 +68,9 @@ kind returns `Error::InvocationKind` before a history refresh or checkpoint
 write; a foreign identity still returns `Error::Identity` first. Wrong-kind
 bundle refusal also precedes the version check. Correct-kind bundles retain
 their existing refresh, version, identity and pre-state checks. These API
-changes are not in a stable release; final combined qualification remains required.
+changes were introduced in 2.3.0; the
+[historical release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
+state the scope of their checks.
 
 ## V1 consumer migration
 

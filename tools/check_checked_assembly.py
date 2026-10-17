@@ -212,6 +212,23 @@ def counts(functions: dict) -> dict:
     return modes
 
 
+def require_reviewed_profile(profile):
+    if 'reviewed' in profile and profile['reviewed'] is not True:
+        raise ValueError('profile requires independent technical review')
+
+
+def candidate_profile(process, report, pin, profile, functions):
+    if (process.returncode != 0 or not verifier.proof_succeeded(report, pin)
+            or verifier.ERROR_HEADER.search(process.stderr)
+            or verifier.NON_SEMANTIC.search(process.stderr)):
+        raise ValueError('cannot inventory a failed or differently pinned whole proof')
+    return {**profile, 'reviewed': False,
+        'expected_verified': report['verification-results']['verified'],
+        'target_functions': sorted(name for name in report['func-details']
+            if name.startswith(NAMESPACES)),
+        'functions': functions, 'inventory': counts(functions)}
+
+
 def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = None) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this proof profile requires qualified Linux x86-64 tools")
@@ -229,7 +246,7 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
                    and k not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
     environment.update(RUSTUP_TOOLCHAIN=pin["rust_toolchain"], VERUS_Z3_PATH=str(tools / "z3"))
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024",
-               "--no-cheating", "--no-external-by-default", "--num-threads", "2",
+               "--no-cheating", "--no-external-by-default", "--num-threads", verifier.proof_threads('2'),
                "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     restricted = [argument for module in MODULES for argument in ("--verify-module", module)]
@@ -270,10 +287,19 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
     report = json.loads(positive.stdout)
     functions = observed_profile((folder / "vir/crate.vir").read_text())
     if emit_profile is not None:
-        emit_profile.write_text(json.dumps({
-            **profile, "expected_verified": report["verification-results"]["verified"],
-            "functions": functions, "inventory": counts(functions),
-        }, indent=2, sort_keys=True) + "\n")
+        proposal = candidate_profile(positive, report, pin, profile, functions)
+        if emit_profile.resolve() == (ROOT / PROFILE).resolve():
+            raise ValueError('candidate output cannot overwrite the reviewed profile')
+        verifier.verify_tool_files(tools, pin)
+        if before != snapshot():
+            raise RuntimeError('source drift during candidate proof')
+        with emit_profile.open('x') as stream:
+            stream.write(json.dumps(proposal, indent=2, sort_keys=True) + "\n")
+        return {'schema': 'zeno-fcis/checked-assembly-evidence/1',
+            'status': 'profile-review-required', 'source_sha256': before,
+            'verus_report': report, 'candidate_profile': str(emit_profile),
+            'review_accepted': False, 'all_controls': False}
+    require_reviewed_profile(profile)
     if not positive_accepted(positive, report, pin, profile):
         raise RuntimeError("the unfiltered proof failed exact pinned admission")
     if functions != profile["functions"] or counts(functions) != profile["inventory"]:
@@ -346,7 +372,7 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--emit-profile", type=Path,
                         help="also write the observed profile here, for review")
@@ -362,9 +388,12 @@ def main() -> int:
     receipt["logs"] = str(logs)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"Checked assembly: {receipt['status']}; receipt: {args.out}")
-    if receipt["status"] != "passed":
+    if receipt["status"] not in ("passed", "profile-review-required"):
         print(receipt["error"])
         return 1
+    if receipt["status"] == "profile-review-required":
+        print(f"Candidate requires independent review: {receipt['candidate_profile']}")
+        return 0
     print(f"{receipt['inventory']['Proof']} proof functions; "
           f"{receipt['verus_report']['verification-results']['verified']} obligations; "
           f"{len(receipt['controls'])} controls caught")

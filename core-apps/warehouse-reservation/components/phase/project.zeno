@@ -26,5 +26,5 @@ law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.
 law 502 exact_transition on accept = (command.101.120 == 1 -> (pre.100.110 == 2 && post.100.110 == 0)) && (command.101.120 == 0 -> post.100.110 == pre.100.110 + 1);
 // Core seed finite-phase-machine/1; parameters {"C": 2}.
 // Instance source-set SHA256 920a526465fd382df456e42086b7250020d85b9d8a96f7bb32aba60d9a2bad7c.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 1e0a26286f7743c92e389b42f18efdb5b8aacbb474cd99474b1957e59192a758; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 69146c1d4d53148aeb8c85ac623cf4b941722b0193f69f77e356f19781bb09e5; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

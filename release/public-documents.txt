@@ -1,10 +1,18 @@
-# Reviewed public user documentation, assurance references and executable fixtures.
 # Follow docs/PUBLICATION_POLICY.md before adding an entry.
+# Reviewed public user documentation, assurance references and executable fixtures.
+# The next 16 entries are frozen kernel-law oracle fixture copies: byte-identical
+# originals kept for regression tests, not user documentation.
 AGENTS.md
 CHANGELOG.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
+core-apps/api-quota/README.md
+core-apps/document-release/README.md
+core-apps/equipment-booking/README.md
+core-apps/expense-approval/README.md
+core-apps/reliable-jobs/README.md
+core-apps/warehouse-reservation/README.md
 core-components/FINITE_PROOFS.md
 core-components/README.md
 core-components/bounded-counter/README.md
@@ -30,6 +38,8 @@ crates/zeno-fcis-cli/tests/fixtures/escrow/README.md
 crates/zeno-fcis-cli/tests/fixtures/spend-approval-migrated/README.md
 crates/zeno-fcis-cli/tests/fixtures/spend-approval/README.md
 crates/zeno-fcis-cli/tests/fixtures/transform-check/README.md
+crates/zeno-fcis-loop-doors/README.md
+crates/zeno-fcis-program-search/README.md
 docs/ACCEPTANCE_TESTING.md
 docs/ADMITTED_ENVELOPE.md
 docs/ADMITTED_VALUE_WITNESS.md
@@ -52,8 +62,10 @@ docs/CLI_REFERENCE.md
 docs/CODEGEN_TYPED_ADAPTERS.md
 docs/COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md
 docs/COMPLETE_FOOTPRINT_WITNESS.md
+docs/COMPOSED_DOMAIN_COMPOSITION.md
 docs/COMPOSED_DOMAIN_PROGRAM.md
 docs/COMPOSED_ROOT_PROJECTION_CONFORMANCE.md
+docs/CONTRACT_JUDGES.md
 docs/CONTRACT_RULES.md
 docs/CORRECT_BY_CONSTRUCTION_MAP_ENTRIES.md
 docs/CRATE_MAP.md
@@ -126,6 +138,7 @@ docs/STRICT_CANONICAL_PLAN_DECODERS.md
 docs/SUPPLY_CHAIN_EXCEPTIONS.md
 docs/SYMBOLIC_CHECKS.md
 docs/SYSTEM_PROPERTIES.md
+docs/TAU_KIT.md
 docs/TEMPORAL_LOGIC_V1.md
 docs/UNIVERSAL_PROJECT_PROFILES.md
 docs/V1_1_RELEASE_NOTES.md
@@ -133,6 +146,7 @@ docs/V1_PRODUCT_CONTRACT.md
 docs/V1_RELEASE_NOTES.md
 docs/V2_PROGRAM_API_MIGRATION.md
 docs/VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md
+docs/WIDE_VALUE_EXECUTION.md
 docs/ZAL_SOURCE_MAP.md
 docs/ZENO_LANGUAGE_V1.md
 docs/adr/0001-meaning-first-assurance.md
@@ -291,10 +305,16 @@ docs/tutorials/MINI_DETERMINATOR.md
 docs/tutorials/TEMPORAL.md
 docs/zal/GRAMMAR.md
 docs/zal/HARNESS_INTEGRATION.md
+docs/zal/LOOPS.md
 docs/zal/README.md
 docs/zal/SPECIFICATION.md
+examples/arithmetic-fee/README.md
+examples/arithmetic-fused/README.md
+examples/arithmetic-quote/README.md
 examples/dual-approval/README.md
 experiments/proof-challenge/README.md
+integrations/elite_archive/README.md
+integrations/ocaml/README.md
 llms.txt
 security/reviews/v1/opus-python-adapters-result.md
 security/reviews/v1/opus-python-shapes-result.md
@@ -312,8 +332,7 @@ skills/rust-typestate-newtype/references/zenofcis.md
 skills/specification-non-vacuity/SKILL.md
 skills/zal-authoring/SKILL.md
 skills/zenofcis-synthesis-first/SKILL.md
-# The next 16 entries are frozen kernel-law oracle fixture copies: byte-identical
-# originals kept for regression tests, not user documentation.
+tools/test_data/g3_original_zusd/README.md
 verification/kernel-laws/src/oracle/templates/account-lockout/README.md
 verification/kernel-laws/src/oracle/templates/account-lockout/original/README.md
 verification/kernel-laws/src/oracle/templates/agent-treasury-guard/README.md
@@ -331,15 +350,5 @@ verification/kernel-laws/src/oracle/templates/prepared-counter/original/README.m
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/README.md
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/README.md
 verification/verus/README.md
-core-apps/api-quota/README.md
-core-apps/document-release/README.md
-core-apps/equipment-booking/README.md
-core-apps/expense-approval/README.md
-core-apps/reliable-jobs/README.md
-core-apps/warehouse-reservation/README.md
-tools/test_data/g3_original_zusd/README.md
-docs/WIDE_VALUE_EXECUTION.md
-docs/TAU_KIT.md
-integrations/elite_archive/README.md
-integrations/ocaml/README.md
 crates/zeno-fcis-cli/tests/fixtures/order-fulfillment-split/README.md
+docs/KNOWLEDGE.md

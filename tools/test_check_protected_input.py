@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import unittest
+from test_negative_retention import StrictGateMutationTests
 
 import check_protected_input as gate
 import check_verus as verifier
@@ -15,8 +16,8 @@ class ProtectedInputCoverage(unittest.TestCase):
     def test_complete_shared_closure_and_real_mutation_anchors(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile['functions'].items() if record['mode'] == 'Exec'}
-        self.assertEqual(len(profile['functions']), 1569)
-        self.assertEqual(len(runtime), 635)
+        self.assertEqual(len(profile['functions']), 1586)
+        self.assertEqual(len(runtime), 641)
         self.assertEqual(set(profile['body_covered_functions']), runtime)
         self.assertTrue(all(record['requires'] == 0 and record['ensures'] > 0
                             for record in profile['functions'].values() if record['mode'] == 'Exec'))
@@ -213,6 +214,10 @@ class ProtectedInputCommandPolicy(unittest.TestCase):
             stack.enter_context(patch.object(verifier, 'run', side_effect=simulated_run))
             stack.enter_context(patch.object(gate, 'native_checks', return_value={'synthetic': True}))
             stack.enter_context(patch.object(gate, 'require_coverage', side_effect=simulated_coverage))
+            # This test isolates command dispatch; StrictGateMutationTests exercises
+            # actual coverage attribution independently with parsed records.
+            stack.enter_context(patch.object(gate, 'coverage_control',
+                                              return_value=(True, 'synthetic coverage refusal')))
             stack.enter_context(patch.object(gate.subprocess, 'check_output', return_value='synthetic'))
             with redirect_stdout(StringIO()):
                 receipt = gate.check(directory / 'cache', False, directory)
@@ -240,7 +245,7 @@ class NativeProtectedInputs(unittest.TestCase):
         pin = json.loads((gate.ROOT / verifier.PIN).read_text())
         with tempfile.TemporaryDirectory(prefix='zeno-protected-native-') as temporary:
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn('test result: ok. 157 passed; 0 failed', evidence['test_output'])
+        self.assertIn('test result: ok. 158 passed; 0 failed', evidence['test_output'])
         self.assertEqual(len(evidence['api_consumers']), 5)
         self.assertEqual(evidence['api_consumers']['positive']['exit_code'], 0)
         self.assertTrue(all(record['exit_code'] != 0 for name, record in evidence['api_consumers'].items()

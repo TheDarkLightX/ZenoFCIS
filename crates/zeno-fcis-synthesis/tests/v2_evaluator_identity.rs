@@ -39,9 +39,9 @@ fn workspace_digest_equals_compiled_authority() {
     let manifest = include_str!("../../../verification/verus/authority_v2_sources.json");
     // Independently pinned membership: omission must refuse even if regenerated.
     let approved_manifest = [
-        25_u8, 67_u8, 159_u8, 168_u8, 21_u8, 41_u8, 151_u8, 118_u8, 156_u8, 206_u8, 245_u8, 159_u8,
-        75_u8, 46_u8, 129_u8, 185_u8, 29_u8, 146_u8, 41_u8, 44_u8, 182_u8, 80_u8, 127_u8, 236_u8,
-        244_u8, 33_u8, 107_u8, 70_u8, 241_u8, 191_u8, 30_u8, 34_u8,
+        238_u8, 185_u8, 144_u8, 218_u8, 237_u8, 115_u8, 52_u8, 192_u8, 14_u8, 183_u8, 24_u8,
+        105_u8, 79_u8, 110_u8, 55_u8, 217_u8, 176_u8, 63_u8, 186_u8, 173_u8, 113_u8, 70_u8, 224_u8,
+        66_u8, 109_u8, 177_u8, 102_u8, 41_u8, 184_u8, 136_u8, 104_u8, 126_u8,
     ];
     assert_eq!(
         RustCryptoSha256::hash(manifest.as_bytes()).as_bytes(),

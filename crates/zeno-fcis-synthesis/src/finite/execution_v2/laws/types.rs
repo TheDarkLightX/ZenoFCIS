@@ -173,6 +173,9 @@ pub enum Op<'a> {
     ProductsGe([usize; 3], [usize; 3]),
     /// Explicit numeric projection of Bool, enum/sum variant, or representable integer.
     ToI128(usize),
+    /// Explicit nonnegative I128 or U128 projection for exact product operations.
+    /// Negative signed values and all noninteger atoms refuse.
+    ToU128(usize),
     /// Exact typed equality.
     Eq(usize, usize),
     /// Same-type integer ordering.

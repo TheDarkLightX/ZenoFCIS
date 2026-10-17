@@ -423,6 +423,16 @@ fn expression(
                 names(then, found);
                 names(otherwise, found);
             }
+            Ast::MulDiv(_, a, b, d) => {
+                names(a, found);
+                names(b, found);
+                names(d, found);
+            }
+            Ast::ProductsGe(arguments) => {
+                for a in arguments.iter() {
+                    names(a, found);
+                }
+            }
             Ast::Bool(_) | Ast::Int(_) => {}
         }
     }
@@ -471,6 +481,9 @@ fn expression(
         .map(super::policy::scalar_op)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| error.to_string())?;
+    if nodes.iter().any(Op::requires_arithmetic_profile) {
+        return Err("arithmetic extension is outside the closed migration profile".to_owned());
+    }
     let root =
         u16::try_from(root.index).map_err(|_| "the expression has too many nodes".to_owned())?;
     let program = Program::try_new_extended(domains, vec![output], nodes, vec![root])

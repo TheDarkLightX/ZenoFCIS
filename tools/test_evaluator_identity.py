@@ -45,6 +45,19 @@ class EvaluatorIdentityTests(unittest.TestCase):
                 gate.check_generated_sources()
             path.write_bytes(original)
 
+    def test_replay_control_flips_exactly_one_compiled_byte(self):
+        from check_evaluator_replay import flip_digest
+        original = (self.root / gate.EVALUATOR).read_text()
+        changed = flip_digest(original)
+        extract = lambda text: re.findall(r'0x([0-9a-f]{2})', text)
+        before, after = extract(original), extract(changed)
+        self.assertEqual(len(before), 32)
+        self.assertEqual(int(after[0], 16), int(before[0], 16) ^ 1)
+        self.assertEqual(after[1:], before[1:])
+        self.assertNotEqual(original, changed)
+        with self.assertRaisesRegex(ValueError, 'exactly the first compiled byte'):
+            flip_digest('no compiled digest')
+
     def test_evaluator_digest_flip(self):
         p = self.root / gate.EVALUATOR
         text, flipped = re.subn(r'(= \[\n    0x)([0-9a-f]{2})',

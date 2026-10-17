@@ -1,9 +1,40 @@
 """The control catalogue is executable and fails on stale/ambiguous anchors."""
 import unittest
+import copy
+import json
 import check_catalog_v2 as gate
 from verus_coverage import descriptor_inventory, require_coverage
 
 class Controls(unittest.TestCase):
+    def test_an_emitted_unreviewed_candidate_cannot_enter_normal_acceptance(self):
+        gate.require_reviewed_profile({})
+        gate.require_reviewed_profile({'reviewed': True})
+        for flag in (False, None, 0, 1, 'true'):
+            with self.assertRaisesRegex(ValueError, 'independent technical review'):
+                gate.require_reviewed_profile({'reviewed': flag})
+
+    def test_candidate_keeps_every_actual_target_and_never_claims_review(self):
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        report = {'verus': {'version': pin['version'], 'commit': pin['commit'],
+            'toolchain': pin['rust_toolchain']},
+            'verification-results': {'success': True, 'errors': 0, 'verified': 2,
+                'encountered-error': False, 'encountered-vir-error': False,
+                'is-verifying-entire-crate': True},
+            'func-details': {'catalog_v2::a': {}, 'catalog_v2::b': {}, 'outside::c': {}}}
+        vir = ''.join(f'(Function (Fun :path catalog_v2::{name}) :mode Exec :typ_bounds () '
+            ':params () :ret () :require () :ensure (true) :d () :body (42))' for name in ('a', 'b'))
+        candidate = gate.candidate_profile(vir, {'exit_code': 0, 'report': report}, pin)
+        self.assertFalse(candidate['reviewed'])
+        self.assertEqual(candidate['target_functions'], ['catalog_v2::a', 'catalog_v2::b'])
+        self.assertEqual(candidate['body_covered_functions'], candidate['target_functions'])
+        for section, key, value in (('verus', 'version', 'wrong'),
+                ('verification-results', 'is-verifying-entire-crate', False),
+                ('verification-results', 'errors', 1)):
+            wrong = copy.deepcopy(report); wrong[section][key] = value
+            with self.assertRaises(ValueError):
+                gate.candidate_profile(vir, {'exit_code': 0, 'report': wrong}, pin)
+
+
     def test_control_anchors_and_failure_partition(self):
         controls=gate.mutations()
         self.assertEqual(len({x[0] for x in controls}),len(controls))

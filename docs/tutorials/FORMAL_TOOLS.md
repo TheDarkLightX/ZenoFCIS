@@ -13,7 +13,7 @@ lean 4.30.0
 ```
 
 The list includes Lean's pinned identity, but the current public Lean exporter
-refuses `UnsupportedMode`. `prove --backend lean` remains blocked (exit `2`).
+returns `UnsupportedMode`, so `prove --backend lean` stays blocked (exit `2`).
 For independently checked scalar program equivalence, use the
 [certificate route](#check-scalar-program-certificates) below.
 
@@ -82,17 +82,18 @@ examples/minimal/.zeno-fcis/evidence/<content-hash>/
   transcript-02-evidence-stdout
 ```
 
-Exit code `2` tells automation that the requested proof remains blocked. The
+Exit code `2` tells automation that the requested proof is still blocked. The
 retained source and solver output let a reviewer inspect exactly what ran.
 
-Read the `scope:` line: claim 500 is `pre.100 == pre.100`, true for every
-observation assignment. No transition relation was exported, so the solver
-result says nothing specific about the application. `check` reports the claim
-as `constant-true`; see [law and claim substance](../CLAIM_SUBSTANCE.md).
+Read the `scope:` line. Claim 500 is `pre.100 == pre.100`, which is true for
+every observation assignment. No transition relation was exported, so the
+solver result says nothing specific about the application, and `check`
+reports the claim as `constant-true`. See
+[law and claim substance](../CLAIM_SUBSTANCE.md).
 
-Before each run, the adapter checks the executable's file type, hash and exact
-reported version. It runs a private copy with fixed arguments, a cleared
-environment, a timeout and an output bound.
+Before each run, the adapter checks the executable's file type, its hash and
+its exact reported version. It runs a private copy with fixed arguments, a
+cleared environment, a timeout and an output bound.
 
 ## Use Z3 and request a counterexample
 
@@ -109,19 +110,19 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
   --tools zeno-fcis.tools.z3.json
 ```
 
-This reflexive claim has no counterexample; Z3's UNSAT answer stays blocked
-(exit `2`) for either command. For a refutable claim, a SAT model counts only
-after the library evaluator replays it. That replay exits `1` from `prove`
-and `0` from `counterexample`. Use `--backend cvc5` and the CVC5 manifest to
-request a counterexample for a claim that selects CVC5.
+This reflexive claim has no counterexample, so Z3's UNSAT answer stays
+blocked (exit `2`) for either command. For a refutable claim, a SAT model
+counts only after the library evaluator replays it. After that replay,
+`prove` exits `1` and `counterexample` exits `0`. To request a counterexample
+for a claim that selects CVC5, use `--backend cvc5` and the CVC5 manifest.
 
 ## Check scalar program certificates
 
 `transform check-certificates` independently checks complete Alethe
 certificates with the pinned Carcara checker. It compares admitted scalar
-programs whose domain exceeds the enumeration cap, within the quantifier-free
-Boolean and linear integer fragment over eager checked-i64 programs. The
-Step limit must never bind.
+programs whose domain is larger than the enumeration cap. The comparison stays
+within the quantifier-free Boolean and linear integer fragment over eager
+checked-i64 programs, and the Step limit must never bind.
 
 Follow the [symbolic checks guide](../SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
 to build and identify the checker, create `checker.json`, and supply exactly
@@ -142,10 +143,10 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 
 A complete check exits `0` with `certificate-checked-equivalent`, evidence
 `CarcaraChecked`, and receipt schema `zeno-fcis/transform-certificate-receipt/1`.
-Successful replay exits `0` with `certificate-replayed` after regenerating the
-queries, independently rechecking every certificate and requiring byte-identical
-receipt contents. Missing, corrupt, unsupported or incomplete proofs, undecided
-queries and failed controls prevent a passing receipt.
+A successful replay regenerates the queries, independently rechecks every
+certificate and requires byte-identical receipt contents. It then exits `0`
+with `certificate-replayed`. Missing, corrupt, unsupported or incomplete
+proofs, undecided queries and failed controls prevent a passing receipt.
 
 The result covers ordered outputs and exact eager failures on the declared
 domain under the scalar query/runtime refinement and the named trusted base:
@@ -169,8 +170,8 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 tools manifest blocked: Io("No such file or directory (os error 2)")
 ```
 
-No proof, certificate, or production permission is created. Missing
-configuration is a visible blocked result.
+No proof, certificate, or production permission is created; missing
+configuration shows up as a blocked result.
 
 ## Move a tools/1 manifest to tools/2
 

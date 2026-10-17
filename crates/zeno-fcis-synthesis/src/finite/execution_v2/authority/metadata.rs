@@ -251,6 +251,42 @@ pub(super) fn scalar_op<'a>(parts: &mut Vec<Part<'a>>, value: &ScalarOp) {
             parts.push(Part::Word(*a as u128));
             parts.push(Part::Word(*b as u128));
         }
+        ScalarOp::Mul(a, b) => {
+            parts.push(Part::Word(10));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+        }
+        ScalarOp::DivFloor(a, b) => {
+            parts.push(Part::Word(11));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+        }
+        ScalarOp::DivCeil(a, b) => {
+            parts.push(Part::Word(12));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+        }
+        ScalarOp::MulDivFloor(a, b, d) => {
+            parts.push(Part::Word(13));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*d as u128));
+        }
+        ScalarOp::MulDivCeil(a, b, d) => {
+            parts.push(Part::Word(14));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*d as u128));
+        }
+        ScalarOp::ProductsGe(a, b) => {
+            parts.push(Part::Word(15));
+            parts.push(Part::Word(a[0] as u128));
+            parts.push(Part::Word(a[1] as u128));
+            parts.push(Part::Word(a[2] as u128));
+            parts.push(Part::Word(b[0] as u128));
+            parts.push(Part::Word(b[1] as u128));
+            parts.push(Part::Word(b[2] as u128));
+        }
     }
 }
 
@@ -520,6 +556,10 @@ pub(super) fn law_op<'a>(parts: &mut Vec<Part<'a>>, value: &laws::Op<'a>) {
             division(parts, round);
             parts.push(Part::Word(*a as u128));
             parts.push(Part::Word(*b as u128));
+        }
+        laws::Op::ToU128(a) => {
+            parts.push(Part::Word(16));
+            parts.push(Part::Word(*a as u128));
         }
         laws::Op::ToI128(a) => {
             parts.push(Part::Word(6));

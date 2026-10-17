@@ -1,6 +1,6 @@
 //! Construct a bounded backend request and expose the independently checked call boundary.
 //!
-//! A project supplies its own [`BackendEngine`] implementation for ESSO, Lean,
+//! A project supplies its own [`BackendEngine`] implementation for Lean,
 //! an SMT solver, or another private/external tool. A separate
 //! [`BackendVerifier`] decides whether the response earns a certificate.
 

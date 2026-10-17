@@ -158,7 +158,7 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
                        CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
                        RUST_TEST_THREADS="1", CARGO_TERM_COLOR="never")
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024",
-               "--no-cheating", "--no-external-by-default", "--num-threads", "1",
+               "--no-cheating", "--no-external-by-default", "--num-threads", verifier.proof_threads('1'),
                "-V", "spinoff-all", "--output-json", "--rlimit", "100",
                "--triggers-mode", "silent", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
@@ -238,7 +238,7 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
     native_env = {**environment, "RUSTUP_TOOLCHAIN": pin["runtime_rust"]}
     for name, arguments, expected in (
         ("symbolic", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "symbolic::",
-                      "--", "--skip", "contract::symbolic::", "--test-threads=1"], 35),
+                      "--", "--skip", "contract::symbolic::", "--test-threads=1"], 36),
         ("contract-runtime", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis",
             "contract::symbolic::tests::the_contract_encoding_agrees_with_the_library_on_sampled_tuples",
             "--", "--exact", "--test-threads=1"], 1),
@@ -273,7 +273,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--cache", type=Path,
-                        default=Path.home() / ".cache/zeno-fcis/verus")
+                        default=verifier.cache_directory())
     parser.add_argument("--install", action="store_true")
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

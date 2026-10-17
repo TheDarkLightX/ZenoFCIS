@@ -41,13 +41,13 @@ law 400 identity = pre.100 == pre.100;
 claim 500 identity cvc5 relational = pre.100 == pre.100;
 ```
 
-Every important name has an explicit number. Those numbers stay stable when a
-human changes comments or rearranges declarations. The merge list keeps its
-written order because it decides which component has precedence.
+Every important name has an explicit number. Those numbers stay stable when
+someone changes comments or rearranges declarations. The merge list keeps its
+written order, because that order decides which component has precedence.
 
-The long hash identifies the checked program meaning. It is useful for review,
-generated-file checks, retained evidence, and replay. A changed stable ID,
-connection, rule, claim, or merge order changes that identity.
+The long hash identifies the meaning of the checked program. It is useful for
+review, generated-file checks, retained evidence, and replay. Changing a stable
+ID, connection, rule, claim, or merge order changes that identity.
 
 ## See several mistakes in one run
 
@@ -67,9 +67,9 @@ ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; de
 ![One bounded check reports three authoring problems](../assets/marketing/terminal-accumulated-diagnostics.png)
 
 The compiler keeps checking after the first independent problem. Each message
-contains a stable code, source location, observed value, expected value, and a
-suggested repair. The order remains stable, which makes the JSON form suitable
-for editors and continuous integration.
+contains a stable code, a source location, the observed value, the expected
+value, and a suggested repair. The order stays stable, which makes the JSON
+form suitable for editors and continuous integration.
 
 ## Create a fresh project
 

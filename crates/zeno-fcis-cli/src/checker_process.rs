@@ -7,6 +7,52 @@ use std::time::Duration;
 const STAGING: &str = "ZENO_FCIS_CHECKER_STAGING";
 #[cfg(target_os = "linux")]
 const MAX_STAGED_RECEIPTS: usize = 16;
+/// Shell diagnostic only: neither field supplies a verdict or cleanup authority.
+#[derive(Debug, Eq, PartialEq)]
+struct SupervisorFailure {
+    reason: String,
+    cleanup: Option<String>,
+}
+impl From<String> for SupervisorFailure {
+    fn from(reason: String) -> Self {
+        Self {
+            reason,
+            cleanup: None,
+        }
+    }
+}
+impl std::fmt::Display for SupervisorFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.reason)?;
+        if let Some(physical) = &self.cleanup {
+            write!(f, "; process-group-cleanup-incomplete; {physical}")?;
+        }
+        Ok(())
+    }
+}
+impl SupervisorFailure {
+    #[cfg(target_os = "linux")]
+    fn cleanup(primary: Option<String>, physical: String) -> Self {
+        Self {
+            reason: primary.unwrap_or_else(|| "process-group-cleanup-incomplete".into()),
+            cleanup: Some(physical),
+        }
+    }
+    fn report(&self, offline: bool) -> serde_json::Value {
+        let mut report = serde_json::json!({"schema":if offline {"zeno-fcis/transform-result/1"}else{"zeno-fcis/transform-loop/1"},
+            "status":"inconclusive","authority":"none","reason":self.reason,"accounting_complete":false});
+        self.add_cleanup(&mut report, false);
+        report
+    }
+    fn add_cleanup(&self, report: &mut serde_json::Value, sanitized: bool) {
+        if let Some(physical) = &self.cleanup {
+            report["cleanup"] = serde_json::json!({"status":"incomplete", "reason":"process-group-cleanup-incomplete", "absence_verified":false});
+            if !sanitized {
+                report["cleanup"]["physical"] = serde_json::json!(physical);
+            }
+        }
+    }
+}
 /// Name prefix of a supervisor-owned staging directory beside final receipts.
 pub(crate) const STAGING_PREFIX: &str = ".zeno-checker-stage-";
 
@@ -949,7 +995,7 @@ mod linux {
         offline: bool,
         workers: u64,
         receipts: Receipts<'_>,
-    ) -> Result<u8, String> {
+    ) -> Result<u8, super::SupervisorFailure> {
         watch_signals()?;
         interrupted()?;
         let sequence = crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
@@ -1036,7 +1082,7 @@ mod linux {
         let mut terminal = false;
         let mut handed_over: Option<u64> = None;
         let mut reported: Option<u8> = None;
-        let result = (|| {
+        let result: Result<u8, String> = (|| {
             loop {
                 interrupted()?;
                 let now = Instant::now();
@@ -1163,13 +1209,7 @@ mod linux {
                     }
                     if !connected {
                         let _ = stderr.read_available(Instant::now() + Duration::from_millis(100));
-                        return Err(format!(
-                            "containment-unavailable:{}",
-                            match stderr.excerpt() {
-                                text if text.is_empty() => format!("systemd-run-exit:{status}"),
-                                text => text,
-                            }
-                        ));
+                        return Err(startup_failure(&stderr.excerpt(), status));
                     }
                     // Non-checking loop commands may finish with no stage.
                     if offline && !terminal {
@@ -1286,7 +1326,7 @@ mod linux {
                 .iter()
                 .all(|pid| !Path::new("/proc").join(pid.to_string()).exists());
         if !dir.writers_gone {
-            return Err(format!("process-group-cleanup-incomplete; {physical}"));
+            return Err(super::SupervisorFailure::cleanup(result.err(), physical));
         }
         let accepted = (|| {
             let waited = result?;
@@ -1309,7 +1349,7 @@ mod linux {
         let (code, published) = accepted.map_err(|reason| format!("{reason}; {physical}"))?;
         if let Err(error) = cleaned {
             if !published {
-                return Err(format!("staging-cleanup-incomplete:{error}; {physical}"));
+                return Err(format!("staging-cleanup-incomplete:{error}; {physical}").into());
             }
             // The run was accepted and its receipt linked: a leftover private
             // staging entry is reported, never turned into a second outcome.
@@ -1330,10 +1370,58 @@ mod linux {
         }
         Ok(code)
     }
+
+    fn startup_failure(stderr: &str, status: std::process::ExitStatus) -> String {
+        let prerequisite = if stderr.contains("Failed to connect to bus") {
+            "systemd-user-manager"
+        } else {
+            "systemd-run"
+        };
+        let detail = if stderr.is_empty() {
+            format!("exit:{status}")
+        } else {
+            stderr.to_owned()
+        };
+        format!("containment-unavailable:{prerequisite}:{detail}")
+    }
     #[cfg(test)]
     mod control_tests {
         use super::*;
         use crate::checker_process::{test_err, test_ok};
+
+        #[test]
+        fn missing_user_manager_is_primary_and_cleanup_is_a_separate_unverified_failure() {
+            use std::os::unix::process::ExitStatusExt;
+            let primary = startup_failure(
+                "Failed to connect to bus: Operation not permitted",
+                std::process::ExitStatus::from_raw(256),
+            );
+            assert!(primary.starts_with("containment-unavailable:systemd-user-manager:"));
+            let failure = super::super::SupervisorFailure::cleanup(
+                Some(primary.clone()),
+                "ObservedControlGroup=\n".into(),
+            );
+            let report = failure.report(false);
+            assert_eq!(report["reason"], primary);
+            assert_eq!(
+                report["cleanup"]["reason"],
+                "process-group-cleanup-incomplete"
+            );
+            assert_eq!(report["cleanup"]["absence_verified"], false);
+            assert_eq!(report["authority"], "none");
+            assert_eq!(report["accounting_complete"], false);
+            let mut capture = serde_json::json!({"authority":"none"});
+            failure.add_cleanup(&mut capture, true);
+            assert!(capture["cleanup"].get("physical").is_none());
+            let cleanup_only = super::super::SupervisorFailure::cleanup(
+                None,
+                "ObservedControlGroup=/unknown\n".into(),
+            );
+            assert_eq!(
+                cleanup_only.report(false)["reason"],
+                "process-group-cleanup-incomplete"
+            );
+        }
 
         #[test]
         fn caller_cpu_quota_is_explicit_conservative_and_fail_closed() {
@@ -1648,7 +1736,13 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
 
 /// Run the complete invocation under an externally controlled process, or
 /// initialize the child control channel before application work begins.
-pub(crate) fn dispatch(command: &crate::Command) -> Option<u8> {
+pub(crate) fn dispatch(
+    command: &crate::Command,
+    knowledge_snapshot: Option<&str>,
+    knowledge_invocation: Option<&str>,
+    knowledge_task: Option<&str>,
+    knowledge_paths: Option<&[std::path::PathBuf]>,
+) -> Option<u8> {
     let profile = contained_profile(command)?;
     let (staging_parent, receipt) = match command {
         crate::Command::Transform {
@@ -1684,7 +1778,38 @@ pub(crate) fn dispatch(command: &crate::Command) -> Option<u8> {
     let outcome = match linux::child() {
         Ok(true) => return None,
         Ok(false) => linux::supervise(
-            &std::env::args_os().skip(1).collect::<Vec<_>>(),
+            &{
+                let mut args = std::env::args_os().skip(1).collect::<Vec<_>>();
+                if let Some(hash) = knowledge_snapshot {
+                    args.extend([
+                        std::ffi::OsString::from("--kb-snapshot"),
+                        std::ffi::OsString::from(hash),
+                    ]);
+                }
+                if let Some(id) = knowledge_invocation {
+                    args.extend([
+                        std::ffi::OsString::from("--kb-invocation"),
+                        std::ffi::OsString::from(id),
+                    ]);
+                }
+                if let Some(task) = knowledge_task
+                    && !task.is_empty()
+                {
+                    args.extend([
+                        std::ffi::OsString::from("--kb-task"),
+                        std::ffi::OsString::from(task),
+                    ]);
+                }
+                if let Some(paths) = knowledge_paths {
+                    for p in paths {
+                        args.extend([
+                            std::ffi::OsString::from("--kb"),
+                            p.as_os_str().to_os_string(),
+                        ]);
+                    }
+                }
+                args
+            },
             profile.0,
             profile.1,
             linux::Receipts {
@@ -1695,19 +1820,48 @@ pub(crate) fn dispatch(command: &crate::Command) -> Option<u8> {
         Err(error) => {
             // The supervisor quotes the child's stderr in its refusal.
             eprintln!("zeno-fcis: contained child refused: {error}");
-            Err(error)
+            Err(error.into())
         }
     };
     #[cfg(not(target_os = "linux"))]
-    let outcome: Result<u8, String> = {
-        let _ = (staging_parent, receipt);
-        Err("containment-unavailable:platform".into())
+    let outcome: Result<u8, SupervisorFailure> = {
+        let _ = (
+            staging_parent,
+            receipt,
+            knowledge_snapshot,
+            knowledge_invocation,
+            knowledge_task,
+            knowledge_paths,
+        );
+        Err("containment-unavailable:platform".to_owned().into())
     };
     Some(match outcome {
         Ok(code) => code,
-        Err(reason) => {
-            let mut report = serde_json::json!({"schema":if profile.0 {"zeno-fcis/transform-result/1"}else{"zeno-fcis/transform-loop/1"},
-                "status":"inconclusive","authority":"none","reason":reason,"accounting_complete":false});
+        Err(failure) => {
+            let reason = &failure.reason;
+            let mut exit_code = crate::BLOCKED;
+            let mut report = failure.report(profile.0);
+            // Capture never falls back to host execution. Sanitize supervisor
+            // diagnostics before they can reach an example-only proposer API.
+            if let crate::Command::Loop { command } = command
+                && crate::loop_command::is_capture(command)
+            {
+                let unavailable = reason.starts_with("containment-unavailable")
+                    || !cfg!(all(target_os = "linux", target_arch = "x86_64"));
+                exit_code = if unavailable {
+                    crate::INVALID
+                } else {
+                    crate::BLOCKED
+                };
+                report = serde_json::json!({"schema":"zeno-fcis/black-box-capture/1","door":"capture",
+                    "status":if unavailable {"refused"}else{"inconclusive"},"authority":"none",
+                    "detail":{"reason":if unavailable {"capture-containment-unavailable"}else{"capture-contained-invocation-stopped"},
+                        "attempt_spent":if unavailable {serde_json::json!(false)}else{serde_json::Value::Null},"accounting_complete":false}});
+                if reason.starts_with("containment-unavailable:systemd-user-manager:") {
+                    report["detail"]["prerequisite"] = serde_json::json!("systemd-user-manager");
+                }
+                failure.add_cleanup(&mut report, true);
+            }
             if let Some(acquisition) = acquisition {
                 let mut intake = acquisition.json();
                 // A killed child's counts are unknown. Its entire allowance
@@ -1717,7 +1871,7 @@ pub(crate) fn dispatch(command: &crate::Command) -> Option<u8> {
                 report["acquisition"] = intake;
             }
             crate::print_json(&report);
-            crate::BLOCKED
+            exit_code
         }
     })
 }
@@ -2030,7 +2184,7 @@ mod tests {
             assert!(physical.lines().any(|s| s == "MemorySwapMax=0"));
             assert!(physical.lines().any(|s| s == "TasksMax=64"));
             if name.ends_with("descendant") {
-                assert!(test_err(result).starts_with("contained-deadline;"));
+                assert!(test_err(result).reason.starts_with("contained-deadline;"));
                 assert!(physical.lines().any(|s| s == "Result=signal"));
                 assert!(
                     members.len() >= 2,
@@ -2186,7 +2340,7 @@ mod tests {
                 "actual process status required",
             );
             println!("abnormal exit {unit}: {error}");
-            assert!(error.starts_with(expected), "{error}");
+            assert!(error.reason.starts_with(expected), "{error}");
             assert!(gone && members_gone, "{physical}");
         }
     }
@@ -2265,7 +2419,11 @@ mod tests {
                 assert_eq!(result, Ok(0));
                 assert_eq!(test_ok(std::fs::read(&receipt)), b"complete\n");
             } else {
-                assert!(test_err(result).starts_with("unit-ended-abnormally:Result=oom-kill"));
+                assert!(
+                    test_err(result)
+                        .reason
+                        .starts_with("unit-ended-abnormally:Result=oom-kill")
+                );
                 assert!(!receipt.exists());
             }
             // Only the published receipt, if any, remains: staging is gone.

@@ -1,0 +1,22 @@
+zeno 1;
+project 1 arithmetic_fused;
+namespace 2 core;
+type 100 state FusedState;
+type 101 command FusedCommand;
+type 102 context FusedContext;
+type 105 int Scalar in 0..=9223372036854775807;
+type 106 int Denominator in 1..=9223372036854775807;
+field 110 100 quotient 105;
+field 120 101 left_factor 105;
+field 121 101 right_factor 105;
+field 122 101 denominator 106;
+component 400 fused {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded_state on commit, genesis = post.100.110 >= 0;
+law 501 exact_floor on accept = post.100.110 == div_floor(command.101.120 * command.101.121, command.101.122);

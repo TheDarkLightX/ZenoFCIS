@@ -1,6 +1,7 @@
 """Pull-based stdio MCP bridge for existing coding harnesses. No accept tool."""
 
 import argparse
+import os
 import json
 from pathlib import Path
 import sys
@@ -33,6 +34,39 @@ TOOLS = [
      "inputSchema": schema({"revision": STRING, "syntax": {"type": "string", "enum": ["symbolic", "english"]}, "surface": STRING}, ["revision", "syntax", "surface"])},
     {"name": "zal_trace", "description": "Replay up to64 assumed inputs from the declared initial state on the exact current revision.",
      "inputSchema": schema({"revision": STRING, "inputs": {"type": "array", "maxItems": 64, "items": schema({"event": STRING, "context": {"type": "object", "additionalProperties": {"type": "boolean"}}}, ["event", "context"])}}, ["revision", "inputs"])},
+]
+
+# The ZAL loop workspace tools (loop_workspace.py, profile zal/fcis-loop/1), on the workspace named by
+# ZAL_LOOP_WORKSPACE. There is no answer or say tool: only the owner's terminal answers and states rules.
+LOOP_NOTE = " Tool permission is not the owner's agreement; every verdict comes from the zeno-fcis checkers."
+TOOLS += [
+    {"name": "zal_loop_read", "description": "Read the loop workspace: subject, incumbent size, open questions for the owner (only the owner answers them) and the latest events in English and symbolic ZAL." + LOOP_NOTE,
+     "inputSchema": schema({}, [])},
+    {"name": "zal_loop_packet", "description": "The subject card: fields and domains with variant names, outputs, case table, declared laws, incumbent program, and the three header lines every document must start with." + LOOP_NOTE,
+     "inputSchema": schema({"surface": {"type": "string", "enum": ["symbolic", "english"]}}, [])},
+    {"name": "zal_loop_submit", "description": "Submit a ZAL loop document written by the model (header, subject and 'author model' lines, then statements): programs (holes make a sketch), family programs, questions for the owner. Answers are refused: a model cannot answer for the owner. Returns the judge's replies in both surfaces." + LOOP_NOTE,
+     "inputSchema": schema({"source": STRING}, ["source"])},
+    {"name": "zal_loop_translate", "description": "Parse a ZAL loop document against the workspace's vocabulary and render it in the other surface, without submitting it." + LOOP_NOTE,
+     "inputSchema": schema({"source": STRING, "to": {"type": "string", "enum": ["english", "symbolic"]}}, ["source", "to"])},
+    {"name": "zal_loop_legend", "description": "The paired symbolic and controlled-English statement forms of the zal/fcis-loop/1 profile." + LOOP_NOTE,
+     "inputSchema": schema({}, [])},
+]
+
+
+# Black-box capture uses separate example-only endpoints. No owner provisioning,
+# private status, answer or say tool is exposed. Existing tools stay unchanged.
+CAPTURE_NOTE = " Only Rust transform check and receipt replay decide captured-exact. Tool permission is not owner agreement."
+TOOLS += [
+    {"name": "zal_capture_read", "description": "Read the public capture transcript in both ZAL surfaces." + CAPTURE_NOTE,
+     "inputSchema": schema({}, [])},
+    {"name": "zal_capture_packet", "description": "Read only public ABI, round, selected examples and proposal headers; no reference source or hidden table." + CAPTURE_NOTE,
+     "inputSchema": schema({}, [])},
+    {"name": "zal_capture_submit", "description": "Submit one complete model capture proposal. Owner answers, source provisioning and judge-authored claims are refused." + CAPTURE_NOTE,
+     "inputSchema": schema({"source": STRING}, ["source"])},
+    {"name": "zal_capture_translate", "description": "Translate a model capture proposal between symbolic and controlled English without submitting it." + CAPTURE_NOTE,
+     "inputSchema": schema({"source": STRING, "to": {"type": "string", "enum": ["english", "symbolic"]}}, ["source", "to"])},
+    {"name": "zal_capture_legend", "description": "Show paired capture acts for zal/fcis-loop/1." + CAPTURE_NOTE,
+     "inputSchema": schema({}, [])},
 ]
 
 
@@ -77,6 +111,16 @@ class Bridge:
         if not tool:
             raise Refusal("Unknown tool")
         validate(arguments, tool["inputSchema"])
+        if name.startswith("zal_capture_"):
+            from capture_workspace import mcp_call as capture_call
+            from loop_doors import disable_automatic_knowledge
+            with disable_automatic_knowledge():
+                return capture_call(name, arguments)
+        if name.startswith("zal_loop_"):
+            from loop_workspace import mcp_call
+            from loop_doors import disable_automatic_knowledge
+            with disable_automatic_knowledge():
+                return mcp_call(name, arguments)
         def action(session):
             if name == "zal_read":
                 return {**session.view(), "object_ids": sorted(session.objects()), "authority": "none",
@@ -129,10 +173,16 @@ class Bridge:
                 return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}], "isError": False}
             except (ValueError, TypeError, KeyError, OSError) as error:
                 return {"content": [{"type": "text", "text": str(error)[:2000]}], "isError": True}
+            except RecursionError:
+                # The parsers refuse deep nesting first; this keeps the server alive if anything else recurses.
+                return {"content": [{"type": "text", "text": "input nested too deeply"}], "isError": True}
         raise Refusal("Unknown method")
 
 
 def main():
+    # MCP has no ambient private-KB write path. Explicit knowledge queries use
+    # the separate read-only tools; ordinary local loop invocations retain env configuration.
+    os.environ.pop("ZENO_FCIS_KB", None)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, required=True)
     options = parser.parse_args()
@@ -151,10 +201,11 @@ def main():
             if result is None:
                 continue
             response = {"jsonrpc": "2.0", "id": request["id"], "result": result}
-        except (ValueError, TypeError, KeyError) as error:
+        except (ValueError, TypeError, KeyError, RecursionError) as error:
             request_id = request.get("id") if isinstance(request, dict) else None
+            message = "input nested too deeply" if isinstance(error, RecursionError) else str(error)[:2000]
             response = {"jsonrpc": "2.0", "id": request_id if valid_request_id(request_id) else None,
-                        "error": {"code": -32600, "message": str(error)[:2000]}}
+                        "error": {"code": -32600, "message": message}}
         print(json.dumps(response, separators=(",", ":")), flush=True)
 
 

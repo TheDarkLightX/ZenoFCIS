@@ -1,0 +1,27 @@
+zeno 1;
+project 1 tripwire;
+namespace 2 fixtures;
+// A wire that a fire command trips as a committed failure: the trip is
+// recorded and the step ends there.
+type 100 state Wire;
+type 101 command Touch;
+type 102 context Operator;
+type 105 int Count in 0..=2;
+type 106 bool Flag;
+type 108 bool Authorized;
+field 110 100 tripped 106;
+field 111 100 touches 105;
+field 120 101 fire 106;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 tripped precedence 1;
+component 400 wire {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.111 <= 2;
+law 501 trip_records on failure = post.100.110 == 1 && post.100.111 == pre.100.111;

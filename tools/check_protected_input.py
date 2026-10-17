@@ -20,6 +20,7 @@ import zipfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
+from verus_coverage import profile_inventory
 import check_verus as verifier
 from check_finite_execution import once
 from check_metered_execution import UNIT_SOURCES as METER_SOURCES
@@ -185,6 +186,33 @@ def mutation_sources(source: str, specification: str, typed: str) -> dict[str, t
     return mutations
 
 
+def coverage_control(vir, profile, name):
+    """Require the declared body/contract fault; source-identity drift is insufficient."""
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = profile['namespace'] + 'execution_v2::input_view::'
+    if name == 'add_uncontracted_projection_work':
+        target = prefix + 'uncontracted_record_probe'
+        intended = (set(actual) == set(expected) | {target}
+            and target not in expected and actual[target]['mode'] == 'Exec'
+            and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        relative, field = {'parse_header_before_ingress': ('typed::project_into', 'body_sha256'), 'parse_field_before_read': ('typed::project_fields', 'body_sha256'), 'weaken_projection_contract': ('project', 'ensures_sha256'), 'narrow_projection_domain': ('project', 'requires_sha256'), 'inject_caller_usage': ('project', 'signature_sha256'), 'change_projection_specification': ('spec::projection', 'body_sha256')}[name]
+        target = prefix + relative
+        intended = (set(actual) == set(expected)
+            and target in actual and target in expected
+            and actual[target].get(field) != expected[target].get(field))
+        if field == 'body_sha256' and actual.get(target, {}).get('mode') == 'Exec':
+            intended = intended and all(actual[target][f] == expected[target][f]
+                for f in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
+    return intended, refusal
+
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     rust = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024",
             "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)"]
@@ -288,8 +316,10 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                     require_coverage((specimen / "logs/crate.vir").read_text(), profile)
                 except ValueError as error:
                     coverage_error = str(error)
-                killed = (mutant.returncode == 0 and result.get("success") is True
-                          and result.get("errors") == 0 and coverage_error is not None)
+                intended, coverage_error = coverage_control((specimen / "logs/crate.vir").read_text(), profile, name)
+                killed = (mutant.returncode == 0 and verifier.proof_succeeded(mutant_report, pin)
+                          and not verifier.ERROR_HEADER.search(mutant.stderr)
+                          and not verifier.NON_SEMANTIC.search(mutant.stderr) and intended)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
                               "coverage_refusal": coverage_error, "logs": str(specimen)})
@@ -319,7 +349,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

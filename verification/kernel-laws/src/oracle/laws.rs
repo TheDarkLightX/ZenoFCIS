@@ -1,10 +1,10 @@
 //! Private original native law inputs, bindings, evaluation and executable oracles.
+use crate::oracle::core::DecisionKind;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use zeno_fcis_catalog::ProjectCatalog;
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
-use crate::oracle::core::DecisionKind;
 use zeno_fcis_evidence::{CoverageDeclaration, EvidenceEnvelope, SourceBindings};
 use zeno_fcis_patch::CanonicalPatch;
 use zeno_fcis_plan::{CommitPlan, OutboxPlan};
@@ -177,7 +177,7 @@ pub enum LawProofDecision {
 
 /// Pluggable external verifier for retained project-law evidence.
 ///
-/// A public Lean/SMT/Flux adapter or a private ESSO adapter can implement this
+/// A public Lean/SMT/Flux adapter or a private checker adapter can implement this
 /// interface. The legacy law owner selects the concrete verifier and trusts
 /// its answer. This callback is not an admission route into V2 Authority.
 pub trait LawEvidenceVerifier {
@@ -572,7 +572,7 @@ impl LawObservation {
 
 /// Reviewed deterministic runtime checker for one project law manifest.
 ///
-/// Concrete process adapters can call Lean, SMT, Flux, Kani, or a private ESSO
+/// Concrete process adapters can call Lean, SMT, Flux, Kani, or a private
 /// checker from a `std` shell. Tool absence, timeout, crash, and `unknown` must
 /// map to a non-authoritative failure or indeterminate observation.
 pub trait ProjectLawEngine {

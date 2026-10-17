@@ -2,7 +2,8 @@
 //!
 //! Rules use a small infix language: `->`, `||`, `&&`, comparisons, `+`, `-`,
 //! `*`, prefix `!` and `-`, `choose(c, a, b)`, `div_floor(a, b)`,
-//! `div_ceil(a, b)`, integers, `true`, `false` and dotted names. Binary
+//! `div_ceil(a, b)`, fused `mul_div_floor/ceil(a,b,d)`, `products_ge` with four
+//! or six arguments, integers, `true`, `false` and dotted names. Binary
 //! operators associate left except `->`. Law formulas come from the
 //! `zeno-fcis-spec` parser and convert to the same tree.
 
@@ -66,7 +67,15 @@ pub const OPERATORS: [(&str, Binary); 12] = [
 ];
 
 /// Every function with its number of arguments.
-pub const FUNCTIONS: [(&str, usize); 3] = [("choose", 3), ("div_floor", 2), ("div_ceil", 2)];
+pub const FUNCTIONS: [(&str, usize); 7] = [
+    ("choose", 3),
+    ("div_floor", 2),
+    ("div_ceil", 2),
+    ("mul_div_floor", 3),
+    ("mul_div_ceil", 3),
+    ("products_ge", 4),
+    ("products_ge", 6),
+];
 
 /// Rounding of `div_floor` and `div_ceil`.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -87,6 +96,10 @@ pub enum Ast {
     Binary(Binary, Box<Ast>, Box<Ast>),
     Choose(Box<Ast>, Box<Ast>, Box<Ast>),
     Div(Rounding, Box<Ast>, Box<Ast>),
+    /// Explicit fused product/division, distinct from Div(Mul(..), ..).
+    MulDiv(Rounding, Box<Ast>, Box<Ast>, Box<Ast>),
+    /// Four arguments compare two-factor products; six compare three factors.
+    ProductsGe(Box<[Ast]>),
 }
 
 const MAX_DEPTH: usize = 64;
@@ -215,9 +228,18 @@ impl<'t> Parser<'t> {
 
 fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let count = arguments.len();
+    if name == "products_ge" && (count == 4 || count == 6) {
+        return Ok(Ast::ProductsGe(arguments.into_boxed_slice()));
+    }
     let mut arguments = arguments.into_iter().map(Box::new);
     let mut next = || arguments.next();
     let call = match (name, count, next(), next(), next()) {
+        ("mul_div_floor", 3, Some(a), Some(b), Some(d)) => {
+            Some(Ast::MulDiv(Rounding::Floor, a, b, d))
+        }
+        ("mul_div_ceil", 3, Some(a), Some(b), Some(d)) => {
+            Some(Ast::MulDiv(Rounding::Ceil, a, b, d))
+        }
         ("choose", 3, Some(condition), Some(then), Some(otherwise)) => {
             Some(Ast::Choose(condition, then, otherwise))
         }
@@ -307,6 +329,17 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
         }
         Ast::Div(Rounding::Floor, left, right) => call("div_floor", &[left, right], out),
         Ast::Div(Rounding::Ceil, left, right) => call("div_ceil", &[left, right], out),
+        Ast::MulDiv(rounding, a, b, d) => call(
+            match rounding {
+                Rounding::Floor => "mul_div_floor",
+                Rounding::Ceil => "mul_div_ceil",
+            },
+            &[a, b, d],
+            out,
+        ),
+        Ast::ProductsGe(arguments) => {
+            call("products_ge", &arguments.iter().collect::<Vec<_>>(), out)
+        }
     }
 }
 
@@ -347,6 +380,18 @@ fn expand_with<'v>(
             recurse(then, stack)?,
             recurse(otherwise, stack)?,
         ),
+        Ast::MulDiv(rounding, a, b, d) => Ast::MulDiv(
+            *rounding,
+            recurse(a, stack)?,
+            recurse(b, stack)?,
+            recurse(d, stack)?,
+        ),
+        Ast::ProductsGe(arguments) => Ast::ProductsGe(
+            arguments
+                .iter()
+                .map(|a| expand_with(a, variables, stack))
+                .collect::<Result<_, _>>()?,
+        ),
         Ast::Div(rounding, left, right) => {
             Ast::Div(*rounding, recurse(left, stack)?, recurse(right, stack)?)
         }
@@ -385,6 +430,10 @@ pub fn law(formula: &RelExpr) -> Result<Ast, String> {
                 Box::new(value(right)?),
             ))
         }
+        RelExpr::Predicate { name, arguments } if name.as_str() == "products_ge" => call(
+            "products_ge",
+            arguments.iter().map(value).collect::<Result<_, _>>()?,
+        ),
         RelExpr::Predicate { name, .. } => Err(format!("named predicate `{}`", name.as_str())),
         RelExpr::ForAll { .. } | RelExpr::Exists { .. } => Err("quantifier".to_owned()),
     }

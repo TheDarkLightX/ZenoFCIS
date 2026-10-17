@@ -22,7 +22,7 @@ from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import UNIT_SOURCES as SCALAR_SOURCES, once
-from verus_coverage import require_coverage
+from verus_coverage import profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = Path("verification/verus/metered-execution.json")
@@ -58,6 +58,17 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
 
 
+SEMANTIC_TARGETS = {'omit_step_charge': 'evaluate',
+ 'charge_wrong_resource': 'evaluate',
+ 'skip_unused_instruction': 'evaluate',
+ 'wrong_budget_precedence': 'evaluate',
+ 'rollback_consumed_usage': 'evaluate_into',
+ 'leak_partial_buffers': 'evaluate_into',
+ 'accept_exhausted_charge': 'charge',
+ 'mutate_usage_on_overflow': 'charge',
+ 'alias_step_counter': 'index'}
+
+
 def snapshot() -> dict[str, str]:
     for path in SOURCES:
         if (ROOT / path).is_symlink():
@@ -77,7 +88,7 @@ def mutation_sources(execution: str, meter: str, spec: str, resource: str,
     for name, before, after in (
         ("omit_step_charge", "meter.charge(Resource::Step, 1)", "meter.charge(Resource::Step, 0)"),
         ("charge_wrong_resource", "meter.charge(Resource::Step, 1)", "meter.charge(Resource::Read, 1)"),
-        ("skip_unused_instruction", "while index < program.len() {", "while index + 1 < program.len() {"),
+        ("skip_unused_instruction", "while index < program.len() {", "while index < program.len() && index != program.len() - 1 {"),
         ("wrong_budget_precedence", "return Err(Failure::Budget(error));", "return Err(Failure::Arithmetic);"),
     ):
         mutations[name] = (NUMERIC, once(numeric, before, after), "proof")
@@ -160,24 +171,62 @@ def classify_mutation(proc, report, name, path, changed, specimen, pin, profile,
     if (expected != "coverage" or proc.returncode != 0 or vir is None
             or not verifier.proof_succeeded(report, pin) or verifier.ERROR_HEADER.search(proc.stderr)):
         return False, None
+    intended, refusal = coverage_control(vir, profile, name)
+    if intended:
+        return True, refusal
+    return False, None
+
+
+def coverage_control(vir, profile, name):
+    """Require the declared body/contract fault; source-identity drift is insufficient."""
     try:
         require_coverage(vir, profile)
     except ValueError as error:
-        return True, str(error)
-    return False, None
-
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = profile['namespace'] + 'execution_v2::'
+    if name == 'add_uncontracted_work':
+        target = prefix + 'uncharged_identity'
+        intended = (set(actual) == set(expected) | {target}
+            and target not in expected and actual[target]['mode'] == 'Exec'
+            and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        relative, field = {'execute_before_charging': ('numeric::evaluate', 'body_sha256'), 'omit_metered_contract': ('execute', 'ensures_sha256'), 'weaken_usage_contract': ('execute', 'ensures_sha256'), 'narrow_input_domain': ('execute', 'requires_sha256'), 'inject_caller_usage_argument': ('execute', 'signature_sha256'), 'change_charge_specification': ('spec::charge', 'body_sha256')}[name]
+        target = prefix + relative
+        intended = (set(actual) == set(expected)
+            and target in actual and target in expected
+            and actual[target].get(field) != expected[target].get(field))
+        if field == 'body_sha256' and actual.get(target, {}).get('mode') == 'Exec':
+            intended = intended and all(actual[target][f] == expected[target][f]
+                for f in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
+    return intended, refusal
 
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     rust = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024",
             "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)"]
     rust += native_dependency_args(ROOT, directory, environment)
     executable = directory / "metered-tests"
-    verifier.require_success(verifier.run([*rust, "--test", str(HARNESS), "-o", str(executable)], ROOT, environment))
-    native = verifier.run([str(executable)], ROOT, environment)
+
+    def recorded_native(label: str, command: list[str]) -> subprocess.CompletedProcess:
+        process = verifier.run(command, ROOT, environment)
+        (directory / (label + ".stdout")).write_text(process.stdout)
+        (directory / (label + ".stderr")).write_text(process.stderr)
+        (directory / (label + ".process.json")).write_text(json.dumps({
+            "command": command, "cwd": str(ROOT), "exit": process.returncode,
+        }, indent=2) + "\n")
+        return process
+
+    verifier.require_success(recorded_native("native-compile",
+        [*rust, "--test", str(HARNESS), "-o", str(executable)]))
+    native = recorded_native("native-tests", [str(executable)])
     verifier.require_success(native)
     library = directory / "libmetered_execution.rlib"
-    verifier.require_success(verifier.run([*rust, "--crate-type=rlib", "--crate-name", "metered_execution",
-                                          str(HARNESS), "-o", str(library)], ROOT, environment))
+    verifier.require_success(recorded_native("native-library",
+        [*rust, "--crate-type=rlib", "--crate-name", "metered_execution",
+         str(HARNESS), "-o", str(library)]))
     prelude = "use metered_execution::execution_v2::{execute, zero_limits, Resource};\n"
     valid = "fn main() { let outcome = execute(&[], &[], &[], &[], &[], zero_limits()); let (_, usage) = outcome.into_parts(); let _ = usage.used(Resource::Step); }\n"
     specimens = {
@@ -191,8 +240,9 @@ def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     for name, (source, error_code) in specimens.items():
         path = directory / f"consumer_{name}.rs"
         path.write_text(source)
-        process = verifier.run([*rust, "--extern", f"metered_execution={library}", str(path),
-                                "-o", str(directory / f"consumer_{name}")], ROOT, environment)
+        process = recorded_native("native-api-" + name,
+            [*rust, "--extern", f"metered_execution={library}", str(path),
+             "-o", str(directory / f"consumer_{name}")])
         if error_code is None:
             verifier.require_success(process)
         elif process.returncode == 0 or error_code not in process.stderr:
@@ -213,7 +263,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                    if not key.startswith(("VERUS_", "VARGO_")) and key not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
     environment.update(RUSTUP_TOOLCHAIN=pin["rust_toolchain"], VERUS_Z3_PATH=str(tools / "z3"))
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024", "--no-cheating",
-               "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json", "--log", "vir",
+               "--no-external-by-default", "--num-threads", verifier.proof_threads('2'), "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
     context = (nullcontext(str(retained_directory)) if retained_directory is not None
@@ -244,7 +294,10 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
-            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+            # The skip-last fault needs more prover work to finish its body check.
+            # Keep resource failures unqualified; runtime budgets/specs are unchanged.
+            control_budget = ["--rlimit", "100"] if name == "skip_unused_instruction" else []
+            mutant_command = [*command, *control_budget, "--log-dir", str(specimen / "logs"), str(HARNESS)]
             mutant = verifier.run(mutant_command, specimen, environment)
             (specimen / "verus.json").write_text(mutant.stdout)
             (specimen / "verus.stderr").write_text(mutant.stderr)
@@ -284,7 +337,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

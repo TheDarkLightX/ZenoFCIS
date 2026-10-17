@@ -66,7 +66,8 @@ pub(in super::super) open spec fn body_fact(
     body: Term, op: Op, domains: Seq<Domain>, input: Seq<Term>, kind: Kind,
     previous_kinds: Seq<Kind>, previous_terms: Seq<Term>,
 ) -> bool {
-    node::depends_on(body, input, previous_terms, previous_kinds)
+    !runtime::new_arithmetic(op)
+        && node::depends_on(body, input, previous_terms, previous_kinds)
         && (input.len() == domains.len() ==> admission::kind(
             op, domains, node::static_kinds(previous_kinds)) == Ok(node::boolean(kind)))
         && (forall|environment: Map<Seq<char>, denotation::Value>|

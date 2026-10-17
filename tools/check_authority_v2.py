@@ -11,6 +11,7 @@ import subprocess
 import check_verus as verifier
 import evaluator_identity as evaluator
 from verus_coverage import descriptor_inventory, inventory, require_coverage
+from verus_coverage import observed_inventory
 ROOT=Path(__file__).resolve().parents[1]
 HARNESS=Path('verification/verus/authority_v2.rs')
 PROFILE=Path('verification/verus/authority_v2.json')
@@ -30,7 +31,7 @@ DESCRIPTOR=SUBJECT.parent/'authority/descriptor.rs'
 EVALUATOR=SUBJECT.parent/'authority/evaluator.rs'
 SOURCE_MANIFEST=Path('verification/verus/authority_v2_sources.json')
 PUBLIC_TEST=Path('crates/zeno-fcis-synthesis/tests/v2_authority.rs')
-APPROVED_SOURCE_CLOSURE_SHA256='19439fa8152997769ccef59f4b2e81b91d92292cb6507fecf4216b46f1bf1e22'
+APPROVED_SOURCE_CLOSURE_SHA256='eeb990daed7334c00eb718694f6e37d9b03fbaad7146e0426db16629b888687e'
 # This unchanged command-substitution control needs more than the default
 # solver budget. Exhaustion still refuses qualification; it is not a kill.
 CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80}
@@ -267,15 +268,30 @@ def custody_controls(out,rust,env):
         if not passed:raise RuntimeError(f'custody control failed or unrelated refusal: {name}')
     return results
 
+def candidate_profile(vir: str, report: dict, pin: dict) -> dict:
+    if not verifier.proof_succeeded(report, pin):
+        raise ValueError('cannot inventory a failed or differently pinned proof')
+    raw, _ = observed_inventory(vir, 'authority_v2::')
+    bodies = sorted(n for n, v in raw.items() if v['mode'] == 'Exec')
+    functions, declarations = observed_inventory(vir, 'authority_v2::', tuple(bodies))
+    profile = {'namespace': 'authority_v2::', 'reviewed': False,
+               'functions': functions, 'body_covered_functions': bodies,
+               'expected_verified': report['verification-results']['verified'],
+               'target_functions': sorted(n for n in report['func-details'] if n.startswith('authority_v2::'))}
+    if declarations is not None:
+        profile['abstract_declarations'] = declarations
+    return profile
+
+
 def check(out:Path,refresh=False,positive_only=False,selected=None):
     generation=check_generated_sources()
     initial=snapshot(True)
     pin=json.loads((ROOT/verifier.PIN).read_text())
-    tool=Path.home()/'.cache/zeno-fcis/verus'/pin['version']/'qualified'
+    tool=verifier.cache_directory()/pin['version']/'qualified'
     verifier.verify_tool_files(tool,pin)
     env={k:v for k,v in os.environ.items() if not k.startswith(('VERUS_','VARGO_')) and k not in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'],VERUS_Z3_PATH=str(tool/'z3'),CARGO_BUILD_JOBS='1',RUST_TEST_THREADS='1')
-    command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2','-V','spinoff-all','--output-json','--triggers-mode','silent','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
+    command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads',verifier.proof_threads('2'),'-V','spinoff-all','--output-json','--triggers-mode','silent','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
     out.mkdir(parents=True,exist_ok=True)
     def proof(cwd,name):
         proc=verifier.run([*command,'--rlimit',str(CONTROL_RLIMITS.get(name,10)),
@@ -287,11 +303,13 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     if not vr.get('is-verifying-entire-crate') or not vr.get('success') or vr.get('errors')!=0:raise RuntimeError('whole closure proof failed')
     vir=(out/'positive/crate.vir').read_text()
     if refresh:
-        prefix='authority_v2::execution_v2::composition::descriptor::'
-        raw,_declarations=descriptor_inventory(vir,'authority_v2::',prefix);body=[n for n,v in raw.items() if v['mode']=='Exec']
-        functions,declarations=descriptor_inventory(vir,'authority_v2::',prefix,tuple(body))
-        profile={'namespace':'authority_v2::','functions':functions,'abstract_declarations':declarations,'body_covered_functions':body,'expected_verified':vr['verified'],'target_functions':sorted(n for n in report['func-details'] if n.startswith('authority_v2::'))}
-        (ROOT/PROFILE).write_text(json.dumps(profile,indent=2,sort_keys=True)+'\n')
+        profile=candidate_profile(vir,report,pin)
+        (out/'candidate-profile.json').write_text(json.dumps(profile,indent=2,sort_keys=True)+'\n')
+        if initial!=snapshot(True):raise RuntimeError('source drift during candidate proof')
+        return {'schema':'zeno-fcis/authority-v2-evidence/1','status':'profile-review-required',
+            'source_sha256':initial,'source_generation':generation,'verus_report':report,
+            'candidate_profile':str(out/'candidate-profile.json'),'review_accepted':False,
+            'all_mutation_controls':False}
     profile=json.loads((ROOT/PROFILE).read_text());coverage=require_coverage(vir,profile)
     if not verifier.accepted(report,{**pin,'expected_verified':profile['expected_verified'],'target_functions':profile['target_functions']}):raise RuntimeError('toolchain or exact function count mismatch')
     before=snapshot()
@@ -382,6 +400,6 @@ def main():
     try:receipt=check(a.out.resolve(),a.refresh_coverage,a.positive_only,a.controls)
     except (OSError,ValueError,KeyError,RuntimeError,subprocess.SubprocessError) as e:receipt={'schema':'zeno-fcis/authority-v2-evidence/1','status':'failed','error':str(e)}
     a.out.mkdir(parents=True,exist_ok=True);(a.out/'receipt.json').write_text(json.dumps(receipt,sort_keys=True,indent=2)+'\n');print(receipt['status'])
-    if receipt['status']!='passed':print(receipt['error']);return 1
+    if receipt['status'] not in ('passed','profile-review-required'):print(receipt['error']);return 1
     return 0
 if __name__=='__main__':raise SystemExit(main())

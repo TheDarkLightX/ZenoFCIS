@@ -1,0 +1,66 @@
+{
+  "checker": "zeno-fcis/composed-domain-checker/1",
+  "components": [
+    {
+      "assume": "true",
+      "bind": {
+        "action": "choose(budget.remaining == 0, 151, 150)",
+        "authorized": "authorized"
+      },
+      "invariant": "true",
+      "name": "counter",
+      "owns": [
+        "counter.value"
+      ],
+      "participates": "op == 0",
+      "path": "counter",
+      "policy_sha256": "02bf43eb28608b51c1d851f6041c03f196cb4b1bc102f61c760726f4cfb8c0ea",
+      "program_sha256": "24744956eb66f826bf6fe7220bba02b37ae0e4b31a27900410e05f02b9f6ed10",
+      "project_sha256": "10f71127b689e33798ecee6fd55ee8980f282ef71142ca9298e113a4c86e9821"
+    },
+    {
+      "assume": "amount >= 1",
+      "bind": {
+        "amount": "qty",
+        "authorized": "authorized"
+      },
+      "invariant": "true",
+      "name": "budget",
+      "owns": [
+        "budget.remaining"
+      ],
+      "participates": "op != 2",
+      "path": "budget",
+      "policy_sha256": "3b182556d4492c35b0d0ed8cb979c43670ecbef742ebb3d8dfc8c8bc695cff51",
+      "program_sha256": "7a5fdb8123d7dd1af1fa9fb34eccb00c06cd165ce422f7831b54add7f005a2e4",
+      "project_sha256": "4002c1198514628122b2aec3d776bf0cd0bcf2057e9fc6ccf5860f80fa07de38"
+    }
+  ],
+  "couplings": [],
+  "name": "binding-reads-later",
+  "request": [
+    {
+      "domain": {
+        "kind": "int",
+        "max": 2,
+        "min": 0
+      },
+      "name": "op"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 2,
+        "min": 1
+      },
+      "name": "qty"
+    },
+    {
+      "domain": {
+        "kind": "bool"
+      },
+      "name": "authorized"
+    }
+  ],
+  "schema": "zeno-fcis/checked-composition/3"
+}

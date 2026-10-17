@@ -405,5 +405,8 @@ fn describe_declares_contract_diff_effects() {
                 .collect()
         })
         .unwrap_or_default();
-    assert_eq!(arguments, ["format", "help", "new", "old"]);
+    assert_eq!(
+        arguments,
+        ["format", "help", "kb", "kb_task", "new", "no_kb", "old"]
+    );
 }

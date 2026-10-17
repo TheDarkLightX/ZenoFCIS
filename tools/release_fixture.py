@@ -128,6 +128,11 @@ class Fixture:
     def make_repo(self) -> None:
         repo = self.repo
         repo.mkdir()
+        # BEGIN neutral knowledge include fixture; public bytes only.
+        source = Path(__file__).resolve().parents[1]
+        for relative in (rc_package.knowledge_files.EXAMPLE, rc_package.knowledge_files.INCLUDES):
+            write(repo / relative, (source / relative).read_text())
+        # END neutral knowledge fixture.
         write(repo / "Cargo.toml", '[workspace]\nresolver = "3"\nmembers = ["crates/demo-core", "crates/demo-cli"]\n\n'
               f'[workspace.package]\nversion = "{VERSION}"\nreadme = "README.md"\n')
         for name, extra in (("demo-core", ""), ("demo-cli", f'\n[dependencies]\ndemo-core = {{ path = "../demo-core", version = "{VERSION}" }}\nextdep = "1.0.0"\n')):
