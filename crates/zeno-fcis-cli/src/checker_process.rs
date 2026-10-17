@@ -9,6 +9,10 @@ use std::time::Duration;
 #[path = "posix_process.rs"]
 mod posix;
 
+#[cfg(target_os = "linux")]
+#[path = "checker_host_policy.rs"]
+mod host_policy;
+
 const STAGING: &str = "ZENO_FCIS_CHECKER_STAGING";
 #[cfg(target_os = "linux")]
 const MAX_STAGED_RECEIPTS: usize = 16;
@@ -18,12 +22,17 @@ const MAX_STAGED_RECEIPTS: usize = 16;
 pub(crate) struct SupervisorFailure {
     reason: String,
     cleanup: Option<String>,
+    #[cfg(target_os = "linux")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    host_policy: Option<host_policy::Evidence>,
 }
 impl From<String> for SupervisorFailure {
     fn from(reason: String) -> Self {
         Self {
             reason,
             cleanup: None,
+            #[cfg(target_os = "linux")]
+            host_policy: None,
         }
     }
 }
@@ -42,6 +51,7 @@ impl SupervisorFailure {
         Self {
             reason: primary.unwrap_or_else(|| "process-group-cleanup-incomplete".into()),
             cleanup: Some(physical),
+            host_policy: None,
         }
     }
     fn report(&self, offline: bool) -> serde_json::Value {
@@ -999,7 +1009,7 @@ mod linux {
         Ok(Some(u64::try_from(percent).unwrap_or(u64::MAX)))
     }
 
-    fn cpu_percent(workers: u64) -> Result<u64, String> {
+    pub(super) fn cpu_percent(workers: u64) -> Result<u64, String> {
         let path = group().map_err(|error| format!("caller-cpu-quota-unavailable:{error}"))?;
         chain_percent(Path::new("/sys/fs/cgroup"), path, workers)
     }
@@ -1053,8 +1063,9 @@ mod linux {
         offline: bool,
         workers: u64,
         receipts: Receipts<'_>,
+        host_policy: Option<(&super::host_policy::Evidence, super::Profile)>,
     ) -> Result<u8, super::SupervisorFailure> {
-        supervise_backend(args, offline, workers, receipts, None)
+        supervise_backend(args, offline, workers, receipts, None, host_policy)
     }
 
     pub(super) fn supervise_posix(
@@ -1062,7 +1073,7 @@ mod linux {
         receipts: Receipts<'_>,
         guardian: &mut super::posix::Guardian,
     ) -> Result<u8, super::SupervisorFailure> {
-        supervise_backend(args, false, 4, receipts, Some(guardian))
+        supervise_backend(args, false, 4, receipts, Some(guardian), None)
     }
 
     fn supervise_backend(
@@ -1071,6 +1082,7 @@ mod linux {
         workers: u64,
         receipts: Receipts<'_>,
         mut guardian: Option<&mut super::posix::Guardian>,
+        host_policy: Option<(&super::host_policy::Evidence, super::Profile)>,
     ) -> Result<u8, super::SupervisorFailure> {
         let is_posix = guardian.is_some();
         let setup_error = |error: String| {
@@ -1486,6 +1498,14 @@ mod linux {
                 accepted_exit(waited, reported, loaded, &physical)?
             };
             interrupted()?;
+            // Prepare diagnostic wrapping after accepting exit/cleanup and
+            // before publication. Worker JSON cannot supply policy evidence.
+            if let Some((evidence, profile)) = host_policy {
+                stdout.bytes = super::host_policy::label_output(&stdout.bytes, profile, evidence)?;
+                if stdout.bytes.len() > OUTPUT_LIMIT {
+                    return Err("contained-output-cap".to_owned());
+                }
+            }
             match (handed_over, receipts.receipt) {
                 (Some(sequence), Some(receipt)) if code == crate::OK => {
                     dir.publish(sequence, receipt)
@@ -1888,7 +1908,11 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
 pub(crate) struct Admission {
     backend: Backend,
     #[cfg(target_os = "linux")]
+    required_profile: Profile,
+    #[cfg(target_os = "linux")]
     invocation: Option<posix::Invocation>,
+    #[cfg(target_os = "linux")]
+    host_policy: Option<host_policy::Evidence>,
 }
 
 static PUBLIC_LABEL: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
@@ -2032,6 +2056,8 @@ pub(crate) fn preflight(
     #[cfg(target_os = "linux")]
     let mut invocation = None;
     #[cfg(target_os = "linux")]
+    let mut host_policy = None;
+    #[cfg(target_os = "linux")]
     match backend {
         Backend::Posix if profile == Profile::FiniteData => {
             let mut actual = posix::probe().map_err(|e| e.to_string())?;
@@ -2074,30 +2100,44 @@ pub(crate) fn preflight(
             }
             // Disposable, read-only prerequisite probe. Never create a unit
             // to discover a missing bus, or repair/widen the caller's sandbox.
-            let shown = linux::manager(
-                &[
-                    "--user",
-                    "show",
-                    "--property=LoadState",
-                    "zeno-containment-preflight.service",
-                ],
-                std::time::Instant::now() + Duration::from_secs(1),
-            );
-            if !shown.as_ref().is_ok_and(|s| linux::unit_loaded(s).is_ok()) {
-                return Err(Unavailable {
-                    backend,
-                    missing: "systemd-user-manager".into(),
+            let probe_manager = || {
+                let shown = linux::manager(
+                    &[
+                        "--user",
+                        "show",
+                        "--property=LoadState",
+                        "zeno-containment-preflight.service",
+                    ],
+                    std::time::Instant::now() + Duration::from_secs(1),
+                );
+                if shown.as_ref().is_ok_and(|s| linux::unit_loaded(s).is_ok()) {
+                    Ok(())
+                } else {
+                    Err("systemd-user-manager".to_owned())
                 }
-                .to_string()
-                .into());
-            }
+            };
             if requested == Backend::Auto {
-                return Err(Unavailable {
-                    backend,
-                    missing: "qualified-host-policy".into(),
+                match host_policy::qualify(
+                    probe_manager,
+                    || std::fs::read_to_string("/proc/self/status"),
+                    linux::scheduling,
+                    || linux::cpu_percent(contained_profile(command).map_or(4, |p| p.1)),
+                ) {
+                    Ok(evidence) => host_policy = Some(evidence),
+                    Err(refusal) => {
+                        let mut failure = SupervisorFailure::from(
+                            Unavailable {
+                                backend,
+                                missing: format!("host-policy:{}", refusal.failed_check),
+                            }
+                            .to_string(),
+                        );
+                        failure.host_policy = Some(refusal.evidence);
+                        return Err(failure);
+                    }
                 }
-                .to_string()
-                .into());
+            } else {
+                probe_manager().map_err(|missing| Unavailable { backend, missing }.to_string())?;
             }
         }
         Backend::Auto => return Err("containment-unavailable:auto:unselected".to_owned().into()),
@@ -2112,7 +2152,9 @@ pub(crate) fn preflight(
     #[cfg(target_os = "linux")]
     Ok(Some(Admission {
         backend,
+        required_profile: profile,
         invocation,
+        host_policy,
     }))
 }
 
@@ -2207,16 +2249,28 @@ pub(crate) fn dispatch(
             Some(Admission {
                 backend: Backend::Posix,
                 invocation: Some(invocation),
+                ..
             }) => posix::supervise(command, &args, invocation),
-            _ => linux::supervise(
-                &args,
-                profile.0,
-                profile.1,
-                linux::Receipts {
-                    staging_parent: staging_parent.as_deref(),
-                    receipt,
-                },
-            ),
+            admission => {
+                let host_policy =
+                    admission.and_then(|a| a.host_policy.map(|e| (e, a.required_profile)));
+                let result = linux::supervise(
+                    &args,
+                    profile.0,
+                    profile.1,
+                    linux::Receipts {
+                        staging_parent: staging_parent.as_deref(),
+                        receipt,
+                    },
+                    host_policy
+                        .as_ref()
+                        .map(|(evidence, profile)| (evidence, *profile)),
+                );
+                result.map_err(|mut failure| {
+                    failure.host_policy = host_policy.map(|(evidence, _)| evidence);
+                    failure
+                })
+            }
         },
         Err(error) => {
             // The supervisor quotes the child's stderr in its refusal.
@@ -2277,6 +2331,7 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
                         "attempt_spent":if unavailable {serde_json::json!(false)}else{serde_json::Value::Null},"accounting_complete":false}});
         if reason.starts_with("containment-unavailable:systemd-user-manager:")
             || reason == "containment-unavailable:systemd:systemd-user-manager"
+            || reason == "containment-unavailable:systemd:host-policy:systemd-user-manager"
         {
             report["detail"]["prerequisite"] = serde_json::json!("systemd-user-manager");
         }
@@ -2299,14 +2354,28 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
         } else {
             Backend::Auto
         };
-        set_public_label(
-            serde_json::json!({"schema":"zeno-fcis/containment-result/1",
+        let label = serde_json::json!({"schema":"zeno-fcis/containment-result/1",
             "backend":backend,"required_profile":required,
             "evidence":"inline-unqualified-refusal",
             "startup":{"guarantees":[],"admitted":false},
             "final":{"termination":"stopped","reason":if let crate::Command::Loop { command } = command && crate::loop_command::is_capture(command) { report["detail"]["reason"].clone() } else { serde_json::json!(failure.reason) },"application_work_started":false,
-                "cleanup":"unknown","absence_verified":false}}),
-        );
+                "cleanup":"unknown","absence_verified":false}});
+        #[cfg(target_os = "linux")]
+        let label = {
+            let mut label = label;
+            if let Some(evidence) = &failure.host_policy {
+                label["host_policy"] = serde_json::json!(evidence);
+                if evidence.qualified {
+                    label["final"]["application_work_started"] = serde_json::Value::Null;
+                } else {
+                    // Policy reasons are fixed nonsecret check names. Keep the
+                    // precise refusal even when capture sanitizes its detail.
+                    label["host_policy_refusal"] = serde_json::json!(failure.reason);
+                }
+            }
+            label
+        };
+        set_public_label(label);
     }
     crate::print_json(&report);
     exit_code
@@ -2553,7 +2622,7 @@ mod tests {
                 staging_parent: Some(&dir),
                 receipt: None,
             };
-            assert_eq!(linux::supervise(&args, false, 1, receipts), Ok(3));
+            assert_eq!(linux::supervise(&args, false, 1, receipts, None), Ok(3));
             let (unit, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual group and cleanup evidence required",
@@ -2615,7 +2684,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             };
-            let result = linux::supervise(&args, false, 1, receipts);
+            let result = linux::supervise(&args, false, 1, receipts, None);
             assert!(result.is_err(), "probe unexpectedly accepted: {result:?}");
             let (unit, physical, gone, members, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
@@ -2781,7 +2850,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             };
-            let error = test_err(linux::supervise(&args, offline, 1, receipts));
+            let error = test_err(linux::supervise(&args, offline, 1, receipts, None));
             let (unit, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual process status required",
@@ -2856,7 +2925,7 @@ mod tests {
                 staging_parent: Some(&dir),
                 receipt: Some(&receipt),
             };
-            let result = linux::supervise(&args, true, 1, receipts);
+            let result = linux::supervise(&args, true, 1, receipts, None);
             let (_, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual process status required",
@@ -2920,6 +2989,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             },
+            None,
         );
         assert_eq!(result, Ok(crate::BLOCKED));
         let (_, physical, gone, _, members_gone) = test_some(

@@ -201,6 +201,28 @@ dependency in the graph bound to the same release source.
 
 ## Contained checker runtime
 
+### Automatic backend selection in the 2.5 integration source
+
+The default `--containment-backend auto` uses POSIX for `finite-data/1`.
+For `python-reference/1` (capture open/whole) and `group-resources/1`
+(including offline parallel transform checks), it uses systemd only when
+the read-only user-manager probe succeeds, `/proc/self/status` reports
+`NoNewPrivs: 0` and `Seccomp: 0`, and the caller's CPU affinity, nice value
+and enclosing cgroup CPU quota are known. The launcher retains those CPU
+restrictions and its existing startup and cleanup checks. Missing, malformed
+or unreadable policy inputs refuse with
+`containment-unavailable:systemd:host-policy:<failed-check>`; a sandbox is
+never escaped automatically. The `containment-result/1` record includes
+the attempted host-policy checks and their results, also on refusal.
+
+Use `zeno-fcis --containment-backend systemd ...` or
+`zeno-fcis --containment-backend posix ...` to request a backend explicitly.
+Explicit selection keeps that backend's checks and never falls back to a
+weaker profile. POSIX currently refuses Python and group-resource profiles.
+These integration-source rules do not establish release qualification.
+
+### Released-source requirements
+
 In the 2.4.0 source, `loop` commands and `transform check --offline-parallel`
 require Linux, cgroup v2 with the memory and pids controllers, and a running
 systemd user manager. `systemd-run --user` and `systemctl --user` must work

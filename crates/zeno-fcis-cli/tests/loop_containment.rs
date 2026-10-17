@@ -274,6 +274,108 @@ fn entries<'a>(session: &'a str, original: &'a str, output: &'a str) -> Vec<Vec<
 }
 
 #[test]
+#[cfg(target_os = "linux")]
+fn automatic_systemd_manager_refusal_records_policy_before_input_or_session_work() {
+    let d = Directory::new();
+    let session = d.path("session");
+    let input = d.path("must-not-be-read");
+    let output = d.path("must-not-be-written");
+    let cases = [
+        vec![
+            "loop",
+            "capture",
+            "open",
+            "--spec",
+            &input,
+            "--reference",
+            &input,
+            "--session",
+            &session,
+        ],
+        vec![
+            "loop",
+            "capture",
+            "whole",
+            "--spec",
+            &input,
+            "--reference",
+            &input,
+            "--expressions",
+            &input,
+        ],
+        vec![
+            "transform",
+            "check",
+            "--original",
+            &input,
+            "--candidate",
+            &input,
+            "--offline-parallel",
+            "--receipt",
+            &output,
+        ],
+    ];
+    let before = snapshot(&d.0);
+    for args in cases {
+        // A nonexistent bus exercises the real read-only probe on every host.
+        // No backend flag: these are the automatic production entry points.
+        let out = Command::new(CLI)
+            .args(&args)
+            .args(["--no-kb"])
+            .env(
+                "DBUS_SESSION_BUS_ADDRESS",
+                format!("unix:path={}", d.path("absent-bus")),
+            )
+            .env("XDG_RUNTIME_DIR", &d.0)
+            .output()
+            .unwrap_or_else(|e| panic!("{e}"));
+        let report = json(&out);
+        let capture = args[0] == "loop";
+        assert_eq!(
+            out.status.code(),
+            Some(if capture { 1 } else { 2 }),
+            "{report}"
+        );
+        assert_eq!(report["authority"], "none");
+        assert_eq!(report["backend"], "systemd");
+        assert_eq!(
+            report["containment"]["host_policy_refusal"],
+            "containment-unavailable:systemd:host-policy:systemd-user-manager"
+        );
+        assert_eq!(
+            report["containment"]["host_policy"],
+            serde_json::json!({
+                "qualified": false,
+                "checks": [{"check":"systemd-user-manager","passed":false,"detail":"systemd-user-manager"}]
+            })
+        );
+        assert_eq!(report["containment"]["startup"]["admitted"], false);
+        assert_eq!(
+            report["containment"]["final"]["application_work_started"],
+            false
+        );
+        if capture {
+            assert_eq!(
+                report["detail"]["reason"],
+                "capture-containment-unavailable"
+            );
+            assert_eq!(report["detail"]["attempt_spent"], false);
+            assert_eq!(report["detail"]["prerequisite"], "systemd-user-manager");
+        } else {
+            assert_eq!(
+                report["reason"],
+                "containment-unavailable:systemd:host-policy:systemd-user-manager"
+            );
+        }
+        assert_eq!(
+            snapshot(&d.0),
+            before,
+            "preflight refusal must preserve every byte"
+        );
+    }
+}
+
+#[test]
 fn contained_loop_entry_points_refuse_without_a_supported_backend() {
     let d = Directory::new();
     let session = d.path("session");
