@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import itertools
+import math
 import json
 import time
 from collections import Counter
@@ -198,14 +199,16 @@ def main():
     parser.add_argument("--coalitions", choices=("singletons", "pair", "all"), default="singletons")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    if args.bound < 1 or not 0 < args.max_seconds <= 120:
-        parser.error("positive bound and a budget in (0,120] are required")
+    if args.bound < 1 or not math.isfinite(args.max_seconds) or args.max_seconds <= 0:
+        parser.error("positive bound and a finite positive time budget are required")
     coalitions = {"singletons": ((0,), (1,)), "pair": ((0, 1),), "all": ((0,), (1,), (0, 1))}[args.coalitions]
     result = exhaustive(args.bound, coalitions=coalitions, max_seconds=args.max_seconds)
+    result['status'] = ('counterexample' if any(m['first_witness'] for m in result['measures'].values())
+                        else 'completed' if result['bound'] == args.bound else 'timeout-UNKNOWN')
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
-    return 1 if result["bound"] == 0 or any(m["first_witness"] for m in result["measures"].values()) else 0
+    return 1 if result["bound"] != args.bound or any(m["first_witness"] for m in result["measures"].values()) else 0
 
 
 if __name__ == "__main__":

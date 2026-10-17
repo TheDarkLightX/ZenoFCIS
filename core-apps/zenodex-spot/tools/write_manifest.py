@@ -33,7 +33,7 @@ def main():
     composition={"schema":"zeno-fcis/core-application-composition/1","application":"zenodex-spot",
         "profile":"fake-ledger-two-users-one-pair/1","authority":"none","owner_adoption":False,
         "contract_owner":"Spot owner-approved fixed policy","composition_owner":"ZenoFCIS acceptance-example lead",
-        "evidence_status":"source authored; bounded native checks; mount and full D4/R6 acceptance pending",
+        "evidence_status":"bounded native checks; optional generated SQLite/HTTP adapter; application acceptance pending",
         "state_fields":state_fields,"stateless_components":[],
         "physical_component":400,"complete_contract":source_hash(APP),
         "components":[
@@ -65,10 +65,10 @@ def main():
                             "AddLiquidity":["used0","used1","mint","unspent0","unspent1",0,0,0],
                             "RemoveLiquidity":["paid0","paid1",0,0,0,0,0,0]},
         "assumptions":["closed two-user one-pair fake-value profile; no multi-pool runtime claim",
-                       "identity/authentication and raw-byte admission are supplied by a future mounting adapter",
+                       "the optional mount binds transport identities and closed requests before native admission",
                        "the integrated contract derives component views; callers cannot provide effect plans or role flags",
                        "contract compiler, CLI, library Authority, law evaluator and scalar schema are named trusted boundaries"],
-        "publication":"one complete native Authority decision; ZenoLedger atomic commit/recovery/retry adapter not implemented",
+        "publication":"one complete native Authority decision; optional native SQLite mount; application acceptance is a separate gate",
         "activation":None,"rollback":"no deployment or activation occurred; future coordinated activation is a lead gate"}
     (APP/"composition.json").write_text(json.dumps(composition,indent=2)+"\n")
     files={str(p.relative_to(APP)):sha(p) for p in sorted(APP.rglob('*')) if p.is_file()
