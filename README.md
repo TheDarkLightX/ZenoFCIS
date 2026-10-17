@@ -1,28 +1,37 @@
 # ZenoFCIS
 
-**Toward a neurosymbolic software factory for high-assurance FCIS applications.**
+**A neurosymbolic software factory for high-assurance FCIS applications.**
 
 ZenoFCIS is a Rust library family for functional-core / imperative-shell
-(FCIS) systems. It combines LLM-assisted authoring with symbolic checking: LLMs
-propose specifications and programs, and deterministic checkers decide whether
-supported artifacts meet their declared contracts. The assurance comes from
-those contracts and qualified checks, whichever model makes a proposal.
+(FCIS) systems. It combines LLM-assisted generation with symbolic checking:
+LLMs propose specifications and programs, and deterministic checkers decide
+whether supported artifacts meet their declared contracts. The assurance comes
+from those contracts and qualified checks, whichever model makes a proposal.
 
 It serves three kinds of user:
 
 - **developers**, who review declarative rules and test the library's
   decisions with explicit inputs;
-- **LLMs**, which get a bounded authoring target and reproducible checks;
+- **LLMs**, which get a bounded generation target and reproducible checks;
 - **agents**, which get reproducible, machine-readable feedback.
 
 [What this gives developers, LLMs, and agents](#what-this-gives-developers-llms-and-agents)
 describes each in detail.
 
-ZenoFCIS aims to become a **state-of-the-art, high-assurance software
-factory**: one that turns reviewed requirements into applications built around
-a **formally verified functional core**, with durable effects and evidence that
-agents can maintain. This describes where the project is heading; comparative
-leadership remains a claim to demonstrate.
+**What the factory does today.** `zeno-fcis new --contract` builds a working
+application from a reviewed contract. The library's authority makes every
+decision from that contract and checks its laws before anything is stored. The
+application's SQLite shell keeps the decisions and delivers their effects
+through an outbox. LLMs and agents can propose contracts, programs and repairs,
+and exact checkers accept or refuse each one. The
+[demo site](https://thedarklightx.github.io/ZenoFCIS/) runs six generated
+applications in the browser. [The assurance goal and its current scope](#the-assurance-goal-and-its-current-scope)
+states what is checked and what is not.
+
+**Where it is heading.** A **state-of-the-art, high-assurance software
+factory**: wider supported domains, more of each application under checked
+rules, and more platforms. Comparative leadership remains a claim to
+demonstrate.
 
 ## The assurance goal and its current scope
 
@@ -74,14 +83,15 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**2.4.0** is the current release source. It builds on the first stable V2
-line, 2.3.0; the [2.4.0 release notes](docs/RELEASE_NOTES.md) describe the
-new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. Its release set has two host executables: the
-**Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on Apple silicon**
-(`aarch64-apple-darwin`). The release process requires both archives to pass
-their host build, custody and installed-binary checks before publication. See
-[installation](docs/INSTALLATION.md) and the
+**2.4.0** is the current release, published on the
+[v2.4.0 release page](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0).
+It builds on the first stable V2 line, 2.3.0. The
+[2.4.0 release notes](docs/RELEASE_NOTES.md) describe the new arithmetic, search,
+loop and contract-judge features, and list one known issue. The release set has two
+host executables: the **Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on
+Apple silicon** (`aarch64-apple-darwin`). Check every download against the signed
+`DOWNLOADS.sha256` on the release page, as the
+[installation guide](docs/INSTALLATION.md) describes. See the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
 [Release assurance](docs/RELEASE_ASSURANCE.md) describes the required checks
@@ -271,8 +281,8 @@ shows. The [principles](docs/adr/0002-principles.md) and
   explicit inputs. Decisions are data, so tests compare exact bytes and a
   failure replays from its inputs. Reviewers start from the catalog of reasons
   and the laws. Generated typed APIs name each state field, so code need not
-  use raw paths, and authoring diagnostics arrive together in one pass.
-- **LLMs** get a bounded authoring target: declarations with explicit inputs
+  use raw paths, and specification diagnostics arrive together in one pass.
+- **LLMs** get a bounded generation target: declarations with explicit inputs
   and outputs, interpreted by the library, plus reproducible checks. The design
   assumes generated code can be wrong:
   - generated typed APIs narrow what it needs to write;
@@ -313,11 +323,11 @@ and rejects conflicting private writes without changing authoritative state.
 
 [![Mini Determinator kernel running in QEMU](docs/assets/marketing/mini-determinator-qemu-kernel.png)](docs/QEMU_MINI_DETERMINATOR.md)
 
-Authoring failures accumulate in one bounded pass. This deliberately invalid
+Specification errors accumulate in one bounded pass. This deliberately invalid
 example reports a duplicate stable ID, an unknown type reference, and an
 invalid merge order together:
 
-[![Three accumulated diagnostics from one check](docs/assets/marketing/terminal-accumulated-diagnostics.png)](docs/tutorials/MINI_DETERMINATOR.md#see-three-authoring-mistakes-at-once)
+[![Three accumulated diagnostics from one check](docs/assets/marketing/terminal-accumulated-diagnostics.png)](docs/tutorials/MINI_DETERMINATOR.md#see-three-specification-mistakes-at-once)
 
 Start with the worked [Mini Determinator tutorial](docs/tutorials/MINI_DETERMINATOR.md),
 reproduce the [QEMU capture](docs/QEMU_MINI_DETERMINATOR.md), or browse all
@@ -350,8 +360,8 @@ be published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 
 ## Example applications
 
-`zeno-fcis new DIR --template NAME` creates a complete application: an
-authored `project.zeno`, generated typed bindings, declarative decision and
+`zeno-fcis new DIR --template NAME` creates a complete application: a
+`project.zeno` specification, generated typed bindings, declarative decision and
 law programs that the library evaluates before publication, a SQLite store
 with an outbox, tests, and a README that states its rules.
 
@@ -377,8 +387,9 @@ conformance test through the running application, and determinism checks.
 template in this table as an isolated package against this checkout. Each
 application's core builds without its SQLite shell
 (`cargo build --no-default-features`), including for `wasm32-unknown-unknown`,
-which the same gate checks. `site/` runs the account-lockout example in the
-browser through that build.
+which the same gate checks. `site/` runs six of these examples in the browser
+through that build; the Pages workflow publishes it as the
+[demo site](https://thedarklightx.github.io/ZenoFCIS/).
 
 ### An application from its contract
 
@@ -437,12 +448,12 @@ upgrades a store at any state; a rule change upgrades a store whose state
 satisfies the new state laws and claims. See
 [contract change classification](docs/CLI_REFERENCE.md#contract-change-classification).
 
-## Authoring and checked synthesis
+## Specification and checked synthesis
 
 V1 includes the inert `.zeno` language, a canonical typed project AST,
 accumulated diagnostics, bounded relational and temporal logic, deterministic
 formal-tool adapters, and the `zeno-fcis` CLI. Start with the
-[authoring contract](docs/RC3_AUTHORING_CONTRACT.md),
+[RC3 language and composition contract](docs/RC3_AUTHORING_CONTRACT.md),
 [language specification](docs/ZENO_LANGUAGE_V1.md),
 [temporal semantics](docs/TEMPORAL_LOGIC_V1.md),
 [formal-tools contract](docs/FORMAL_TOOLS_RC3.md),
@@ -459,7 +470,7 @@ cargo +1.97.1 run -p zeno-fcis-spec --example mini_determinator --locked
 python3 tools/qemu_demo.py run
 ```
 
-The tutorials cover [language authoring](docs/tutorials/LANGUAGE.md),
+The tutorials cover [the specification language](docs/tutorials/LANGUAGE.md),
 [composition](docs/tutorials/COMPOSITION.md),
 [temporal claims](docs/tutorials/TEMPORAL.md),
 [formal tools](docs/tutorials/FORMAL_TOOLS.md),
@@ -471,7 +482,7 @@ through UEFI, and validates its guest serial result. It requires QEMU, OVMF,
 ImageMagick, and the documented pinned nightly toolchain. It is not part of the
 default library build.
 
-`.zeno` source and every derived view are non-authoritative authoring input.
+`.zeno` source and every derived view are non-authoritative specification input.
 Only the lowered typed AST has canonical identity, and concrete machines still
 bind through the existing authority-gated constructors.
 

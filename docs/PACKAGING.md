@@ -1,8 +1,7 @@
 # Release packaging
 
 This document describes the release packaging tooling and the `2.4.0`
-artifact set it prepares. Final release qualification and publication remain
-pending.
+artifact set it prepares; the 2.4.0 release publishes that set.
 
 ## Package set
 
@@ -40,10 +39,10 @@ SHA256SUMS
 zeno-fcis-<version>-rc-bundle.zip
 ```
 
-The tooling builds the full list above locally. The current public candidate
-download pages carry a smaller set: the Linux x86-64 GNU CLI archive, the
+The tooling builds the full list above locally. The 2.4.0 release publishes a
+smaller set: the Linux x86-64 GNU and Apple silicon macOS CLI archives, the
 offline Rustdoc archive, `SBOM.cdx.json`, signed checksums, and a commentless
-`RELEASE-SIGNING-KEY.pub`. A candidate's source is its matching public Git
+`RELEASE-SIGNING-KEY.pub`. The release's source is its matching public Git
 tag. The source archive, full bundle, and `.crate` archives are local build
 outputs, not published downloads.
 

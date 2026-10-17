@@ -1,11 +1,21 @@
 # ZenoFCIS 2.4.0
 
-2.4.0 is the current release source. These notes describe the changes recorded
-in the [changelog](../CHANGELOG.md#240---2026-10-15). Final source qualification,
-hosted checks, packaging, signing and publication remain separate gates; these
-notes do not claim those gates have passed. Published downloads must be checked
-against their signed checksum list as the [installation guide](INSTALLATION.md)
-describes.
+2.4.0 is the current release. These notes describe the changes recorded in the
+[changelog](../CHANGELOG.md#240---2026-10-15). Check every published download
+against its signed checksum list, as the [installation guide](INSTALLATION.md)
+describes. The release source also includes two release-preparation fixes: crates
+now carry their own source fingerprints, so each package builds in isolation, and
+external-tool process cleanup on macOS accepts a process group that has already
+exited.
+
+## Known issue
+
+- Knowledge-evidence replay checks each declared input's fingerprint and then reruns
+  the case, which reopens the input files. If an input is edited during that window
+  and restored before the final dependency check, the validation receipt can name the
+  original bytes while the case ran on the edited ones. Do not edit evidence inputs
+  while validation runs. The fix, which runs each case on a private snapshot of the
+  checked bytes, is planned for 2.5.
 
 ## Arithmetic and execution
 

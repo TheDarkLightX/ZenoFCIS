@@ -1,11 +1,10 @@
 # Installation
 
-ZenoFCIS `2.4.0` is the current release source. Final qualification and
-publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
-The intended 2.4.0 release set includes CLI archives for **Linux x86_64 GNU**
-and **macOS on Apple silicon**, with offline Rustdoc. After qualification and
-publication, the signed `DOWNLOADS.sha256` on the release page will list the
-assets available to install.
+ZenoFCIS `2.4.0` is the current release; ZenoFCIS 2.3.0 introduced the first
+stable V2 line. The 2.4.0 release set includes CLI archives for **Linux x86_64 GNU**
+and **macOS on Apple silicon**, with offline Rustdoc. The signed `DOWNLOADS.sha256`
+on the [release page](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0)
+lists the assets available to install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
 qualification boundary. The [2.4.0 release notes](RELEASE_NOTES.md) describe
 the release's scope.
@@ -39,10 +38,8 @@ exact source pins, signed checksum assets and qualification limits.
 
 ## Install the 2.4.0 CLI
 
-Once the qualified 2.4.0 release is published and its signed `DOWNLOADS.sha256`
-lists the Linux archive, use the commands below. In the directory where you
-want to keep the archive and the executable, set `export VERSION=2.4.0`, then
-run:
+In the directory where you want to keep the archive and the executable, set
+`export VERSION=2.4.0`, then run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
 ```bash
@@ -76,9 +73,9 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-After the qualified 2.4.0 release is published, check that its signed
-`DOWNLOADS.sha256` lists `zeno-fcis-2.4.0-aarch64-apple-darwin.tar.gz`. Then set
-`export VERSION=2.4.0` in your shell and run:
+The signed `DOWNLOADS.sha256` lists
+`zeno-fcis-2.4.0-aarch64-apple-darwin.tar.gz`. Set `export VERSION=2.4.0` in
+your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash
@@ -171,9 +168,7 @@ The current V2 API uses source or path dependencies on the source tag that
 matches your CLI. The historical `1.1.0` package keeps its own V1 API. Follow
 the release's source pin when you build generated applications.
 
-Before publication, use an explicitly pinned, reviewed source checkout. Once
-the matching 2.4.0 release and its source tag are published, clone into a fresh
-directory:
+Clone the release's source tag into a fresh directory:
 
 ```bash
 git clone --branch v2.4.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
