@@ -226,9 +226,8 @@ fn long_hash_consistent_adversarial_history_remains_accepted_and_exact() {
 
 #[test]
 fn admitted_header_reuses_exact_totals_and_keeps_binding_refusal_order() {
-    let original = include_bytes!(
-        "../../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve"
-    );
+    let original =
+        include_bytes!("../../tests/fixtures/i128-programs/boolean-kernel-original.zcve");
     let request = Request::admit(
         original,
         Profile::FunctionalBoolV1,

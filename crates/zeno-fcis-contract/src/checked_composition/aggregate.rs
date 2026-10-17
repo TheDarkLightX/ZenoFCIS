@@ -288,7 +288,7 @@ impl Layout {
                 Box::new(self.renamed(leaf, then)?),
                 Box::new(self.renamed(leaf, otherwise)?),
             ),
-            Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+            Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
                 return Err("arithmetic extension is outside the assembly profile".to_owned());
             }
             Ast::DecisionReason => {

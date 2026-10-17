@@ -347,7 +347,7 @@ fn capture_decided_refutation_spends_attempt_when_example_budget_is_zero() {
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn nullary_int(max: i64) -> Value {
+fn nullary_int(max: i128) -> Value {
     json!({"inputs":[],"outputs":[{"kind":"Int","min":"0","max":max.to_string()}]})
 }
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

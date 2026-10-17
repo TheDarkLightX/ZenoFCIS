@@ -52,7 +52,7 @@ pub const MAX_HOLES: usize = 16;
 /// Most alternatives of a choice hole.
 pub const MAX_CHOICES: usize = 16;
 /// Widest explicit constant-hole range (`hi - lo`).
-pub const MAX_RANGE: i64 = 1 << 16;
+pub const MAX_RANGE: i128 = 1 << 16;
 
 /// Words that cannot be names: the controlled-English surface uses them.
 pub const RESERVED: [&str; 34] = [
@@ -262,7 +262,7 @@ impl Function {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Hole {
     /// A constant, optionally within an explicit inclusive range.
-    Const(Option<(i64, i64)>),
+    Const(Option<(i128, i128)>),
     /// Any expression (filled by synthesis).
     Expr,
     /// Exactly one of these hole-free alternatives.
@@ -273,7 +273,7 @@ pub enum Hole {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Expr {
     /// An integer literal (Booleans are 0 and 1).
-    Int(i64),
+    Int(i128),
     /// A name: an input field, an output or a variant.
     Var(String),
     /// A family parameter `$NAME`.
@@ -524,12 +524,16 @@ impl Parser {
         }
     }
 
-    fn number(text: &str, negative: bool) -> Result<i64> {
-        let magnitude: i128 = text
+    fn number(text: &str, negative: bool) -> Result<i128> {
+        let magnitude: u128 = text
             .parse()
             .map_err(|_| Refusal::new("expression-integer-range"))?;
-        let value = if negative { -magnitude } else { magnitude };
-        i64::try_from(value).map_err(|_| Refusal::new("expression-integer-range"))
+        if negative && magnitude == 1u128 << 127 {
+            return Ok(i128::MIN);
+        }
+        let magnitude =
+            i128::try_from(magnitude).map_err(|_| Refusal::new("expression-integer-range"))?;
+        Ok(if negative { -magnitude } else { magnitude })
     }
 
     fn primary(&mut self) -> Result<Expr> {
@@ -616,7 +620,7 @@ impl Parser {
         }
     }
 
-    fn integer(&mut self) -> Result<i64> {
+    fn integer(&mut self) -> Result<i128> {
         let negative = self.accept("-");
         match self.take() {
             Token::Num(text) => Self::number(&text, negative),
@@ -837,7 +841,7 @@ pub fn params_of(node: &Expr) -> BTreeSet<String> {
 
 /// Integer literals of the expression.
 #[must_use]
-pub fn constants(node: &Expr) -> BTreeSet<i64> {
+pub fn constants(node: &Expr) -> BTreeSet<i128> {
     let mut out = BTreeSet::new();
     visit_all(node, &mut |n| {
         if let Expr::Int(value) = n {
@@ -902,7 +906,7 @@ pub fn substitute(node: &Expr, f: &mut impl FnMut(&Expr) -> Result<Option<Expr>>
 }
 
 /// Replaces every parameter by its value; an unbound one is refused.
-pub fn bind_params(node: &Expr, values: &BTreeMap<String, i64>) -> Result<Expr> {
+pub fn bind_params(node: &Expr, values: &BTreeMap<String, i128>) -> Result<Expr> {
     substitute(node, &mut |n| match n {
         Expr::Param(name) => values
             .get(name)
@@ -937,7 +941,7 @@ pub fn fold(node: &Expr) -> Result<Expr> {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Fill {
     /// A constant (constant holes).
-    Const(i64),
+    Const(i128),
     /// An alternative's index (choice holes).
     Choice(usize),
     /// An expression (any hole).
@@ -960,7 +964,7 @@ pub fn fill(node: &Expr, assignment: &BTreeMap<usize, Fill>) -> Result<Expr> {
                 .cloned()
                 .ok_or_else(|| Refusal::new("choice-index"))?,
             (Fill::Choice(index), _) => {
-                Expr::Int(i64::try_from(*index).map_err(|_| Refusal::new("choice-index"))?)
+                Expr::Int(i128::try_from(*index).map_err(|_| Refusal::new("choice-index"))?)
             }
             (Fill::Const(value), _) => Expr::Int(*value),
         }))
@@ -1008,8 +1012,8 @@ pub struct Vocabulary {
     outputs: Vec<Domain>,
     input_kinds: Vec<Kind>,
     output_kinds: Vec<Kind>,
-    variants: BTreeMap<String, i64>,
-    field_variants: BTreeMap<String, BTreeMap<i64, String>>,
+    variants: BTreeMap<String, i128>,
+    field_variants: BTreeMap<String, BTreeMap<i128, String>>,
 }
 
 fn is_identifier(name: &str) -> bool {
@@ -1043,7 +1047,7 @@ impl Vocabulary {
         names: Vec<String>,
         inputs: Vec<Domain>,
         outputs: Vec<Domain>,
-        variants: &BTreeMap<String, BTreeMap<String, i64>>,
+        variants: &BTreeMap<String, BTreeMap<String, i128>>,
     ) -> Result<Self> {
         if names.len() != inputs.len() {
             return Err(Refusal::new("vocabulary-input-count"));
@@ -1148,7 +1152,7 @@ impl Vocabulary {
 
     /// Every declared variant name and its value.
     #[must_use]
-    pub fn variants(&self) -> &BTreeMap<String, i64> {
+    pub fn variants(&self) -> &BTreeMap<String, i128> {
         &self.variants
     }
 
@@ -1170,7 +1174,7 @@ impl Vocabulary {
 
     /// The declared name of `value` for field `field`, if any.
     #[must_use]
-    pub fn variant_name(&self, field: &str, value: i64) -> Option<&str> {
+    pub fn variant_name(&self, field: &str, value: i128) -> Option<&str> {
         self.field_variants
             .get(field)
             .and_then(|table| table.get(&value))
@@ -1431,7 +1435,7 @@ impl Printer<'_> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HoleValue {
     /// A constant hole's value.
-    Const(i64),
+    Const(i128),
     /// A choice hole's alternative.
     Choice(usize),
 }
@@ -1443,18 +1447,18 @@ pub struct Env<'a> {
     /// Names and kinds.
     pub vocab: &'a Vocabulary,
     /// One column per input, in program order.
-    pub columns: &'a [Vec<i64>],
+    pub columns: &'a [Vec<i128>],
     /// The value `keep` stands for, when available.
-    pub keep: Option<&'a [i64]>,
+    pub keep: Option<&'a [i128]>,
     /// Tuples considered.
     pub len: usize,
 }
 
-fn bit(value: bool) -> i64 {
-    i64::from(value)
+fn bit(value: bool) -> i128 {
+    i128::from(value)
 }
 
-/// Refusal code for `+` or `-` leaving the signed 64-bit range.
+/// Refusal code for `+` or `-` leaving the signed 128-bit range.
 pub const OVERFLOW: &str = "expression-arithmetic-overflow";
 
 /// `Ok(None)` for a refusal with [`OVERFLOW`]; other refusals pass. Searches
@@ -1470,14 +1474,14 @@ pub fn skip_overflow<T>(result: Result<T>) -> Result<Option<T>> {
 /// The value of `node` on every considered tuple. Evaluation is eager, like
 /// a lowered program's: every subexpression is computed on every tuple, both
 /// branches of `c ? a : b` included, and `+` or `-` leaving the signed
-/// 64-bit range on any tuple refuses the whole evaluation with [`OVERFLOW`]
+/// 128-bit range on any tuple refuses the whole evaluation with [`OVERFLOW`]
 /// (where the lowered program would trap). A caller that searches skips
 /// such a candidate: it cannot be a completion.
 pub fn evaluate(
     node: &Expr,
     env: &Env<'_>,
     holes: &BTreeMap<usize, HoleValue>,
-) -> Result<Vec<i64>> {
+) -> Result<Vec<i128>> {
     let n = env.len;
     Ok(match node {
         Expr::Int(value) => vec![*value; n],
@@ -1494,7 +1498,7 @@ pub fn evaluate(
         Expr::Param(name) => return Err(Refusal::new(format!("unbound-parameter:{name}"))),
         Expr::Keep => env
             .keep
-            .map(<[i64]>::to_vec)
+            .map(<[i128]>::to_vec)
             .ok_or_else(|| Refusal::new("keep-unavailable"))?,
         Expr::Hole(k, hole) => {
             let value = holes.get(k).ok_or_else(|| Refusal::new("unfilled-hole"))?;
@@ -1537,7 +1541,7 @@ pub fn evaluate(
                     }
                 }
             };
-            let columns: Vec<&[i64]> = columns.iter().map(Vec::as_slice).collect();
+            let columns: Vec<&[i128]> = columns.iter().map(Vec::as_slice).collect();
             zeno_fcis_program_search::arithmetic::evaluate(op, &columns)
                 .ok_or_else(|| Refusal::new(OVERFLOW))?
         }
@@ -1557,9 +1561,9 @@ pub fn evaluate(
                 return zeno_fcis_program_search::arithmetic::evaluate(LibOp::Mul(0, 1), &[&a, &b])
                     .ok_or_else(|| Refusal::new(OVERFLOW));
             }
-            let f: fn(i64, i64) -> Option<i64> = match op {
-                Op::Add => i64::checked_add,
-                Op::Sub => i64::checked_sub,
+            let f: fn(i128, i128) -> Option<i128> = match op {
+                Op::Add => i128::checked_add,
+                Op::Sub => i128::checked_sub,
                 Op::Mul => return Err(Refusal::new("proposal-operator-unsupported:*")),
                 Op::And => |x, y| Some(bit(x == 1 && y == 1)),
                 Op::Or => |x, y| Some(if x == 1 { x } else { y }),
@@ -1574,7 +1578,7 @@ pub fn evaluate(
             a.iter()
                 .zip(&b)
                 .map(|(x, y)| f(*x, *y).ok_or_else(|| Refusal::new(OVERFLOW)))
-                .collect::<Result<Vec<i64>>>()?
+                .collect::<Result<Vec<i128>>>()?
         }
     })
 }

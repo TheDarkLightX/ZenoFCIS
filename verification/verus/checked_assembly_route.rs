@@ -24,7 +24,7 @@ verus! {
 /// A canonical term; an input is an aggregate input position.
 pub(crate) enum Term {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(Box<Term>, Box<Term>),
     Sub(Box<Term>, Box<Term>),
@@ -42,8 +42,8 @@ pub(crate) enum Term {
 }
 
 /// A binary operator of the evaluator on two operand results.
-pub(crate) open spec fn binary(op: Op, left: Result<i64, Failure>, right: Result<i64, Failure>)
-    -> Result<i64, Failure>
+pub(crate) open spec fn binary(op: Op, left: Result<i128, Failure>, right: Result<i128, Failure>)
+    -> Result<i128, Failure>
 {
     match left {
         Err(error) => Err(error),
@@ -55,8 +55,8 @@ pub(crate) open spec fn binary(op: Op, left: Result<i64, Failure>, right: Result
 }
 
 /// A three-operand D1 operator, retaining operand refusal order.
-pub(crate) open spec fn ternary(op: Op, first: Result<i64, Failure>,
-    second: Result<i64, Failure>, third: Result<i64, Failure>) -> Result<i64, Failure>
+pub(crate) open spec fn ternary(op: Op, first: Result<i128, Failure>,
+    second: Result<i128, Failure>, third: Result<i128, Failure>) -> Result<i128, Failure>
 {
     match first {
         Err(error) => Err(error),
@@ -72,7 +72,7 @@ pub(crate) open spec fn ternary(op: Op, first: Result<i64, Failure>,
 
 /// The value of a term on the aggregate's input `env`, operator by
 /// operator as the evaluator specification computes it.
-pub(crate) open spec fn denote(term: Term, env: Seq<i64>) -> Result<i64, Failure>
+pub(crate) open spec fn denote(term: Term, env: Seq<i128>) -> Result<i128, Failure>
     decreases term,
 {
     match term {
@@ -147,7 +147,7 @@ pub(crate) open spec fn boolean(term: Term, bools: spec_fn(u16) -> bool) -> bool
 }
 
 /// Every input position marked Boolean carries 0 or 1.
-pub(crate) open spec fn booleans_hold(bools: spec_fn(u16) -> bool, env: Seq<i64>) -> bool {
+pub(crate) open spec fn booleans_hold(bools: spec_fn(u16) -> bool, env: Seq<i128>) -> bool {
     forall|id: u16| #[trigger] bools(id) && (id as int) < env.len() ==> 0 <= env[id as int] <= 1
 }
 
@@ -155,8 +155,8 @@ pub(crate) open spec fn booleans_hold(bools: spec_fn(u16) -> bool, env: Seq<i64>
 
 pub(crate) open spec fn add(a: Term, b: Term) -> Term {
     match (a, b) {
-        (Term::Int(x), Term::Int(y)) => if i64::MIN <= x + y <= i64::MAX {
-            Term::Int((x + y) as i64)
+        (Term::Int(x), Term::Int(y)) => if i128::MIN <= x + y <= i128::MAX {
+            Term::Int((x + y) as i128)
         } else {
             Term::Add(Box::new(a), Box::new(b))
         },
@@ -166,8 +166,8 @@ pub(crate) open spec fn add(a: Term, b: Term) -> Term {
 
 pub(crate) open spec fn sub(a: Term, b: Term) -> Term {
     match (a, b) {
-        (Term::Int(x), Term::Int(y)) => if i64::MIN <= x - y <= i64::MAX {
-            Term::Int((x - y) as i64)
+        (Term::Int(x), Term::Int(y)) => if i128::MIN <= x - y <= i128::MAX {
+            Term::Int((x - y) as i128)
         } else {
             Term::Sub(Box::new(a), Box::new(b))
         },
@@ -298,7 +298,7 @@ pub(crate) open spec fn canonical(nodes: Seq<Op>, input: spec_fn(u16) -> Term,
 }
 
 /// Route `route` of the aggregate: its target input is the route constant.
-pub(crate) open spec fn specialized(target: u16, route: i64) -> spec_fn(u16) -> Term {
+pub(crate) open spec fn specialized(target: u16, route: i128) -> spec_fn(u16) -> Term {
     |id: u16| if id == target { Term::Int(route) } else { Term::Input(id) }
 }
 
@@ -314,7 +314,7 @@ pub(crate) open spec fn boolean_inputs(inputs: Seq<Domain>) -> spec_fn(u16) -> b
 
 /// The case pairs of two selection chains with the same conditions: each
 /// aggregate case number with the leaf case number in the same position.
-pub(crate) open spec fn selection_pairs(a: Term, l: Term) -> Option<Seq<(i64, i64)>>
+pub(crate) open spec fn selection_pairs(a: Term, l: Term) -> Option<Seq<(i128, i128)>>
     decreases a,
 {
     match a {
@@ -341,17 +341,17 @@ pub(crate) open spec fn selection_pairs(a: Term, l: Term) -> Option<Seq<(i64, i6
 }
 
 /// The pairs map each aggregate case to one leaf case.
-pub(crate) open spec fn functional(pairs: Seq<(i64, i64)>) -> bool {
+pub(crate) open spec fn functional(pairs: Seq<(i128, i128)>) -> bool {
     forall|p: int, q: int| 0 <= p < pairs.len() && 0 <= q < pairs.len()
         && (#[trigger] pairs[p]).0 == (#[trigger] pairs[q]).0 ==> pairs[p].1 == pairs[q].1
 }
 
 /// Boolean terms take the values 0 and 1.
-pub(crate) proof fn boolean_values(term: Term, env: Seq<i64>, bools: spec_fn(u16) -> bool, value: i64)
+pub(crate) proof fn boolean_values(term: Term, env: Seq<i128>, bools: spec_fn(u16) -> bool, value: i128)
     requires
         boolean(term, bools),
         booleans_hold(bools, env),
-        denote(term, env) == Ok::<i64, Failure>(value),
+        denote(term, env) == Ok::<i128, Failure>(value),
     ensures 0 <= value <= 1,
     decreases term,
 {
@@ -433,11 +433,11 @@ pub(crate) proof fn boolean_values(term: Term, env: Seq<i64>, bools: spec_fn(u16
 
 /// Constant folds and selection identities retain the evaluator's values.
 pub(crate) proof fn folded_constructors_preserve_values(a: Term, b: Term, c: Term,
-    env: Seq<i64>, x: i64, y: i64, z: i64)
+    env: Seq<i128>, x: i128, y: i128, z: i128)
     requires
-        denote(a, env) == Ok::<i64, Failure>(x),
-        denote(b, env) == Ok::<i64, Failure>(y),
-        denote(c, env) == Ok::<i64, Failure>(z),
+        denote(a, env) == Ok::<i128, Failure>(x),
+        denote(b, env) == Ok::<i128, Failure>(y),
+        denote(c, env) == Ok::<i128, Failure>(z),
     ensures
         denote(add(a, b), env) == node(Op::Add(0, 1), Seq::empty(), seq![x, y]),
         denote(sub(a, b), env) == node(Op::Sub(0, 1), Seq::empty(), seq![x, y]),
@@ -453,11 +453,11 @@ pub(crate) proof fn folded_constructors_preserve_values(a: Term, b: Term, c: Ter
 
 /// D1 constructors retain their operands and delegate to the exact D1 node.
 pub(crate) proof fn arithmetic_constructors_preserve_values(a: Term, b: Term, c: Term,
-    env: Seq<i64>, x: i64, y: i64, z: i64)
+    env: Seq<i128>, x: i128, y: i128, z: i128)
     requires
-        denote(a, env) == Ok::<i64, Failure>(x),
-        denote(b, env) == Ok::<i64, Failure>(y),
-        denote(c, env) == Ok::<i64, Failure>(z),
+        denote(a, env) == Ok::<i128, Failure>(x),
+        denote(b, env) == Ok::<i128, Failure>(y),
+        denote(c, env) == Ok::<i128, Failure>(z),
     ensures
         denote(mul(a, b), env) == node(Op::Mul(0, 1), Seq::empty(), seq![x, y]),
         denote(div_floor(a, b), env) == node(Op::DivFloor(0, 1), Seq::empty(), seq![x, y]),
@@ -472,11 +472,11 @@ pub(crate) proof fn arithmetic_constructors_preserve_values(a: Term, b: Term, c:
 }
 
 /// Double negation retains its operand only when that operand is Boolean.
-pub(crate) proof fn negation_preserves_value(a: Term, env: Seq<i64>,
-    bools: spec_fn(u16) -> bool, x: i64)
+pub(crate) proof fn negation_preserves_value(a: Term, env: Seq<i128>,
+    bools: spec_fn(u16) -> bool, x: i128)
     requires
         booleans_hold(bools, env),
-        denote(a, env) == Ok::<i64, Failure>(x),
+        denote(a, env) == Ok::<i128, Failure>(x),
     ensures
         denote(not(a, bools), env) == node(Op::Not(0), Seq::empty(), seq![x]),
 {
@@ -501,13 +501,13 @@ pub(crate) proof fn negation_preserves_value(a: Term, env: Seq<i64>,
 
 /// Each constructor gives the value the evaluator computes for its
 /// operator on the operands' values.
-pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env: Seq<i64>,
-    bools: spec_fn(u16) -> bool, x: i64, y: i64, z: i64)
+pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env: Seq<i128>,
+    bools: spec_fn(u16) -> bool, x: i128, y: i128, z: i128)
     requires
         booleans_hold(bools, env),
-        denote(a, env) == Ok::<i64, Failure>(x),
-        denote(b, env) == Ok::<i64, Failure>(y),
-        denote(c, env) == Ok::<i64, Failure>(z),
+        denote(a, env) == Ok::<i128, Failure>(x),
+        denote(b, env) == Ok::<i128, Failure>(y),
+        denote(c, env) == Ok::<i128, Failure>(z),
     ensures
         denote(add(a, b), env) == node(Op::Add(0, 1), Seq::empty(), seq![x, y]),
         denote(sub(a, b), env) == node(Op::Sub(0, 1), Seq::empty(), seq![x, y]),
@@ -554,14 +554,14 @@ pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env:
 
 /// All six product factors retain their values before D1 compares the exact products.
 pub(crate) proof fn products_ge_preserves_values(a: Term, b: Term, c: Term,
-    d: Term, e: Term, f: Term, env: Seq<i64>, u: i64, v: i64, w: i64, x: i64, y: i64, z: i64)
+    d: Term, e: Term, f: Term, env: Seq<i128>, u: i128, v: i128, w: i128, x: i128, y: i128, z: i128)
     requires
-        denote(a, env) == Ok::<i64, Failure>(u),
-        denote(b, env) == Ok::<i64, Failure>(v),
-        denote(c, env) == Ok::<i64, Failure>(w),
-        denote(d, env) == Ok::<i64, Failure>(x),
-        denote(e, env) == Ok::<i64, Failure>(y),
-        denote(f, env) == Ok::<i64, Failure>(z),
+        denote(a, env) == Ok::<i128, Failure>(u),
+        denote(b, env) == Ok::<i128, Failure>(v),
+        denote(c, env) == Ok::<i128, Failure>(w),
+        denote(d, env) == Ok::<i128, Failure>(x),
+        denote(e, env) == Ok::<i128, Failure>(y),
+        denote(f, env) == Ok::<i128, Failure>(z),
     ensures
         denote(products_ge(a, b, c, d, e, f), env) ==
             node(Op::ProductsGe([0, 1, 2], [3, 4, 5]), Seq::empty(), seq![u, v, w, x, y, z]),
@@ -573,7 +573,7 @@ pub(crate) proof fn products_ge_preserves_values(a: Term, b: Term, c: Term,
 
 /// A node of the program on its operand values is the same operator on
 /// canonical operand positions, including all six product factors.
-pub(crate) proof fn node_on_operands(op: Op, input: Seq<i64>, values: Seq<i64>)
+pub(crate) proof fn node_on_operands(op: Op, input: Seq<i128>, values: Seq<i128>)
     ensures
         match op {
             Op::Add(a, b) | Op::Sub(a, b) | Op::Mul(a, b) | Op::DivFloor(a, b)
@@ -644,20 +644,20 @@ pub(crate) proof fn node_on_operands(op: Op, input: Seq<i64>, values: Seq<i64>)
 }
 
 /// Node `i`'s canonical term has the node's value.
-pub(crate) open spec fn node_value(terms: Seq<Term>, env: Seq<i64>, values: Seq<i64>, i: int) -> bool {
-    denote(terms[i], env) == Ok::<i64, Failure>(values[i])
+pub(crate) open spec fn node_value(terms: Seq<Term>, env: Seq<i128>, values: Seq<i128>, i: int) -> bool {
+    denote(terms[i], env) == Ok::<i128, Failure>(values[i])
 }
 
 /// On an input the specification evaluates without failure, every node's
 /// value is the value of its canonical term.
-pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<i64>,
-    env: Seq<i64>, inputs: spec_fn(u16) -> Term, bools: spec_fn(u16) -> bool, count: nat,
-    values: Seq<i64>)
+pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<i128>,
+    env: Seq<i128>, inputs: spec_fn(u16) -> Term, bools: spec_fn(u16) -> bool, count: nat,
+    values: Seq<i128>)
     requires
         count <= nodes.len(),
-        prefix(nodes, input, count) == Ok::<Seq<i64>, Failure>(values),
+        prefix(nodes, input, count) == Ok::<Seq<i128>, Failure>(values),
         forall|id: u16| (id as int) < input.len()
-            ==> denote(#[trigger] inputs(id), env) == Ok::<i64, Failure>(input[id as int]),
+            ==> denote(#[trigger] inputs(id), env) == Ok::<i128, Failure>(input[id as int]),
         booleans_hold(bools, env),
     ensures
         values.len() == count,
@@ -724,7 +724,7 @@ pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<
                                     previous[b[0] as int], previous[b[1] as int], previous[b[2] as int]);
                             },
                         }
-                        assert(denote(term, env) == Ok::<i64, Failure>(v));
+                        assert(denote(term, env) == Ok::<i128, Failure>(v));
                         assert forall|i: int| 0 <= i < count
                             implies #[trigger] node_value(canonical(nodes, inputs, bools, count), env, values, i) by {
                             if i < last {
@@ -744,16 +744,16 @@ pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<
 }
 
 /// Output `i` of the specification's projection is root `i`'s value.
-pub(crate) open spec fn reads_root(values: Seq<i64>, roots: Seq<u16>, output: Seq<i64>, i: int) -> bool {
+pub(crate) open spec fn reads_root(values: Seq<i128>, roots: Seq<u16>, output: Seq<i128>, i: int) -> bool {
     (roots[i] as int) < values.len() && output[i] == values[roots[i] as int]
 }
 
 /// The specification's projection reads each root's value.
-pub(crate) proof fn projection_reads_roots(values: Seq<i64>, roots: Seq<u16>, count: nat,
-    output: Seq<i64>)
+pub(crate) proof fn projection_reads_roots(values: Seq<i128>, roots: Seq<u16>, count: nat,
+    output: Seq<i128>)
     requires
         count <= roots.len(),
-        projection(values, roots, count) == Ok::<Seq<i64>, Failure>(output),
+        projection(values, roots, count) == Ok::<Seq<i128>, Failure>(output),
     ensures
         output.len() == count,
         forall|i: int| 0 <= i < count ==> #[trigger] reads_root(values, roots, output, i),
@@ -777,20 +777,20 @@ pub(crate) proof fn projection_reads_roots(values: Seq<i64>, roots: Seq<u16>, co
 }
 
 /// Output `i` is the value of the canonical term at root `i`.
-pub(crate) open spec fn root_value(terms: Seq<Term>, roots: Seq<u16>, env: Seq<i64>,
-    result: Seq<i64>, i: int) -> bool
+pub(crate) open spec fn root_value(terms: Seq<Term>, roots: Seq<u16>, env: Seq<i128>,
+    result: Seq<i128>, i: int) -> bool
 {
-    (roots[i] as int) < terms.len() && denote(terms[roots[i] as int], env) == Ok::<i64, Failure>(result[i])
+    (roots[i] as int) < terms.len() && denote(terms[roots[i] as int], env) == Ok::<i128, Failure>(result[i])
 }
 
 /// An execution's outputs are the canonical terms' values at its roots.
 pub(crate) proof fn outputs_are_root_terms(inputs: Seq<Domain>, outputs: Seq<Domain>,
-    nodes: Seq<Op>, roots: Seq<u16>, input: Seq<i64>, env: Seq<i64>,
-    terms: spec_fn(u16) -> Term, bools: spec_fn(u16) -> bool, result: Seq<i64>)
+    nodes: Seq<Op>, roots: Seq<u16>, input: Seq<i128>, env: Seq<i128>,
+    terms: spec_fn(u16) -> Term, bools: spec_fn(u16) -> bool, result: Seq<i128>)
     requires
-        execution(inputs, outputs, nodes, roots, input) == Ok::<Seq<i64>, Failure>(result),
+        execution(inputs, outputs, nodes, roots, input) == Ok::<Seq<i128>, Failure>(result),
         forall|id: u16| (id as int) < input.len()
-            ==> denote(#[trigger] terms(id), env) == Ok::<i64, Failure>(input[id as int]),
+            ==> denote(#[trigger] terms(id), env) == Ok::<i128, Failure>(input[id as int]),
         booleans_hold(bools, env),
     ensures
         admitted(inputs, input),
@@ -820,7 +820,7 @@ pub(crate) proof fn outputs_are_root_terms(inputs: Seq<Domain>, outputs: Seq<Dom
 }
 
 /// Admitted Boolean inputs carry 0 or 1.
-pub(crate) proof fn admitted_booleans(inputs: Seq<Domain>, env: Seq<i64>)
+pub(crate) proof fn admitted_booleans(inputs: Seq<Domain>, env: Seq<i128>)
     requires admitted(inputs, env),
     ensures booleans_hold(boolean_inputs(inputs), env),
 {
@@ -834,10 +834,10 @@ pub(crate) proof fn admitted_booleans(inputs: Seq<Domain>, env: Seq<i64>)
 /// executes the aggregate's program on an input whose target is `route`,
 /// each output is the value of its route-specialized canonical term.
 pub(crate) proof fn route_specialization_preserves_evaluation(inputs: Seq<Domain>,
-    outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>, x: Seq<i64>, target: u16,
-    route: i64, result: Seq<i64>)
+    outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>, x: Seq<i128>, target: u16,
+    route: i128, result: Seq<i128>)
     requires
-        execution(inputs, outputs, nodes, roots, x) == Ok::<Seq<i64>, Failure>(result),
+        execution(inputs, outputs, nodes, roots, x) == Ok::<Seq<i128>, Failure>(result),
         (target as int) < x.len(),
         x[target as int] == route,
     ensures
@@ -849,13 +849,13 @@ pub(crate) proof fn route_specialization_preserves_evaluation(inputs: Seq<Domain
     assert(admitted(inputs, x));
     admitted_booleans(inputs, x);
     assert forall|id: u16| (id as int) < x.len() implies
-        denote(#[trigger] specialized(target, route)(id), x) == Ok::<i64, Failure>(x[id as int]) by {}
+        denote(#[trigger] specialized(target, route)(id), x) == Ok::<i128, Failure>(x[id as int]) by {}
     outputs_are_root_terms(inputs, outputs, nodes, roots, x, x, specialized(target, route),
         boolean_inputs(inputs), result);
 }
 
 /// The leaf's input is the aggregate's input read at the leaf's positions.
-pub(crate) open spec fn reads_from(y: Seq<i64>, x: Seq<i64>, position: Seq<u16>) -> bool {
+pub(crate) open spec fn reads_from(y: Seq<i128>, x: Seq<i128>, position: Seq<u16>) -> bool {
     position.len() == y.len() && forall|j: int| #![trigger position[j]] 0 <= j < y.len()
         ==> (position[j] as int) < x.len() && x[position[j] as int] == y[j]
 }
@@ -863,13 +863,13 @@ pub(crate) open spec fn reads_from(y: Seq<i64>, x: Seq<i64>, position: Seq<u16>)
 /// Renaming preserves evaluation: when the specification executes a leaf's
 /// program on the aggregate input read at the leaf's positions, each output
 /// is the value of its renamed canonical term on the aggregate input.
-pub(crate) proof fn renaming_preserves_evaluation(inputs: Seq<Domain>, x: Seq<i64>,
+pub(crate) proof fn renaming_preserves_evaluation(inputs: Seq<Domain>, x: Seq<i128>,
     leaf_inputs: Seq<Domain>, leaf_outputs: Seq<Domain>, leaf_nodes: Seq<Op>,
-    leaf_roots: Seq<u16>, y: Seq<i64>, position: Seq<u16>, result: Seq<i64>)
+    leaf_roots: Seq<u16>, y: Seq<i128>, position: Seq<u16>, result: Seq<i128>)
     requires
         admitted(inputs, x),
         reads_from(y, x, position),
-        execution(leaf_inputs, leaf_outputs, leaf_nodes, leaf_roots, y) == Ok::<Seq<i64>, Failure>(result),
+        execution(leaf_inputs, leaf_outputs, leaf_nodes, leaf_roots, y) == Ok::<Seq<i128>, Failure>(result),
     ensures
         result.len() == leaf_roots.len(),
         forall|i: int| 0 <= i < leaf_roots.len() ==> #[trigger] root_value(
@@ -878,7 +878,7 @@ pub(crate) proof fn renaming_preserves_evaluation(inputs: Seq<Domain>, x: Seq<i6
 {
     admitted_booleans(inputs, x);
     assert forall|id: u16| (id as int) < y.len() implies
-        denote(#[trigger] renamed(position)(id), x) == Ok::<i64, Failure>(y[id as int]) by {
+        denote(#[trigger] renamed(position)(id), x) == Ok::<i128, Failure>(y[id as int]) by {
         assert((position[id as int] as int) < x.len() && x[position[id as int] as int] == y[id as int]);
     }
     outputs_are_root_terms(leaf_inputs, leaf_outputs, leaf_nodes, leaf_roots, y, x,
@@ -886,8 +886,8 @@ pub(crate) proof fn renaming_preserves_evaluation(inputs: Seq<Domain>, x: Seq<i6
 }
 
 /// A selection term's value from its three parts' values.
-pub(crate) proof fn select_value(c: Term, t: Term, e: Term, env: Seq<i64>, value: i64)
-    requires denote(Term::Select(Box::new(c), Box::new(t), Box::new(e)), env) == Ok::<i64, Failure>(value),
+pub(crate) proof fn select_value(c: Term, t: Term, e: Term, env: Seq<i128>, value: i128)
+    requires denote(Term::Select(Box::new(c), Box::new(t), Box::new(e)), env) == Ok::<i128, Failure>(value),
     ensures
         denote(c, env) is Ok && denote(t, env) is Ok && denote(e, env) is Ok,
         value == if denote(c, env)->Ok_0 == 1 { denote(t, env)->Ok_0 } else { denote(e, env)->Ok_0 },
@@ -908,17 +908,17 @@ pub(crate) proof fn select_value(c: Term, t: Term, e: Term, env: Seq<i64>, value
 }
 
 /// The pair `(va, vl)` is among the pairs.
-pub(crate) open spec fn paired(pairs: Seq<(i64, i64)>, va: i64, vl: i64) -> bool {
+pub(crate) open spec fn paired(pairs: Seq<(i128, i128)>, va: i128, vl: i128) -> bool {
     exists|p: int| 0 <= p < pairs.len() && #[trigger] pairs[p] == (va, vl)
 }
 
 /// Selection chains with the same conditions choose a recorded pair.
-pub(crate) proof fn selections_choose_a_pair(a: Term, l: Term, env: Seq<i64>,
-    pairs: Seq<(i64, i64)>, va: i64, vl: i64)
+pub(crate) proof fn selections_choose_a_pair(a: Term, l: Term, env: Seq<i128>,
+    pairs: Seq<(i128, i128)>, va: i128, vl: i128)
     requires
         selection_pairs(a, l) == Some(pairs),
-        denote(a, env) == Ok::<i64, Failure>(va),
-        denote(l, env) == Ok::<i64, Failure>(vl),
+        denote(a, env) == Ok::<i128, Failure>(va),
+        denote(l, env) == Ok::<i128, Failure>(vl),
     ensures paired(pairs, va, vl),
     decreases a,
 {
@@ -959,16 +959,16 @@ pub(crate) proof fn selections_choose_a_pair(a: Term, l: Term, env: Seq<i64>,
 /// selection outputs' chains give a functional set of case pairs, the leaf
 /// selects the case paired with the aggregate's selected case.
 pub(crate) proof fn validated_routes_agree(inputs: Seq<Domain>, outputs: Seq<Domain>,
-    nodes: Seq<Op>, roots: Seq<u16>, x: Seq<i64>, target: u16, route: i64, result: Seq<i64>,
+    nodes: Seq<Op>, roots: Seq<u16>, x: Seq<i128>, target: u16, route: i128, result: Seq<i128>,
     leaf_inputs: Seq<Domain>, leaf_outputs: Seq<Domain>, leaf_nodes: Seq<Op>,
-    leaf_roots: Seq<u16>, y: Seq<i64>, position: Seq<u16>, leaf_result: Seq<i64>,
-    pairs: Seq<(i64, i64)>)
+    leaf_roots: Seq<u16>, y: Seq<i128>, position: Seq<u16>, leaf_result: Seq<i128>,
+    pairs: Seq<(i128, i128)>)
     requires
-        execution(inputs, outputs, nodes, roots, x) == Ok::<Seq<i64>, Failure>(result),
+        execution(inputs, outputs, nodes, roots, x) == Ok::<Seq<i128>, Failure>(result),
         (target as int) < x.len(),
         x[target as int] == route,
         reads_from(y, x, position),
-        execution(leaf_inputs, leaf_outputs, leaf_nodes, leaf_roots, y) == Ok::<Seq<i64>, Failure>(leaf_result),
+        execution(leaf_inputs, leaf_outputs, leaf_nodes, leaf_roots, y) == Ok::<Seq<i128>, Failure>(leaf_result),
         roots.len() > 0,
         leaf_roots.len() > 0,
         selection_pairs(

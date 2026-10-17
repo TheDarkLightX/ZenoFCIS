@@ -275,7 +275,7 @@ fn parse_question(question: ProbeCommand) -> Result<(Common, probe::Question), S
             let input = input
                 .split_whitespace()
                 .map(|word| {
-                    word.parse::<i64>()
+                    word.parse::<i128>()
                         .map_err(|_| format!("--input: `{word}` is not an integer"))
                 })
                 .collect::<Result<Vec<_>, _>>()?;

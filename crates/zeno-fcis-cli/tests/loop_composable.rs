@@ -74,19 +74,19 @@ fn bytes(program: &Program) -> Vec<u8> {
         .and_then(|v| v.canonical_bytes())
         .unwrap_or_else(|e| panic!("encoding: {e:?}"))
 }
-fn scalar(high: i64, nodes: Vec<Op>, root: u16) -> Program {
+fn scalar(high: i128, nodes: Vec<Op>, root: u16) -> Program {
     Program::try_new(
         vec![Domain::Int { min: 0, max: high }],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
         nodes,
         vec![root],
     )
     .unwrap_or_else(|e| panic!("program: {e:?}"))
 }
-fn long(high: i64) -> Program {
+fn long(high: i128) -> Program {
     scalar(high, vec![Op::Input(0), Op::Add(0, 0), Op::Sub(1, 0)], 2)
 }
 fn exported(program: &Program) -> Value {
@@ -277,10 +277,10 @@ fn pipeline_pruning_dead_eager_overflow_is_refuted_and_all_failure_is_inconclusi
     let p = Program::try_new(
         vec![Domain::Int { min: -1, max: 1 }],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
-        vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(0, 1), Op::Int(0)],
+        vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(0, 1), Op::Int(0)],
         vec![3],
     )
     .unwrap_or_else(|e| panic!("{e:?}"));
@@ -298,7 +298,7 @@ fn pipeline_pruning_dead_eager_overflow_is_refuted_and_all_failure_is_inconclusi
     );
     assert_eq!(report["detail"]["candidates"][1]["check"]["ordinal"], 2);
     confirm(&out, &report["detail"]["best_check"]);
-    let trap = scalar(0, vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1)], 2);
+    let trap = scalar(0, vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1)], 2);
     let original = dir.file("trap.zcve", &bytes(&trap));
     let request = dir.json("trap.json", &proposal(&original, exported(&trap), &[]));
     let (exit, report) = pipeline(&original, &request, &[]);
@@ -421,7 +421,7 @@ fn rules_a_forged_bank_and_dead_eager_trap_cannot_authorize_a_rewrite() {
             Op::Input(0),
             Op::Add(0, 0),
             Op::Sub(1, 0),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(3, 4),
         ],
@@ -671,7 +671,7 @@ fn rules_unchanged_original_is_labelled_without_an_improvement_claim() {
         ("successful", scalar(3, vec![Op::Input(0)], 0)),
         (
             "trapping",
-            scalar(0, vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1)], 2),
+            scalar(0, vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1)], 2),
         ),
     ] {
         let original = dir.file(&format!("{name}.zcve"), &bytes(&program));

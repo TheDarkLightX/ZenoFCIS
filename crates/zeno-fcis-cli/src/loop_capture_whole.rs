@@ -97,7 +97,7 @@ impl<'a> WholeCheck<'a> {
         })
     }
 
-    fn point(&self, mut ordinal: u64) -> Result<Vec<i64>, String> {
+    fn point(&self, mut ordinal: u64) -> Result<Vec<i128>, String> {
         if ordinal >= self.total {
             return Err("capture-whole-ordinal".into());
         }
@@ -105,14 +105,14 @@ impl<'a> WholeCheck<'a> {
         for (slot, domain) in point.iter_mut().zip(self.candidate.inputs()).rev() {
             let width =
                 u64::try_from(domain_size(*domain)).map_err(|_| "capture-whole-domain-budget")?;
-            *slot = i64::try_from(i128::from(domain.bounds().0) + i128::from(ordinal % width))
+            *slot = i128::try_from(i128::from(domain.bounds().0) + i128::from(ordinal % width))
                 .map_err(|_| "capture-whole-ordinal")?;
             ordinal /= width;
         }
         Ok(point)
     }
 
-    fn points(&self, start: u64) -> Result<Vec<Vec<i64>>, String> {
+    fn points(&self, start: u64) -> Result<Vec<Vec<i128>>, String> {
         let end = start.saturating_add(self.page_limit).min(self.total);
         (start..end).map(|ordinal| self.point(ordinal)).collect()
     }
@@ -120,7 +120,7 @@ impl<'a> WholeCheck<'a> {
     /// Accept exactly the next complete page. No skip, overlap or partial page
     /// can advance the cursor. Every exact piece is a rectangle in the original
     /// input kinds; only interval bounds change, never operations or roots.
-    fn page(&mut self, start: u64, rows: &[Vec<i64>]) -> Result<Option<Value>, String> {
+    fn page(&mut self, start: u64, rows: &[Vec<i128>]) -> Result<Option<Value>, String> {
         let expected = self.page_limit.min(self.total.saturating_sub(self.next));
         if self.stopped || start != self.next || expected == 0 || rows.len() as u64 != expected {
             return Err("capture-whole-page-coverage".into());
@@ -150,7 +150,9 @@ impl<'a> WholeCheck<'a> {
                     .collect::<Vec<_>>();
                 if let Some(Domain::Int { max, .. }) = inputs.last_mut() {
                     *max = max
-                        .checked_add(i64::try_from(count - 1).map_err(|_| "capture-whole-ordinal")?)
+                        .checked_add(
+                            i128::try_from(count - 1).map_err(|_| "capture-whole-ordinal")?,
+                        )
                         .ok_or("capture-whole-ordinal")?;
                 }
                 let table = proposal::ReferenceTable::new(

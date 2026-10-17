@@ -46,15 +46,37 @@ fn seek_matches_odometer_and_signed_endpoints() {
     assert_eq!(tuple_at(&[], 0), Some(vec![]));
     assert_eq!(tuple_at(&[], 1), None);
     let full = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
-    assert_eq!(tuple_at(&[full], 0), Some(vec![i64::MIN]));
-    assert_eq!(tuple_at(&[full], u64::MAX), Some(vec![i64::MAX]));
+    assert_eq!(tuple_at(&[full], 0), Some(vec![i128::MIN]));
+    let at_max_ordinal = i128::MIN + i128::from(u64::MAX);
+    assert_eq!(tuple_at(&[full], u64::MAX), Some(vec![at_max_ordinal]));
     assert_eq!(
         tuple_at(&[full, full], u64::MAX),
-        Some(vec![i64::MIN, i64::MAX])
+        Some(vec![i128::MIN, at_max_ordinal])
     );
+    let old_full = Domain::Int {
+        min: i128::from(i64::MIN),
+        max: i128::from(i64::MAX),
+    };
+    assert_eq!(
+        tuple_at(&[old_full], u64::MAX),
+        Some(vec![i128::from(i64::MAX)])
+    );
+    for base in [i128::MIN, i128::MAX - 2] {
+        let near_end = Domain::Int {
+            min: base,
+            max: base + 2,
+        };
+        for ordinal in 0..3 {
+            assert_eq!(
+                tuple_at(&[near_end], ordinal),
+                Some(vec![base + i128::from(ordinal)])
+            );
+        }
+        assert_eq!(tuple_at(&[near_end], 3), None);
+    }
     assert_eq!(
         tuple_at(&[full, full, Domain::Int { min: 1, max: 0 }], 0),
         None
@@ -62,12 +84,12 @@ fn seek_matches_odometer_and_signed_endpoints() {
     assert_eq!(
         tuple_at(
             &[Domain::Int {
-                min: i64::MAX,
-                max: i64::MAX
+                min: i128::MAX,
+                max: i128::MAX
             }],
             0
         ),
-        Some(vec![i64::MAX])
+        Some(vec![i128::MAX])
     );
 }
 
@@ -86,8 +108,8 @@ fn all_split_points_preserve_usage_traps_and_boundary_precedence() {
         Op::Int(0),
         Op::Select(4, 5, 1),
     ];
-    let trap_a = [Op::Int(i64::MAX), Op::Add(0, 0)];
-    let trap_b = [Op::Bool(false), Op::Int(i64::MAX), Op::Add(1, 1)];
+    let trap_a = [Op::Int(i128::MAX), Op::Add(0, 0)];
+    let trap_b = [Op::Bool(false), Op::Int(i128::MAX), Op::Add(1, 1)];
     let a = program(&inputs, &outputs, &plain, &[0]);
     let equivalent = program(&inputs, &outputs, &extra, &[0]);
     let changed = program(&inputs, &outputs, &changed, &[6]);
@@ -242,7 +264,7 @@ fn work_preflight_and_admission_order_are_exact() {
     ));
     let huge = [Domain::Int {
         min: 0,
-        max: i64::MAX,
+        max: (1_i128 << 63) - 1,
     }];
     let p = program(&huge, &[], &[], &[]);
     assert!(matches!(
@@ -252,4 +274,15 @@ fn work_preflight_and_admission_order_are_exact() {
     let left = ok(scan_range(&p, &p, 1 << 63, 0, 0, 1, 2));
     // Large range refuses before evaluating; this is not an enormous test loop.
     assert_eq!(left.progress(), (0, 1, 1, 1, 2));
+    let wider = [Domain::Int {
+        min: 0,
+        max: i128::MAX,
+    }];
+    let p = program(&wider, &[], &[], &[]);
+    assert!(matches!(
+        scan_range(&p, &p, 1 << 63, 0, 0, 1 << 63, u64::MAX),
+        Err(RangeError::Comparison(Failure::DomainTooLarge {
+            size: Some(n), limit,
+        })) if n == 1_u128 << 127 && limit == 1 << 63
+    ));
 }

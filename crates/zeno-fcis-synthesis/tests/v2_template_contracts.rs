@@ -96,7 +96,7 @@ struct App {
     command: &'static [(u16, Leaf)],
     context: &'static [(u16, Leaf)],
     examples: &'static str,
-    genesis: &'static [i64],
+    genesis: &'static [i128],
 }
 const APPS: [App; 6] = [
     App {
@@ -160,7 +160,7 @@ const APPS: [App; 6] = [
         genesis: &[6, 1, 0, 0, 170, 0, 0],
     },
 ];
-fn value(kind: Leaf, n: i64) -> Value {
+fn value(kind: Leaf, n: i128) -> Value {
     match kind {
         Int => Value::signed(i128::from(n)),
         Bool => {
@@ -170,7 +170,7 @@ fn value(kind: Leaf, n: i64) -> Value {
         Sum(type_id) => Value::sum(type_id, u16::try_from(n).unwrap(), None),
     }
 }
-fn atom(kind: Leaf, n: i64) -> c::Atom<'static> {
+fn atom(kind: Leaf, n: i128) -> c::Atom<'static> {
     match kind {
         Int => c::Atom::I128(i128::from(n)),
         Bool => c::Atom::Bool(n != 0),
@@ -180,7 +180,7 @@ fn atom(kind: Leaf, n: i64) -> c::Atom<'static> {
         },
     }
 }
-fn record(fields: &[(u16, Leaf)], numbers: &[i64]) -> Value {
+fn record(fields: &[(u16, Leaf)], numbers: &[i128]) -> Value {
     assert_eq!(fields.len(), numbers.len());
     Value::record_canonical(
         fields
@@ -197,7 +197,7 @@ fn frame(binding: &c::FrameBinding, v: Value) -> Vec<u8> {
         .unwrap()
 }
 impl App {
-    fn wire(&self, f: &c::Framing, s: &[i64], cmd: &[i64], ctx: &[i64]) -> [Vec<u8>; 3] {
+    fn wire(&self, f: &c::Framing, s: &[i128], cmd: &[i128], ctx: &[i128]) -> [Vec<u8>; 3] {
         [
             frame(&f.state, record(self.state, s)),
             frame(
@@ -218,7 +218,7 @@ impl App {
             ),
         ]
     }
-    fn split<'n>(&self, all: &'n [i64]) -> (&'n [i64], &'n [i64], &'n [i64]) {
+    fn split<'n>(&self, all: &'n [i128]) -> (&'n [i128], &'n [i128], &'n [i128]) {
         let (s, rest) = all.split_at(self.state.len());
         let (c, x) = rest.split_at(self.command.len().max(1));
         assert_eq!(x.len(), self.context.len().max(1));
@@ -229,8 +229,8 @@ impl App {
 struct Expected {
     class: c::Class,
     reason: Option<u32>,
-    post: Vec<i64>,
-    outbox: Vec<(u32, Vec<i64>)>,
+    post: Vec<i128>,
+    outbox: Vec<(u32, Vec<i128>)>,
     refusal: Option<&'static str>,
 }
 fn reject(reason: u32) -> Expected {
@@ -242,7 +242,7 @@ fn reject(reason: u32) -> Expected {
         refusal: None,
     }
 }
-fn accept(s: &[i64]) -> Expected {
+fn accept(s: &[i128]) -> Expected {
     Expected {
         class: c::Class::Accept,
         reason: None,
@@ -273,7 +273,7 @@ fn payload(channel: u32, app: &str) -> (&'static str, &'static [(u16, Leaf)]) {
         _ => panic!("unexpected channel"),
     }
 }
-fn reference(app: usize, s: &[i64], cmd: &[i64], ctx: &[i64]) -> Expected {
+fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
     let mut out = accept(s);
     match app {
         0 => {
@@ -472,15 +472,15 @@ fn reference(app: usize, s: &[i64], cmd: &[i64], ctx: &[i64]) -> Expected {
                     let pending_a = (plant / 12) % 2;
                     out.post[1] = if pending_a != 0 { 182 } else { 180 };
                     out.post[3] = if pending_b != 0 { 182 } else { 180 };
-                    out.post[5] = i64::from(pause);
-                    out.post[6] = i64::from(must);
-                    out.post[7] = 170 + i64::from(next % 2);
+                    out.post[5] = i128::from(pause);
+                    out.post[6] = i128::from(must);
+                    out.post[7] = 170 + i128::from(next % 2);
                     if pay != 0 {
                         let pos = if pay == 1 { 1 } else { 3 };
                         let paid = s[pos + 1];
                         out.post[0] -= paid;
                         out.post[pos + 1] = 0;
-                        out.outbox.push((300, vec![169 + i64::from(pay), paid]));
+                        out.outbox.push((300, vec![169 + i128::from(pay), paid]));
                         if !(1..=2).contains(&paid) {
                             out.refusal = Some("schema")
                         }
@@ -598,14 +598,14 @@ fn reference(app: usize, s: &[i64], cmd: &[i64], ctx: &[i64]) -> Expected {
     }
     out
 }
-fn vault_invariant(s: &[i64]) -> bool {
+fn vault_invariant(s: &[i128]) -> bool {
     s[0] <= 4
         && s[0] >= s[2] + s[4]
         && if s[1] == 180 { s[2] == 0 } else { s[2] >= 1 }
         && if s[3] == 180 { s[4] == 0 } else { s[4] >= 1 }
         && (s[6] == 0 || (s[5] == 0 && (s[1] == 182 || s[3] == 182)))
 }
-fn check(app: &App, out: &a::Evaluation<'_>, s: &[i64], expected: &Expected) {
+fn check(app: &App, out: &a::Evaluation<'_>, s: &[i128], expected: &Expected) {
     check_report(
         app,
         out.result(),
@@ -626,7 +626,7 @@ fn check_report(
     usage: zeno_fcis_synthesis::finite::V2Usage,
     reads: &[c::ReadAttempt],
     diagnostics: &[l::Diagnostic],
-    s: &[i64],
+    s: &[i128],
     expected: &Expected,
 ) {
     if let Some(refusal) = expected.refusal {
@@ -783,7 +783,7 @@ fn exercise(
     index: usize,
     authority: &a::Authority<'_>,
     framing: &c::Framing,
-    all: &[i64],
+    all: &[i128],
 ) -> String {
     let app = &APPS[index];
     let (s, cmd, ctx) = app.split(all);
@@ -851,7 +851,7 @@ fn examples_range(
         println!("retained {} example {}: start", app.name, case);
         let sections: Vec<_> = line.split('|').map(str::trim).collect();
         let split = sections.len() - 2;
-        let all: Vec<i64> = sections[..split]
+        let all: Vec<i128> = sections[..split]
             .join(" ")
             .split_whitespace()
             .map(|n| n.parse().unwrap())
@@ -864,13 +864,13 @@ fn examples_range(
             "failure" => c::Class::CommittedFailure,
             _ => panic!("class"),
         };
-        let post: Vec<i64> = words[2..].iter().map(|n| n.parse().unwrap()).collect();
+        let post: Vec<i128> = words[2..].iter().map(|n| n.parse().unwrap()).collect();
         if class == c::Class::Reject {
             assert_eq!(post, s)
         }
         let mut deliveries = vec![];
         if sections[split + 1] != "-" {
-            let mut nums: Vec<i64> = sections[split + 1]
+            let mut nums: Vec<i128> = sections[split + 1]
                 .split_whitespace()
                 .map(|n| n.parse().unwrap())
                 .collect();
@@ -921,18 +921,18 @@ struct Corpus {
     name: &'static str,
     app: usize,
     size: usize,
-    dimensions: &'static [(&'static str, &'static [i64])],
-    input: fn(&[i64]) -> Vec<i64>,
+    dimensions: &'static [(&'static str, &'static [i128])],
+    input: fn(&[i128]) -> Vec<i128>,
     /// Every observed outcome signature of the complete native corpus.
     outcomes: &'static [&'static str],
     /// Named boundary relations that both the native corpus and the bounded
     /// profile must witness.
     boundaries: &'static [Boundary],
     /// The bounded Miri cases, strictly ascending.
-    profile: &'static [&'static [i64]],
+    profile: &'static [&'static [i128]],
 }
 /// A named relation over a case's logical values.
-type Boundary = (&'static str, fn(&[i64]) -> bool);
+type Boundary = (&'static str, fn(&[i128]) -> bool);
 
 /// Counts, observed values, outcome signatures and boundary witnesses of the
 /// cases exercised from one corpus. Only the first witness of each feature is
@@ -940,9 +940,9 @@ type Boundary = (&'static str, fn(&[i64]) -> bool);
 struct Observation<'c> {
     corpus: &'c Corpus,
     cases: usize,
-    values: Vec<BTreeSet<i64>>,
-    outcomes: BTreeMap<String, Vec<i64>>,
-    boundaries: Vec<Option<Vec<i64>>>,
+    values: Vec<BTreeSet<i128>>,
+    outcomes: BTreeMap<String, Vec<i128>>,
+    boundaries: Vec<Option<Vec<i128>>>,
 }
 impl<'c> Observation<'c> {
     fn new(corpus: &'c Corpus) -> Self {
@@ -965,7 +965,7 @@ impl<'c> Observation<'c> {
         &mut self,
         authority: &a::Authority<'_>,
         framing: &c::Framing,
-        case: &[i64],
+        case: &[i128],
     ) -> bool {
         let corpus = self.corpus;
         assert_eq!(
@@ -1061,7 +1061,7 @@ fn bounded(
     observation
 }
 /// Smallest whole minimum output for a treasury proposal.
-fn treasury_least(buys: bool, amount: i64, price: i64) -> i64 {
+fn treasury_least(buys: bool, amount: i128, price: i128) -> i128 {
     let (numerator, denominator) = if buys {
         (amount * 3, 4 * price)
     } else {
@@ -1070,7 +1070,7 @@ fn treasury_least(buys: bool, amount: i64, price: i64) -> i64 {
     (numerator + denominator - 1) / denominator
 }
 /// Proposal value, daily spend and least output when every earlier guard passes.
-fn treasury_proposal(d: &[i64]) -> Option<(i64, i64, i64)> {
+fn treasury_proposal(d: &[i128]) -> Option<(i128, i128, i128)> {
     let (spent, seen, now, buys, amount, price) = (d[0], d[1], d[2], d[3] == 173, d[4], d[6]);
     (d[7] == 170 && now > seen).then(|| {
         let spent = if now / 4 > seen / 4 { 0 } else { spent };
@@ -1080,7 +1080,7 @@ fn treasury_proposal(d: &[i64]) -> Option<(i64, i64, i64)> {
 }
 /// Whether a guard-partition proposal passes authority, clock, oracle, cap and
 /// minimum-output guards, reaching the reserve guard.
-fn treasury_reserve_reached(d: &[i64]) -> bool {
+fn treasury_reserve_reached(d: &[i128]) -> bool {
     let (buys, amount, min_out, price) = (d[2] == 173, d[3], d[4], d[8]);
     let value = if buys { amount } else { amount * price };
     d[5] == 178
@@ -1090,7 +1090,7 @@ fn treasury_reserve_reached(d: &[i64]) -> bool {
         && min_out >= treasury_least(buys, amount, price)
 }
 /// Whether a callback for the pending intent reaches its fill or refund.
-fn treasury_callback_reached(d: &[i64]) -> bool {
+fn treasury_callback_reached(d: &[i128]) -> bool {
     d[2] != 170 && d[8] == 2
 }
 

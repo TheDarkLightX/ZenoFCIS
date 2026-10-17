@@ -120,7 +120,7 @@ impl Inconclusive {
 #[derive(Debug)]
 pub(super) struct Space {
     /// Every value of each position, in enumeration order.
-    values: Vec<Vec<i64>>,
+    values: Vec<Vec<i128>>,
     state_width: usize,
     pub(super) states: usize,
     pub(super) inputs: usize,
@@ -145,12 +145,12 @@ impl Space {
             Some(size) if size <= u128::from(max_tuples) => {}
             _ => return Err(too_large()),
         }
-        let values: Vec<Vec<i64>> = positions
+        let values: Vec<Vec<i128>> = positions
             .iter()
             .map(|position| position.domain.values_within(max_tuples))
             .collect::<Option<_>>()
             .ok_or_else(too_large)?;
-        let count = |lists: &[Vec<i64>]| lists.iter().map(Vec::len).product::<usize>();
+        let count = |lists: &[Vec<i128>]| lists.iter().map(Vec::len).product::<usize>();
         let states = count(&values[..state_width]);
         let inputs = count(&values[state_width..]);
         Ok(Self {
@@ -167,7 +167,7 @@ impl Space {
 
     /// The values of the `index`th element of the product of `lists`, the
     /// last list fastest.
-    fn element(lists: &[Vec<i64>], mut index: usize) -> Vec<i64> {
+    fn element(lists: &[Vec<i128>], mut index: usize) -> Vec<i128> {
         let mut out = vec![0; lists.len()];
         for (slot, list) in out.iter_mut().zip(lists).rev() {
             *slot = list[index % list.len()];
@@ -178,7 +178,7 @@ impl Space {
 
     /// The index of `values` in the product of `lists`, if every value is in
     /// its list.
-    fn index(lists: &[Vec<i64>], values: &[i64]) -> Option<usize> {
+    fn index(lists: &[Vec<i128>], values: &[i128]) -> Option<usize> {
         if values.len() != lists.len() {
             return None;
         }
@@ -191,27 +191,27 @@ impl Space {
             })
     }
 
-    pub(super) fn state(&self, index: usize) -> Vec<i64> {
+    pub(super) fn state(&self, index: usize) -> Vec<i128> {
         Self::element(&self.values[..self.state_width], index)
     }
 
-    pub(super) fn input(&self, index: usize) -> Vec<i64> {
+    pub(super) fn input(&self, index: usize) -> Vec<i128> {
         Self::element(&self.values[self.state_width..], index)
     }
 
-    pub(super) fn state_of(&self, values: &[i64]) -> Option<usize> {
+    pub(super) fn state_of(&self, values: &[i128]) -> Option<usize> {
         Self::index(&self.values[..self.state_width], values)
     }
 
     /// The tuple of a state and an input.
-    pub(super) fn tuple(&self, state: usize, input: usize) -> Vec<i64> {
+    pub(super) fn tuple(&self, state: usize, input: usize) -> Vec<i128> {
         let mut tuple = self.state(state);
         tuple.extend(self.input(input));
         tuple
     }
 
     /// The tuple at `ordinal`.
-    pub(super) fn at(&self, ordinal: usize) -> Vec<i64> {
+    pub(super) fn at(&self, ordinal: usize) -> Vec<i128> {
         self.tuple(ordinal / self.inputs, ordinal % self.inputs)
     }
 
@@ -398,8 +398,8 @@ fn genesis(space: &Space, positions: &[Position], rules: &Rules) -> Result<usize
                 ContractError::new("project.zeno", "a scalar state root has no genesis field")
             })?;
             match rules.genesis.get(&field) {
-                Some(Constant::Bool(value)) => Ok(i64::from(*value)),
-                Some(Constant::Int(value)) => i64::try_from(*value).map_err(|_| {
+                Some(Constant::Bool(value)) => Ok(i128::from(*value)),
+                Some(Constant::Int(value)) => i128::try_from(*value).map_err(|_| {
                     ContractError::new(format!("v2/policy.json genesis.{field}"), "is out of range")
                 }),
                 None => Err(ContractError::new(
@@ -442,11 +442,11 @@ fn observe(
                     .iter()
                     .map(|(field, value)| (*field, value.number()))
                     .collect();
-                let values: Option<Vec<i64>> = positions[..space.state_width]
+                let values: Option<Vec<i128>> = positions[..space.state_width]
                     .iter()
                     .map(|position| {
                         let number = (*by_field.get(&position.field.unwrap_or(0))?)?;
-                        i64::try_from(number).ok()
+                        i128::try_from(number).ok()
                     })
                     .collect();
                 values
@@ -558,7 +558,7 @@ pub(super) fn observe_contract(
 
 /// `test` on each state, framed with the first input; a state test reads
 /// only the state.
-pub(super) fn valid_states(space: &Space, test: impl Fn(&[i64]) -> bool + Sync) -> Vec<bool> {
+pub(super) fn valid_states(space: &Space, test: impl Fn(&[i128]) -> bool + Sync) -> Vec<bool> {
     let input = space.input(0);
     parallel(space.states, |state| {
         let mut tuple = space.state(state);

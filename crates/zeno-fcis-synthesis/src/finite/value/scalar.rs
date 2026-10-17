@@ -1,22 +1,19 @@
-//! Checked scalar arithmetic and explicit nonnegative full-product operations.
-//! All temporaries are owned by one invocation; only scalar values escape.
+//! Checked signed scalar arithmetic. Unsigned magnitudes hold MIN exactly.
+//! Invocation-local scalars only; the existing unsigned limb engine owns wide products.
 use super::wide;
-#[cfg(verus_keep_ghost)]
-use vstd::arithmetic::div_mod::*;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
 verus! {
 pub(crate) open spec fn magnitude(value: int) -> int { if value < 0 { -value } else { value } }
-pub(crate) open spec fn narrow(value: int) -> Option<i64> {
-    if i64::MIN <= value <= i64::MAX { Some(value as i64) } else { None }
+pub(crate) open spec fn narrow(value: int) -> Option<i128> {
+    if i128::MIN <= value <= i128::MAX { Some(value as i128) } else { None }
 }
-pub(crate) open spec fn multiply_value(a: i64, b: i64) -> Option<i64> {
+pub(crate) open spec fn multiply_value(a: i128, b: i128) -> Option<i128> {
     narrow(a as int * b as int)
 }
-/// Magnitude/sign rational rounding, matching the existing law definition.
-pub(crate) open spec fn division_value(up: bool, a: i64, b: i64) -> Option<i64> {
+pub(crate) open spec fn division_value(up: bool, a: i128, b: i128) -> Option<i128> {
     if b == 0 { None } else {
         let negative = (a < 0) != (b < 0);
         let x = magnitude(a as int); let y = magnitude(b as int);
@@ -25,89 +22,115 @@ pub(crate) open spec fn division_value(up: bool, a: i64, b: i64) -> Option<i64> 
         narrow(if negative { -rounded } else { rounded })
     }
 }
-pub(crate) open spec fn mul_div_value(up: bool, a: i64, b: i64, den: i64) -> Option<i64> {
+pub(crate) open spec fn mul_div_value(up: bool, a: i128, b: i128, den: i128) -> Option<i128> {
     if a < 0 || b < 0 || den <= 0 { None } else {
         let p = a as int * b as int;
         narrow(p / den as int + if up && p % den as int != 0 { 1int } else { 0int })
     }
 }
-pub(crate) open spec fn products_ge_value(a:i64,b:i64,c:i64,d:i64,e:i64,f:i64) -> Option<bool> {
+/// Total D7 relation: mathematical integer division by a positive divisor is floor.
+pub(crate) open spec fn signed_mul_div_floor_value(a:i128,b:i128,den:i128)->Option<i128> {
+    if den <= 0 { None } else { narrow((a as int * b as int) / den as int) }
+}
+/// Exact success/refusal partition, stated over every raw machine tuple.
+pub(crate) open spec fn signed_floor_relation(a:i128,b:i128,d:i128,result:Option<i128>)->bool {
+    result == signed_mul_div_floor_value(a,b,d)
+    && match result {
+        Some(q) => d>0 && q as int*d as int <= a as int*b as int
+            && a as int*b as int < (q as int+1)*d as int,
+        None => if d<=0 {true}else{!((i128::MIN as int) <= (a as int*b as int)/d as int <= (i128::MAX as int))},
+    }
+}
+pub(crate) open spec fn products_ge_value(a:i128,b:i128,c:i128,d:i128,e:i128,f:i128) -> Option<bool> {
     if a < 0 || b < 0 || c < 0 || d < 0 || e < 0 || f < 0 { None }
     else { Some(a as int * b as int * c as int >= d as int * e as int * f as int) }
 }
 }
 
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result as int == magnitude(value as int),))]
+pub(crate) fn unsigned_magnitude(value: i128) -> u128 {
+    if value < 0 {
+        (-(value + 1)) as u128 + 1
+    } else {
+        value as u128
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == narrow(if negative { -(value as int) } else { value as int }),
+))]
+fn signed_magnitude(value: u128, negative: bool) -> Option<i128> {
+    if negative && value == i128::MAX as u128 + 1 {
+        Some(i128::MIN)
+    } else if value > i128::MAX as u128 {
+        None
+    } else if negative {
+        Some(-(value as i128))
+    } else {
+        Some(value as i128)
+    }
+}
+
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == multiply_value(a, b),))]
-pub(crate) fn multiply(a: i64, b: i64) -> Option<i64> {
+pub(crate) fn multiply(a: i128, b: i128) -> Option<i128> {
     a.checked_mul(b)
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == division_value(up, a, b),))]
-pub(crate) fn divide(up: bool, a: i64, b: i64) -> Option<i64> {
+pub(crate) fn divide(up: bool, a: i128, b: i128) -> Option<i128> {
     if b == 0 {
         return None;
     }
-    // i128 holds both i64 magnitudes, including MIN, without abs overflow.
-    let x = if a < 0 { -(a as i128) } else { a as i128 };
-    let y = if b < 0 { -(b as i128) } else { b as i128 };
+    let x = unsigned_magnitude(a);
+    let y = unsigned_magnitude(b);
     let negative = (a < 0) != (b < 0);
     let q = x / y;
     let r = x % y;
-    #[cfg(verus_keep_ghost)]
-    proof! {
-        lemma_fundamental_div_mod(x as int, y as int);
-        lemma_mod_bound(x as int, y as int);
-        assert(0 <= q <= x) by(nonlinear_arith)
-            requires 0<=x, y>0, 0<=r<y, x as int == q as int*y as int+r as int;
-        assert(x <= 9_223_372_036_854_775_808int);
-    }
-    let rounded = if r != 0 && (up != negative) { q + 1 } else { q };
-    let result = if negative { -rounded } else { rounded };
-    if result < i64::MIN as i128 || result > i64::MAX as i128 {
-        None
+    let rounded = if r != 0 && (up != negative) {
+        q.checked_add(1)?
     } else {
-        Some(result as i64)
-    }
+        q
+    };
+    signed_magnitude(rounded, negative)
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == mul_div_value(up, a, b, den),))]
-pub(crate) fn mul_div(up: bool, a: i64, b: i64, den: i64) -> Option<i64> {
+pub(crate) fn mul_div(up: bool, a: i128, b: i128, den: i128) -> Option<i128> {
     if a < 0 || b < 0 || den <= 0 {
         return None;
     }
-    #[cfg(verus_keep_ghost)]
-    proof! {
-        let p = a as int * b as int;
-        let upper = (i64::MAX as int) * (i64::MAX as int);
-        vstd::arithmetic::mul::lemma_mul_upper_bound(a as int, i64::MAX as int,
-            b as int, i64::MAX as int);
-        assert(0 <= p) by(nonlinear_arith)
-            requires 0 <= a as int, 0 <= b as int, p == (a as int) * (b as int);
-        assert(p <= upper);
-        assert(upper + 1 <= u128::MAX as int);
-        let divisor = den as int;
-        let q = p / divisor;
-        let r = p % divisor;
-        lemma_fundamental_div_mod(p, divisor);
-        lemma_mod_bound(p, divisor);
-        assert(p == q * divisor + r);
-        assert(0 <= q <= p) by(nonlinear_arith)
-            requires divisor > 0, 0 <= p, p == q * divisor + r, 0 <= r < divisor;
-        assert(q + 1 <= u128::MAX as int);
-    }
-    let result = if up {
+    let q = if up {
         wide::mul_div_ceil(a as u128, b as u128, den as u128)
     } else {
         wide::mul_div_floor(a as u128, b as u128, den as u128)
-    };
-    match result {
-        Some(q) if q <= i64::MAX as u128 => Some(q as i64),
-        _ => None,
+    }?;
+    signed_magnitude(q, false)
+}
+
+/// Floor of the exact signed two-factor product, without narrowing the product.
+/// Nonpositive divisors refuse even for zero numerators. All helper/fit failures refuse.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == signed_mul_div_floor_value(a, b, den),
+        signed_floor_relation(a,b,den,result),
+))]
+pub(crate) fn signed_mul_div_floor(a: i128, b: i128, den: i128) -> Option<i128> {
+    if den <= 0 {
+        return None;
     }
+    let negative = (a < 0) != (b < 0);
+    let x = unsigned_magnitude(a);
+    let y = unsigned_magnitude(b);
+    let q = if negative {
+        // D7_NEGATIVE_ROUNDING: floor(-P/d) = -ceil(P/d).
+        wide::mul_div_ceil(x, y, den as u128)
+    } else {
+        wide::mul_div_floor(x, y, den as u128)
+    }?;
+    signed_magnitude(q, negative)
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == products_ge_value(a,b,c,d,e,f),))]
-pub(crate) fn products_ge(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) -> Option<bool> {
+pub(crate) fn products_ge(a: i128, b: i128, c: i128, d: i128, e: i128, f: i128) -> Option<bool> {
     if a < 0 || b < 0 || c < 0 || d < 0 || e < 0 || f < 0 {
         return None;
     }

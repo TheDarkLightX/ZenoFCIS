@@ -42,7 +42,7 @@ use super::judges::{Core, Result, Stop, class_of, label};
 /// Most cases a lookup table may have.
 const MAX_LOOKUP: usize = 64;
 /// A decision code: 0 for an accept, else `class * 2^32 + reason + 1`.
-type Code = i64;
+type Code = i128;
 /// No case of the component fires.
 const NOCASE: Code = -1;
 /// The component's Authority refuses its own decision.
@@ -53,7 +53,7 @@ fn code(class: Class, reason: Option<u32>) -> Code {
     if class == 0 {
         0
     } else {
-        (i64::from(class) << 32) + i64::from(reason.unwrap_or(0)) + 1
+        (i128::from(class) << 32) + i128::from(reason.unwrap_or(0)) + 1
     }
 }
 
@@ -67,7 +67,7 @@ fn decode(code: Code) -> (Class, Option<u32>) {
 }
 
 /// Successor values of a component's owned fields, by state position.
-type Posts = BTreeMap<usize, Vec<i64>>;
+type Posts = BTreeMap<usize, Vec<i128>>;
 
 /// One case of a component: a guard and a decision with successors for
 /// fields it owns.
@@ -104,7 +104,7 @@ struct Need {
     verdict: Vec<Code>,
     care_post: Vec<bool>,
     /// Per owned field, by state position: the required successor value.
-    post: BTreeMap<usize, Vec<i64>>,
+    post: BTreeMap<usize, Vec<i128>>,
 }
 
 fn refuse<T>(reason: impl Into<String>) -> Result<T> {
@@ -292,7 +292,7 @@ struct Monolith {
     class: Vec<Class>,
     reason: Vec<Option<u32>>,
     /// Per state position, the successor value on each tuple.
-    post: Vec<Vec<i64>>,
+    post: Vec<Vec<i128>>,
 }
 
 fn monolith(core: &Core) -> Result<Monolith> {
@@ -417,8 +417,8 @@ fn keys(core: &Core, fields: &[usize]) -> Vec<u64> {
 
 /// The first two cared tuples with the same key and different required
 /// values.
-fn clash(key: &[u64], value: &[i64], care: &[bool]) -> Option<(usize, usize)> {
-    let mut seen: BTreeMap<u64, (i64, usize)> = BTreeMap::new();
+fn clash(key: &[u64], value: &[i128], care: &[bool]) -> Option<(usize, usize)> {
+    let mut seen: BTreeMap<u64, (i128, usize)> = BTreeMap::new();
     let mut best: Option<(usize, usize)> = None;
     for o in (0..key.len()).filter(|o| care[*o]) {
         match seen.get(&key[o]) {
@@ -440,8 +440,8 @@ fn clash(key: &[u64], value: &[i64], care: &[bool]) -> Option<(usize, usize)> {
 fn score(core: &Core, need: &Need, fields: &[usize]) -> usize {
     let key = keys(core, fields);
     let mut count = 0;
-    let mut tally = |values: &[i64], care: &[bool]| {
-        let mut seen: BTreeMap<u64, (i64, bool)> = BTreeMap::new();
+    let mut tally = |values: &[i128], care: &[bool]| {
+        let mut seen: BTreeMap<u64, (i128, bool)> = BTreeMap::new();
         for o in (0..key.len()).filter(|o| care[*o]) {
             let entry = seen.entry(key[o]).or_insert((values[o], false));
             if entry.0 != values[o] {
@@ -555,7 +555,7 @@ fn option(core: &Core, code: Code, sets: Option<BTreeMap<String, Value>>) -> Val
 fn evaluate_part(core: &Core, part: &Part) -> Result<(Vec<Code>, Posts)> {
     let n = core.tuples();
     let mut codes = vec![NOCASE; n];
-    let mut post: BTreeMap<usize, Vec<i64>> = part
+    let mut post: BTreeMap<usize, Vec<i128>> = part
         .owns
         .iter()
         .map(|f| (*f, core.columns[*f].clone()))
@@ -563,7 +563,7 @@ fn evaluate_part(core: &Core, part: &Part) -> Result<(Vec<Code>, Posts)> {
     let mut decided = vec![false; n];
     for case in &part.cases {
         let fires = core.eval(&case.when)?;
-        let sets: BTreeMap<usize, Vec<i64>> = if case.class == Class::Reject {
+        let sets: BTreeMap<usize, Vec<i128>> = if case.class == Class::Reject {
             BTreeMap::new()
         } else {
             case.sets
@@ -599,7 +599,7 @@ fn evaluate_part(core: &Core, part: &Part) -> Result<(Vec<Code>, Posts)> {
 }
 
 /// Where a component differs from its required behaviour.
-fn wrong(need: &Need, codes: &[Code], post: &BTreeMap<usize, Vec<i64>>) -> Vec<bool> {
+fn wrong(need: &Need, codes: &[Code], post: &BTreeMap<usize, Vec<i128>>) -> Vec<bool> {
     (0..codes.len())
         .map(|o| {
             (need.care_verdict[o] && codes[o] != need.verdict[o])

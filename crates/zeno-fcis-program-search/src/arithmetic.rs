@@ -10,7 +10,7 @@ use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 /// publication authority. D1 enforces nonnegative full-product operands,
 /// zero-denominator and result-overflow refusals.
 #[must_use]
-pub fn evaluate(op: Op, columns: &[&[i64]]) -> Option<Vec<i64>> {
+pub fn evaluate(op: Op, columns: &[&[i128]]) -> Option<Vec<i128>> {
     if columns.is_empty() || columns.len() > 6 {
         return None;
     }
@@ -28,8 +28,8 @@ pub fn evaluate(op: Op, columns: &[&[i64]]) -> Option<Vec<i64>> {
         return None;
     }
     let integer = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let mut nodes = (0..columns.len())
         .map(|k| Some(Op::Input(u16::try_from(k).ok()?)))

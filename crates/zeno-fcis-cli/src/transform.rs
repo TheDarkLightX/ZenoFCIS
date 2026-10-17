@@ -75,7 +75,7 @@ pub(crate) enum Rejection {
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Counterexample {
     pub(crate) ordinal: u64,
-    pub(crate) input: Vec<i64>,
+    pub(crate) input: Vec<i128>,
     pub(crate) original: Observation,
     pub(crate) candidate: Observation,
 }
@@ -598,7 +598,7 @@ fn differing_fields(recorded: &Value, computed: &Value) -> Vec<String> {
 }
 
 /// Scalar values as exact decimal strings, which JSON readers cannot round.
-pub(crate) fn values_json(values: &[i64]) -> Value {
+pub(crate) fn values_json(values: &[i128]) -> Value {
     Value::from(
         values
             .iter()

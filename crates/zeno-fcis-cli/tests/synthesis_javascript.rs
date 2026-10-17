@@ -5,9 +5,9 @@ use std::process::Command;
 use zeno_fcis_synthesis::finite::emit::{JavaScriptEmitter, TargetEmitter};
 use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 
-const I64: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+const I128: Domain = Domain::Int {
+    min: i128::MIN,
+    max: i128::MAX,
 };
 
 fn execute(
@@ -41,8 +41,8 @@ fn execute(
 #[ignore = "requires Node.js; the finite-synthesis ATDD scenario runs this explicitly"]
 fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
     execute(
-        vec![I64],
-        vec![I64],
+        vec![I128],
+        vec![I128],
         vec![Op::Input(0)],
         vec![0],
         r#"
@@ -62,8 +62,8 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
     "#,
     );
     execute(
-        vec![I64, I64],
-        vec![I64, I64],
+        vec![I128, I128],
+        vec![I128, I128],
         vec![Op::Input(0), Op::Input(1), Op::Add(0, 1), Op::Sub(0, 1)],
         vec![2, 3],
         r#"
@@ -77,9 +77,9 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
     );
     execute(
         vec![],
-        vec![I64],
+        vec![I128],
         vec![
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(0, 1),
             Op::Bool(false),
@@ -91,23 +91,23 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
     );
     execute(
         vec![],
-        vec![I64],
-        vec![Op::Int(i64::MIN), Op::Int(1), Op::Sub(0, 1), Op::Int(7)],
+        vec![I128],
+        vec![Op::Int(i128::MIN), Op::Int(1), Op::Sub(0, 1), Op::Int(7)],
         vec![3],
         "expect('', null);",
     );
     execute(
         vec![],
-        vec![I64],
-        vec![Op::Int(i64::MIN)],
+        vec![I128],
+        vec![Op::Int(i128::MIN)],
         vec![0],
         r#"
         expect('', '-9223372036854775808'); expect('0', null); expect(' ', null);
     "#,
     );
     execute(
-        vec![I64; 16],
-        vec![I64],
+        vec![I128; 16],
+        vec![I128],
         vec![Op::Input(15)],
         vec![0],
         r#"
@@ -117,14 +117,14 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
     "#,
     );
     execute(
-        vec![Domain::Bool, Domain::Bool, I64],
+        vec![Domain::Bool, Domain::Bool, I128],
         vec![
             Domain::Bool,
             Domain::Bool,
             Domain::Bool,
             Domain::Bool,
             Domain::Bool,
-            I64,
+            I128,
         ],
         vec![
             Op::Input(0),

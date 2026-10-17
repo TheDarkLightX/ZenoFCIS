@@ -222,7 +222,7 @@ class NegativeRetentionTests(unittest.TestCase):
         for gate in GATES:
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate)
-                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 24 if gate is check_finite_execution else 16)
+                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 25 if gate is check_finite_execution else 16)
                 self.assertEqual(len(observed), 1 + len(mutants))
                 self.assertEqual([entry['name'] for entry in receipt['mutations']], list(mutants))
                 self.assertTrue(all(entry['killed'] for entry in receipt['mutations']))

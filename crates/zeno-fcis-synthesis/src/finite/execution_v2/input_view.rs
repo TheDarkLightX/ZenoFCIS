@@ -13,27 +13,27 @@ pub struct Variant {
     /// Closed wire variant identifier; zero is legal in generic ZCVE.
     pub id: u16,
     /// Declared scalar code within the complete inclusive interval.
-    pub code: i64,
+    pub code: i128,
 }
 
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
-/// A complete finite leaf descriptor; codes may occupy any inclusive i64 interval.
+/// A complete finite leaf descriptor; codes may occupy any inclusive i128 interval.
 #[non_exhaustive]
 pub enum Leaf {
     /// Original unsigned canonical u128, with an injective bounded scalar projection.
     U128 {
         /// Complete inclusive unsigned lower bound.
         min: u128,
-        /// Complete inclusive unsigned upper bound; scalar admission requires i64 fit.
+        /// Complete inclusive unsigned upper bound; scalar admission requires i128 fit.
         max: u128,
     },
-    /// A signed canonical i128 constrained by an inclusive i64 value interval.
+    /// A signed canonical i128 constrained by an inclusive i128 value interval.
     I128 {
         /// Inclusive lower value bound.
-        min: i64,
+        min: i128,
         /// Inclusive upper value bound.
-        max: i64,
+        max: i128,
     },
     /// Canonical false and true, projected to scalar zero and one.
     Bool,
@@ -42,9 +42,9 @@ pub enum Leaf {
         /// Exact wire type identifier.
         type_id: u32,
         /// Inclusive lower scalar-code bound.
-        min: i64,
+        min: i128,
         /// Inclusive upper scalar-code bound.
-        max: i64,
+        max: i128,
         /// Distinct variant IDs and codes covering the entire declared interval.
         variants: Vec<Variant>,
     },
@@ -53,9 +53,9 @@ pub enum Leaf {
         /// Exact wire type identifier.
         type_id: u32,
         /// Inclusive lower scalar-code bound.
-        min: i64,
+        min: i128,
         /// Inclusive upper scalar-code bound.
-        max: i64,
+        max: i128,
         /// Distinct variant IDs and codes covering the entire declared interval.
         variants: Vec<Variant>,
     },
@@ -74,12 +74,37 @@ pub struct Field<L = Leaf> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::variants_valid(variants@, min, max),
 ))]
-fn validate_variants(variants: &[Variant], min: i64, max: i64) -> bool {
+fn validate_variants(variants: &[Variant], min: i128, max: i128) -> bool {
+    // Materialize the native length before the overflow exits. A sequence view
+    // alone does not give the prover the machine-sized slice-length bound.
+    let variant_count = variants.len();
     if min > max {
         return false;
     }
-    let cardinality = max as i128 - min as i128 + 1;
-    if cardinality != variants.len() as i128 {
+    // A complete variant table has at most usize::MAX entries. A difference
+    // that exceeds i128 therefore cannot equal its cardinality.
+    let cardinality = match max.checked_sub(min) {
+        Some(span) => match span.checked_add(1) {
+            Some(cardinality) => cardinality,
+            None => {
+                #[cfg(verus_keep_ghost)]
+                proof! {
+                    assert(variants@.len() <= usize::MAX);
+                    assert(max as int - min as int + 1 > variants@.len());
+                }
+                return false;
+            }
+        },
+        None => {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(variants@.len() <= usize::MAX);
+                assert(max as int - min as int + 1 > variants@.len());
+            }
+            return false;
+        }
+    };
+    if cardinality != variant_count as i128 {
         return false;
     }
     let mut index = 0usize;
@@ -131,7 +156,7 @@ fn validate_variants(variants: &[Variant], min: i64, max: i64) -> bool {
 pub(super) fn validate_leaf(leaf: &Leaf) -> bool {
     match leaf {
         Leaf::I128 { min, max } => min <= max,
-        Leaf::U128 { min, max } => min <= max && *max <= i64::MAX as u128,
+        Leaf::U128 { min, max } => min <= max && *max <= i128::MAX as u128,
         Leaf::Bool => true,
         Leaf::Enum {
             min, max, variants, ..
@@ -171,11 +196,11 @@ pub(super) fn validate_schema(fields: &[Field]) -> bool {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::lookup(variants@, id, variants@.len()),
 ))]
-fn lookup(variants: &[Variant], id: u16) -> Option<i64> {
+fn lookup(variants: &[Variant], id: u16) -> Option<i128> {
     let mut index = 0usize;
     #[cfg_attr(verus_keep_ghost, verus_spec(
         invariant index <= variants.len(),
-            spec::lookup(variants@, id, index as nat) == None::<i64>,
+            spec::lookup(variants@, id, index as nat) == None::<i128>,
         decreases variants.len() - index,
     ))]
     while index < variants.len() {
@@ -202,7 +227,7 @@ fn decode_variant(
     type_id: u32,
     variants: &[Variant],
     sum: bool,
-) -> Option<(i64, usize)> {
+) -> Option<(i128, usize)> {
     let (raw_type, after_type) = read_big_endian(bytes, offset, 4)?;
     if raw_type != type_id as u128 {
         return None;
@@ -225,13 +250,13 @@ fn decode_variant(
     ensures result == spec::scalar(bytes@, offset, *leaf),
 ))]
 #[cfg(any(test, verus_keep_ghost))]
-pub(super) fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i64, usize)> {
+pub(super) fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i128, usize)> {
     let (value, end) = typed::decode_value(bytes, offset, typed::LeafView::Legacy(leaf))?;
     match value {
         super::super::value::Atom::I128(value)
-            if value >= i64::MIN as i128 && value <= i64::MAX as i128 =>
+            if value >= i128::MIN as i128 && value <= i128::MAX as i128 =>
         {
-            Some((value as i64, end))
+            Some((value as i128, end))
         }
         _ => None,
     }
@@ -288,7 +313,7 @@ impl AccessAttempt {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
 pub struct Projection {
-    result: Result<Vec<i64>, Failure>,
+    result: Result<Vec<i128>, Failure>,
     usage: super::Usage,
     attempts: Vec<AccessAttempt>,
 }
@@ -317,7 +342,7 @@ impl Projection {
         ensures (match result.0 { Ok(values) => Ok(values@), Err(error) => Err(error) },
             result.1.view(), result.2@) == self.view(),
     ))]
-    pub fn into_parts(self) -> (Result<Vec<i64>, Failure>, super::Usage, Vec<AccessAttempt>) {
+    pub fn into_parts(self) -> (Result<Vec<i128>, Failure>, super::Usage, Vec<AccessAttempt>) {
         (self.result, self.usage, self.attempts)
     }
 }
@@ -329,14 +354,14 @@ impl AccessAttempt {
 }
 impl Projection {
     pub closed spec fn view(&self)
-        -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
+        -> (Result<Seq<i128>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
         (match self.result { Ok(values) => Ok(values@), Err(error) => Err(error) },
             self.usage.view(), self.attempts@)
     }
 }
 pub closed spec fn projection(bytes: Seq<u8>, fields: Seq<Field>,
     limits: Seq<u64>, used: Seq<u64>)
-    -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
+    -> (Result<Seq<i128>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
     spec::projection(bytes, fields, limits, used)
 }
 pub(super) proof fn projection_usage(bytes: Seq<u8>, fields: Seq<Field>,
@@ -356,13 +381,13 @@ pub closed spec fn schema_valid(fields: Seq<Field>) -> bool {
 pub closed spec fn leaf_domain(leaf: Leaf) -> super::super::evaluation::Domain {
     match leaf {
         Leaf::Bool => super::super::evaluation::Domain::Bool,
-        Leaf::U128 { min, max } => super::super::evaluation::Domain::Int { min: min as i64, max: max as i64 },
+        Leaf::U128 { min, max } => super::super::evaluation::Domain::Int { min: min as i128, max: max as i128 },
         Leaf::I128 { min, max } | Leaf::Enum { min, max, .. }
         | Leaf::Sum { min, max, .. } => super::super::evaluation::Domain::Int { min, max },
     }
 }
 pub(super) proof fn projected_is_typed(bytes: Seq<u8>, fields: Seq<Field>,
-    limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>)
+    limits: Seq<u64>, used: Seq<u64>, values: Seq<i128>)
     requires limits.len() == 8, used.len() == 8,
         projection(bytes, fields, limits, used).0 == Ok(values),
     ensures values.len() == fields.len(),
@@ -388,8 +413,8 @@ pub(super) fn scalar_domain(leaf: &Leaf) -> super::super::evaluation::Domain {
     match leaf {
         Leaf::Bool => super::super::evaluation::Domain::Bool,
         Leaf::U128 { min, max } => super::super::evaluation::Domain::Int {
-            min: *min as i64,
-            max: *max as i64,
+            min: *min as i128,
+            max: *max as i128,
         },
         Leaf::I128 { min, max } | Leaf::Enum { min, max, .. } | Leaf::Sum { min, max, .. } => {
             super::super::evaluation::Domain::Int {
@@ -404,7 +429,7 @@ pub(super) fn scalar_domain(leaf: &Leaf) -> super::super::evaluation::Domain {
     ensures result == spec::field(bytes@, offset, *field),
 ))]
 #[cfg(any(test, verus_keep_ghost))]
-fn decode_field(bytes: &[u8], offset: usize, field: &Field) -> Option<(i64, usize)> {
+fn decode_field(bytes: &[u8], offset: usize, field: &Field) -> Option<(i128, usize)> {
     let (id, payload_offset) = read_big_endian(bytes, offset, 2)?;
     if id != field.id as u128 {
         return None;
@@ -435,13 +460,13 @@ fn decode_header(bytes: &[u8], field_count: usize) -> Option<usize> {
                     old(meter).limits.counters@, old(meter).used.counters@);
                 (projected.0, projected.1, old(attempts)@ + projected.2)
             },
-        result.is_err() ==> final(output)@ == Seq::<i64>::empty(),
+        result.is_err() ==> final(output)@ == Seq::<i128>::empty(),
 ))]
 pub(super) fn project_into(
     bytes: &[u8],
     fields: &[Field],
     meter: &mut super::meter::Meter,
-    output: &mut Vec<i64>,
+    output: &mut Vec<i128>,
     attempts: &mut Vec<AccessAttempt>,
 ) -> Result<(), Failure> {
     #[cfg(verus_keep_ghost)]
@@ -463,7 +488,7 @@ pub(super) fn project_into(
     #[cfg(verus_keep_ghost)]
     proof! {
         assert(projected.0.is_ok());
-        let codes = match projected.0 { Ok(codes) => codes, Err(_) => Seq::<i64>::empty() };
+        let codes = match projected.0 { Ok(codes) => codes, Err(_) => Seq::<i128>::empty() };
         assert(values@ == typed::spec::lift(codes));
         assert(typed::spec::lift(codes) =~= super::super::evaluation::typed::spec::lift(codes));
         super::numeric::spec::lift_projects(codes);

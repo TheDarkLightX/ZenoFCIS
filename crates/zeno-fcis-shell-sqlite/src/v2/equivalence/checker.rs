@@ -29,7 +29,7 @@ pub const FULL_BUDGET: u64 = MAX_NODES as u64;
 #[derive(Debug, Eq, PartialEq)]
 pub struct Observation {
     /// Complete output tuple, or the evaluator's exact failure.
-    pub result: Result<Vec<i64>, V2ExecutionFailure>,
+    pub result: Result<Vec<i128>, V2ExecutionFailure>,
     /// True Step usage: instruction attempts, including a trapping one.
     pub steps: u64,
 }
@@ -37,7 +37,7 @@ pub struct Observation {
 #[cfg(verus_keep_ghost)]
 verus! {
 impl Observation {
-    pub closed spec fn view(self) -> (Result<Seq<i64>, V2ExecutionFailure>, u64) {
+    pub closed spec fn view(self) -> (Result<Seq<i128>, V2ExecutionFailure>, u64) {
         (match self.result { Ok(values) => Ok(values@), Err(error) => Err(error) }, self.steps)
     }
 }
@@ -98,7 +98,7 @@ pub enum Failure {
         /// Zero-based tuple ordinal.
         ordinal: u64,
         /// The input tuple, owned independently of both programs.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The original program's exact result and Step usage.
         original: Observation,
         /// The candidate program's exact result and Step usage.
@@ -254,7 +254,7 @@ pub(crate) fn compare_equal(
     {
         #[cfg(verus_keep_ghost)]
         proof! {
-            assert forall|xs: Seq<i64>| spec::tuple(original.inputs@, xs) implies
+            assert forall|xs: Seq<i128>| spec::tuple(original.inputs@, xs) implies
                 spec::observation(original, xs).0 == spec::observation(candidate, xs).0 by {}
         }
         return Ok(Equal {
@@ -369,7 +369,7 @@ fn scan(
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures spec::observation_view(result) == spec::observation(program, input@),
 ))]
-fn observe(program: &V2ScalarProgram<'_>, input: &[i64]) -> Observation {
+fn observe(program: &V2ScalarProgram<'_>, input: &[i128]) -> Observation {
     let meter = v2_zero_limits().with_limit(V2Resource::Step, FULL_BUDGET);
     #[cfg(verus_keep_ghost)]
     proof! { assert(meter.view() =~= spec::limits()); }
@@ -385,6 +385,47 @@ fn observe(program: &V2ScalarProgram<'_>, input: &[i64]) -> Observation {
     Observation {
         result,
         steps: usage.used(V2Resource::Step),
+    }
+}
+
+/// Order-preserving signed position, expressed arithmetically for refinement.
+/// This is the same map as flipping the sign bit of the unsigned encoding.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result as int == value as int - i128::MIN as int,
+))]
+fn signed_position(value: i128) -> u128 {
+    if value < 0 {
+        (value - i128::MIN) as u128
+    } else {
+        value as u128 + (i128::MAX as u128 + 1)
+    }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result as int == position as int + i128::MIN as int,
+))]
+fn signed_value(position: u128) -> i128 {
+    let bias = i128::MAX as u128 + 1;
+    if position < bias {
+        i128::MIN + position as i128
+    } else {
+        (position - bias) as i128
+    }
+}
+
+/// The sole unrepresentable cardinality is the complete signed range, 2^128.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures match result {
+        Some(n) => min <= max && n as int == max as int - min as int + 1 && n > 0,
+        None => min > max || max as int - min as int + 1 == u128::MAX as int + 1,
+    },
+))]
+fn interval_width(min: i128, max: i128) -> Option<u128> {
+    let lower = signed_position(min);
+    let upper = signed_position(max);
+    match upper.checked_sub(lower) {
+        Some(span) => span.checked_add(1),
+        None => None,
     }
 }
 
@@ -410,20 +451,27 @@ pub(crate) fn domain_size(domains: &[Domain]) -> Result<Option<u128>, usize> {
         if min > max {
             return Err(position);
         }
-        // i128 represents the full i64 width, including 2^64.
-        let width = ((max as i128) - (min as i128) + 1) as u128;
+        let width = interval_width(min, max);
         #[cfg(verus_keep_ghost)]
         proof! {
             spec::product_positive(domains@, position as int);
+            let prior = spec::product(domains@, position as int);
+            let w = spec::width(domains@[position as int]);
+            assert(w == max as int - min as int + 1 && w >= 1);
             if size.is_none() {
-                let prior = spec::product(domains@, position as int);
-                assert(prior * width > u128::MAX) by(nonlinear_arith)
-                    requires prior > u128::MAX, width >= 1;
+                if let Some(width) = width {
+                    assert(prior * width > u128::MAX) by(nonlinear_arith)
+                        requires prior > u128::MAX, width >= 1;
+                }
+            }
+            if width.is_none() {
+                assert(prior * w > u128::MAX) by(nonlinear_arith)
+                    requires prior >= 1, w == u128::MAX as int + 1;
             }
         }
-        size = match size {
-            Some(n) => n.checked_mul(width),
-            None => None,
+        size = match (size, width) {
+            (Some(n), Some(width)) => n.checked_mul(width),
+            _ => None,
         };
         position += 1;
     }
@@ -436,7 +484,7 @@ pub(crate) fn domain_size(domains: &[Domain]) -> Result<Option<u128>, usize> {
         spec::rank(domains@, result@, domains@.len() as int) == 0,
         spec::valid(domains@, domains@.len() as int) ==> spec::tuple(domains@, result@),
 ))]
-pub(crate) fn first_tuple(domains: &[Domain]) -> Vec<i64> {
+pub(crate) fn first_tuple(domains: &[Domain]) -> Vec<i128> {
     let mut result = Vec::new();
     let mut position = 0usize;
     #[cfg_attr(verus_keep_ghost, verus_spec(
@@ -455,7 +503,7 @@ pub(crate) fn first_tuple(domains: &[Domain]) -> Vec<i64> {
 
 /// Steps `tuple` to its successor, last input fastest. Returns false after the
 /// last tuple, leaving the first one in place. An input is incremented only
-/// while it is below its maximum, so no value overflows at an `i64` endpoint.
+/// while it is below its maximum, so no value overflows at an `i128` endpoint.
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures final(tuple)@.len() == old(tuple)@.len(),
         spec::tuple(domains@, old(tuple)@) ==> (
@@ -470,7 +518,7 @@ pub(crate) fn first_tuple(domains: &[Domain]) -> Vec<i64> {
                     == spec::product(domains@, domains@.len() as int) - 1 })
         ),
 ))]
-pub(crate) fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
+pub(crate) fn advance(domains: &[Domain], tuple: &mut [i128]) -> bool {
     let mut position = tuple.len().min(domains.len());
     #[cfg_attr(verus_keep_ghost, verus_spec(
         invariant position <= domains.len(), position <= tuple.len(),

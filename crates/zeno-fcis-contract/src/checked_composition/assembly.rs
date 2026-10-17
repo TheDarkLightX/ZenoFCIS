@@ -269,7 +269,11 @@ fn node(op: &ScalarOp) -> Result<Node, Refusal> {
         ScalarOp::And(a, b) => Node::And(a, b),
         ScalarOp::Not(a) => Node::Not(a),
         ScalarOp::Select(c, a, b) => Node::Select(c, a, b),
-        ScalarOp::Mul(..) | ScalarOp::Div(..) | ScalarOp::MulDiv(..) | ScalarOp::ProductsGe(..) => {
+        ScalarOp::Mul(..)
+        | ScalarOp::Div(..)
+        | ScalarOp::MulDiv(..)
+        | ScalarOp::SignedMulDivFloor(..)
+        | ScalarOp::ProductsGe(..) => {
             return Err(refuse(
                 Obligation::EagerNodesTotal,
                 "program",
@@ -332,7 +336,7 @@ fn fields(
     }
     let command = declarations.fields(101).map_err(route_error)?;
     let (target, _) = layout.target;
-    let last = i64::try_from(compiled.len().saturating_sub(1)).unwrap_or(i64::MAX);
+    let last = i128::try_from(compiled.len().saturating_sub(1)).unwrap_or(i128::MAX);
     let mut seen = BTreeSet::new();
     for field in command {
         seen.insert(field.id);
@@ -497,9 +501,9 @@ fn value_term(
     match value {
         Expr::Constant(Atom::Bool(value)) => Some(arena.constant(*value)),
         Expr::Constant(Atom::I128(value)) => {
-            i64::try_from(*value).ok().map(|value| arena.int(value))
+            i128::try_from(*value).ok().map(|value| arena.int(value))
         }
-        Expr::Constant(Atom::Sum { variant, .. }) => Some(arena.int(i64::from(*variant))),
+        Expr::Constant(Atom::Sum { variant, .. }) => Some(arena.int(i128::from(*variant))),
         Expr::Constant(_) | Expr::Root(_) => None,
         Expr::Input(source, field) => input(arena, *source, *field),
         Expr::Output(index) => outputs.get(*index).copied(),
@@ -578,7 +582,7 @@ fn boolean_inputs(contract: &Contract<'_>) -> BTreeSet<Key> {
 struct Route<'l> {
     layout: &'l Layout,
     position: usize,
-    value: i64,
+    value: i128,
 }
 
 impl Route<'_> {
@@ -602,7 +606,7 @@ impl Route<'_> {
 pub(crate) struct RouteTerms {
     pub(crate) aggregate_outputs: Vec<u32>,
     pub(crate) leaf_outputs: Vec<u32>,
-    pub(crate) cases: BTreeMap<i64, i64>,
+    pub(crate) cases: BTreeMap<i128, i128>,
 }
 
 /// Which obligation a differing term breaks: when the aggregate's value
@@ -739,12 +743,12 @@ fn decisions(
         let route = Route {
             layout,
             position,
-            value: i64::try_from(position).unwrap_or(i64::MAX),
+            value: i128::try_from(position).unwrap_or(i128::MAX),
         };
         let terms = route_terms(&mut arena, &route, contract, nodes, &leaf.contract, &place)?;
         let views = view_keys(layout, position);
         for (aggregate_case, leaf_case) in &terms.cases {
-            let index = |value: i64| usize::try_from(value).ok();
+            let index = |value: i128| usize::try_from(value).ok();
             let (Some(mine), Some(theirs)) = (
                 index(*aggregate_case).and_then(|at| contract.branches.get(at)),
                 index(*leaf_case).and_then(|at| leaf.contract.branches.get(at)),
@@ -875,7 +879,7 @@ pub(crate) fn specialization(
         let route = Route {
             layout: &layout,
             position,
-            value: i64::try_from(position).unwrap_or(i64::MAX),
+            value: i128::try_from(position).unwrap_or(i128::MAX),
         };
         routes.push(route_terms(
             &mut arena,
@@ -996,7 +1000,7 @@ fn collect_names(ast: &Ast, out: &mut Vec<String>) {
             collect_names(left, out);
             collect_names(right, out);
         }
-        Ast::MulDiv(_, a, b, d) => {
+        Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => {
             collect_names(a, out);
             collect_names(b, out);
             collect_names(d, out);
@@ -1027,6 +1031,9 @@ fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
         }
         Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
         Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+        Ast::SignedMulDivFloor(a, b, d) => {
+            Ast::SignedMulDivFloor(recurse(a), recurse(b), recurse(d))
+        }
         Ast::ProductsGe(arguments) => {
             Ast::ProductsGe(arguments.iter().map(|a| *recurse(a)).collect())
         }
@@ -1064,7 +1071,7 @@ fn implied_by_invariant(leaf: &Compiled, formula: &str, place: &str) -> Result<u
     let values = fields
         .iter()
         .map(|field| field.domain.values_within(leaf::MAX_LOCAL_ROWS))
-        .collect::<Option<Vec<Vec<i64>>>>()
+        .collect::<Option<Vec<Vec<i128>>>>()
         .ok_or_else(|| {
             refuse(
                 Obligation::CompleteEnumeration,
@@ -1131,12 +1138,12 @@ fn observe(
 ) -> Result<([u8; 32], u64), Refusal> {
     let (target, _) = layout.target;
     let framer = Framer::new(positions, contract);
-    let mut tuple: Vec<i64> = Vec::with_capacity(positions.len());
+    let mut tuple: Vec<i128> = Vec::with_capacity(positions.len());
     for position in positions {
         let value = match (position.source, position.field) {
             (Source::State, Some(field)) => match rules.genesis.get(&field) {
-                Some(Constant::Bool(value)) => i64::from(*value),
-                Some(Constant::Int(value)) => i64::try_from(*value).unwrap_or(i64::MAX),
+                Some(Constant::Bool(value)) => i128::from(*value),
+                Some(Constant::Int(value)) => i128::try_from(*value).unwrap_or(i128::MAX),
                 None => position.domain.least().unwrap_or(0),
             },
             _ => position.domain.least().unwrap_or(0),
@@ -1168,7 +1175,7 @@ fn observe(
         let mut most = 0u64;
         for route in 0..routes {
             let mut input = tuple.clone();
-            input[target_at] = i64::try_from(route).unwrap_or(i64::MAX);
+            input[target_at] = i128::try_from(route).unwrap_or(i128::MAX);
             let frames = framer.frame(&input);
             let outcome = authority.publish(c::Raw {
                 state: &frames[0],

@@ -266,6 +266,12 @@ pub(super) fn scalar_op<'a>(parts: &mut Vec<Part<'a>>, value: &ScalarOp) {
             parts.push(Part::Word(*a as u128));
             parts.push(Part::Word(*b as u128));
         }
+        ScalarOp::SignedMulDivFloor(a, b, d) => {
+            parts.push(Part::Word(16));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*d as u128));
+        }
         ScalarOp::MulDivFloor(a, b, d) => {
             parts.push(Part::Word(13));
             parts.push(Part::Word(*a as u128));
@@ -589,6 +595,12 @@ pub(super) fn law_op<'a>(parts: &mut Vec<Part<'a>>, value: &laws::Op<'a>) {
             parts.push(Part::Word(*c as u128));
             parts.push(Part::Word(*a as u128));
             parts.push(Part::Word(*b as u128));
+        }
+        laws::Op::SignedMulDivFloor(a, b, d) => {
+            parts.push(Part::Word(17));
+            parts.push(Part::Word(*a as u128));
+            parts.push(Part::Word(*b as u128));
+            parts.push(Part::Word(*d as u128));
         }
         laws::Op::MulDivFloor(a, b, den) => {
             parts.push(Part::Word(13));

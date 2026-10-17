@@ -312,7 +312,7 @@ pub(in super::super) proof fn preserve_block(
 }
 
 /// Direct input-map witness. This maps supplied raw data, not instructions.
-pub(in super::super) proof fn input_environment(input: Seq<Term>, raw: Seq<i64>)
+pub(in super::super) proof fn input_environment(input: Seq<Term>, raw: Seq<i128>)
     -> (environment: Map<Seq<char>, denotation::Value>)
     requires scalar_input_names(input), input.len() == raw.len(),
     ensures node::typed_sources(input, Seq::empty(), Seq::empty(), environment),
@@ -412,7 +412,7 @@ pub(in super::super) proof fn scalar_pair_model(
     left_definitions: Seq<(String, Sort, Term)>, definitions: Seq<(String, Sort, Term)>,
     left_domains: Seq<Domain>, left_nodes: Seq<Op>, left_kinds: Seq<Kind>, left_terms: Seq<Term>,
     right_domains: Seq<Domain>, right_nodes: Seq<Op>, right_kinds: Seq<Kind>, right_terms: Seq<Term>,
-    input: Seq<Term>, raw: Seq<i64>,
+    input: Seq<Term>, raw: Seq<i128>,
 ) -> (environment: Map<Seq<char>, denotation::Value>)
     requires scalar_input_names(input), input.len() == raw.len(),
         spec::shape(left_definitions, 0, seq!['p'], left_kinds, left_terms),

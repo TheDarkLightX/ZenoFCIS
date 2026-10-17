@@ -128,7 +128,7 @@ fn four_intake_routes_charge_actual_ledger_and_preserve_serial_receipt() {
         let stored = ledger(&session);
         assert_eq!(preparations(&stored), vec![intake, 635_904]);
         let totals = stored.accounting();
-        assert_eq!(totals.work_reserved, intake + 635_904 + 282_871);
+        assert_eq!(totals.work_reserved, intake + 635_904 + 282_891);
         assert_eq!((totals.attempts, totals.checks, totals.replays), (1, 1, 0));
         assert_eq!(
             report["detail"]["accounting"]["work_reserved"],
@@ -176,7 +176,7 @@ fn missing_then_malformed_provenance_keeps_each_actual_reservation() {
         assert_eq!(preparations(&after), vec![intake, intake, 635_904]);
         assert_eq!(
             after.accounting().work_reserved,
-            2 * intake + 635_904 + 282_871
+            2 * intake + 635_904 + 282_891
         );
         assert_eq!(asserted(&session), Value::Null);
     }

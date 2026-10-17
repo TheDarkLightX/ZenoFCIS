@@ -1517,6 +1517,7 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 }
             },
             ExportNode::Value(value) => match value {
+                ValueExpr::SignedMulDivFloor(..) => return Err(ExportError::UnsupportedMode),
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::MulDiv(_, a, b, d) => {
                     for child in [a, b, d] {
@@ -1991,6 +1992,7 @@ impl UndefinedReason {
             ModelReason::Overflow => Some(Self::Overflow),
             ModelReason::DivisionByZero => Some(Self::DivisionByZero),
             ModelReason::NonExactDivision => Some(Self::NonExactDivision),
+            ModelReason::UnsupportedArithmetic => None,
             _ => None,
         }
     }
@@ -3593,6 +3595,7 @@ fn render_value_smt(
         // backend has no matching full-product semantics: refuse, never emit
         // an intermediate signed multiplication with different overflow rules.
         ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
+        ValueExpr::SignedMulDivFloor(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
             let left = render_value_smt(left, step, environment, budget)?;
             let right = render_value_smt(right, step, environment, budget)?;
@@ -4004,6 +4007,11 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
             collect_value(a, paths);
             collect_value(b, paths)
         }
+        ValueExpr::SignedMulDivFloor(a, b, d) => {
+            collect_value(a, paths);
+            collect_value(b, paths);
+            collect_value(d, paths);
+        }
         ValueExpr::Sum { body, .. } => collect_value(body, paths),
         ValueExpr::MulDiv(_, a, b, d) => {
             collect_value(a, paths);
@@ -4023,24 +4031,33 @@ fn fused_value_calls_refuse_in_unextended_backends() {
         Box::new(ValueExpr::Int(2)),
         Box::new(ValueExpr::Int(3)),
     );
-    assert!(matches!(
-        render_value_lean(
-            &value,
-            "0",
-            &BTreeMap::new(),
-            &mut LeanRenderBudget::new(ExportLimits::default())
+    for value in [
+        value.clone(),
+        ValueExpr::SignedMulDivFloor(
+            Box::new(ValueExpr::Int(-1)),
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
         ),
-        Err(ExportError::UnsupportedMode)
-    ));
-    assert!(matches!(
-        render_value_smt(
-            &value,
-            0,
-            &BTreeMap::new(),
-            &mut SmtRenderBudget::new(ExportLimits::default())
-        ),
-        Err(ExportError::UnsupportedMode)
-    ));
+    ] {
+        assert!(matches!(
+            render_value_lean(
+                &value,
+                "0",
+                &BTreeMap::new(),
+                &mut LeanRenderBudget::new(ExportLimits::default())
+            ),
+            Err(ExportError::UnsupportedMode)
+        ));
+        assert!(matches!(
+            render_value_smt(
+                &value,
+                0,
+                &BTreeMap::new(),
+                &mut SmtRenderBudget::new(ExportLimits::default())
+            ),
+            Err(ExportError::UnsupportedMode)
+        ));
+    }
     let formula = RelExpr::Compare(CompareOp::Eq, value, ValueExpr::Int(0));
     let step = model_diagnostics::ModelStep::try_new(Vec::new()).unwrap();
     let limits = model_diagnostics::DiagnosticLimits::try_new(1000, 1000, 1000).unwrap();

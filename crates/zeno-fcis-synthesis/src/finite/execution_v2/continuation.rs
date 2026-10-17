@@ -67,7 +67,7 @@ pub enum GraphFailure {
     OutputType,
 }
 
-/// A structurally admitted, immutable original eager checked-i64 graph.
+/// A structurally admitted, immutable original eager checked-i128 graph.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 pub struct Graph {
     inputs: Vec<Domain>,
@@ -195,9 +195,9 @@ pub enum Failure {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 pub struct PreparedFold {
     graph: Graph,
-    initial: Vec<i64>,
-    items: Vec<Vec<i64>>,
-    accumulator: Vec<i64>,
+    initial: Vec<i128>,
+    items: Vec<Vec<i128>>,
+    accumulator: Vec<i128>,
     context: Context,
     limits: PreparationLimits,
     processed: u32,
@@ -278,7 +278,7 @@ fn capacity(resource: Capacity, required: u64, declared: u64) -> Result<(), Fail
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == (a@ == b@),))]
-fn same_scalars(a: &[i64], b: &[i64]) -> bool {
+fn same_scalars(a: &[i128], b: &[i128]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -350,6 +350,7 @@ fn same_node(a: Op, b: Op) -> bool {
         | (Op::And(a, b), Op::And(c, d)) => a == c && b == d,
         (Op::Select(a, b, c), Op::Select(d, e, f))
         | (Op::MulDivFloor(a, b, c), Op::MulDivFloor(d, e, f))
+        | (Op::SignedMulDivFloor(a, b, c), Op::SignedMulDivFloor(d, e, f))
         | (Op::MulDivCeil(a, b, c), Op::MulDivCeil(d, e, f)) => a == d && b == e && c == f,
         (Op::ProductsGe(a, b), Op::ProductsGe(c, d)) => {
             let equal = a[0] == c[0]
@@ -413,7 +414,7 @@ fn same_nodes(a: &[Op], b: &[Op]) -> bool {
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == (spec::items(a@) == spec::items(b@)),))]
-fn same_items(a: &[Vec<i64>], b: &[Vec<i64>]) -> bool {
+fn same_items(a: &[Vec<i128>], b: &[Vec<i128>]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -438,13 +439,13 @@ fn same_items(a: &[Vec<i64>], b: &[Vec<i64>]) -> bool {
 /// all tuple frames. Step counts actual instruction attempts through one meter.
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures
         start_result_value(result) == start_value(graph.view(),initial@,
-            items@.map(|_:int,x:Vec<i64>|x@),context,limits,budget.view()),
+            items@.map(|_:int,x:Vec<i128>|x@),context,limits,budget.view()),
         match result { Ok(p)=>valid_state_value(p.view()),Err(_)=>true },
     ))]
 pub fn start(
     graph: Graph,
-    initial: Vec<i64>,
-    items: Vec<Vec<i64>>,
+    initial: Vec<i128>,
+    items: Vec<Vec<i128>>,
     context: Context,
     limits: PreparationLimits,
     budget: Limits,
@@ -702,7 +703,7 @@ impl PreparedFold {
         (match result { Ok(v)=>Ok(v@),Err(e)=>Err(e) })==finish_value(self.view(),current),
         match result { Ok(v)=>valid_state_value(self.view()) ==> complete_fold_value(self.view(),v@),Err(_)=>true },
     ))]
-    pub fn finish(&self, current: Context) -> Result<Vec<i64>, Failure> {
+    pub fn finish(&self, current: Context) -> Result<Vec<i128>, Failure> {
         #[cfg(verus_keep_ghost)]
         proof! { reveal(PreparedFold::view); reveal(finish_value); reveal(valid_state_value); reveal(complete_fold_value); }
         if self.processed as usize != self.items.len() {
@@ -789,16 +790,16 @@ impl PreparedFold { pub closed spec fn view(&self)->spec::FoldView {
 pub closed spec fn graph_value(a:Seq<Domain>,b:Seq<Domain>,n:Seq<Op>,r:Seq<u16>)->Result<spec::GraphView,GraphFailure> {
     spec::graph(a,b,n,r)
 }
-pub closed spec fn start_value(g:spec::GraphView,a:Seq<i64>,v:Seq<Seq<i64>>,c:Context,l:PreparationLimits,b:Seq<u64>)->Result<spec::FoldView,Failure> {
+pub closed spec fn start_value(g:spec::GraphView,a:Seq<i128>,v:Seq<Seq<i128>>,c:Context,l:PreparationLimits,b:Seq<u64>)->Result<spec::FoldView,Failure> {
     spec::start(g,a,v,c,l,b)
 }
 pub closed spec fn start_result_value(r:Result<PreparedFold,Failure>)->Result<spec::FoldView,Failure> { spec::start_result(r) }
 pub closed spec fn advance_value(a:spec::FoldView,b:spec::FoldView,r:Result<(),Failure>,o:u32,c:u32)->bool { spec::advance_result(a,b,r,o,c) }
-pub closed spec fn finish_value(p:spec::FoldView,c:Context)->Result<Seq<i64>,Failure> { spec::finish(p,c) }
+pub closed spec fn finish_value(p:spec::FoldView,c:Context)->Result<Seq<i128>,Failure> { spec::finish(p,c) }
 pub closed spec fn remaining_value(p:spec::FoldView)->u32 { spec::remaining(p) }
 pub closed spec fn same_operation_value(a:spec::FoldView,b:spec::FoldView)->bool { spec::same_operation(a,b) }
 pub closed spec fn valid_state_value(p:spec::FoldView)->bool { spec::valid_state(p) }
-pub closed spec fn complete_fold_value(p:spec::FoldView,output:Seq<i64>)->bool {
+pub closed spec fn complete_fold_value(p:spec::FoldView,output:Seq<i128>)->bool {
     spec::pure_fold(p.graph,p.items,0,p.items.len(),p.initial)==Ok(output)
 }
 }

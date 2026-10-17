@@ -32,7 +32,7 @@ pub(super) struct LawProgram<'a> {
 
 /// A tuple's state record in field-ID order, as the library admits it: the
 /// review's framing of the state root.
-pub(super) fn state(framer: &Framer, tuple: &[i64]) -> Vec<c::Field<'static>> {
+pub(super) fn state(framer: &Framer, tuple: &[i128]) -> Vec<c::Field<'static>> {
     framer.fields(&framer.roots[0], tuple)
 }
 
@@ -99,7 +99,7 @@ pub(super) fn verdict_name(verdict: Option<l::Verdict>) -> &'static str {
 
 /// The descriptor's program on a tuple, at a budget no admitted program
 /// exhausts.
-pub(super) fn run(descriptor: &c::Descriptor<'_>, tuple: &[i64]) -> Option<Vec<i64>> {
+pub(super) fn run(descriptor: &c::Descriptor<'_>, tuple: &[i128]) -> Option<Vec<i128>> {
     let program = &descriptor.program;
     let meter = v2_zero_limits().with_limit(V2Resource::Step, crate::transform::FULL_BUDGET);
     execute_v2(
@@ -127,7 +127,7 @@ fn number(atom: c::Atom<'_>) -> Option<i128> {
 }
 
 /// An output's number by its output type, as reification decodes it.
-fn reify(leaf: &Leaf, code: i64) -> Option<i128> {
+fn reify(leaf: &Leaf, code: i128) -> Option<i128> {
     match leaf {
         Leaf::Bool => (code == 0 || code == 1).then_some(i128::from(code)),
         Leaf::I128 { min, max } => (*min..=*max).contains(&code).then_some(i128::from(code)),
@@ -159,7 +159,7 @@ fn admitted(domain: c::Domain<'_>, value: i128) -> bool {
 
 /// The branch the decision output selects on a tuple, from the program's
 /// outputs; `None` when the outputs do not reify or no branch has the code.
-pub(super) fn branch(descriptor: &c::Descriptor<'_>, outputs: &[i64]) -> Option<usize> {
+pub(super) fn branch(descriptor: &c::Descriptor<'_>, outputs: &[i128]) -> Option<usize> {
     let code = reify(
         descriptor.output_types.get(descriptor.decision_output)?,
         *outputs.get(descriptor.decision_output)?,
@@ -178,8 +178,8 @@ pub(super) fn branch(descriptor: &c::Descriptor<'_>, outputs: &[i64]) -> Option<
 pub(super) fn successor(
     descriptor: &c::Descriptor<'_>,
     positions: &[Position],
-    tuple: &[i64],
-    outputs: &[i64],
+    tuple: &[i128],
+    outputs: &[i128],
     index: usize,
 ) -> Result<Vec<(u16, i128)>, String> {
     let branch = descriptor
@@ -222,7 +222,11 @@ pub(super) fn successor(
 }
 
 /// The tuple with its state positions set to `state`.
-pub(super) fn with_state(positions: &[Position], tuple: &[i64], state: &[(u16, i128)]) -> Vec<i64> {
+pub(super) fn with_state(
+    positions: &[Position],
+    tuple: &[i128],
+    state: &[(u16, i128)],
+) -> Vec<i128> {
     positions
         .iter()
         .zip(tuple)
@@ -231,7 +235,7 @@ pub(super) fn with_state(positions: &[Position], tuple: &[i64], state: &[(u16, i
                 (Source::State, Some(field)) => state
                     .iter()
                     .find(|(id, _)| *id == field)
-                    .and_then(|(_, value)| i64::try_from(*value).ok()),
+                    .and_then(|(_, value)| i128::try_from(*value).ok()),
                 _ => None,
             }
             .unwrap_or(*value)
@@ -253,7 +257,7 @@ pub(super) enum Decided {
 }
 
 /// Evaluates a tuple with the bound Authority.
-pub(super) fn decide(authority: &Authority<'_>, framer: &Framer, tuple: &[i64]) -> Decided {
+pub(super) fn decide(authority: &Authority<'_>, framer: &Framer, tuple: &[i128]) -> Decided {
     match evaluate::evaluate(authority, framer, tuple) {
         Outcome::Decision(decision) => {
             if decision.class == super::super::rules::Class::Reject {

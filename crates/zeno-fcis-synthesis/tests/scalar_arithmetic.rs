@@ -11,9 +11,9 @@ use zeno_fcis_synthesis::finite::{
 use zeno_fcis_synthesis::finite_runtime::import_program;
 use zeno_fcis_value::{Value, ValueRef};
 
-const I64: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+const I128: Domain = Domain::Int {
+    min: i128::MIN,
+    max: i128::MAX,
 };
 
 fn program(operation: &str, arity: usize) -> Program {
@@ -21,7 +21,7 @@ fn program(operation: &str, arity: usize) -> Program {
     let output = if operation == "products_ge" {
         Domain::Bool
     } else {
-        I64
+        I128
     };
     let op = match operation {
         "mul" => Op::Mul(0, 1),
@@ -38,22 +38,23 @@ fn program(operation: &str, arity: usize) -> Program {
     };
     nodes.push(op);
     let root = nodes.len() - 1;
-    Program::try_new(vec![I64; arity], vec![output], nodes, vec![root as u16]).unwrap()
+    Program::try_new(vec![I128; arity], vec![output], nodes, vec![root as u16]).unwrap()
 }
 
 #[test]
 fn independent_fraction_vectors_match_native_and_metered_execution() {
     let mut count = 0;
-    for line in include_str!("../../../tools/test-data/scalar-arithmetic/vectors.tsv").lines() {
+    for line in include_str!("../../../tools/test-data/scalar-arithmetic/i128-vectors.tsv").lines()
+    {
         let fields: Vec<_> = line.split('\t').collect();
-        let operands: Vec<i64> = fields[1..fields.len() - 1]
+        let operands: Vec<i128> = fields[1..fields.len() - 1]
             .iter()
             .map(|v| v.parse().unwrap())
             .collect();
         let expected = if fields[fields.len() - 1] == "arithmetic" {
             Err(Error::Arithmetic)
         } else {
-            Ok(vec![fields[fields.len() - 1].parse::<i64>().unwrap()])
+            Ok(vec![fields[fields.len() - 1].parse::<i128>().unwrap()])
         };
         let p = program(fields[0], operands.len());
         assert_eq!(p.profile(), ARITHMETIC_PROFILE);
@@ -106,7 +107,7 @@ fn malformed_references_precede_arithmetic_and_charge_is_retained() {
     for (limit, reference) in [(2, false), (3, true)] {
         let (result, usage) = execute_v2(
             &[],
-            &[I64],
+            &[I128],
             &nodes,
             &[2],
             &[],
@@ -125,7 +126,7 @@ fn malformed_references_precede_arithmetic_and_charge_is_retained() {
     assert_eq!(
         Program::try_new(
             vec![],
-            vec![I64],
+            vec![I128],
             vec![Op::Bool(false), Op::Mul(0, 99)],
             vec![1]
         ),
@@ -146,9 +147,9 @@ fn malformed_references_precede_arithmetic_and_charge_is_retained() {
 fn unused_and_unselected_arithmetic_traps_stay_eager() {
     let p = Program::try_new(
         vec![],
-        vec![I64],
+        vec![I128],
         vec![
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(0, 1),
             Op::Int(0),
@@ -165,10 +166,10 @@ fn unused_and_unselected_arithmetic_traps_stay_eager() {
     assert_eq!(usage.used(Resource::Step), 3);
     let p = Program::try_new(
         vec![],
-        vec![I64],
+        vec![I128],
         vec![
             Op::Bool(false),
-            Op::Int(i64::MIN),
+            Op::Int(i128::MIN),
             Op::Int(-1),
             Op::DivFloor(1, 2),
             Op::Int(0),
@@ -180,7 +181,7 @@ fn unused_and_unselected_arithmetic_traps_stay_eager() {
     assert_eq!(p.evaluate(&[]), Err(Error::Arithmetic));
     let p = Program::try_new(
         vec![],
-        vec![I64],
+        vec![I128],
         vec![Op::Int(0), Op::DivCeil(0, 0)],
         vec![0],
     )
@@ -192,20 +193,20 @@ fn unused_and_unselected_arithmetic_traps_stay_eager() {
 fn narrow_multiply_and_fused_multiply_divide_are_distinct() {
     let narrow = Program::try_new(
         vec![],
-        vec![I64],
-        vec![Op::Int(i64::MAX), Op::Mul(0, 0), Op::DivFloor(1, 0)],
+        vec![I128],
+        vec![Op::Int(i128::MAX), Op::Mul(0, 0), Op::DivFloor(1, 0)],
         vec![2],
     )
     .unwrap();
     let fused = Program::try_new(
         vec![],
-        vec![I64],
-        vec![Op::Int(i64::MAX), Op::MulDivFloor(0, 0, 0)],
+        vec![I128],
+        vec![Op::Int(i128::MAX), Op::MulDivFloor(0, 0, 0)],
         vec![1],
     )
     .unwrap();
     assert_eq!(narrow.evaluate(&[]), Err(Error::Arithmetic));
-    assert_eq!(fused.evaluate(&[]), Ok(vec![i64::MAX]));
+    assert_eq!(fused.evaluate(&[]), Ok(vec![i128::MAX]));
     assert_ne!(narrow.value().unwrap(), fused.value().unwrap());
 }
 
@@ -213,7 +214,7 @@ fn narrow_multiply_and_fused_multiply_divide_are_distinct() {
 fn arithmetic_tags_require_their_profile_and_keep_old_program_bytes() {
     let old = Program::try_new(
         vec![],
-        vec![I64],
+        vec![I128],
         vec![Op::Int(2), Op::Int(3), Op::Add(0, 1)],
         vec![2],
     )
@@ -228,7 +229,7 @@ fn arithmetic_tags_require_their_profile_and_keep_old_program_bytes() {
     wrong[0] = Value::text_ascii(PROFILE.into()).unwrap();
     assert!(import_program(&Value::tuple(wrong).unwrap().canonical_bytes().unwrap()).is_err());
     let mut wrong = fields.to_vec();
-    wrong[0] = Value::text_ascii("zeno-fcis/finite-i128/3".into()).unwrap();
+    wrong[0] = Value::text_ascii("zeno-fcis/finite-i64/3".into()).unwrap();
     assert!(import_program(&Value::tuple(wrong).unwrap().canonical_bytes().unwrap()).is_err());
     // A decoder swapping tags 11 and 12 is a semantic difference at this row.
     let floor = program("div_floor", 2);
@@ -247,7 +248,7 @@ fn arithmetic_tags_require_their_profile_and_keep_old_program_bytes() {
     );
     let mut nodes = vec![Op::Int(1); 4095];
     nodes.push(Op::Mul(0, 0));
-    let large = Program::try_new_extended(vec![], vec![I64], nodes, vec![4095]).unwrap();
+    let large = Program::try_new_extended(vec![], vec![I128], nodes, vec![4095]).unwrap();
     assert_eq!(large.profile(), ARITHMETIC_EXTENDED_PROFILE);
     assert!(import_program(&large.value().unwrap().canonical_bytes().unwrap()).is_err());
     assert_eq!(old.evaluate(&[]), Ok(vec![5]));
@@ -268,7 +269,7 @@ fn scalar_capacity_and_step_boundaries_are_complete() {
         let mut nodes = vec![Op::Int(1); count - 1];
         nodes.push(Op::Mul(0, 0));
         let admitted =
-            Program::try_new_extended(vec![], vec![I64], nodes, vec![(count - 1) as u16]);
+            Program::try_new_extended(vec![], vec![I128], nodes, vec![(count - 1) as u16]);
         if count == 4097 {
             assert_eq!(admitted, Err(Error::Invalid("program-shape")));
             continue;
@@ -325,8 +326,8 @@ fn emit_qualification_subjects() {
     }
 
     let eager = Program::try_new(
-        vec![I64; 2],
-        vec![I64],
+        vec![I128; 2],
+        vec![I128],
         vec![
             Op::Input(0),
             Op::Input(1),
@@ -369,7 +370,7 @@ fn prepared_arithmetic_identity_compares_every_operand_and_keeps_owned_work() {
     let prepared = |op: Op| {
         let mut nodes: Vec<Op> = (0..6).map(Op::Input).collect();
         nodes.push(op);
-        let graph = fold::admit_graph(vec![I64; 6], vec![I64], nodes, vec![0]).unwrap();
+        let graph = fold::admit_graph(vec![I128; 6], vec![I128], nodes, vec![0]).unwrap();
         let budget = [
             Resource::Read,
             Resource::Write,

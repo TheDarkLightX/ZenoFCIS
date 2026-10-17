@@ -2,7 +2,7 @@
 //!
 //! [`crate::export_smt`] exports a claim over unconstrained observations, so
 //! its results say nothing specific about a system. The obligations here
-//! include the transition itself: an exact encoding of a `finite-i64/1`
+//! include the transition itself: an exact encoding of a `finite-i128/1`
 //! program, its input and output domains, and its checked arithmetic. A
 //! property is a closed Boolean relation over the transition's inputs followed
 //! by its outputs: a synthesis [`Contract`].
@@ -210,10 +210,10 @@ pub enum SystemAnswer {
     /// Satisfiable, with the model values the script requests.
     Sat {
         /// Transition input values, in order.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// Proposed output values, in order. Only the domain-only control
         /// requests them; for the other obligations this is empty.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
 }
 
@@ -230,21 +230,21 @@ pub enum SystemVerdict {
     /// A replayed admitted input traps or leaves the output domains.
     NotTotal {
         /// The replayed input.
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     /// A replayed admitted input violates the property.
     Violated {
         /// The replayed input.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The interpreter's output for that input.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
     /// The property traps on a replayed admitted input.
     Undefined {
         /// The replayed input.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The interpreter's output for that input.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
 }
 
@@ -277,9 +277,9 @@ pub enum SystemSolveError {
         /// The obligation that produced the model.
         kind: SystemObligationKind,
         /// The model's input values.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The model's proposed output values, if any.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
 }
 
@@ -302,7 +302,7 @@ pub fn parse_system_answer(
     let values = |prefix: &str, count: usize| {
         (0..count)
             .map(|index| model_value(text, &format!("{prefix}{index}")))
-            .collect::<Option<Vec<i64>>>()
+            .collect::<Option<Vec<i128>>>()
     };
     let proposed = if kind == SystemObligationKind::DomainOnly {
         outputs
@@ -320,7 +320,7 @@ pub fn parse_system_answer(
 }
 
 /// Reads `(name v)`, accepting a negative value printed as `(- n)`.
-fn model_value(text: &str, name: &str) -> Option<i64> {
+fn model_value(text: &str, name: &str) -> Option<i128> {
     let key = format!("({name} ");
     let rest = &text[text.find(&key)? + key.len()..];
     let (negative, rest) = rest
@@ -328,7 +328,7 @@ fn model_value(text: &str, name: &str) -> Option<i64> {
         .map_or((false, rest), |rest| (true, rest));
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
     let magnitude: i128 = digits.parse().ok()?;
-    i64::try_from(if negative { -magnitude } else { magnitude }).ok()
+    i128::try_from(if negative { -magnitude } else { magnitude }).ok()
 }
 
 /// Exports the obligations for `property`, asks `solve` for each in order, and
@@ -402,7 +402,7 @@ pub fn system_verdict(
 }
 
 /// True when `values` has exactly one value per domain, each inside it.
-fn admitted(domains: &[Domain], values: &[i64]) -> bool {
+fn admitted(domains: &[Domain], values: &[i128]) -> bool {
     values.len() == domains.len()
         && domains.iter().zip(values).all(|(domain, value)| {
             let (min, max) = domain.bounds();
@@ -413,7 +413,7 @@ fn admitted(domains: &[Domain], values: &[i64]) -> bool {
 /// SMT definitions for one program's nodes.
 struct Encoded {
     definitions: String,
-    /// True exactly when every checked addition and subtraction stays in i64.
+    /// True exactly when every checked addition and subtraction stays in i128.
     defined: String,
     /// Term naming the program's single result, when it has exactly one.
     root: String,
@@ -444,7 +444,7 @@ fn encode(
         let name = format!("{prefix}_{index}");
         let _ = writeln!(definitions, "(define-fun {name} () Int {term})");
         if matches!(op, Op::Add(..) | Op::Sub(..)) {
-            checked.push(format!("(<= {} {name} {})", int(i64::MIN), int(i64::MAX)));
+            checked.push(format!("(<= {} {name} {})", int(i128::MIN), int(i128::MAX)));
         }
     }
     let root = program
@@ -494,7 +494,7 @@ fn conjunction(mut terms: impl Iterator<Item = String>) -> String {
     }
 }
 
-fn int(value: i64) -> String {
+fn int(value: i128) -> String {
     if value < 0 {
         format!("(- {})", value.unsigned_abs())
     } else {
@@ -518,7 +518,7 @@ mod tests {
     const COUNT: Domain = Domain::Int { min: 0, max: 3 };
 
     /// Increments a counter while it is below `cap`, else keeps it.
-    fn counter(cap: i64) -> Program {
+    fn counter(cap: i128) -> Program {
         Program::try_new(
             vec![COUNT],
             vec![COUNT],
@@ -722,7 +722,7 @@ mod tests {
         }
     }
 
-    fn sat(input: Vec<i64>, output: Vec<i64>) -> SystemAnswer {
+    fn sat(input: Vec<i128>, output: Vec<i128>) -> SystemAnswer {
         SystemAnswer::Sat { input, output }
     }
 
@@ -733,7 +733,7 @@ mod tests {
         // domain check, which was reported as a totality failure.
         let identity = identity_over_bits();
         let always = bit_property(vec![Op::Bool(true)]);
-        let refused = |kind, input: Vec<i64>, output: Vec<i64>| {
+        let refused = |kind, input: Vec<i128>, output: Vec<i128>| {
             Err(SystemSolveError::UnreplayableModel {
                 kind,
                 input,
@@ -927,13 +927,13 @@ mod tests {
                     Op::Not(4),
                 ]),
             ),
-            // Traps whenever post is at least 1, because i64::MAX + post
+            // Traps whenever post is at least 1, because i128::MAX + post
             // overflows.
             (
-                "0 < post + i64::MAX",
+                "0 < post + i128::MAX",
                 property(vec![
                     Op::Input(1),
-                    Op::Int(i64::MAX),
+                    Op::Int(i128::MAX),
                     Op::Add(0, 1),
                     Op::Int(0),
                     Op::Lt(3, 2),
@@ -943,7 +943,7 @@ mod tests {
     }
 
     /// Every tuple the domains admit, in the checkers' lexicographic order.
-    fn tuples(domains: &[Domain]) -> Vec<Vec<i64>> {
+    fn tuples(domains: &[Domain]) -> Vec<Vec<i128>> {
         domains.iter().fold(vec![Vec::new()], |prefixes, domain| {
             let (min, max) = domain.bounds();
             prefixes
@@ -968,7 +968,7 @@ mod tests {
         kind: SystemObligationKind,
     ) -> SystemAnswer {
         let fails =
-            |input: &[i64], output: &[i64]| !matches!(property.holds(input, output), Ok(true));
+            |input: &[i128], output: &[i128]| !matches!(property.holds(input, output), Ok(true));
         let inputs = tuples(transition.inputs());
         let found = match kind {
             SystemObligationKind::Totality => inputs

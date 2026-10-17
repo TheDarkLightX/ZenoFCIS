@@ -64,7 +64,7 @@ pub enum Failure {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
 pub struct Outcome {
-    result: Result<Vec<i64>, Failure>,
+    result: Result<Vec<i128>, Failure>,
     usage: Usage,
 }
 
@@ -84,7 +84,7 @@ impl Outcome {
             Ok(values) => Ok(values@), Err(error) => Err(error),
         }, result.1.view()) == self.view(),
     ))]
-    pub fn into_parts(self) -> (Result<Vec<i64>, Failure>, Usage) {
+    pub fn into_parts(self) -> (Result<Vec<i128>, Failure>, Usage) {
         (self.result, self.usage)
     }
 }
@@ -98,7 +98,7 @@ impl Usage {
     pub closed spec fn view(self) -> Seq<u64> { self.counters@ }
 }
 impl Outcome {
-    pub closed spec fn view(self) -> (Result<Seq<i64>, Failure>, Seq<u64>) {
+    pub closed spec fn view(self) -> (Result<Seq<i128>, Failure>, Seq<u64>) {
         (match self.result {
             Ok(values) => Ok(values@), Err(error) => Err(error),
         }, self.usage.view())
@@ -106,8 +106,8 @@ impl Outcome {
 }
 pub closed spec fn execution(
     inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>,
-    input: Seq<i64>, limits: Seq<u64>, used: Seq<u64>,
-) -> (Result<Seq<i64>, Failure>, Seq<u64>) {
+    input: Seq<i128>, limits: Seq<u64>, used: Seq<u64>,
+) -> (Result<Seq<i128>, Failure>, Seq<u64>) {
     spec::execution(inputs, outputs, nodes, roots, input, limits, used)
 }
 }
@@ -136,10 +136,10 @@ fn evaluate_nodes(
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
+    input: &[i128],
     meter: &mut Meter,
-    values: &mut Vec<i64>,
-    output: &mut Vec<i64>,
+    values: &mut Vec<i128>,
+    output: &mut Vec<i128>,
 ) -> Result<(), Failure> {
     use super::evaluation::typed::Values;
     values.clear();
@@ -182,18 +182,18 @@ fn evaluate_nodes(
         (match result { Ok(()) => Ok(final(output)@), Err(error) => Err(error) },
             final(meter).used.counters@) == spec::execution(inputs@, outputs@, nodes@,
                 roots@, input@, old(meter).limits.counters@, old(meter).used.counters@),
-        result.is_err() ==> final(values)@ == Seq::<i64>::empty()
-            && final(output)@ == Seq::<i64>::empty(),
+        result.is_err() ==> final(values)@ == Seq::<i128>::empty()
+            && final(output)@ == Seq::<i128>::empty(),
 ))]
 fn evaluate_into(
     inputs: &[Domain],
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
+    input: &[i128],
     meter: &mut Meter,
-    values: &mut Vec<i64>,
-    output: &mut Vec<i64>,
+    values: &mut Vec<i128>,
+    output: &mut Vec<i128>,
 ) -> Result<(), Failure> {
     let result = evaluate_nodes(inputs, outputs, nodes, roots, input, meter, values, output);
     if result.is_err() {
@@ -218,7 +218,7 @@ pub fn execute(
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
+    input: &[i128],
     limits: Limits,
 ) -> Outcome {
     #[cfg(verus_keep_ghost)]

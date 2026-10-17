@@ -20,8 +20,8 @@ fn intp(nodes: Vec<Op>, root: u16) -> Program {
     Program::try_new(
         vec![Domain::Int { min: 0, max: 3 }],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
         nodes,
         vec![root],
@@ -327,8 +327,8 @@ fn strategy_cases_region_checks_find_a_nested_rare_exception() {
         Program::try_new(
             vec![Domain::Int { min: 0, max: 7 }],
             vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             nodes,
             vec![root],

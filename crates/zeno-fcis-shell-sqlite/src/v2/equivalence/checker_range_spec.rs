@@ -137,18 +137,18 @@ pub(super) open spec fn scan_result(a: &V2ScalarProgram, b: &V2ScalarProgram,
 }
 
 /// Rebuild a full rank from a prefix rank and the remaining fixed digits.
-pub(crate) open spec fn tail_rank(ds: Seq<Domain>, xs: Seq<i64>, start: int, n: int, prefix: int) -> int
+pub(crate) open spec fn tail_rank(ds: Seq<Domain>, xs: Seq<i128>, start: int, n: int, prefix: int) -> int
     decreases n - start,
 {
     if n <= start { prefix } else { tail_rank(ds, xs, start, n - 1, prefix)
         * spec::width(ds[n - 1]) + xs[n - 1] - spec::lo(ds[n - 1]) }
 }
-pub(crate) proof fn tail_zero(ds: Seq<Domain>, xs: Seq<i64>, n: int)
+pub(crate) proof fn tail_zero(ds: Seq<Domain>, xs: Seq<i128>, n: int)
     requires 0 <= n <= ds.len(), xs.len() == ds.len(),
     ensures tail_rank(ds, xs, 0, n, 0) == spec::rank(ds, xs, n),
     decreases n,
 { if n > 0 { tail_zero(ds, xs, n - 1); } }
-pub(crate) proof fn unrank_step(ds: Seq<Domain>, old: Seq<i64>, new: Seq<i64>, pos: int, n: int,
+pub(crate) proof fn unrank_step(ds: Seq<Domain>, old: Seq<i128>, new: Seq<i128>, pos: int, n: int,
     prior: int, next: int)
     requires 0 <= pos < n <= ds.len(), old.len() == ds.len(), new.len() == ds.len(),
         prior == next * spec::width(ds[pos]) + new[pos] - spec::lo(ds[pos]),

@@ -216,8 +216,8 @@ fn fields(channel: &c::Channel<'_>) -> Option<Vec<InputField>> {
             let leaf = match field.domain {
                 c::Domain::Bool => Leaf::Bool,
                 c::Domain::I128 { min, max } => Leaf::I128 {
-                    min: i64::try_from(min).ok()?,
-                    max: i64::try_from(max).ok()?,
+                    min: i128::try_from(min).ok()?,
+                    max: i128::try_from(max).ok()?,
                 },
                 c::Domain::U128 { min, max } => Leaf::U128 { min, max },
                 c::Domain::Enum { type_id, variants } | c::Domain::Sum { type_id, variants } => {
@@ -229,11 +229,11 @@ fn fields(channel: &c::Channel<'_>) -> Option<Vec<InputField>> {
                         .map(|(code, id)| {
                             Some(Variant {
                                 id,
-                                code: i64::try_from(code).ok()?,
+                                code: i128::try_from(code).ok()?,
                             })
                         })
                         .collect::<Option<Vec<_>>>()?;
-                    let max = i64::try_from(variants.len()).ok()?.checked_sub(1)?;
+                    let max = i128::try_from(variants.len()).ok()?.checked_sub(1)?;
                     if matches!(field.domain, c::Domain::Enum { .. }) {
                         Leaf::Enum {
                             type_id,

@@ -58,12 +58,39 @@ fn kind(op: NumericOp, inputs: &[Domain<'_>], previous: &[Kind]) -> Result<Kind,
             }
         }
         Instruction::Literal(_, kind) => Ok(kind),
-        // These adapters are never produced by typed_instruction. Refuse them
-        // here rather than extending the existing public numeric instruction set.
-        Instruction::ScalarMul(..)
-        | Instruction::ScalarDiv(..)
-        | Instruction::ScalarMulDiv(..)
-        | Instruction::ScalarProductsGe(..) => Err(AdmissionFailure::TypeMismatch),
+        // Width-explicit D1 adapters preserve the historical i64 route.
+        Instruction::ScalarMul(w, a, b) | Instruction::ScalarDiv(w, _, a, b) => {
+            if matches!(w, IntegerWidth::Unsigned128) {
+                return Err(AdmissionFailure::TypeMismatch);
+            }
+            require_kind(previous, a, Kind::Signed)?;
+            require_kind(previous, b, Kind::Signed)?;
+            Ok(Kind::Signed)
+        }
+        Instruction::ScalarMulDiv(w, _, a, b, d) => {
+            if matches!(w, IntegerWidth::Unsigned128) {
+                return Err(AdmissionFailure::TypeMismatch);
+            }
+            require_kind(previous, a, Kind::Signed)?;
+            require_kind(previous, b, Kind::Signed)?;
+            require_kind(previous, d, Kind::Signed)?;
+            Ok(Kind::Signed)
+        }
+        Instruction::ScalarProductsGe(_, a, b) => {
+            require_kind(previous, a[0], Kind::Signed)?;
+            require_kind(previous, a[1], Kind::Signed)?;
+            require_kind(previous, a[2], Kind::Signed)?;
+            require_kind(previous, b[0], Kind::Signed)?;
+            require_kind(previous, b[1], Kind::Signed)?;
+            require_kind(previous, b[2], Kind::Signed)?;
+            Ok(Kind::Bool)
+        }
+        Instruction::SignedMulDivFloor(a, b, d) => {
+            require_kind(previous, a, Kind::Signed)?;
+            require_kind(previous, b, Kind::Signed)?;
+            require_kind(previous, d, Kind::Signed)?;
+            Ok(Kind::Signed)
+        }
         Instruction::MulDiv(_, a, b, den) => {
             require_kind(previous, a, Kind::Unsigned)?;
             require_kind(previous, b, Kind::Unsigned)?;

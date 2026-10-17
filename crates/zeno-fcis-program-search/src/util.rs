@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 /// FNV-1a over the little-endian bytes of `values`, from `basis`.
-pub(crate) fn fingerprint(basis: u64, values: impl IntoIterator<Item = i64>) -> u64 {
+pub(crate) fn fingerprint(basis: u64, values: impl IntoIterator<Item = i128>) -> u64 {
     let mut hash = basis;
     for value in values {
         for byte in value.to_le_bytes() {
@@ -21,15 +21,15 @@ pub(crate) const FNV_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 pub(crate) const FNV_BASIS_2: u64 = 0x6c62_272e_07bb_0142;
 
 /// True when every value equals the first (and there is at least one).
-pub(crate) fn single_value(values: &[i64]) -> Option<i64> {
+pub(crate) fn single_value(values: &[i128]) -> Option<i128> {
     let first = *values.first()?;
     values.iter().all(|value| *value == first).then_some(first)
 }
 
 /// The distinct values of `values`, ascending, or `None` once more than
 /// `limit` are seen.
-pub(crate) fn distinct_up_to(values: &[i64], limit: usize) -> Option<Vec<i64>> {
-    let mut seen: Vec<i64> = Vec::new();
+pub(crate) fn distinct_up_to(values: &[i128], limit: usize) -> Option<Vec<i128>> {
+    let mut seen: Vec<i128> = Vec::new();
     for value in values {
         if let Err(at) = seen.binary_search(value) {
             if seen.len() == limit {
@@ -42,7 +42,7 @@ pub(crate) fn distinct_up_to(values: &[i64], limit: usize) -> Option<Vec<i64>> {
 }
 
 /// Number of distinct values.
-pub(crate) fn distinct_count(values: &[i64]) -> usize {
+pub(crate) fn distinct_count(values: &[i128]) -> usize {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
     sorted.dedup();

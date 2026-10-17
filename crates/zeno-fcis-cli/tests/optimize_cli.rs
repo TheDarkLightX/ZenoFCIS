@@ -336,7 +336,7 @@ fn a_profile_bounds_the_search_and_conflicts_are_refused() {
     // A strategy naming another profile than --profile is refused.
     let named = directory.write(
         "named.json",
-        br#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "boolean", "rounds": 1}], "profile": "checked-i64-v1"}"#,
+        br#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "boolean", "rounds": 1}], "profile": "checked-i128-v1"}"#,
     );
     let (exit, report) = optimize(
         &original,

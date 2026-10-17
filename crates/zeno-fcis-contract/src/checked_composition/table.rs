@@ -58,7 +58,7 @@ impl Table {
 
     /// Folds in the previous record, starts the next one with a row's values
     /// and returns its bytes for the check to extend.
-    pub(crate) fn row(&mut self, values: &[i64]) -> &mut Vec<u8> {
+    pub(crate) fn row(&mut self, values: &[i128]) -> &mut Vec<u8> {
         self.fold();
         for value in values {
             self.record.extend_from_slice(&value.to_be_bytes());

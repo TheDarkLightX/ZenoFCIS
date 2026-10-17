@@ -622,7 +622,7 @@ fn decimal_product(factors: &[u128]) -> String {
 }
 
 /// Names and values of `fields` as a JSON object.
-fn named<'a>(names: impl Iterator<Item = &'a str>, values: &[i64]) -> Value {
+fn named<'a>(names: impl Iterator<Item = &'a str>, values: &[i128]) -> Value {
     Value::Object(
         names
             .zip(values)
@@ -632,7 +632,7 @@ fn named<'a>(names: impl Iterator<Item = &'a str>, values: &[i64]) -> Value {
 }
 
 /// The states of `components` as `component.field` values.
-fn states_json(composition: &Composition, components: &[usize], states: &[Vec<i64>]) -> Value {
+fn states_json(composition: &Composition, components: &[usize], states: &[Vec<i128>]) -> Value {
     let mut out = Map::new();
     for at in components {
         let component = &composition.components[*at];
@@ -643,7 +643,7 @@ fn states_json(composition: &Composition, components: &[usize], states: &[Vec<i6
     Value::Object(out)
 }
 
-fn request_json(composition: &Composition, cone: &[usize], request: &[i64]) -> Value {
+fn request_json(composition: &Composition, cone: &[usize], request: &[i128]) -> Value {
     named(
         cone.iter()
             .map(|at| composition.manifest.request[*at].name.as_str()),
@@ -668,7 +668,7 @@ fn check_local(composition: &Composition, tables: &Tables, obligation: &mut Chec
             .iter()
             .map(|field| field.name.as_str())
     };
-    let invariant = |state: &[i64]| {
+    let invariant = |state: &[i128]| {
         own.invariant
             .holds(&gather(&component.invariant.reads, &[], &[], state))
     };
@@ -718,7 +718,7 @@ fn check_local(composition: &Composition, tables: &Tables, obligation: &mut Chec
             return;
         }
     }
-    let values: Vec<Vec<i64>> = component
+    let values: Vec<Vec<i128>> = component
         .fields
         .iter()
         .map(|field| field.domain.values())
@@ -792,9 +792,9 @@ fn check_local(composition: &Composition, tables: &Tables, obligation: &mut Chec
 fn for_each_states(
     composition: &Composition,
     components: &[usize],
-    mut visit: impl FnMut(&[Vec<i64>]) -> Result<(), ()>,
+    mut visit: impl FnMut(&[Vec<i128>]) -> Result<(), ()>,
 ) -> Result<(), ()> {
-    let mut values: Vec<Vec<i64>> = Vec::new();
+    let mut values: Vec<Vec<i128>> = Vec::new();
     let mut owners: Vec<usize> = Vec::new();
     for at in components {
         for field in composition.components[*at].state_fields() {
@@ -802,7 +802,7 @@ fn for_each_states(
             owners.push(*at);
         }
     }
-    let mut states: Vec<Vec<i64>> = vec![Vec::new(); composition.components.len()];
+    let mut states: Vec<Vec<i128>> = vec![Vec::new(); composition.components.len()];
     for_each_tuple(&values, |tuple| {
         for state in &mut states {
             state.clear();
@@ -819,13 +819,13 @@ fn for_each_states(
 fn for_each_request(
     composition: &Composition,
     cone: &[usize],
-    mut visit: impl FnMut(&[i64]) -> Result<(), ()>,
+    mut visit: impl FnMut(&[i128]) -> Result<(), ()>,
 ) -> Result<(), ()> {
-    let values: Vec<Vec<i64>> = cone
+    let values: Vec<Vec<i128>> = cone
         .iter()
         .map(|at| composition.manifest.request[*at].domain.values())
         .collect();
-    let mut request = vec![0i64; composition.manifest.request.len()];
+    let mut request = vec![0i128; composition.manifest.request.len()];
     for_each_tuple(&values, |tuple| {
         for (at, value) in cone.iter().zip(tuple) {
             request[*at] = *value;
@@ -838,7 +838,7 @@ fn invariants_hold(
     composition: &Composition,
     tables: &Tables,
     components: &[usize],
-    states: &[Vec<i64>],
+    states: &[Vec<i128>],
 ) -> bool {
     components.iter().all(|at| {
         let reads = &composition.components[*at].invariant.reads;
@@ -877,7 +877,7 @@ fn check_assume(composition: &Composition, tables: &Tables, obligation: &mut Che
                     "failed": failed,
                 })
             };
-            let mut tuple = vec![0i64; width];
+            let mut tuple = vec![0i128; width];
             let deliver = |field: usize, value: Delivered| match value {
                 Delivered::Value(value) => Ok(value),
                 Delivered::Outside(side) => Err(witness(
@@ -965,7 +965,7 @@ fn check_couple(composition: &Composition, tables: &Tables, obligation: &mut Che
     let members = &coupling.members;
     let (cone, spaces) = coupling_spaces(composition, members);
     let holds =
-        |states: &[Vec<i64>]| table.holds(&gather(&coupling.invariant.reads, &[], states, &[]));
+        |states: &[Vec<i128>]| table.holds(&gather(&coupling.invariant.reads, &[], states, &[]));
     // The components with a CommittedFailure case that run between the
     // previous member and each member: any of them may end the step just
     // before it.
@@ -985,7 +985,7 @@ fn check_couple(composition: &Composition, tables: &Tables, obligation: &mut Che
             .map(|at| composition.components[*at].name.clone())
             .collect::<Vec<_>>()
     };
-    let mut genesis: Vec<Vec<i64>> = vec![Vec::new(); composition.components.len()];
+    let mut genesis: Vec<Vec<i128>> = vec![Vec::new(); composition.components.len()];
     for member in members {
         genesis[*member] = composition.components[*member].genesis.clone();
     }

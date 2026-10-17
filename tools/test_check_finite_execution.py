@@ -93,7 +93,7 @@ class TranslatedCoverage(unittest.TestCase):
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0 for record in runtime))
         mutations = gate.mutation_sources(*((gate.ROOT / path).read_text() for path in
                                             (gate.SUBJECT, gate.ADMISSION, gate.TYPED, gate.VALUE)))
-        self.assertEqual(len(mutations), 24)
+        self.assertEqual(len(mutations), 25)
         for path, changed, expected in mutations.values():
             self.assertNotEqual(changed, (gate.ROOT / path).read_text())
             self.assertIn(expected, ("proof", "coverage"))

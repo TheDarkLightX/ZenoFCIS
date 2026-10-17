@@ -36,7 +36,7 @@ impl Directory {
         path.to_string_lossy().into_owned()
     }
 
-    fn contract(&self, family: &str, parameters: &[(&str, i64)]) -> String {
+    fn contract(&self, family: &str, parameters: &[(&str, i128)]) -> String {
         let base = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../core-components")
             .join(family);

@@ -121,7 +121,9 @@ fn preflight_export(
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
+                ValueExpr::MulDiv(..) | ValueExpr::SignedMulDivFloor(..) => {
+                    return Err(ExportError::UnsupportedMode);
+                }
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
@@ -430,7 +432,9 @@ fn render_value_lean(
 ) -> Result<LeanValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
-        ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
+        ValueExpr::MulDiv(..) | ValueExpr::SignedMulDivFloor(..) => {
+            return Err(ExportError::UnsupportedMode);
+        }
         ValueExpr::Int(value) => LeanValue {
             term: lean_int(*value),
             defined: "True".to_owned(),

@@ -42,7 +42,7 @@ fn law_judges(core: &Core, formula: &str, expected: &str) {
     assert_eq!(results[0]["verdict"], expected, "{formula}: {results:?}");
 }
 
-fn actual_admission(core: &Core, formula: &str, amount: i64) -> bool {
+fn actual_admission(core: &Core, formula: &str, amount: i128) -> bool {
     let admitted = core
         .admissible(&[("accept".to_owned(), formula.to_owned())])
         .unwrap();
@@ -198,4 +198,30 @@ fn arithmetic_scenario_judge_rejects_wrong_rounded_successors_and_refusal() {
     )
     .unwrap();
     assert_eq!(result.failed, 1, "{}", result.packet);
+}
+
+#[test]
+fn arithmetic_judges_keep_i128_full_products_at_actual_admission() {
+    let max = i128::MAX;
+    let expression = format!("mul_div_floor(amount, {max}, {max})");
+    let core = core(&expression, "true");
+    let law = core
+        .successor_law(0, &core.read_checked(&expression).unwrap())
+        .unwrap();
+    assert!(actual_admission(&core, &law, 2));
+    let wrong = core
+        .successor_law(0, &core.read_checked("0").unwrap())
+        .unwrap();
+    assert!(!actual_admission(&core, &wrong, 2));
+    let product = format!(
+        "products_ge({max}, {max}, {max}, {max}, {max}, {})",
+        max - 1
+    );
+    let good = core
+        .law_text(&core.read_checked(&product).unwrap())
+        .unwrap();
+    assert_eq!(
+        core.admissible(&[("commit".to_owned(), good)]).unwrap(),
+        core.admissible(&[]).unwrap()
+    );
 }

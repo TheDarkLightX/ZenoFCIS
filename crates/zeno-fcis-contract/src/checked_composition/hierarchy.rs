@@ -373,7 +373,7 @@ impl Conjunct {
         self.reads.iter().map(|(_, var)| *var).collect()
     }
 
-    fn truth(&self, values: &BTreeMap<Var, i64>, domains: &Domains<'_>) -> Option<Truth> {
+    fn truth(&self, values: &BTreeMap<Var, i128>, domains: &Domains<'_>) -> Option<Truth> {
         let mut record = Vec::with_capacity(self.reads.len());
         for (id, var) in &self.reads {
             let domain = domains.domain(*var)?;
@@ -741,6 +741,9 @@ impl Scope {
             }
             Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
             Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+            Ast::SignedMulDivFloor(a, b, d) => {
+                Ast::SignedMulDivFloor(recurse(a), recurse(b), recurse(d))
+            }
             Ast::ProductsGe(arguments) => {
                 Ast::ProductsGe(arguments.iter().map(|a| *recurse(a)).collect())
             }
@@ -906,7 +909,7 @@ fn implication(
     };
     leaf::for_each_tuple(&values, |tuple| {
         rows.count += 1;
-        let row: BTreeMap<Var, i64> = ordered.iter().copied().zip(tuple.iter().copied()).collect();
+        let row: BTreeMap<Var, i128> = ordered.iter().copied().zip(tuple.iter().copied()).collect();
         let mut premise = true;
         for var in &ordered {
             let Some((provider, view_field, ids)) = facts(*var) else {
@@ -1474,7 +1477,7 @@ fn satisfiable(conditions: &[Conjunct], domains: &Domains<'_>) -> Result<(), Ref
         if found {
             return Ok(());
         }
-        let row: BTreeMap<Var, i64> = vars.iter().copied().zip(tuple.iter().copied()).collect();
+        let row: BTreeMap<Var, i128> = vars.iter().copied().zip(tuple.iter().copied()).collect();
         found = conditions
             .iter()
             .all(|conjunct| conjunct.truth(&row, domains) == Some(Truth::Holds));

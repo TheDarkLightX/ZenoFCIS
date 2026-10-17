@@ -897,8 +897,8 @@ fn independent_order_full_schema_product_1728_typed_decisions() {
                         let fixture = order_fixture::transition(&[
                             i64::from(action - 150),
                             i64::from(status - 160),
-                            attempts as i64,
-                            callback as i64,
+                            i64::try_from(attempts).unwrap_or_else(|_| panic!("fixture attempts")),
+                            i64::try_from(callback).unwrap_or_else(|_| panic!("fixture callback")),
                             i64::from(caller - 170),
                         ])
                         .unwrap_or_else(|| panic!("missing fixture value in independent_order_full_schema_product_1728_typed_decisions"));

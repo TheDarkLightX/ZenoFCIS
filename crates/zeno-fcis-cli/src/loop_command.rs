@@ -74,15 +74,15 @@ const HEAD_LIMIT: u64 = acquisition::HEAD_BYTES;
 pub(super) enum ProfileArg {
     #[value(name = "functional-bool-v1")]
     FunctionalBoolV1,
-    #[value(name = "checked-i64-v1")]
-    CheckedI64V1,
+    #[value(name = "checked-i128-v1")]
+    CheckedI128V1,
 }
 
 impl ProfileArg {
     fn profile(self) -> Profile {
         match self {
             ProfileArg::FunctionalBoolV1 => Profile::FunctionalBoolV1,
-            ProfileArg::CheckedI64V1 => Profile::CheckedI64V1,
+            ProfileArg::CheckedI128V1 => Profile::CheckedI128V1,
         }
     }
 }
@@ -110,7 +110,7 @@ pub(super) enum Command {
         /// New or empty directory holding the request, ledger and artifacts.
         #[arg(long)]
         session: PathBuf,
-        #[arg(long, value_enum, default_value_t = ProfileArg::CheckedI64V1)]
+        #[arg(long, value_enum, default_value_t = ProfileArg::CheckedI128V1)]
         profile: ProfileArg,
         /// Attempts per session, at most 8.
         #[arg(long, default_value_t = Limits::CEILING.attempts)]

@@ -79,7 +79,7 @@ pub(super) fn program() -> ScalarProgram<'static> {
 #[derive(Debug)]
 struct Facts {
     raw: (i128, i128, i128, u16, i128, bool),
-    branch: i64,
+    branch: i128,
     increment: i128,
     deadline: i128,
 }

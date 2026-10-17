@@ -150,7 +150,7 @@ impl RangeReport<'_, '_> {
             || ordinal >= spec::product(domains@, domains@.len() as int),
     },
 ))]
-pub(super) fn tuple_at(domains: &[Domain], ordinal: u64) -> Option<Vec<i64>> {
+pub(super) fn tuple_at(domains: &[Domain], ordinal: u64) -> Option<Vec<i128>> {
     let size = match domain_size(domains) {
         Ok(size) => size,
         Err(_) => return None,
@@ -175,9 +175,16 @@ pub(super) fn tuple_at(domains: &[Domain], ordinal: u64) -> Option<Vec<i64>> {
     while position > 0 {
         position -= 1;
         let (min, max) = domains[position].bounds();
-        let width = ((max as i128) - (min as i128) + 1) as u128;
-        let digit = remaining % width;
-        let next = remaining / width;
+        let lower = signed_position(min);
+        let _upper = signed_position(max);
+        let maybe_width = interval_width(min, max);
+        // The complete signed range has width 2^128, larger than remaining.
+        let (digit, next) = match maybe_width {
+            Some(width) => (remaining % width, remaining / width),
+            None => (remaining, 0),
+        };
+        #[cfg(verus_keep_ghost)]
+        proof_decl! { let ghost width = spec::width(domains@[position as int]); }
         #[cfg(verus_keep_ghost)]
         proof_decl! { let ghost before = tuple@; }
         #[cfg(verus_keep_ghost)]
@@ -185,6 +192,20 @@ pub(super) fn tuple_at(domains: &[Domain], ordinal: u64) -> Option<Vec<i64>> {
             spec::product_positive(domains@, position as int);
             vstd::arithmetic::div_mod::lemma_fundamental_div_mod(remaining as int, width as int);
             vstd::arithmetic::div_mod::lemma_mod_bound(remaining as int, width as int);
+            match maybe_width {
+                Some(w) => {
+                    assert(w as int == width && w > 0);
+                    assert(digit as int == remaining as int % width);
+                    assert(next as int == remaining as int / width);
+                }
+                None => {
+                    assert(width == u128::MAX as int + 1);
+                    assert((remaining as int) < width);
+                    assert(next == 0 && digit == remaining);
+                }
+            }
+            assert(0 <= (digit as int) < width);
+            assert(lower as int + digit as int <= _upper as int);
             let p = spec::product(domains@, position as int);
             assert(remaining as int == next as int * width as int + digit as int) by(nonlinear_arith)
                 requires remaining as int == width as int * next as int + digit as int, width > 0;
@@ -192,7 +213,7 @@ pub(super) fn tuple_at(domains: &[Domain], ordinal: u64) -> Option<Vec<i64>> {
                 requires remaining < p * width, remaining == next * width + digit,
                     0 <= digit < width, width > 0;
         }
-        tuple[position] = ((min as i128) + (digit as i128)) as i64;
+        tuple[position] = signed_value(lower + digit);
         #[cfg(verus_keep_ghost)]
         proof! {
             range_spec::unrank_step(domains@, before, tuple@, position as int,

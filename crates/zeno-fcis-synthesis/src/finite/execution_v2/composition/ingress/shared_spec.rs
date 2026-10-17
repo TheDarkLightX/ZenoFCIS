@@ -22,7 +22,7 @@ pub(in super::super::super) open spec fn valid(schema:SchemaView)->bool {
 }
 pub(in super::super::super) open spec fn reify(leaf:LeafView,code:Atom<'static>)->Option<Atom<'static>> {
     match leaf {
-        LeafView::Legacy(l)=>match code {Atom::I128(v)=>if i64::MIN<=v<=i64::MAX {legacy::reify(*l,v as i64)}else{None},_=>None},
+        LeafView::Legacy(l)=>match code {Atom::I128(v)=>if i128::MIN<=v<=i128::MAX {legacy::reify(*l,v as i128)}else{None},_=>None},
         LeafView::Numeric(d)=>if super::super::super::schema_validation::spec::atom(d,code){Some(code)}else{None},
     }
 }
@@ -90,7 +90,7 @@ pub(in super::super::super) open spec fn project<'a>(bytes:Seq<u8>,schema:Schema
     }
 }
 /// Lifting old scalar codes preserves every value, including the empty tuple.
-pub(in super::super::super) proof fn legacy_lift(values:Seq<i64>)
+pub(in super::super::super) proof fn legacy_lift(values:Seq<i128>)
     ensures super::super::super::super::numeric::spec::project_all(typed::spec::lift(values))==Some(values),
 {
     assert(typed::spec::lift(values) =~= super::super::super::super::super::evaluation::typed::spec::lift(values));

@@ -223,7 +223,7 @@ pub(crate) fn export(
         "sources": {"project_sha256": sha256_hex(project.as_bytes()), "rules_sha256": sha256_hex(source.as_bytes()),
             "program_sha256": sha256_hex(&super::program_bytes(&native_program)?)},
         "mapping": positions.iter().enumerate().map(|(index, position)| json!({"contract": position.name, "tau": format!("x{index}"), "domain": position.domain.json(),
-            "representation": "64-bit two's-complement; comparisons explicitly signed"})).collect::<Vec<_>>(),
+            "representation": "128-bit two's-complement; comparisons explicitly signed"})).collect::<Vec<_>>(),
         "review": {"construction": set.construction.name(), "inputs": set.len(), "sampled_inputs": sample_count, "decisions": decisions.len(),
             "sample_rule": "ordinal floor(k * input_count / sample_count), k increasing", "tally": tally, "sampled_refusals": refusals},
         "decisions": decisions, "queries": queries,
@@ -232,7 +232,11 @@ pub(crate) fn export(
     )
 }
 
-fn inputs(script: &mut Script, positions: &[Position], tuple: Option<&[i64]>) -> Vec<(Term, Sort)> {
+fn inputs(
+    script: &mut Script,
+    positions: &[Position],
+    tuple: Option<&[i128]>,
+) -> Vec<(Term, Sort)> {
     positions
         .iter()
         .enumerate()
@@ -607,7 +611,7 @@ fn ast(
         }
         Ast::Bool(value) => (Term::Bool(*value), Sort::Bool),
         Ast::Int(value) => {
-            i64::try_from(*value).map_err(|_| refused("integer outside i64"))?;
+            i128::try_from(*value).map_err(|_| refused("integer outside i128"))?;
             (Term::Int(*value), Sort::Int)
         }
         Ast::Name(name) => names
@@ -675,7 +679,7 @@ fn ast(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
-        Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
             return Err(refused(
                 "arithmetic extension is outside the Tau export profile",
             ));
@@ -782,7 +786,7 @@ fn decision_property(
     Ok(Term::or(alternatives))
 }
 
-/// A structural sufficient condition for eager arithmetic to fit i64 even
+/// A structural sufficient condition for eager arithmetic to fit i128 even
 /// in unused/unselected nodes. A failed bound refuses rather than approximates.
 fn ranges(program: &Program) -> Result<(), ContractError> {
     let mut values = Vec::<(i128, i128)>::new();
@@ -802,12 +806,22 @@ fn ranges(program: &Program) -> Result<(), ContractError> {
             Op::Add(a, b) => {
                 let a = values[usize::from(a)];
                 let b = values[usize::from(b)];
-                (a.0 + b.0, a.1 + b.1)
+                (
+                    a.0.checked_add(b.0)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                    a.1.checked_add(b.1)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                )
             }
             Op::Sub(a, b) => {
                 let a = values[usize::from(a)];
                 let b = values[usize::from(b)];
-                (a.0 - b.1, a.1 - b.0)
+                (
+                    a.0.checked_sub(b.1)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                    a.1.checked_sub(b.0)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                )
             }
             Op::Select(_, a, b) => {
                 let a = values[usize::from(a)];
@@ -816,9 +830,9 @@ fn ranges(program: &Program) -> Result<(), ContractError> {
             }
             _ => return Err(refused("unsupported scalar instruction")),
         };
-        if interval.0 < i128::from(i64::MIN) || interval.1 > i128::from(i64::MAX) {
+        if interval.0 < i128::from(i128::MIN) || interval.1 > i128::from(i128::MAX) {
             return Err(refused(
-                "cannot establish eager i64 arithmetic safety for this program",
+                "cannot establish eager i128 arithmetic safety for this program",
             ));
         }
         values.push(interval);
@@ -849,7 +863,12 @@ fn ast_ranges(
         }
         Ast::Neg(inner) => {
             let (lo, hi) = ast_ranges(inner, names)?;
-            (-hi, -lo)
+            (
+                hi.checked_neg()
+                    .ok_or_else(|| refused("interval overflow"))?,
+                lo.checked_neg()
+                    .ok_or_else(|| refused("interval overflow"))?,
+            )
         }
         Ast::Choose(condition, yes, no) => {
             ast_ranges(condition, names)?;
@@ -861,8 +880,18 @@ fn ast_ranges(
             let a = ast_ranges(left, names)?;
             let b = ast_ranges(right, names)?;
             match operator {
-                Binary::Add => (a.0 + b.0, a.1 + b.1),
-                Binary::Sub => (a.0 - b.1, a.1 - b.0),
+                Binary::Add => (
+                    a.0.checked_add(b.0)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                    a.1.checked_add(b.1)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                ),
+                Binary::Sub => (
+                    a.0.checked_sub(b.1)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                    a.1.checked_sub(b.0)
+                        .ok_or_else(|| refused("interval overflow"))?,
+                ),
                 Binary::Mul => {
                     return Err(refused("multiplication is outside the Tau export profile"));
                 }
@@ -870,15 +899,15 @@ fn ast_ranges(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
-        Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
             return Err(refused(
                 "arithmetic extension is outside the Tau export profile",
             ));
         }
     };
-    if interval.0 < i128::from(i64::MIN) || interval.1 > i128::from(i64::MAX) {
+    if interval.0 < i128::from(i128::MIN) || interval.1 > i128::from(i128::MAX) {
         return Err(refused(
-            "cannot establish authored eager i64 arithmetic safety",
+            "cannot establish authored eager i128 arithmetic safety",
         ));
     }
     Ok(interval)
@@ -900,7 +929,7 @@ fn query(
     Ok(json!({"id": id, "kind": kind, "expected": expected, "tau": tau, "smt": smt}))
 }
 
-/// Render unbounded integer terms in an explicitly signed bv[64] profile.
+/// Render unbounded integer terms in an explicitly signed bv[128] profile.
 /// Numeric conditionals are lifted to constrained fresh variables, since the
 /// supported Tau grammar uses conditionals over formulas.
 struct Tau {
@@ -930,9 +959,9 @@ impl Tau {
     fn int(&mut self, term: &Term) -> Result<String, ContractError> {
         Ok(match term {
             Term::Int(value) => {
-                let value = i64::try_from(*value)
+                let value = i128::try_from(*value)
                     .map_err(|_| refused("Tau integer outside the signed representation"))?;
-                format!("{{{}}}:bv[64]", value as u64)
+                format!("{{{}}}:bv[128]", value as u128)
             }
             Term::Name(name) if self.sorts.get(name) == Some(&Sort::Int) => name.clone(),
             Term::Add(a, b) | Term::Sub(a, b) => {
@@ -975,7 +1004,7 @@ impl Tau {
         Ok(match term {
             Term::Bool(value) => if *value { "T" } else { "F" }.to_owned(),
             Term::Name(name) if self.sorts.get(name) == Some(&Sort::Bool) => {
-                format!("({name} = {{1}}:bv[64])")
+                format!("({name} = {{1}}:bv[128])")
             }
             Term::Not(inner) => format!("!({})", self.boolean(inner)?),
             Term::And(items) | Term::Or(items) => {
@@ -1009,8 +1038,8 @@ impl Tau {
             Term::Lt(a, b) | Term::Le(a, b) => {
                 let a = self.int(a)?;
                 let b = self.int(b)?;
-                let sa = format!("({a} >= {{9223372036854775808}}:bv[64])");
-                let sb = format!("({b} >= {{9223372036854775808}}:bv[64])");
+                let sa = format!("({a} >= {{170141183460469231731687303715884105728}}:bv[128])");
+                let sb = format!("({b} >= {{170141183460469231731687303715884105728}}:bv[128])");
                 format!(
                     "(({sa} && !{sb}) || (({sa} <-> {sb}) && (({a}) {} ({b}))))",
                     if matches!(term, Term::Lt(..)) {
@@ -1044,7 +1073,7 @@ impl Tau {
                 format!("({name} = {})", self.int(term)?)
             } else {
                 format!(
-                    "({name} = {{1}}:bv[64] <-> ({})) && ({name} <= {{1}}:bv[64])",
+                    "({name} = {{1}}:bv[128] <-> ({})) && ({name} <= {{1}}:bv[128])",
                     self.boolean(term)?
                 )
             };
@@ -1055,7 +1084,7 @@ impl Tau {
         let quantifiers = self
             .sorts
             .keys()
-            .map(|name| format!("all {name}:bv[64] "))
+            .map(|name| format!("all {name}:bv[128] "))
             .collect::<String>();
         let premise = if premises.is_empty() {
             "T".to_owned()
@@ -1115,7 +1144,7 @@ mod tests {
         let program = Program::try_new(
             vec![],
             vec![Domain::Int { min: 0, max: 0 }],
-            vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1), Op::Int(0)],
+            vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1), Op::Int(0)],
             vec![3],
         )
         .unwrap_or_else(|error| panic!("cannot construct the eager-trap test program: {error}"));
@@ -1128,23 +1157,23 @@ mod tests {
         assert_eq!(
             tau.int(&Term::Int(-1))
                 .unwrap_or_else(|error| panic!("cannot render the signed boundary query: {error}")),
-            "{18446744073709551615}:bv[64]"
+            "{340282366920938463463374607431768211455}:bv[128]"
         );
         assert_eq!(
-            tau.int(&Term::Int(i128::from(i64::MIN)))
+            tau.int(&Term::Int(i128::from(i128::MIN)))
                 .unwrap_or_else(|error| panic!("cannot render the signed boundary query: {error}")),
-            "{9223372036854775808}:bv[64]"
+            "{170141183460469231731687303715884105728}:bv[128]"
         );
         let order = tau
             .boolean(&Term::lt(Term::Int(-1), Term::Int(0)))
             .unwrap_or_else(|error| panic!("cannot render the signed boundary query: {error}"));
-        assert!(order.contains("9223372036854775808"));
+        assert!(order.contains("170141183460469231731687303715884105728"));
         assert!(order.contains("<->"));
         let unsafe_arm = Ast::Choose(
             Box::new(Ast::Bool(false)),
             Box::new(Ast::Binary(
                 Binary::Sub,
-                Box::new(Ast::Int(i128::from(i64::MIN))),
+                Box::new(Ast::Int(i128::from(i128::MIN))),
                 Box::new(Ast::Int(1)),
             )),
             Box::new(Ast::Int(0)),

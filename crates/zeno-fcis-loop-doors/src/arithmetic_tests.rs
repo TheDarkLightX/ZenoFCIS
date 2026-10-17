@@ -47,7 +47,7 @@ fn subject(text: &str, boolean: bool) -> Subject {
     } else {
         Domain::Int {
             min: 0,
-            max: i64::MAX,
+            max: i128::MAX,
         }
     };
     let (original, vocab) = seed(vec![integer], vec![output], &["x"]);
@@ -97,7 +97,7 @@ fn main_route_calls_round_trip_lower_lift_and_reject_stubs() {
 #[test]
 fn new_calls_keep_full_products_and_refuse_undefined_values() {
     let s = subject("x", false);
-    let max = i64::MAX;
+    let max = i128::MAX;
     for (text, expected) in [
         (format!("mul_div_floor({max}, {max}, {max})"), max),
         (format!("mul_div_ceil({max}, {max}, {max})"), max),

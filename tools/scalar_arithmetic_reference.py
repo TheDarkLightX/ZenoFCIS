@@ -18,7 +18,10 @@ class Case:
     operands: tuple[int, ...]
 
 
-def result(case: Case) -> int | None:
+def result(case: Case, bits: int = 64) -> int | None:
+    if bits not in (64,128):
+        raise ValueError("unsupported reference width")
+    MIN, MAX = -(1 << (bits-1)), (1 << (bits-1))-1
     a = case.operands
     if any(type(x) is not int or not MIN <= x <= MAX for x in a):
         return None
@@ -47,7 +50,10 @@ def result(case: Case) -> int | None:
     return answer if MIN <= answer <= MAX else None
 
 
-def boundary_cases() -> tuple[Case, ...]:
+def boundary_cases(bits: int = 64) -> tuple[Case, ...]:
+    if bits not in (64,128):
+        raise ValueError("unsupported reference width")
+    MIN, MAX = -(1 << (bits-1)), (1 << (bits-1))-1
     cases = []
     edges = (MIN, MIN + 1, -3, -2, -1, 0, 1, 2, 3, MAX - 1, MAX)
     for operation in ("mul", "div_floor", "div_ceil"):
@@ -78,6 +84,6 @@ def boundary_cases() -> tuple[Case, ...]:
     return tuple(cases)
 
 
-def vectors() -> str:
+def vectors(bits: int = 64) -> str:
     return "".join("\t".join((case.operation, *(str(x) for x in case.operands),
-        "arithmetic" if result(case) is None else str(result(case)))) + "\n" for case in boundary_cases())
+        "arithmetic" if result(case,bits) is None else str(result(case,bits)))) + "\n" for case in boundary_cases(bits))

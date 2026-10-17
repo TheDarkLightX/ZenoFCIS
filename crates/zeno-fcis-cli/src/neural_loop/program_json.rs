@@ -20,7 +20,7 @@ pub(crate) enum ProgramJsonError {
     Shape,
     /// A domain object is malformed.
     Domain { position: usize },
-    /// A decimal string is not a canonical i64.
+    /// A decimal string is not a canonical i128.
     Decimal { text: String },
     /// A node is malformed or names an unknown opcode or arity.
     Node { index: usize },
@@ -33,7 +33,7 @@ pub(crate) enum ProgramJsonError {
 }
 
 /// Reads a canonical signed decimal: no plus sign, leading zeros or `-0`.
-fn decimal(value: &Value) -> Result<i64, ProgramJsonError> {
+fn decimal(value: &Value) -> Result<i128, ProgramJsonError> {
     let text = value.as_str().ok_or_else(|| ProgramJsonError::Decimal {
         text: value.to_string(),
     })?;
@@ -216,7 +216,7 @@ pub(crate) fn program_to_json(program: &Program) -> Value {
 
 /// Typed values in the fixture vocabulary: Bool positions as JSON Booleans,
 /// integers as decimal strings.
-pub(crate) fn typed_values(domains: &[Domain], values: &[i64]) -> Value {
+pub(crate) fn typed_values(domains: &[Domain], values: &[i128]) -> Value {
     Value::Array(
         domains
             .iter()

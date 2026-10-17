@@ -726,7 +726,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil")
+                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor")
         );
         if named_predicate {
             let name = self
@@ -811,6 +811,10 @@ impl Parser {
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
         if self.take_symbol(&TokenKind::Minus) {
+            if self.current().kind == TokenKind::Number(1u128 << 127) {
+                self.advance();
+                return ValueExpr::Int(i128::MIN);
+            }
             let value = self.nested("value.negation", ValueExpr::Int(0), |parser| {
                 parser.parse_value_atom()
             });
@@ -818,7 +822,19 @@ impl Parser {
         }
         if let TokenKind::Number(value) = self.current().kind.clone() {
             self.advance();
-            return ValueExpr::Int(i128::from(value));
+            return match i128::try_from(value) {
+                Ok(value) => ValueExpr::Int(value),
+                Err(_) => {
+                    self.error(
+                        DiagnosticCode::InvalidNumber,
+                        "value.integer",
+                        "i128",
+                        text(value),
+                        "use a signed 128-bit integer",
+                    );
+                    ValueExpr::Int(0)
+                }
+            };
         }
         if self.take_symbol(&TokenKind::LParen) {
             let value = self.nested("value.group", ValueExpr::Int(0), |parser| {
@@ -851,6 +867,21 @@ impl Parser {
                 DivisionMode::Ceil
             };
             return ValueExpr::MulDiv(mode, Box::new(a), Box::new(b), Box::new(d));
+        }
+        if name.as_str() == "signed_mul_div_floor" && self.take_symbol(&TokenKind::LParen) {
+            let a = self.nested("value.signed_mul_div_floor.a", ValueExpr::Int(0), |p| {
+                p.parse_value()
+            });
+            self.expect_symbol(TokenKind::Comma, "signed_mul_div_floor");
+            let b = self.nested("value.signed_mul_div_floor.b", ValueExpr::Int(0), |p| {
+                p.parse_value()
+            });
+            self.expect_symbol(TokenKind::Comma, "signed_mul_div_floor");
+            let d = self.nested("value.signed_mul_div_floor.d", ValueExpr::Int(0), |p| {
+                p.parse_value()
+            });
+            self.expect_symbol(TokenKind::RParen, "signed_mul_div_floor");
+            return ValueExpr::SignedMulDivFloor(Box::new(a), Box::new(b), Box::new(d));
         }
         if matches!(name.as_str(), "div_exact" | "div_floor" | "div_ceil")
             && self.take_symbol(&TokenKind::LParen)
@@ -1077,7 +1108,19 @@ impl Parser {
     fn take_number(&mut self, path: &str) -> Option<u64> {
         if let TokenKind::Number(value) = self.current().kind.clone() {
             self.advance();
-            Some(value)
+            match u64::try_from(value) {
+                Ok(value) => Some(value),
+                Err(_) => {
+                    self.error(
+                        DiagnosticCode::InvalidNumber,
+                        path,
+                        "u64",
+                        text(value),
+                        "use a value within the u64 range",
+                    );
+                    None
+                }
+            }
         } else {
             self.error(
                 DiagnosticCode::ExpectedToken,
@@ -1123,8 +1166,34 @@ impl Parser {
     }
     fn take_i128(&mut self, path: &str) -> Option<i128> {
         let negative = self.take_symbol(&TokenKind::Minus);
-        let value = i128::from(self.take_number(path)?);
-        Some(if negative { -value } else { value })
+        let TokenKind::Number(magnitude) = self.current().kind.clone() else {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                path,
+                "integer",
+                self.describe_current(),
+                "use an explicit decimal integer",
+            );
+            return None;
+        };
+        self.advance();
+        let value = if negative && magnitude == 1u128 << 127 {
+            Some(i128::MIN)
+        } else {
+            i128::try_from(magnitude)
+                .ok()
+                .map(|value| if negative { -value } else { value })
+        };
+        if value.is_none() {
+            self.error(
+                DiagnosticCode::InvalidNumber,
+                path,
+                "i128",
+                text(magnitude),
+                "use a signed 128-bit integer",
+            );
+        }
+        value
     }
     fn take_id(&mut self, path: &str) -> Option<StableId> {
         let value = self.take_u32(path)?;

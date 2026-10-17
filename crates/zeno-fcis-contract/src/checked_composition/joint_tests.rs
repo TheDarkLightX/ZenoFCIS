@@ -20,7 +20,7 @@ fn joint(parts: Vec<Part>) -> JointComposition {
     .unwrap_or_else(fail)
 }
 
-fn step(joint: &JointComposition, state: &[i64], request: &[i64]) -> JointOutcome {
+fn step(joint: &JointComposition, state: &[i128], request: &[i128]) -> JointOutcome {
     joint.joint_step(state, request).unwrap_or_else(fail)
 }
 
@@ -39,7 +39,7 @@ fn refused(component: &str, class: RefusedClass) -> OutcomeKind {
 }
 
 /// op, qty, authorized.
-const SPEND_ONE: [i64; 3] = [0, 1, 1];
+const SPEND_ONE: [i128; 3] = [0, 1, 1];
 
 #[test]
 fn the_in_memory_constructor_lays_out_state_request_and_genesis() {

@@ -440,7 +440,7 @@ fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, S
             })
             .collect();
         let laws = LawSet::new(descriptor, &declared);
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let gaps = parallel(space.tuples(), |ordinal| {
             tuple_gap(&laws, framer, &machine, &states, &reasons, failure, ordinal)
         });
@@ -519,7 +519,7 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    states: &[Vec<i64>],
+    states: &[Vec<i128>],
     reasons: &[u32],
     failure: bool,
     ordinal: usize,
@@ -545,7 +545,7 @@ fn tuple_gap(
             mismatch: false,
         };
     };
-    let check = |class: Class, reason: Option<u32>, post: &[i64]| {
+    let check = |class: Class, reason: Option<u32>, post: &[i128]| {
         laws.on_transition(
             framer,
             &tuple,
@@ -978,7 +978,7 @@ fn check_proposals(
             .map(|id| LawSet::new(authority.descriptor(), &[*id]))
             .collect();
         let space = &machine.space;
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let verdicts = parallel(space.tuples(), |ordinal| {
             let Observed::Decided {
                 class,

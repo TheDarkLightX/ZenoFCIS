@@ -37,8 +37,8 @@ fn domains() -> [Domain; 4] {
         Domain::Int { min: -2, max: 2 },
         Domain::Int { min: 1, max: 0 },
         Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: (i64::MIN as i128),
+            max: (i64::MAX as i128),
         },
     ]
 }
@@ -46,8 +46,8 @@ fn domains() -> [Domain; 4] {
 fn all_ten_kinds_match_baseline_with_ordered_failures() {
     let refs = [0u16, 1, 2, 3, 4, u16::MAX];
     let mut ops = vec![
-        Op::Int(i64::MIN),
-        Op::Int(i64::MAX),
+        Op::Int((i64::MIN as i128)),
+        Op::Int((i64::MAX as i128)),
         Op::Bool(false),
         Op::Bool(true),
     ];
@@ -121,17 +121,17 @@ fn shape_boundaries_and_invalid_domains_match_baseline() {
                         let mut input = vec![Domain::Bool; ninput];
                         let mut output = vec![Domain::Bool; noutput];
                         let invalid = Domain::Int {
-                            min: i64::MAX,
-                            max: i64::MIN,
+                            min: (i64::MAX as i128),
+                            max: (i64::MIN as i128),
                         };
                         if variant == 1 {
                             input.fill(Domain::Int {
-                                min: i64::MIN,
-                                max: i64::MAX,
+                                min: (i64::MIN as i128),
+                                max: (i64::MAX as i128),
                             });
                             output.fill(Domain::Int {
-                                min: i64::MIN,
-                                max: i64::MAX,
+                                min: (i64::MIN as i128),
+                                max: (i64::MAX as i128),
                             });
                         }
                         if variant == 2 && !input.is_empty() {
@@ -245,15 +245,15 @@ fn program_shape_prefix_and_root_precedence_match_baseline() {
     }
     let input = vec![
         Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX
+            min: (i64::MIN as i128),
+            max: (i64::MAX as i128)
         };
         32
     ];
     let output = vec![
         Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX
+            min: (i64::MIN as i128),
+            max: (i64::MAX as i128)
         };
         16
     ];

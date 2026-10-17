@@ -61,7 +61,7 @@ impl Drop for Scratch {
 }
 
 /// Fresh process per observation schedule; its only input is source and points.
-pub(super) fn invoke(source: &str, points: &[Vec<i64>]) -> Result<Value, String> {
+pub(super) fn invoke(source: &str, points: &[Vec<i128>]) -> Result<Value, String> {
     if !crate::checker_process::contained() {
         return Err("capture-containment-unavailable".into());
     }

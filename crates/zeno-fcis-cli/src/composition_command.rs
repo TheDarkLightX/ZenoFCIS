@@ -575,7 +575,41 @@ mod tests {
                 rules: read(ring.join(leaf).join(super::RULES)),
             })
             .collect();
-        let committed = read(ring.join("composition.json"));
+        let historical = read(ring.join("composition.json"));
+        assert!(
+            checked_composition::check(CompositionSources {
+                manifest: &historical,
+                leaves: &leaves,
+                aggregate: None,
+            })
+            .is_err(),
+            "historical Authority identities must not authorize the new source"
+        );
+        let mut current: Value = serde_json::from_str(&historical).unwrap();
+        for (entry, leaf) in current["leaves"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(&leaves)
+        {
+            use zeno_fcis_contract::internals::{
+                declarations::Declarations, model::Contract, policy, rules::Rules, schema,
+                schema_commitment,
+            };
+            let rules = Rules::read(&leaf.rules).unwrap();
+            let declarations = Declarations::read(&leaf.project, &rules.leaf_bindings).unwrap();
+            let schema = schema::encode(&declarations).unwrap();
+            let contract =
+                Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap())
+                    .unwrap();
+            entry["program_sha256"] = Value::from(
+                policy::with_authority(&contract, &schema, |authority| {
+                    crate::transform::sha256_hex(authority.identity())
+                })
+                .unwrap(),
+            );
+        }
+        let committed = serde_json::to_string(&current).unwrap();
         // A name with quotes, a backslash, non-ASCII text and a control
         // character, so that both writers escape the same strings.
         let mut renamed: Value =

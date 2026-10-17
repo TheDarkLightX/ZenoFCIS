@@ -171,13 +171,13 @@ pub(crate) fn replay(
 }
 
 /// The genesis state's values, when every state field has one.
-fn genesis_values(loaded: &Loaded) -> Option<Vec<i64>> {
+fn genesis_values(loaded: &Loaded) -> Option<Vec<i128>> {
     loaded.positions[..loaded.state_width]
         .iter()
         .map(
             |position| match loaded.rules.genesis.get(&position.field?)? {
-                Constant::Bool(value) => Some(i64::from(*value)),
-                Constant::Int(value) => i64::try_from(*value).ok(),
+                Constant::Bool(value) => Some(i128::from(*value)),
+                Constant::Int(value) => i128::try_from(*value).ok(),
             },
         )
         .collect()
@@ -260,7 +260,7 @@ fn run(
     scenario: &Scenario,
     width: usize,
 ) -> Option<Failure> {
-    let mut state: Vec<i64> = scenario.steps[0].inputs[..width].to_vec();
+    let mut state: Vec<i128> = scenario.steps[0].inputs[..width].to_vec();
     for (index, step) in scenario.steps.iter().enumerate() {
         if step.inputs[..width] != state[..] {
             return Some(Failure {
@@ -290,7 +290,7 @@ fn run(
             state = step
                 .post
                 .iter()
-                .map(|value| i64::try_from(*value).unwrap_or(i64::MAX))
+                .map(|value| i128::try_from(*value).unwrap_or(i128::MAX))
                 .collect();
         }
     }

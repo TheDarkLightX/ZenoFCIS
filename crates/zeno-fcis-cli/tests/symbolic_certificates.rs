@@ -1,4 +1,4 @@
-//! Actual full-i64 certificate-command and replay qualification.
+//! Actual full-i128 certificate-command and replay qualification.
 //! These tests require the genuine pinned CVC5 and separately built Carcara
 //! wrapper. The mandatory CI/acceptance runner fails on missing configuration.
 #![cfg(target_os = "linux")]
@@ -85,8 +85,8 @@ impl Fixture {
         Self::program(
             &original,
             Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             },
             vec![Op::Input(0)],
         );
@@ -178,7 +178,7 @@ impl Drop for Fixture {
 
 #[test]
 #[ignore = "requires pinned CVC5 and independently built certificate checker"]
-fn pinned_certificate_command_checks_full_i64_replays_and_refuses_controls() {
+fn pinned_certificate_command_checks_full_i128_replays_and_refuses_controls() {
     let fixture = Fixture::new();
     let receipt = fixture.directory.join("receipt.json");
     let (exit, report) = fixture.run(
@@ -242,13 +242,13 @@ fn pinned_certificate_command_checks_full_i64_replays_and_refuses_controls() {
         bytes
     );
     eprintln!(
-        "certificate positive full-i64 and byte-identical replay: {}",
+        "certificate positive full-i128 and byte-identical replay: {}",
         sha256(&bytes)
     );
 
     let wide = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     // A genuine non-identical candidate: eliminate an unused constant node.
     // Eager execution of the constant cannot fail, and the nonbinding Step
@@ -295,7 +295,7 @@ fn pinned_certificate_command_checks_full_i64_replays_and_refuses_controls() {
     Fixture::program(
         &different,
         wide,
-        vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(0, 1)],
+        vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(0, 1)],
     );
     fixture.refuses(
         &fixture.original,
@@ -306,8 +306,8 @@ fn pinned_certificate_command_checks_full_i64_replays_and_refuses_controls() {
     Fixture::program(
         &different,
         Domain::Int {
-            min: i64::MIN + 1,
-            max: i64::MAX,
+            min: i128::MIN + 1,
+            max: i128::MAX,
         },
         vec![Op::Input(0)],
     );

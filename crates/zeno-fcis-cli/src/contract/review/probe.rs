@@ -43,7 +43,7 @@ use zeno_fcis_synthesis::finite::v2_laws::{Failure, Verdict};
 #[derive(Clone, Debug)]
 pub(crate) enum Question {
     Explain {
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     Reachable {
         state: String,
@@ -270,7 +270,7 @@ pub(super) fn conditions(
     let space = &machine.space;
     extended.bind(&extended.rules, |authority, framer| {
         let laws = LawSet::new(authority.descriptor(), &[id]);
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         Ok(parallel(space.tuples(), |ordinal| {
             let Observed::Decided {
                 class,
@@ -375,7 +375,7 @@ fn depends(
 }
 
 /// The case that decides `input` and what the Authority does with it.
-fn explain(loaded: &Loaded, input: &[i64]) -> Result<Value, ContractError> {
+fn explain(loaded: &Loaded, input: &[i128]) -> Result<Value, ContractError> {
     if input.len() != loaded.positions.len() {
         return Err(ContractError::new(
             "--input",
@@ -395,9 +395,9 @@ fn explain(loaded: &Loaded, input: &[i64]) -> Result<Value, ContractError> {
         let inside = match &position.domain {
             LeafDomain::Bool => matches!(value, 0 | 1),
             LeafDomain::Int { min, max } => (min..=max).contains(&value),
-            LeafDomain::Sum { variants, .. } => {
-                variants.iter().any(|variant| i64::from(*variant) == *value)
-            }
+            LeafDomain::Sum { variants, .. } => variants
+                .iter()
+                .any(|variant| i128::from(*variant) == *value),
         };
         if !inside {
             return Err(ContractError::new(

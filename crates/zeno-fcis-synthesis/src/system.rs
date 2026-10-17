@@ -59,22 +59,22 @@ pub enum SystemCheck {
     /// domains, so the transition fails before any property applies.
     NotTotal {
         /// First admitted input, in canonical order, without an in-domain output.
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     /// The property is false for this admitted input and the transition's
     /// output.
     Violated {
         /// First violating admitted input in canonical order.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The transition's exact output for that input.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
     /// The property traps on this admitted input and the transition's output.
     Undefined {
         /// First admitted input, in canonical order, on which the property traps.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// The transition's exact output for that input.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
 }
 
@@ -152,7 +152,7 @@ pub fn check_system_property(
         .filter(|pairs| *pairs <= limits.max_pairs)
         .ok_or(Error::Limit("system-pairs"))?;
     for input in property.input_space()? {
-        let mut output: Vec<i64> = transition.outputs().iter().map(|d| d.bounds().0).collect();
+        let mut output: Vec<i128> = transition.outputs().iter().map(|d| d.bounds().0).collect();
         loop {
             // A violating or undefined tuple that the domains admit shows that
             // the property depends on what the transition produces.
@@ -177,7 +177,7 @@ fn cardinality(domains: &[Domain]) -> Result<u64, Error> {
 }
 
 /// Steps a tuple to its lexicographic successor; false once it wraps.
-fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
+fn advance(domains: &[Domain], tuple: &mut [i128]) -> bool {
     for (value, domain) in tuple.iter_mut().zip(domains).rev() {
         let (min, max) = domain.bounds();
         if *value < max {
@@ -199,7 +199,7 @@ mod tests {
     const COUNT: Domain = Domain::Int { min: 0, max: 3 };
 
     /// Increments a counter while it is below `cap`, else keeps it.
-    fn counter(cap: i64) -> Program {
+    fn counter(cap: i128) -> Program {
         Program::try_new(
             vec![COUNT],
             vec![COUNT],

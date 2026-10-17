@@ -353,7 +353,7 @@ fn fields_json(fields: &[(u16, Atom)]) -> Value {
 }
 
 /// Input values as decimal strings.
-fn numbers(values: &[i64]) -> Value {
+fn numbers(values: &[i128]) -> Value {
     Value::Array(
         values
             .iter()

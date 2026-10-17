@@ -182,7 +182,7 @@ fn leaf(leaf: &Leaf, code: &Term) -> Result<(Values, Typed), Unsupported> {
             }
             if variants
                 .iter()
-                .all(|variant| i64::from(variant.id) == variant.code)
+                .all(|variant| i128::from(variant.id) == variant.code)
             {
                 id = code.clone();
             }

@@ -88,7 +88,7 @@ verus! {
     /// The actual returned partition has a model precisely for runtime differences.
     /// Includes declaration constraints and model existence, not only implication.
     pub(super) proof fn runtime_difference_has_model(queries: Queries,
-        original: program::Program<'_>, candidate: program::Program<'_>, raw: Seq<i64>)
+        original: program::Program<'_>, candidate: program::Program<'_>, raw: Seq<i128>)
         requires complete(queries, original, candidate),
             original.inputs@ == candidate.inputs@, original.outputs@ == candidate.outputs@,
             crate::evaluation::spec::admitted(original.inputs@, raw),
@@ -150,32 +150,37 @@ impl Queries {
             Some(domain) => Some(domain.bounds()),
             None => None,
         };
-        match first {
-            Some((min, max))
-                if i128::from(max) - i128::from(min) >= 0
-                    && i128::from(max) - i128::from(min) < MAX_CASE_PIECES as i128 =>
-            {
-                let minimum = i128::from(min);
-                let maximum = i128::from(max);
-                let mut value = minimum;
+        let span = match first {
+            Some((min, max)) => max.checked_sub(min),
+            None => None,
+        };
+        match (first, span) {
+            (Some((min, max)), Some(span)) if span >= 0 && span < MAX_CASE_PIECES as i128 => {
+                let count = span as usize + 1;
+                let mut offset = 0usize;
                 #[cfg_attr(verus_keep_ghost, verus_spec(
-                    invariant minimum <= value <= maximum + 1,
-                        i64::MIN <= minimum <= maximum <= i64::MAX,
+                    invariant offset <= count,
+                        min <= max, span as int == max as int - min as int,
+                        count as int == span as int + 1,
+                        0 < count as int <= MAX_CASE_PIECES as int,
                         spec::split(original.outputs@),
-                        spec::bounds(original.outputs@[0]) == (minimum as int, maximum as int),
-                        pieces@.len() == value - minimum,
+                        spec::bounds(original.outputs@[0]) == (min as int, max as int),
+                        pieces@.len() == offset,
                         forall|i: int| 0 <= i < pieces@.len() ==>
                             printed(#[trigger] pieces@[i]) && spec::query(pieces@[i].witness@,
                                 spec::partition_piece(original.outputs@, i as nat), original, candidate),
-                    decreases maximum - value + 1,
+                    decreases count - offset,
                 ))]
-                while value <= maximum {
+                while offset < count {
+                    // offset <= span, so this sum remains within [min, max].
+                    // Only the bounded offset advances after the final piece.
+                    let value = min + offset as i128;
                     pieces.push(construction_pieces::outputs(
                         original,
                         candidate,
                         Some(value),
                     )?);
-                    value += 1;
+                    offset += 1;
                 }
             }
             _ => {
@@ -193,5 +198,37 @@ impl Queries {
         pieces.push(construction_pieces::failure(original, candidate, false)?);
         let control = construction_pieces::control(original, candidate)?;
         Ok(Self { pieces, control })
+    }
+}
+
+#[cfg(test)]
+mod endpoint_tests {
+    use super::*;
+    use zeno_fcis_synthesis::finite::{Domain, Op, Program as OwnedProgram};
+
+    #[test]
+    fn partitions_cover_both_i128_endpoints_and_overflowing_spans() {
+        for (min, max, count) in [
+            (i128::MIN, i128::MIN, 3),
+            (i128::MAX, i128::MAX, 3),
+            (i128::MIN, i128::MIN + 2, 5),
+            (i128::MAX - 2, i128::MAX, 5),
+            (i128::MIN, i128::MAX, 3),
+        ] {
+            let owned = OwnedProgram::try_new(
+                vec![Domain::Int {
+                    min: i128::MIN,
+                    max: i128::MAX,
+                }],
+                vec![Domain::Int { min, max }],
+                vec![Op::Input(0)],
+                vec![0],
+            )
+            .unwrap_or_else(|error| panic!("partition fixture: {error:?}"));
+            let borrowed = program::Program::of(&owned);
+            let queries = Queries::build(borrowed, borrowed)
+                .unwrap_or_else(|error| panic!("partition construction: {error:?}"));
+            assert_eq!(queries.pieces.len(), count, "{min}..={max}");
+        }
     }
 }

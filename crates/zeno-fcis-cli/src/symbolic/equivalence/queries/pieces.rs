@@ -39,7 +39,7 @@ pub(super) fn outputs(
     script.assert(Term::not(same(&left, &right)));
     #[cfg(verus_keep_ghost)]
     proof! {
-        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i128>|
             spec::context(script, original, candidate, raw, environment) implies
                 spec::assertions_hold(script, environment) == spec::expected(
                     spec::Piece::Outputs(match first { Some(value) => Some(value as int), None => None }),
@@ -117,7 +117,7 @@ pub(super) fn failure(
     }
     #[cfg(verus_keep_ghost)]
     proof! {
-        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i128>|
             spec::context(script, original, candidate, raw, environment) implies
                 spec::assertions_hold(script, environment) == spec::expected(
                     if arithmetic { spec::Piece::Arithmetic } else { spec::Piece::OutputDomain },
@@ -178,7 +178,7 @@ pub(super) fn control(
     }
     #[cfg(verus_keep_ghost)]
     proof! {
-        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, Value>, raw: Seq<i128>|
             spec::context(script, original, candidate, raw, environment) implies
                 spec::assertions_hold(script, environment)
                     == spec::expected(spec::Piece::Control, original, candidate, raw) by {

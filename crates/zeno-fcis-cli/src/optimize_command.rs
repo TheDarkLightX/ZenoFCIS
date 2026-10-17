@@ -42,7 +42,7 @@ pub(super) struct Arguments {
     /// Artifact profile every candidate must stay within; instructions
     /// outside it are never proposed or extracted. A strategy naming another
     /// profile is refused.
-    #[arg(long, value_parser = ["functional-bool-v1", "checked-i64-v1"])]
+    #[arg(long, value_parser = ["functional-bool-v1", "checked-i128-v1"])]
     profile: Option<String>,
     /// A canonical program claimed equivalent to the original, to fuse into
     /// the search (repeatable, at most 8). Each is checked against the

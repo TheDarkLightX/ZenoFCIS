@@ -51,7 +51,7 @@ pub(crate) struct Assessment {
     pub(crate) ready: bool,
     pub(crate) generated: GeneratedContract,
     pub(crate) examples: String,
-    pub(crate) questions: BTreeSet<Vec<i64>>,
+    pub(crate) questions: BTreeSet<Vec<i128>>,
 }
 
 pub(crate) fn hash(bytes: &[u8]) -> String {
@@ -335,12 +335,12 @@ impl Draft {
             let values = witness["input"]
                 .as_array()
                 .ok_or("review witness lacks input")?;
-            let input: Vec<i64> = values
+            let input: Vec<i128> = values
                 .iter()
                 .map(|v| {
                     v.as_str()
                         .ok_or("review input is not decimal".to_owned())
-                        .and_then(|s| s.parse::<i64>().map_err(|e| e.to_string()))
+                        .and_then(|s| s.parse::<i128>().map_err(|e| e.to_string()))
                 })
                 .collect::<Result<_, _>>()?;
             if questions.insert(input.clone()) {
@@ -351,7 +351,7 @@ impl Draft {
                 );
             }
         }
-        let covered: BTreeSet<Vec<i64>> = labels.iter().map(|l| l.input.clone()).collect();
+        let covered: BTreeSet<Vec<i128>> = labels.iter().map(|l| l.input.clone()).collect();
         let missing: Vec<_> = questions.difference(&covered).cloned().collect();
         let ready = !labels.is_empty() && missing.is_empty() && reviewed.summary().findings == 0;
         let report = json!({"shape": shape, "proposal": proposal.id, "ready": ready,

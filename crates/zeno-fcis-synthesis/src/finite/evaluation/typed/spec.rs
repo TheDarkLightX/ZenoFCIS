@@ -3,7 +3,7 @@ use super::super::Failure as LegacyFailure;
 use super::*;
 use vstd::prelude::*;
 verus! {
-pub(crate) open spec fn lift<'a>(values:Seq<i64>)->Seq<Atom<'a>> {
+pub(crate) open spec fn lift<'a>(values:Seq<i128>)->Seq<Atom<'a>> {
     Seq::new(values.len(), |i:int| Atom::I128(values[i] as i128))
 }
 impl<'s,'a> Values<'s,'a> {
@@ -22,8 +22,8 @@ pub(crate) open spec fn boolean(e:BooleanEncoding,v:bool)->Atom<'static> {
     match e {BooleanEncoding::TypedBool=>Atom::Bool(v),
         BooleanEncoding::LegacyInteger01=>Atom::I128(if v {1} else {0})}
 }
-pub(crate) open spec fn project(v:Atom)->Option<i64> {
-    match v {Atom::I128(n)=>if i64::MIN<=n<=i64::MAX {Some(n as i64)} else {None},_=>None}
+pub(crate) open spec fn project(v:Atom)->Option<i128> {
+    match v {Atom::I128(n)=>if i128::MIN<=n<=i128::MAX {Some(n as i128)} else {None},_=>None}
 }
 pub(crate) open spec fn legacy_instruction(op:Op)->Instruction {
     let e=BooleanEncoding::LegacyInteger01;
@@ -31,17 +31,18 @@ pub(crate) open spec fn legacy_instruction(op:Op)->Instruction {
         Op::Input(i)=>Instruction::Input(i),
         Op::Int(v)=>Instruction::Literal(Atom::I128(v as i128),Kind::Signed),
         Op::Bool(v)=>Instruction::Literal(Atom::I128(if v {1} else {0}),Kind::Bool),
-        Op::Add(a,b)=>Instruction::Arithmetic(IntegerWidth::Signed64,ArithmeticOp::Add,a,b),
-        Op::Sub(a,b)=>Instruction::Arithmetic(IntegerWidth::Signed64,ArithmeticOp::Sub,a,b),
+        Op::Add(a,b)=>Instruction::Arithmetic(IntegerWidth::Signed128,ArithmeticOp::Add,a,b),
+        Op::Sub(a,b)=>Instruction::Arithmetic(IntegerWidth::Signed128,ArithmeticOp::Sub,a,b),
         Op::Eq(a,b)=>Instruction::Eq(e,a,b),Op::Lt(a,b)=>Instruction::Lt(e,a,b),
         Op::And(a,b)=>Instruction::And(e,a,b),Op::Not(a)=>Instruction::Not(e,a),
         Op::Select(c,a,b)=>Instruction::Select(e,c,a,b),
-        Op::Mul(a,b)=>Instruction::ScalarMul(a,b),
-        Op::DivFloor(a,b)=>Instruction::ScalarDiv(false,a,b),
-        Op::DivCeil(a,b)=>Instruction::ScalarDiv(true,a,b),
-        Op::MulDivFloor(a,b,d)=>Instruction::ScalarMulDiv(false,a,b,d),
-        Op::MulDivCeil(a,b,d)=>Instruction::ScalarMulDiv(true,a,b,d),
-        Op::ProductsGe(a,b)=>Instruction::ScalarProductsGe(a,b),
+        Op::Mul(a,b)=>Instruction::ScalarMul(IntegerWidth::Signed128,a,b),
+        Op::DivFloor(a,b)=>Instruction::ScalarDiv(IntegerWidth::Signed128,false,a,b),
+        Op::DivCeil(a,b)=>Instruction::ScalarDiv(IntegerWidth::Signed128,true,a,b),
+        Op::MulDivFloor(a,b,d)=>Instruction::ScalarMulDiv(IntegerWidth::Signed128,false,a,b,d),
+        Op::MulDivCeil(a,b,d)=>Instruction::ScalarMulDiv(IntegerWidth::Signed128,true,a,b,d),
+        Op::ProductsGe(a,b)=>Instruction::ScalarProductsGe(e,a,b),
+        Op::SignedMulDivFloor(a,b,d)=>Instruction::SignedMulDivFloor(a,b,d),
     }
 }
 pub(crate) open spec fn typed_instruction(op:NumericOp)->Instruction {
@@ -59,9 +60,22 @@ pub(crate) open spec fn typed_instruction(op:NumericOp)->Instruction {
         NumericOp::MulDivFloor(a,b,den)=>Instruction::MulDiv(false,a,b,den),
         NumericOp::MulDivCeil(a,b,den)=>Instruction::MulDiv(true,a,b,den),
         NumericOp::ProductsGe(left,right)=>Instruction::ProductsGe(left,right),
+        NumericOp::SignedMulDivFloor(a,b,d)=>Instruction::SignedMulDivFloor(a,b,d),
+        NumericOp::Mul(w,a,b)=>Instruction::ScalarMul(w,a,b),
+        NumericOp::DivFloor(w,a,b)=>Instruction::ScalarDiv(w,false,a,b),
+        NumericOp::DivCeil(w,a,b)=>Instruction::ScalarDiv(w,true,a,b),
+        NumericOp::NonnegativeMulDivFloor(w,a,b,d)=>Instruction::ScalarMulDiv(w,false,a,b,d),
+        NumericOp::NonnegativeMulDivCeil(w,a,b,d)=>Instruction::ScalarMulDiv(w,true,a,b,d),
+        NumericOp::NonnegativeProductsGe(a,b)=>Instruction::ScalarProductsGe(e,a,b),
     }
 }
-pub(crate) open spec fn scalar_result<'a>(value:Option<i64>)->Result<Atom<'a>,Failure> {
+pub(crate) open spec fn project_width(w:IntegerWidth,v:Atom)->Option<i128> {
+    match v {Atom::I128(n)=>if w==IntegerWidth::Signed128 || (w==IntegerWidth::Signed64 && i64::MIN<=n<=i64::MAX) {Some(n)}else{None},_=>None}
+}
+pub(crate) open spec fn width_result(w:IntegerWidth,v:Option<i128>)->Result<Atom<'static>,Failure> {
+    match v {Some(n)=>match project_width(w,Atom::I128(n)){Some(n)=>Ok(Atom::I128(n)),None=>Err(Failure::Arithmetic)},None=>Err(Failure::Arithmetic)}
+}
+pub(crate) open spec fn scalar_result<'a>(value:Option<i128>)->Result<Atom<'a>,Failure> {
     match value {Some(v)=>Ok(Atom::I128(v as i128)),None=>Err(Failure::Arithmetic)}
 }
 pub(crate) open spec fn node<'a>(op:Instruction,input:Seq<Atom<'a>>,values:Seq<Atom<'a>>)->Result<Atom<'a>,Failure> {
@@ -70,25 +84,29 @@ pub(crate) open spec fn node<'a>(op:Instruction,input:Seq<Atom<'a>>,values:Seq<A
             None=>Err(Failure::Reference),Some(v)=>if kind(v).is_some(){Ok(v)}else{Err(Failure::Kind)},
         },
         Instruction::Literal(v,_)=>Ok(v),
-        Instruction::ScalarMul(a,b)|Instruction::ScalarDiv(_,a,b)=>match(at(values,a as nat),at(values,b as nat)) {
-            (Some(a),Some(b))=>match(project(a),project(b)) {
-                (Some(a),Some(b))=>scalar_result(match op {
+        Instruction::ScalarMul(w,a,b)|Instruction::ScalarDiv(w,_,a,b)=>match(at(values,a as nat),at(values,b as nat)) {
+            (Some(a),Some(b))=>if project(a).is_none() || project(b).is_none(){Err(Failure::Kind)}else{match(project_width(w,a),project_width(w,b)) {
+                (Some(a),Some(b))=>width_result(w,match op {
                     Instruction::ScalarMul(..)=>value::scalar::multiply_value(a,b),
-                    Instruction::ScalarDiv(up,_,_)=>value::scalar::division_value(up,a,b),_=>None,
+                    Instruction::ScalarDiv(_,up,_,_)=>value::scalar::division_value(up,a,b),_=>None,
                 }),_=>Err(Failure::Arithmetic),
+            }},_=>Err(Failure::Reference),
+        },
+        Instruction::ScalarMulDiv(w,up,a,b,d)=>match(at(values,a as nat),at(values,b as nat),at(values,d as nat)) {
+            (Some(a),Some(b),Some(d))=>if project(a).is_none() || project(b).is_none() || project(d).is_none(){Err(Failure::Kind)}else{match(project_width(w,a),project_width(w,b),project_width(w,d)) {
+                (Some(a),Some(b),Some(d))=>width_result(w,value::scalar::mul_div_value(up,a,b,d)),_=>Err(Failure::Arithmetic),
+            }},_=>Err(Failure::Reference),
+        },
+        Instruction::ScalarProductsGe(e,a,b)=>match(at(values,a[0] as nat),at(values,a[1] as nat),at(values,a[2] as nat),at(values,b[0] as nat),at(values,b[1] as nat),at(values,b[2] as nat)) {
+            (Some(a),Some(b),Some(c),Some(d),Some(e1),Some(f))=>match(project(a),project(b),project(c),project(d),project(e1),project(f)) {
+                (Some(a),Some(b),Some(c),Some(d),Some(e1),Some(f))=>match value::scalar::products_ge_value(a,b,c,d,e1,f) {
+                    Some(v)=>Ok(boolean(e,v)),None=>Err(Failure::Arithmetic),
+                },_=>Err(Failure::Kind),
             },_=>Err(Failure::Reference),
         },
-        Instruction::ScalarMulDiv(up,a,b,d)=>match(at(values,a as nat),at(values,b as nat),at(values,d as nat)) {
-            (Some(a),Some(b),Some(d))=>match(project(a),project(b),project(d)) {
-                (Some(a),Some(b),Some(d))=>scalar_result(value::scalar::mul_div_value(up,a,b,d)),_=>Err(Failure::Arithmetic),
-            },_=>Err(Failure::Reference),
-        },
-        Instruction::ScalarProductsGe(a,b)=>match(at(values,a[0] as nat),at(values,a[1] as nat),at(values,a[2] as nat),at(values,b[0] as nat),at(values,b[1] as nat),at(values,b[2] as nat)) {
-            (Some(a),Some(b),Some(c),Some(d),Some(e),Some(f))=>match(project(a),project(b),project(c),project(d),project(e),project(f)) {
-                (Some(a),Some(b),Some(c),Some(d),Some(e),Some(f))=>match value::scalar::products_ge_value(a,b,c,d,e,f) {
-                    Some(v)=>Ok(boolean(BooleanEncoding::LegacyInteger01,v)),None=>Err(Failure::Arithmetic),
-                },_=>Err(Failure::Arithmetic),
-            },_=>Err(Failure::Reference),
+        Instruction::SignedMulDivFloor(a,b,d)=>match(at(values,a as nat),at(values,b as nat),at(values,d as nat)) {
+            (Some(Atom::I128(a)),Some(Atom::I128(b)),Some(Atom::I128(d)))=>scalar_result(value::scalar::signed_mul_div_floor_value(a,b,d)),
+            (Some(_),Some(_),Some(_))=>Err(Failure::Kind),_=>Err(Failure::Reference),
         },
         Instruction::MulDiv(up,a,b,den)=>match(at(values,a as nat),at(values,b as nat),at(values,den as nat)) {
             (Some(Atom::U128(a)),Some(Atom::U128(b)),Some(Atom::U128(den)))=>{
@@ -138,14 +156,14 @@ pub(crate) open spec fn node<'a>(op:Instruction,input:Seq<Atom<'a>>,values:Seq<A
         },
     }
 }
-pub(crate) open spec fn project_result(result:Result<Atom,Failure>)->Result<i64,LegacyFailure> {
+pub(crate) open spec fn project_result(result:Result<Atom,Failure>)->Result<i128,LegacyFailure> {
     match result {
         Ok(v)=>match project(v){Some(n)=>Ok(n),None=>Err(LegacyFailure::Arithmetic)},
         Err(Failure::Reference)=>Err(LegacyFailure::Reference),
         Err(_)=>Err(LegacyFailure::Arithmetic),
     }
 }
-pub(crate) proof fn legacy_node_embedding(op:Op,input:Seq<i64>,values:Seq<i64>)
+pub(crate) proof fn legacy_node_embedding(op:Op,input:Seq<i128>,values:Seq<i128>)
     ensures project_result(node(legacy_instruction(op),lift(input),lift(values)))
         == super::super::spec::node(op,input,values),
         match node(legacy_instruction(op),lift(input),lift(values)) {
@@ -155,7 +173,7 @@ pub(crate) proof fn legacy_node_embedding(op:Op,input:Seq<i64>,values:Seq<i64>)
     match op {
         Op::Add(a,b)|Op::Sub(a,b)=>{
             if a<values.len()&&b<values.len() {
-                value::spec::legacy_embedding(if matches!(op,Op::Add(..)){ArithmeticOp::Add}else{ArithmeticOp::Sub},values[a as int],values[b as int]);
+                value::spec::scalar_embedding(if matches!(op,Op::Add(..)){ArithmeticOp::Add}else{ArithmeticOp::Sub},values[a as int],values[b as int]);
             }
         },
         Op::Input(_)=>{}, Op::Int(_)=>{}, Op::Bool(_)=>{},
@@ -165,6 +183,7 @@ pub(crate) proof fn legacy_node_embedding(op:Op,input:Seq<i64>,values:Seq<i64>)
         Op::DivFloor(a,b)=>{}, Op::DivCeil(a,b)=>{},
         Op::MulDivFloor(a,b,d)=>{}, Op::MulDivCeil(a,b,d)=>{},
         Op::ProductsGe(a,b)=>{},
+        Op::SignedMulDivFloor(..)=>{},
     }
 }
 }

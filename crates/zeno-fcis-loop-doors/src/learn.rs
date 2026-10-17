@@ -189,8 +189,8 @@ fn full_domain(kind: Kind) -> Domain {
     match kind {
         Kind::Bool => Domain::Bool,
         Kind::Int => Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     }
 }
@@ -199,7 +199,7 @@ fn full_domain(kind: Kind) -> Domain {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Observation {
     /// Successful scalar result.
-    Value(i64),
+    Value(i128),
     /// Eager checked-arithmetic failure, including an unselected argument.
     Arithmetic,
     /// A root value outside this output's declared domain.
@@ -210,9 +210,9 @@ pub enum Observation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Example {
     /// Complete input tuple.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Complete successful output tuple.
-    pub output: Vec<i64>,
+    pub output: Vec<i128>,
 }
 
 /// Complete owned declaration, independent of an original or hidden core.
@@ -225,7 +225,7 @@ pub struct Specification {
     /// Output domains.
     pub outputs: Vec<Domain>,
     /// Declared integer leaves; Boolean leaves come from Boolean inputs.
-    pub constants: Vec<i64>,
+    pub constants: Vec<i128>,
     /// Declared operation order breaks equal-size ties deterministically.
     pub operations: Vec<Operation>,
     /// Maximum vocabulary expression size, including leaves.
@@ -404,7 +404,7 @@ impl Budget {
 #[derive(Clone, Debug)]
 enum Term {
     Input(usize),
-    Constant(i64),
+    Constant(i128),
     Apply(Operation, Vec<usize>),
 }
 struct Meaning {
@@ -515,7 +515,7 @@ impl Pool {
                 budget.allocate(cells as u64)?;
                 let mut table = Vec::with_capacity(cells);
                 for j in 0..cells {
-                    let values: Option<Vec<i64>> = args
+                    let values: Option<Vec<i128>> = args
                         .iter()
                         .map(|id| match self.entries[*id].table[j] {
                             Observation::Value(v) => Some(v),
@@ -683,7 +683,7 @@ pub struct Bucket {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Question {
     /// Complete input tuple in domain order.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Input ordinal, last input fastest.
     pub ordinal: usize,
     /// Ordered buckets per output; the joint partition is their product.
@@ -724,7 +724,7 @@ pub struct Analysis {
     pub candidate: Option<Program>,
 }
 
-fn ordinal(point: &[i64], domains: &[Domain]) -> Result<usize, Stop> {
+fn ordinal(point: &[i128], domains: &[Domain]) -> Result<usize, Stop> {
     let mut n = 0u128;
     for (v, d) in point.iter().zip(domains) {
         n = n
@@ -793,7 +793,7 @@ fn minimum_core(
 // BEGIN typed strategy corpus producer interface (merge with strategy consumer).
 /// Owned full-domain terms for typed case composition; no checker authority.
 pub struct StrategyTermsV1 {
-    /// Integer terms with full i64 output, in declared size/tie order.
+    /// Integer terms with full i128 output, in declared size/tie order.
     pub integers: Vec<Program>,
     /// Nontrapping Boolean predicates, in declared size/tie order.
     pub predicates: Vec<Program>,
@@ -804,7 +804,7 @@ struct Enumeration {
     vocab: Vocabulary,
     cells: usize,
     pool: Pool,
-    columns: Vec<Vec<i64>>,
+    columns: Vec<Vec<i128>>,
 }
 
 fn enumerate_for_analysis(spec: &Specification, budget: &mut Budget) -> Result<Enumeration, Stop> {
@@ -1174,7 +1174,7 @@ pub enum ExampleCheck {
         /// Number evaluated, including the failing example.
         checked: usize,
         /// Successful values, or no values on library failure.
-        actual: Option<Vec<i64>>,
+        actual: Option<Vec<i128>>,
     },
 }
 
@@ -1228,8 +1228,8 @@ mod strategy_corpus_tests {
             names: vec!["x".into()],
             inputs: vec![Domain::Int { min: 0, max: 3 }],
             outputs: vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             constants: vec![0, 2, 7],
             operations: vec![Operation::Lt, Operation::Eq],

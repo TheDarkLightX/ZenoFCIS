@@ -28,7 +28,7 @@ pub(crate) struct Program<'a> {
 pub(crate) struct Encoded {
     /// Each output's wire value, Booleans as 0 and 1.
     pub(crate) outputs: Vec<Term>,
-    /// True when some checked addition or subtraction leaves the `i64` range:
+    /// True when some checked addition or subtraction leaves the `i128` range:
     /// the evaluator's `Arithmetic` failure.
     pub(crate) trap: Term,
     /// True when every output lies in its declared domain. The evaluator
@@ -127,7 +127,7 @@ impl Encoded {
         Ok(encoded) => encoded.outputs@.len() == program.outputs@.len()
             && bridge::block(final(script).definitions@, old(script).definitions@.len(),
             prefix@, program.inputs@, program.nodes@, input@)
-            && (forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i64>|
+            && (forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i128>|
                 node::input_values(program.inputs@, input@, raw, environment)
                     && crate::script::spec::definitions_hold(final(script).definitions@,
                         old(script).definitions@.len(), program.nodes@.len(), environment) ==>
@@ -199,7 +199,7 @@ pub(crate) fn encode(
         assert(terms@.subrange(0, program.nodes@.len() as int) =~= terms@);
         assert(guards@.0.subrange(0, nodes::spec::guards(program.nodes@, program.nodes@.len()) as int)
             =~= guards@.0);
-        assert forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i128>|
             node::input_values(program.inputs@, input@, raw, environment)
                 && crate::script::spec::definitions_hold(script.definitions@,
                     base@, program.nodes@.len(), environment) implies
@@ -244,10 +244,7 @@ pub(crate) fn encode(
 pub(crate) fn input_values(domain: Domain) -> Result<Values, Unsupported> {
     match domain {
         Domain::Bool => Ok(Values::Range { min: 0, max: 1 }),
-        Domain::Int { min, max } => Ok(Values::Range {
-            min: i128::from(min),
-            max: i128::from(max),
-        }),
+        Domain::Int { min, max } => Ok(Values::Range { min, max }),
         _ => Err(Unsupported::new(
             "an input domain this encoding does not know",
         )),

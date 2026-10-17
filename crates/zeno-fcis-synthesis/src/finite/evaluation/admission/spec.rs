@@ -43,7 +43,7 @@ pub(crate) open spec fn kind(op: Op, inputs: Seq<Domain>, previous: Seq<bool>)
             else if previous[b as int] { Err(AdmissionFailure::TypeMismatch) }
             else { Ok(matches!(op, Op::Lt(..))) }
         },
-        Op::MulDivFloor(a,b,d) | Op::MulDivCeil(a,b,d) => {
+        Op::MulDivFloor(a,b,d) | Op::MulDivCeil(a,b,d) | Op::SignedMulDivFloor(a,b,d) => {
             match required_node(previous,a,false) { Err(e)=>Err(e), Ok(())=>
             match required_node(previous,b,false) { Err(e)=>Err(e), Ok(())=>
             match required_node(previous,d,false) { Err(e)=>Err(e), Ok(())=>Ok(false) } } }

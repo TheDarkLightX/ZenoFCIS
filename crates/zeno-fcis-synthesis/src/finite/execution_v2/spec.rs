@@ -36,8 +36,8 @@ pub(super) open spec fn scalar_failure(error: ScalarFailure) -> Failure {
 }
 
 pub(super) open spec fn prefix(
-    nodes: Seq<Op>, input: Seq<i64>, count: nat, limits: Seq<u64>, used: Seq<u64>,
-) -> (Result<Seq<i64>, Failure>, Seq<u64>)
+    nodes: Seq<Op>, input: Seq<i128>, count: nat, limits: Seq<u64>, used: Seq<u64>,
+) -> (Result<Seq<i128>, Failure>, Seq<u64>)
     recommends count <= nodes.len(), limits.len() == 8, used.len() == 8,
     decreases count,
 {
@@ -61,7 +61,7 @@ pub(super) open spec fn prefix(
 }
 
 pub(super) proof fn failure_persists(
-    nodes: Seq<Op>, input: Seq<i64>, failed: nat, count: nat,
+    nodes: Seq<Op>, input: Seq<i128>, failed: nat, count: nat,
     limits: Seq<u64>, used: Seq<u64>, error: Failure,
 )
     requires failed <= count <= nodes.len(),
@@ -77,8 +77,8 @@ pub(super) proof fn failure_persists(
 
 pub(super) open spec fn execution(
     inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>,
-    input: Seq<i64>, limits: Seq<u64>, used: Seq<u64>,
-) -> (Result<Seq<i64>, Failure>, Seq<u64>) {
+    input: Seq<i128>, limits: Seq<u64>, used: Seq<u64>,
+) -> (Result<Seq<i128>, Failure>, Seq<u64>) {
     if !scalar::admitted(inputs, input) { (Err(Failure::InputDomain), used) }
     else {
         let evaluated = prefix(nodes, input, nodes.len(), limits, used);

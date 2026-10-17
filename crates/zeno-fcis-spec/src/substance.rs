@@ -275,6 +275,9 @@ fn value_reads(expr: &ValueExpr, scope: ReadScope) -> bool {
         | ValueExpr::Sub(left, right)
         | ValueExpr::Mul(left, right)
         | ValueExpr::Div(_, left, right) => value_reads(left, scope) || value_reads(right, scope),
+        ValueExpr::SignedMulDivFloor(a, b, d) => {
+            value_reads(a, scope) || value_reads(b, scope) || value_reads(d, scope)
+        }
         ValueExpr::Sum { body, .. } => value_reads(body, scope),
         ValueExpr::MulDiv(_, a, b, d) => {
             value_reads(a, scope) || value_reads(b, scope) || value_reads(d, scope)

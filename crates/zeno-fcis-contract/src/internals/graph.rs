@@ -37,6 +37,7 @@ pub enum Op {
     ToI128(usize),
     ToU128(usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
 }
 
@@ -88,6 +89,7 @@ pub enum LawOp {
     ToI128(usize),
     ToU128(usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
@@ -99,13 +101,14 @@ pub enum LawOp {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ScalarOp {
     Input(usize),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
     Mul(usize, usize),
     Div(Rounding, usize, usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
@@ -196,13 +199,7 @@ pub trait Graph {
             Ast::Name(name) => self.name(name),
             Ast::DecisionReason => self.decision_reason(),
             Ast::Neg(inner) => {
-                // MIN is a legal i64 literal although its positive magnitude is
-                // not. Keep the old lowering for every previously admitted negation.
-                if matches!(inner.as_ref(), Ast::Int(v) if *v == i64::MAX as i128 + 1)
-                    && Self::int_node(i64::MAX as i128 + 1).is_err()
-                {
-                    return self.int(i64::MIN as i128);
-                }
+                // The parser admits MIN directly; every other negation remains eager.
                 let zero = self.int(0)?;
                 let inner = self.compile(inner)?;
                 let inner = self.numeric(inner)?;
@@ -231,6 +228,15 @@ pub trait Graph {
                 let left = self.compile(left)?;
                 let right = self.compile(right)?;
                 self.binary(*operator, left, right)
+            }
+            Ast::SignedMulDivFloor(a, b, d) => {
+                let a = self.compile(a)?;
+                let a = self.numeric(a)?;
+                let b = self.compile(b)?;
+                let b = self.numeric(b)?;
+                let d = self.compile(d)?;
+                let d = self.numeric(d)?;
+                self.op(Op::SignedMulDivFloor(a.index, b.index, d.index), Kind::Int)
             }
             Ast::MulDiv(rounding, a, b, d) => {
                 let a = self.compile(a)?;
@@ -356,9 +362,7 @@ impl Graph for ScalarGraph<'_> {
     }
 
     fn int_node(value: i128) -> Result<ScalarOp, String> {
-        i64::try_from(value)
-            .map(ScalarOp::Int)
-            .map_err(|_| format!("decision integer {value} exceeds the 64-bit program range"))
+        Ok(ScalarOp::Int(value))
     }
 
     fn op_node(op: Op) -> Result<ScalarOp, String> {
@@ -372,6 +376,7 @@ impl Graph for ScalarGraph<'_> {
             Op::Select(c, a, b) => ScalarOp::Select(c, a, b),
             Op::Mul(a, b) => ScalarOp::Mul(a, b),
             Op::Div(r, a, b) => ScalarOp::Div(r, a, b),
+            Op::SignedMulDivFloor(a, b, d) => ScalarOp::SignedMulDivFloor(a, b, d),
             Op::MulDiv(r, a, b, d) => ScalarOp::MulDiv(r, a, b, d),
             Op::ProductsGe(a, b) => ScalarOp::ProductsGe(a, b),
             Op::ToU128(_) => {
@@ -560,6 +565,7 @@ impl Graph for LawGraph<'_> {
             Op::Select(c, a, b) => LawOp::Select(c, a, b),
             Op::ToI128(a) => LawOp::ToI128(a),
             Op::ToU128(a) => LawOp::ToU128(a),
+            Op::SignedMulDivFloor(a, b, d) => LawOp::SignedMulDivFloor(a, b, d),
             Op::MulDiv(r, a, b, d) => LawOp::MulDiv(r, a, b, d),
             Op::ProductsGe(a, b) => LawOp::ProductsGe(a, b),
         })

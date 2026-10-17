@@ -401,7 +401,7 @@ pub(super) struct Task {
     pub(super) binding: Value,
     expressions: Vec<Expr>,
     vocabulary: Option<VocabularySpec>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     candidate: Option<Program>,
 }
 

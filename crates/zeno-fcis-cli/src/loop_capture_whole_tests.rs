@@ -242,3 +242,27 @@ fn whole_capture_splits_an_encoding_that_exceeds_the_existing_node_cap() {
         "oversized lookup was not split"
     );
 }
+
+#[test]
+fn whole_capture_keeps_wide_arithmetic_and_reference_work() {
+    let wide = 1i128 << 63;
+    let domain = Domain::Int {
+        min: wide,
+        max: wide + 1,
+    };
+    let skeleton = ok(Program::try_new(
+        vec![domain],
+        vec![domain],
+        vec![Op::Input(0)],
+        vec![0],
+    ));
+    let expressions = ok(serde_json::to_vec(&json!({
+        "schema":"zeno-fcis/capture-expressions/1",
+        "outputs":["products_ge(x0, 3, x0, 3) ? mul_div_floor(x0, 3, 3) : 0"],
+    })));
+    let reference = ok(proposed_program_for_abi(&expressions, true, &skeleton));
+    assert_eq!(ok(reference.evaluate(&[wide])), vec![wide]);
+    let result = ok(complete(&reference, &reference));
+    assert_eq!(result["coverage"]["checked"], 2);
+    assert_eq!(result["coverage"]["complete"], true);
+}

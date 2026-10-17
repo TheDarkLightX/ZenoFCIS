@@ -150,7 +150,7 @@ fn constant_bool(nodes: &[Op], id: u16) -> Option<bool> {
     }
 }
 
-fn constant_int(nodes: &[Op], id: u16) -> Option<i64> {
+fn constant_int(nodes: &[Op], id: u16) -> Option<i128> {
     match nodes.get(usize::from(id)) {
         Some(Op::Int(value)) => Some(*value),
         _ => None,
@@ -255,7 +255,7 @@ fn simplify_op(op: Op, nodes: &[Op]) -> Simplified {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Key {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(u16, u16),
     Sub(u16, u16),

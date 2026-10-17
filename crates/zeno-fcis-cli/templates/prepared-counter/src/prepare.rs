@@ -134,11 +134,11 @@ impl PreparedBatch {
         ))?;
         let items = [command.first.0, command.second.0, command.third.0]
             .into_iter()
-            .map(|delta| checked(i64::try_from(delta)).map(|value| vec![value]))
+            .map(|delta| checked(i64::try_from(delta)).map(|value| vec![i128::from(value)]))
             .collect::<AppResult<Vec<_>>>()?;
         let fold = checked(continuation::start(
             graph,
-            vec![checked(i64::try_from(state.count.0))?],
+            vec![i128::from(checked(i64::try_from(state.count.0))?)],
             items,
             context(snapshot, &command_bytes, &context_bytes, replay)?,
             continuation::PreparationLimits {

@@ -2,7 +2,7 @@
 //!
 //! `tests/data/NAME.original.zcve` was written by `zeno-fcis contract
 //! export-program` for the instance `NAME` of `core-components/`, and
-//! `NAME.optimized.zcve` by `zeno-fcis optimize --profile checked-i64-v1` on
+//! `NAME.optimized.zcve` by `zeno-fcis optimize --profile checked-i128-v1` on
 //! it. The oracle is the library evaluator, through `Program::evaluate`.
 
 use zeno_fcis_program_search::{Outcome, Proposers, Settings, search};
@@ -14,10 +14,22 @@ fn fixture(name: &str, kind: &str) -> Vec<u8> {
         "{}/tests/data/{name}.{kind}.zcve",
         env!("CARGO_MANIFEST_DIR")
     );
-    match std::fs::read(&path) {
-        Ok(bytes) => bytes,
-        Err(error) => panic!("{path}: {error}"),
-    }
+    let historical = std::fs::read(&path).unwrap_or_else(|error| panic!("{path}: {error}"));
+    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(&historical).unwrap();
+    assert_eq!(old.value().unwrap().zcve_bytes().unwrap(), historical);
+    let profile = old.profile().as_bytes();
+    assert_eq!(
+        &historical[..10],
+        &[8, 0, 0, 0, 4, 6, 0, 0, 0, profile.len() as u8]
+    );
+    assert_eq!(&historical[10..10 + profile.len()], profile);
+    // A fresh current-route graph for proposer qualification. The retained
+    // source fixture stays on the legacy replay route.
+    let mut bytes = historical[..10].to_vec();
+    bytes[9] += 1;
+    bytes.extend_from_slice(old.profile().replace("i64", "i128").as_bytes());
+    bytes.extend_from_slice(&historical[10 + profile.len()..]);
+    bytes
 }
 
 fn import(bytes: &[u8]) -> Program {
@@ -27,7 +39,7 @@ fn import(bytes: &[u8]) -> Program {
     }
 }
 
-fn tuples(inputs: &[Domain]) -> Vec<Vec<i64>> {
+fn tuples(inputs: &[Domain]) -> Vec<Vec<i128>> {
     let mut all = vec![Vec::new()];
     for domain in inputs {
         let (min, max) = domain.bounds();
@@ -45,7 +57,7 @@ fn tuples(inputs: &[Domain]) -> Vec<Vec<i64>> {
     all
 }
 
-fn table(program: &Program) -> Vec<Result<Vec<i64>, String>> {
+fn table(program: &Program) -> Vec<Result<Vec<i128>, String>> {
     tuples(program.inputs())
         .iter()
         .map(|tuple| {

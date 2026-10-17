@@ -120,7 +120,7 @@ struct Target<'a> {
 /// A replayed tuple and what the library made of it.
 #[derive(Clone, Debug)]
 struct Witness {
-    tuple: Vec<i64>,
+    tuple: Vec<i128>,
     case: Option<usize>,
     post: Vec<(u16, i128)>,
     target: Option<&'static str>,
@@ -435,7 +435,7 @@ impl Context<'_> {
     }
 
     /// The genesis state, with every other input at its domain's least value.
-    fn genesis_tuple(&self) -> Vec<i64> {
+    fn genesis_tuple(&self) -> Vec<i128> {
         self.positions
             .iter()
             .map(|position| {
@@ -446,9 +446,9 @@ impl Context<'_> {
                         .iter()
                         .find(|(id, _)| *id == field)
                         .and_then(|(_, atom)| match atom {
-                            Atom::Bool(value) => Some(i64::from(*value)),
-                            Atom::I128(value) => i64::try_from(*value).ok(),
-                            Atom::Sum { variant, .. } => Some(i64::from(*variant)),
+                            Atom::Bool(value) => Some(i128::from(*value)),
+                            Atom::I128(value) => i128::try_from(*value).ok(),
+                            Atom::Sum { variant, .. } => Some(i128::from(*variant)),
                             _ => None,
                         }),
                     _ => None,
@@ -561,7 +561,7 @@ struct Replays<'r> {
 
 impl Replays<'_> {
     /// The model's tuple, inside the declared domains.
-    fn tuple(&self, model: &std::collections::BTreeMap<String, i128>) -> Result<Vec<i64>, String> {
+    fn tuple(&self, model: &std::collections::BTreeMap<String, i128>) -> Result<Vec<i128>, String> {
         self.context
             .positions
             .iter()
@@ -570,7 +570,7 @@ impl Replays<'_> {
                 let name = format!("x{index}");
                 let value = model
                     .get(&name)
-                    .and_then(|value| i64::try_from(*value).ok())
+                    .and_then(|value| i128::try_from(*value).ok())
                     .ok_or_else(|| format!("the model has no 64-bit value for {name}"))?;
                 if admits(&position.domain, value) {
                     Ok(value)
@@ -585,7 +585,7 @@ impl Replays<'_> {
     }
 
     /// Whether every premise holds on the tuple's pre-state.
-    fn lawful(&self, tuple: &[i64]) -> Result<(), String> {
+    fn lawful(&self, tuple: &[i128]) -> Result<(), String> {
         let state = library::state(self.context.framer, tuple);
         for premise in self.premises {
             let verdict = library::verdict(self.descriptor, *premise, &state);
@@ -601,7 +601,7 @@ impl Replays<'_> {
     }
 
     /// The case the program selects on the tuple and its successor.
-    fn decide(&self, tuple: &[i64]) -> Result<(usize, Vec<(u16, i128)>), String> {
+    fn decide(&self, tuple: &[i128]) -> Result<(usize, Vec<(u16, i128)>), String> {
         let outputs = library::run(self.descriptor, tuple)
             .ok_or_else(|| "the library program fails on the tuple".to_owned())?;
         let case = library::branch(self.descriptor, &outputs)
@@ -760,7 +760,7 @@ impl Replays<'_> {
         let positions = self.context.positions;
         // `None` only for an empty domain beside a wide one: nothing to
         // enumerate, and the wide one is never collected.
-        let values: Vec<Vec<i64>> = positions
+        let values: Vec<Vec<i128>> = positions
             .iter()
             .map(|position| position.domain.values_within(max_tuples))
             .collect::<Option<_>>()
@@ -779,9 +779,9 @@ impl Replays<'_> {
             return result;
         }
         let mut indices = vec![0usize; positions.len()];
-        let mut lawful_cache: Option<(Vec<i64>, bool)> = None;
+        let mut lawful_cache: Option<(Vec<i128>, bool)> = None;
         loop {
-            let tuple: Vec<i64> = indices
+            let tuple: Vec<i128> = indices
                 .iter()
                 .zip(&values)
                 .map(|(index, values)| values[*index])
@@ -823,7 +823,7 @@ impl Replays<'_> {
 
     fn enumerate_one(
         &self,
-        tuple: &[i64],
+        tuple: &[i128],
         targets: &[Target<'_>],
         committing: &[usize],
         result: &mut Enumeration,
@@ -1232,7 +1232,7 @@ fn combine(
 }
 
 /// Whether a position's domain holds a value.
-fn admits(domain: &domain::LeafDomain, value: i64) -> bool {
+fn admits(domain: &domain::LeafDomain, value: i128) -> bool {
     match domain {
         domain::LeafDomain::Bool => value == 0 || value == 1,
         domain::LeafDomain::Int { min, max } => (*min..=*max).contains(&value),
@@ -1243,7 +1243,7 @@ fn admits(domain: &domain::LeafDomain, value: i64) -> bool {
 }
 
 /// A tuple with each value named by its position.
-fn named(positions: &[Position], tuple: &[i64]) -> String {
+fn named(positions: &[Position], tuple: &[i128]) -> String {
     positions
         .iter()
         .zip(tuple)

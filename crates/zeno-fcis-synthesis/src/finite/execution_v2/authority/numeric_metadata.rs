@@ -88,6 +88,53 @@ fn op<'a>(parts: &mut Vec<Part<'a>>, op: NumericOp) {
             parts.push(Part::Word(b as u128));
             parts.push(Part::Word(den as u128));
         }
+        NumericOp::SignedMulDivFloor(a, b, d) => {
+            parts.push(Part::Word(14));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+            parts.push(Part::Word(d as u128));
+        }
+        NumericOp::Mul(w, a, b) => {
+            parts.push(Part::Word(15));
+            parts.push(Part::Word(width(w)));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+        }
+        NumericOp::DivFloor(w, a, b) => {
+            parts.push(Part::Word(16));
+            parts.push(Part::Word(width(w)));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+        }
+        NumericOp::DivCeil(w, a, b) => {
+            parts.push(Part::Word(17));
+            parts.push(Part::Word(width(w)));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+        }
+        NumericOp::NonnegativeMulDivFloor(w, a, b, d) => {
+            parts.push(Part::Word(18));
+            parts.push(Part::Word(width(w)));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+            parts.push(Part::Word(d as u128));
+        }
+        NumericOp::NonnegativeMulDivCeil(w, a, b, d) => {
+            parts.push(Part::Word(19));
+            parts.push(Part::Word(width(w)));
+            parts.push(Part::Word(a as u128));
+            parts.push(Part::Word(b as u128));
+            parts.push(Part::Word(d as u128));
+        }
+        NumericOp::NonnegativeProductsGe(a, b) => {
+            parts.push(Part::Word(20));
+            parts.push(Part::Word(a[0] as u128));
+            parts.push(Part::Word(a[1] as u128));
+            parts.push(Part::Word(a[2] as u128));
+            parts.push(Part::Word(b[0] as u128));
+            parts.push(Part::Word(b[1] as u128));
+            parts.push(Part::Word(b[2] as u128));
+        }
         NumericOp::ProductsGe(left, right) => {
             parts.push(Part::Word(13));
             parts.push(Part::Word(left[0] as u128));

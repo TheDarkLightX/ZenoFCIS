@@ -121,7 +121,7 @@ fn check_original_graph() {
         .collect();
     let mut tag = vec![6];
     tag.extend(22u32.to_be_bytes());
-    tag.extend(b"zeno-fcis/finite-i64/1");
+    tag.extend(b"zeno-fcis/finite-i128/1");
     let roots = ROOTS
         .iter()
         .map(|n| {
@@ -158,7 +158,7 @@ fn limits() -> Limits {
     }
     cap
 }
-fn int(id: u16, min: i64, max: i64) -> InputField {
+fn int(id: u16, min: i128, max: i128) -> InputField {
     InputField {
         id,
         leaf: InputLeaf::I128 { min, max },
@@ -231,7 +231,10 @@ fn with_inventory(run: impl FnOnce(&mut c::Descriptor<'_>)) {
                 max: 3,
                 variants: (150..=153)
                     .enumerate()
-                    .map(|(i, id)| Variant { id, code: i as i64 })
+                    .map(|(i, id)| Variant {
+                        id,
+                        code: i as i128,
+                    })
                     .collect(),
             },
         },

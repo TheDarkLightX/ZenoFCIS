@@ -61,6 +61,8 @@ pub mod behaviour;
 mod compact;
 mod delivery;
 pub mod equivalence;
+/// Read-only access to retained histories, without assigning a new Authority.
+pub mod history;
 mod lineage;
 /// Data migrations admitted by forward simulation, and the rename tier.
 pub mod migration;

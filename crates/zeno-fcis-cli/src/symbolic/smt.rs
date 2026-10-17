@@ -497,13 +497,13 @@ mod tests {
         let boundary = [
             i128::MIN,
             i128::MIN + 1,
-            i64::MIN as i128,
+            i128::MIN as i128,
             -10,
             -1,
             0,
             1,
             10,
-            i64::MAX as i128,
+            i128::MAX as i128,
             i128::MAX - 1,
             i128::MAX,
         ];

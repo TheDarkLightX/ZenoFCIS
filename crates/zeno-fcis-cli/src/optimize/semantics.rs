@@ -30,21 +30,21 @@ pub(crate) enum Kind {
 /// Inclusive bounds on every defined value of a class.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Interval {
-    pub(crate) min: i64,
-    pub(crate) max: i64,
+    pub(crate) min: i128,
+    pub(crate) max: i128,
 }
 
 impl Interval {
     pub(crate) const BOOL: Self = Self { min: 0, max: 1 };
 
-    pub(crate) const fn point(value: i64) -> Self {
+    pub(crate) const fn point(value: i128) -> Self {
         Self {
             min: value,
             max: value,
         }
     }
 
-    pub(crate) fn constant(self) -> Option<i64> {
+    pub(crate) fn constant(self) -> Option<i128> {
         (self.min == self.max).then_some(self.min)
     }
 
@@ -71,14 +71,7 @@ impl Interval {
     }
 }
 
-/// Clamps an `i128` bound into `i64`, reporting whether it was out of range.
-fn clamp(value: i128) -> (i64, bool) {
-    match i64::try_from(value) {
-        Ok(value) => (value, false),
-        Err(_) if value < 0 => (i64::MIN, true),
-        Err(_) => (i64::MAX, true),
-    }
-}
+/// Clamps an `i128` bound into `i128`, reporting whether it was out of range.
 
 /// The declared input domain: per-input bounds and the fixed sample tuples.
 #[derive(Clone, Debug)]
@@ -86,13 +79,13 @@ pub(crate) struct DomainInfo {
     inputs: Vec<Domain>,
     /// Exact number of tuples; `None` above `u64::MAX`.
     size: Option<u64>,
-    minima: Vec<i64>,
+    minima: Vec<i128>,
     /// Number of values of each input, saturated at `u64::MAX`.
     widths: Vec<u64>,
     /// Every tuple in enumeration order when the domain has at most
     /// [`EXHAUSTIVE_SAMPLES`] tuples; otherwise the fixed selection of
     /// [`signature::sample_tuples`].
-    samples: Vec<Vec<i64>>,
+    samples: Vec<Vec<i128>>,
     exhaustive: bool,
 }
 
@@ -101,7 +94,7 @@ impl DomainInfo {
     pub(crate) fn new(inputs: &[Domain]) -> Option<Self> {
         let size = domain_size(inputs).ok()?;
         let size = size.and_then(|size| u64::try_from(size).ok());
-        let bounds: Vec<(i64, i64)> = inputs.iter().map(|domain| domain.bounds()).collect();
+        let bounds: Vec<(i128, i128)> = inputs.iter().map(|domain| domain.bounds()).collect();
         let (samples, exhaustive) = match size {
             Some(size) if size <= EXHAUSTIVE_SAMPLES => {
                 let mut tuples = Vec::new();
@@ -122,7 +115,9 @@ impl DomainInfo {
             minima: bounds.iter().map(|(min, _)| *min).collect(),
             widths: bounds
                 .iter()
-                .map(|(min, max)| max.abs_diff(*min).saturating_add(1))
+                .map(|(min, max)| {
+                    u64::try_from(max.abs_diff(*min).saturating_add(1)).unwrap_or(u64::MAX)
+                })
                 .collect(),
             samples,
             exhaustive,
@@ -138,7 +133,7 @@ impl DomainInfo {
     }
 
     #[cfg(test)]
-    pub(crate) fn minima(&self) -> &[i64] {
+    pub(crate) fn minima(&self) -> &[i128] {
         &self.minima
     }
 
@@ -200,7 +195,7 @@ pub(crate) enum MergeDecision {
 
 impl ClassData {
     /// The value every member takes on every tuple, when known.
-    pub(crate) fn constant(&self) -> Option<i64> {
+    pub(crate) fn constant(&self) -> Option<i128> {
         match &self.table {
             Some(table) => table.constant_value(),
             None if self.may_poison => None,
@@ -308,7 +303,7 @@ impl ClassData {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Shape<'a> {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(&'a ClassData, &'a ClassData),
     Sub(&'a ClassData, &'a ClassData),
@@ -354,7 +349,7 @@ pub(crate) fn analyze(
     shape: Shape<'_>,
     budget: &mut Budget,
 ) -> Result<Analysis, TypeError> {
-    let constant = |kind: Kind, value: i64| Analysis {
+    let constant = |kind: Kind, value: i128| Analysis {
         data: ClassData {
             kind,
             interval: Interval::point(value),
@@ -391,25 +386,27 @@ pub(crate) fn analyze(
             })
         }
         Shape::Int(value) => Ok(constant(Kind::Int, value)),
-        Shape::Bool(value) => Ok(constant(Kind::Bool, i64::from(value))),
+        Shape::Bool(value) => Ok(constant(Kind::Bool, i128::from(value))),
         Shape::Add(a, b) | Shape::Sub(a, b) => {
             require(a, Kind::Int)?;
             require(b, Kind::Int)?;
             let subtract = matches!(shape, Shape::Sub(..));
-            let (low, high) = if subtract {
+            let (low, high, min, max) = if subtract {
                 (
-                    i128::from(a.interval.min) - i128::from(b.interval.max),
-                    i128::from(a.interval.max) - i128::from(b.interval.min),
+                    a.interval.min.checked_sub(b.interval.max),
+                    a.interval.max.checked_sub(b.interval.min),
+                    a.interval.min.saturating_sub(b.interval.max),
+                    a.interval.max.saturating_sub(b.interval.min),
                 )
             } else {
                 (
-                    i128::from(a.interval.min) + i128::from(b.interval.min),
-                    i128::from(a.interval.max) + i128::from(b.interval.max),
+                    a.interval.min.checked_add(b.interval.min),
+                    a.interval.max.checked_add(b.interval.max),
+                    a.interval.min.saturating_add(b.interval.min),
+                    a.interval.max.saturating_add(b.interval.max),
                 )
             };
-            let (min, low_out) = clamp(low);
-            let (max, high_out) = clamp(high);
-            let op = move |arguments: &[i64]| {
+            let op = move |arguments: &[i128]| {
                 if subtract {
                     arguments[0].checked_sub(arguments[1])
                 } else {
@@ -422,7 +419,7 @@ pub(crate) fn analyze(
                 Kind::Int,
                 Interval { min, max },
                 &[a, b],
-                low_out || high_out,
+                low.is_none() || high.is_none(),
                 op,
             ))
         }
@@ -446,7 +443,7 @@ pub(crate) fn analyze(
                 interval,
                 &[a, b],
                 false,
-                |arguments| Some(i64::from(arguments[0] == arguments[1])),
+                |arguments| Some(i128::from(arguments[0] == arguments[1])),
             ))
         }
         Shape::Lt(a, b) => {
@@ -466,7 +463,7 @@ pub(crate) fn analyze(
                 interval,
                 &[a, b],
                 false,
-                |arguments| Some(i64::from(arguments[0] < arguments[1])),
+                |arguments| Some(i128::from(arguments[0] < arguments[1])),
             ))
         }
         Shape::And(a, b) => {
@@ -486,7 +483,7 @@ pub(crate) fn analyze(
                 interval,
                 &[a, b],
                 false,
-                |arguments| Some(i64::from(arguments[0] == 1 && arguments[1] == 1)),
+                |arguments| Some(i128::from(arguments[0] == 1 && arguments[1] == 1)),
             ))
         }
         Shape::Not(a) => {
@@ -502,7 +499,7 @@ pub(crate) fn analyze(
                 interval,
                 &[a],
                 false,
-                |arguments| Some(i64::from(arguments[0] == 0)),
+                |arguments| Some(i128::from(arguments[0] == 0)),
             ))
         }
         Shape::Select(c, a, b) => {
@@ -546,7 +543,7 @@ fn derive(
     interval: Interval,
     operands: &[&ClassData],
     bound_trap: bool,
-    op: impl Fn(&[i64]) -> Option<i64> + Copy,
+    op: impl Fn(&[i128]) -> Option<i128> + Copy,
 ) -> Analysis {
     let samples: Vec<&Samples> = operands.iter().map(|data| &*data.samples).collect();
     let (samples, _) = Samples::combine(kind, &samples, op);

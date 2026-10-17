@@ -15,12 +15,25 @@ pub(crate) open spec fn require_kind(k:Seq<Kind>,id:u16,want:Kind)->Result<(),Ad
 pub(crate) open spec fn pair(k:Seq<Kind>,a:u16,b:u16,want:Kind,result:Kind)->Result<Kind,AdmissionFailure> {
  match require_kind(k,a,want){Err(e)=>Err(e),Ok(())=>match require_kind(k,b,want){Err(e)=>Err(e),Ok(())=>Ok(result)}}
 }
+pub(crate) open spec fn signed_triple(k:Seq<Kind>,a:u16,b:u16,d:u16)->Result<Kind,AdmissionFailure> {
+ match require_kind(k,a,Kind::Signed){Err(e)=>Err(e),Ok(())=>match require_kind(k,b,Kind::Signed){Err(e)=>Err(e),Ok(())=>match require_kind(k,d,Kind::Signed){Err(e)=>Err(e),Ok(())=>Ok(Kind::Signed)}}}
+}
 pub(crate) open spec fn kind(op:NumericOp,inputs:Seq<Domain>,previous:Seq<Kind>)->Result<Kind,AdmissionFailure> {
  match op {
  NumericOp::Input(i)=>if i<inputs.len(){match domain_kind(inputs[i as int]){Some(k)=>Ok(k),None=>Err(AdmissionFailure::TypeMismatch)}}else{Err(AdmissionFailure::InputReference)},
  NumericOp::Bool(_)=>Ok(Kind::Bool),NumericOp::I128(_)=>Ok(Kind::Signed),NumericOp::U128(_)=>Ok(Kind::Unsigned),
  NumericOp::Add(w,a,b)|NumericOp::Sub(w,a,b)=>{
  let k=if matches!(w,IntegerWidth::Unsigned128){Kind::Unsigned}else{Kind::Signed};pair(previous,a,b,k,k)
+ },
+ NumericOp::Mul(w,a,b)|NumericOp::DivFloor(w,a,b)|NumericOp::DivCeil(w,a,b)=>{
+     if w==IntegerWidth::Unsigned128 {Err(AdmissionFailure::TypeMismatch)}else{pair(previous,a,b,Kind::Signed,Kind::Signed)}
+ },
+ NumericOp::SignedMulDivFloor(a,b,d)=>signed_triple(previous,a,b,d),
+ NumericOp::NonnegativeMulDivFloor(w,a,b,d)|NumericOp::NonnegativeMulDivCeil(w,a,b,d)=>{
+     if w==IntegerWidth::Unsigned128 {Err(AdmissionFailure::TypeMismatch)}else{signed_triple(previous,a,b,d)}
+ },
+ NumericOp::NonnegativeProductsGe(a,b)=>{
+     match signed_triple(previous,a[0],a[1],a[2]){Err(e)=>Err(e),Ok(_)=>match signed_triple(previous,b[0],b[1],b[2]){Err(e)=>Err(e),Ok(_)=>Ok(Kind::Bool)}}
  },
  NumericOp::And(a,b)=>pair(previous,a,b,Kind::Bool,Kind::Bool),
  NumericOp::MulDivFloor(a,b,den)|NumericOp::MulDivCeil(a,b,den)=>{

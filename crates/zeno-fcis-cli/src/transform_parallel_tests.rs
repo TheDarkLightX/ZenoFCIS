@@ -39,7 +39,7 @@ fn worker_counts_chunks_limits_and_receipt_bytes_match_serial() {
         a.clone(),
         fixture(vec![Op::Input(0), Op::Int(0), Op::Add(0, 1)], 2),
         fixture(vec![Op::Int(0)], 0),
-        fixture(vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(0, 1)], 0),
+        fixture(vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(0, 1)], 0),
     ];
     for b in candidates {
         for workers in [1, 2, 4] {

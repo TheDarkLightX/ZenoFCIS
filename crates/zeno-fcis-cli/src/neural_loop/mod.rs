@@ -21,7 +21,7 @@
 //! | Module | Contract |
 //! | --- | --- |
 //! | [`limits`] | compiled resource ceilings; lower operator limits win (NSR-001) |
-//! | [`profiles`] | `FunctionalBoolV1` and `CheckedI64V1` artifact admission (NSC-002/003/005) |
+//! | [`profiles`] | `FunctionalBoolV1` and `CheckedI128V1` artifact admission (NSC-002/003/005) |
 //! | [`request`] | frozen canonical request and its `RequestId` (NSC-001/004/006/007/008) |
 //! | [`incumbent`] | original-or-checked incumbent, costs and lexicographic selection (NSL-001/005/006) |
 //! | [`ledger`] | append-only hash-chained reservation ledger and accounting (NSR-005/007/008) |

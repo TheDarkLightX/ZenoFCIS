@@ -65,16 +65,12 @@ impl Drop for Directory {
     }
 }
 
-const ORIGINAL: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve"
-);
-const CANDIDATE: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve"
-);
+const ORIGINAL: &[u8] =
+    include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-original.zcve");
+const CANDIDATE: &[u8] =
+    include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-candidate.zcve");
 #[cfg(target_os = "linux")]
-const PADDED: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve"
-);
+const PADDED: &[u8] = include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-padded.zcve");
 
 fn request() -> Request {
     Request::admit(
@@ -654,12 +650,12 @@ fn the_engine_searches_within_the_requests_profile() {
     }
     // A strategy that names another profile than the request's is unavailable.
     let mut named = document.clone();
-    named["profile"] = json!("checked-i64-v1");
+    named["profile"] = json!("checked-i128-v1");
     let named = Strategy::from_json(&named).unwrap_or_else(|refusal| panic!("{refusal:?}"));
     assert_eq!(
         OptimizeEngine.run(&original, &named, Profile::FunctionalBoolV1, &[]),
         SearchReport::Unavailable {
-            reason: String::from("engine:profile-mismatch:checked-i64-v1:functional-bool-v1")
+            reason: String::from("engine:profile-mismatch:checked-i128-v1:functional-bool-v1")
         }
     );
 }
@@ -673,8 +669,8 @@ fn the_engine_fuses_the_loops_checked_candidates() {
         max: 99_999,
     };
     let full = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let encode = |nodes: Vec<Op>, roots: Vec<u16>| -> Vec<u8> {
         Program::try_new(vec![wide], vec![full, full], nodes, roots)
@@ -714,7 +710,7 @@ fn the_engine_fuses_the_loops_checked_candidates() {
         OptimizeEngine.run(
             &original,
             &strategy,
-            Profile::CheckedI64V1,
+            Profile::CheckedI128V1,
             std::slice::from_ref(&first)
         ),
         SearchReport::Failed {
@@ -727,7 +723,7 @@ fn the_engine_fuses_the_loops_checked_candidates() {
     let SearchReport::Candidate { bytes, extraction } = OptimizeEngine.run(
         &original,
         &strategy,
-        Profile::CheckedI64V1,
+        Profile::CheckedI128V1,
         &[first, second],
     ) else {
         panic!("expected a fused candidate");

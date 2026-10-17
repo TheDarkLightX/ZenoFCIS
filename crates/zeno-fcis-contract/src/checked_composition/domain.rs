@@ -65,18 +65,18 @@ pub enum FieldDomain {
     /// Every integer from `min` to `max`.
     Int {
         /// The least value.
-        min: i64,
+        min: i128,
         /// The greatest value.
-        max: i64,
+        max: i128,
     },
     /// The listed variant IDs of a sum type.
-    Variants(Vec<i64>),
+    Variants(Vec<i128>),
 }
 
 impl FieldDomain {
     /// Every value in enumeration order.
     #[must_use]
-    pub fn values(&self) -> Vec<i64> {
+    pub fn values(&self) -> Vec<i128> {
         match self {
             Self::Bool => vec![0, 1],
             Self::Int { min, max } => (*min..=*max).collect(),
@@ -86,7 +86,7 @@ impl FieldDomain {
 
     /// Whether `value` lies in the domain.
     #[must_use]
-    pub fn contains(&self, value: i64) -> bool {
+    pub fn contains(&self, value: i128) -> bool {
         match self {
             Self::Bool => value == 0 || value == 1,
             Self::Int { min, max } => (*min..=*max).contains(&value),
@@ -94,13 +94,19 @@ impl FieldDomain {
         }
     }
 
-    /// The number of values.
+    /// Cardinality capped at u128::MAX; values above every configured budget refuse.
     #[must_use]
     pub fn size(&self) -> u128 {
         match self {
             Self::Bool => 2,
             Self::Int { min, max } => {
-                u128::try_from(i128::from(*max) - i128::from(*min) + 1).unwrap_or(0)
+                if min > max {
+                    0
+                } else {
+                    let lower = (*min as u128) ^ (1u128 << 127);
+                    let upper = (*max as u128) ^ (1u128 << 127);
+                    (upper - lower).checked_add(1).unwrap_or(u128::MAX)
+                }
             }
             Self::Variants(variants) => variants.len() as u128,
         }
@@ -108,12 +114,12 @@ impl FieldDomain {
 
     /// The value at `offset` in enumeration order; `offset` is below
     /// [`Self::size`].
-    pub(crate) fn nth(&self, offset: u128) -> i64 {
+    pub(crate) fn nth(&self, offset: u128) -> i128 {
         match self {
-            Self::Bool => i64::from(offset != 0),
+            Self::Bool => i128::from(offset != 0),
             Self::Int { min, .. } => {
-                i64::try_from(i128::from(*min) + i128::try_from(offset).unwrap_or(i128::MAX))
-                    .unwrap_or(i64::MAX)
+                i128::try_from(i128::from(*min) + i128::try_from(offset).unwrap_or(i128::MAX))
+                    .unwrap_or(i128::MAX)
             }
             Self::Variants(variants) => usize::try_from(offset)
                 .ok()
@@ -122,7 +128,7 @@ impl FieldDomain {
         }
     }
 
-    pub(crate) fn interval(&self) -> Option<(i64, i64)> {
+    pub(crate) fn interval(&self) -> Option<(i128, i128)> {
         match self {
             Self::Int { min, max } => Some((*min, *max)),
             _ => None,
@@ -145,7 +151,7 @@ impl FieldDomain {
                 max: *max,
             },
             LeafDomain::Sum { variants, .. } => {
-                Self::Variants(variants.iter().map(|id| i64::from(*id)).collect())
+                Self::Variants(variants.iter().map(|id| i128::from(*id)).collect())
             }
         }
     }
@@ -242,8 +248,8 @@ struct RequestFile {
 #[serde(deny_unknown_fields)]
 struct DomainFile {
     kind: String,
-    min: Option<i64>,
-    max: Option<i64>,
+    min: Option<i128>,
+    max: Option<i128>,
 }
 
 #[derive(Deserialize)]
@@ -627,7 +633,7 @@ pub(crate) struct Component {
     /// The request fields they read, in request order.
     pub(crate) cone: Vec<usize>,
     /// The declared genesis state, in state order.
-    pub(crate) genesis: Vec<i64>,
+    pub(crate) genesis: Vec<i128>,
 }
 
 impl Component {

@@ -82,7 +82,7 @@ pub enum Request {
 #[allow(missing_docs)]
 pub enum Value {
     Text(String),
-    Integer(i64),
+    Integer(i128),
 }
 /// Query variable bindings. Anonymous underscores are omitted.
 pub type Binding = BTreeMap<String, Value>;

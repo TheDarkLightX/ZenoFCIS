@@ -861,7 +861,7 @@ mod posix_controls {
         let d = Directory::new();
         let session = d.path("frozen");
         fs::create_dir(&session).unwrap_or_else(|e| panic!("{e}"));
-        let rows = vec![vec![0_i64], vec![1_i64]];
+        let rows = vec![vec![0_i128], vec![1_i128]];
         let table = zeno_fcis_loop_doors::capture::ReferenceTable::new(
             vec![Domain::Bool],
             vec![Domain::Bool],

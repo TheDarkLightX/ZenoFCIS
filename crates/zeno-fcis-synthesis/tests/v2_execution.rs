@@ -6,8 +6,8 @@ use zeno_fcis_synthesis::finite::{
 #[test]
 fn public_program_adapter_matches_checked_entry_and_restarts_usage() {
     let domain = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let program = Program::try_new(
         vec![domain],
@@ -17,7 +17,7 @@ fn public_program_adapter_matches_checked_entry_and_restarts_usage() {
     )
     .unwrap_or_else(|error| panic!("program: {error}"));
     for quota in [0, 1, 2, 3, 4, u64::MAX] {
-        for value in [i64::MIN, -1, 0, i64::MAX] {
+        for value in [i128::MIN, -1, 0, i128::MAX] {
             let limits = v2_zero_limits().with_limit(V2Resource::Step, quota);
             let actual = program.execute_v2(&[value], limits);
             assert_eq!(
@@ -33,7 +33,7 @@ fn public_program_adapter_matches_checked_entry_and_restarts_usage() {
             );
             let (result, usage) = actual.into_parts();
             assert_eq!(usage.used(V2Resource::Step), quota.min(3));
-            if quota >= 3 && value == i64::MAX {
+            if quota >= 3 && value == i128::MAX {
                 assert_eq!(result, Err(V2ExecutionFailure::Arithmetic));
             }
             assert_eq!(program.execute_v2(&[value], limits).into_parts().1, usage);

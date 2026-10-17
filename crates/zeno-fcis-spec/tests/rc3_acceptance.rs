@@ -70,6 +70,32 @@ fn spec(source: &str) -> zeno_fcis_spec::ProjectSpec {
     elaborate_project(parsed, ProjectLimits::default()).unwrap_or_else(|set| panic!("{set}"))
 }
 
+#[test]
+fn signed_and_nonnegative_fused_calls_parse_wide_operands_without_aliasing() {
+    use zeno_fcis_spec::{CompareOp, ValueExpr};
+    let wide = 1i128 << 100;
+    let source = SOURCE_A.replace(
+        "law 400 same = pre.100 == pre.100;",
+        &format!("law 400 same = signed_mul_div_floor({wide}, -1, 2) >= 0;"),
+    );
+    let signed = spec(&source);
+    let RelExpr::Compare(CompareOp::GreaterEq, ValueExpr::SignedMulDivFloor(a, _, _), _) =
+        signed.laws()[0].formula()
+    else {
+        panic!("signed floor lost its dedicated node");
+    };
+    assert_eq!(**a, ValueExpr::Int(wide));
+    let nonnegative = spec(&source.replace("signed_mul_div_floor", "mul_div_floor"));
+    assert_ne!(signed.canonical_bytes(), nonnegative.canonical_bytes());
+    for call in [
+        "signed_mul_div_floor(1, 2)",
+        "signed_mul_div_floor(1, 2, 3, 4)",
+    ] {
+        let bad = SOURCE_A.replace("pre.100 == pre.100;", &format!("{call} >= 0;"));
+        assert!(parse_project(&bad, SourceLimits::default()).is_err());
+    }
+}
+
 fn id(value: u32) -> StableId {
     StableId::new(value).unwrap_or_else(|| unreachable!())
 }

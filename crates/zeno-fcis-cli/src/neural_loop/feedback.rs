@@ -27,7 +27,7 @@ pub(crate) struct Witness {
     pub(crate) original_sha256: String,
     pub(crate) candidate_sha256: String,
     pub(crate) ordinal: u64,
-    pub(crate) input: Vec<i64>,
+    pub(crate) input: Vec<i128>,
     pub(crate) original: Observation,
     pub(crate) candidate: Observation,
 }
@@ -159,7 +159,7 @@ fn observation_from_json(outputs: &[Domain], value: &Value) -> Option<Observatio
 }
 
 /// Typed fixture values back to wire scalars, checked against their domains.
-pub(crate) fn values_from_json(domains: &[Domain], value: &Value) -> Option<Vec<i64>> {
+pub(crate) fn values_from_json(domains: &[Domain], value: &Value) -> Option<Vec<i128>> {
     let items = value.as_array()?;
     if items.len() != domains.len() {
         return None;
@@ -169,7 +169,7 @@ pub(crate) fn values_from_json(domains: &[Domain], value: &Value) -> Option<Vec<
         .zip(domains)
         .map(|(item, domain)| {
             let value = match (domain, item) {
-                (Domain::Bool, Value::Bool(flag)) => i64::from(*flag),
+                (Domain::Bool, Value::Bool(flag)) => i128::from(*flag),
                 (Domain::Bool, _) => return None,
                 (_, Value::String(text)) => text.parse().ok()?,
                 _ => return None,
@@ -181,21 +181,21 @@ pub(crate) fn values_from_json(domains: &[Domain], value: &Value) -> Option<Vec<
 
 /// The ordinal's tuple under `ordered-product-last-input-fastest-v1`,
 /// computed by mixed-radix decoding, independently of the checker's odometer.
-pub(crate) fn tuple_of_ordinal(domains: &[Domain], ordinal: u64) -> Option<Vec<i64>> {
+pub(crate) fn tuple_of_ordinal(domains: &[Domain], ordinal: u64) -> Option<Vec<i128>> {
     let mut remaining = u128::from(ordinal);
-    let mut tuple = vec![0_i64; domains.len()];
+    let mut tuple = vec![0_i128; domains.len()];
     for (slot, domain) in tuple.iter_mut().zip(domains).rev() {
         let (min, max) = domain.bounds();
         let width = u128::from(max.abs_diff(min)) + 1;
         let offset = i128::try_from(remaining % width).ok()?;
         remaining /= width;
-        *slot = i64::try_from(i128::from(min) + offset).ok()?;
+        *slot = i128::try_from(i128::from(min) + offset).ok()?;
     }
     (remaining == 0).then_some(tuple)
 }
 
 /// Observes a program on one tuple at the full budget, as the checker does.
-pub(crate) fn observe(program: &Program, input: &[i64]) -> Observation {
+pub(crate) fn observe(program: &Program, input: &[i128]) -> Observation {
     let meter = v2_zero_limits().with_limit(V2Resource::Step, FULL_BUDGET);
     let (result, usage) = program.execute_v2(input, meter).into_parts();
     Observation {

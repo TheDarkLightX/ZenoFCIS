@@ -423,7 +423,7 @@ fn expression(
                 names(then, found);
                 names(otherwise, found);
             }
-            Ast::MulDiv(_, a, b, d) => {
+            Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => {
                 names(a, found);
                 names(b, found);
                 names(d, found);
@@ -516,8 +516,10 @@ fn scalar_domain(kind: Kind<'_>) -> Result<ScalarDomain, String> {
         }
     };
     Ok(ScalarDomain::Int {
-        min: i64::try_from(min).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
-        max: i64::try_from(max).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
+        min: i128::try_from(min)
+            .map_err(|_| "expression domain exceeds checked i128".to_owned())?,
+        max: i128::try_from(max)
+            .map_err(|_| "expression domain exceeds checked i128".to_owned())?,
     })
 }
 

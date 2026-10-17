@@ -312,7 +312,7 @@ fn the_program_commands_refuse_the_larger_profile() {
     assert_eq!(report["program"]["nodes"], nodes, "{report}");
     assert_eq!(report["program"]["outputs"], outputs, "{report}");
     let bytes = fs::read(&program).unwrap_or_else(|error| panic!("{error}"));
-    let profile = b"zeno-fcis/finite-i64/2";
+    let profile = b"zeno-fcis/finite-i128/2";
     assert!(bytes.windows(profile.len()).any(|window| window == profile));
 
     // Every command that reads a program file imports profile 1 only.

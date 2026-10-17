@@ -266,7 +266,7 @@ fn infinite_holes_and_implicit_core_names_do_not_claim_emptiness() {
 // Full scaled cube is covered by disjoint fixed-x declarations (1,681 tuples
 // each), within the unchanged 4,096-tuple default. These are proposal tests;
 // the CLI's separate law/check/replay controls below remain necessary.
-fn owner_rounding(mut s: Specification, owner: impl Fn(&[i64]) -> Vec<i64>) {
+fn owner_rounding(mut s: Specification, owner: impl Fn(&[i128]) -> Vec<i128>) {
     for round in 0..=2 {
         match analyze(&s).0 {
             Proposal::Question { count, question } => {
@@ -352,7 +352,7 @@ fn version_space_product_comparison_control_fails_when_stubbed() {
                 2
             );
             // The exact owner product comparison is false precisely on odd x.
-            let output = vec![i64::from(question.input[0] % 2 == 0)];
+            let output = vec![i128::from(question.input[0] % 2 == 0)];
             s.requirements.push(Requirement::Example {
                 id: "owner".into(),
                 input: question.input,

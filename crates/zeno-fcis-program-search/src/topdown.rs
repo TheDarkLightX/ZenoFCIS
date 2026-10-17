@@ -24,7 +24,7 @@ use crate::{Env, MAX_DEPTH, Stop};
 /// its size as a shared DAG, and the inputs it reads (as a bit mask).
 struct Entry {
     node: Node,
-    value: Vec<i64>,
+    value: Vec<i128>,
     cost: usize,
     inputs: u64,
 }
@@ -33,7 +33,7 @@ type MemoKey = (Kind, u32, u64, u64, u64, usize);
 
 struct TopDown<'a> {
     original: &'a Graph,
-    columns: Vec<Vec<i64>>,
+    columns: Vec<Vec<i128>>,
     size: usize,
     depth: u32,
     width: usize,
@@ -157,7 +157,9 @@ impl<'a> TopDown<'a> {
         let mut predicates = Vec::new();
         for (k, domain) in inputs.iter().enumerate() {
             let (min, max) = domain.bounds();
-            let span = i128::from(max) - i128::from(min) + 1;
+            let Some(span) = max.checked_sub(min).and_then(|span| span.checked_add(1)) else {
+                continue;
+            };
             if domain_kind(*domain) != Some(Kind::Int) || span > i128::from(PREDICATE_DOMAIN) {
                 continue;
             }
@@ -227,55 +229,56 @@ impl<'a> TopDown<'a> {
         meter.charge(size.max(1).saturating_mul(extra))?;
         let value_of = |id: usize| self.arena.get(id).map(|entry| &entry.value);
         let pair = |a: usize, b: usize| Some((value_of(a)?, value_of(b)?));
-        let value: Option<Vec<i64>> =
-            match node {
-                Node::Input(k) => self.columns.get(usize::from(k)).cloned(),
-                Node::Int(value) => Some(vec![value; size]),
-                Node::Bool(value) => Some(vec![i64::from(value); size]),
-                Node::Add(a, b) => pair(a, b)
-                    .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_add(*q)).collect()),
-                Node::Sub(a, b) => pair(a, b)
-                    .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_sub(*q)).collect()),
-                Node::Mul(..)
-                | Node::DivFloor(..)
-                | Node::DivCeil(..)
-                | Node::MulDivFloor(..)
-                | Node::MulDivCeil(..)
-                | Node::ProductsGe(..) => {
-                    let (operands, count) = node.operands();
-                    let operands = &operands[..count];
-                    let compute = || {
-                        let columns = operands
-                            .iter()
-                            .map(|id| value_of(*id).map(Vec::as_slice))
-                            .collect::<Option<Vec<_>>>()?;
-                        let renamed = node
-                            .map(|id| operands.iter().position(|v| *v == id).unwrap_or(usize::MAX));
-                        crate::arithmetic::evaluate(renamed.library()?, &columns)
-                    };
-                    compute()
-                }
-                Node::Eq(a, b) => pair(a, b)
-                    .map(|(x, y)| x.iter().zip(y).map(|(p, q)| i64::from(p == q)).collect()),
-                Node::Lt(a, b) => pair(a, b)
-                    .map(|(x, y)| x.iter().zip(y).map(|(p, q)| i64::from(p < q)).collect()),
-                Node::And(a, b) => pair(a, b).map(|(x, y)| {
-                    x.iter()
-                        .zip(y)
-                        .map(|(p, q)| i64::from(*p == 1 && *q == 1))
-                        .collect()
-                }),
-                Node::Not(a) => value_of(a).map(|x| x.iter().map(|p| i64::from(*p == 0)).collect()),
-                Node::Select(c, a, b) => match (value_of(c), pair(a, b)) {
-                    (Some(cond), Some((x, y))) => Some(
-                        cond.iter()
-                            .zip(x.iter().zip(y))
-                            .map(|(c, (p, q))| if *c == 1 { *p } else { *q })
-                            .collect(),
-                    ),
-                    _ => None,
-                },
-            };
+        let value: Option<Vec<i128>> = match node {
+            Node::Input(k) => self.columns.get(usize::from(k)).cloned(),
+            Node::Int(value) => Some(vec![value; size]),
+            Node::Bool(value) => Some(vec![i128::from(value); size]),
+            Node::Add(a, b) => pair(a, b)
+                .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_add(*q)).collect()),
+            Node::Sub(a, b) => pair(a, b)
+                .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_sub(*q)).collect()),
+            Node::Mul(..)
+            | Node::DivFloor(..)
+            | Node::DivCeil(..)
+            | Node::MulDivFloor(..)
+            | Node::MulDivCeil(..)
+            | Node::ProductsGe(..) => {
+                let (operands, count) = node.operands();
+                let operands = &operands[..count];
+                let compute = || {
+                    let columns = operands
+                        .iter()
+                        .map(|id| value_of(*id).map(Vec::as_slice))
+                        .collect::<Option<Vec<_>>>()?;
+                    let renamed =
+                        node.map(|id| operands.iter().position(|v| *v == id).unwrap_or(usize::MAX));
+                    crate::arithmetic::evaluate(renamed.library()?, &columns)
+                };
+                compute()
+            }
+            Node::Eq(a, b) => {
+                pair(a, b).map(|(x, y)| x.iter().zip(y).map(|(p, q)| i128::from(p == q)).collect())
+            }
+            Node::Lt(a, b) => {
+                pair(a, b).map(|(x, y)| x.iter().zip(y).map(|(p, q)| i128::from(p < q)).collect())
+            }
+            Node::And(a, b) => pair(a, b).map(|(x, y)| {
+                x.iter()
+                    .zip(y)
+                    .map(|(p, q)| i128::from(*p == 1 && *q == 1))
+                    .collect()
+            }),
+            Node::Not(a) => value_of(a).map(|x| x.iter().map(|p| i128::from(*p == 0)).collect()),
+            Node::Select(c, a, b) => match (value_of(c), pair(a, b)) {
+                (Some(cond), Some((x, y))) => Some(
+                    cond.iter()
+                        .zip(x.iter().zip(y))
+                        .map(|(c, (p, q))| if *c == 1 { *p } else { *q })
+                        .collect(),
+                ),
+                _ => None,
+            },
+        };
         meter.charge(size.max(1))?;
         let Some(value) = value else {
             return Ok(None);
@@ -319,7 +322,7 @@ impl<'a> TopDown<'a> {
     fn constant(
         &mut self,
         kind: Kind,
-        value: i64,
+        value: i128,
         meter: &mut Meter,
     ) -> Result<Option<usize>, Stop> {
         match kind {
@@ -338,18 +341,22 @@ impl<'a> TopDown<'a> {
             .is_some_and(|entry| entry.inputs & exclude == 0)
     }
 
-    fn value(&self, id: usize, position: u32) -> i64 {
+    fn value(&self, id: usize, position: u32) -> i128 {
         self.arena
             .get(id)
             .and_then(|entry| entry.value.get(position as usize))
             .copied()
-            .unwrap_or(i64::MIN)
+            .unwrap_or(i128::MIN)
     }
 
-    fn matches(&self, id: usize, pos: &[u32], want: &[i64], negate: bool) -> bool {
+    fn matches(&self, id: usize, pos: &[u32], want: &[i128], negate: bool) -> bool {
         pos.iter().zip(want).all(|(p, w)| {
             let value = self.value(id, *p);
-            let value = if negate { i64::from(value == 0) } else { value };
+            let value = if negate {
+                i128::from(value == 0)
+            } else {
+                value
+            };
             value == *w
         })
     }
@@ -367,7 +374,7 @@ impl<'a> TopDown<'a> {
     fn solve(
         &mut self,
         pos: &[u32],
-        want: &[i64],
+        want: &[i128],
         kind: Kind,
         depth: u32,
         exclude: u64,
@@ -375,7 +382,7 @@ impl<'a> TopDown<'a> {
     ) -> Result<Option<usize>, Stop> {
         let positions = || {
             pos.iter()
-                .map(|p| i64::from(*p))
+                .map(|p| i128::from(*p))
                 .chain(want.iter().copied())
         };
         let key = (
@@ -445,15 +452,15 @@ impl<'a> TopDown<'a> {
     fn select_two(
         &mut self,
         pos: &[u32],
-        want: &[i64],
-        (a, b): (i64, i64),
+        want: &[i128],
+        (a, b): (i128, i128),
         depth: u32,
         exclude: u64,
         best: &mut Option<usize>,
         meter: &mut Meter,
     ) -> Result<(), Stop> {
         for (first, second) in [(a, b), (b, a)] {
-            let condition: Vec<i64> = want.iter().map(|v| i64::from(*v == first)).collect();
+            let condition: Vec<i128> = want.iter().map(|v| i128::from(*v == first)).collect();
             let Some(cond) = self.solve(pos, &condition, Kind::Bool, depth - 1, exclude, meter)?
             else {
                 continue;
@@ -475,7 +482,7 @@ impl<'a> TopDown<'a> {
     fn invert(
         &mut self,
         pos: &[u32],
-        want: &[i64],
+        want: &[i128],
         depth: u32,
         exclude: u64,
         best: &mut Option<usize>,
@@ -487,7 +494,7 @@ impl<'a> TopDown<'a> {
             }
             for subtract in [true, false] {
                 meter.charge(pos.len())?;
-                let rest: Option<Vec<i64>> = pos
+                let rest: Option<Vec<i128>> = pos
                     .iter()
                     .zip(want)
                     .map(|(p, w)| {
@@ -534,7 +541,7 @@ impl<'a> TopDown<'a> {
     fn invert_equality(
         &mut self,
         pos: &[u32],
-        want: &[i64],
+        want: &[i128],
         depth: u32,
         exclude: u64,
         best: &mut Option<usize>,
@@ -558,7 +565,7 @@ impl<'a> TopDown<'a> {
                 continue;
             }
             let reads = self.arena.get(x).map_or(0, |entry| entry.inputs);
-            let target: Vec<i64> = on.iter().map(|p| self.value(x, *p)).collect();
+            let target: Vec<i128> = on.iter().map(|p| self.value(x, *p)).collect();
             let Some(y) = self.solve(&on, &target, Kind::Int, depth - 1, exclude | reads, meter)?
             else {
                 continue;
@@ -577,7 +584,7 @@ impl<'a> TopDown<'a> {
     fn split(
         &mut self,
         pos: &[u32],
-        want: &[i64],
+        want: &[i128],
         kind: Kind,
         depth: u32,
         exclude: u64,
@@ -629,7 +636,7 @@ impl<'a> TopDown<'a> {
     /// Fresh plans per output; an output with no plan keeps its original cone.
     fn program_for(
         &mut self,
-        targets: &[(Vec<i64>, Kind)],
+        targets: &[(Vec<i128>, Kind)],
         meter: &mut Meter,
     ) -> Result<Option<Graph>, Stop> {
         let all: Vec<u32> = (0..self.size)
@@ -670,7 +677,7 @@ impl<'a> TopDown<'a> {
 /// the live tuples are `sig`. Depth adapts to the number of tuples.
 pub(crate) fn top_down(
     original: &Graph,
-    sig: &[Vec<i64>],
+    sig: &[Vec<i128>],
     env: &Env<'_>,
     meter: &mut Meter,
 ) -> Result<Option<Graph>, Stop> {
@@ -680,7 +687,7 @@ pub(crate) fn top_down(
         return Ok(None);
     }
     let kinds = original.kinds();
-    let targets: Vec<(Vec<i64>, Kind)> = original
+    let targets: Vec<(Vec<i128>, Kind)> = original
         .roots
         .iter()
         .map(|root| (sig[*root].clone(), kinds[*root]))
@@ -705,7 +712,7 @@ pub(crate) fn top_down(
 
 fn counterexample_guided(
     original: &Graph,
-    targets: &[(Vec<i64>, Kind)],
+    targets: &[(Vec<i128>, Kind)],
     env: &Env<'_>,
     meter: &mut Meter,
 ) -> Result<Option<Graph>, Stop> {
@@ -721,7 +728,7 @@ fn counterexample_guided(
     let per_value = (shape.sample / 8).max(64);
     for (target, _) in targets {
         meter.charge(positions.len())?;
-        let mut groups: BTreeMap<i64, Vec<u32>> = BTreeMap::new();
+        let mut groups: BTreeMap<i128, Vec<u32>> = BTreeMap::new();
         let mut too_many = false;
         for position in &positions {
             let value = target[*position as usize];
@@ -745,7 +752,7 @@ fn counterexample_guided(
             .depth
             .unwrap_or(if sample.len() <= 4096 { 6 } else { 5 })
             .min(MAX_DEPTH);
-        let local: Vec<(Vec<i64>, Kind)> = targets
+        let local: Vec<(Vec<i128>, Kind)> = targets
             .iter()
             .map(|(values, kind)| (sample.iter().map(|p| values[*p as usize]).collect(), *kind))
             .collect();
@@ -778,10 +785,10 @@ fn counterexample_guided(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn solve_target(
     inputs: &[zeno_fcis_synthesis::finite::Domain],
-    columns: Vec<Vec<i64>>,
+    columns: Vec<Vec<i128>>,
     size: usize,
     pos: &[u32],
-    want: &[i64],
+    want: &[i128],
     kind: Kind,
     depth: u32,
     width: usize,
@@ -819,8 +826,8 @@ pub(crate) fn solve_target(
     let output = match kind {
         Kind::Bool => zeno_fcis_synthesis::finite::Domain::Bool,
         Kind::Int => zeno_fcis_synthesis::finite::Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     };
     let mut pool = Pool::new(inputs);

@@ -221,7 +221,7 @@ fn the_local_table_digest_is_the_digest_of_typed_outcomes() {
             Contract::build(&compiled.declarations, &compiled.rules, compiled.commitment)
                 .unwrap_or_else(fail);
         let framer = Framer::new(&compiled.positions, &contract);
-        let values: Vec<Vec<i64>> = compiled
+        let values: Vec<Vec<i128>> = compiled
             .positions
             .iter()
             .map(|position| {

@@ -115,8 +115,8 @@ fn an_agent_drives_the_loop_one_candidate_at_a_time_and_resumes() {
         .unwrap_or_default()
         .to_owned();
     assert_eq!(request_id.len(), 64);
-    // checked-i64-v1 is the default profile (G12).
-    assert_eq!(report["detail"]["request"]["profile"], "checked-i64-v1");
+    // checked-i128-v1 is the default profile (G12).
+    assert_eq!(report["detail"]["request"]["profile"], "checked-i128-v1");
     assert_eq!(report["detail"]["request"]["policy"]["hosted"], "disabled");
     assert_eq!(report["detail"]["view"]["original"]["nodes"], 16);
     for name in [

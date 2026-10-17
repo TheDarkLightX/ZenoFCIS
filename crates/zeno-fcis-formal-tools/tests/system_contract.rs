@@ -21,7 +21,7 @@ fn property(nodes: Vec<Op>, root: u16) -> Contract {
         .unwrap_or_else(|error| panic!("property: {error:?}"))
 }
 
-fn sat(input: Vec<i64>, output: Vec<i64>) -> SystemAnswer {
+fn sat(input: Vec<i128>, output: Vec<i128>) -> SystemAnswer {
     SystemAnswer::Sat { input, output }
 }
 

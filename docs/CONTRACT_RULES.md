@@ -74,7 +74,7 @@ a binding.
 | Leaf | Meaning |
 |---|---|
 | `Bool` | `["Bool"]`: a boolean, 0 or 1 in examples. |
-| `I128` | `["I128", min, max]`: an integer from `min` to `max`, with `min <= max`. Inputs and computed values must also fit in 64 bits. |
+| `I128` | `["I128", min, max]`: an integer from `min` to `max`, with `min <= max`. Inputs and computed values must fit in 128 bits. |
 | `Text` | `["Text", min, max]`: ASCII text of `min` to `max` bytes. Only destinations are text. |
 
 A binding for an undeclared type is refused, and so is a binding that
@@ -121,7 +121,7 @@ integer, or expression text. Expression text has:
 | `>=` | at least |
 | `+` | add |
 | `-` | subtract; also prefix negation |
-| `*` | checked signed multiply: i64 in rules, i128 in signed laws |
+| `*` | checked signed i128 multiply in rules and signed laws |
 
   Prefix `!` negates a boolean. Other binary operators group to the left.
 
@@ -133,7 +133,8 @@ integer, or expression text. Expression text has:
 | `choose` | `choose(c, a, b)` is `a` when `c` holds, else `b`. |
 | `div_floor` | `div_floor(a, b)`: mathematical division rounded down, including negative divisors. |
 | `div_ceil` | `div_ceil(a, b)`: mathematical division rounded up, including negative divisors. |
-| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative i64 factors, positive denominator, exact intermediate product and final i64 fit. |
+| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative i128 factors, positive denominator, exact intermediate product and final i128 fit. |
+| `signed_mul_div_floor` | `signed_mul_div_floor(a, b, d)`: signed exact-product floor division with a positive denominator and a final i128 fit check. |
 | `mul_div_ceil` | `mul_div_ceil(a, b, d)`: the same fused rule operation rounded up. |
 | `products_ge` | `products_ge(a, b, c, d)` compares `a*b >= c*d`. Every factor is nonnegative; products are exact, with no intermediate narrowing. Rules and laws support this predicate. |
 | `products_ge` | `products_ge(a, b, c, d, e, f)` compares `a*b*c >= d*e*f`, with the same nonnegative domain and exact products. |
@@ -141,14 +142,14 @@ integer, or expression text. Expression text has:
 These arithmetic extensions describe development source whose native and
 source-proof qualification is pending. Rules compile to the same library
 program evaluated by generated applications and the Authority. Standalone
-multiplication must fit i64. Division by zero and an out-of-range quotient
-refuse, including `div_floor(-9223372036854775808, -1)`. The signed minimum is a
-legal literal; its positive magnitude is not an i64 value. With a positive divisor, `div_floor(-1, 2)`
+multiplication must fit i128. Division by zero and an out-of-range quotient
+refuse, including `div_floor(-170141183460469231731687303715884105728, -1)`. The signed minimum is a
+legal literal; its positive magnitude is not an i128 value. With a positive divisor, `div_floor(-1, 2)`
 is -1 and `div_ceil(-1, 2)` is 0; negative divisors follow mathematical rounding.
 
 `div_floor(a * b, d)` and `mul_div_floor(a, b, d)` are distinct graphs. The
 first checks and can refuse the narrow multiplication; the second preserves
-the exact product and narrows only the quotient. For `M = 2^63 - 1`, the fused
+the exact product and narrows only the quotient. For `M = 2^127 - 1`, the fused
 `mul_div_floor(M, M, M)` has result M while the standalone product refuses.
 Negative fused factors and a nonpositive denominator refuse even when a zero
 factor would make the mathematical product zero. A variant is its ID:
@@ -158,7 +159,7 @@ when it equals 1. Decision arithmetic is 64-bit, and the program evaluates
 every node, both branches of `choose` included, so an overflow anywhere
 refuses the decision. A contract has at most 4,096 program nodes and 64
 program outputs: the case selection and each distinct computed value. A graph
-using an arithmetic extension has profile `zeno-fcis/finite-i64/3` within the
+using an arithmetic extension has profile `zeno-fcis/finite-i128/3` within the
 original 256-node, 16-output, 32-input caps, or `/4` beyond those caps. Old
 operation-only graphs keep `/1` or `/2` and their canonical program bytes.
 Program-file commands admit `/1` and `/3`; they refuse the larger `/2` and `/4`
@@ -445,7 +446,7 @@ Each entry of `state` uses one source form, by its keys:
 | `from` | The decimal ID of an old state field. Alone, it carries that field's value over, under its own name or a new one; the field's kind (Boolean, integer, variant) must not change. |
 | `default` | Alone, the value of an added field: `true`, `false`, an integer in the field's range, or a variant's ID. |
 | `map` | With `from`, a table from every value of the old field to the new field's value: keys are decimal integers, `false` or `true`. It splits an old field into several new ones. |
-| `expr` | Version 2 only, alone: a closed expression over `old.<field ID>` in the source record. Booleans, checked i64 integers, addition, subtraction, comparisons, Boolean operators and `choose` use the library finite evaluator; multiplication, division, text and external inputs are refused. |
+| `expr` | Version 2 only, alone: a closed expression over `old.<field ID>` in the source record. Booleans, checked i128 integers, addition, subtraction, comparisons, Boolean operators and `choose` use the library finite evaluator; multiplication, division, text and external inputs are refused. |
 
 Every new field needs exactly one entry. Every old state field must be carried
 or read by a split expression, or explicitly listed in version 2's `drop`.

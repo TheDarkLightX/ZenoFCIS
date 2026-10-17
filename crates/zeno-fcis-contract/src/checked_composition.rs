@@ -633,7 +633,7 @@ fn interface(
     };
     // Each interface field with its values and, for each value, whether the
     // provider facts hold on it; then each command field with its values.
-    let mut columns: Vec<(leaf::FieldDomain, Vec<i64>, Option<Vec<bool>>)> = Vec::new();
+    let mut columns: Vec<(leaf::FieldDomain, Vec<i128>, Option<Vec<bool>>)> = Vec::new();
     for field in leaf.fields(Source::Context) {
         let Some(edge) = edges
             .iter()
@@ -684,7 +684,7 @@ fn interface(
             .ok_or_else(too_large)?;
         columns.push((field, values, None));
     }
-    let values: Vec<Vec<i64>> = columns
+    let values: Vec<Vec<i128>> = columns
         .iter()
         .map(|(_, values, _)| values.clone())
         .collect();

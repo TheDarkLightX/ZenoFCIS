@@ -36,7 +36,7 @@ pub enum PlanNode {
     /// The input at this position.
     Input(u16),
     /// An integer constant.
-    Int(i64),
+    Int(i128),
     /// A Boolean constant.
     Bool(bool),
     /// Checked addition.
@@ -86,7 +86,7 @@ pub struct TargetBudget {
     pub width: usize,
     /// Subproblems solved before only constants and atoms remain.
     pub solve_limit: u32,
-    /// Most `i64` cells of plan values.
+    /// Most `i128` cells of plan values.
     pub max_cells: u64,
     /// Work units, counted as in [`crate::Budget::work_units`].
     pub work_units: u64,
@@ -113,8 +113,8 @@ impl Default for TargetBudget {
 /// limits; it never means that none exists.
 pub fn synthesize_target(
     inputs: &[Domain],
-    columns: &[Vec<i64>],
-    target: &[i64],
+    columns: &[Vec<i128>],
+    target: &[i128],
     care: &[bool],
     kind: TargetKind,
     budget: &TargetBudget,
@@ -127,8 +127,8 @@ pub fn synthesize_target(
 /// across several solves.
 pub fn synthesize_target_counted(
     inputs: &[Domain],
-    columns: &[Vec<i64>],
-    target: &[i64],
+    columns: &[Vec<i128>],
+    target: &[i128],
     care: &[bool],
     kind: TargetKind,
     budget: &TargetBudget,
@@ -144,8 +144,8 @@ pub fn synthesize_target_counted(
 
 fn solve_counted(
     inputs: &[Domain],
-    columns: &[Vec<i64>],
-    target: &[i64],
+    columns: &[Vec<i128>],
+    target: &[i128],
     care: &[bool],
     kind: TargetKind,
     budget: &TargetBudget,
@@ -227,20 +227,20 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    fn value(plan: &Plan, row: &[i64]) -> Option<i64> {
+    fn value(plan: &Plan, row: &[i128]) -> Option<i128> {
         use zeno_fcis_synthesis::finite::Op;
-        let arithmetic = |op: Op, args: &[i64]| {
-            let columns: Vec<Vec<i64>> = args.iter().map(|v| vec![*v]).collect();
-            let columns: Vec<&[i64]> = columns.iter().map(Vec::as_slice).collect();
+        let arithmetic = |op: Op, args: &[i128]| {
+            let columns: Vec<Vec<i128>> = args.iter().map(|v| vec![*v]).collect();
+            let columns: Vec<&[i128]> = columns.iter().map(Vec::as_slice).collect();
             crate::arithmetic::evaluate(op, &columns)?.first().copied()
         };
-        let mut values: Vec<i64> = Vec::new();
+        let mut values: Vec<i128> = Vec::new();
         for node in &plan.nodes {
             let at = |index: usize| values.get(index).copied();
             let next = match *node {
                 PlanNode::Input(k) => row.get(usize::from(k)).copied()?,
                 PlanNode::Int(value) => value,
-                PlanNode::Bool(value) => i64::from(value),
+                PlanNode::Bool(value) => i128::from(value),
                 PlanNode::Add(a, b) => at(a)?.checked_add(at(b)?)?,
                 PlanNode::Sub(a, b) => at(a)?.checked_sub(at(b)?)?,
                 PlanNode::Mul(a, b) => arithmetic(Op::Mul(0, 1), &[at(a)?, at(b)?])?,
@@ -263,10 +263,10 @@ mod tests {
                         at(b[2])?,
                     ],
                 )?,
-                PlanNode::Eq(a, b) => i64::from(at(a)? == at(b)?),
-                PlanNode::Lt(a, b) => i64::from(at(a)? < at(b)?),
-                PlanNode::And(a, b) => i64::from(at(a)? == 1 && at(b)? == 1),
-                PlanNode::Not(a) => i64::from(at(a)? == 0),
+                PlanNode::Eq(a, b) => i128::from(at(a)? == at(b)?),
+                PlanNode::Lt(a, b) => i128::from(at(a)? < at(b)?),
+                PlanNode::And(a, b) => i128::from(at(a)? == 1 && at(b)? == 1),
+                PlanNode::Not(a) => i128::from(at(a)? == 0),
                 PlanNode::Select(c, a, b) => {
                     if at(c)? == 1 {
                         at(a)?
@@ -281,7 +281,7 @@ mod tests {
     }
 
     /// x in 0..=5, flag Bool: every tuple in order, last input fastest.
-    fn space() -> (Vec<Domain>, Vec<Vec<i64>>) {
+    fn space() -> (Vec<Domain>, Vec<Vec<i128>>) {
         let inputs = vec![Domain::Int { min: 0, max: 5 }, Domain::Bool];
         let mut x = Vec::new();
         let mut flag = Vec::new();
@@ -295,11 +295,31 @@ mod tests {
     }
 
     #[test]
+    fn arithmetic_plan_oracle_keeps_wide_full_products_and_product_comparisons() {
+        let wide = 1i128 << 100;
+        let mut plan = Plan {
+            nodes: vec![
+                PlanNode::Input(0),
+                PlanNode::Int(3),
+                PlanNode::MulDivFloor(0, 1, 1),
+            ],
+            root: 2,
+        };
+        assert_eq!(value(&plan, &[wide]), Some(wide));
+        plan.nodes.push(PlanNode::ProductsGe([0, 1, 1], [0, 1, 1]));
+        plan.root = 3;
+        assert_eq!(value(&plan, &[wide]), Some(1));
+        plan.nodes.push(PlanNode::Mul(0, 0));
+        plan.root = 4;
+        assert_eq!(value(&plan, &[wide]), None);
+    }
+
+    #[test]
     fn a_care_masked_target_is_met_where_it_is_cared_for() {
         let (inputs, columns) = space();
         // Where the flag holds the target is x + 2; elsewhere it is noise and
         // does not matter.
-        let target: Vec<i64> = columns[0]
+        let target: Vec<i128> = columns[0]
             .iter()
             .zip(&columns[1])
             .map(|(x, flag)| if *flag == 1 { x + 2 } else { 1000 - 7 * x })
@@ -346,10 +366,10 @@ mod tests {
     #[test]
     fn a_boolean_region_is_described_exactly() {
         let (inputs, columns) = space();
-        let target: Vec<i64> = columns[0]
+        let target: Vec<i128> = columns[0]
             .iter()
             .zip(&columns[1])
-            .map(|(x, flag)| i64::from(*x < 3 && *flag == 1))
+            .map(|(x, flag)| i128::from(*x < 3 && *flag == 1))
             .collect();
         let all = vec![true; target.len()];
         let plan = synthesize_target(
@@ -376,7 +396,7 @@ mod tests {
     #[test]
     fn solves_are_deterministic() {
         let (inputs, columns) = space();
-        let target: Vec<i64> = columns[0]
+        let target: Vec<i128> = columns[0]
             .iter()
             .map(|x| if *x == 4 { 9 } else { x - 1 })
             .collect();
@@ -399,7 +419,7 @@ mod tests {
     #[test]
     fn an_exhausted_work_budget_stops_with_no_plan() {
         let (inputs, columns) = space();
-        let target: Vec<i64> = columns[0].iter().map(|x| x * 3 % 5).collect();
+        let target: Vec<i128> = columns[0].iter().map(|x| x * 3 % 5).collect();
         let care = vec![true; target.len()];
         let budget = TargetBudget {
             work_units: 10,
@@ -413,7 +433,7 @@ mod tests {
     #[test]
     fn an_exhausted_cell_budget_stops_with_no_plan() {
         let (inputs, columns) = space();
-        let target: Vec<i64> = columns[0].iter().map(|x| x * 3 % 5).collect();
+        let target: Vec<i128> = columns[0].iter().map(|x| x * 3 % 5).collect();
         let care = vec![true; target.len()];
         // Each value vector holds 12 cells, so a second one is over budget.
         let budget = TargetBudget {

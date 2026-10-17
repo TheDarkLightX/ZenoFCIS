@@ -1115,7 +1115,7 @@ pub fn scalar_profile() -> AppResult<()> {
                             && variants.len() == declared.len()
                             && declared.iter().all(|variant| name_fits(variant.name, 128))
                             && variants.iter().all(|variant| {
-                                variant.code == i64::from(variant.id)
+                                variant.code == i128::from(variant.id)
                                     && declared.iter().any(|item| item.id == variant.id)
                             })
                     }

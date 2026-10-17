@@ -216,7 +216,7 @@ pub(crate) fn decode_value(
                 return None;
             }
             let (value, end) = read_big_endian(bytes, payload_offset, 16)?;
-            if value < *min || value > *max || value > i64::MAX as u128 {
+            if value < *min || value > *max || value > i128::MAX as u128 {
                 return None;
             }
             Some((Atom::I128(value as i128), end))

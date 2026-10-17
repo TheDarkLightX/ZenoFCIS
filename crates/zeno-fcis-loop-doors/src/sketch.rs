@@ -5,7 +5,7 @@
 //! targets, so each output's holes are solved on their own:
 //!
 //! - a single hole is solved exactly by inverse semantics: a constant hole
-//!   has a complete answer over signed 64-bit constants (a value, or a tuple
+//!   has a complete answer over signed 128-bit constants (a value, or a tuple
 //!   where no value works), a choice hole is decided by trying each alternative, and
 //!   an expression hole is synthesized top-down (incomplete: "not found" is
 //!   never "impossible");
@@ -22,7 +22,7 @@
 //!   filtered on a seeded stratified sample before the pivot is derived on
 //!   the whole domain.
 //!
-//! A candidate whose `+` or `-` would leave the signed 64-bit range on some
+//! A candidate whose `+` or `-` would leave the signed 128-bit range on some
 //! tuple is skipped: the lowered program would trap there.
 //!
 //! A constant hole compared with a hole-free expression gets a complete
@@ -116,7 +116,7 @@ pub struct Searched {
     /// The hole.
     pub hole: usize,
     /// Its candidates (choice: alternative indices), in search order.
-    pub values: Vec<i64>,
+    pub values: Vec<i128>,
     /// Whether the set is complete: no value outside it behaves differently.
     pub complete: bool,
     /// Whether the hole is a choice hole.
@@ -265,14 +265,14 @@ impl Rng {
 
 /// Tuple ordinals: a seeded random sample plus a stratum per distinct target
 /// value, so rare values are represented.
-fn sample(target: &[i64], size: usize, seed: u64) -> Vec<usize> {
+fn sample(target: &[i128], size: usize, seed: u64) -> Vec<usize> {
     let pool: Vec<usize> = (0..target.len()).collect();
     if pool.len() <= size {
         return pool;
     }
     let mut rng = Rng(seed);
     let mut chosen: BTreeSet<usize> = rng.choose(&pool, size).into_iter().collect();
-    let mut groups: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+    let mut groups: BTreeMap<i128, Vec<usize>> = BTreeMap::new();
     for (t, value) in target.iter().enumerate() {
         if groups.len() > 64 {
             break;
@@ -288,8 +288,8 @@ fn sample(target: &[i64], size: usize, seed: u64) -> Vec<usize> {
     chosen.into_iter().collect()
 }
 
-fn nearest_zero(values: impl IntoIterator<Item = i64>) -> Vec<i64> {
-    let mut out: Vec<i64> = values
+fn nearest_zero(values: impl IntoIterator<Item = i128>) -> Vec<i128> {
+    let mut out: Vec<i128> = values
         .into_iter()
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -307,12 +307,12 @@ fn nearest_zero(values: impl IntoIterator<Item = i64>) -> Vec<i64> {
 pub fn default_candidates(
     subject: &Subject,
     kind: Kind,
-    sketch_constants: &BTreeSet<i64>,
-) -> Vec<i64> {
+    sketch_constants: &BTreeSet<i128>,
+) -> Vec<i128> {
     if kind == Kind::Bool {
         return vec![0, 1];
     }
-    let mut found: BTreeSet<i64> = [-1, 0, 1, 2].into_iter().collect();
+    let mut found: BTreeSet<i128> = [-1, 0, 1, 2].into_iter().collect();
     found.extend(sketch_constants.iter().copied());
     found.extend(subject.original_constants());
     if let Some(cases) = subject.cases {
@@ -329,7 +329,7 @@ pub fn default_candidates(
     base.truncate(MAX_CANDIDATES);
     // The most frequent offsets between an input and an output, in first-seen
     // order, then by total count.
-    let mut mined: Vec<(i64, usize)> = Vec::new();
+    let mut mined: Vec<(i128, usize)> = Vec::new();
     let kinds = subject.vocab.input_kinds();
     for (k, column) in subject.columns.iter().enumerate() {
         if kinds[k] != Kind::Int {
@@ -340,7 +340,7 @@ pub fn default_candidates(
                 continue;
             }
             for flip in [false, true] {
-                let mut counts: BTreeMap<i64, usize> = BTreeMap::new();
+                let mut counts: BTreeMap<i128, usize> = BTreeMap::new();
                 for (x, t) in column.iter().zip(target) {
                     let diff = if flip {
                         t.wrapping_sub(*x)
@@ -349,7 +349,7 @@ pub fn default_candidates(
                     };
                     *counts.entry(diff).or_default() += 1;
                 }
-                let mut ranked: Vec<(i64, usize)> = counts.into_iter().collect();
+                let mut ranked: Vec<(i128, usize)> = counts.into_iter().collect();
                 ranked.sort_by_key(|entry| core::cmp::Reverse(entry.1));
                 for (value, count) in ranked.into_iter().take(4) {
                     match mined.iter_mut().find(|(v, _)| *v == value) {
@@ -397,13 +397,13 @@ fn path_to_hole(node: &Expr, k: usize) -> Result<Vec<u8>> {
 /// A single unbounded constant hole with coefficient +1. Offsets and the
 /// intersection of every intermediate's safe integer range are invocation
 /// scratch; overflow never creates a supposedly complete search space.
-fn affine_hole(node: &Expr, env: &Env<'_>) -> Option<(usize, Vec<i64>, i128, i128)> {
+fn affine_hole(node: &Expr, env: &Env<'_>) -> Option<(usize, Vec<i128>, i128, i128)> {
     if let Expr::Hole(k, Hole::Const(None)) = node {
         return Some((
             *k,
             vec![0; env.len],
-            i128::from(i64::MIN),
-            i128::from(i64::MAX),
+            i128::from(i128::MIN),
+            i128::from(i128::MAX),
         ));
     }
     let Expr::Bin(op @ (Op::Add | Op::Sub), a, b) = node else {
@@ -424,8 +424,8 @@ fn affine_hole(node: &Expr, env: &Env<'_>) -> Option<(usize, Vec<i64>, i128, i12
         } else {
             offset.checked_sub(value)?
         };
-        lo = lo.max(i128::from(i64::MIN) - i128::from(*offset));
-        hi = hi.min(i128::from(i64::MAX) - i128::from(*offset));
+        lo = lo.max(i128::MIN.saturating_sub(*offset));
+        hi = hi.min(i128::MAX.saturating_sub(*offset));
     }
     (lo <= hi).then_some((k, offsets, lo, hi))
 }
@@ -461,7 +461,7 @@ impl Solver<'_> {
     /// Comparisons against a hole-free integer expression, including
     /// additive offsets around a hole. Threshold neighbours represent all
     /// comparison outcomes; intersect with the eager-overflow-safe range.
-    fn comparison_ranges(&self, node: &Expr) -> Result<BTreeMap<usize, (i64, i64)>> {
+    fn comparison_ranges(&self, node: &Expr) -> Result<BTreeMap<usize, (i128, i128)>> {
         let mut out = BTreeMap::new();
         let env = self.subject.env(None);
         let none = BTreeMap::new();
@@ -488,18 +488,25 @@ impl Solver<'_> {
             let Ok(values) = evaluate(sibling, &env, &none) else {
                 continue;
             };
-            let thresholds: Vec<i128> = values
+            let Some(thresholds) = values
                 .iter()
                 .zip(offsets)
-                .map(|(value, offset)| i128::from(*value) - i128::from(offset))
-                .collect();
+                .map(|(value, offset)| value.checked_sub(offset))
+                .collect::<Option<Vec<i128>>>()
+            else {
+                continue;
+            };
             let (Some(min), Some(max)) = (thresholds.iter().min(), thresholds.iter().max()) else {
                 continue;
             };
-            let lo = (min - 1).clamp(safe_lo, safe_hi);
-            let hi = (max + 1).clamp(safe_lo, safe_hi);
-            if hi - lo <= 4096 {
-                let range = (i64::try_from(lo).ok(), i64::try_from(hi).ok());
+            let Some(lo) = min.checked_sub(1).map(|n| n.clamp(safe_lo, safe_hi)) else {
+                continue;
+            };
+            let Some(hi) = max.checked_add(1).map(|n| n.clamp(safe_lo, safe_hi)) else {
+                continue;
+            };
+            if hi.checked_sub(lo).is_some_and(|n| n <= 4096) {
+                let range = (i128::try_from(lo).ok(), i128::try_from(hi).ok());
                 if let (Some(lo), Some(hi)) = range {
                     out.insert(k, (lo, hi));
                 }
@@ -508,14 +515,19 @@ impl Solver<'_> {
         Ok(out)
     }
 
-    fn width(hole: &Expr, compared: &BTreeMap<usize, (i64, i64)>) -> i64 {
+    fn width(hole: &Expr, compared: &BTreeMap<usize, (i128, i128)>) -> i128 {
         match hole {
-            Expr::Hole(_, Hole::Const(Some((lo, hi)))) => hi - lo + 1,
-            Expr::Hole(k, Hole::Const(None)) => {
-                compared.get(k).map_or(1 << 30, |(lo, hi)| hi - lo + 1)
-            }
+            Expr::Hole(_, Hole::Const(Some((lo, hi)))) => hi
+                .checked_sub(*lo)
+                .and_then(|n| n.checked_add(1))
+                .unwrap_or(i128::MAX),
+            Expr::Hole(k, Hole::Const(None)) => compared.get(k).map_or(1 << 30, |(lo, hi)| {
+                hi.checked_sub(*lo)
+                    .and_then(|n| n.checked_add(1))
+                    .unwrap_or(i128::MAX)
+            }),
             Expr::Hole(_, Hole::Choice(alternatives)) => {
-                i64::try_from(alternatives.len()).unwrap_or(0)
+                i128::try_from(alternatives.len()).unwrap_or(0)
             }
             _ => 0,
         }
@@ -525,15 +537,15 @@ impl Solver<'_> {
         &self,
         hole: &Expr,
         kinds: &BTreeMap<usize, Kind>,
-        sketch_constants: &BTreeSet<i64>,
-        compared: &BTreeMap<usize, (i64, i64)>,
+        sketch_constants: &BTreeSet<i128>,
+        compared: &BTreeMap<usize, (i128, i128)>,
     ) -> Result<Searched> {
         let Expr::Hole(k, kind) = hole else {
             return Err(Refusal::new("hole-expected"));
         };
         let (values, complete, choice) = match kind {
             Hole::Choice(alternatives) => (
-                (0..i64::try_from(alternatives.len()).unwrap_or(0)).collect(),
+                (0..i128::try_from(alternatives.len()).unwrap_or(0)).collect(),
                 true,
                 true,
             ),
@@ -564,7 +576,7 @@ impl Solver<'_> {
         &self,
         pivot: &Expr,
         need: &Need,
-        sketch_constants: &BTreeSet<i64>,
+        sketch_constants: &BTreeSet<i128>,
     ) -> Result<Option<Fill>> {
         match pivot {
             Expr::Hole(_, Hole::Const(range)) => {
@@ -577,7 +589,7 @@ impl Solver<'_> {
                         *v = (*v).min(i128::from(*hi));
                     }
                 }
-                let mut prefer: BTreeSet<i64> = sketch_constants.clone();
+                let mut prefer: BTreeSet<i128> = sketch_constants.clone();
                 prefer.extend(self.subject.original_constants());
                 let prefer = nearest_zero(prefer);
                 Ok(solve_constant(&need, &prefer).map(Fill::Const))
@@ -613,7 +625,7 @@ impl Solver<'_> {
         j: usize,
         node: &Expr,
         kinds: &BTreeMap<usize, Kind>,
-        sketch_constants: &BTreeSet<i64>,
+        sketch_constants: &BTreeSet<i128>,
     ) -> Result<(Vec<Completion>, OutputSearch)> {
         let target = &self.subject.targets[j];
         let holes: Vec<Expr> = holes_of(node).into_iter().cloned().collect();
@@ -700,13 +712,13 @@ impl Solver<'_> {
             self.settings.sample,
             self.settings.seed.wrapping_add(j as u64),
         );
-        let sample_columns: Vec<Vec<i64>> = self
+        let sample_columns: Vec<Vec<i128>> = self
             .subject
             .columns
             .iter()
             .map(|column| rows.iter().map(|t| column[*t]).collect())
             .collect();
-        let sample_target: Vec<i64> = rows.iter().map(|t| target[*t]).collect();
+        let sample_target: Vec<i128> = rows.iter().map(|t| target[*t]).collect();
         let sample_env = Env {
             vocab: &self.subject.vocab,
             columns: &sample_columns,
@@ -934,7 +946,7 @@ impl Solver<'_> {
         j: usize,
         node: &Expr,
         kinds: &BTreeMap<usize, Kind>,
-        sketch_constants: &BTreeSet<i64>,
+        sketch_constants: &BTreeSet<i128>,
         mut info: OutputSearch,
     ) -> Result<(Vec<Completion>, OutputSearch)> {
         info.search = "meanings";
@@ -1021,7 +1033,7 @@ impl Solver<'_> {
         assignment: BTreeMap<usize, Fill>,
         depth: usize,
         order: &MeaningOrder,
-        sketch_constants: &BTreeSet<i64>,
+        sketch_constants: &BTreeSet<i128>,
         state: &mut Meanings,
     ) -> Result<()> {
         if state.found.len() >= MAX_COMPLETIONS {
@@ -1152,7 +1164,7 @@ impl Solver<'_> {
         &mut self,
         j: usize,
         node: Expr,
-        sketch_constants: &BTreeSet<i64>,
+        sketch_constants: &BTreeSet<i128>,
     ) -> Result<(Expr, BTreeMap<usize, Fill>, Option<Dead>)> {
         let mut node = node;
         let mut solved = BTreeMap::new();
@@ -1208,7 +1220,7 @@ impl Solver<'_> {
         node: &Expr,
         hole: &Expr,
         space: &Searched,
-    ) -> Result<Vec<i64>> {
+    ) -> Result<Vec<i128>> {
         let k = hole_id(hole);
         let path = path_to_hole(node, k)?;
         let Some((_, parent_path)) = path.split_last() else {
@@ -1221,7 +1233,7 @@ impl Solver<'_> {
         let subject = self.subject;
         let env = subject.env(Some(j));
         let none = BTreeMap::new();
-        let mut classes: Vec<(Vec<i64>, i64)> = Vec::new();
+        let mut classes: Vec<(Vec<i128>, i128)> = Vec::new();
         let cost = size(parent) as u64;
         for value in &space.values {
             if self.over_budget() {
@@ -1398,10 +1410,10 @@ fn solve_inner(subject: &Subject, outputs: &[Expr], settings: &Settings) -> Resu
 /// value times the number of input reads, plus the largest absolute target,
 /// plus 2. Used to state a checkable candidate space for a constant pivot.
 #[must_use]
-pub fn constant_bound(subject: &Subject, node: &Expr) -> i64 {
-    let mut literals: i64 = 0;
-    let mut reads: i64 = 0;
-    fn visit(node: &Expr, literals: &mut i64, reads: &mut i64) {
+pub fn constant_bound(subject: &Subject, node: &Expr) -> i128 {
+    let mut literals: i128 = 0;
+    let mut reads: i128 = 0;
+    fn visit(node: &Expr, literals: &mut i128, reads: &mut i128) {
         match node {
             Expr::Int(v) => *literals = literals.saturating_add(v.saturating_abs()),
             Expr::Var(_) => *reads = reads.saturating_add(1),
@@ -1447,5 +1459,5 @@ pub fn constant_bound(subject: &Subject, node: &Expr) -> i64 {
         .min(BOUND_CAP)
 }
 
-/// Largest [`constant_bound`]: far inside the 64-bit range.
-const BOUND_CAP: i64 = 1 << 62;
+/// Largest [`constant_bound`]: far inside the 128-bit range.
+const BOUND_CAP: i128 = 1 << 62;

@@ -16,13 +16,13 @@ pub const MAX_NODES: usize = 256;
 #[cfg_attr(verus_keep_ghost, verus_spec)]
 pub const MAX_FIELDS: usize = 16;
 
-/// Maximum input positions in the larger finite-i64/2 profile.
+/// Maximum input positions in the larger finite-i128/2 profile.
 #[cfg_attr(verus_keep_ghost, verus_spec)]
 pub const MAX_EXTENDED_INPUTS: usize = 64;
-/// Maximum output positions in the larger finite-i64/2 profile.
+/// Maximum output positions in the larger finite-i128/2 profile.
 #[cfg_attr(verus_keep_ghost, verus_spec)]
 pub const MAX_EXTENDED_OUTPUTS: usize = 64;
-/// Maximum instructions in the larger finite-i64/2 profile.
+/// Maximum instructions in the larger finite-i128/2 profile.
 #[cfg_attr(verus_keep_ghost, verus_spec)]
 pub const MAX_EXTENDED_NODES: usize = 4096;
 
@@ -41,9 +41,9 @@ pub enum Domain {
     /// Inclusive integer bounds.
     Int {
         /// Smallest admitted value.
-        min: i64,
+        min: i128,
         /// Largest admitted value.
-        max: i64,
+        max: i128,
     },
 }
 
@@ -52,11 +52,11 @@ impl Domain {
     #[must_use]
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == match self {
-            Self::Bool => (0i64, 1i64),
+            Self::Bool => (0i128, 1i128),
             Self::Int { min, max } => (min, max),
         },
     ))]
-    pub const fn bounds(self) -> (i64, i64) {
+    pub const fn bounds(self) -> (i128, i128) {
         match self {
             Self::Bool => (0, 1),
             Self::Int { min, max } => (min, max),
@@ -83,7 +83,7 @@ impl Domain {
     #[cfg_attr(verus_keep_ghost, verus_spec(result =>
         ensures result == spec::contains(self, value),
     ))]
-    pub fn contains(self, value: i64) -> bool {
+    pub fn contains(self, value: i128) -> bool {
         let (min, max) = self.bounds();
         value >= min && value <= max
     }
@@ -98,7 +98,7 @@ pub enum Op {
     /// Read a declared input by its zero-based position.
     Input(u16),
     /// An integer constant.
-    Int(i64),
+    Int(i128),
     /// A Boolean constant.
     Bool(bool),
     /// Checked signed addition.
@@ -115,18 +115,20 @@ pub enum Op {
     Not(u16),
     /// Select between equal-kind values using a Boolean condition.
     Select(u16, u16, u16),
-    /// Checked signed i64 product, independent of fused multiply-divide.
+    /// Checked signed i128 product, independent of fused multiply-divide.
     Mul(u16, u16),
     /// Mathematical floor division; zero divisor and out-of-range result refuse.
     DivFloor(u16, u16),
     /// Mathematical ceiling division, including negative divisors.
     DivCeil(u16, u16),
-    /// Nonnegative exact product, positive denominator, final checked i64 floor.
+    /// Nonnegative exact product, positive denominator, final checked i128 floor.
     MulDivFloor(u16, u16, u16),
-    /// Nonnegative exact product, positive denominator, final checked i64 ceiling.
+    /// Nonnegative exact product, positive denominator, final checked i128 ceiling.
     MulDivCeil(u16, u16, u16),
     /// Nonnegative exact three-factor comparison; no intermediate narrowing.
     ProductsGe([u16; 3], [u16; 3]),
+    /// Signed full-product floor; positive divisor and final i128 fit required.
+    SignedMulDivFloor(u16, u16, u16),
 }
 
 impl Op {
@@ -134,7 +136,7 @@ impl Op {
     #[must_use]
     #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == matches!(*self,
         Self::Mul(..) | Self::DivFloor(..) | Self::DivCeil(..) | Self::MulDivFloor(..)
-            | Self::MulDivCeil(..) | Self::ProductsGe(..)),))]
+            | Self::MulDivCeil(..) | Self::ProductsGe(..) | Self::SignedMulDivFloor(..)),))]
     pub fn requires_arithmetic_profile(&self) -> bool {
         matches!(
             self,
@@ -144,6 +146,7 @@ impl Op {
                 | Self::MulDivFloor(..)
                 | Self::MulDivCeil(..)
                 | Self::ProductsGe(..)
+                | Self::SignedMulDivFloor(..)
         )
     }
 }
@@ -170,6 +173,7 @@ impl Clone for Op {
             Self::MulDivFloor(a, b, d) => Self::MulDivFloor(a, b, d),
             Self::MulDivCeil(a, b, d) => Self::MulDivCeil(a, b, d),
             Self::ProductsGe(a, b) => Self::ProductsGe(a, b),
+            Self::SignedMulDivFloor(a, b, d) => Self::SignedMulDivFloor(a, b, d),
         }
     }
 }
@@ -187,7 +191,7 @@ pub(crate) enum Failure {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::admitted(domains@, values@),
 ))]
-pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
+pub(super) fn admitted(domains: &[Domain], values: &[i128]) -> bool {
     if domains.len() != values.len() {
         return false;
     }
@@ -215,7 +219,7 @@ pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
         None
     },
 ))]
-pub(super) fn at(values: &[i64], id: u16) -> Option<i64> {
+pub(super) fn at(values: &[i128], id: u16) -> Option<i128> {
     let index = id as usize;
     if index < values.len() {
         Some(values[index])
@@ -227,7 +231,7 @@ pub(super) fn at(values: &[i64], id: u16) -> Option<i64> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::node(*op, input@, values@),
 ))]
-pub(super) fn evaluate_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
+pub(super) fn evaluate_node(op: &Op, input: &[i128], values: &[i128]) -> Result<i128, Failure> {
     #[cfg(verus_keep_ghost)]
     proof! { typed::spec::legacy_node_embedding(*op, input@, values@); }
     match typed::node(
@@ -257,9 +261,9 @@ fn evaluate_nodes(
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
-    values: &mut Vec<i64>,
-    output: &mut Vec<i64>,
+    input: &[i128],
+    values: &mut Vec<i128>,
+    output: &mut Vec<i128>,
 ) -> Result<(), Failure> {
     values.clear();
     output.clear();
@@ -276,7 +280,7 @@ fn evaluate_nodes(
             index <= nodes.len(),
             values@.len() == index,
             spec::prefix(nodes@, input@, index as nat) == Ok(values@),
-            output@ == Seq::<i64>::empty(),
+            output@ == Seq::<i128>::empty(),
         decreases nodes.len() - index,
     ))]
     while index < nodes.len() {
@@ -335,8 +339,8 @@ fn evaluate_nodes(
             == Ok(final(output)@),
         Err(error) => spec::execution(inputs@, outputs@, nodes@, roots@, input@)
             == Err(error)
-            && final(values)@ == Seq::<i64>::empty()
-            && final(output)@ == Seq::<i64>::empty(),
+            && final(values)@ == Seq::<i128>::empty()
+            && final(output)@ == Seq::<i128>::empty(),
     },
 ))]
 pub(super) fn evaluate_into(
@@ -344,9 +348,9 @@ pub(super) fn evaluate_into(
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
-    values: &mut Vec<i64>,
-    output: &mut Vec<i64>,
+    input: &[i128],
+    values: &mut Vec<i128>,
+    output: &mut Vec<i128>,
 ) -> Result<(), Failure> {
     let result = evaluate_nodes(inputs, outputs, nodes, roots, input, values, output);
     if result.is_err() {

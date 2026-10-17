@@ -184,7 +184,7 @@ pub(in super::super) open spec fn framed_genesis(d:&DescriptorProjection,initial
 }
 
 /// Pointwise binding correspondence; the value view is retained, never rebuilt from codes.
-pub(in super::super) proof fn legacy_scalar<'a>(schema:Schema<'a>,v:(ValueView<'a>,Seq<i64>),selector:Selector)
+pub(in super::super) proof fn legacy_scalar<'a>(schema:Schema<'a>,v:(ValueView<'a>,Seq<i128>),selector:Selector)
     ensures scalar(SchemaView::Legacy(schema),input_view::typed::spec::lift(v.1),selector)
         ==match producer::spec::scalar_data(schema,v,selector){None=>None,Some(code)=>Some(Atom::I128(code as i128))},
 {
@@ -218,7 +218,7 @@ pub(in super::super) proof fn legacy_scalar<'a>(schema:Schema<'a>,v:(ValueView<'
         }
     }
 }
-pub(in super::super) proof fn legacy_tuple<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i64>),c:(ValueView<'a>,Seq<i64>),x:(ValueView<'a>,Seq<i64>),n:nat)
+pub(in super::super) proof fn legacy_tuple<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i128>),c:(ValueView<'a>,Seq<i128>),x:(ValueView<'a>,Seq<i128>),n:nat)
     requires n<=d.bindings@.len(),
     ensures tuple(&d.model(),input_view::typed::spec::lift(s.1),input_view::typed::spec::lift(c.1),input_view::typed::spec::lift(x.1),n)
         ==match producer::spec::tuple_data(d,s,c,x,n){None=>None,Some(values)=>Some(input_view::typed::spec::lift(values))},
@@ -242,17 +242,17 @@ pub(in super::super) proof fn legacy_tuple<'a>(d:&Descriptor<'a>,s:(ValueView<'a
             };
             if let Some(code)=code{input_view::typed::spec::lift_push(prior,code);}
         }
-    }else{assert(input_view::typed::spec::lift(Seq::<i64>::empty()) =~= Seq::<Atom>::empty());}
+    }else{assert(input_view::typed::spec::lift(Seq::<i128>::empty()) =~= Seq::<Atom>::empty());}
 }
 /// Exact old inverse mapping, including raw invalid codes and incomplete tuples.
-pub(in super::super) proof fn legacy_outputs(types:&[InputLeaf],codes:Seq<i64>,n:nat)
+pub(in super::super) proof fn legacy_outputs(types:&[InputLeaf],codes:Seq<i128>,n:nat)
     requires n<=types@.len(),
     ensures output_prefix(OutputTypes::Legacy(types),input_view::typed::spec::lift(codes),n)==producer::spec::atoms(types@,codes,n),
     decreases n,
 {
     if n>0{legacy_outputs(types,codes,(n-1) as nat);}
 }
-pub(in super::super) proof fn legacy_after_ingress<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i64>),c:(ValueView<'a>,Seq<i64>),x:(ValueView<'a>,Seq<i64>),limits:Seq<u64>,used:Seq<u64>,t:TraceView,finished:ProducedFinished<'a>)
+pub(in super::super) proof fn legacy_after_ingress<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i128>),c:(ValueView<'a>,Seq<i128>),x:(ValueView<'a>,Seq<i128>),limits:Seq<u64>,used:Seq<u64>,t:TraceView,finished:ProducedFinished<'a>)
     requires limits.len()==8,used.len()==8,
     ensures after_ingress(&d.model(),(s.0,input_view::typed::spec::lift(s.1)),(c.0,input_view::typed::spec::lift(c.1)),(x.0,input_view::typed::spec::lift(x.1)),limits,used,t,finished)
         ==producer::spec::after_ingress(d,s,c,x,limits,used,t,finished),

@@ -224,7 +224,7 @@ struct Classified<'m> {
 #[derive(Clone, Debug)]
 struct Witness {
     source: WitnessSource,
-    input: Vec<i64>,
+    input: Vec<i128>,
     original: Outcome,
     mutant: Outcome,
     /// For an owner example: whether its outcome agrees with the contract,
@@ -263,7 +263,7 @@ struct LawRefusal {
     refusal: String,
     inputs: usize,
     ordinal: usize,
-    input: Vec<i64>,
+    input: Vec<i128>,
     /// The case the decision program selects for the witness, and its
     /// `when`, as the library's program evaluator computes it.
     case: Option<(usize, String)>,
@@ -339,7 +339,7 @@ fn review_with(
             Some(text) => examples::parse(text, descriptor)?,
             None => Vec::new(),
         };
-        let example_inputs: Vec<&[i64]> = examples
+        let example_inputs: Vec<&[i128]> = examples
             .iter()
             .map(|example| example.inputs.as_slice())
             .collect();
@@ -567,7 +567,7 @@ pub(crate) fn draft_examples(
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct DraftExample {
-    pub(crate) input: Vec<i64>,
+    pub(crate) input: Vec<i128>,
     pub(crate) text: String,
     pub(crate) difference: Option<String>,
 }

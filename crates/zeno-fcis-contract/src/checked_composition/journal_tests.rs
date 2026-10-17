@@ -26,8 +26,8 @@ use crate::internals::rules::Constant;
 /// their domain's least value.
 #[derive(Clone, Debug)]
 pub(super) struct Step {
-    pub(super) command: BTreeMap<u16, i64>,
-    pub(super) context: BTreeMap<u16, i64>,
+    pub(super) command: BTreeMap<u16, i128>,
+    pub(super) context: BTreeMap<u16, i128>,
 }
 
 /// One publication: its kind, its subject and its successor's bytes.
@@ -44,19 +44,19 @@ pub(super) struct Journal {
     pub(super) genesis: Vec<u8>,
     pub(super) entries: Vec<Entry>,
     /// The state fields after genesis and after each step, by ID.
-    pub(super) states: Vec<BTreeMap<u16, i64>>,
+    pub(super) states: Vec<BTreeMap<u16, i128>>,
 }
 
-fn number(atom: &c::Atom<'_>) -> i64 {
+fn number(atom: &c::Atom<'_>) -> i128 {
     match atom {
-        c::Atom::Bool(value) => i64::from(*value),
-        c::Atom::I128(value) => i64::try_from(*value).unwrap_or_else(fail),
-        c::Atom::Sum { variant, .. } => i64::from(*variant),
+        c::Atom::Bool(value) => i128::from(*value),
+        c::Atom::I128(value) => i128::try_from(*value).unwrap_or_else(fail),
+        c::Atom::Sum { variant, .. } => i128::from(*variant),
         other => fail(format!("unexpected atom {other:?}")),
     }
 }
 
-fn least(position: &Position) -> i64 {
+fn least(position: &Position) -> i128 {
     position
         .domain
         .least()
@@ -64,7 +64,7 @@ fn least(position: &Position) -> i64 {
 }
 
 /// The input tuple of a state and a step.
-fn tuple(positions: &[Position], state: &BTreeMap<u16, i64>, step: &Step) -> Vec<i64> {
+fn tuple(positions: &[Position], state: &BTreeMap<u16, i128>, step: &Step) -> Vec<i128> {
     positions
         .iter()
         .map(|position| {
@@ -94,14 +94,14 @@ pub(super) fn journal(files: &AggregateSources, steps: &[Step]) -> Journal {
     let contract = built.contract().unwrap_or_else(fail);
     let positions = domain::positions(&built.declarations).unwrap_or_else(fail);
     let framer = Framer::new(&positions, &contract);
-    let mut state: BTreeMap<u16, i64> = positions
+    let mut state: BTreeMap<u16, i128> = positions
         .iter()
         .filter(|position| position.source == Source::State)
         .map(|position| {
             let field = position.field.unwrap_or_else(|| fail("a root state"));
             let value = match built.rules.genesis.get(&field) {
-                Some(Constant::Bool(value)) => i64::from(*value),
-                Some(Constant::Int(value)) => i64::try_from(*value).unwrap_or_else(fail),
+                Some(Constant::Bool(value)) => i128::from(*value),
+                Some(Constant::Int(value)) => i128::try_from(*value).unwrap_or_else(fail),
                 None => least(position),
             };
             (field, value)
@@ -180,13 +180,13 @@ fn leaf_decision(
     leaf: &Compiled,
     layout: &Layout,
     position: usize,
-    pre: &BTreeMap<u16, i64>,
+    pre: &BTreeMap<u16, i128>,
     step: &Step,
-) -> (&'static str, BTreeMap<u16, i64>) {
+) -> (&'static str, BTreeMap<u16, i128>) {
     let contract =
         Contract::build(&leaf.declarations, &leaf.rules, leaf.commitment).unwrap_or_else(fail);
     let framer = Framer::new(&leaf.positions, &contract);
-    let input: Vec<i64> = leaf
+    let input: Vec<i128> = leaf
         .positions
         .iter()
         .map(|at| {
@@ -239,12 +239,12 @@ fn ring_steps(n: usize, target: u16) -> Vec<(usize, Step)> {
     let mut steps = Vec::new();
     for round in 0..3 {
         for route in 0..n {
-            let action = i64::try_from((route + round) % 5).unwrap_or_else(fail);
+            let action = i128::try_from((route + round) % 5).unwrap_or_else(fail);
             steps.push((
                 route,
                 Step {
                     command: BTreeMap::from([
-                        (target, i64::try_from(route).unwrap_or_else(fail)),
+                        (target, i128::try_from(route).unwrap_or_else(fail)),
                         (201, action),
                     ]),
                     context: BTreeMap::new(),

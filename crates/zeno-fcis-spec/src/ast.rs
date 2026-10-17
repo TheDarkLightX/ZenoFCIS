@@ -792,6 +792,7 @@ pub enum ValueExpr {
     /// Nonnegative full-product division, distinct from a possibly trapping
     /// intermediate multiplication. Authored calls use Floor or Ceil.
     MulDiv(DivisionMode, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
+    SignedMulDivFloor(Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
     Sum {
         variable: Identifier,
         start: i128,
@@ -1531,6 +1532,12 @@ fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError>
             encode_value(b, out)?;
             encode_value(d, out)
         }
+        ValueExpr::SignedMulDivFloor(a, b, d) => {
+            out.push(9);
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
+        }
         ValueExpr::Sum {
             variable,
             start,
@@ -1732,7 +1739,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
-            ValueExpr::MulDiv(_, a, b, d) => {
+            ValueExpr::MulDiv(_, a, b, d) | ValueExpr::SignedMulDivFloor(a, b, d) => {
                 for child in [a, b, d] {
                     stack.push((child, current_depth.saturating_add(1)));
                 }
@@ -1741,6 +1748,28 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         }
     }
     (nodes, depth)
+}
+
+#[cfg(test)]
+#[test]
+fn fused_variants_keep_distinct_tags_and_count_every_operand() {
+    let nonnegative = ValueExpr::MulDiv(
+        DivisionMode::Floor,
+        Box::new(ValueExpr::Int(1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    let signed = ValueExpr::SignedMulDivFloor(
+        Box::new(ValueExpr::Int(-1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    for (value, tag) in [(&nonnegative, 8), (&signed, 9)] {
+        let mut encoded = Vec::new();
+        encode_value(value, &mut encoded).unwrap();
+        assert_eq!(encoded[0], tag);
+        assert_eq!(formula_shape_value(value), (4, 2));
+    }
 }
 
 pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {

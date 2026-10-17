@@ -109,7 +109,7 @@ def entry_contract(source: str, replacement: str) -> str:
 def mutation_sources(source: str, specification: str, typed: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
     for name, before, after in (
-        ("wrong_interval_cardinality", "max as i128 - min as i128 + 1", "max as i128 - min as i128 + 2"),
+        ("wrong_interval_cardinality", "Some(span) => match span.checked_add(1)", "Some(span) => match span.checked_add(2)"),
         ("ignore_negative_code_bound", "variant.code < min || variant.code > max", "variant.code > max"),
         ("allow_duplicate_variant_ids", "variants[prior].id == variant.id || variants[prior].code == variant.code",
          "variants[prior].code == variant.code"),
@@ -131,8 +131,8 @@ def mutation_sources(source: str, specification: str, typed: str) -> dict[str, t
         ("wrong_enum_tag", "if tag != 0x07 {", "if tag != 0x0a {"),
         ("wrong_integer_value", "value > *max as i128 { return None; } Some((Atom::I128(value), end))",
          "value > *max as i128 { return None; } Some((Atom::I128(0), end))"),
-        ("wrong_unsigned_value", "value > i64::MAX as u128 { return None; } Some((Atom::I128(value as i128), end))",
-         "value > i64::MAX as u128 { return None; } Some((Atom::I128(0), end))"),
+        ("wrong_unsigned_value", "value > i128::MAX as u128 { return None; } Some((Atom::I128(value as i128), end))",
+         "value > i128::MAX as u128 { return None; } Some((Atom::I128(0), end))"),
         ("wrong_boolean_value", "Some((Atom::I128(1), payload_offset))", "Some((Atom::I128(0), payload_offset))"),
         ("ignore_field_identity", "if actual != id as u128 {", "if false {"),
         ("omit_ingress_charge", "meter.charge(Resource::Byte, bytes.len() as u64)",

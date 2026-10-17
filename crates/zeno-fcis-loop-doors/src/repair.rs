@@ -44,7 +44,7 @@ pub const MAX_SITES: usize = 6;
 /// Viable positions per output that get a replacement attempt.
 pub const MAX_ATTEMPTS: usize = 24;
 /// A failing tuple's value in observations (no real output takes it).
-pub const IMPOSSIBLE: i64 = -(1 << 62);
+pub const IMPOSSIBLE: i128 = -(1 << 62);
 
 /// Door settings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -141,7 +141,7 @@ pub struct Region {
     /// one (checked on every tuple).
     pub formula: Option<Expr>,
     /// Otherwise, the fields every failing tuple shares.
-    pub shared: Vec<(usize, i64)>,
+    pub shared: Vec<(usize, i128)>,
     /// Every failing tuple, by ordinal.
     pub mask: Vec<bool>,
 }
@@ -216,10 +216,10 @@ pub struct Explanation {
 
 /// Every output of `program` on every tuple, from the library evaluator; a
 /// trap, or an output outside its declared domain, reads as [`IMPOSSIBLE`].
-pub fn observe(subject: &Subject, program: &Program) -> Result<Vec<Vec<i64>>> {
+pub fn observe(subject: &Subject, program: &Program) -> Result<Vec<Vec<i128>>> {
     let wide = widened(program)?;
     let outputs = program.outputs();
-    let mut values: Vec<Vec<i64>> = outputs
+    let mut values: Vec<Vec<i128>> = outputs
         .iter()
         .map(|_| Vec::with_capacity(subject.size))
         .collect();
@@ -804,8 +804,8 @@ mod accounting_tests {
         let original = Program::try_new(
             vec![Domain::Int { min: 0, max: 3 }],
             vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             vec![Op::Input(0)],
             vec![0],

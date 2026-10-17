@@ -558,11 +558,11 @@ impl Check<'_, '_> {
 
     /// Every value of every input position, after the complete domain is
     /// shown to fit the row limit.
-    fn local_values(&self) -> Result<Vec<Vec<i64>>, Refusal> {
+    fn local_values(&self) -> Result<Vec<Vec<i128>>, Refusal> {
         let positions = &self.compiled.positions;
         let fits =
             domain::domain_size(positions).is_some_and(|size| size <= u128::from(MAX_LOCAL_ROWS));
-        let values: Option<Vec<Vec<i64>>> = positions
+        let values: Option<Vec<Vec<i128>>> = positions
             .iter()
             .map(|position| position.domain.values_within(MAX_LOCAL_ROWS))
             .collect();
@@ -581,7 +581,7 @@ impl Check<'_, '_> {
 
     /// Init ⇒ I, then the Authority's genuine genesis and its exact replay.
     fn genesis(&self) -> Result<[u8; 32], Refusal> {
-        let mut tuple: Vec<i64> = Vec::new();
+        let mut tuple: Vec<i128> = Vec::new();
         for position in &self.compiled.positions {
             let declared = match (position.source, position.field) {
                 (Source::State, Some(field)) => self
@@ -665,7 +665,7 @@ impl Check<'_, '_> {
 
     /// One local input: the Authority's actual outcome against the leaf's
     /// obligations, recorded in the local table.
-    fn row(&self, tuple: &[i64], tally: &mut Tally) -> Result<(), Refusal> {
+    fn row(&self, tuple: &[i128], tally: &mut Tally) -> Result<(), Refusal> {
         tally.rows += 1;
         let roots = &self.framer.roots;
         let pre = self.framer.fields(&roots[0], tuple);
@@ -917,7 +917,7 @@ impl Check<'_, '_> {
         let Some(values) = state
             .iter()
             .map(|field| field.domain.values_within(MAX_LOCAL_ROWS))
-            .collect::<Option<Vec<Vec<i64>>>>()
+            .collect::<Option<Vec<Vec<i128>>>>()
         else {
             return Err(self.refusal(
                 Stage::Local,
@@ -1012,7 +1012,7 @@ impl Check<'_, '_> {
         }
     }
 
-    fn witness(&self, tuple: &[i64], note: Option<&str>) -> Value {
+    fn witness(&self, tuple: &[i128], note: Option<&str>) -> Value {
         let mut row: Map<String, Value> = self
             .compiled
             .positions
@@ -1091,14 +1091,14 @@ fn record_reads(reads: &[ReadAttempt], tally: &mut Tally) {
 /// Calls `visit` on every tuple of the product of `values`, last position
 /// fastest, and stops at its first error.
 pub(crate) fn for_each_tuple<E>(
-    values: &[Vec<i64>],
-    mut visit: impl FnMut(&[i64]) -> Result<(), E>,
+    values: &[Vec<i128>],
+    mut visit: impl FnMut(&[i128]) -> Result<(), E>,
 ) -> Result<(), E> {
     if values.iter().any(Vec::is_empty) {
         return Ok(());
     }
     let mut index = vec![0usize; values.len()];
-    let mut tuple: Vec<i64> = values.iter().map(|domain| domain[0]).collect();
+    let mut tuple: Vec<i128> = values.iter().map(|domain| domain[0]).collect();
     loop {
         visit(&tuple)?;
         let mut position = values.len();
@@ -1120,7 +1120,7 @@ pub(crate) fn for_each_tuple<E>(
 
 /// The atom a domain's value number denotes, as the review frames it: a
 /// boolean, an integer, or a sum variant.
-pub(crate) fn atom(domain: &LeafDomain, value: i64) -> c::Atom<'static> {
+pub(crate) fn atom(domain: &LeafDomain, value: i128) -> c::Atom<'static> {
     match domain {
         LeafDomain::Bool => c::Atom::Bool(value != 0),
         LeafDomain::Int { .. } => c::Atom::I128(i128::from(value)),
@@ -1131,12 +1131,12 @@ pub(crate) fn atom(domain: &LeafDomain, value: i64) -> c::Atom<'static> {
     }
 }
 
-pub(crate) fn number(atom: &Atom) -> Option<i64> {
+pub(crate) fn number(atom: &Atom) -> Option<i128> {
     match atom {
-        Atom::Bool(value) => Some(i64::from(*value)),
-        Atom::I128(value) => i64::try_from(*value).ok(),
-        Atom::U128(value) => i64::try_from(*value).ok(),
-        Atom::Sum { variant, .. } => Some(i64::from(*variant)),
+        Atom::Bool(value) => Some(i128::from(*value)),
+        Atom::I128(value) => i128::try_from(*value).ok(),
+        Atom::U128(value) => i128::try_from(*value).ok(),
+        Atom::Sum { variant, .. } => Some(i128::from(*variant)),
         Atom::Text(_) => None,
     }
 }

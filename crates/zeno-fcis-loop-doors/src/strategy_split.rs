@@ -77,7 +77,7 @@ pub struct SplitReport {
     /// Charged proposer work.
     pub work: u64,
 }
-fn table(p: &Program, pts: &[Vec<i64>], w: &mut Work) -> Result<Vec<i64>, Stop> {
+fn table(p: &Program, pts: &[Vec<i128>], w: &mut Work) -> Result<Vec<i128>, Stop> {
     let mut out = Vec::new();
     for point in pts {
         w.charge(p.nodes().len())?;
@@ -112,7 +112,7 @@ fn cover(m: &[Vec<bool>], cols: &[usize], w: &mut Work) -> Result<Option<Vec<usi
 }
 fn trees(
     m: &[Vec<bool>],
-    pred: &[Vec<i64>],
+    pred: &[Vec<i128>],
     sizes: &[usize],
     cols: &[usize],
     depth: u8,
@@ -189,10 +189,10 @@ fn trees(
 }
 fn meaning(
     t: &Tree,
-    terms: &[Vec<i64>],
-    pred: &[Vec<i64>],
+    terms: &[Vec<i128>],
+    pred: &[Vec<i128>],
     w: &mut Work,
-) -> Result<Vec<i64>, Stop> {
+) -> Result<Vec<i128>, Stop> {
     match t {
         Tree::Leaf(i) => {
             w.charge(terms[*i].len())?;
@@ -215,7 +215,7 @@ fn meaning(
 fn leaf_variants(
     t: &Tree,
     m: &[Vec<bool>],
-    pred: &[Vec<i64>],
+    pred: &[Vec<i128>],
     cols: &[usize],
     k: usize,
     w: &mut Work,
@@ -265,7 +265,7 @@ fn leaf_variants(
 fn regions(
     t: &Tree,
     mask: Vec<bool>,
-    pred: &[Vec<i64>],
+    pred: &[Vec<i128>],
     out: &mut Vec<Vec<bool>>,
     w: &mut Work,
 ) -> Result<(), Stop> {
@@ -403,7 +403,7 @@ pub fn split(
     let size = usize::try_from(count).map_err(|_| w.stop("strategy-split-domain", true))?;
     let pts = (0..size)
         .map(|j| columns.iter().map(|col| col[j]).collect())
-        .collect::<Vec<Vec<i64>>>();
+        .collect::<Vec<Vec<i128>>>();
     let truth = table(original, &pts, &mut w)?;
     let mut terms = corpus.integers.clone();
     terms.sort_by_key(|p| p.nodes().len());
@@ -413,8 +413,8 @@ pub fn split(
         if term.inputs() != original.inputs()
             || term.outputs()
                 != [Domain::Int {
-                    min: i64::MIN,
-                    max: i64::MAX,
+                    min: i128::MIN,
+                    max: i128::MAX,
                 }]
         {
             return Err(w.stop("strategy-learn-term-abi", false));
@@ -493,7 +493,7 @@ pub fn split(
                 continue;
             }
             w.charge(meanings.len())?;
-            let mut buckets = BTreeMap::<i64, usize>::new();
+            let mut buckets = BTreeMap::<i128, usize>::new();
             for row in &meanings {
                 *buckets.entry(row[j]).or_default() += 1;
             }

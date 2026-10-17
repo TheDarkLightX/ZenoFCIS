@@ -12,7 +12,7 @@ readme.workspace = true
 
 [dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
+serde_json = { version = "=1.0.151", features = ["raw_value"] }
 zeno-fcis-codec = { version = "=2.4.0", path = "../zeno-fcis-codec" }
 zeno-fcis-compose = { version = "=2.4.0", path = "../zeno-fcis-compose" }
 zeno-fcis-crypto = { version = "=2.4.0", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }

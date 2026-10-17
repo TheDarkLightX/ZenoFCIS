@@ -27,7 +27,7 @@ use crate::{Refusal, Result};
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Term {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
@@ -496,7 +496,7 @@ pub fn from_program(program: &Program, vocab: &Vocabulary, max_size: usize) -> R
                 1,
             ),
             LibOp::Int(value) => (Expr::Int(*value), 1),
-            LibOp::Bool(value) => (Expr::Int(i64::from(*value)), 1),
+            LibOp::Bool(value) => (Expr::Int(i128::from(*value)), 1),
             LibOp::Not(a) => {
                 let (a, s) = at(a).ok_or_else(missing)?;
                 (Expr::negation(a), 1 + s)
@@ -589,8 +589,8 @@ pub fn widened(program: &Program) -> Result<Program> {
         .map(|domain| match Kind::of(*domain) {
             Some(Kind::Bool) => Ok(Domain::Bool),
             Some(Kind::Int) => Ok(Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }),
             None => Err(Refusal::new("unsupported-domain")),
         })

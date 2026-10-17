@@ -32,9 +32,9 @@ pub enum Requirement {
         /// Unique requirement identifier.
         id: String,
         /// Complete declared input tuple.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// Complete declared output tuple.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
 }
 
@@ -397,7 +397,7 @@ impl Specification {
         Ok(())
     }
     /// Validate a complete tuple with exact domain membership.
-    pub fn point(&self, values: &[i64], domains: &[Domain]) -> Result<(), Stop> {
+    pub fn point(&self, values: &[i128], domains: &[Domain]) -> Result<(), Stop> {
         if values.len() != domains.len() || values.iter().zip(domains).any(|(v, d)| !d.contains(*v))
         {
             Err(Stop::Refused("version-space-value-outside-domain".into()))
@@ -455,13 +455,13 @@ pub struct Meaning {
     /// Representative expressions.
     pub expressions: Vec<Expr>,
     /// Input-major complete output tuples.
-    pub table: Vec<Vec<i64>>,
+    pub table: Vec<Vec<i128>>,
 }
 /// An offered output tuple and its exact proposed survivors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Answer {
     /// Complete offered output tuple.
-    pub output: Vec<i64>,
+    pub output: Vec<i128>,
     /// Exact proposed survivor count for this tuple.
     pub remaining: usize,
 }
@@ -469,7 +469,7 @@ pub struct Answer {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Question {
     /// Declared input at which meanings differ.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Product ordinal, last input fastest.
     pub ordinal: usize,
     /// Lexically ordered complete answer partition.
@@ -503,7 +503,7 @@ fn enumerate(
     nodes: Vec<Expr>,
     env: &Env<'_>,
     budget: &mut Budget,
-    seen: &mut BTreeSet<Vec<Vec<i64>>>,
+    seen: &mut BTreeSet<Vec<Vec<i128>>>,
     meanings: &mut Vec<Meaning>,
     kinds: &BTreeMap<usize, Kind>,
 ) -> Result<(), Stop> {
@@ -512,7 +512,7 @@ fn enumerate(
         if let Some(Expr::Hole(k, hole)) = expr::holes_of(node).first().copied() {
             let (lo, hi, choice) = match hole {
                 Hole::Choice(alternatives) => {
-                    (0, i64::try_from(alternatives.len()).unwrap_or(0) - 1, true)
+                    (0, i128::try_from(alternatives.len()).unwrap_or(0) - 1, true)
                 }
                 Hole::Const(Some((lo, hi))) => (*lo, *hi, false),
                 Hole::Const(None) if kinds.get(k) == Some(&Kind::Bool) => (0, 1, false),
@@ -554,7 +554,7 @@ fn enumerate(
         return Ok(());
     }
     budget.retain((env.len as u64).saturating_mul(spec.outputs.len() as u64))?;
-    let table: Vec<Vec<i64>> = (0..env.len)
+    let table: Vec<Vec<i128>> = (0..env.len)
         .map(|k| columns.iter().map(|c| c[k]).collect())
         .collect();
     if !seen.contains(&table) {
@@ -714,7 +714,7 @@ pub fn analyze(spec: &Specification, budget: &mut Budget) -> Result<Proposal, St
             let mut best: Option<((usize, u64, usize), Question)> = None;
             for ordinal in 0..domain {
                 budget.spend((survivors.len() as u64).saturating_mul(spec.outputs.len() as u64))?;
-                let mut buckets = BTreeMap::<Vec<i64>, usize>::new();
+                let mut buckets = BTreeMap::<Vec<i128>, usize>::new();
                 for k in &survivors {
                     *buckets
                         .entry(meanings[*k].table[ordinal].clone())

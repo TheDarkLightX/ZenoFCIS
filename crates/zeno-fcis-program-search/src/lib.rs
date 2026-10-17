@@ -109,7 +109,7 @@ const DIAGRAM: &str = "dd-resynth";
 pub struct Budget {
     /// Largest declared input domain the search enumerates.
     pub max_tuples: u64,
-    /// Most `i64` cells in each of three tables: the original's observations,
+    /// Most `i128` cells in each of three tables: the original's observations,
     /// a program's node signatures, and the top-down plan values. Each table
     /// is limited separately, so together they can hold up to three times
     /// this; smaller buffers are not counted.

@@ -43,19 +43,19 @@ impl Sample {
         z ^ (z >> 31)
     }
 
-    fn within(&mut self, (min, max): (i64, i64)) -> i64 {
+    fn within(&mut self, (min, max): (i128, i128)) -> i128 {
         let width = u64::try_from(i128::from(max) - i128::from(min) + 1).unwrap_or(u64::MAX);
-        let offset = i64::try_from(self.next() % width).unwrap_or_else(fail);
+        let offset = i128::try_from(self.next() % width).unwrap_or_else(fail);
         min + offset
     }
 }
 
 /// A successor value in the evaluator's outputs and inputs.
-fn value(expr: &Expr, outputs: &[i64], input: &dyn Fn(Source, u16) -> i64) -> i64 {
+fn value(expr: &Expr, outputs: &[i128], input: &dyn Fn(Source, u16) -> i128) -> i128 {
     match expr {
-        Expr::Constant(Atom::Bool(value)) => i64::from(*value),
-        Expr::Constant(Atom::I128(value)) => i64::try_from(*value).unwrap_or_else(fail),
-        Expr::Constant(Atom::Sum { variant, .. }) => i64::from(*variant),
+        Expr::Constant(Atom::Bool(value)) => i128::from(*value),
+        Expr::Constant(Atom::I128(value)) => i128::try_from(*value).unwrap_or_else(fail),
+        Expr::Constant(Atom::Sum { variant, .. }) => i128::from(*variant),
         Expr::Input(source, field) => input(*source, *field),
         Expr::Output(index) => outputs[*index],
         other => fail(format!("unexpected successor value {other:?}")),
@@ -63,7 +63,7 @@ fn value(expr: &Expr, outputs: &[i64], input: &dyn Fn(Source, u16) -> i64) -> i6
 }
 
 /// Every tuple of values within `bounds`, in order.
-fn tuples(bounds: &[(i64, i64)]) -> Vec<Vec<i64>> {
+fn tuples(bounds: &[(i128, i128)]) -> Vec<Vec<i128>> {
     let mut out = vec![Vec::new()];
     for (min, max) in bounds {
         out = out
@@ -121,7 +121,7 @@ fn compare(ring: &Ring, n: usize) -> u64 {
         .enumerate()
         .map(|(at, key)| (*key, at))
         .collect();
-    let bounds: Vec<(i64, i64)> = contract
+    let bounds: Vec<(i128, i128)> = contract
         .input_domains
         .iter()
         .map(|domain| match domain {
@@ -157,18 +157,18 @@ fn compare(ring: &Ring, n: usize) -> u64 {
         let free: Vec<usize> = (0..keys.len())
             .filter(|at| *at != target && !local.contains(at))
             .collect();
-        let draws: Vec<Vec<i64>> = if free.iter().all(|at| bounds[*at].0 == bounds[*at].1) {
+        let draws: Vec<Vec<i128>> = if free.iter().all(|at| bounds[*at].0 == bounds[*at].1) {
             vec![free.iter().map(|at| bounds[*at].0).collect()]
         } else {
             (0..SAMPLES)
                 .map(|_| free.iter().map(|at| sample.within(bounds[*at])).collect())
                 .collect()
         };
-        let local_bounds: Vec<(i64, i64)> = local.iter().map(|at| bounds[*at]).collect();
+        let local_bounds: Vec<(i128, i128)> = local.iter().map(|at| bounds[*at]).collect();
         for tuple in tuples(&local_bounds) {
             for draw in &draws {
-                let mut x = vec![0i64; keys.len()];
-                x[target] = i64::try_from(route).unwrap_or_else(fail);
+                let mut x = vec![0i128; keys.len()];
+                x[target] = i128::try_from(route).unwrap_or_else(fail);
                 for (at, v) in local.iter().zip(&tuple).chain(free.iter().zip(draw)) {
                     x[*at] = *v;
                 }
@@ -181,7 +181,7 @@ fn compare(ring: &Ring, n: usize) -> u64 {
                         "n={n} route {route} aggregate output {output} at {x:?}"
                     );
                 }
-                let y: Vec<i64> = leaf_positions.iter().map(|at| x[*at]).collect();
+                let y: Vec<i128> = leaf_positions.iter().map(|at| x[*at]).collect();
                 let leaf_actual = leaf_program.evaluate(&y).unwrap_or_else(fail);
                 for (output, id) in terms.leaf_outputs.iter().enumerate() {
                     assert_eq!(
@@ -197,7 +197,7 @@ fn compare(ring: &Ring, n: usize) -> u64 {
                     Some(&leaf_case),
                     "n={n} route {route} at {x:?}"
                 );
-                let index = |case: i64| usize::try_from(case).unwrap_or_else(fail);
+                let index = |case: i128| usize::try_from(case).unwrap_or_else(fail);
                 let (mine, theirs) = (
                     &contract.branches[index(case)],
                     &leaf_contract.branches[index(leaf_case)],
@@ -206,7 +206,7 @@ fn compare(ring: &Ring, n: usize) -> u64 {
                 let aggregate_input =
                     |source: Source, field: u16| x[position[&aggregate_key(source, field)]];
                 let leaf_input = |source: Source, field: u16| x[leaf_at(source, field)];
-                let leaf_values: BTreeMap<u16, i64> = theirs
+                let leaf_values: BTreeMap<u16, i128> = theirs
                     .assignments
                     .iter()
                     .map(|assignment| {
@@ -216,7 +216,7 @@ fn compare(ring: &Ring, n: usize) -> u64 {
                         )
                     })
                     .collect();
-                let posts: BTreeMap<u16, i64> = mine
+                let posts: BTreeMap<u16, i128> = mine
                     .assignments
                     .iter()
                     .map(|assignment| {

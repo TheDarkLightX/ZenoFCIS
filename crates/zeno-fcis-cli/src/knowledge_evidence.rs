@@ -274,6 +274,7 @@ pub(crate) fn load(
                 Value::String(s) => Ok(K::Value::Text(s)),
                 Value::Number(n) => n
                     .as_i64()
+                    .map(i128::from)
                     .map(K::Value::Integer)
                     .ok_or_else(|| error("kb-evidence-statement")),
                 _ => Err(error("kb-evidence-statement")),

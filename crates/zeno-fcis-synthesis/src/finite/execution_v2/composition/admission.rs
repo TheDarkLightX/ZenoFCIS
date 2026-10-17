@@ -438,13 +438,39 @@ fn reason(d: &Descriptor<'_>, class: Class, reason_id: Option<u32>) -> bool {
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::branches(d,fields@),))]
 fn branches(d: &Descriptor<'_>, fields: &[InputField]) -> bool {
+    // Read the native length even when cardinality arithmetic refuses early.
+    let branch_count = d.branches.len();
     if d.decision_output >= d.output_types.len() {
         return false;
     }
     let InputLeaf::I128 { min, max } = d.output_types[d.decision_output] else {
         return false;
     };
-    if min > max || max as i128 - min as i128 + 1 != d.branches.len() as i128 {
+    if min > max {
+        return false;
+    }
+    let cardinality = match max.checked_sub(min) {
+        Some(span) => match span.checked_add(1) {
+            Some(cardinality) => cardinality,
+            None => {
+                #[cfg(verus_keep_ghost)]
+                proof! {
+                    assert(d.branches@.len() <= usize::MAX);
+                    assert(max as int - min as int + 1 > d.branches@.len());
+                }
+                return false;
+            }
+        },
+        None => {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(d.branches@.len() <= usize::MAX);
+                assert(max as int - min as int + 1 > d.branches@.len());
+            }
+            return false;
+        }
+    };
+    if cardinality != branch_count as i128 {
         return false;
     }
     let mut i = 0usize;

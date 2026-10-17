@@ -202,7 +202,7 @@ fn four_node_macro_construction_names_the_three_node_search_bound() {
         {"name":"y","domain":{"kind":"Int","min":-1,"max":1}}],
         "outputs":[{"kind":"Int","min":0,"max":2}],"max_size":3,
         "vocabulary":{"constants":[],"arithmetic":["+"],"macros":["abs"]},
-        "examples":(-1i64..=1).flat_map(|x|(-1i64..=1).map(move|y|json!({"input":[x,y],"output":[(x+y).abs()]}))).collect::<Vec<_>>()});
+        "examples":(-1i128..=1).flat_map(|x|(-1i128..=1).map(move|y|json!({"input":[x,y],"output":[(x+y).abs()]}))).collect::<Vec<_>>()});
     let small = d.document("small.json", &spec);
     let done = run(&["loop", "learn", "--spec", text(&small)]);
     let result = report(&done);

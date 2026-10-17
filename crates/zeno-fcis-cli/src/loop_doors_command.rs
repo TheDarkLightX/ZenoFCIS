@@ -245,7 +245,7 @@ pub(crate) enum DoorCommand {
         expressions: PathBuf,
         /// Input values in the original's ABI order.
         #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     /// Ask about the largest region where the contract's laws leave the decision open; no session.
     Question {
@@ -534,15 +534,15 @@ fn doors_result(exit: u8, door: &str, status: &str, mut detail: Value) -> (u8, V
 /// What a document declares about names.
 struct VocabularySpec {
     inputs: Vec<String>,
-    variants: BTreeMap<String, BTreeMap<String, i64>>,
-    cases: Option<i64>,
+    variants: BTreeMap<String, BTreeMap<String, i128>>,
+    cases: Option<i128>,
 }
 
 /// A parsed expressions document (texts not yet parsed as expressions).
 struct Document {
     vocabulary: Option<VocabularySpec>,
     outputs: Vec<String>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
 }
 
 fn identifier(text: &str) -> bool {
@@ -562,7 +562,7 @@ fn only_keys(object: &Map<String, Value>, allowed: &[&str], what: &str) -> Resul
     }
 }
 
-fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i64>, String> {
+fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i128>, String> {
     let object = value.as_object().ok_or_else(|| format!("{what}-shape"))?;
     let mut out = BTreeMap::new();
     for (name, value) in object {
@@ -573,6 +573,7 @@ fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i64>, Strin
             name.clone(),
             value
                 .as_i64()
+                .map(i128::from)
                 .ok_or_else(|| format!("{what}-value:{name}"))?,
         );
     }
@@ -601,6 +602,7 @@ fn vocabulary_spec(value: &Value) -> Result<VocabularySpec, String> {
         Some(value) => Some(
             value
                 .as_i64()
+                .map(i128::from)
                 .filter(|n| (1..=1 << 16).contains(n))
                 .ok_or("vocabulary-cases")?,
         ),
@@ -1612,7 +1614,7 @@ fn explanation(
 
 struct Instance {
     name: String,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     program: Vec<u8>,
     optimize_nodes: Option<usize>,
     fit: bool,
@@ -1622,7 +1624,7 @@ struct Instance {
 /// path, optional optimize-result path, and whether it is fitted on.
 type Listed = (
     String,
-    BTreeMap<String, i64>,
+    BTreeMap<String, i128>,
     PathBuf,
     Option<PathBuf>,
     bool,
@@ -1780,7 +1782,7 @@ struct Row {
     json: Value,
     verdict: String,
     holes: Option<BTreeMap<usize, Fill>>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     nodes: Option<usize>,
     optimize_nodes: Option<usize>,
     fit: bool,
@@ -1969,7 +1971,7 @@ fn family_command(instances: &Path, program: &Path, fit: bool) -> (u8, Value) {
         .map(|n| zeno_fcis_loop_doors::expr::holes_of(n).len())
         .sum();
     if fit && hole_count > 0 {
-        let samples: Vec<(BTreeMap<String, i64>, BTreeMap<usize, Fill>)> = rows
+        let samples: Vec<(BTreeMap<String, i128>, BTreeMap<usize, Fill>)> = rows
             .iter()
             .filter(|r| r.fit && r.json["sketch"]["status"] == "completed")
             .filter_map(|r| r.holes.clone().map(|h| (r.parameters.clone(), h)))
@@ -2050,7 +2052,7 @@ fn form_json(form: Option<&Form>) -> Value {
 
 // --- the meaning key ---------------------------------------------------------------
 
-fn evaluate_command(original: &Path, expressions: &Path, input: &[i64]) -> (u8, Value) {
+fn evaluate_command(original: &Path, expressions: &Path, input: &[i128]) -> (u8, Value) {
     use zeno_fcis_loop_doors::expr::kind_of;
     use zeno_fcis_synthesis::finite::{Domain, Op};
     let bytes = match crate::transform_command::read_bounded(original, PROGRAM_LIMIT) {
@@ -2094,8 +2096,8 @@ fn evaluate_command(original: &Path, expressions: &Path, input: &[i64]) -> (u8, 
     } else {
         (
             Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             },
             Op::Int(0),
         )
@@ -2696,6 +2698,52 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evaluate_uses_i128_inputs_and_full_width_arithmetic_outputs() {
+        use zeno_fcis_synthesis::finite::{Domain, Op};
+        let wide = 1i128 << 100;
+        let program = Program::try_new(
+            vec![Domain::Int {
+                min: wide,
+                max: wide,
+            }],
+            vec![Domain::Int {
+                min: 0,
+                max: i128::MAX,
+            }],
+            vec![Op::Input(0)],
+            vec![0],
+        )
+        .unwrap();
+        let scratch = std::env::temp_dir().join(format!(
+            "loop-evaluate-wide-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&scratch).unwrap();
+        let original = scratch.join("original.zcve");
+        let expressions = scratch.join("expressions.json");
+        std::fs::write(&original, encode(&program).unwrap()).unwrap();
+        for (expression, expected) in [
+            ("mul_div_floor(x, 3, 2)", (wide * 3 / 2).to_string()),
+            ("products_ge(x, 3, x, 2)", "1".to_owned()),
+        ] {
+            std::fs::write(
+                &expressions,
+                json!({
+                    "schema":"zeno-fcis/loop-expressions/1", "vocabulary":{"inputs":["x"]},
+                    "outputs":[expression],
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let (status, value) = evaluate_command(&original, &expressions, &[wide]);
+            assert_eq!(status, crate::OK, "{value}");
+            assert_eq!(value["detail"]["values"], json!([expected]));
+        }
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
 
     #[test]
     fn documents_are_bounded_and_fail_closed() {

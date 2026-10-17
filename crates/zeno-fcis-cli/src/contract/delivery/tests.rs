@@ -42,7 +42,7 @@ fn generated(
     })
 }
 
-fn decide(project: &str, json: &Value, tuple: &[i64]) -> Outcome {
+fn decide(project: &str, json: &Value, tuple: &[i128]) -> Outcome {
     let rules = Rules::read(&json.to_string())
         .unwrap_or_else(|error| panic!("test operation failed: {error:?}"));
     let declarations = Declarations::read(project, &rules.leaf_bindings)
@@ -79,7 +79,7 @@ fn escrow_actual_payouts_match_released_holds_and_double_payout_refuses_at_two()
         if line.trim().is_empty() || line.starts_with('#') {
             continue;
         }
-        let tuple: Vec<i64> = line
+        let tuple: Vec<i128> = line
             .split('|')
             .next()
             .unwrap_or_else(|| panic!("required fixture value is missing"))

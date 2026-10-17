@@ -45,14 +45,14 @@ const STEP_ALLOWANCE: u64 = 5;
 #[derive(Clone, Copy, Debug)]
 pub enum ScalarDomain {
     Bool,
-    Int { min: i64, max: i64 },
+    Int { min: i128, max: i128 },
 }
 
 /// A typed inverse map from a scalar to an original value.
 #[derive(Clone, Debug)]
 pub enum InputLeaf {
     Bool,
-    I128 { min: i64, max: i64 },
+    I128 { min: i128, max: i128 },
     Sum { type_id: u32, variants: Vec<u16> },
 }
 
@@ -537,7 +537,7 @@ struct Outputs {
 impl Outputs {
     /// The case index, from 0 to `last`.
     fn selection(&mut self, ast: Ast, last: usize) {
-        let last = i64::try_from(last).unwrap_or(i64::MAX);
+        let last = i128::try_from(last).unwrap_or(i128::MAX);
         self.entries.push((ast, None));
         self.types.push(InputLeaf::I128 { min: 0, max: last });
         self.domains.push(ScalarDomain::Int { min: 0, max: last });
@@ -1212,7 +1212,7 @@ fn domain(declarations: &Declarations, type_id: u32) -> Result<Domain, ContractE
     })
 }
 
-/// The input leaf of a scalar type; `wide` integers span the whole 64-bit
+/// The input leaf of a scalar type; `wide` integers span the whole 128-bit
 /// program range, as computed outputs do.
 pub fn input_leaf(
     declarations: &Declarations,
@@ -1242,8 +1242,8 @@ pub fn input_leaf(
             ));
         }
         TypeKind::I128 { .. } if wide => InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
         TypeKind::I128 { min, max } => {
             let (min, max) = program_bounds(type_id, min, max)?;
@@ -1267,20 +1267,20 @@ fn scalar_domain(
         InputLeaf::Bool => ScalarDomain::Bool,
         InputLeaf::I128 { min, max } => ScalarDomain::Int { min, max },
         InputLeaf::Sum { variants, .. } => ScalarDomain::Int {
-            min: variants.first().copied().map_or(0, i64::from),
-            max: variants.last().copied().map_or(0, i64::from),
+            min: variants.first().copied().map_or(0, i128::from),
+            max: variants.last().copied().map_or(0, i128::from),
         },
     })
 }
 
-fn program_bounds(type_id: u32, min: i128, max: i128) -> Result<(i64, i64), ContractError> {
-    i64::try_from(min)
+fn program_bounds(type_id: u32, min: i128, max: i128) -> Result<(i128, i128), ContractError> {
+    i128::try_from(min)
         .ok()
-        .zip(i64::try_from(max).ok())
+        .zip(i128::try_from(max).ok())
         .ok_or_else(|| {
             ContractError::new(
                 "project.zeno",
-                format!("type {type_id} range exceeds the 64-bit program range"),
+                format!("type {type_id} range exceeds the 128-bit program range"),
             )
         })
 }
@@ -1388,6 +1388,9 @@ fn contract_op(op: &LibraryOp, place: &str) -> Result<ScalarOp, ContractError> {
         }
         LibraryOp::MulDivCeil(a, b, d) => {
             ScalarOp::MulDiv(super::expr::Rounding::Ceil, index(a), index(b), index(d))
+        }
+        LibraryOp::SignedMulDivFloor(a, b, d) => {
+            ScalarOp::SignedMulDivFloor(index(a), index(b), index(d))
         }
         LibraryOp::ProductsGe(a, b) => ScalarOp::ProductsGe(a.map(index), b.map(index)),
         LibraryOp::Eq(a, b) => ScalarOp::Eq(index(a), index(b)),

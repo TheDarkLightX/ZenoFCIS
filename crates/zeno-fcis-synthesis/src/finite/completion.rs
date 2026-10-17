@@ -55,26 +55,26 @@ pub enum CompletionError {
     /// A declared program traps, including an unselected command.
     Evaluation {
         /// Exact input tuple: state, followed by command for the step program.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// Original interpreter error.
         source: EvaluationError,
     },
     /// A rejected command attempts to change the modeled state.
     RejectedStateChange {
         /// Exact state/command input.
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     /// First lexicographic state with no accepted path to a terminal state.
     NoExit {
         /// Exact finite state tuple.
-        state: Vec<i64>,
+        state: Vec<i128>,
     },
     /// A proposed plan is not evidence for the independently supplied problem.
     InvalidPlan {
         /// Stable diagnostic.
         reason: &'static str,
         /// Affected state, or absent for a whole-plan binding/shape failure.
-        state: Option<Vec<i64>>,
+        state: Option<Vec<i128>>,
     },
     /// Canonical encoding or identity construction failed.
     Encoding(SynthesisError),
@@ -252,7 +252,7 @@ impl CompletionProblem {
     fn commands(&self) -> Result<Space, CompletionError> {
         Space::try_new(self.command_domains(), MAX_INPUTS).map_err(CompletionError::Resource)
     }
-    fn terminal(&self, state: &[i64]) -> Result<bool, CompletionError> {
+    fn terminal(&self, state: &[i128]) -> Result<bool, CompletionError> {
         evaluate(&self.terminal, state).map(|output| output == [1])
     }
 }
@@ -263,7 +263,7 @@ pub struct CompletionStep {
     /// Zero at terminal states; strictly decreases along the selected commands.
     pub remaining: u32,
     /// Empty at terminal states; otherwise an exact admitted command tuple.
-    pub command: Vec<i64>,
+    pub command: Vec<i128>,
 }
 /// Transport data only. Use `verify_completion` against your own expected problem.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,7 +297,7 @@ impl VerifiedCompletion {
             .map_err(CompletionError::Encoding)
     }
     /// Gets the checked next command, or `None` at a terminal state.
-    pub fn next_command(&self, state: &[i64]) -> Result<Option<&[i64]>, CompletionError> {
+    pub fn next_command(&self, state: &[i128]) -> Result<Option<&[i128]>, CompletionError> {
         let index = tuple_index(&self.domains, state)?;
         let row = &self.plan.steps[index];
         Ok((row.remaining != 0).then_some(row.command.as_slice()))
@@ -381,7 +381,7 @@ pub fn verify_completion_bytes(
             .iter()
             .map(|value| match value.view() {
                 ValueRef::I128(value) => {
-                    i64::try_from(value).map_err(|_| invalid_plan("command-range", None))
+                    i128::try_from(value).map_err(|_| invalid_plan("command-range", None))
                 }
                 _ => Err(invalid_plan("command-scalar", None)),
             })
@@ -502,8 +502,8 @@ pub fn verify_completion(
 
 fn successor(
     problem: &CompletionProblem,
-    state: &[i64],
-    command: &[i64],
+    state: &[i128],
+    command: &[i128],
 ) -> Result<Option<usize>, CompletionError> {
     let mut input = state.to_vec();
     input.extend_from_slice(command);
@@ -517,7 +517,7 @@ fn successor(
     tuple_index(problem.state_domains(), &output[1..]).map(Some)
 }
 
-fn evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, CompletionError> {
+fn evaluate(program: &Program, input: &[i128]) -> Result<Vec<i128>, CompletionError> {
     program
         .evaluate(input)
         .map_err(|source| CompletionError::Evaluation {
@@ -526,7 +526,7 @@ fn evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, CompletionErro
         })
 }
 
-fn tuple_index(domains: &[Domain], values: &[i64]) -> Result<usize, CompletionError> {
+fn tuple_index(domains: &[Domain], values: &[i128]) -> Result<usize, CompletionError> {
     if !ir::admitted(domains, values) {
         return Err(CompletionError::Invalid("state-domain"));
     }
@@ -589,6 +589,6 @@ fn plan_value(problem_hash: Hash32, steps: &[CompletionStep]) -> Result<Value, E
         )?,
     ])
 }
-fn invalid_plan(reason: &'static str, state: Option<Vec<i64>>) -> CompletionError {
+fn invalid_plan(reason: &'static str, state: Option<Vec<i128>>) -> CompletionError {
     CompletionError::InvalidPlan { reason, state }
 }

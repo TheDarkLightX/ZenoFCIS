@@ -285,7 +285,11 @@ pub(super) fn command(
             };
             let vector = list(&input["vector"])?
                 .iter()
-                .map(|v| v.as_i64().ok_or("strategy-input-value".into()))
+                .map(|v| {
+                    v.as_i64()
+                        .map(i128::from)
+                        .ok_or("strategy-input-value".into())
+                })
                 .collect::<Result<Vec<_>, String>>()?;
             let mut observed = BTreeMap::new();
             for pair in list(&input["observations"])? {
@@ -294,7 +298,10 @@ pub(super) fn command(
                     return Err("strategy-observation".into());
                 }
                 let wire = int(&pair[0])?;
-                let value = pair[1].as_i64().ok_or("strategy-observation-value")?;
+                let value = pair[1]
+                    .as_i64()
+                    .map(i128::from)
+                    .ok_or("strategy-observation-value")?;
                 if observed.insert(wire, value).is_some() {
                     return Err("strategy-duplicate-observation".into());
                 }

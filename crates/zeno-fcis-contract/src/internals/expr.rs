@@ -67,11 +67,12 @@ pub const OPERATORS: [(&str, Binary); 12] = [
 ];
 
 /// Every function with its number of arguments.
-pub const FUNCTIONS: [(&str, usize); 7] = [
+pub const FUNCTIONS: [(&str, usize); 8] = [
     ("choose", 3),
     ("div_floor", 2),
     ("div_ceil", 2),
     ("mul_div_floor", 3),
+    ("signed_mul_div_floor", 3),
     ("mul_div_ceil", 3),
     ("products_ge", 4),
     ("products_ge", 6),
@@ -100,6 +101,7 @@ pub enum Ast {
     Div(Rounding, Box<Ast>, Box<Ast>),
     /// Explicit fused product/division, distinct from Div(Mul(..), ..).
     MulDiv(Rounding, Box<Ast>, Box<Ast>, Box<Ast>),
+    SignedMulDivFloor(Box<Ast>, Box<Ast>, Box<Ast>),
     /// Four arguments compare two-factor products; six compare three factors.
     ProductsGe(Box<[Ast]>),
 }
@@ -188,7 +190,20 @@ impl<'t> Parser<'t> {
                 inner
             }
             "!" => Ast::Not(Box::new(self.expression(8, depth + 1)?)),
-            "-" => Ast::Neg(Box::new(self.expression(8, depth + 1)?)),
+            "-" => {
+                // The minimum has no positive i128 magnitude. Preserve the
+                // existing Neg tree for every other expression and literal.
+                if self
+                    .tokens
+                    .get(self.index)
+                    .is_some_and(|digits| digits.parse::<u128>() == Ok(1u128 << 127))
+                {
+                    self.index += 1;
+                    Ast::Int(i128::MIN)
+                } else {
+                    Ast::Neg(Box::new(self.expression(8, depth + 1)?))
+                }
+            }
             "true" => Ast::Bool(true),
             "false" => Ast::Bool(false),
             _ if token.as_bytes()[0].is_ascii_digit() => Ast::Int(
@@ -236,6 +251,9 @@ fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let mut arguments = arguments.into_iter().map(Box::new);
     let mut next = || arguments.next();
     let call = match (name, count, next(), next(), next()) {
+        ("signed_mul_div_floor", 3, Some(a), Some(b), Some(d)) => {
+            Some(Ast::SignedMulDivFloor(a, b, d))
+        }
         ("mul_div_floor", 3, Some(a), Some(b), Some(d)) => {
             Some(Ast::MulDiv(Rounding::Floor, a, b, d))
         }
@@ -274,6 +292,26 @@ pub fn render(ast: &Ast) -> String {
     let mut text = String::new();
     write(ast, 0, &mut text);
     text
+}
+
+#[cfg(test)]
+mod signed_literal_tests {
+    use super::*;
+
+    #[test]
+    fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {
+        assert_eq!(parse(&i128::MIN.to_string()), Ok(Ast::Int(i128::MIN)));
+        assert_eq!(parse(&i128::MAX.to_string()), Ok(Ast::Int(i128::MAX)));
+        assert_eq!(parse("-1"), Ok(Ast::Neg(Box::new(Ast::Int(1)))));
+        for text in [
+            "170141183460469231731687303715884105728",
+            "-170141183460469231731687303715884105729",
+        ] {
+            assert!(parse(text).is_err(), "{text}");
+        }
+        let tree = Ast::Int(i128::MIN);
+        assert_eq!(parse(&render(&tree)), Ok(tree));
+    }
 }
 
 /// Writes `ast` where only operators binding at least as tightly as `level`
@@ -341,6 +379,7 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
             &[a, b, d],
             out,
         ),
+        Ast::SignedMulDivFloor(a, b, d) => call("signed_mul_div_floor", &[a, b, d], out),
         Ast::ProductsGe(arguments) => {
             call("products_ge", &arguments.iter().collect::<Vec<_>>(), out)
         }
@@ -384,6 +423,9 @@ fn expand_with<'v>(
             recurse(then, stack)?,
             recurse(otherwise, stack)?,
         ),
+        Ast::SignedMulDivFloor(a, b, d) => {
+            Ast::SignedMulDivFloor(recurse(a, stack)?, recurse(b, stack)?, recurse(d, stack)?)
+        }
         Ast::MulDiv(rounding, a, b, d) => Ast::MulDiv(
             *rounding,
             recurse(a, stack)?,
@@ -474,6 +516,11 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ValueExpr::Add(left, right) => binary(Binary::Add, left, right),
         ValueExpr::Sub(left, right) => binary(Binary::Sub, left, right),
         ValueExpr::Mul(left, right) => binary(Binary::Mul, left, right),
+        ValueExpr::SignedMulDivFloor(a, b, d) => Ok(Ast::SignedMulDivFloor(
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+            Box::new(value(d)?),
+        )),
         ValueExpr::Div(mode, left, right) => {
             let rounding = match mode {
                 DivisionMode::Floor => Rounding::Floor,

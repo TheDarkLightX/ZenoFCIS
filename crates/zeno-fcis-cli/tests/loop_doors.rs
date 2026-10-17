@@ -95,7 +95,7 @@ fn document(outputs: &[&str]) -> Value {
     json!({"schema": "zeno-fcis/loop-expressions/1", "vocabulary": counter_vocabulary(), "outputs": outputs})
 }
 
-fn decimal(value: &Value) -> i64 {
+fn decimal(value: &Value) -> i128 {
     value
         .as_str()
         .and_then(|text| text.parse().ok())
@@ -369,7 +369,7 @@ fn open_with(directory: &Directory, name: &str, extra: &[&str]) -> (String, Vec<
         "--session",
         &session,
         "--profile",
-        "checked-i64-v1",
+        "checked-i128-v1",
     ];
     arguments.extend_from_slice(extra);
     let (exit, report) = run(&arguments);
@@ -552,7 +552,7 @@ fn a_sketch_completes_or_is_unrealizable_with_a_witness() {
     );
 }
 
-fn counter_manifest(directory: &Directory, fitted: &[i64]) -> PathBuf {
+fn counter_manifest(directory: &Directory, fitted: &[i128]) -> PathBuf {
     let mut instances = Vec::new();
     for c in 1..=8 {
         let name = format!("bounded-counter-c{c}");
@@ -870,7 +870,7 @@ fn a_sketch_search_stopped_by_its_budget_is_inconclusive_and_spends_nothing() {
         "--session",
         &session,
         "--profile",
-        "checked-i64-v1",
+        "checked-i128-v1",
     ]);
     assert_eq!(exit, Some(0), "{report}");
     let sum = ["?c[0..1]"; 16].join(" + ");
@@ -1044,8 +1044,7 @@ fn a_family_sketch_stopped_by_its_budget_is_never_unrealizable() {
     // ?c = 0 and any values for the other holes, but its padded branch makes
     // the search run out of work before it can enumerate the classes.
     let directory = Directory::new();
-    let int =
-        |min: i64, max: i64| json!({"kind": "Int", "min": min.to_string(), "max": max.to_string()});
+    let int = |min: i128, max: i128| json!({"kind": "Int", "min": min.to_string(), "max": max.to_string()});
     let program = json!({
         "inputs": [int(0, 360), int(0, 360)],
         "outputs": [int(0, 720)],

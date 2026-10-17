@@ -56,26 +56,26 @@ fn leaf(type_id: u32, ids: &[u16], sum: bool) -> InputLeaf {
         .enumerate()
         .map(|(code, &id)| Variant {
             id,
-            code: code as i64,
+            code: code as i128,
         })
         .collect();
     if sum {
         InputLeaf::Sum {
             type_id,
             min: 0,
-            max: ids.len() as i64 - 1,
+            max: ids.len() as i128 - 1,
             variants,
         }
     } else {
         InputLeaf::Enum {
             type_id,
             min: 0,
-            max: ids.len() as i64 - 1,
+            max: ids.len() as i128 - 1,
             variants,
         }
     }
 }
-fn int(id: u16, min: i64, max: i64) -> InputField {
+fn int(id: u16, min: i128, max: i128) -> InputField {
     InputField {
         id,
         leaf: InputLeaf::I128 { min, max },
@@ -192,11 +192,11 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
         };
         x
     }
-    fn number(v: &Value) -> i64 {
+    fn number(v: &Value) -> i128 {
         let ValueRef::I128(x) = v.view() else {
             panic!("artifact integer")
         };
-        i64::try_from(x)
+        i128::try_from(x)
             .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
     }
     fn domains(v: &Value) -> Vec<ScalarDomain> {
@@ -1333,7 +1333,7 @@ fn with_account(run: impl FnOnce(&Descriptor<'_>)) {
         variants: (120..=122)
             .map(|id| Variant {
                 id,
-                code: id as i64,
+                code: id as i128,
             })
             .collect(),
     };
@@ -1358,12 +1358,12 @@ fn with_account(run: impl FnOnce(&Descriptor<'_>)) {
     let outputs = [
         InputLeaf::I128 { min: 0, max: 6 },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     ];
     let assign = |field, value, max| Assignment {

@@ -9,7 +9,9 @@ use crate::{AstPath, Diagnostic, DiagnosticCode, DiagnosticStage, SourceLimits, 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum TokenKind {
     Ident(Box<str>),
-    Number(u64),
+    // A magnitude, so the signed i128 minimum can be read after a minus sign.
+    // Identifiers, counts and resource limits narrow at their existing readers.
+    Number(u128),
     Hex(Box<str>),
     LBrace,
     RBrace,
@@ -149,7 +151,7 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token>, Vec<Diagno
                 column = column.saturating_add(1);
             }
             let value = &source[start..index];
-            match value.parse::<u64>() {
+            match value.parse::<u128>() {
                 Ok(number) => tokens.push(Token {
                     kind: TokenKind::Number(number),
                     span: span(start, index, line, start_column),
@@ -157,9 +159,9 @@ pub(crate) fn lex(source: &str, limits: SourceLimits) -> (Vec<Token>, Vec<Diagno
                 Err(_) => diagnostics.push(diagnostic(
                     DiagnosticCode::InvalidNumber,
                     span(start, index, line, start_column),
-                    "unsigned 64-bit integer",
+                    "unsigned 128-bit integer magnitude",
                     value,
-                    "use a decimal value within the u64 range",
+                    "use a decimal magnitude within the u128 range",
                 )),
             }
             continue;

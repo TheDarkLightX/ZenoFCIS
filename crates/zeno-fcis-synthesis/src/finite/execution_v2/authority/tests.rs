@@ -492,8 +492,8 @@ fn complete_schema_metadata_preserves_ranges_ids_codes_and_limits() {
         InputField {
             id: 0,
             leaf: InputLeaf::I128 {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             },
         },
         InputField {
@@ -519,16 +519,16 @@ fn complete_schema_metadata_preserves_ranges_ids_codes_and_limits() {
             id: u16::MAX,
             leaf: InputLeaf::Sum {
                 type_id: u32::MAX,
-                min: i64::MIN,
-                max: i64::MIN + 1,
+                min: i128::MIN,
+                max: i128::MIN + 1,
                 variants: vec![
                     InputVariant {
                         id: 0,
-                        code: i64::MIN + 1,
+                        code: i128::MIN + 1,
                     },
                     InputVariant {
                         id: u16::MAX,
-                        code: i64::MIN,
+                        code: i128::MIN,
                     },
                 ],
             },
@@ -541,8 +541,8 @@ fn complete_schema_metadata_preserves_ranges_ids_codes_and_limits() {
         4,
         0,
         0,
-        i64::MIN as i128 as u128,
-        i64::MAX as u128,
+        i128::MIN as i128 as u128,
+        i128::MAX as u128,
         1,
         1,
         2,
@@ -558,13 +558,13 @@ fn complete_schema_metadata_preserves_ranges_ids_codes_and_limits() {
         u16::MAX as u128,
         3,
         u32::MAX as u128,
-        i64::MIN as i128 as u128,
-        (i64::MIN + 1) as i128 as u128,
+        i128::MIN as i128 as u128,
+        (i128::MIN + 1) as i128 as u128,
         2,
         0,
-        (i64::MIN + 1) as i128 as u128,
+        (i128::MIN + 1) as i128 as u128,
         u16::MAX as u128,
-        i64::MIN as i128 as u128,
+        i128::MIN as i128 as u128,
     ] {
         w(&mut expected, value);
     }
@@ -693,14 +693,14 @@ fn complete_scalar_graph_metadata_keeps_all_nodes_domains_and_root_order() {
     let inputs = [
         D::Bool,
         D::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     ];
     let outputs = [D::Int { min: -2, max: 4 }, D::Bool];
     let nodes = [
         Op::Input(u16::MAX),
-        Op::Int(i64::MIN),
+        Op::Int(i128::MIN),
         Op::Bool(true),
         Op::Add(0, u16::MAX),
         Op::Sub(u16::MAX, 1),
@@ -724,8 +724,8 @@ fn complete_scalar_graph_metadata_keeps_all_nodes_domains_and_root_order() {
         2,
         0,
         1,
-        i64::MIN as i128 as u128,
-        i64::MAX as u128,
+        i128::MIN as i128 as u128,
+        i128::MAX as u128,
         2,
         1,
         (-2i128) as u128,
@@ -735,7 +735,7 @@ fn complete_scalar_graph_metadata_keeps_all_nodes_domains_and_root_order() {
         0,
         u16::MAX as u128,
         1,
-        i64::MIN as i128 as u128,
+        i128::MIN as i128 as u128,
         2,
         1,
         3,

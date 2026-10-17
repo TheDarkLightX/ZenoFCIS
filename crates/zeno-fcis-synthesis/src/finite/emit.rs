@@ -43,17 +43,17 @@ pub trait TargetEmitter {
 
 /// Rust module emitter: core-only code with stack-allocated inputs and outputs.
 pub struct RustEmitter;
-/// Python module emitter: exact built-in integers, with checked i64 intermediates.
+/// Python module emitter: exact built-in integers, with checked i128 intermediates.
 pub struct PythonEmitter;
 /// JavaScript ES module emitter: `BigInt` values behind an immutable string ABI.
 pub struct JavaScriptEmitter;
 
-const RUST_ABI: &str = "transition(input: &[i64]) -> Option<[i64; outputs]>; an out-of-domain input, \
+const RUST_ABI: &str = "transition(input: &[i128]) -> Option<[i128; outputs]>; an out-of-domain input, \
      a checked-arithmetic trap, or an out-of-domain output returns None";
 const PYTHON_ABI: &str = "transition(input: tuple[int, ...]) -> tuple[int, ...] | None; the argument must be \
      an exact tuple of built-in int, excluding bool and int subclasses";
 const JAVASCRIPT_ABI: &str = "transition(input: string) -> string | null; the argument must be a primitive string of \
-     exactly `inputs` canonical signed decimal i64 tokens separated by single ASCII spaces \
+     exactly `inputs` canonical signed decimal i128 tokens separated by single ASCII spaces \
      (the empty string for zero fields); the result spells the complete output tuple the same \
      way, and null covers every rejected input, domain, arithmetic, or output case";
 
@@ -73,7 +73,7 @@ impl TargetEmitter for RustEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "rust",
-            revision: 2,
+            revision: 3,
             extension: "rs",
         }
     }
@@ -85,11 +85,11 @@ impl TargetEmitter for RustEmitter {
     }
     fn emit(&self, program: &Program) -> Result<String, Error> {
         let mut source = String::from(
-            "// Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.\n/// Evaluates the generated finite program; no commit authority.\n#[rustfmt::skip]\n",
+            "// Generated from zeno-fcis/finite-i128/1. Pure code; no commit authority.\n/// Evaluates the generated finite program; no commit authority.\n#[rustfmt::skip]\n",
         );
         writeln!(
             source,
-            "pub fn transition(input: &[i64]) -> Option<[i64; {}]> {{",
+            "pub fn transition(input: &[i128]) -> Option<[i128; {}]> {{",
             program.outputs().len()
         )
         .map_err(|_| Error::Invalid("format"))?;
@@ -103,20 +103,23 @@ impl TargetEmitter for RustEmitter {
             let (min, max) = d.bounds();
             writeln!(
                 source,
-                "    if !({min}_i64..={max}_i64).contains(&input[{i}]) {{ return None; }}"
+                "    if !({min}_i128..={max}_i128).contains(&input[{i}]) {{ return None; }}"
             )
             .map_err(|_| Error::Invalid("format"))?;
         }
         for (i, op) in program.nodes().iter().enumerate() {
             let expression = match *op {
                 Op::Input(a) => format!("input[{a}]"),
-                Op::Int(a) => format!("{a}_i64"),
-                Op::Bool(a) => format!("{}_i64", i64::from(a)),
+                Op::Int(a) => format!("{a}_i128"),
+                Op::Bool(a) => format!("{}_i128", i128::from(a)),
                 Op::Add(a, b) => format!("v{a}.checked_add(v{b})?"),
                 Op::Sub(a, b) => format!("v{a}.checked_sub(v{b})?"),
                 Op::Mul(a, b) => format!("arithmetic::scalar::multiply(v{a},v{b})?"),
                 Op::DivFloor(a, b) => format!("arithmetic::scalar::divide(false,v{a},v{b})?"),
                 Op::DivCeil(a, b) => format!("arithmetic::scalar::divide(true,v{a},v{b})?"),
+                Op::SignedMulDivFloor(a, b, d) => {
+                    format!("arithmetic::scalar::signed_mul_div_floor(v{a},v{b},v{d})?")
+                }
                 Op::MulDivFloor(a, b, d) => {
                     format!("arithmetic::scalar::mul_div(false,v{a},v{b},v{d})?")
                 }
@@ -124,20 +127,20 @@ impl TargetEmitter for RustEmitter {
                     format!("arithmetic::scalar::mul_div(true,v{a},v{b},v{d})?")
                 }
                 Op::ProductsGe(a, b) => format!(
-                    "i64::from(arithmetic::scalar::products_ge(v{},v{},v{},v{},v{},v{})?)",
+                    "i128::from(arithmetic::scalar::products_ge(v{},v{},v{},v{},v{},v{})?)",
                     a[0], a[1], a[2], b[0], b[1], b[2]
                 ),
-                Op::Eq(a, b) => format!("i64::from(v{a} == v{b})"),
-                Op::Lt(a, b) => format!("i64::from(v{a} < v{b})"),
-                Op::And(a, b) => format!("i64::from(v{a} == 1 && v{b} == 1)"),
-                Op::Not(a) => format!("i64::from(v{a} == 0)"),
+                Op::Eq(a, b) => format!("i128::from(v{a} == v{b})"),
+                Op::Lt(a, b) => format!("i128::from(v{a} < v{b})"),
+                Op::And(a, b) => format!("i128::from(v{a} == 1 && v{b} == 1)"),
+                Op::Not(a) => format!("i128::from(v{a} == 0)"),
                 Op::Select(c, a, b) => format!("if v{c} == 1 {{ v{a} }} else {{ v{b} }}"),
             };
             // Some valid graphs have unused nodes. Evaluate them anyway: a dead
             // checked arithmetic node must still trap under this eager profile.
             writeln!(
                 source,
-                "    let v{i}: i64 = {expression};\n    let _ = v{i};"
+                "    let v{i}: i128 = {expression};\n    let _ = v{i};"
             )
             .map_err(|_| Error::Invalid("format"))?;
         }
@@ -145,7 +148,7 @@ impl TargetEmitter for RustEmitter {
             let (min, max) = d.bounds();
             writeln!(
                 source,
-                "    if !({min}_i64..={max}_i64).contains(&v{id}) {{ return None; }}"
+                "    if !({min}_i128..={max}_i128).contains(&v{id}) {{ return None; }}"
             )
             .map_err(|_| Error::Invalid("format"))?;
         }
@@ -169,7 +172,7 @@ impl TargetEmitter for PythonEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "python",
-            revision: 2,
+            revision: 3,
             extension: "py",
         }
     }
@@ -181,7 +184,7 @@ impl TargetEmitter for PythonEmitter {
     }
     fn emit(&self, program: &Program) -> Result<String, Error> {
         let mut source = String::from(
-            "# Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.\ndef transition(input):\n",
+            "# Generated from zeno-fcis/finite-i128/1. Pure code; no commit authority.\ndef transition(input):\n",
         );
         writeln!(
             source,
@@ -195,6 +198,7 @@ impl TargetEmitter for PythonEmitter {
         }
         for (i, op) in program.nodes().iter().enumerate() {
             let invalid = match *op {
+                Op::SignedMulDivFloor(_, _, d) => Some(format!("v{d} <= 0")),
                 Op::DivFloor(_, b) | Op::DivCeil(_, b) => Some(format!("v{b} == 0")),
                 Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
                     Some(format!("v{a} < 0 or v{b} < 0 or v{d} <= 0"))
@@ -212,12 +216,13 @@ impl TargetEmitter for PythonEmitter {
             let expression = match *op {
                 Op::Input(a) => format!("input[{a}]"),
                 Op::Int(a) => format!("{a}"),
-                Op::Bool(a) => format!("{}", i64::from(a)),
+                Op::Bool(a) => format!("{}", i128::from(a)),
                 Op::Add(a, b) => format!("v{a} + v{b}"),
                 Op::Sub(a, b) => format!("v{a} - v{b}"),
                 Op::Mul(a, b) => format!("v{a} * v{b}"),
                 Op::DivFloor(a, b) => format!("v{a} // v{b}"),
                 Op::DivCeil(a, b) => format!("-((-v{a}) // v{b})"),
+                Op::SignedMulDivFloor(a, b, d) => format!("(v{a} * v{b}) // v{d}"),
                 Op::MulDivFloor(a, b, d) => format!("(v{a} * v{b}) // v{d}"),
                 Op::MulDivCeil(a, b, d) => format!("(v{a} * v{b} + v{d} - 1) // v{d}"),
                 Op::ProductsGe(a, b) => format!(
@@ -240,8 +245,9 @@ impl TargetEmitter for PythonEmitter {
                     | Op::DivCeil(..)
                     | Op::MulDivFloor(..)
                     | Op::MulDivCeil(..)
+                    | Op::SignedMulDivFloor(..)
             ) {
-                writeln!(source,"    if not (-9223372036854775808 <= v{i} <= 9223372036854775807):\n        return None").map_err(|_|Error::Invalid("format"))?;
+                writeln!(source,"    if not (-170141183460469231731687303715884105728 <= v{i} <= 170141183460469231731687303715884105727):\n        return None").map_err(|_|Error::Invalid("format"))?;
             }
         }
         for (d, id) in program.outputs().iter().zip(program.roots()) {
@@ -269,9 +275,9 @@ impl TargetEmitter for PythonEmitter {
 /// The scanner never sees a caller-controlled object. It bounds the input by
 /// the declared arity, accepts only canonical ASCII spellings, and builds every
 /// value with `BigInt`, so no field can pass through `Number` rounding.
-const JAVASCRIPT_PRELUDE: &str = r#"// Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.
+const JAVASCRIPT_PRELUDE: &str = r#"// Generated from zeno-fcis/finite-i128/1. Pure code; no commit authority.
 // ABI: transition(input) requires a primitive string holding exactly the
-// declared number of canonical signed decimal i64 tokens separated by single
+// declared number of canonical signed decimal i128 tokens separated by single
 // ASCII spaces; zero fields is the empty string. It returns the complete output
 // tuple in the same spelling, or null for every rejected input, domain,
 // arithmetic, or output case. The immutable string ABI excludes Number rounding
@@ -280,10 +286,10 @@ const JAVASCRIPT_PRELUDE: &str = r#"// Generated from zeno-fcis/finite-i64/1. Pu
 // I/O, global assignment, or source splice, and mutates only local temporaries.
 // Unmodified native ECMAScript intrinsics are a stated runtime premise, not a
 // claim about an arbitrary monkeypatched runtime.
-const I64_MIN = -9223372036854775808n;
-const I64_MAX = 9223372036854775807n;
-const TOKEN = 20; // "-9223372036854775808".length
-const DIGITS = 19; // "9223372036854775808".length
+const I128_MIN = -170141183460469231731687303715884105728n;
+const I128_MAX = 170141183460469231731687303715884105727n;
+const TOKEN = 40; // signed i128 MIN token length
+const DIGITS = 39; // unsigned magnitude of i128 MIN
 
 function parseFields(text, arity) {
   // Bound the work by the declared arity before any scan, slice, or BigInt.
@@ -312,7 +318,7 @@ function parseFields(text, arity) {
     const magnitude = BigInt(text.slice(start, at));
     if (negative && magnitude === 0n) { return null; }
     const value = negative ? -magnitude : magnitude;
-    if (value < I64_MIN || value > I64_MAX) { return null; }
+    if (value < I128_MIN || value > I128_MAX) { return null; }
     fields.push(value);
   }
   // A missing token, extra token, trailing space, or trailing character fails.
@@ -325,7 +331,7 @@ impl TargetEmitter for JavaScriptEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "javascript",
-            revision: 2,
+            revision: 3,
             extension: "mjs",
         }
     }
@@ -359,6 +365,7 @@ impl TargetEmitter for JavaScriptEmitter {
         }
         for (i, op) in program.nodes().iter().enumerate() {
             let invalid = match *op {
+                Op::SignedMulDivFloor(_, _, d) => Some(format!("v{d} <= 0n")),
                 Op::DivFloor(_, b) | Op::DivCeil(_, b) => Some(format!("v{b} === 0n")),
                 Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
                     Some(format!("v{a} < 0n || v{b} < 0n || v{d} <= 0n"))
@@ -376,12 +383,13 @@ impl TargetEmitter for JavaScriptEmitter {
             let expression = match *op {
                 Op::Input(a) => format!("fields[{a}]"),
                 Op::Int(a) => format!("{a}n"),
-                Op::Bool(a) => format!("{}n", i64::from(a)),
+                Op::Bool(a) => format!("{}n", i128::from(a)),
                 Op::Add(a, b) => format!("v{a} + v{b}"),
                 Op::Sub(a, b) => format!("v{a} - v{b}"),
                 Op::Mul(a, b) => format!("v{a} * v{b}"),
                 Op::DivFloor(a, b) => format!("divRounded(v{a}, v{b}, false)"),
                 Op::DivCeil(a, b) => format!("divRounded(v{a}, v{b}, true)"),
+                Op::SignedMulDivFloor(a, b, d) => format!("divRounded(v{a} * v{b},v{d},false)"),
                 Op::MulDivFloor(a, b, d) => format!("(v{a} * v{b}) / v{d}"),
                 Op::MulDivCeil(a, b, d) => format!("(v{a} * v{b} + v{d} - 1n) / v{d}"),
                 Op::ProductsGe(a, b) => format!(
@@ -395,7 +403,7 @@ impl TargetEmitter for JavaScriptEmitter {
                 Op::Select(c, a, b) => format!("v{c} === 1n ? v{a} : v{b}"),
             };
             // Every node is evaluated in order, including a dead one: BigInt is
-            // unbounded, so each add and sub carries its own i64 trap check.
+            // unbounded, so each add and sub carries its own i128 trap check.
             writeln!(source, "  const v{i} = {expression};")
                 .map_err(|_| Error::Invalid("format"))?;
             if matches!(
@@ -407,10 +415,11 @@ impl TargetEmitter for JavaScriptEmitter {
                     | Op::DivCeil(..)
                     | Op::MulDivFloor(..)
                     | Op::MulDivCeil(..)
+                    | Op::SignedMulDivFloor(..)
             ) {
                 writeln!(
                     source,
-                    "  if (v{i} < I64_MIN || v{i} > I64_MAX) {{ return null; }}"
+                    "  if (v{i} < I128_MIN || v{i} > I128_MAX) {{ return null; }}"
                 )
                 .map_err(|_| Error::Invalid("format"))?;
             }

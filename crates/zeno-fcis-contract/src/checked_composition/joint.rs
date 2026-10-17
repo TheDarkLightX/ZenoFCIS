@@ -163,7 +163,7 @@ pub struct JointOutcome {
     pub kind: OutcomeKind,
     /// The committed global state, in the layout of
     /// [`JointComposition::state_layout`].
-    pub successor: Vec<i64>,
+    pub successor: Vec<i128>,
 }
 
 impl JointOutcome {
@@ -190,9 +190,9 @@ impl JointOutcome {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JointRow {
     /// The global pre-state.
-    pub state: Vec<i64>,
+    pub state: Vec<i128>,
     /// The request.
-    pub request: Vec<i64>,
+    pub request: Vec<i128>,
     /// The step.
     pub outcome: JointOutcome,
 }
@@ -251,7 +251,7 @@ pub(crate) struct Decisions {
     reasons: Vec<Option<u32>>,
     /// The successor of each committing row, `width` values each; zeros
     /// elsewhere.
-    posts: Vec<i64>,
+    posts: Vec<i128>,
     width: usize,
     /// The SHA-256 chained over every row.
     pub(crate) digest: [u8; 32],
@@ -259,7 +259,7 @@ pub(crate) struct Decisions {
 
 impl Decisions {
     /// The decision on a local tuple: its kind, reason and successor.
-    pub(crate) fn get(&self, tuple: &[i64]) -> Option<(Decided, Option<u32>, &[i64])> {
+    pub(crate) fn get(&self, tuple: &[i128]) -> Option<(Decided, Option<u32>, &[i128])> {
         let at = self.index.of(tuple)?;
         Some((
             *self.kinds.get(at)?,
@@ -269,7 +269,7 @@ impl Decisions {
     }
 
     /// The decision at enumeration position `at`.
-    pub(crate) fn at(&self, at: usize) -> (Decided, Option<u32>, &[i64]) {
+    pub(crate) fn at(&self, at: usize) -> (Decided, Option<u32>, &[i128]) {
         (
             self.kinds[at],
             self.reasons[at],
@@ -307,7 +307,7 @@ pub(crate) fn decide_all(
         ));
     }
     let contract = component.contract()?;
-    let values: Vec<Vec<i64>> = component
+    let values: Vec<Vec<i128>> = component
         .fields
         .iter()
         .map(|field| field.domain.values())
@@ -365,7 +365,7 @@ pub(crate) fn decide_all(
                         _ => Decided::Refused(RefusedClass::Other),
                     };
                     if matches!(kind, Decided::Accept | Decided::CommittedFailure) {
-                        let by_id: BTreeMap<u16, i64> = candidate
+                        let by_id: BTreeMap<u16, i128> = candidate
                             .post()
                             .iter()
                             .filter_map(|field| Some((field.id, number(field.value)?)))
@@ -431,12 +431,12 @@ pub(crate) fn decide_all(
 
 /// The number a successor's value denotes: 0 or 1 for a boolean, the
 /// integer, or the variant ID.
-fn number(atom: c::Atom<'_>) -> Option<i64> {
+fn number(atom: c::Atom<'_>) -> Option<i128> {
     match atom {
-        c::Atom::Bool(value) => Some(i64::from(value)),
-        c::Atom::I128(value) => i64::try_from(value).ok(),
-        c::Atom::U128(value) => i64::try_from(value).ok(),
-        c::Atom::Sum { variant, .. } | c::Atom::Enum { variant, .. } => Some(i64::from(variant)),
+        c::Atom::Bool(value) => Some(i128::from(value)),
+        c::Atom::I128(value) => i128::try_from(value).ok(),
+        c::Atom::U128(value) => i128::try_from(value).ok(),
+        c::Atom::Sum { variant, .. } | c::Atom::Enum { variant, .. } => Some(i128::from(variant)),
         _ => None,
     }
 }
@@ -650,10 +650,10 @@ impl Tables {
 /// vector per component, empty for a read-only one) and a local tuple.
 pub(crate) fn gather(
     reads: &[Read],
-    request: &[i64],
-    states: &[Vec<i64>],
-    local: &[i64],
-) -> Vec<i64> {
+    request: &[i128],
+    states: &[Vec<i128>],
+    local: &[i128],
+) -> Vec<i128> {
     reads
         .iter()
         .map(|read| match read {
@@ -675,7 +675,7 @@ pub(crate) enum Local {
     Commit {
         failure: bool,
         reason: Option<u32>,
-        post: Vec<i64>,
+        post: Vec<i128>,
     },
 }
 
@@ -684,10 +684,10 @@ pub(crate) enum Local {
 pub(crate) fn delivered(
     component: &Component,
     tables: &ComponentTables,
-    request: &[i64],
-    pre: &[Vec<i64>],
-    own: &[i64],
-) -> Result<Vec<i64>, RefusedClass> {
+    request: &[i128],
+    pre: &[Vec<i128>],
+    own: &[i128],
+) -> Result<Vec<i128>, RefusedClass> {
     let mut tuple = Vec::with_capacity(component.fields.len());
     let deliver = |resolved: &super::domain::Resolved, table: &ValueTable| match table
         .value(&gather(&resolved.reads, request, pre, &[]))
@@ -714,8 +714,8 @@ pub(crate) fn local(
     composition: &Composition,
     tables: &Tables,
     at: usize,
-    pre: &[Vec<i64>],
-    request: &[i64],
+    pre: &[Vec<i128>],
+    request: &[i128],
 ) -> Local {
     let component = &composition.components[at];
     let own = &tables.components[at];
@@ -763,9 +763,9 @@ pub(crate) enum Ended {
 pub(crate) fn step(
     composition: &Composition,
     tables: &Tables,
-    pre: &[Vec<i64>],
-    request: &[i64],
-) -> (Ended, Vec<Vec<i64>>) {
+    pre: &[Vec<i128>],
+    request: &[i128],
+) -> (Ended, Vec<Vec<i128>>) {
     let mut after = pre.to_vec();
     for at in 0..composition.components.len() {
         match local(composition, tables, at, pre, request) {
@@ -806,7 +806,7 @@ impl<'a> Odometer<'a> {
         }
     }
 
-    fn next_tuple(&mut self) -> Option<Vec<i64>> {
+    fn next_tuple(&mut self) -> Option<Vec<i128>> {
         if self.done {
             return None;
         }
@@ -885,7 +885,7 @@ pub struct JointComposition {
     tables: Tables,
     layout: Vec<StateSlot>,
     request: Vec<RequestSlot>,
-    genesis: Vec<i64>,
+    genesis: Vec<i128>,
 }
 
 impl JointComposition {
@@ -974,7 +974,7 @@ impl JointComposition {
 
     /// The global genesis state: each owning component's declared genesis.
     #[must_use]
-    pub fn genesis(&self) -> &[i64] {
+    pub fn genesis(&self) -> &[i128] {
         &self.genesis
     }
 
@@ -985,8 +985,8 @@ impl JointComposition {
     /// outside its slot's domain.
     pub fn joint_step(
         &self,
-        global_state: &[i64],
-        request: &[i64],
+        global_state: &[i128],
+        request: &[i128],
     ) -> Result<JointOutcome, JointInputError> {
         let pre = self.split(global_state, request)?;
         let (ended, after) = step(&self.composition, &self.tables, &pre, request);
@@ -1000,7 +1000,7 @@ impl JointComposition {
     /// # Errors
     /// More than `max_pairs` pairs: the exploration is refused, not cut.
     pub fn reachable(&self, max_pairs: u64) -> Result<Vec<JointRow>, u64> {
-        let mut seen: BTreeSet<Vec<i64>> = BTreeSet::new();
+        let mut seen: BTreeSet<Vec<i128>> = BTreeSet::new();
         seen.insert(self.genesis.clone());
         let mut frontier = vec![self.genesis.clone()];
         let mut rows = Vec::new();
@@ -1035,9 +1035,9 @@ impl JointComposition {
 
     fn split(
         &self,
-        global_state: &[i64],
-        request: &[i64],
-    ) -> Result<Vec<Vec<i64>>, JointInputError> {
+        global_state: &[i128],
+        request: &[i128],
+    ) -> Result<Vec<Vec<i128>>, JointInputError> {
         let error = |reason: String| JointInputError { reason };
         if global_state.len() != self.layout.len() {
             return Err(error(format!(
@@ -1084,7 +1084,7 @@ impl JointComposition {
         Ok(pre)
     }
 
-    fn outcome(&self, ended: &Ended, after: &[Vec<i64>]) -> JointOutcome {
+    fn outcome(&self, ended: &Ended, after: &[Vec<i128>]) -> JointOutcome {
         let name = |at: usize| self.composition.components[at].name.clone();
         let kind = match *ended {
             Ended::Accept => OutcomeKind::Accept,

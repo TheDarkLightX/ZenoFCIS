@@ -29,7 +29,7 @@ pub(crate) enum Key {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Term {
     Input(Key),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(u32, u32),
     Sub(u32, u32),
@@ -44,7 +44,7 @@ pub(crate) enum Term {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Node {
     Input(usize),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
@@ -102,7 +102,7 @@ impl Arena {
         self.intern(Term::Input(key))
     }
 
-    pub(crate) fn int(&mut self, value: i64) -> u32 {
+    pub(crate) fn int(&mut self, value: i128) -> u32 {
         self.intern(Term::Int(value))
     }
 
@@ -117,7 +117,7 @@ impl Arena {
         }
     }
 
-    fn constant_int(&self, id: u32) -> Option<i64> {
+    fn constant_int(&self, id: u32) -> Option<i128> {
         match self.term(id) {
             Term::Int(value) => Some(value),
             _ => None,
@@ -199,7 +199,7 @@ impl Arena {
     /// A term's value where `input` gives each input's value, operator by
     /// operator as the evaluator specification computes it and evaluating
     /// every operand; `None` where evaluation fails.
-    pub(crate) fn evaluate(&self, id: u32, input: &dyn Fn(Key) -> Option<i64>) -> Option<i64> {
+    pub(crate) fn evaluate(&self, id: u32, input: &dyn Fn(Key) -> Option<i128>) -> Option<i128> {
         let mut memo = BTreeMap::new();
         self.value(id, input, &mut memo)
     }
@@ -207,9 +207,9 @@ impl Arena {
     fn value(
         &self,
         id: u32,
-        input: &dyn Fn(Key) -> Option<i64>,
-        memo: &mut BTreeMap<u32, Option<i64>>,
-    ) -> Option<i64> {
+        input: &dyn Fn(Key) -> Option<i128>,
+        memo: &mut BTreeMap<u32, Option<i128>>,
+    ) -> Option<i128> {
         if let Some(value) = memo.get(&id) {
             return *value;
         }
@@ -217,13 +217,15 @@ impl Arena {
         let value = match self.term(id) {
             Term::Input(key) => input(key),
             Term::Int(value) => Some(value),
-            Term::Bool(value) => Some(i64::from(value)),
+            Term::Bool(value) => Some(i128::from(value)),
             Term::Add(a, b) => get(a).zip(get(b)).and_then(|(a, b)| a.checked_add(b)),
             Term::Sub(a, b) => get(a).zip(get(b)).and_then(|(a, b)| a.checked_sub(b)),
-            Term::Eq(a, b) => get(a).zip(get(b)).map(|(a, b)| i64::from(a == b)),
-            Term::Lt(a, b) => get(a).zip(get(b)).map(|(a, b)| i64::from(a < b)),
-            Term::And(a, b) => get(a).zip(get(b)).map(|(a, b)| i64::from(a == 1 && b == 1)),
-            Term::Not(a) => get(a).map(|a| i64::from(a == 0)),
+            Term::Eq(a, b) => get(a).zip(get(b)).map(|(a, b)| i128::from(a == b)),
+            Term::Lt(a, b) => get(a).zip(get(b)).map(|(a, b)| i128::from(a < b)),
+            Term::And(a, b) => get(a)
+                .zip(get(b))
+                .map(|(a, b)| i128::from(a == 1 && b == 1)),
+            Term::Not(a) => get(a).map(|a| i128::from(a == 0)),
             Term::Select(c, a, b) => {
                 let (c, a, b) = (get(c), get(a), get(b));
                 c.zip(a)
@@ -292,7 +294,7 @@ pub(crate) fn same_selection(
     arena: &Arena,
     aggregate: u32,
     leaf: u32,
-    cases: &mut BTreeMap<i64, i64>,
+    cases: &mut BTreeMap<i128, i128>,
 ) -> bool {
     match (arena.term(aggregate), arena.term(leaf)) {
         (Term::Int(mine), Term::Int(theirs)) => *cases.entry(mine).or_insert(theirs) == theirs,
@@ -306,13 +308,13 @@ pub(crate) fn same_selection(
 }
 
 /// The inclusive value interval of each node, as `i128`, for inputs within
-/// `domains`; `None` for a node whose value can leave the `i64` range, which
+/// `domains`; `None` for a node whose value can leave the `i128` range, which
 /// the eager evaluator refuses as a trap.
 pub(crate) fn intervals(nodes: &[Node], domains: &[(i128, i128)]) -> Vec<Option<(i128, i128)>> {
     let mut out: Vec<Option<(i128, i128)>> = Vec::with_capacity(nodes.len());
     let fits = |(low, high): (i128, i128)| {
-        (i128::from(i64::MIN)..=i128::from(i64::MAX)).contains(&low)
-            && (i128::from(i64::MIN)..=i128::from(i64::MAX)).contains(&high)
+        (i128::from(i128::MIN)..=i128::from(i128::MAX)).contains(&low)
+            && (i128::from(i128::MIN)..=i128::from(i128::MAX)).contains(&high)
     };
     for node in nodes {
         let get = |index: usize| out.get(index).copied().flatten();
@@ -322,11 +324,11 @@ pub(crate) fn intervals(nodes: &[Node], domains: &[(i128, i128)]) -> Vec<Option<
             Node::Bool(value) => Some((i128::from(value), i128::from(value))),
             Node::Add(a, b) => get(a)
                 .zip(get(b))
-                .map(|((al, ah), (bl, bh))| (al + bl, ah + bh))
+                .and_then(|((al, ah), (bl, bh))| Some((al.checked_add(bl)?, ah.checked_add(bh)?)))
                 .filter(|interval| fits(*interval)),
             Node::Sub(a, b) => get(a)
                 .zip(get(b))
-                .map(|((al, ah), (bl, bh))| (al - bh, ah - bl))
+                .and_then(|((al, ah), (bl, bh))| Some((al.checked_sub(bh)?, ah.checked_sub(bl)?)))
                 .filter(|interval| fits(*interval)),
             Node::Eq(a, b) | Node::Lt(a, b) | Node::And(a, b) => get(a).zip(get(b)).map(|_| (0, 1)),
             Node::Not(a) => get(a).map(|_| (0, 1)),

@@ -11,7 +11,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
-            ValueExpr::MulDiv(_, a, b, d) => {
+            ValueExpr::MulDiv(_, a, b, d) | ValueExpr::SignedMulDivFloor(a, b, d) => {
                 for child in [a, b, d] {
                     stack.push((child, current_depth.saturating_add(1)));
                 }

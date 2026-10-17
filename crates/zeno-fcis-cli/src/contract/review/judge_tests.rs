@@ -26,7 +26,7 @@ struct Core {
 }
 
 impl Core {
-    fn new(family: &str, parameters: &[(&str, i64)]) -> Self {
+    fn new(family: &str, parameters: &[(&str, i128)]) -> Self {
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../core-components")
             .join(family);

@@ -129,16 +129,18 @@ fn domain(v: &Value) -> Result<Domain, Stop> {
     fields(v, &["kind", "min", "max"])?;
     let min = v["min"]
         .as_i64()
+        .map(i128::from)
         .ok_or_else(|| bad("version-space-domain"))?;
     let max = v["max"]
         .as_i64()
+        .map(i128::from)
         .ok_or_else(|| bad("version-space-domain"))?;
     if v["kind"] != "Int" || min > max {
         return Err(bad("version-space-domain"));
     }
     Ok(Domain::Int { min, max })
 }
-fn point(v: &Value, domains: &[Domain]) -> Result<Vec<i64>, Stop> {
+fn point(v: &Value, domains: &[Domain]) -> Result<Vec<i128>, Stop> {
     let values = list(v)?;
     if values.len() != domains.len() {
         return Err(bad("version-space-tuple-arity"));
@@ -148,9 +150,11 @@ fn point(v: &Value, domains: &[Domain]) -> Result<Vec<i64>, Stop> {
         .zip(domains)
         .map(|(v, d)| {
             let n = if *d == Domain::Bool {
-                v.as_bool().map(i64::from).or_else(|| v.as_i64())
+                v.as_bool()
+                    .map(i128::from)
+                    .or_else(|| v.as_i64().map(i128::from))
             } else {
-                v.as_i64()
+                v.as_i64().map(i128::from)
             }
             .ok_or_else(|| bad("version-space-tuple-kind"))?;
             if !d.contains(n) {
@@ -330,7 +334,7 @@ fn stub_comparison(name: &str) -> bool {
 fn library_law(
     nodes: &[laws::Op<'static>],
     root: usize,
-    values: &[i64],
+    values: &[i128],
     domains: &[Domain],
     retained: &mut LawUsage,
 ) -> Result<(), Stop> {
@@ -521,11 +525,11 @@ fn final_check(
         .map_err(|_| Stop::Inconclusive("domain-budget".into()))?;
     for k in 0..domain {
         budget.spend(program.nodes().len() as u64)?;
-        let input: Vec<i64> = cols.iter().map(|c| c[k]).collect();
+        let input: Vec<i128> = cols.iter().map(|c| c[k]).collect();
         let output = program
             .evaluate(&input)
             .map_err(|e| bad(format!("candidate-not-total:{e:?}")))?;
-        let values: Vec<i64> = input.into_iter().chain(output).collect();
+        let values: Vec<i128> = input.into_iter().chain(output).collect();
         let domains: Vec<Domain> = spec.inputs.iter().chain(&spec.outputs).copied().collect();
         for law in &laws {
             budget.spend(
@@ -887,7 +891,7 @@ mod arithmetic_tests {
             library_law(
                 &law.nodes,
                 law.root,
-                &[i64::MAX, 1],
+                &[i128::from(i64::MAX), 1],
                 &[spec.inputs[0], Domain::Bool],
                 &mut LawUsage::default()
             )

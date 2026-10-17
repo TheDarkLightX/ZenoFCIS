@@ -28,7 +28,7 @@ pub(crate) fn domain_kind(domain: Domain) -> Option<Kind> {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Node {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
@@ -235,8 +235,8 @@ impl Graph {
             .map(|node| match kinds.get(*node)? {
                 Kind::Bool => Some(Domain::Bool),
                 Kind::Int => Some(Domain::Int {
-                    min: i64::MIN,
-                    max: i64::MAX,
+                    min: i128::MIN,
+                    max: i128::MAX,
                 }),
             })
             .collect::<Option<Vec<_>>>()?;

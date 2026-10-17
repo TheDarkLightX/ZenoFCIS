@@ -176,28 +176,28 @@ impl Random {
 /// Tuples that hit boundaries and equalities often: each integer is a
 /// domain bound, a value from a small pool, a value an earlier integer of the
 /// same tuple took, or uniform.
-fn sampled_tuples(positions: &[Position], count: usize, seed: u64) -> Vec<Vec<i64>> {
-    const POOL: [i64; 10] = [
+fn sampled_tuples(positions: &[Position], count: usize, seed: u64) -> Vec<Vec<i128>> {
+    const POOL: [i128; 10] = [
         0, 1, 2, 3, 50, 604_800, 604_801, 1_209_600, 1_209_601, 1_814_401,
     ];
     let mut random = Random(seed);
     (0..count)
         .map(|_| {
-            let mut tuple: Vec<i64> = Vec::with_capacity(positions.len());
-            let mut integers: Vec<i64> = Vec::new();
+            let mut tuple: Vec<i128> = Vec::with_capacity(positions.len());
+            let mut integers: Vec<i128> = Vec::new();
             for position in positions {
                 let value = match &position.domain {
-                    domain::LeafDomain::Bool => i64::from(random.next() % 2 == 1),
+                    domain::LeafDomain::Bool => i128::from(random.next() % 2 == 1),
                     domain::LeafDomain::Sum { variants, .. } => {
-                        i64::from(variants[random.below(variants.len())])
+                        i128::from(variants[random.below(variants.len())])
                     }
                     domain::LeafDomain::Int { min, max } => {
-                        let earlier: Vec<i64> = integers
+                        let earlier: Vec<i128> = integers
                             .iter()
                             .copied()
                             .filter(|value| (*min..=*max).contains(value))
                             .collect();
-                        let pooled: Vec<i64> = POOL
+                        let pooled: Vec<i128> = POOL
                             .iter()
                             .copied()
                             .filter(|value| (*min..=*max).contains(value))
@@ -208,7 +208,8 @@ fn sampled_tuples(positions: &[Position], count: usize, seed: u64) -> Vec<Vec<i6
                                 let width = u64::try_from(i128::from(*max) - i128::from(*min))
                                     .unwrap_or(u64::MAX);
                                 let offset = random.next() % width.saturating_add(1).max(1);
-                                i64::try_from(i128::from(*min) + i128::from(offset)).unwrap_or(*min)
+                                i128::try_from(i128::from(*min) + i128::from(offset))
+                                    .unwrap_or(*min)
                             }
                             1 if !earlier.is_empty() => earlier[random.below(earlier.len())],
                             _ => pooled[random.below(pooled.len())],

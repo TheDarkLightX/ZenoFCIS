@@ -79,7 +79,7 @@ pub(super) struct Failure {
         ==> result.is_ok(),
     match result {
         Ok(encoded) => forall|environment: Map<Seq<char>, denotation::Value>,
-            raw_input: Seq<i64>, count: nat|
+            raw_input: Seq<i128>, count: nat|
             count <= nodes@.len()
                 && node::input_values(domains@, input@, raw_input, environment)
                 && script_spec::definitions_hold(final(script).definitions@,
@@ -190,7 +190,7 @@ pub(super) fn encode_nodes(
         }
         if matches!(op, Op::Add(..) | Op::Sub(..)) {
             // Only names the original two temporary constructor results.
-            let in_range = Term::within(&defined, i128::from(i64::MIN), i128::from(i64::MAX));
+            let in_range = Term::within(&defined, i128::MIN, i128::MAX);
             #[cfg(verus_keep_ghost)]
             let range = verus_exec_expr!(Ghost(in_range@));
             let guard = Term::not(in_range);
@@ -202,9 +202,9 @@ pub(super) fn encode_nodes(
                     denotation::term(guard, environment)
                         == Some(denotation::Value::Boolean(spec::outside(value))) by {
                     assert(denotation::term(range@, environment)
-                        == Some(denotation::Value::Boolean(i64::MIN <= value && value <= i64::MAX)));
+                        == Some(denotation::Value::Boolean(i128::MIN <= value && value <= i128::MAX)));
                     assert(denotation::term(guard, environment)
-                        == Some(denotation::Value::Boolean(!(i64::MIN <= value && value <= i64::MAX))));
+                        == Some(denotation::Value::Boolean(!(i128::MIN <= value && value <= i128::MAX))));
                 }
             }
             checked.push(guard);
@@ -282,7 +282,7 @@ pub(super) fn encode_nodes(
             spec::guards(nodes@, count) <= checked@.len() by {
             spec::guards_monotone(nodes@, count, nodes@.len());
         }
-        assert forall|environment: Map<Seq<char>, denotation::Value>, raw_input: Seq<i64>, count: nat|
+        assert forall|environment: Map<Seq<char>, denotation::Value>, raw_input: Seq<i128>, count: nat|
             count <= nodes@.len()
                 && node::input_values(domains@, input@, raw_input, environment)
                 && script_spec::definitions_hold(script.definitions@, base@, nodes@.len(), environment)

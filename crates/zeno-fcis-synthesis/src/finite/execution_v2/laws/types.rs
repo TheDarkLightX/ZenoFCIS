@@ -169,6 +169,8 @@ pub enum Op<'a> {
     MulDivFloor(usize, usize, usize),
     /// Unsigned ceiling with the same exact intermediate and overflow checks.
     MulDivCeil(usize, usize, usize),
+    /// Signed full-product floor, with a positive I128 divisor and final fit.
+    SignedMulDivFloor(usize, usize, usize),
     /// Compare two exact products of three U128 operands without overflow.
     ProductsGe([usize; 3], [usize; 3]),
     /// Explicit numeric projection of Bool, enum/sum variant, or representable integer.

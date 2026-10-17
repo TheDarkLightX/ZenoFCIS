@@ -125,6 +125,7 @@ pub(super) enum ModelReason {
     Overflow,
     DivisionByZero,
     NonExactDivision,
+    UnsupportedArithmetic,
     InvalidRange,
     OperationLimit,
     QuantifierLimit,
@@ -402,6 +403,7 @@ fn eval_value<'formula>(
         ValueExpr::Mul(left, right) => eval_value(left, step, variables, fuel)?
             .checked_mul(eval_value(right, step, variables, fuel)?)
             .ok_or(ModelReason::Overflow),
+        ValueExpr::SignedMulDivFloor(..) => Err(ModelReason::UnsupportedArithmetic),
         ValueExpr::Div(mode, left, right) => divide(
             *mode,
             eval_value(left, step, variables, fuel)?,
@@ -543,6 +545,12 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
             | ValueExpr::Div(_, left, right) => {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
+            }
+            ValueExpr::SignedMulDivFloor(a, b, d) => {
+                let next = current_depth.saturating_add(1);
+                stack.push((a, next));
+                stack.push((b, next));
+                stack.push((d, next));
             }
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));

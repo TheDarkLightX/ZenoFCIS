@@ -57,7 +57,7 @@ fn run(command: &mut Command) -> (i32, Value) {
 fn source() -> Value {
     json!({
         "schema": "zeno-fcis/completion-problem/1",
-        "profile": "zeno-fcis/finite-i64/1",
+        "profile": "zeno-fcis/finite-i128/1",
         "state": [{"name": "count", "type": {"kind": "int", "min": 0, "max": 3}}],
         "commands": [{"name": "exit", "type": {"kind": "bool"}}],
         "step": {"nodes": [["input", 0], ["input", 1], ["int", 0], ["int", 1],
@@ -133,7 +133,7 @@ fn failure_cases_are_inert_portable_and_replay_the_actual_claim_exit_code() {
     no_exit["step"] = json!({"nodes": [["bool", true], ["input", 0]], "roots": [0, 1]});
     let mut trap = source();
     trap["step"]["nodes"].as_array_mut().unwrap().extend([
-        json!(["int", i64::MAX]),
+        json!(["int", i128::MAX]),
         json!(["int", 1]),
         json!(["add", 8, 9]),
     ]);

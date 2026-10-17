@@ -25,15 +25,11 @@ use zeno_fcis_synthesis::finite_runtime::import_program;
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
-const ORIGINAL: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve"
-);
-const CANDIDATE: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve"
-);
-const PADDED: &[u8] = include_bytes!(
-    "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve"
-);
+const ORIGINAL: &[u8] =
+    include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-original.zcve");
+const CANDIDATE: &[u8] =
+    include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-candidate.zcve");
+const PADDED: &[u8] = include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-padded.zcve");
 
 /// A scratch directory with the session's input files; removed on drop.
 struct Scratch(PathBuf);
@@ -283,13 +279,13 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
         + 8192;
     let preparation = intake + admission;
     assert_eq!((intake, admission), (69_632, 635_904));
-    assert_eq!(work, 282_871);
+    assert_eq!(work, 282_891);
     let limits = Limits {
         check_work: self_check,
         session_work: preparation + 2 * work,
         ..Limits::CEILING
     };
-    assert_eq!(limits.session_work, 1_271_278);
+    assert_eq!(limits.session_work, 1_271_318);
     assert!(limits.session_work <= Limits::CEILING.session_work);
     assert!(work <= self_check && self_check <= limits.session_work);
     let scratch = Scratch::new();
@@ -321,25 +317,22 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
     }
 }
 
-/// Full ledger, head and complete direct-handler transcript for the 2.3.0
-/// evaluator, checker-work/4 and loop-acquisition/1 policies. Includes every
-/// preparation, check and replay charge; no output field is filtered.
-/// The fixture was derived from the retained checker-work/3 journey by
-/// substituting the evaluator and work-policy bindings, recomputing request,
-/// receipt and ledger digests, and adding the reviewed `seeds: 0` run field.
-/// The resulting ledger, head and transcript were then replayed exactly.
+/// Full ledger, head and complete direct-handler transcript for the merged
+/// i128 evaluator, checker-work/4 and loop-acquisition/1. The complete journey
+/// was replayed through every existing status assertion before these three
+/// source/profile-bound digests were refreshed; no field is filtered.
 const METERED_LEDGER_SHA256: &str =
-    "d6080fbff7c9b053e6811ce722707bd12043243d2b95b5d698c72d75dc18eb3a";
+    "da8899545104387e2ecdd2fabcbf60e0f41d501766b1eebaa532c8f0f5e2b70b";
 const METERED_HEAD_SHA256: &str =
-    "77772e7f40b25f2fd5c084b8964283e29e9102938c975235123e1ab8d0e85f6a";
+    "6a1fe6686342254b0a7d8e68c95ea7f22c0758dd77e44fa9635dab061df5f707";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "aeced3d993eb28ea0d317c63237ba6c99abe75c93286a1cf2938a2b0f9b2a97d";
+    "dcb044aaedc76f1a34360c06e5f691ed0a893a079ec3a6e81f540e9bf0a3a2d2";
 
 #[test]
 fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
     assert_eq!(
         crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
-        "86f516bef89978cb43d3a063deea156a138ab2a3d5ea777de34309bd9282d4ff",
+        "0c32e666044d0c7e4910aaa858201cecbcb7fb2b08cc2c5cf9bf7647abf51ca7",
         "checker identity changed: replay the recorded metered journey before refreshing its digests"
     );
     let scratch = Scratch::new();

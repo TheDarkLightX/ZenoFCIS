@@ -5,10 +5,10 @@ use super::*;
 use vstd::prelude::*;
 verus! {
 pub struct GraphView { pub inputs:Seq<Domain>,pub outputs:Seq<Domain>,pub nodes:Seq<Op>,pub roots:Seq<u16> }
-pub struct FoldView { pub graph:GraphView,pub initial:Seq<i64>,pub items:Seq<Seq<i64>>,
-    pub accumulator:Seq<i64>,pub context:Context,pub limits:PreparationLimits,
+pub struct FoldView { pub graph:GraphView,pub initial:Seq<i128>,pub items:Seq<Seq<i128>>,
+    pub accumulator:Seq<i128>,pub context:Context,pub limits:PreparationLimits,
     pub processed:u32,pub budget:Seq<u64>,pub used:Seq<u64>,pub reserved:Seq<u64> }
-pub(super) open spec fn items(v:Seq<Vec<i64>>)->Seq<Seq<i64>> { v.map(|_:int,x:Vec<i64>|x@) }
+pub(super) open spec fn items(v:Seq<Vec<i128>>)->Seq<Seq<i128>> { v.map(|_:int,x:Vec<i128>|x@) }
 pub(super) open spec fn graph_failure(e:admission::AdmissionFailure)->GraphFailure {
     match e { admission::AdmissionFailure::Shape=>GraphFailure::Shape,
         admission::AdmissionFailure::InputReference=>GraphFailure::InputReference,
@@ -37,10 +37,10 @@ pub(super) open spec fn capacity(resource:Capacity,required:u64,declared:u64)->R
     if required>declared { Err(Failure::Capacity{resource,required,declared}) } else { Ok(()) }
 }
 pub(super) open spec fn item_bytes(g:GraphView)->int { 5+17*(g.inputs.len()-g.outputs.len()) }
-pub(super) open spec fn input_bytes(g:GraphView,items:Seq<Seq<i64>>)->int {
+pub(super) open spec fn input_bytes(g:GraphView,items:Seq<Seq<i128>>)->int {
     15+17*g.outputs.len()+items.len()*item_bytes(g)
 }
-pub(super) open spec fn item_prefix(g:GraphView,v:Seq<Seq<i64>>,n:nat,limit:u64)->Result<u64,Failure>
+pub(super) open spec fn item_prefix(g:GraphView,v:Seq<Seq<i128>>,n:nat,limit:u64)->Result<u64,Failure>
 recommends n<=v.len(),g.outputs.len()<=g.inputs.len(),
 decreases n,
 {
@@ -61,12 +61,12 @@ decreases n,
         }
     } }
 }
-pub(super) proof fn item_failure(g:GraphView,v:Seq<Seq<i64>>,failed:nat,n:nat,limit:u64,e:Failure)
+pub(super) proof fn item_failure(g:GraphView,v:Seq<Seq<i128>>,failed:nat,n:nat,limit:u64,e:Failure)
 requires failed<=n<=v.len(),g.outputs.len()<=g.inputs.len(),item_prefix(g,v,failed,limit)==Err(e),
 ensures item_prefix(g,v,n,limit)==Err(e),
 decreases n-failed,
 { if n>failed { item_failure(g,v,failed,(n-1) as nat,limit,e); } }
-pub(super) open spec fn reserve(g:GraphView,v:Seq<Seq<i64>>,budget:Seq<u64>)->Result<Seq<u64>,Failure> {
+pub(super) open spec fn reserve(g:GraphView,v:Seq<Seq<i128>>,budget:Seq<u64>)->Result<Seq<u64>,Failure> {
     let zero=Seq::new(8,|_:int|0u64);
     let r=work::charge(budget,zero,Resource::Read,(v.len()*g.inputs.len()) as u64);
     match r.0 { Err(e)=>Err(Failure::Budget(e)),Ok(())=>{
@@ -81,7 +81,7 @@ pub(super) open spec fn reserve(g:GraphView,v:Seq<Seq<i64>>,budget:Seq<u64>)->Re
     } }
 }
 
-pub(super) open spec fn ready_inputs(g:GraphView,a:Seq<i64>,v:Seq<Seq<i64>>,c:Context,l:PreparationLimits)->bool {
+pub(super) open spec fn ready_inputs(g:GraphView,a:Seq<i128>,v:Seq<Seq<i128>>,c:Context,l:PreparationLimits)->bool {
     graph_admission::program(g.inputs,g.outputs,g.nodes,g.roots)==Ok(())
         && l.max_items<=65536 && 0<l.max_chunk_items<=65536
         && l.max_input_bytes<=16777216 && l.max_output_bytes<=16777216
@@ -89,7 +89,7 @@ pub(super) open spec fn ready_inputs(g:GraphView,a:Seq<i64>,v:Seq<Seq<i64>>,c:Co
         && v.len()<=l.max_items && v.len()*g.nodes.len()<=100000000
         && 5+17*g.outputs.len()<=l.max_output_bytes
 }
-pub(super) open spec fn start(g:GraphView,a:Seq<i64>,v:Seq<Seq<i64>>,c:Context,l:PreparationLimits,b:Seq<u64>)
+pub(super) open spec fn start(g:GraphView,a:Seq<i128>,v:Seq<Seq<i128>>,c:Context,l:PreparationLimits,b:Seq<u64>)
     ->Result<FoldView,Failure> {
     match graph_admission::program(g.inputs,g.outputs,g.nodes,g.roots) {
         Err(e)=>Err(Failure::Graph(graph_failure(e))),Ok(())=>{
@@ -116,8 +116,8 @@ pub(super) open spec fn start(g:GraphView,a:Seq<i64>,v:Seq<Seq<i64>>,c:Context,l
 pub(super) open spec fn start_result(r:Result<PreparedFold,Failure>)->Result<FoldView,Failure> {
     match r { Err(e)=>Err(e),Ok(p)=>Ok(p.view()) }
 }
-pub(super) open spec fn fold(g:GraphView,v:Seq<Seq<i64>>,start:nat,end:nat,a:Seq<i64>,b:Seq<u64>,used:Seq<u64>)
-    ->(Result<Seq<i64>,Failure>,Seq<u64>)
+pub(super) open spec fn fold(g:GraphView,v:Seq<Seq<i128>>,start:nat,end:nat,a:Seq<i128>,b:Seq<u64>,used:Seq<u64>)
+    ->(Result<Seq<i128>,Failure>,Seq<u64>)
 recommends start<=end<=v.len(),b.len()==8,used.len()==8,
 decreases end-start,
 {
@@ -130,7 +130,7 @@ decreases end-start,
         } }
     }
 }
-pub(super) proof fn fold_failure(g:GraphView,v:Seq<Seq<i64>>,start:nat,failed:nat,end:nat,a:Seq<i64>,b:Seq<u64>,used:Seq<u64>,item:u32,e:EvaluationFailure)
+pub(super) proof fn fold_failure(g:GraphView,v:Seq<Seq<i128>>,start:nat,failed:nat,end:nat,a:Seq<i128>,b:Seq<u64>,used:Seq<u64>,item:u32,e:EvaluationFailure)
 requires start<=failed<=end<=v.len(),b.len()==8,used.len()==8,
     fold(g,v,start,failed,a,b,used).0==Err(Failure::Evaluation{item,source:e}),
 ensures fold(g,v,start,end,a,b,used)==fold(g,v,start,failed,a,b,used),
@@ -154,7 +154,7 @@ pub(super) open spec fn advance_result(a:FoldView,b:FoldView,r:Result<(),Failure
         }
     }
 }
-pub(super) open spec fn finish(p:FoldView,c:Context)->Result<Seq<i64>,Failure> {
+pub(super) open spec fn finish(p:FoldView,c:Context)->Result<Seq<i128>,Failure> {
     if p.processed!=p.items.len() { Err(Failure::Incomplete) }
     else if !context_equal(p.context,c) { Err(Failure::StaleContext) }
     else { Ok(p.accumulator) }
@@ -166,7 +166,7 @@ pub(super) open spec fn same_operation(a:FoldView,b:FoldView)->bool {
     a.graph==b.graph && a.initial==b.initial && a.items==b.items && context_equal(a.context,b.context)
         && a.limits==b.limits && a.budget==b.budget
 }
-pub(super) proof fn metered_prefix_sound(nodes:Seq<Op>,input:Seq<i64>,count:nat,b:Seq<u64>,used:Seq<u64>)
+pub(super) proof fn metered_prefix_sound(nodes:Seq<Op>,input:Seq<i128>,count:nat,b:Seq<u64>,used:Seq<u64>)
 requires count<=nodes.len(),b.len()==8,used.len()==8,
 ensures work::prefix(nodes,input,count,b,used).1.len()==8,
     match work::prefix(nodes,input,count,b,used).0 {
@@ -174,21 +174,21 @@ ensures work::prefix(nodes,input,count,b,used).1.len()==8,
     },
 decreases count,
 { if count>0 { metered_prefix_sound(nodes,input,(count-1) as nat,b,used); } }
-pub(super) proof fn metered_execution_sound(g:GraphView,input:Seq<i64>,b:Seq<u64>,used:Seq<u64>)
+pub(super) proof fn metered_execution_sound(g:GraphView,input:Seq<i128>,b:Seq<u64>,used:Seq<u64>)
 requires b.len()==8,used.len()==8,
 ensures work::execution(g.inputs,g.outputs,g.nodes,g.roots,input,b,used).1.len()==8,
     match work::execution(g.inputs,g.outputs,g.nodes,g.roots,input,b,used).0 {
         Ok(out)=>scalar::execution(g.inputs,g.outputs,g.nodes,g.roots,input)==Ok(out),Err(_)=>true,
     },
 { metered_prefix_sound(g.nodes,input,g.nodes.len(),b,used); }
-pub(super) open spec fn pure_fold(g:GraphView,v:Seq<Seq<i64>>,start:nat,end:nat,a:Seq<i64>)
-    ->Result<Seq<i64>,evaluation::Failure>
+pub(super) open spec fn pure_fold(g:GraphView,v:Seq<Seq<i128>>,start:nat,end:nat,a:Seq<i128>)
+    ->Result<Seq<i128>,evaluation::Failure>
 recommends start<=end<=v.len(),
 decreases end-start,
 { if end<=start { Ok(a) } else { match pure_fold(g,v,start,(end-1) as nat,a) {
     Err(e)=>Err(e),Ok(acc)=>scalar::execution(g.inputs,g.outputs,g.nodes,g.roots,acc+v[end-1]),
 } } }
-pub(super) proof fn fold_sound(g:GraphView,v:Seq<Seq<i64>>,start:nat,end:nat,a:Seq<i64>,b:Seq<u64>,used:Seq<u64>)
+pub(super) proof fn fold_sound(g:GraphView,v:Seq<Seq<i128>>,start:nat,end:nat,a:Seq<i128>,b:Seq<u64>,used:Seq<u64>)
 requires start<=end<=v.len(),b.len()==8,used.len()==8,
 ensures fold(g,v,start,end,a,b,used).1.len()==8,
     match fold(g,v,start,end,a,b,used).0 { Err(_)=>true,Ok(out)=>pure_fold(g,v,start,end,a)==Ok(out) },
@@ -200,7 +200,7 @@ decreases end-start,
         if let Ok(acc)=previous.0 { metered_execution_sound(g,acc+v[end-1],b,previous.1); }
     }
 }
-pub(super) proof fn pure_split(g:GraphView,v:Seq<Seq<i64>>,start:nat,mid:nat,end:nat,a:Seq<i64>,acc:Seq<i64>)
+pub(super) proof fn pure_split(g:GraphView,v:Seq<Seq<i128>>,start:nat,mid:nat,end:nat,a:Seq<i128>,acc:Seq<i128>)
 requires start<=mid<=end<=v.len(),pure_fold(g,v,start,mid,a)==Ok(acc),
 ensures pure_fold(g,v,start,end,a)==pure_fold(g,v,mid,end,acc),
 decreases end-mid,

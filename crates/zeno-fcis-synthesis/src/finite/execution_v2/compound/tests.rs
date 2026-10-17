@@ -595,8 +595,8 @@ fn full_unsigned_wire_is_retained_without_scalar_projection() {
     for value in [
         0,
         9,
-        i64::MAX as u128,
-        i64::MAX as u128 + 1,
+        i128::MAX as u128,
+        i128::MAX as u128 + 1,
         i128::MAX as u128 + 1,
         u128::MAX,
     ] {

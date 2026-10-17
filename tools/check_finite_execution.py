@@ -20,6 +20,7 @@ import zipfile
 
 from v2_proof_sources import execution_sources
 import scalar_arithmetic_controls as arithmetic_controls
+import signed_arithmetic_controls as signed_controls
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from verus_coverage import profile_inventory, require_coverage
@@ -43,6 +44,10 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("tools/check_finite_execution.py"), Path("tools/verus_coverage.py"),
            Path("tools/scalar_arithmetic_controls.py"), Path("tools/test_scalar_arithmetic_controls.py"),
            Path("tools/scalar_arithmetic_reference.py"), Path("tools/test-data/scalar-arithmetic/vectors.tsv"),
+           Path("tools/test-data/scalar-arithmetic/i128-vectors.tsv"),
+           Path("tools/signed_arithmetic_controls.py"), Path("tools/signed_arithmetic_reference.py"),
+           Path("tools/check_signed_arithmetic.py"), Path("tools/test_signed_arithmetic.py"),
+           Path("tools/test-data/signed-arithmetic/vectors.tsv"),
            Path("tools/check_verus.py"), Path("tools/test_check_finite_execution.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
@@ -62,6 +67,7 @@ SEMANTIC_TARGETS = {
     'admit_excess_node_count': 'validate_shape', 'accept_wrong_root_kind': 'validate_roots',
 }
 SEMANTIC_TARGETS.update(arithmetic_controls.targets())
+SEMANTIC_TARGETS.update(signed_controls.targets())
 
 
 
@@ -137,6 +143,7 @@ def mutation_sources(execution: str, admission: str, typed: str, value: str) -> 
     mutations["add_uncontracted_function"] = (
         SUBJECT, execution + "\nfn unchecked_identity(value: i64) -> i64 { value }\n", "coverage")
     mutations.update(arithmetic_controls.specimens(ROOT))
+    mutations.update(signed_controls.specimens(ROOT))
     return mutations
 
 

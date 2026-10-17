@@ -43,7 +43,7 @@ fn capture_reference_replay_control_fails_with_stubbed_comparison() {
     let stable = vec![vec![0], vec![1], vec![0], vec![1]];
     let nondeterministic = vec![vec![0], vec![1], vec![0], vec![0]];
     let controls = |stub: bool| {
-        let same = |a: &[Vec<i64>], b: &[Vec<i64>]| stub || a == b;
+        let same = |a: &[Vec<i128>], b: &[Vec<i128>]| stub || a == b;
         reconcile_reference(Some(&first), &order, &stable, same).is_ok()
             && reconcile_reference(Some(&first), &order, &nondeterministic, same).is_err()
             && reconcile_reference(Some(&[vec![1], vec![1]]), &order, &stable, same).is_err()
@@ -204,7 +204,7 @@ fn capture_arithmetic_candidates_use_exact_checker_and_product_stub_fails() {
         let table = ok(proposal::ReferenceTable::new(
             vec![Domain::Int { min: 0, max: 40 }],
             vec![Domain::Bool],
-            (0..=40).map(|x| vec![i64::from(x % 2 == 0)]).collect(),
+            (0..=40).map(|x| vec![i128::from(x % 2 == 0)]).collect(),
         ));
         let bytes = ok(serde_json::to_vec(
             &json!({"schema":"zeno-fcis/capture-expressions/1","outputs":[comparison]}),

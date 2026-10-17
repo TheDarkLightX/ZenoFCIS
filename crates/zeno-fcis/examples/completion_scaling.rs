@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use zeno_fcis::legacy::prelude::*;
     use zeno_fcis::legacy::synthesis::finite::{Domain as FiniteDomain, Op, Program};
 
-    for states in [8_i64, 64, 512, 4096] {
+    for states in [8_i128, 64, 512, 4096] {
         let state = FiniteDomain::Int {
             min: 0,
             max: states - 1,

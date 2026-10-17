@@ -431,7 +431,9 @@ fn eval_value<'formula>(
     fuel.operation()?;
     match value {
         // This legacy test oracle has no fused arithmetic semantics.
-        ValueExpr::MulDiv(..) => Err(IndeterminateReason::MissingPredicate),
+        ValueExpr::MulDiv(..) | ValueExpr::SignedMulDivFloor(..) => {
+            Err(IndeterminateReason::MissingPredicate)
+        }
         ValueExpr::Int(value) => Ok(*value),
         ValueExpr::Var(name) => variables
             .iter()

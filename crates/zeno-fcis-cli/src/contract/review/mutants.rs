@@ -615,7 +615,7 @@ fn children(ast: &Ast) -> Vec<&Ast> {
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
         Ast::Choose(condition, then, otherwise) => vec![condition, then, otherwise],
         // Arithmetic mutation coverage belongs to its explicit control suite.
-        Ast::MulDiv(..) | Ast::ProductsGe(..) => Vec::new(),
+        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => Vec::new(),
     }
 }
 
@@ -649,7 +649,9 @@ pub(super) fn render(ast: &Ast) -> String {
         _ => render(inner),
     };
     match ast {
-        Ast::MulDiv(..) | Ast::ProductsGe(..) => super::super::expr::render(ast),
+        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
+            super::super::expr::render(ast)
+        }
         Ast::Bool(value) => value.to_string(),
         Ast::Int(value) => value.to_string(),
         Ast::Name(name) => name.clone(),

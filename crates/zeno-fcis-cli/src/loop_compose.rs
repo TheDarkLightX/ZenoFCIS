@@ -66,7 +66,7 @@ struct Fields {
     variants: Vec<Vec<(u16, String)>>,
     reasons: Vec<(u32, String, u32)>,
     /// The genesis value of each state position.
-    genesis: Vec<i64>,
+    genesis: Vec<i128>,
 }
 
 fn fields(core: &Core) -> Result<Fields> {
@@ -114,9 +114,9 @@ fn fields(core: &Core) -> Result<Fields> {
         .iter()
         .filter(|p| p.source == Source::State)
         .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
-            Some(Constant::Bool(b)) => Ok(i64::from(*b)),
+            Some(Constant::Bool(b)) => Ok(i128::from(*b)),
             Some(Constant::Int(v)) => {
-                i64::try_from(*v).map_err(|_| Stop::Invalid("compose-genesis-range".into()))
+                i128::try_from(*v).map_err(|_| Stop::Invalid("compose-genesis-range".into()))
             }
             None => refuse("compose-genesis-missing"),
         })
@@ -355,7 +355,7 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
                         variant_lines.push_str(&format!("variant {id} {type_id} {name} none;\n"));
                     }
                 }
-                let ids = variants.iter().map(|v| i64::from(*v));
+                let ids = variants.iter().map(|v| i128::from(*v));
                 (ids.clone().min().unwrap_or(0), ids.max().unwrap_or(0))
             }
         };
@@ -659,8 +659,8 @@ pub(super) fn compose(core: &Core, parts: &[Part], export: Option<&Path>) -> Res
     let mut first: Option<Value> = None;
     for ordinal in 0..core.tuples() {
         let tuple = core.tuple(ordinal);
-        let global: Vec<i64> = slot_of.iter().map(|p| tuple[*p]).collect();
-        let request: Vec<i64> = request_of.iter().map(|p| tuple[*p]).collect();
+        let global: Vec<i128> = slot_of.iter().map(|p| tuple[*p]).collect();
+        let request: Vec<i128> = request_of.iter().map(|p| tuple[*p]).collect();
         let outcome = joint
             .joint_step(&global, &request)
             .map_err(|error| Stop::Invalid(format!("compose-joint-input: {error:?}")))?;

@@ -9,7 +9,7 @@ use zeno_fcis_value::{Field, Value};
 #[test]
 fn actual_canonical_records_preserve_closed_mapping_and_opaque_usage() {
     let record = Value::record_canonical(vec![
-        Field::new(0, Value::signed(i64::MIN as i128)),
+        Field::new(0, Value::signed(i128::MIN as i128)),
         Field::new(7, Value::boolean(true)),
         Field::new(32, Value::enumeration(u32::MAX, u16::MAX)),
         Field::new(u16::MAX, Value::sum(0, 7, None)),
@@ -22,8 +22,8 @@ fn actual_canonical_records_preserve_closed_mapping_and_opaque_usage() {
         V2InputField {
             id: 0,
             leaf: V2InputLeaf::I128 {
-                min: i64::MIN,
-                max: i64::MIN,
+                min: i128::MIN,
+                max: i128::MIN,
             },
         },
         V2InputField {
@@ -74,7 +74,7 @@ fn actual_canonical_records_preserve_closed_mapping_and_opaque_usage() {
             .collect::<Vec<_>>(),
         expected_attempts
     );
-    assert_eq!(outcome.into_parts().0, Ok(vec![i64::MIN, 1, 10, -11]));
+    assert_eq!(outcome.into_parts().0, Ok(vec![i128::MIN, 1, 10, -11]));
     let refused = project_record_v2(&bytes, &fields, limits.with_limit(V2Resource::Read, 3));
     assert_eq!(refused.usage().used(V2Resource::Read), 3);
     assert_eq!(refused.usage().used(V2Resource::Byte), bytes.len() as u64);

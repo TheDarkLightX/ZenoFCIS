@@ -6,7 +6,7 @@ use zeno_fcis_synthesis::finite::{
 };
 
 #[test]
-fn unsigned_deposit_exceeds_i64_through_public_shared_interpreter() {
+fn unsigned_deposit_exceeds_i128_through_public_shared_interpreter() {
     let domain = Domain::U128 {
         min: 0,
         max: u128::MAX,

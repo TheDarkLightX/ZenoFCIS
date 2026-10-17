@@ -49,12 +49,12 @@ pub struct DiagramReport {
 struct OverSize;
 
 struct Diagram<'a> {
-    inputs: &'a [Vec<i64>],
-    minimums: &'a [i64],
+    inputs: &'a [Vec<i128>],
+    minimums: &'a [i128],
     kinds: &'a [Kind],
     order: &'a [usize],
     pool: Pool,
-    cache: BTreeMap<(usize, Kind, Vec<i64>), usize>,
+    cache: BTreeMap<(usize, Kind, Vec<i128>), usize>,
     built: usize,
     max_built: usize,
 }
@@ -89,7 +89,7 @@ impl Diagram<'_> {
     fn equal_or(
         &mut self,
         input: usize,
-        value: i64,
+        value: i128,
         child: usize,
         rest: usize,
     ) -> Result<usize, OverSize> {
@@ -102,12 +102,12 @@ impl Diagram<'_> {
         &mut self,
         rows: &[u32],
         depth: usize,
-        values: &[i64],
+        values: &[i128],
         kind: Kind,
         meter: &mut Meter,
     ) -> Result<Result<usize, OverSize>, Stop> {
         meter.charge(5 * rows.len() + 10)?;
-        let local: Vec<i64> = rows.iter().map(|row| values[*row as usize]).collect();
+        let local: Vec<i128> = rows.iter().map(|row| values[*row as usize]).collect();
         let key = (depth, kind, local);
         if let Some(id) = self.cache.get(&key) {
             return Ok(Ok(*id));
@@ -142,7 +142,7 @@ impl Diagram<'_> {
         &mut self,
         rows: &[u32],
         depth: usize,
-        values: &[i64],
+        values: &[i128],
         kind: Kind,
         meter: &mut Meter,
     ) -> Result<Option<Result<usize, OverSize>>, Stop> {
@@ -162,7 +162,7 @@ impl Diagram<'_> {
         };
         let column = &self.inputs[variable];
         let minimum = self.minimums[variable];
-        let mut groups: BTreeMap<i64, Vec<u32>> = BTreeMap::new();
+        let mut groups: BTreeMap<i128, Vec<u32>> = BTreeMap::new();
         meter.charge(4 * rows.len() + 8)?;
         for row in rows {
             groups.entry(column[*row as usize]).or_default().push(*row);
@@ -214,7 +214,7 @@ impl Diagram<'_> {
             if *child == fallback {
                 continue;
             }
-            match self.equal_or(input, minimum + offset as i64, *child, result) {
+            match self.equal_or(input, minimum + offset as i128, *child, result) {
                 Ok(next) => result = next,
                 Err(OverSize) => return Ok(Some(Err(OverSize))),
             }
@@ -243,7 +243,7 @@ fn next_permutation(order: &mut [usize]) -> bool {
 /// the smallest distinct programs found, smallest first.
 pub(crate) fn propose(
     original: &Graph,
-    sig: &[Vec<i64>],
+    sig: &[Vec<i128>],
     env: &Env<'_>,
     meter: &mut Meter,
 ) -> Result<(Vec<Graph>, DiagramReport), Stop> {
@@ -262,14 +262,18 @@ pub(crate) fn propose(
     let mut input_kinds = Vec::with_capacity(original.inputs.len());
     for domain in &original.inputs {
         let (min, max) = domain.bounds();
-        if i128::from(max) - i128::from(min) + 1 > i128::from(shape.diagram_cardinality) {
+        if !max
+            .checked_sub(min)
+            .and_then(|span| span.checked_add(1))
+            .is_some_and(|span| span <= i128::from(shape.diagram_cardinality))
+        {
             report.skipped = Some("input-cardinality-over-diagram-limit");
             return Ok((Vec::new(), report));
         }
         minimums.push(min);
         input_kinds.push(domain_kind(*domain).unwrap_or(Kind::Int));
     }
-    let columns: Vec<Vec<i64>> = (0..original.inputs.len())
+    let columns: Vec<Vec<i128>> = (0..original.inputs.len())
         .map(|input| env.space.column(input, live))
         .collect();
     let kinds = original.kinds();
@@ -278,7 +282,7 @@ pub(crate) fn propose(
     for (index, root) in original.roots.iter().enumerate() {
         meter.charge(3 * live.len() + 4)?;
         let few =
-            sig[*root].iter().copied().collect::<BTreeSet<i64>>().len() <= RESYNTHESIZED_VALUES;
+            sig[*root].iter().copied().collect::<BTreeSet<i128>>().len() <= RESYNTHESIZED_VALUES;
         if kinds[*root] == Kind::Bool || few {
             resynthesized.push(index);
         } else {

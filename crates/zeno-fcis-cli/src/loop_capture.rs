@@ -119,7 +119,7 @@ struct Session {
     table_sha256: String,
     program_sha256: String,
     checker: Value,
-    rows: Vec<Vec<i64>>,
+    rows: Vec<Vec<i128>>,
     reference_observations: u64,
     budget: Budget,
     attempts: u64,
@@ -362,7 +362,11 @@ fn packet(state: &Session, table: &proposal::ReferenceTable) -> Value {
         "round":state.attempts,"examples":examples.iter().map(|i|json!({"input":table.points()[*i],"output":table.rows()[*i]})).collect::<Vec<_>>()})
 }
 
-fn reference_rows(reply: Value, skeleton: &Program, count: usize) -> Result<Vec<Vec<i64>>, String> {
+fn reference_rows(
+    reply: Value,
+    skeleton: &Program,
+    count: usize,
+) -> Result<Vec<Vec<i128>>, String> {
     let object = reply.as_object().ok_or("capture-reference-output-shape")?;
     if object.len() != 1 || !object.contains_key("rows") {
         return Err("capture-reference-output-shape".into());
@@ -383,6 +387,8 @@ fn reference_rows(reply: Value, skeleton: &Program, count: usize) -> Result<Vec<
                 .zip(skeleton.outputs())
                 .map(|(v, d)| {
                     v.as_i64()
+                        .map(i128::from)
+                        .or_else(|| v.as_u64().map(i128::from))
                         .filter(|v| d.contains(*v))
                         .ok_or_else(|| "capture-reference-output-domain".to_owned())
                 })
@@ -401,10 +407,10 @@ struct ReferenceWork {
 fn observed_table(
     source: &str,
     skeleton: &Program,
-    points: &[Vec<i64>],
+    points: &[Vec<i128>],
     stages: &mut super::Stages,
     work: &mut ReferenceWork,
-) -> Result<Vec<Vec<i64>>, String> {
+) -> Result<Vec<Vec<i128>>, String> {
     observed_table_with(skeleton, points, work, |schedule| {
         stages.run(true, || runtime::invoke(source, schedule))?
     })
@@ -415,10 +421,10 @@ fn observed_table(
 // reverse-order, strict-label and work-accounting checks.
 fn observed_table_with(
     skeleton: &Program,
-    points: &[Vec<i64>],
+    points: &[Vec<i128>],
     work: &mut ReferenceWork,
-    mut invoke: impl FnMut(&[Vec<i64>]) -> Result<Value, String>,
-) -> Result<Vec<Vec<i64>>, String> {
+    mut invoke: impl FnMut(&[Vec<i128>]) -> Result<Value, String>,
+) -> Result<Vec<Vec<i128>>, String> {
     let mut baseline = None;
     for reversed in [false, true, false] {
         let mut order = (0..points.len()).collect::<Vec<_>>();
@@ -444,11 +450,11 @@ fn observed_table_with(
 }
 
 fn reconcile_reference(
-    baseline: Option<&[Vec<i64>]>,
+    baseline: Option<&[Vec<i128>]>,
     order: &[usize],
-    rows: &[Vec<i64>],
-    mut same: impl FnMut(&[Vec<i64>], &[Vec<i64>]) -> bool,
-) -> Result<Vec<Vec<i64>>, String> {
+    rows: &[Vec<i128>],
+    mut same: impl FnMut(&[Vec<i128>], &[Vec<i128>]) -> bool,
+) -> Result<Vec<Vec<i128>>, String> {
     let n = order.len();
     if rows.len() != 2 * n || order.iter().any(|i| *i >= n) {
         return Err("capture-reference-row-count".into());
