@@ -180,13 +180,13 @@ def exhaustive(bound, *, coalitions=((0,), (1,)), max_seconds=120):
             "coalitions": coalitions, "commands_per_coalition": {str(c): len(commands[c]) for c in coalitions},
             "counts": dict(counts), "counts_per_coalition": {c: dict(v) for c, v in by_coalition.items()},
             "distinct_transition_checks_including_partial_depth": len(transitions),
-            "primary_measure": "floored_burn_payout",
+            "primary_measure": "exact_pro_rata",
             "measures": {name: {"first_witness": w, "status": "counterexample" if w else "no violation through completed bound"}
                          for name, w in witnesses.items()},
             "seconds": round(time.monotonic() - started, 3),
             "domain": "initial_domain() and command_domain(); every Cartesian value; all statuses; real K=1000; successors unrestricted by initial domain",
-            "claim_definition": "combined liquid balances + sum of each member's floor(shares*reserve/supply)",
-            "extra_guards": "exact combined pro-rata; hypothetical floor of pooled shares (no share transfer command)",
+            "claim_definition": "combined liquid balances + exact combined pro-rata claim",
+            "extra_guards": "sum of each member's floored burn payouts; hypothetical floor of pooled shares (no share transfer command)",
             "capabilities": "only coalition members submit commands; either ordinary recipient; interleaved atomic sequential steps; no borrowing, outside income, admin, external markets or oracle",
             "nonclaims": "finite oracle domain/alphabet only; no arbitrary amounts, native equivalence, flash lender or donation command; partial depth is not exhaustive"}
 
