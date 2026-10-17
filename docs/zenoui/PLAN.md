@@ -33,7 +33,7 @@ Do **not** implement a novel DOM engine, CRDT store, browser framework, general 
 
 As of this proposal, `main` documents **2.4.0 as released**, with a checked-program and mandatory Authority route; the 2.3 boundary remains. The current library already distinguishes `Accept | Reject | CommittedFailure`, complete contract decisions, canonical admission, checked execution, law enforcement, nominal publication and outbox delivery. Preserve those existing decisions, result classes, versioned identities and refusal semantics. See [README](../../README.md), [V2 API migration](../V2_PROGRAM_API_MIGRATION.md), and [release notes](../RELEASE_NOTES.md).
 
-ZAL currently provides a **bounded experimental** `zal/finite-fsm/1` behavior dialogue with symbolic and controlled-English surfaces, exact-revision review and scoped checks. This is a promising **authoring input**, not a released, general UI contract language. Any UI profile, type or parser proposed below must be independently specified, implemented, reviewed and qualified; do not pretend the existing ZAL parser already supports UI semantics.
+ZAL currently provides a **bounded experimental** `zal/finite-fsm/1` behavior dialogue with symbolic and controlled-English surfaces, exact-revision review and scoped checks. This is a promising **specification input**, not a released, general UI contract language. Any UI profile, type or parser proposed below must be independently specified, implemented, reviewed and qualified; do not pretend the existing ZAL parser already supports UI semantics.
 
 Maintain the existing FCIS trust separation:
 
@@ -126,11 +126,50 @@ Canonical UI meaning is revision-bound. A digest can identify bytes; **it does n
 
 The existing ZAL review path may be explored for *meaning review*; it cannot be reused as an unqualified source of production UI authorization.
 
-## 4. Presentation-policy best practices
+## 4. Default UI from the application contract
+
+**The default workflow starts with an app contract, not a UI policy.** Supply `project.zeno`, `v2/policy.json`, decision examples and a short statement of user tasks. Import declarations, laws and ordered policy through existing admission, retaining object IDs and exact source identity; see [contract rules](../CONTRACT_RULES.md). A small reviewed presentation descriptor supplies labels, units, task names, consequential-action classifications and context sources alongside the contract, without adding unsupported contract keys.
+
+| Contract input | Generated baseline | Acceptance gate |
+| --- | --- | --- |
+| Commands and command fields | One discoverable action route per command; typed form, review and submit controls | Complete command coverage and exact command-field binding, never dispatch by list position |
+| State fields, types, ranges and variants | Typed views and inputs with labels and units beside values | Reviewed units, including explicit unitless values; bounded Boolean/enum/integer codecs preserving full integer width |
+| Reasons and admission refusals | Explanations, associated fields where known, and permitted recovery guidance | Preserve decision class, reason ID and precedence; never reinterpret refusal as success |
+| Policy, laws and real Authority decisions | Eligibility and refusal reasons, followed by task, review, busy and uncertainty masks | Full declared-domain UI–Authority comparison; admission and law failures make the action unavailable |
+| Channels, effect payloads and outbox records | Request, commit and delivery status views | Matching evidence for pending, committed, queued and acknowledged states; commit does not imply external delivery |
+
+Field names may suggest labels, but a type name does not establish a real-world unit. Missing meanings become explicit descriptor questions. Principal and authorization observations come from the declared application adapter, never automatically from editable form fields. Unresolved descriptors block qualification of the affected package; unsupported or oversized domains may produce a scaffold with an explicit unsupported result.
+
+The deterministic baseline contains task navigation, state summary, the selected form, review dialog, outcome/status and a collapsed record. The same generator emits the presentation contract, keyed Semantic UI Tree, application bindings, controlled-English readback and positive/refusal fixtures. It emits closed data interpreted by a reviewed primitive library, with no app-specific components, event handlers or CSS required. Optional ZAL-UI refines this baseline; the neural search loop is not needed to create it.
+
+Keep any admitted `zenoui/semantic-contract/1` prototype unchanged. Typed workflow/binding additions require an explicitly migrated proposed `zenoui/semantic-contract/2`, with old/new observation comparison on the common domain. The optional `zal/ui/1` surface below does not silently widen either profile.
+
+**Regression target:** the supplied 2.3 prototype presentation predicate allowed `available=1, reserved=5, quantity=1, authorized=true`. The inspected current [inventory policy](../../verification/kernel-laws/src/oracle/templates/inventory-reservation/v2/policy.json) refuses the Reserve request because `reserved + quantity > 5`. Retain this exact tuple and the complete source identities as a cross-version regression fixture. This is a source-comparison target, not a fresh replay of the original 2.3 Authority. Never copy demo predicates or their restricted enumeration as the acceptance oracle; replay against the actual selected Authority and include law-invalid/admission-refused tuples.
+
+**M1 success test:** another agent receives only the written workflow, pinned tooling, the second app contract and reviewed intent/descriptors, then generates a different app's UI without hidden instructions or app-specific renderer/handler/CSS changes or a custom ZAL-UI policy. Proposed second app: [document release](../../core-apps/document-release/project.zeno), with Edit, Submit, Approve and Release, version refusals and release-outbox status. Both apps must use the same generator and real application adapters. Record all descriptor questions, reviews, per-action positive journeys, negative cases and reproduction commands. This is an M1 exit condition, not a later search milestone.
+
+### 4.1 When a UI cannot be synthesized: four honest tiers
+
+Some interfaces do not follow from a contract: rich visualisations (price charts, order-book depth, maps), direct
+manipulation (drag and drop, canvases, games), real-time collaborative views and brand pages. Contracts too large to
+check exhaustively can still get a generated UI, but not a fully checked one. Every UI region therefore states its
+tier and evidence level:
+
+| Tier | Covers | Evidence |
+|---|---|---|
+| 1. Synthesized | Forms, actions, task flows, status and explanations derived from the contract | Finite checked against the real Authority |
+| 2. Synthesized and shaped by ZAL-UI | Adaptive emphasis, disclosure, enablement and focus from a reviewed policy | Finite checked |
+| 3. Custom component behind a typed boundary | A chart, order book or canvas that may only render declared data bindings and emit declared typed events. It never dispatches commands, decides enablement or captures consent; the Presentation Core keeps those | Boundary finite checked; component internals tested only, and labelled so |
+| 4. Custom UI with ZenoUI as checker | An existing or bespoke interface whose events are mapped to typed actions | Agreement with the Authority (W ⇒ A) and the mandatory invariants checked; everything else tested |
+
+A tier-3 component is admitted like any primitive, with its own declared bindings, events, accessibility contract and
+conformance tests. It can never be used to bypass the Presentation Core or the Authority.
+
+## 5. Presentation-policy best practices
 
 The Presentation Core is ZenoUI's main addition to the original reactive-systems research. Encode supported rules for:
 
-- **Intent-aware adaptation:** explicit task/selection takes priority over inferred intent; inferred recommendations are advisory only. A change in inferred intent cannot silently invoke, authorize or consent to a command.
+- **Intent-aware adaptation:** explicit task/selection takes priority over inferred intent; inferred recommendations are advisory only and may change **emphasis only**. Hints cannot select a task, reorder controls, reveal/hide content, move focus, change fields, enable an action, consent or invoke a command.
 - **Progressive disclosure:** show the necessary next step first; reveal advanced settings when task/state warrants it. Every required task remains discoverable by a documented navigation path, including keyboard access.
 - **Contextual action priority:** make a safe recovery action primary when the intended operation becomes invalid; distinguish explanatory, reversible advice from business requirements.
 - **Explainability:** expose why a control is unavailable and what permitted action can repair that condition; never conceal necessary risks or unexpected consequences.
@@ -142,7 +181,13 @@ The Presentation Core is ZenoUI's main addition to the original reactive-systems
 
 Prefer **task success** and **error recovery** over novelty. These are UX hypotheses and policy constraints; no symbolic checker can establish universal ease of use, taste or comprehension. Test them with representative human tasks.
 
-### 4.1 Example: expired quote
+### 5.1 Adaptive-UX limits and user control
+
+Keep inferred hints separate from explicit task state and checked application facts. Only the latter drive disclosure and eligibility. Each adaptive change carries a stable rule or hint ID and a short **“Why this changed”** explanation. **Undo** restores prior presentation choices; **“Keep this layout”** suppresses further hints. Neither control can restore stale permissions, consent or application state. A wrong prediction costs attention, never access or authority.
+
+Require paired-run noninterference for identical semantic inputs and explicit event traces: changing hints, theme, width or motion must preserve keyed eligibility, command bindings, selection, consent, request identity and outcomes. Layout may differ for responsive presentation; inferred hints still change emphasis only. Inference is optional, and an inconclusive evaluation keeps the deterministic baseline.
+
+### 5.2 Example: expired quote
 
 ```text
 given state.quote = Expired
@@ -162,9 +207,63 @@ Application:
 
 The presentation policy can be checked against exhaustive finite projections and mutated examples. Only the authoritative core may decide or publish the business action. Provide positive and negative intent examples so a trivial **disable-everything** implementation cannot masquerade as correct.
 
-## 5. Versioned synchronization protocol
+## 6. ZAL-UI v1: optional presentation policy
 
-A server-driven or distributed UI is a distributed system. The original October 15 review identified Livewire 4 island concurrency as a concrete motivating example; consult the current official [islands documentation](https://livewire.laravel.com/docs/4.x/islands) before making a public comparative claim.
+`zal/ui/1` is a **proposed** small versioned language over the generated manifest, not syntax supported by the current ZAL parser. IDs refer to admitted tasks, nodes, actions, reasons and facts; directives describe semantic data, not scripts or arbitrary components.
+
+```text
+profile "zal/ui/1"
+interface NAME
+task TASK
+when RULE_ID: CONDITION {
+    DIRECTIVE ...
+}
+DIRECTIVE = emphasize NODE | deemphasize NODE | reveal NODE
+          | enable ACTION | disable ACTION
+          | explain ACTION because REASON | focus NODE
+motion { transition instant | fade MILLISECONDS; reduced_motion instant }
+invariant OBLIGATION_ID
+CONDITION = true | false | FACT | task == TASK
+          | not CONDITION | (CONDITION and CONDITION)
+          | (CONDITION or CONDITION)
+```
+
+The grammar is a sketch pending profile admission. Require one profile, interface and motion declaration; unique task/rule IDs matching `[a-z][a-z0-9_]{0,31}`; precedence `not`, then `and`, then `or`, with parentheses overriding it. Facts are typed Boolean bindings to explicit interaction state or checked application predicates. Unknown facts, targets, operations, extra syntax and over-limit collections are refused. Freeze domain, size and expression bounds before checking. Arbitrary arithmetic, function calls, temporal syntax and inferred-hint reads are absent from v1 conditions.
+
+| Construct | Proposed semantics |
+| --- | --- |
+| `task` | Declares a selectable goal and manifest action bindings; does not select or invoke it. Initialization selects generated `overview`; declaration order has no meaning. |
+| `when` | Evaluate all conditions against the same immutable pre-view inputs. True rules contribute directives without persistent side effects or feeding other rules in that evaluation. |
+| `emphasize` / `deemphasize` | Choose an approved prominence variant without changing visibility, focusability, eligibility or order. Conflicting active variants are a finite-check error; default is normal prominence. |
+| `reveal` | A conditional manifest node is shown iff at least one applicable reveal condition holds; otherwise it is hidden. Always-visible nodes stay visible. Explicit disclosure-open state is a fact; hiding preserves drafts. |
+| `enable` / `disable` | E is true if no enable rules target the action, otherwise their conditions' OR; D is the OR of disable conditions. `enabled = W and E and not D and selected and ready and current_consent_if_required`. W is valid-input eligibility against the real Authority; ready excludes busy/uncertain states. Dispatch rechecks the masks and invokes Authority; enable never grants permission. |
+| `explain` | Attach a registered parameterized reason. Core refusal is primary, followed by uncertainty/busy/input/consent reasons, then policy reasons sorted by stable ID. Every unavailable action needs an explanation; a label cannot fabricate a core reason. |
+| `focus` | Reducer requests focus once on a rule's false-to-true entry, keyed by event and target. Only explicit navigation, review/error handling or its matching completed request may trigger it. Background progress and inference cannot; hidden/inert targets are invalid. Initialization uses manifest focus. |
+| `motion` | Choose a closed preset, duration 0 or 120–160 ms; reduced motion is always instant. Animation completion never gates domain actions or reducer progress. |
+| `invariant` | Select a versioned checker obligation, not assert its truth. All nine mandatory invariant rows in section 10 remain required; generators cannot omit them and unknown IDs are refused. |
+
+**Merge precedence:** authoritative eligibility and workflow restrictions first; disable over enable; reveal by OR. Conflicting prominence variants or distinct simultaneous focus targets reject the candidate; identical focus requests coalesce. Manifest order is explicit data, and source rule order never breaks ties. Mandatory accessibility and evidence obligations veto a candidate. This deliberately differs from the application policy's first-matching-case semantics in [contract rules](../CONTRACT_RULES.md).
+
+| Operation | User and accessibility effects |
+| --- | --- |
+| De-emphasise | Remains visible, keyboard reachable and in the accessibility tree, with sufficient contrast, label and target size. Never make a required task unreadable through opacity. |
+| Disable | Remains visible with an independently readable reason. Native disabled controls do not activate and normally leave tab order; an `aria-disabled` variant must suppress pointer, keyboard and dispatch activation. |
+| Hide | Absent from visual display, accessibility tree and tab order, retaining keyed state/drafts. Resolve focus to a declared visible return target first; preserve a discoverable disclosure/navigation route. |
+| Remove | Absent from the component tree. V1 permits only optional structural choices at generation, never removal of required actions or hint-driven removal. Draft deletion requires an explicit reviewed reset/discard. |
+
+Hide/remove describe manifest behavior; they are not additional v1 directives. The generated task navigation remains available even when an action is disabled. For inventory, explicit task selection reveals its form, checked validity and core eligibility constrain confirmation, authorization refusal is explained, and only a matching accepted commit reveals success.
+
+### 6.1 Shared-AST readback, finite-FSM boundary and ladder
+
+Generate symbolic and controlled-English surfaces from **one canonical AST with source maps**. Both admitted surfaces must parse back to the same AST. Include defaults, masks, precedence, bindings, definitions, scope, owner-decision status and evidence per rule; arbitrary prose remains an untrusted proposal. Human teach-back and independent checks still test whether the meaning is right.
+
+Reuse `zal/finite-fsm/1` only for compatible workflow slices. Its existing profile permits at most 8 states, 8 events and 4 Boolean facts; arithmetic, effects and concurrency are unsupported, and overlapping enabled transitions are errors. A supplied `authorized` fact is not authenticated identity. See [ZAL grammar](../zal/GRAMMAR.md), [behavior implementation](../../integrations/zal/behavior.py) and [factory binding](../../integrations/zal/factory.py). UI lowering, parser support and real-Authority correspondence need new evidence; profile reuse does not prove the full UI.
+
+Use the ZAL explanation ladder: **formula → formal reading → precise English → intuitive wording → question**, retaining the same definitions, scope and positive/negative examples. For `W ⇒ A`, the question is “Can this UI offer a request the core refuses?” and the search target is `W and not A`. Register UI-specific ladder templates with paired round-trip fixtures; the ladder is an explanation surface, not execution or permission. Use [question and teach-back tools](../zal/LOOPS.md) to expose missing meaning before adoption.
+
+## 7. Versioned synchronization protocol
+
+A server-driven or distributed UI is a distributed system. The original October 15 review identified island concurrency as a motivating example; verify the comparison framework and version before making a public comparative claim.
 
 Proposed **illustrative** envelopes:
 
@@ -195,7 +294,7 @@ Required semantics:
 
 **Important distinction:** browser-side monotonic versions prevent some stale rendering; they do **not** prevent server-side lost updates. Both the application commit protocol and UI reconciliation must be checked.
 
-## 6. Incremental reactive dependency engine
+## 8. Incremental reactive dependency engine
 
 Propose a small deterministic, bounded dependency DAG over semantic projections. For an input \(x\) and graph \(G\), affected computations lie in the dependency-reachable set:
 
@@ -215,7 +314,7 @@ Reachability indicates *possible* invalidation, not that every reachable computa
 
 Start with signals/selectors and transactional invalidation. Treat reactive relational queries (as explored by **Riffle**) as a later opt-in, benchmark-driven extension, not an immediate database rewrite.
 
-## 7. Temporal effects and component lifecycle
+## 9. Temporal effects and component lifecycle
 
 Model time and sequencing **explicitly** in the shell's effect protocol and verification traces. Drawing on Willow, describe for each effect its:
 
@@ -241,7 +340,7 @@ SearchChanged(query):
 
 Initial implementation: developer-visible traces, sequence-model tests, and explicit cancellation. A Willow-like **static temporal effect checker** is a research track after those practical contracts exist. Do not advertise it as implemented.
 
-## 8. Formal obligations and verification strategy
+## 10. Formal obligations and verification strategy
 
 Separate three questions:
 
@@ -268,7 +367,33 @@ Additional obligations: deterministic render output for identical complete input
 
 Use a property-based model harness inspired by **PropRatt**: generate actions, asynchronous completions, timer firings, disconnects, retries, permission changes, unmount/remount and injected failures. Minimize failing event traces and turn every counterexample into a stable regression fixture. Pair with mutation testing so a checker that never fails is not accepted on its own.
 
-### 8.1 Proof and evidence labels
+### 10.1 Real-Authority agreement and nine mandatory invariants
+
+For a frozen state/request/context tuple x, **A(x)** means the actual library Authority accepts after admission and laws; this Boolean predicate is distinct from the typed command A in section 3. **W(x)** is presentation valid-input eligibility before task, policy and workflow masks. Require **W(x) ⇒ A(x)**; prefer equality and enumerate every conservative omission. Build the acceptance reference from the real Authority, never a duplicate UI predicate or fake adapter. Check every declared tuple, including unreachable, law-invalid and admission-refused cases with tagged outcomes. Decoder tests separately cover malformed bytes outside the finite typed domain.
+
+**No disable-everything escape:** each required action needs an Authority-accepted positive witness and a reachable permitted journey, plus refusal cases and an independent coverage oracle. A policy may restrict invocation but cannot remove inspection of the action/reason. An action with no accepted witness is an explicit scope/meaning blocker, not a silently passing row. Preview cannot prevent a later permission change, so actual dispatch and commit always revalidate authority and snapshot identity.
+
+The catalogue below supplements U-SAFE/U-INTENT/U-A11Y/U-LIVE, rather than replacing the sync/lifecycle obligations. Its final row couples two named obligations; both are mandatory, giving nine catalogue rows.
+
+| Named invariant | Finite obligation | Required browser/integration evidence |
+| --- | --- | --- |
+| `confirmation_requires_commit` | Success requires the matching accepted-and-committed outcome; submission, Reject, admission refusal, Unknown and CommittedFailure are not success. | Forged/mismatched replies and lost acknowledgements never display success. |
+| `forbidden_actions_not_invokable` | W ⇒ real A; enabled and dispatched requests satisfy W and all workflow masks. | Actual Authority refusal paths; permission changes and permissive-guard/bypass-dispatch mutants fail. |
+| `required_actions_remain_discoverable` | Persistent task navigation; controls and reasons reachable within a declared UI-step bound without a domain command. Busy/uncertain may block invocation, not inspection. | Keyboard and screen-reader paths, including disabled actions and recovery. |
+| `no_stale_or_backward_revision` | Updates are nondecreasing within one store/epoch; equal revisions require identical canonical contents. Stale replies are no-ops; reset creates a new epoch and invalidates review/outcomes. | Reorder, replay, reconcile and restart schedules preserve the eligible view. |
+| `consent_bound_to_what_is_shown` | Consequential dispatch matches reviewed command bytes, values/units, principal/context, contract, snapshot and request identity; edits or binding changes invalidate review. | Compare rendered review facts with exact dispatched bytes; reject stale confirmation. |
+| `run_identity` | Replies match epoch, run, request and cell ordinal/selection generation where applicable. Identity never silently wraps or reuses; finite equality abstractions alone do not prove lifetime uniqueness. | Old progress, cells, cancelled runs and disposed sessions change nothing. |
+| `preferences_never_change_meaning` | Paired theme/width/motion/hint inputs preserve the keyed security projection and command trace, allowing layout-only steps. | Same explicit journey across the preference matrix; intent-alters-guard/selects-task/confirms mutants fail. |
+| `accessible_presentation` | Names, explanations, required routes, unique valid focus targets and dialog states; no focus on hidden/inert nodes. | Contrast, keyboard, focus return, announcements, zoom/reflow, reduced motion and manual assistive-technology review. |
+| `complete_initial_view` / `truthful_evidence` | Every declared region initially has data, empty or loading status; verdicts/counts derive from matching evidence scope, including partial/unknown results. | No blank status region, fabricated claim or pending work displayed as complete. |
+
+The noninterference projection includes keyed eligibility/enabled values, explicit selection, input-to-command bindings, consent, replay identities, outcomes and command paths. It excludes approved prominence and responsive layout. Compare initialization and every admitted reducer transition for the same supplied semantic events; this does not claim that people behave identically under different layouts.
+
+Propose lowering the reducer/policy to an ordinary finite FCIS subject (`project.zeno`, `v2/policy.json` and finite program), with checked bindings for labels and exact payloads. Encode obligations as Boolean targets for `transform check` and `transform replay`, alongside `contract review --gaps`, `contract lemma`, `contract scenario` and `contract probe`; see [loop tools](../zal/LOOPS.md). Independently compare the presentation evaluator, lowered evaluator and real application adapter on identical domains and event traces. Preserve integer widths, overflow/refusal and eager evaluation; never narrow wide amounts through JavaScript Number. Payload equality abstractions and decomposed checks require explicit correspondence/interface evidence; otherwise bound the domain and limit the claim.
+
+Every invariant needs a positive witness, a planted defect rejected by its intended predicate, and a deterministic counterexample input or minimized reachable trace on failure. Bind results to exact contract/policy/adapter/checker identities, domains, assumptions and expected/actual observations. Exhausted budgets, missing bridges and unsupported expressions remain inconclusive. Reports separate finite checking, bridge conformance, browser evidence and theorems using the labels below; no aggregate “verified UI” flag hides absent evidence.
+
+### 10.2 Proof and evidence labels
 
 Use explicit labels, consistent with [epistemic status](../adr/0003-epistemic-status.md):
 
@@ -282,7 +407,7 @@ Use explicit labels, consistent with [epistemic status](../adr/0003-epistemic-st
 
 Never promote bounded model checks to universal proofs. Never claim browser-wide "bug free" or mathematically optimal UX from a semantic-core proof.
 
-## 9. Security and trust threats
+## 11. Security and trust threats
 
 Explicitly consider:
 
@@ -298,7 +423,7 @@ Explicitly consider:
 
 No signed UI snapshot grants business authorization. The server treats UI state as an untrusted view even when it is integrity-protected.
 
-## 10. Performance, responsiveness and accessibility evidence
+## 12. Performance, responsiveness and accessibility evidence
 
 Use the **same behavior and workload** when comparing ZenoUI against an established renderer/framework (optionally Livewire 4 in an applicable server-driven configuration); do not extrapolate from synthetic microbenchmarks.
 
@@ -323,11 +448,29 @@ Measure per test environment:
 | Usability | Task success, completion time, recovery rate, comprehension and perceived predictability |
 | Developer effort | Specification complexity, implementation size, defects/feature, maintenance burden |
 
-An INP of **200 ms or less at the 75th percentile** is a common good-responsiveness reference, **not** a promise for this architecture; separate it from round-trip server latency. The release gate should specify actual test device classes and representative tasks. Use [web.dev INP](https://web.dev/articles/inp) and [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/) as baseline guidance.
+An INP of **200 ms or less at the 75th percentile** is a common good-responsiveness reference, **not** a promise for this architecture; separate it from round-trip server latency. The release gate should specify actual test device classes and representative tasks. Treat INP guidance and WCAG 2.2 as qualification inputs whose versions must be recorded with the eventual repository evidence.
 
 Test at least one keyboard-only and screen-reader journey; automated accessibility lint is not sufficient. Honor `prefers-reduced-motion`; document focus restoration, live-region announcement frequency, contrast and responsive disclosure. Keep these as observable acceptance tests, not assumptions that a pure AST implies correct browser output.
 
-## 11. Implementation phases and dependency gates
+## 13. Neurosymbolic generation and evaluation
+
+The deterministic contract-to-UI baseline belongs to M1. Optional neural proposals and search belong to M6, after the semantic, Authority, browser and accessibility gates exist. Existing tools judge admitted finite subjects; the UI-specific lowering and bindings remain proposed work. Search never chooses intended meaning or grants authority.
+
+| Loop | Existing tools and proposed UI use | Gate |
+| --- | --- | --- |
+| Specification | `contract review --gaps`, `contract probe`, `contract scenario`, `loop question`, `loop teach-back`: find missing descriptors, contradictions, unreachable tasks and positive/refusal examples. | Owner-reviewed meaning, explicit bounds and positive witnesses; zero findings alone does not establish complete requirements. |
+| Synthesis | Deterministic baseline first; then `loop sketch`, expression proposals and program search over bounded holes where fixed-target semantics apply. | Independent obligations, real-Authority parity and `transform check` plus receipt replay. New layout freedom is checked through its security projection, not falsely called whole-view equivalence. |
+| UX optimisation | Browser task runners measure real-adapter journeys; candidate policy changes return through contract review and the same check/replay gates. | Hard safety/accessibility constraints before ranking; task completion/errors first, then time, steps and attention proxies, with human review and held-out tasks. |
+| Counterexample repair | Existing expression repair doors, using the exact failed input/trace and rule/source map. | Retain the old witness; rerun all affected invariants, parity, replay and browser regressions. No weakening requirements or shrinking the domain to erase a failure. |
+| Meta-optimisation | Proposed UI adapter for the experimental MAP-Elites archive; compare equal-budget enumeration and single-champion search. | Noninterference, task coverage, accessibility and exact replay before archive entry or migration; human review of the selected artifact. |
+
+See [ZAL loops](../zal/LOOPS.md) and [the contained check/replay implementation](../../crates/zeno-fcis-cli/src/loop_doors_command.rs). Platform, containment and resource prerequisites still apply; a timeout or unavailable platform cannot promote a candidate. Supported reference capture requires correspondence checks; executable-JavaScript capture is not assumed.
+
+The existing [MAP-Elites archive](../../integrations/elite_archive/README.md) holds equivalent finite programs described by instruction count and canonical byte length. It is experimental, not a UI optimizer or a population trainer. A new UI adapter needs measured layout descriptors and an independently checked security projection; do not weaken the existing archive's whole-program equivalence gate. Archive variants may change approved grouping, density, order and prominence only while preserving commands, guards, disclosure conditions, consent and evidence meaning. This is reviewed design-time search; runtime inferred hints remain emphasis only.
+
+Among candidates satisfying correctness, safety and accessibility, evaluate `Q = w1*Usability + w2*Efficiency + w3*Clarity - w4*Latency`. Freeze tasks, weights, attention proxies and budgets before comparison. Validate proxies with people, report Pareto tradeoffs and retain the deterministic baseline if improvement is unsupported. Ratings, attractive previews and search completion do not establish eligibility or universal optimality.
+
+## 14. Implementation phases and dependency gates
 
 These are **proposed future milestones**, not promises for the already published 2.4.0 release. Keep each task in a separate bounded PR. No subtask may claim completion merely because this design PR is merged.
 
@@ -336,7 +479,7 @@ These are **proposed future milestones**, not promises for the already published
 - Confirm the three-core boundary and nonclaims against current 2.4 code.
 - Record which semantic view features are *new proposals*, which ZAL capabilities are experimental, and which interfaces are already released.
 - Select an initial narrow UI profile and declare unsupported constructs explicitly.
-- Approve one small counter, form and search example corpus and human-reviewed expected outcomes.
+- Approve one small counter, form and search example corpus and human-reviewed expected outcomes. Pin inventory and the proposed document-release contract for the M1 factory test, including units, principal sources and consequential-action classifications.
 - **Exit:** reviewed architecture, threat model, bounded profile, ownership matrix and initial expected test fixtures. **No code capability claimed.**
 
 ### M1: Pure Presentation Core (minimal vertical slice)
@@ -345,7 +488,12 @@ These are **proposed future milestones**, not promises for the already published
 - Implement deterministic `P(S,J,C)` as a pure evaluator with bounded resource accounting; prefer existing ZenoFCIS patterns without changing the 2.4 public API.
 - Define canonical serialization / round-trip only if needed and justified. Evaluate any reused codec against actual profile semantics, no ad hoc compatibility assumptions.
 - Pair user-readable scenario cases with positive and negative admission expectations.
-- **Exit:** exhaustive bounded cases for a toy profile, independent reference oracle, evidence of purity and refusal paths; no claim of verified browser behavior.
+- Add deterministic default synthesis from the application contract and reviewed descriptors, complete command coverage, shared-AST readback and positive/refusal cases; no neural loop or custom ZAL-UI is required.
+- Check the nine mandatory invariants, W ⇒ real A, per-action positive journeys, noninterference and the exact inventory regression tuple; record finite bounds, mutants, replay and adapter correspondence.
+- Run the second-app success test: a different agent uses only the written workflow and pinned inputs to generate the document-release UI through the same generator, primitive library and real adapter path, recording questions and all reproduction steps.
+- **Exit:** exhaustive bounded cases, independent reference oracle, purity/refusal evidence, and both apps running through a shared minimal renderer with actual Authority bindings, per-action positive/negative journeys and scoped browser/accessibility checks. No app-specific renderer/handler/CSS or custom ZAL-UI is needed for the second app; no hidden instructions. Browser evidence covers only the exercised adapter/environment, never a whole-browser proof.
+
+M1 therefore requires the minimal typed adapter and renderer portions of ZUI-02/ZUI-04 as supporting work. It does not wait for the full M2 concurrency/recovery matrix or M3 incremental runtime. M2/M3 retain their broader gates; milestone numbering is not permission to defer the second-app test.
 
 ### M2: Versioned command protocol and reconciliation
 
@@ -358,15 +506,16 @@ These are **proposed future milestones**, not promises for the already published
 
 - Build a small dependency graph keyed by snapshot and presentation input revisions.
 - Update only affected projections; publish a coherent UI revision.
-- Implement a simple adapter into an established browser rendering technology with keyed identity, event capture and safe text output.
+- Implement a simple adapter into an established browser rendering technology with keyed identity, event capture and safe text output. Proposed default: React with native HTML controls; pin and qualify it before implementation, preserving drafts, selection and IME composition. Extend the minimal M1 adapter rather than introducing app-specific renderers.
 - **Exit:** counter/form/table live in a browser; differential semantic tree oracle, resource bounds and focus/selection tests pass in declared environments.
 
 ### M4: Adaptive UX + accessibility
 
-- Introduce progressive disclosure, action priority, error explanation, task-based navigation and transparent user overrides.
+- Introduce progressive disclosure, action priority, error explanation, task-based navigation and transparent user overrides. Implement optional ZAL-UI v1 with the grammar, shared-AST readback, fixed merge precedence, finite-FSM limits and ladder fixtures in section 6.
+- Keep inferred intent at emphasis only. Every adaptation has a rule/hint ID and “Why this changed”; provide Undo and “Keep this layout”. Wrong predictions may cost attention, never access or authority; check preference/hint noninterference and planted violations.
 - Bind permissions and safety to the **Application Core**; UI adapts but never authorizes.
 - Add the expired-quote showcase and accessibility expectations.
-- **Exit:** explicit finite policy checks, keyboard and screen-reader scenarios, human review of task success and recovery. A11y status remains scoped.
+- **Exit:** explicit finite policy checks, paired symbolic/English round trips, conflict/unsupported-input refusals, adaptation undo/freeze and noninterference tests, keyboard and screen-reader scenarios, and human review of task success and recovery. Rerun both app journeys; A11y status remains scoped.
 
 ### M5: Temporal verification and adversarial sequence generation
 
@@ -377,16 +526,17 @@ These are **proposed future milestones**, not promises for the already published
 
 ### M6: Neurosymbolic search and measured optimization
 
-- Human supplies tasks and semantic constraints; agent proposes policy/layout/component variations.
+- Run the five loops in section 13: contract review/gaps and question/teach-back; sketch/search; measured UX; counterexample repair; and a proposed MAP-Elites UI archive under noninterference. Human supplies tasks and semantic constraints; proposals stay within the reviewed policy/layout/primitive grammar.
+- Reuse existing `transform check` and receipt replay for admitted finite targets, qualifying UI lowering and bindings separately. Demonstrate at least one policy-hole completion and one injected-failure repair without weakening requirements.
 - Independently admit and check candidate meaning, run browser/usability evaluations, retain negative examples and Pareto tradeoffs.
 - Optimize only among candidates satisfying hard security, correctness and accessibility gates; hold out user tasks and device conditions.
-- **Exit:** demonstrated improvements over a measured baseline with raw artifacts, unchanged specifications where behavior preservation is claimed, and explicit generalization limits.
+- **Exit:** all five loops have reproducible scoped results; eligible archive entries replay and planted semantic changes fail. Record demonstrated improvement over the measured baseline, or an explicit no-improvement result retaining it, with held-out tasks, equal budgets, raw artifacts and unchanged specifications wherever preservation is claimed. No generalization or universal-optimum claim.
 
 ### Deferred until evidence warrants
 
 - General-purpose CRDT/offline invariant engine, relational reactive database, self-built DOM reconciler, universal temporal type system, unrestricted natural-language execution semantics, native/mobile multiple-shell productization, automatic "optimal UI" claims.
 
-## 12. Agent work packages
+## 15. Agent work packages
 
 Use the detailed [handoff](AGENT_HANDOFF.md). Suggested parallel ownership after M0:
 
@@ -400,53 +550,63 @@ Use the detailed [handoff](AGENT_HANDOFF.md). Suggested parallel ownership after
 | UI-U | UX scenarios and empirical test protocol | M0 human tasks | Tasks, labeled expected paths, study design |
 | UI-N | Neurosymbolic synthesis/optimization | M1–M5 validated interfaces | Hard-constraint gate + held-out tasks + measured comparison |
 | UI-V | Independent security/assurance reviewer | Every stage | Source-bound claims, threat checks, no unsupported guarantees |
+| UI-D | Default contract-to-UI synthesis (ZUI-09) | M0 + stable tree | Coverage, exact bindings, units/reasons/status and real-Authority agreement |
+| UI-L | Optional ZAL-UI v1 (ZUI-10) | Generated manifest + reviewed policy meaning | Shared-AST readback, merge/conflict tests, ladder and migration gates |
+| UI-I | Nine invariant gates (ZUI-11) | Finite profile + actual adapter | Positive witnesses, planted defects, finite replay and distinct browser evidence |
+| UI-F | Independent second-app reproduction (ZUI-12) | Generator + minimal adapter/renderer + invariant gates | Written workflow alone produces document-release UI; mandatory M1 exit |
 
-No agent silently invents owner intent. A contract ambiguity blocks the affected stage and produces an explicit question or counterexample, while unrelated tracks continue.
+Label assignments **reasoning** or **step-by-step** by the judgment required; never assign semantic or proof decisions to a frozen execution checklist. No agent silently invents owner intent. A contract ambiguity blocks the affected stage and produces an explicit question or counterexample, while unrelated tracks continue.
 
-## 13. Release gate and definition of done
+## 16. Release gate and definition of done
 
 **Design PR definition of done:** documentation is understandable, public-source safe, accurately labeled as a proposal, indexed, and reviewed against the existing 2.4 architecture; no code changes or unqualified success claims. GitHub CI/docs policy acceptance is separate.
 
 **First runnable prototype definition of done:** a counter, form and table share (a) one checked/replayed application contract where applicable, (b) one deterministic presentation contract, (c) a revision-aware action protocol and (d) a real browser adapter. Adversarial tests must cover concurrent overlapping events, reversals, retries, interruptions, remount, invalid client values and focus/accessibility obligations. Publish all assumptions and coverage.
 
+**Factory capability additionally requires:** the M1 two-app reproduction from the written workflow, with full command coverage, real-Authority agreement, positive/refusal journeys, all nine invariant gates and separate browser evidence. A single bespoke demo does not meet that requirement.
+
 **Future promotion requires:** exact source/checker/adapter/device identifiers, independent replay, relevant ATDD integration, documentation privacy and link checks, browser+manual a11y evaluation, benchmark comparisons and owner approval. The existing [release assurance gate](../RELEASE_ASSURANCE.md) remains in force. Neither this proposal nor a successful `cargo test` alone qualifies a release.
 
-## 14. Open decisions for human review
+## 17. Open decisions for human review
 
 These are intentionally **not** chosen by a coding agent without evidence:
 
 1. Is ZenoUI initially **a library extension plus adapter**, a standalone package, or a separate integration project? Prefer the least invasive option until measured.
 2. What finite semantic-UI profile is expressive enough for the first three workloads without importing unrestricted HTML, scripting or CSS?
-3. Should the first shell target a React-style client adapter or a simple server-rendered/HTML adapter? Benchmark and compare complexity.
-4. Which user intents are explicit and which are inferred? What are opt-out, override, explanation and privacy requirements?
+3. Is React with native HTML controls the right first renderer? Proposed default: React; compare a simpler HTML adapter only with equivalent behavior and measured complexity, without building a new renderer.
+4. Which user intents are explicit, and is optional inferred emphasis useful? Proposed default: emphasis only, with rule IDs, explanations, Undo and “Keep this layout”. Would opt-in inferred reordering ever be desirable? It is excluded from v1 and needs a separate reviewed profile change, evidence and consent.
 5. Which presentation data must be canonical/protocol-visible versus nonauthoritative browser styling?
 6. How are trusted permission projections, time observations and quote freshness bound to snapshots?
 7. Which formal checker(s), random scheduler and empirical UX tasks constitute sufficient evidence at each tier?
-8. What is the source-of-truth for UI policy review: a new ZAL profile, dedicated contract format, or a typed intermediate representation with controlled-English views? No unreviewed parser extension.
+8. What is the accepted source of truth for policy review? Proposed default: a canonical typed presentation AST, generated baseline and optional `zal/ui/1` symbolic/controlled-English surfaces with round-trip checks. No unreviewed parser extension.
+9. Is document release the right independent M1 app? Proposed default: yes; require a different agent to follow only the published workflow.
+10. Which commands are consequential? Proposed default: every mutating command needs explicit review until individually classified; bind consent to the exact facts shown and request identity.
+11. Which units and principal/context sources are authoritative for each app? These require descriptor answers; neither names nor inferred intent supply them.
+12. Which representative user tasks and acceptable attention/latency tradeoffs should M4 define and M6 freeze for comparison? Proposed default: completion and errors before speed; validate attention proxies with human users.
 
 Any accepted answer must document why simpler alternatives were insufficient and state what needs to be measured.
 
-## 15. Research-to-requirement map
+## 18. Research-to-requirement map
 
-This document **synthesizes** public papers and the targeted October 15, 2026 research notes; it is not a systematic literature review, comparative product benchmark, or claim that one paper proves the combined architecture.
+This document **synthesizes** the research themes in the baseline proposal; it is not a systematic literature review, comparative product benchmark, or claim that one paper proves the combined architecture. Research leads below were not revalidated during this documentation merge. Repository paths are the only cited references; record source/version validation with future repository evidence before comparative or standards-conformance claims.
 
-| Source | Usable insight | ZenoUI choice | Limit |
+| Research theme | Usable insight | ZenoUI choice | Limit |
 | --- | --- | --- | --- |
-| [Riffle, UIST 2023](https://doi.org/10.1145/3586183.3606801) | Reactive relational/incremental state | Fine-grained dependencies and measured invalidation | Does not prove a whole browser database is optimal |
-| [Wunder, Das & Gaboardi, 2026 preprint](https://arxiv.org/abs/2607.27074) | Temporal type/effect and dependency analysis | Explicit scheduling, cancellation and lifecycle metadata | Static checker is future research, not delivered |
-| [Nielsen, Kristiansen & Bahr, PADL 2026](https://doi.org/10.1007/978-3-032-15981-6_3) | Asynchronous FRP property testing with temporal logic | Generated event schedules, minimized counterexamples | Model correctness and test coverage remain scoped |
-| [Bombarda, Bonfanti & Gargantini, 2025](https://doi.org/10.1007/s10009-025-00812-2) | Formal MVC UI specifications and tests | Typed application/presentation models | Does not imply full browser proof |
-| [Köhler et al., IEEE TSE 2025](https://doi.org/10.1109/TSE.2024.3477723) | Convergence is not application invariant safety | Authority-aware synchronization and CAS | No automatic invariants from CRDT convergence |
-| [Ma'ayan, Maoz & Ringert, 2026](https://doi.org/10.1145/3767159) | Modular reactive synthesis specifications | Small independent contracts and incremental milestones | Evidence is scoped to its study |
-| [Maoz, Shalom & Taieb, 2026](https://doi.org/10.1007/s10270-026-01364-y) | Spec quality/validity review | Human-readable positive and negative scenarios | A verified implementation can meet a bad specification |
-| [Lee et al., ReDemon UI, UIST Adjunct 2025](https://doi.org/10.1145/3746058.3758454) | Reactive UI synthesis from examples | Optional LLM proposal and independent checking loop | Early research, not production qualification |
-| [Livewire 4 islands](https://livewire.laravel.com/docs/4.x/islands) | Shared-state race warning in an established framework | Adversarial consistency benchmark | Confirm version and comparable semantics when testing |
-| [7GUIs](https://eugenkiss.github.io/7guis/) | Small UI interaction benchmark portfolio | Counter/form/table plus additional cases | Not a complete usability benchmark |
-| [WCAG 2.2](https://www.w3.org/TR/WCAG22/), [web.dev INP](https://web.dev/articles/inp) | Accessibility and responsiveness standards | Explicit browser/manual acceptance | Standards conformance needs actual evaluation |
+| Reactive relational state (Riffle) | Reactive relational/incremental state | Fine-grained dependencies and measured invalidation | Does not prove a whole browser database is optimal |
+| Temporal effects (Willow) | Temporal type/effect and dependency analysis | Explicit scheduling, cancellation and lifecycle metadata | Static checker is future research, not delivered |
+| Asynchronous FRP testing (PropRatt) | Asynchronous FRP property testing with temporal logic | Generated event schedules, minimized counterexamples | Model correctness and test coverage remain scoped |
+| Formal MVC UI specifications | Formal MVC UI specifications and tests | Typed application/presentation models | Does not imply full browser proof |
+| Invariant-aware replicated state | Convergence is not application invariant safety | Authority-aware synchronization and CAS | No automatic invariants from CRDT convergence |
+| Modular reactive synthesis | Modular reactive synthesis specifications | Small independent contracts and incremental milestones | Evidence is scoped to its study |
+| Reactive specification review | Spec quality/validity review | Human-readable positive and negative scenarios | A verified implementation can meet a bad specification |
+| Example-driven reactive UI synthesis (ReDemon UI) | Reactive UI synthesis from examples | Optional LLM proposal and independent checking loop | Early research, not production qualification |
+| Server-driven islands (Livewire) | Shared-state race warning in an established framework | Adversarial consistency benchmark | Confirm version and comparable semantics when testing |
+| Small interaction workloads (7GUIs) | Small UI interaction benchmark portfolio | Counter/form/table plus additional cases | Not a complete usability benchmark |
+| Accessibility and responsiveness (WCAG 2.2, INP) | Accessibility and responsiveness standards | Explicit browser/manual acceptance | Standards conformance needs actual evaluation |
 
 **Interpretation:** The best supported immediate combination is *formal behavior models + versioned synchronization + fine-grained reactivity + asynchronous model/property testing*. ZenoUI's separate **Presentation Core** and neurosymbolic optimization workflow are architectural proposals that require their own validation.
 
-## 16. Mental shortcuts
+## 19. Mental shortcuts
 
 - **Core decides truth; presentation decides communication; shell performs effects.**
 - **A disabled control is not authorization.** Recheck at the committing boundary.
