@@ -320,6 +320,24 @@ def fixture_sets(pins: Pins, root: Path) -> dict[str, str]:
     return out
 
 
+def limit_fixtures(pins: Pins, target: Path) -> dict[str, str]:
+    """Refresh only program bindings of the retained limit scenarios."""
+    manifests = {}
+    for path in sorted((target / "limits").rglob("*.json")):
+        manifest = json.loads(path.read_text())
+        if manifest.get("schema") != SCHEMA:
+            continue
+        for component in manifest["components"]:
+            actual = pins.of(path.parent / component["path"])
+            # A width-profile refresh cannot silently bless changed inputs.
+            for key in ("project_sha256", "policy_sha256"):
+                if component[key] != actual[key]:
+                    raise SystemExit(f"limit fixture inputs changed: {path}: {component['name']}: {key}")
+            component["program_sha256"] = actual["program_sha256"]
+        manifests[str(path.relative_to(target))] = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    return manifests
+
+
 def fixtures(args) -> int:
     scratch = Path(args.scratch)
     scratch.mkdir(parents=True, exist_ok=True)
@@ -328,7 +346,9 @@ def fixtures(args) -> int:
     if args.check:
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(CONTRACTS, target / "contracts")
+        shutil.copytree(FIXTURES / "limits", target / "limits")
     manifests = fixture_sets(pins, target)
+    manifests.update(limit_fixtures(pins, target))
     for path, text in manifests.items():
         (target / path).write_text(text)
     if not args.check:

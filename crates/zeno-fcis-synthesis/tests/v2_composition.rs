@@ -218,7 +218,14 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
     let value = zeno_fcis_codec::decode_value(bytes, Default::default())
         .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"));
     let v = tuple(&value);
-    assert_eq!(v[0].view(), ValueRef::Text(finite::PROFILE));
+    assert_eq!(
+        v[0].view(),
+        ValueRef::Text(zeno_fcis_synthesis::finite_runtime::I64_PROFILE)
+    );
+    let legacy = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes).unwrap();
+    {
+        assert_eq!(legacy.value().unwrap().zcve_bytes().unwrap(), bytes);
+    }
     let schema = tuple(&v[1]);
     let nodes = tuple(&v[2])
         .iter()
@@ -254,8 +261,39 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
                 .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
         })
         .collect();
-    ScalarOwned::try_new(domains(&schema[0]), domains(&schema[1]), nodes, roots)
-        .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
+    let main = ScalarOwned::try_new(domains(&schema[0]), domains(&schema[1]), nodes, roots)
+        .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"));
+    // Reification is only for this bounded original-wire corpus. Check every
+    // input against real i64 execution before the graph enters the i128 bridge.
+    let size = main
+        .inputs()
+        .iter()
+        .try_fold(1u128, |size, d| {
+            let (min, max) = d.bounds();
+            size.checked_mul(min.abs_diff(max).checked_add(1)?)
+        })
+        .unwrap();
+    assert!(size <= 100_000);
+    let mut point: Vec<_> = main.inputs().iter().map(|d| d.bounds().0).collect();
+    for _ in 0..size {
+        let old: Vec<_> = point.iter().map(|v| i64::try_from(*v).unwrap()).collect();
+        assert_eq!(
+            legacy
+                .evaluate(&old)
+                .map(|out| out.into_iter().map(i128::from).collect::<Vec<_>>()),
+            main.evaluate(&point)
+        );
+        for (v, d) in point.iter_mut().zip(main.inputs()).rev() {
+            let (min, max) = d.bounds();
+            if *v == max {
+                *v = min;
+            } else {
+                *v += 1;
+                break;
+            }
+        }
+    }
+    main
 }
 #[derive(Default)]
 struct Predicate {

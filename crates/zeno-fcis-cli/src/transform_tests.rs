@@ -16,7 +16,7 @@ use zeno_fcis_synthesis::finite::{
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 #[allow(dead_code, unreachable_pub, missing_docs, clippy::all)]
-#[path = "../tests/fixtures/i128-templates/withdrawal-queue/src/v2_contract.rs"]
+#[path = "../templates/withdrawal-queue/src/v2_contract.rs"]
 mod withdrawal_contract;
 
 /// The actual shell library's program-successor comparison API.
@@ -417,7 +417,7 @@ fn receipt_is_canonical_and_deterministic() {
             "{{\"authority\":\"none\",",
             "\"candidate\":{{\"bytes\":{},\"nodes\":1,\"sha256\":\"{}\"}},",
             "\"checker\":{{\"evaluator_identity\":\"{}\",",
-            "\"semantics\":\"zeno-fcis/transform-check/3\"}},",
+            "\"semantics\":\"zeno-fcis/transform-check/4\"}},",
             "\"claim\":\"Functionally equal on the full declared input domain: every tuple ",
             "gives identical outputs or identical failures. The Step limit never binds: no ",
             "tuple needs more Steps than the limit in either program.\",",
@@ -1535,3 +1535,6 @@ fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
         Some(Verdict::Counterexample { .. })
     ));
 }
+
+#[path = "transform_legacy_tests.rs"]
+mod legacy;

@@ -385,7 +385,7 @@ mod tests {
         );
         // Two full i128 domains: 2^128 tuples overflow u128 by one.
         assert_eq!(domain_size(&[full, full]), Ok(None));
-        assert_eq!(domain_size(&[full]), Ok(Some(1 << 64)));
+        assert_eq!(domain_size(&[full]), Ok(None));
     }
 
     #[test]

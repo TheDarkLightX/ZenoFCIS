@@ -56,20 +56,8 @@ fn template(name: &str) -> Template {
         rules: text("v2/policy.json"),
         schema: read("v2/schema.zcve"),
         origin: text("v2/schema-origin.json"),
-        source: fs::read_to_string(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/i128-templates")
-                .join(name)
-                .join("src/v2_contract.rs"),
-        )
-        .unwrap(),
-        policy: fs::read(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/i128-templates")
-                .join(name)
-                .join("v2/policy.zcve"),
-        )
-        .unwrap(),
+        source: text("src/v2_contract.rs"),
+        policy: read("v2/policy.zcve"),
     }
 }
 

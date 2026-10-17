@@ -369,7 +369,8 @@ fn missing_partial_lossy_and_trapped_payload_maps_write_nothing() {
     let mut lossy = good.clone();
     lossy["payloads"]["300"]["147"] = json!({"expr": "old.145 < 0"});
     let mut trapped = good.clone();
-    trapped["payloads"]["300"]["147"] = json!({"expr": "old.145 + 9223372036854775807 > 0"});
+    trapped["payloads"]["300"]["147"] =
+        json!({"expr": "old.145 + 170141183460469231731687303715884105727 > 0"});
     let mut wrong = good.clone();
     wrong["payloads"]["300"]["145"] = json!({"expr": "old.145 == 0 || old.145 == 2"});
     let mut unsupported = good.clone();
@@ -1416,9 +1417,13 @@ fn non_closed_state_expressions_and_invalid_source_domains_write_nothing() {
         (
             "excluded-trap",
             "124",
-            "choose(old.120 == 150 && old.121 > 0, 9223372036854775807, 0) + old.121 < 0",
+            "choose(old.120 == 150 && old.121 > 0, 170141183460469231731687303715884105727, 0) + old.121 < 0",
         ),
-        ("trap", "124", "old.121 + 9223372036854775807 < 0"),
+        (
+            "trap",
+            "124",
+            "old.121 + 170141183460469231731687303715884105727 < 0",
+        ),
     ] {
         let mut state = carried(json!({"124":{"default":false}}));
         state[field] = json!({"expr":expression});

@@ -1,0 +1,104 @@
+{
+  "inputs": [
+    {
+      "kind": "Bool"
+    },
+    {
+      "kind": "Bool"
+    },
+    {
+      "kind": "Bool"
+    },
+    {
+      "kind": "Bool"
+    }
+  ],
+  "outputs": [
+    {
+      "kind": "Bool"
+    },
+    {
+      "kind": "Bool"
+    },
+    {
+      "kind": "Bool"
+    }
+  ],
+  "nodes": [
+    [
+      "Input",
+      0
+    ],
+    [
+      "Input",
+      1
+    ],
+    [
+      "Input",
+      2
+    ],
+    [
+      "Input",
+      3
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Select",
+      0,
+      0,
+      2
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Select",
+      1,
+      1,
+      3
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Bool",
+      false
+    ],
+    [
+      "Select",
+      7,
+      7,
+      11
+    ]
+  ],
+  "roots": [
+    7,
+    11,
+    15
+  ]
+}

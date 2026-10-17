@@ -43,7 +43,7 @@ pub(crate) const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
 /// `tests/fixtures/transform-check/`, which the tests compare with this
 /// checker's output; refactoring the source, or a new crate version, changes
 /// no receipt.
-pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/3";
+pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/4";
 
 /// Limits that fix the meaning of one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

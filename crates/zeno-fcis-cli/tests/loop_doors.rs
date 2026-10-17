@@ -62,7 +62,7 @@ impl Drop for Directory {
 /// `contract export-program`; shared with the loop-doors crate's tests).
 fn exported(name: &str) -> Vec<u8> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../zeno-fcis-loop-doors/tests/data")
+        .join("tests/fixtures/i128-door-programs")
         .join(format!("{name}.original.zcve"));
     fs::read(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
 }
@@ -276,7 +276,7 @@ fn main_route_arithmetic_reaches_exact_checks_replay_and_point_evaluation() {
             "--session",
             &session,
             "--profile",
-            "checked-i64-v1",
+            "checked-i128-v1",
         ]);
         assert_eq!(exit, Some(0), "{label}: {report}");
         let make_document = |expression: &str| {

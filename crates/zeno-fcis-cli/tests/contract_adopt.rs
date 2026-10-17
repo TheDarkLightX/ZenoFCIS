@@ -64,13 +64,11 @@ fn template() -> PathBuf {
 }
 
 fn fixture() -> PathBuf {
-    manifest("tests/fixtures/withdrawal-queue-adopted")
+    manifest("tests/fixtures/i128-contracts/withdrawal-queue-adopted")
 }
 
 fn artifact(name: &str) -> PathBuf {
-    manifest(&format!(
-        "../../docs/benchmarks/withdrawal-queue/artifacts/{name}.zcve"
-    ))
+    manifest(&format!("tests/fixtures/i128-programs/{name}.zcve"))
 }
 
 fn read(path: impl AsRef<Path>) -> Vec<u8> {
@@ -320,7 +318,7 @@ fn the_committed_fixture_is_current() {
     );
     assert_eq!(
         report["summary"]["adoptions"][0]["candidate_sha256"],
-        "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89"
+        "467e570f1c82afe073aded99d6a7a89d7f5f9e7d5b236f82997705d7add094e0"
     );
 }
 
@@ -625,7 +623,7 @@ fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
     );
     let report = json(&output);
     assert_eq!(report["status"], "refreshed");
-    assert_eq!(report["checker"], "zeno-fcis/transform-check/3");
+    assert_eq!(report["checker"], "zeno-fcis/transform-check/4");
     assert_eq!(report["refreshed"], json!([1]));
     // The application is the committed fixture again, which is current.
     assert_eq!(snapshot(&dir), snapshot(&fixture()));

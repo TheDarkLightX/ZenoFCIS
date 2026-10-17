@@ -1,0 +1,16 @@
+{
+  "authority": "none",
+  "candidate_sha256": "8d75ab9e598f3ac963de70aad39a9e8a89e82ed6df2ea32f5248c48798e4f08a",
+  "detail": {
+    "cause": "domain-too-large",
+    "domain_size": "9",
+    "max_input_tuples": 8
+  },
+  "limits": {
+    "input_tuples": 8,
+    "steps": 256
+  },
+  "original_sha256": "9b8c7455c8ffb8b9ec7bd52d3a109142b3605a50a16321767a3f68368c3777c6",
+  "schema": "zeno-fcis/transform-result/1",
+  "status": "inconclusive"
+}

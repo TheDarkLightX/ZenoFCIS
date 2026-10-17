@@ -85,6 +85,11 @@ fn tuple(items: Vec<Vec<u8>>) -> Vec<u8> {
     b
 }
 fn check_original_graph() {
+    let bytes = include_bytes!(
+        "../../zeno-fcis-cli/templates/inventory-reservation/synthesized/program.zcve"
+    );
+    let legacy = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes).unwrap();
+    assert_eq!(legacy.value().unwrap().zcve_bytes().unwrap(), bytes);
     fn domains(values: &[ScalarDomain]) -> Vec<u8> {
         tuple(
             values
@@ -121,7 +126,7 @@ fn check_original_graph() {
         .collect();
     let mut tag = vec![6];
     tag.extend(22u32.to_be_bytes());
-    tag.extend(b"zeno-fcis/finite-i128/1");
+    tag.extend(b"zeno-fcis/finite-i64/1");
     let roots = ROOTS
         .iter()
         .map(|n| {

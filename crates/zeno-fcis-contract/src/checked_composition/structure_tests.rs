@@ -381,7 +381,7 @@ fn controls() -> Vec<Control> {
     let mut control = ring();
     control.leaves[0].rules = control.leaves[0].rules.replace(
         "\"cases\": [",
-        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 9223372036854775807 - 9223372036854775807\"}, \"outbox\": []},",
+        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 170141183460469231731687303715884105727 - 170141183460469231731687303715884105727\"}, \"outbox\": []},",
     );
     control.repin(0);
     add("eager unused trap", control, Accepted, None);

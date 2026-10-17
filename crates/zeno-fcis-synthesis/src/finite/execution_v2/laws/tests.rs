@@ -1646,7 +1646,7 @@ fn shared_arithmetic_keeps_all_four_law_arms_and_undefined() {
         (1, Atom::U128(0), Atom::U128(1), Err(Failure::Undefined)),
         (
             0,
-            Atom::I128(i128::from(i128::MAX)),
+            Atom::I128(i128::from(i64::MAX)),
             Atom::I128(1),
             Ok(Atom::I128(1_i128 << 63)),
         ),

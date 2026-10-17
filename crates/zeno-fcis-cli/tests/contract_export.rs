@@ -162,11 +162,11 @@ fn the_export_is_the_contracts_current_program_and_never_overwrites() {
     assert!(
         read(&original)
             == read(&crate_path(
-                "../../docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-original.zcve"
+                "tests/fixtures/i128-programs/current-decision-scalars-original.zcve"
             ))
     );
     // After an adoption, the program is the adopted candidate.
-    let adopted = crate_path("tests/fixtures/withdrawal-queue-adopted");
+    let adopted = crate_path("tests/fixtures/i128-contracts/withdrawal-queue-adopted");
     let current = root.path().join("current.zcve");
     let report = export(&adopted, &current);
     assert_eq!(report["version"], 2);

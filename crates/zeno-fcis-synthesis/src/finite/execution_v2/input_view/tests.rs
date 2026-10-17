@@ -6,7 +6,8 @@ fn variants_valid(variants: &[Variant], min: i128, max: i128) -> bool {
     let ids: BTreeSet<_> = variants.iter().map(|v| v.id).collect();
     let codes: BTreeSet<_> = variants.iter().map(|v| v.code).collect();
     min <= max
-        && max as i128 - min as i128 + 1 == variants.len() as i128
+        && max.checked_sub(min).and_then(|width| width.checked_add(1))
+            == Some(variants.len() as i128)
         && ids.len() == variants.len()
         && codes.len() == variants.len()
         && codes.iter().all(|code| min <= *code && *code <= max)
@@ -277,6 +278,27 @@ fn raw_projection_matches_independent_wire_and_wider_counter_oracle() {
             0
         ])
     );
+}
+
+#[test]
+fn variant_oracle_rejects_unrepresentable_cardinalities_without_overflow() {
+    let variants = [Variant {
+        id: 0,
+        code: i128::MIN,
+    }];
+    for (min, max) in [(i128::MIN, i128::MAX), (i128::MIN, 0), (-1, i128::MAX)] {
+        assert!(!variants_valid(&variants, min, max));
+        let fields = [Field {
+            id: 0,
+            leaf: Leaf::Enum {
+                type_id: 1,
+                min,
+                max,
+                variants: variants.to_vec(),
+            },
+        }];
+        assert_public(&[], &fields, [u64::MAX; 8]);
+    }
 }
 
 #[test]

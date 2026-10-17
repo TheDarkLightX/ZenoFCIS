@@ -133,7 +133,7 @@ fn failure_cases_are_inert_portable_and_replay_the_actual_claim_exit_code() {
     no_exit["step"] = json!({"nodes": [["bool", true], ["input", 0]], "roots": [0, 1]});
     let mut trap = source();
     trap["step"]["nodes"].as_array_mut().unwrap().extend([
-        json!(["int", i128::MAX]),
+        json!(["int", i128::MAX.to_string()]),
         json!(["int", 1]),
         json!(["add", 8, 9]),
     ]);

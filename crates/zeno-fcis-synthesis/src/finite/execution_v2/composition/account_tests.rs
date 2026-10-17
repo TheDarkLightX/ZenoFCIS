@@ -26,12 +26,12 @@ pub(super) fn program() -> ScalarProgram<'static> {
         outputs: &[
             ScalarDomain::Int { min: 0, max: 6 },
             ScalarDomain::Int {
-                min: -9223372036854775808,
-                max: 9223372036854775807,
+                min: i128::MIN,
+                max: i128::MAX,
             },
             ScalarDomain::Int {
-                min: -9223372036854775808,
-                max: 9223372036854775807,
+                min: i128::MIN,
+                max: i128::MAX,
             },
         ],
         nodes: &[

@@ -44,7 +44,7 @@ impl Drop for Directory {
 
 fn artifact(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/benchmarks/withdrawal-queue/artifacts")
+        .join("tests/fixtures/i128-programs")
         .join(format!("{name}.zcve"))
 }
 
@@ -169,7 +169,7 @@ fn an_agent_drives_the_loop_one_candidate_at_a_time_and_resumes() {
     assert_eq!(report["status"], "checked-improvement");
     assert_eq!(
         report["detail"]["outcome"]["cost"],
-        json!({"nodes": 7, "bytes": 763})
+        json!({"nodes": 7, "bytes": 764})
     );
     assert_eq!(
         report["detail"]["outcome"]["selection"]["selection"],
@@ -311,7 +311,7 @@ fn the_fake_provider_improves_a_benchmark_case_and_its_claims_change_nothing() {
     assert_eq!(loop_report["status"], "best-checked-so-far");
     assert_eq!(
         loop_report["incumbent"]["cost"],
-        json!({"nodes": 7, "bytes": 763})
+        json!({"nodes": 7, "bytes": 764})
     );
     assert_eq!(loop_report["session"]["stop_reason"], "proposer-exhausted");
     assert_eq!(loop_report["accounting"]["model_calls"], 4);

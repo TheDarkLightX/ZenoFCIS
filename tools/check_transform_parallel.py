@@ -27,9 +27,9 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES = ROOT / 'docs/benchmarks/cases.json'
-ARTIFACTS = ROOT / 'docs/benchmarks/withdrawal-queue/artifacts'
-VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/3'
+CASES = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/cases-i128.json'
+ARTIFACTS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/i128-programs'
+VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/4'
 ARTIFACT_PAIRS = (
     ('kernel', 'boolean-kernel-original', 'boolean-kernel-candidate'),
     ('kernel-padded', 'boolean-kernel-original', 'boolean-kernel-padded'),

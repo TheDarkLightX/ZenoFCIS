@@ -1,0 +1,27 @@
+{
+  "authority": "none",
+  "candidate_sha256": "f96e716e1d8e3e368038de73b24b636b6a3f94500e315f98c39357157314bbe6",
+  "detail": {
+    "cause": "budget-boundary",
+    "minimum_step_limit": 3,
+    "over_limit": {
+      "candidate": 0,
+      "original": 9
+    },
+    "usage": {
+      "candidate_uses_more": 0,
+      "max_steps": {
+        "candidate": 1,
+        "original": 3
+      },
+      "usage_preserved": false
+    }
+  },
+  "limits": {
+    "input_tuples": 100000000,
+    "steps": 2
+  },
+  "original_sha256": "3d89e951a0aedf69645754da996913652be80e1bef44a25ff8c0d578f0d4360e",
+  "schema": "zeno-fcis/transform-result/1",
+  "status": "inconclusive"
+}

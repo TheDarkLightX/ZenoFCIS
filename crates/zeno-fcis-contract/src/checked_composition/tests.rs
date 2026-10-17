@@ -586,7 +586,7 @@ fn an_eager_unused_trap_is_refused() {
     let mut ring = Ring::new(2);
     ring.leaves[0].rules = ring.leaves[0].rules.replace(
         "\"cases\": [",
-        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 9223372036854775807 - 9223372036854775807\"}, \"outbox\": []},",
+        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 170141183460469231731687303715884105727 - 170141183460469231731687303715884105727\"}, \"outbox\": []},",
     );
     ring.repin(0);
     let refusal = ring.refusal();

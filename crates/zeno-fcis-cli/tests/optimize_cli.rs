@@ -41,7 +41,7 @@ impl Drop for Directory {
 
 fn artifact(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/benchmarks/withdrawal-queue/artifacts")
+        .join("tests/fixtures/i128-programs")
         .join(format!("{name}.zcve"))
 }
 

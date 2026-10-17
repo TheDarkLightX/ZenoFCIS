@@ -212,7 +212,7 @@ impl Drop for Directory {
 
 fn artifact(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/benchmarks/withdrawal-queue/artifacts")
+        .join("tests/fixtures/i128-programs")
         .join(format!("{name}.zcve"))
 }
 
@@ -606,7 +606,7 @@ fn describe_declares_transform_effects() {
 #[test]
 fn known_answers_pin_the_checker_semantics() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/transform-check");
-    let probe = root.join("1");
+    let probe = root.join("4");
     let (_, report) = check(
         &probe.join("program-1.zcve"),
         &probe.join("program-2.zcve"),

@@ -32,9 +32,12 @@ impl LeafDomain {
     pub fn size(&self) -> Option<u128> {
         match self {
             Self::Bool => Some(2),
-            Self::Int { min, max } => u128::try_from(i128::from(*max) - i128::from(*min))
-                .ok()?
-                .checked_add(1),
+            Self::Int { min, max } => {
+                if min > max {
+                    return None;
+                }
+                min.abs_diff(*max).checked_add(1)
+            }
             Self::Sum { variants, .. } => Some(variants.len() as u128),
         }
     }
@@ -543,10 +546,8 @@ fn collect(
     };
     match ast {
         Ast::Int(value) => {
-            if let Ok(value) = i128::try_from(*value) {
-                for type_id in expected {
-                    found.entry(*type_id).or_default().insert(value);
-                }
+            for type_id in expected {
+                found.entry(*type_id).or_default().insert(*value);
             }
         }
         Ast::Bool(_) | Ast::Name(_) | Ast::DecisionReason => {}
@@ -616,6 +617,27 @@ mod bounded_values {
         };
         assert_eq!(whole.values_within(u64::MAX), None);
         assert_eq!(whole.least(), Some(i128::MIN));
+    }
+
+    #[test]
+    fn interval_cardinality_covers_both_i128_boundaries_without_collecting() {
+        for (min, max, size) in [
+            (i128::MIN, i128::MAX, None),
+            (i128::MIN, 0, Some((1u128 << 127) + 1)),
+            (-1, i128::MAX, Some((1u128 << 127) + 1)),
+            (i128::MIN, i128::MIN + 1, Some(2)),
+            (i128::MAX - 1, i128::MAX, Some(2)),
+            (1, 0, None),
+        ] {
+            let domain = LeafDomain::Int { min, max };
+            assert_eq!(domain.size(), size);
+            if size == Some(2) {
+                assert_eq!(domain.values_within(1), None);
+                assert_eq!(domain.values_within(2), Some(vec![min, max]));
+            } else {
+                assert_eq!(domain.values_within(u64::MAX), None);
+            }
+        }
     }
 
     #[test]

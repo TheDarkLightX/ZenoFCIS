@@ -567,7 +567,7 @@ mod tests {
         // The output domain appears only inside the negated goal.
         assert!(!totality.contains("(assert (<= 0 t_5 3))"));
         assert!(totality.contains(
-            "(assert (not (and (<= (- 9223372036854775808) t_4 9223372036854775807) (<= 0 t_5 3))))"
+            "(assert (not (and (<= (- 170141183460469231731687303715884105728) t_4 170141183460469231731687303715884105727) (<= 0 t_5 3))))"
         ));
         // The property script assumes totality, which is proved separately.
         let property = text(&obligations, SystemObligationKind::Property);

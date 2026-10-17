@@ -322,11 +322,11 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// was replayed through every existing status assertion before these three
 /// source/profile-bound digests were refreshed; no field is filtered.
 const METERED_LEDGER_SHA256: &str =
-    "da8899545104387e2ecdd2fabcbf60e0f41d501766b1eebaa532c8f0f5e2b70b";
+    "f2c78d839d74896019d88f6f2156ca8754837286487bf025b00dbddbbbd6aaa4";
 const METERED_HEAD_SHA256: &str =
-    "6a1fe6686342254b0a7d8e68c95ea7f22c0758dd77e44fa9635dab061df5f707";
+    "7b849e2f3035847419db0f37d6dc2c2363313dc047f8e461284c9fd121ed6570";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "dcb044aaedc76f1a34360c06e5f691ed0a893a079ec3a6e81f540e9bf0a3a2d2";
+    "85b1bbffb42e59f2e36790a4c6e01725bf2092350be833e32b536f8176ccfbe3";
 
 #[test]
 fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {

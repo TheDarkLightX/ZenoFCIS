@@ -281,7 +281,7 @@ fn rules_are_judged_exactly_with_regions_and_a_summary() {
         rule("t2", "authorized && action == Inc && value == 3", "Reject", json!("at_capacity"), Value::Null),
         rule("t1", "action == Inc && value == 3", "Reject", json!("at_capacity"), Value::Null),
         rule("t3", "authorized && action == Inc && value < 2", "Accept", Value::Null, json!({"value": "value + 1"})),
-        rule("o", "!authorized && (9223372036854775807 + 1 < 0)", "Reject", json!("not_authorized"), Value::Null),
+        rule("o", "!authorized && (170141183460469231731687303715884105727 + 1 < 0)", "Reject", json!("not_authorized"), Value::Null),
     ]});
     let path = directory.json("rules.json", &rules);
     let (exit, report) = run(&["loop", "teach-back", "--contract", &c3, "--rule", &path]);

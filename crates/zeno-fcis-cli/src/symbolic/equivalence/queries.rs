@@ -155,6 +155,8 @@ impl Queries {
             None => None,
         };
         match (first, span) {
+            // `max` is read only by the Verus invariant below; ordinary builds compile that out.
+            #[cfg_attr(not(verus_keep_ghost), allow(unused_variables))]
             (Some((min, max)), Some(span)) if span >= 0 && span < MAX_CASE_PIECES as i128 => {
                 let count = span as usize + 1;
                 let mut offset = 0usize;

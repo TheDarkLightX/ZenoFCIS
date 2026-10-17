@@ -154,7 +154,7 @@ fn an_authority_refusal_ends_the_step_with_no_change() {
 fn a_binding_without_a_value_or_outside_its_domain_ends_the_step() {
     // Bindings use checked 64-bit arithmetic: an overflow has no value.
     let mut undefined = budget();
-    undefined.entry["bind"]["amount"] = json!("9223372036854775807 + qty");
+    undefined.entry["bind"]["amount"] = json!("170141183460469231731687303715884105727 + qty");
     let joint_undefined = joint(vec![counter(), undefined]);
     let outcome = step(&joint_undefined, &[0, 2], &SPEND_ONE);
     assert_eq!(
