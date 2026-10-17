@@ -69,6 +69,11 @@ with [Get started](#get-started), then follow a tutorial.
 - [ZAL harness integration](zal/HARNESS_INTEGRATION.md)
 - [ZAL prototype source map](ZAL_SOURCE_MAP.md)
 
+## Proposed future UI engineering (ZenoUI)
+
+- [ZenoUI: specification-driven, intent-aware UI architecture and implementation plan](zenoui/PLAN.md) (proposal, **not released**)
+- [ZenoUI local-agent work packages and handoff](zenoui/AGENT_HANDOFF.md)
+
 ## Architecture and design records
 
 - [Architecture](ARCHITECTURE.md)
