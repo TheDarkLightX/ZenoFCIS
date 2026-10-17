@@ -485,6 +485,7 @@ fn describe_declares_optimize_effects() {
         ids,
         [
             "candidate_out",
+            "containment_backend",
             "help",
             "kb",
             "kb_task",

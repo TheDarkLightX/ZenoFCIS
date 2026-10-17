@@ -32,6 +32,12 @@ pub(crate) enum Node {
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
+    Mul(usize, usize),
+    DivFloor(usize, usize),
+    DivCeil(usize, usize),
+    MulDivFloor(usize, usize, usize),
+    MulDivCeil(usize, usize, usize),
+    ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
     And(usize, usize),
@@ -41,16 +47,22 @@ pub(crate) enum Node {
 
 impl Node {
     /// Operands in order, padded; the second value is how many are used.
-    pub(crate) fn operands(self) -> ([usize; 3], usize) {
+    pub(crate) fn operands(self) -> ([usize; 6], usize) {
         match self {
-            Self::Input(_) | Self::Int(_) | Self::Bool(_) => ([0; 3], 0),
-            Self::Not(a) => ([a, 0, 0], 1),
+            Self::Input(_) | Self::Int(_) | Self::Bool(_) => ([0; 6], 0),
+            Self::Not(a) => ([a, 0, 0, 0, 0, 0], 1),
             Self::Add(a, b)
             | Self::Sub(a, b)
+            | Self::Mul(a, b)
+            | Self::DivFloor(a, b)
+            | Self::DivCeil(a, b)
             | Self::Eq(a, b)
             | Self::Lt(a, b)
-            | Self::And(a, b) => ([a, b, 0], 2),
-            Self::Select(c, a, b) => ([c, a, b], 3),
+            | Self::And(a, b) => ([a, b, 0, 0, 0, 0], 2),
+            Self::Select(c, a, b) | Self::MulDivFloor(c, a, b) | Self::MulDivCeil(c, a, b) => {
+                ([c, a, b, 0, 0, 0], 3)
+            }
+            Self::ProductsGe(a, b) => ([a[0], a[1], a[2], b[0], b[1], b[2]], 6),
         }
     }
 
@@ -65,12 +77,44 @@ impl Node {
             Self::Input(_) | Self::Int(_) | Self::Bool(_) => self,
             Self::Add(a, b) => Self::Add(rename(a), rename(b)),
             Self::Sub(a, b) => Self::Sub(rename(a), rename(b)),
+            Self::Mul(a, b) => Self::Mul(rename(a), rename(b)),
+            Self::DivFloor(a, b) => Self::DivFloor(rename(a), rename(b)),
+            Self::DivCeil(a, b) => Self::DivCeil(rename(a), rename(b)),
+            Self::MulDivFloor(a, b, d) => Self::MulDivFloor(rename(a), rename(b), rename(d)),
+            Self::MulDivCeil(a, b, d) => Self::MulDivCeil(rename(a), rename(b), rename(d)),
+            Self::ProductsGe(a, b) => Self::ProductsGe(a.map(&mut rename), b.map(&mut rename)),
             Self::Eq(a, b) => Self::Eq(rename(a), rename(b)),
             Self::Lt(a, b) => Self::Lt(rename(a), rename(b)),
             Self::And(a, b) => Self::And(rename(a), rename(b)),
             Self::Not(a) => Self::Not(rename(a)),
             Self::Select(c, a, b) => Self::Select(rename(c), rename(a), rename(b)),
         }
+    }
+
+    /// Converts indices only. Admission and evaluation remain library work.
+    pub(crate) fn library(self) -> Option<Op> {
+        let id = |value: usize| u16::try_from(value).ok();
+        Some(match self {
+            Self::Input(a) => Op::Input(a),
+            Self::Int(v) => Op::Int(v),
+            Self::Bool(v) => Op::Bool(v),
+            Self::Add(a, b) => Op::Add(id(a)?, id(b)?),
+            Self::Sub(a, b) => Op::Sub(id(a)?, id(b)?),
+            Self::Mul(a, b) => Op::Mul(id(a)?, id(b)?),
+            Self::DivFloor(a, b) => Op::DivFloor(id(a)?, id(b)?),
+            Self::DivCeil(a, b) => Op::DivCeil(id(a)?, id(b)?),
+            Self::MulDivFloor(a, b, d) => Op::MulDivFloor(id(a)?, id(b)?, id(d)?),
+            Self::MulDivCeil(a, b, d) => Op::MulDivCeil(id(a)?, id(b)?, id(d)?),
+            Self::ProductsGe(a, b) => Op::ProductsGe(
+                [id(a[0])?, id(a[1])?, id(a[2])?],
+                [id(b[0])?, id(b[1])?, id(b[2])?],
+            ),
+            Self::Eq(a, b) => Op::Eq(id(a)?, id(b)?),
+            Self::Lt(a, b) => Op::Lt(id(a)?, id(b)?),
+            Self::And(a, b) => Op::And(id(a)?, id(b)?),
+            Self::Not(a) => Op::Not(id(a)?),
+            Self::Select(c, a, b) => Op::Select(id(c)?, id(a)?, id(b)?),
+        })
     }
 }
 
@@ -101,6 +145,12 @@ impl Graph {
                     Op::Bool(value) => Node::Bool(value),
                     Op::Add(a, b) => Node::Add(id(a), id(b)),
                     Op::Sub(a, b) => Node::Sub(id(a), id(b)),
+                    Op::Mul(a, b) => Node::Mul(id(a), id(b)),
+                    Op::DivFloor(a, b) => Node::DivFloor(id(a), id(b)),
+                    Op::DivCeil(a, b) => Node::DivCeil(id(a), id(b)),
+                    Op::MulDivFloor(a, b, d) => Node::MulDivFloor(id(a), id(b), id(d)),
+                    Op::MulDivCeil(a, b, d) => Node::MulDivCeil(id(a), id(b), id(d)),
+                    Op::ProductsGe(a, b) => Node::ProductsGe(a.map(id), b.map(id)),
                     Op::Eq(a, b) => Node::Eq(id(a), id(b)),
                     Op::Lt(a, b) => Node::Lt(id(a), id(b)),
                     Op::And(a, b) => Node::And(id(a), id(b)),
@@ -134,10 +184,20 @@ impl Graph {
                     .get(usize::from(k))
                     .and_then(|domain| domain_kind(*domain))
                     .unwrap_or(Kind::Int),
-                Node::Int(_) | Node::Add(..) | Node::Sub(..) => Kind::Int,
-                Node::Bool(_) | Node::Eq(..) | Node::Lt(..) | Node::And(..) | Node::Not(_) => {
-                    Kind::Bool
-                }
+                Node::Int(_)
+                | Node::Add(..)
+                | Node::Sub(..)
+                | Node::Mul(..)
+                | Node::DivFloor(..)
+                | Node::DivCeil(..)
+                | Node::MulDivFloor(..)
+                | Node::MulDivCeil(..) => Kind::Int,
+                Node::Bool(_)
+                | Node::Eq(..)
+                | Node::Lt(..)
+                | Node::And(..)
+                | Node::Not(_)
+                | Node::ProductsGe(..) => Kind::Bool,
                 Node::Select(_, a, _) => kinds.get(a).copied().unwrap_or(Kind::Int),
             };
             kinds.push(kind);
@@ -146,24 +206,7 @@ impl Graph {
     }
 
     fn library_nodes(&self) -> Option<Vec<Op>> {
-        let id = |value: usize| u16::try_from(value).ok();
-        self.nodes
-            .iter()
-            .map(|node| {
-                Some(match *node {
-                    Node::Input(a) => Op::Input(a),
-                    Node::Int(value) => Op::Int(value),
-                    Node::Bool(value) => Op::Bool(value),
-                    Node::Add(a, b) => Op::Add(id(a)?, id(b)?),
-                    Node::Sub(a, b) => Op::Sub(id(a)?, id(b)?),
-                    Node::Eq(a, b) => Op::Eq(id(a)?, id(b)?),
-                    Node::Lt(a, b) => Op::Lt(id(a)?, id(b)?),
-                    Node::And(a, b) => Op::And(id(a)?, id(b)?),
-                    Node::Not(a) => Op::Not(id(a)?),
-                    Node::Select(c, a, b) => Op::Select(id(c)?, id(a)?, id(b)?),
-                })
-            })
-            .collect()
+        self.nodes.iter().map(|node| node.library()).collect()
     }
 
     /// The library's profile-1 admission of this graph, or `None` when the

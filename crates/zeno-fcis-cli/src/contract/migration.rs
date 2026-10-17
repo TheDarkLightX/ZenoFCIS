@@ -433,7 +433,7 @@ fn expression(
                     names(a, found);
                 }
             }
-            Ast::Bool(_) | Ast::Int(_) => {}
+            Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => {}
         }
     }
     let mut found = std::collections::BTreeSet::new();

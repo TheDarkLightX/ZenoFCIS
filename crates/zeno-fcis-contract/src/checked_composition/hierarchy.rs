@@ -730,7 +730,7 @@ impl Scope {
                         .unwrap_or_else(|| name.clone()),
                 )
             }
-            Ast::Bool(_) | Ast::Int(_) => ast.clone(),
+            Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
             Ast::Not(inner) => Ast::Not(recurse(inner)),
             Ast::Neg(inner) => Ast::Neg(recurse(inner)),
             Ast::Binary(operator, left, right) => {

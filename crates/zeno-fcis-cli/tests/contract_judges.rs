@@ -12,6 +12,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::Value;
 
+#[path = "support/cpmm.rs"]
+mod cpmm;
+
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct TempRoot(PathBuf);
@@ -83,6 +86,77 @@ fn run(args: &[&str], expected: i32) -> Value {
 
 fn text(path: &Path) -> &str {
     path.to_str().unwrap_or_else(|| panic!("UTF-8 path"))
+}
+
+#[test]
+fn transition_lemma_cli_checks_actual_swaps_and_refutes_a_decreasing_step() {
+    let root = TempRoot::new("transition-lemma");
+    let app = root.path().join("swap");
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|error| panic!("{error}"));
+    let write = |limit, bps, bad| {
+        fs::write(app.join("project.zeno"), cpmm::project(limit))
+            .unwrap_or_else(|error| panic!("{error}"));
+        fs::write(
+            app.join("v2/policy.json"),
+            cpmm::policy(limit, bps, bad).to_string(),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    };
+    write(40, 30, false);
+    let result = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+        ],
+        0,
+    );
+    assert_eq!(result["schema"], "zeno-fcis/contract-transition-lemma/1");
+    assert_eq!(result["status"], "checked");
+    assert_eq!(result["authority"], "none");
+    assert_eq!(result["lemmas"][0]["mode"], "transition-relation");
+    assert_eq!(result["lemmas"][0]["admitted"], 68_921);
+    assert_eq!(result["lemmas"][0]["checked"], 68_921);
+    assert_eq!(result["lemmas"][0]["undefined"], 0);
+    assert!(result["lemmas"][0].get("initiation").is_none());
+    let stop = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+            "--max-tuples",
+            "1",
+        ],
+        2,
+    );
+    assert_eq!(stop["status"], "inconclusive");
+    write(3, 0, true);
+    let refuted = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+        ],
+        1,
+    );
+    assert_eq!(refuted["status"], "refuted");
+    assert_eq!(
+        refuted["lemmas"][0]["counterexample"]["state"],
+        serde_json::json!([1, 1])
+    );
+    assert_eq!(
+        refuted["lemmas"][0]["counterexample"]["outcome"]["post"],
+        serde_json::json!([2, 0])
+    );
 }
 
 #[test]

@@ -342,10 +342,10 @@ fn learn_outside_vocabulary_has_a_minimum_conflict_and_no_accepted_program() {
 }
 
 #[test]
-fn learn_refuses_primitives_multiplication_noise_and_has_described_effects() {
+fn learn_refuses_unknown_primitives_and_has_described_effects() {
     let d = Directory::new();
     let mut spec = declaration();
-    spec["vocabulary"]["arithmetic"] = json!(["*"]);
+    spec["vocabulary"]["arithmetic"] = json!(["opaque_product"]);
     let path = d.document("research.json", &spec);
     let out = run(&["loop", "learn", "--spec", text(&path)]);
     assert_eq!(out.status.code(), Some(1));
@@ -394,5 +394,79 @@ fn learn_malformed_specimens_are_refused_before_enumeration() {
         for field in ["counts", "question", "candidate", "core"] {
             assert!(r["detail"][field].is_null(), "{r}");
         }
+    }
+}
+
+#[test]
+fn learn_fused_arithmetic_checks_examples_and_qualifies_against_native_reference() {
+    for (name, ceil) in [("MulDivFloor", false), ("MulDivCeil", true)] {
+        let d = Directory::new();
+        let spec = json!({"schema":"zeno-fcis/loop-learn/1",
+            "inputs":[{"name":"x","domain":{"kind":"Int","min":0,"max":4}}],
+            "outputs":[{"kind":"Int","min":0,"max":10}],
+            "vocabulary":{"constants":[3,2],"arithmetic":[if ceil {"mul_div_ceil"} else {"mul_div_floor"}]},
+            "max_size":4,"examples":(0..=4).map(|x| json!({"input":[x],
+                "output":[(3*x + i64::from(ceil)) / 2]})).collect::<Vec<_>>()});
+        let path = d.document("arithmetic.json", &spec);
+        let original = reference(
+            &d,
+            &json!({"inputs":[{"kind":"Int","min":"0","max":"4"}],
+            "outputs":[{"kind":"Int","min":"0","max":"10"}],
+            "nodes":[["Input",0],["Int","3"],["Int","2"],[name,0,1,2]],"roots":[3]}),
+        );
+        let done = run(&[
+            "loop",
+            "learn",
+            "--spec",
+            text(&path),
+            "--original",
+            text(&original),
+        ]);
+        let r = report(&done);
+        assert_eq!(done.status.code(), Some(0), "{r}");
+        assert_eq!(r["status"], "qualified", "{r}");
+        assert_eq!(r["detail"]["candidate"]["examples_check"]["checked"], 5);
+        assert_eq!(
+            r["detail"]["candidate"]["examples_check"]["verdict"],
+            "reproduced"
+        );
+        assert_eq!(r["authority"], "none");
+    }
+}
+
+#[test]
+fn learn_product_comparison_stub_reference_cannot_qualify() {
+    for stub in [false, true] {
+        let d = Directory::new();
+        let path = d.document("products.json", &json!({"schema":"zeno-fcis/loop-learn/1",
+            "inputs":[{"name":"x","domain":{"kind":"Int","min":0,"max":4}}],
+            "outputs":[{"kind":"Bool"}],"max_size":5,
+            "vocabulary":{"constants":[1,2],"arithmetic":[],"compare":["products_ge"]},
+            "examples":(0..=4).map(|x| json!({"input":[x],"output":[i64::from(x>=2)]})).collect::<Vec<_>>() }));
+        let compare = if stub {
+            json!(["Bool", true])
+        } else {
+            json!(["ProductsGe", 0, 1, 1, 2, 1, 1])
+        };
+        let original = reference(
+            &d,
+            &json!({"inputs":[{"kind":"Int","min":"0","max":"4"}],
+            "outputs":[{"kind":"Bool"}],"nodes":[["Input",0],["Int","1"],["Int","2"],compare],"roots":[3]}),
+        );
+        let done = run(&[
+            "loop",
+            "learn",
+            "--spec",
+            text(&path),
+            "--original",
+            text(&original),
+        ]);
+        let r = report(&done);
+        assert_eq!(
+            r["status"],
+            if stub { "refuted" } else { "qualified" },
+            "{r}"
+        );
+        assert_eq!(done.status.code() == Some(0), !stub, "{r}");
     }
 }

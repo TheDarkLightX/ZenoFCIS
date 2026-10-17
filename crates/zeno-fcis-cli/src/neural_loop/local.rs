@@ -57,9 +57,6 @@ impl LocalProposer {
 
 /// Rewrites to a fixpoint; `None` when the result would not admit.
 pub(crate) fn simplify(program: &Program, aggressive: bool) -> Option<Program> {
-    if program.nodes().iter().any(Op::requires_arithmetic_profile) {
-        return None;
-    }
     let mut current = program.clone();
     for _ in 0..MAX_PASSES {
         let next = pass(&current, aggressive)?;
@@ -121,6 +118,15 @@ fn remap(op: &Op, canon: &[u16]) -> Option<Op> {
         Op::Bool(a) => Op::Bool(a),
         Op::Add(a, b) => Op::Add(id(a)?, id(b)?),
         Op::Sub(a, b) => Op::Sub(id(a)?, id(b)?),
+        Op::Mul(a, b) => Op::Mul(id(a)?, id(b)?),
+        Op::DivFloor(a, b) => Op::DivFloor(id(a)?, id(b)?),
+        Op::DivCeil(a, b) => Op::DivCeil(id(a)?, id(b)?),
+        Op::MulDivFloor(a, b, d) => Op::MulDivFloor(id(a)?, id(b)?, id(d)?),
+        Op::MulDivCeil(a, b, d) => Op::MulDivCeil(id(a)?, id(b)?, id(d)?),
+        Op::ProductsGe(a, b) => Op::ProductsGe(
+            [id(a[0])?, id(a[1])?, id(a[2])?],
+            [id(b[0])?, id(b[1])?, id(b[2])?],
+        ),
         Op::Eq(a, b) => Op::Eq(id(a)?, id(b)?),
         Op::Lt(a, b) => Op::Lt(id(a)?, id(b)?),
         Op::And(a, b) => Op::And(id(a)?, id(b)?),
@@ -253,6 +259,12 @@ enum Key {
     Bool(bool),
     Add(u16, u16),
     Sub(u16, u16),
+    Mul(u16, u16),
+    DivFloor(u16, u16),
+    DivCeil(u16, u16),
+    MulDivFloor(u16, u16, u16),
+    MulDivCeil(u16, u16, u16),
+    ProductsGe([u16; 3], [u16; 3]),
     Eq(u16, u16),
     Lt(u16, u16),
     And(u16, u16),
@@ -269,6 +281,12 @@ impl Key {
             Op::Bool(a) => Key::Bool(a),
             Op::Add(a, b) => Key::Add(a, b),
             Op::Sub(a, b) => Key::Sub(a, b),
+            Op::Mul(a, b) => Key::Mul(a, b),
+            Op::DivFloor(a, b) => Key::DivFloor(a, b),
+            Op::DivCeil(a, b) => Key::DivCeil(a, b),
+            Op::MulDivFloor(a, b, d) => Key::MulDivFloor(a, b, d),
+            Op::MulDivCeil(a, b, d) => Key::MulDivCeil(a, b, d),
+            Op::ProductsGe(a, b) => Key::ProductsGe(a, b),
             Op::Eq(a, b) => Key::Eq(a, b),
             Op::Lt(a, b) => Key::Lt(a, b),
             Op::And(a, b) => Key::And(a, b),
@@ -282,9 +300,17 @@ impl Key {
 fn operands(op: &Op) -> Vec<u16> {
     match *op {
         Op::Input(_) | Op::Int(_) | Op::Bool(_) => Vec::new(),
-        Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => vec![a, b],
+        Op::Add(a, b)
+        | Op::Sub(a, b)
+        | Op::Mul(a, b)
+        | Op::DivFloor(a, b)
+        | Op::DivCeil(a, b)
+        | Op::Eq(a, b)
+        | Op::Lt(a, b)
+        | Op::And(a, b) => vec![a, b],
         Op::Not(a) => vec![a],
-        Op::Select(c, a, b) => vec![c, a, b],
+        Op::Select(c, a, b) | Op::MulDivFloor(c, a, b) | Op::MulDivCeil(c, a, b) => vec![c, a, b],
+        Op::ProductsGe(a, b) => a.into_iter().chain(b).collect(),
         _ => Vec::new(),
     }
 }
@@ -297,7 +323,17 @@ fn eliminate_dead(nodes: &[Op], roots: &[u16], aggressive: bool) -> Option<(Vec<
     let mut stack: Vec<u16> = roots.to_vec();
     if !aggressive {
         for (index, op) in nodes.iter().enumerate() {
-            if matches!(op, Op::Add(..) | Op::Sub(..)) {
+            if matches!(
+                op,
+                Op::Add(..)
+                    | Op::Sub(..)
+                    | Op::Mul(..)
+                    | Op::DivFloor(..)
+                    | Op::DivCeil(..)
+                    | Op::MulDivFloor(..)
+                    | Op::MulDivCeil(..)
+                    | Op::ProductsGe(..)
+            ) {
                 stack.push(u16::try_from(index).ok()?);
             }
         }
@@ -323,6 +359,15 @@ fn eliminate_dead(nodes: &[Op], roots: &[u16], aggressive: bool) -> Option<(Vec<
             Op::Bool(a) => Op::Bool(a),
             Op::Add(a, b) => Op::Add(id(a)?, id(b)?),
             Op::Sub(a, b) => Op::Sub(id(a)?, id(b)?),
+            Op::Mul(a, b) => Op::Mul(id(a)?, id(b)?),
+            Op::DivFloor(a, b) => Op::DivFloor(id(a)?, id(b)?),
+            Op::DivCeil(a, b) => Op::DivCeil(id(a)?, id(b)?),
+            Op::MulDivFloor(a, b, d) => Op::MulDivFloor(id(a)?, id(b)?, id(d)?),
+            Op::MulDivCeil(a, b, d) => Op::MulDivCeil(id(a)?, id(b)?, id(d)?),
+            Op::ProductsGe(a, b) => Op::ProductsGe(
+                [id(a[0])?, id(a[1])?, id(a[2])?],
+                [id(b[0])?, id(b[1])?, id(b[2])?],
+            ),
             Op::Eq(a, b) => Op::Eq(id(a)?, id(b)?),
             Op::Lt(a, b) => Op::Lt(id(a)?, id(b)?),
             Op::And(a, b) => Op::And(id(a)?, id(b)?),

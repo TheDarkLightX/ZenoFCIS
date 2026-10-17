@@ -96,6 +96,12 @@ fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
             Box::new(value_at(left, root)?),
             Box::new(value_at(right, root)?),
         ),
+        ValueExpr::MulDiv(mode, a, b, d) => ValueExpr::MulDiv(
+            *mode,
+            Box::new(value_at(a, root)?),
+            Box::new(value_at(b, root)?),
+            Box::new(value_at(d, root)?),
+        ),
         ValueExpr::Sum {
             variable,
             start,

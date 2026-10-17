@@ -7,6 +7,7 @@ mod binding;
 mod checker_process;
 mod compliance_gateway;
 mod composition_command;
+mod containment_policy;
 mod contract;
 mod contract_adopt;
 mod contract_diff;
@@ -135,6 +136,9 @@ claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pr
     disable_help_subcommand = true
 )]
 struct Cli {
+    /// Required containment backend; auto uses direct POSIX for eligible finite data.
+    #[arg(long, global = true, value_enum, default_value_t = containment_policy::Backend::Auto)]
+    containment_backend: containment_policy::Backend,
     /// Ordered external KB files; omission consults ZENO_FCIS_KB for loop sessions.
     #[arg(long, global = true)]
     kb: Vec<PathBuf>,
@@ -402,17 +406,34 @@ enum SmtBackend {
 }
 
 fn main() -> ExitCode {
+    if let Some(code) = checker_process::bootstrap() {
+        return ExitCode::from(code);
+    }
     match Cli::try_parse() {
         Ok(cli) => {
             if let Command::Kb { operation } = cli.command {
                 return ExitCode::from(knowledge_command::execute(&cli.kb, operation));
             }
-            if let Some(result) =
-                loop_command::knowledge_operation(&cli.command, &cli.kb, &cli.kb_task)
+            let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {
-                print_json(&result.1);
-                return ExitCode::from(result.0);
-            }
+                Ok(admission) => admission,
+                Err(failure) => {
+                    return ExitCode::from(checker_process::refuse(&cli.command, failure));
+                }
+            };
+            let resolved_kb =
+                if cli.kb.is_empty() && loop_command::has_knowledge_operation(&cli.command) {
+                    match knowledge_command::paths(&[]) {
+                        Ok(paths) => Some(paths),
+                        Err(report) => {
+                            print_json(&report);
+                            return ExitCode::from(INVALID);
+                        }
+                    }
+                } else {
+                    None
+                };
+            let kb_paths = resolved_kb.as_deref().unwrap_or(&cli.kb);
             let knowledge = match loop_knowledge::prepare(
                 &cli.command,
                 &cli.kb,
@@ -445,6 +466,7 @@ fn main() -> ExitCode {
                 BLOCKED
             } else if let Some(code) = checker_process::dispatch(
                 &cli.command,
+                admission,
                 knowledge.as_ref().map(|k| k.policy.snapshot.as_str()),
                 knowledge.as_ref().map(|k| k.invocation()),
                 if cli.kb_task.is_empty() {
@@ -452,12 +474,19 @@ fn main() -> ExitCode {
                 } else {
                     None
                 },
-                if cli.kb.is_empty() {
+                if let Some(paths) = &resolved_kb {
+                    Some(paths)
+                } else if cli.kb.is_empty() {
                     knowledge.as_ref().map(|k| k.paths())
                 } else {
                     None
                 },
             ) {
+                code
+            } else if let Some((code, report)) =
+                loop_command::knowledge_operation(&cli.command, kb_paths, &cli.kb_task)
+            {
+                print_json(&report);
                 code
             } else {
                 match cli.command {
@@ -1721,7 +1750,9 @@ fn diagnostic_json(path: &Path, diagnostics: &[&Diagnostic], truncated: bool) ->
 }
 
 fn print_json(value: &Value) {
-    match serde_json::to_string(value) {
+    let mut value = value.clone();
+    checker_process::label_public_result(&mut value);
+    match serde_json::to_string(&value) {
         Ok(encoded) => println!("{encoded}"),
         Err(error) => eprintln!("JSON encoding failed: {error}"),
     }
@@ -1894,6 +1925,14 @@ mod tests {
         // Every loop command, named by the parser, so a new one needs review.
         let example = |path: &[&str]| -> &[&str] {
             match path {
+                ["loop", "capture", "whole"] => &[
+                    "--spec",
+                    "s.json",
+                    "--reference",
+                    "r.py",
+                    "--candidate-json",
+                    "c.json",
+                ],
                 ["loop", "capture", "open"] => {
                     &["--spec", "s.json", "--reference", "r.py", "--session", "s"]
                 }
@@ -1911,6 +1950,13 @@ mod tests {
                     "family" => &["--instances", "m.json", "--program", "p.json"],
                     "transfer" => &["--from", "p.json", "--to-instances", "m.json"],
                     "meaning" => &["--original", "p.zcve", "--candidate", "c.zcve"],
+                    "evaluate" => &[
+                        "--original",
+                        "p.zcve",
+                        "--expressions",
+                        "e.json",
+                        "--input=0",
+                    ],
                     "question" => &["--contract", "app"],
                     "teach-back" => &["--contract", "app", "--rule", "r.json"],
                     "decompose" => &["--contract", "app", "--architecture", "a.json"],

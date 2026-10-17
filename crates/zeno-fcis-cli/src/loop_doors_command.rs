@@ -235,6 +235,18 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         candidate: Option<PathBuf>,
     },
+    /// Evaluate one expression at a declared input through the library; no verdict or receipt.
+    Evaluate {
+        /// Canonical program supplying the declared input domains.
+        #[arg(long)]
+        original: PathBuf,
+        /// One plain output expression and its input vocabulary.
+        #[arg(long)]
+        expressions: PathBuf,
+        /// Input values in the original's ABI order.
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        input: Vec<i64>,
+    },
     /// Ask about the largest region where the contract's laws leave the decision open; no session.
     Question {
         /// Existing application contract (original question mode).
@@ -326,6 +338,11 @@ pub(crate) fn run_with_policy(
     match command {
         // BEGIN black-box capture dispatch (additive)
         DoorCommand::Capture { command } => capture::run(command),
+        DoorCommand::Evaluate {
+            original,
+            expressions,
+            input,
+        } => evaluate_command(&original, &expressions, &input),
         // END black-box capture dispatch
         // BEGIN composable program loop dispatch (qualification uses check + replay).
         DoorCommand::Pipeline {
@@ -1103,7 +1120,21 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                             let bound = result
                                 .sketch
                                 .get(info.output)
-                                .map_or(0, |node| sketch::constant_bound(subject, node));
+                                .filter(|node| {
+                                    !zeno_fcis_loop_doors::inverse::positions(node).iter().any(
+                                        |(_, sub)| {
+                                            matches!(
+                                                sub,
+                                                Expr::Call(..)
+                                                    | Expr::Bin(
+                                                        zeno_fcis_loop_doors::expr::Op::Mul,
+                                                        ..
+                                                    )
+                                            )
+                                        },
+                                    )
+                                })
+                                .map(|node| sketch::constant_bound(subject, node));
                             json!({"kind": "constant", "derived": "exact over all integers",
                                    "range": range.map(|(lo, hi)| json!([lo, hi])),
                                    "enumeration_bound": bound})
@@ -2019,6 +2050,83 @@ fn form_json(form: Option<&Form>) -> Value {
 
 // --- the meaning key ---------------------------------------------------------------
 
+fn evaluate_command(original: &Path, expressions: &Path, input: &[i64]) -> (u8, Value) {
+    use zeno_fcis_loop_doors::expr::kind_of;
+    use zeno_fcis_synthesis::finite::{Domain, Op};
+    let bytes = match crate::transform_command::read_bounded(original, PROGRAM_LIMIT) {
+        Ok(bytes) if !crate::transform_command::over(&bytes, PROGRAM_LIMIT) => bytes,
+        Ok(_) => return refused("program-too-large"),
+        Err(error) => return super::io_failure(&error),
+    };
+    let original = match import_program(&bytes) {
+        Ok(program) => program,
+        Err(error) => return refused(&format!("original-not-admitted:{error:?}")),
+    };
+    if tuples(original.inputs()) > u128::from(DOOR_MAX_TUPLES) {
+        return refused("domain-over-budget");
+    }
+    let document = match read_document(expressions) {
+        Ok(d) => d,
+        Err(e) => return e,
+    };
+    if document.outputs.len() != 1 || !document.parameters.is_empty() {
+        return refused("evaluate-needs-one-plain-expression");
+    }
+    let Some(spec) = document.vocabulary else {
+        return refused("document-vocabulary-missing");
+    };
+    let initial_vocab = match vocabulary(&spec, &original) {
+        Ok(v) => v,
+        Err(e) => return refused(&e),
+    };
+    let node = match parse(&document.outputs[0], 0, Allow::PLAIN)
+        .and_then(|n| initial_vocab.resolve_variants(&n))
+    {
+        Ok(node) => node,
+        Err(e) => return refused(&e.0),
+    };
+    let kind = match kind_of(&node, &initial_vocab) {
+        Ok(k) => k.unwrap_or(Kind::Int),
+        Err(e) => return refused(&e.0),
+    };
+    let (output, zero) = if kind == Kind::Bool {
+        (Domain::Bool, Op::Bool(false))
+    } else {
+        (
+            Domain::Int {
+                min: i64::MIN,
+                max: i64::MAX,
+            },
+            Op::Int(0),
+        )
+    };
+    let seed = match Program::try_new(
+        original.inputs().to_vec(),
+        vec![output],
+        vec![zero],
+        vec![0],
+    ) {
+        Ok(p) => p,
+        Err(e) => return refused(&format!("evaluate-not-admitted:{e:?}")),
+    };
+    let vocab = match vocabulary(&spec, &seed) {
+        Ok(v) => v,
+        Err(e) => return refused(&e),
+    };
+    let program = match lower_outputs(&[node], &vocab, &seed) {
+        Ok(p) => p,
+        Err(e) => return refused(&e.0),
+    };
+    match program.evaluate(input) {
+        Ok(values) => super::result(
+            crate::OK,
+            "evaluated",
+            json!({"values": values.iter().map(ToString::to_string).collect::<Vec<_>>()}),
+        ),
+        Err(error) => refused(&format!("evaluation-refused:{error:?}")),
+    }
+}
+
 /// A program's meaning key: a digest of its input and output domains and of
 /// its observation on every declared input, in the checker's order: every
 /// output, or the evaluator's exact failure. Observations come from the
@@ -2575,6 +2683,7 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
     match command {
         DoorCommand::Sketch { session, .. } => Some((session, false)),
         DoorCommand::Capture { command } => match command {
+            capture::Command::Whole { .. } => None,
             capture::Command::Open { session, .. } => Some((session, true)),
             capture::Command::Packet { session }
             | capture::Command::Candidate { session, .. }

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -146,6 +147,22 @@ def decompose(cli: Path, contract: Path, architecture: Path, compose: bool = Tru
 def gaps(cli: Path, contract: Path, laws: Path) -> tuple[int, dict]:
     """The specification-gap judge with proposed laws (``contract review --gaps --gaps-laws``)."""
     return run(cli, ["contract", "review", contract, "--gaps", "--gaps-laws", laws, "--format", "json"])
+
+
+def evaluate_expression(cli: Path, original: Path, expressions: Path, values: list[int]) -> int:
+    """Read one scalar through Rust's existing library evaluator, with no verdict or receipt."""
+    code, report = run(cli, ["loop", "evaluate", "--original", original, "--expressions", expressions,
+                             "--input=" + ",".join(str(v) for v in values)])
+    result = (report.get("detail") or {}).get("values")
+    if code != 0 or report.get("status") != "evaluated" or not isinstance(result, list) or len(result) != 1:
+        raise Refusal("scenario-expression-refused-by-library")
+    value = result[0]
+    if not isinstance(value, str) or not re.fullmatch(r"-?(?:0|[1-9][0-9]{0,18})", value):
+        raise Refusal("scenario-expression-result-shape")
+    number = int(value)
+    if not -(1 << 63) <= number < (1 << 63):
+        raise Refusal("scenario-expression-result-range")
+    return number
 
 
 def lemma(cli: Path, contract: Path, formula: str) -> tuple[int, dict]:

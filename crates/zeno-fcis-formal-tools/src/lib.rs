@@ -1518,6 +1518,17 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
             },
             ExportNode::Value(value) => match value {
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+                ValueExpr::MulDiv(_, a, b, d) => {
+                    for child in [a, b, d] {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Value(child),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
                 | ValueExpr::Mul(left, right)
@@ -3578,6 +3589,10 @@ fn render_value_smt(
             render_value_smt(right, step, environment, budget)?,
             budget,
         )?,
+        // Native main-route compilation owns fused arithmetic. This optional
+        // backend has no matching full-product semantics: refuse, never emit
+        // an intermediate signed multiplication with different overflow rules.
+        ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
             let left = render_value_smt(left, step, environment, budget)?;
             let right = render_value_smt(right, step, environment, budget)?;
@@ -3990,8 +4005,55 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
             collect_value(b, paths)
         }
         ValueExpr::Sum { body, .. } => collect_value(body, paths),
+        ValueExpr::MulDiv(_, a, b, d) => {
+            collect_value(a, paths);
+            collect_value(b, paths);
+            collect_value(d, paths);
+        }
         ValueExpr::Int(_) | ValueExpr::Var(_) => {}
     }
+}
+
+#[cfg(test)]
+#[test]
+fn fused_value_calls_refuse_in_unextended_backends() {
+    let value = ValueExpr::MulDiv(
+        zeno_fcis_spec::DivisionMode::Floor,
+        Box::new(ValueExpr::Int(1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    assert!(matches!(
+        render_value_lean(
+            &value,
+            "0",
+            &BTreeMap::new(),
+            &mut LeanRenderBudget::new(ExportLimits::default())
+        ),
+        Err(ExportError::UnsupportedMode)
+    ));
+    assert!(matches!(
+        render_value_smt(
+            &value,
+            0,
+            &BTreeMap::new(),
+            &mut SmtRenderBudget::new(ExportLimits::default())
+        ),
+        Err(ExportError::UnsupportedMode)
+    ));
+    let formula = RelExpr::Compare(CompareOp::Eq, value, ValueExpr::Int(0));
+    let step = model_diagnostics::ModelStep::try_new(Vec::new()).unwrap();
+    let limits = model_diagnostics::DiagnosticLimits::try_new(1000, 1000, 1000).unwrap();
+    let result = model_diagnostics::check_relation(
+        &formula,
+        model_diagnostics::ModelContext::new(&step, limits),
+    );
+    assert_eq!(
+        result,
+        model_diagnostics::DiagnosticOutcome::Indeterminate(
+            model_diagnostics::ModelReason::UnsupportedExpression
+        )
+    );
 }
 fn parse_lean_axioms(text: &str) -> Option<Vec<String>> {
     let reports = text

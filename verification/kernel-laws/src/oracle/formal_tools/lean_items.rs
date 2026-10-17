@@ -1,6 +1,9 @@
 // Private original shallow Lean reference. Included only in the unit test crate.
 #[derive(Clone, Copy)]
-enum ExportKind { Smt, Lean }
+enum ExportKind {
+    Smt,
+    Lean,
+}
 
 fn preflight_export(
     claim: &ClaimDecl,
@@ -118,6 +121,7 @@ fn preflight_export(
                 }
             },
             ExportNode::Value(value) => match value {
+                ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
@@ -426,6 +430,7 @@ fn render_value_lean(
 ) -> Result<LeanValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Int(value) => LeanValue {
             term: lean_int(*value),
             defined: "True".to_owned(),
@@ -751,7 +756,6 @@ fn render_temporal_lean(
     };
     budget.boolean(rendered)
 }
-
 
 fn original_export_smt_with_limits(
     claim: &ClaimDecl,

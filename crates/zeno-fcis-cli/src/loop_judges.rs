@@ -41,8 +41,8 @@ use zeno_fcis_contract::internals::review::evaluate::{
 use zeno_fcis_contract::internals::rules::{Class, Constant, LawKind, Rules};
 use zeno_fcis_contract::internals::{policy, schema, schema_commitment};
 use zeno_fcis_loop_doors::expr::{
-    Allow, Env, Expr, Kind, Op, Vocabulary, children, evaluate, kind_of, parse, show, size,
-    substitute,
+    Allow, Env, Expr, Function, Kind, Op, Vocabulary, children, evaluate, kind_of, parse, show,
+    size, substitute,
 };
 use zeno_fcis_loop_doors::inverse::{Synthesis, Synthesizer, describe_region};
 use zeno_fcis_loop_doors::subject::Subject;
@@ -777,6 +777,7 @@ impl Core {
                 .position(|n| n == name)
                 .is_some_and(|k| self.bools[k]),
             Expr::Not(_) => true,
+            Expr::Call(function, _) => function.kind() == Kind::Bool,
             Expr::Bin(op, _, _) => matches!(
                 op,
                 Op::And
@@ -813,8 +814,11 @@ impl Core {
             Expr::Int(1) => "true".to_owned(),
             Expr::Int(0) => "false".to_owned(),
             Expr::Var(name) => format!("{} == 1", self.path_of(name, post)?),
-            Expr::Not(a) if self.is_number(a) => format!("{} == 0", self.law_value(a, post)?),
+            Expr::Not(a) if self.is_number(a) => format!("{} == 0", self.law_left_value(a, post)?),
             Expr::Not(a) => format!("!({})", self.law_bool(a, post)?),
+            Expr::Call(Function::ProductsGe, args) => {
+                self.law_call(Function::ProductsGe, args, post)?
+            }
             Expr::If(c, a, b) => {
                 let (c, a, b) = (
                     self.law_bool(c, post)?,
@@ -850,11 +854,22 @@ impl Core {
             }
             Expr::Bin(op @ (Op::Eq | Op::Ne | Op::Lt | Op::Le | Op::Gt | Op::Ge), a, b) => format!(
                 "{} {} {}",
-                self.law_value(a, post)?,
+                self.law_left_value(a, post)?,
                 op.symbol(),
                 self.law_value(b, post)?
             ),
             _ => return invalid("law-not-boolean"),
+        })
+    }
+
+    fn law_left_value(&self, node: &Expr, post: bool) -> Result<String> {
+        let value = self.law_value(node, post)?;
+        // The spec grammar reads an initial '(' as a relation group. An
+        // identity sum keeps scalar parentheses and their refusal order.
+        Ok(if value.starts_with('(') {
+            format!("0 + {value}")
+        } else {
+            value
         })
     }
 
@@ -863,6 +878,14 @@ impl Core {
             Expr::Int(v) if *v < 0 => format!("(0 - {})", v.unsigned_abs()),
             Expr::Int(v) => v.to_string(),
             Expr::Var(name) => self.path_of(name, post)?,
+            Expr::Call(function, args) if function.kind() == Kind::Int => {
+                self.law_call(*function, args, post)?
+            }
+            Expr::Bin(Op::Mul, a, b) => format!(
+                "({}) * ({})",
+                self.law_value(a, post)?,
+                self.law_value(b, post)?
+            ),
             Expr::Bin(op @ (Op::Add | Op::Sub), a, b) => {
                 let right = self.law_value(b, post)?;
                 let right = if matches!(**b, Expr::Bin(..)) {
@@ -874,6 +897,17 @@ impl Core {
             }
             _ => return invalid("law-value-must-be-a-sum"),
         })
+    }
+
+    fn law_call(&self, function: Function, args: &[Expr], post: bool) -> Result<String> {
+        if !function.accepts(args.len()) {
+            return invalid("law-call-arity");
+        }
+        let args = args
+            .iter()
+            .map(|a| self.law_value(a, post))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(format!("{}({})", function.name(), args.join(", ")))
     }
 
     /// `post.F == value` for state position `k`, `value` over the pre-state
@@ -1981,10 +2015,45 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
 }
 
 #[cfg(test)]
+#[path = "../tests/support/cpmm.rs"]
+mod cpmm;
+
+#[cfg(test)]
+#[path = "loop_judges_arithmetic_tests.rs"]
+mod arithmetic_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn arithmetic_law_writers_compile_and_check_with_the_native_laws() {
+        let core = Core::from_sources(cpmm::project(2), cpmm::policy(2, 30, false).to_string())
+            .unwrap_or_else(|error| panic!("core: {error:?}"));
+        let baseline = core.admissible(&[]).unwrap();
+        for text in [
+            "(x + 1) * (y + 2) >= x * y",
+            "mul_div_floor(amount, 30, 10000) <= mul_div_ceil(amount, 30, 10000)",
+            "products_ge(x, 2, x, 2)",
+            "products_ge(x, 2, 3, x, 2, 3)",
+        ] {
+            let expression = parse(text, 0, Allow::PLAIN).unwrap();
+            let law = core.law_text(&expression).unwrap();
+            let admitted = core
+                .admissible(&[("commit".to_owned(), law.clone())])
+                .unwrap();
+            assert_eq!(admitted, baseline, "{text}: {law}");
+        }
+        let constrained = core
+            .admissible(&[("commit".to_owned(), cpmm::RELATION.to_owned())])
+            .unwrap();
+        assert_ne!(
+            constrained, baseline,
+            "product comparison admitted every successor"
+        );
+    }
 
     fn check_prefixes(family: &str, parameter: &str, value: i64, answers: &str) {
         let root = std::env::temp_dir().join(format!(

@@ -31,7 +31,9 @@ use zeno_fcis_program_search::target::{
     Plan, PlanNode, TargetBudget, TargetKind, synthesize_target_counted,
 };
 
-use crate::expr::{Env, Expr, HoleValue, Kind, Op, Vocabulary, compare_side, evaluate, has_holes};
+use crate::expr::{
+    Env, Expr, Function, HoleValue, Kind, Op, Vocabulary, compare_side, evaluate, has_holes,
+};
 use crate::subject::{Subject, domain_size};
 use crate::{Refusal, Result};
 
@@ -276,8 +278,34 @@ pub fn replace_at(node: &Expr, path: &[u8], new: &Expr) -> Result<Expr> {
         (Expr::If(c, a, b), 2) => {
             Expr::select((**c).clone(), (**a).clone(), replace_at(b, rest, new)?)
         }
+        (Expr::Call(function, args), index) if usize::from(index) < args.len() => {
+            let mut args = args.clone();
+            args[usize::from(index)] = replace_at(&args[usize::from(index)], rest, new)?;
+            Expr::Call(*function, args)
+        }
         _ => return Err(Refusal::new("position-outside-tree")),
     })
+}
+
+/// Whether the existing exact inverse covers every ancestor of this path.
+/// Nonlinear arguments are searched over their stated finite candidates;
+/// lack of an inverse never establishes impossibility.
+#[must_use]
+pub fn can_derive(root: &Expr, path: &[u8]) -> bool {
+    let mut node = root;
+    for index in path {
+        if matches!(node, Expr::Call(..) | Expr::Bin(Op::Mul, ..)) {
+            return false;
+        }
+        let Some(child) = crate::expr::children(node)
+            .get(usize::from(*index))
+            .copied()
+        else {
+            return false;
+        };
+        node = child;
+    }
+    true
 }
 
 // --- derivation --------------------------------------------------------------
@@ -760,6 +788,19 @@ pub fn from_plan(plan: &Plan, vocab: &Vocabulary, readable: bool) -> Result<Expr
             }
             PlanNode::Add(a, b) => Expr::bin(Op::Add, at(a)?, at(b)?),
             PlanNode::Sub(a, b) => Expr::bin(Op::Sub, at(a)?, at(b)?),
+            PlanNode::Mul(a, b) => Expr::bin(Op::Mul, at(a)?, at(b)?),
+            PlanNode::DivFloor(a, b) => Expr::Call(Function::DivFloor, vec![at(a)?, at(b)?]),
+            PlanNode::DivCeil(a, b) => Expr::Call(Function::DivCeil, vec![at(a)?, at(b)?]),
+            PlanNode::MulDivFloor(a, b, d) => {
+                Expr::Call(Function::MulDivFloor, vec![at(a)?, at(b)?, at(d)?])
+            }
+            PlanNode::MulDivCeil(a, b, d) => {
+                Expr::Call(Function::MulDivCeil, vec![at(a)?, at(b)?, at(d)?])
+            }
+            PlanNode::ProductsGe(a, b) => Expr::Call(
+                Function::ProductsGe,
+                a.into_iter().chain(b).map(at).collect::<Result<Vec<_>>>()?,
+            ),
             PlanNode::Eq(a, b) => Expr::bin(Op::Eq, at(a)?, at(b)?),
             PlanNode::Lt(a, b) => Expr::bin(Op::Lt, at(a)?, at(b)?),
             PlanNode::And(a, b) => Expr::bin(Op::And, at(a)?, at(b)?),

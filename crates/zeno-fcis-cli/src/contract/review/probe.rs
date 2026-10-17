@@ -86,7 +86,7 @@ pub(crate) enum Answer {
 
 /// A condition's value on one tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Truth {
+pub(super) enum Truth {
     /// The contract refuses the tuple; there is no decision to read.
     Refused,
     Holds,
@@ -252,7 +252,7 @@ fn outcome_name(outcome: Observed) -> String {
 }
 
 /// A condition on every tuple, read on the contract's own decision.
-fn conditions(
+pub(super) fn conditions(
     project: &str,
     loaded: &Loaded,
     machine: &Machine,

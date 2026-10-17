@@ -329,7 +329,7 @@ fn record(tuple: &[i64]) -> Vec<c::Field<'static>> {
 /// The children of one expression node.
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
-        Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) => Vec::new(),
+        Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => Vec::new(),
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
         Ast::MulDiv(_, a, b, d) => vec![a, b, d],

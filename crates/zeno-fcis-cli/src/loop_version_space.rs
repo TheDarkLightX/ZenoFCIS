@@ -235,32 +235,82 @@ fn specification(data: &[u8]) -> Result<Specification, Stop> {
     Ok(spec)
 }
 
-/// Lift already admitted finite predicates to the existing typed law IR.
-/// This is representation conversion; evaluation remains library-owned.
-fn law_nodes(program: &Program) -> Result<Vec<laws::Op<'static>>, Stop> {
-    program
-        .nodes()
-        .iter()
-        .map(|op| {
-            Ok(match *op {
-                Instruction::Input(k) => laws::Op::Observe(laws::Observation::Initial(
-                    k.checked_add(1).ok_or_else(|| bad("law-field"))?,
-                )),
-                Instruction::Bool(v) => laws::Op::Literal(laws::Atom::Bool(v)),
-                Instruction::Int(v) => laws::Op::Literal(laws::Atom::I128(i128::from(v))),
-                Instruction::Add(a, b) => laws::Op::Add(usize::from(a), usize::from(b)),
-                Instruction::Sub(a, b) => laws::Op::Sub(usize::from(a), usize::from(b)),
-                Instruction::Eq(a, b) => laws::Op::Eq(usize::from(a), usize::from(b)),
-                Instruction::Lt(a, b) => laws::Op::Lt(usize::from(a), usize::from(b)),
-                Instruction::And(a, b) => laws::Op::And(usize::from(a), usize::from(b)),
-                Instruction::Not(a) => laws::Op::Not(usize::from(a)),
-                Instruction::Select(c, a, b) => {
-                    laws::Op::Select(usize::from(c), usize::from(a), usize::from(b))
+/// Owned representation of a single admitted predicate. Added projections
+/// change node indices, so retain an explicit source-to-law mapping.
+struct LawPredicate {
+    nodes: Vec<laws::Op<'static>>,
+    root: usize,
+}
+
+/// Representation conversion only; the existing typed law evaluator owns
+/// arithmetic. Fused/product operands project to U128 and fused results back
+/// to I128, so subsequent signed comparisons keep their original types.
+fn law_nodes(program: &Program) -> Result<LawPredicate, Stop> {
+    let mut nodes = Vec::new();
+    let mut mapped = Vec::new();
+    for op in program.nodes() {
+        let id = |k: u16| {
+            mapped
+                .get(usize::from(k))
+                .copied()
+                .ok_or_else(|| bad("version-space-law-reference"))
+        };
+        let next = match *op {
+            Instruction::Input(k) => laws::Op::Observe(laws::Observation::Initial(
+                k.checked_add(1).ok_or_else(|| bad("law-field"))?,
+            )),
+            Instruction::Bool(v) => laws::Op::Literal(laws::Atom::Bool(v)),
+            Instruction::Int(v) => laws::Op::Literal(laws::Atom::I128(i128::from(v))),
+            Instruction::Add(a, b) => laws::Op::Add(id(a)?, id(b)?),
+            Instruction::Sub(a, b) => laws::Op::Sub(id(a)?, id(b)?),
+            Instruction::Mul(a, b) => laws::Op::Mul(id(a)?, id(b)?),
+            Instruction::DivFloor(a, b) | Instruction::DivCeil(a, b) => laws::Op::Div(
+                if matches!(op, Instruction::DivFloor(..)) {
+                    laws::Division::Floor
+                } else {
+                    laws::Division::Ceil
+                },
+                id(a)?,
+                id(b)?,
+            ),
+            Instruction::MulDivFloor(a, b, d) | Instruction::MulDivCeil(a, b, d) => {
+                let mut args = Vec::new();
+                for k in [a, b, d] {
+                    nodes.push(laws::Op::ToU128(id(k)?));
+                    args.push(nodes.len() - 1);
                 }
-                _ => return Err(bad("version-space-unsupported-law-instruction")),
-            })
-        })
-        .collect()
+                nodes.push(if matches!(op, Instruction::MulDivFloor(..)) {
+                    laws::Op::MulDivFloor(args[0], args[1], args[2])
+                } else {
+                    laws::Op::MulDivCeil(args[0], args[1], args[2])
+                });
+                laws::Op::ToI128(nodes.len() - 1)
+            }
+            Instruction::ProductsGe(a, b) => {
+                let mut args = Vec::new();
+                for k in a.into_iter().chain(b) {
+                    nodes.push(laws::Op::ToU128(id(k)?));
+                    args.push(nodes.len() - 1);
+                }
+                laws::Op::ProductsGe([args[0], args[1], args[2]], [args[3], args[4], args[5]])
+            }
+            Instruction::Eq(a, b) => laws::Op::Eq(id(a)?, id(b)?),
+            Instruction::Lt(a, b) => laws::Op::Lt(id(a)?, id(b)?),
+            Instruction::And(a, b) => laws::Op::And(id(a)?, id(b)?),
+            Instruction::Not(a) => laws::Op::Not(id(a)?),
+            Instruction::Select(c, a, b) => laws::Op::Select(id(c)?, id(a)?, id(b)?),
+            _ => return Err(bad("version-space-unsupported-law-instruction")),
+        };
+        nodes.push(next);
+        mapped.push(nodes.len() - 1);
+    }
+    let root = program
+        .roots()
+        .first()
+        .and_then(|r| mapped.get(usize::from(*r)))
+        .copied()
+        .ok_or_else(|| bad("version-space-law-root"))?;
+    Ok(LawPredicate { nodes, root })
 }
 
 // Invocation-local measured law work survives a later refusal or budget stop.
@@ -477,19 +527,13 @@ fn final_check(
             .map_err(|e| bad(format!("candidate-not-total:{e:?}")))?;
         let values: Vec<i64> = input.into_iter().chain(output).collect();
         let domains: Vec<Domain> = spec.inputs.iter().chain(&spec.outputs).copied().collect();
-        for (r, nodes) in requirements.iter().zip(&laws) {
+        for law in &laws {
             budget.spend(
-                (r.nodes().len() as u64)
+                (law.nodes.len() as u64)
                     .saturating_mul(2)
                     .saturating_add(16),
             )?;
-            library_law(
-                nodes,
-                usize::from(r.roots()[0]),
-                &values,
-                &domains,
-                retained,
-            )?;
+            library_law(&law.nodes, law.root, &values, &domains, retained)?;
         }
     }
     let reference = Program::try_new(
@@ -648,8 +692,8 @@ mod tests {
         let domains: Vec<Domain> = spec.inputs.iter().chain(&spec.outputs).copied().collect();
         assert!(
             library_law(
-                &nodes,
-                usize::from(predicate.roots()[0]),
+                &nodes.nodes,
+                nodes.root,
                 &[0, 0],
                 &domains,
                 &mut LawUsage::default()
@@ -658,8 +702,8 @@ mod tests {
             "the same law and frame must accept the correct output"
         );
         let wrong = library_law(
-            &nodes,
-            usize::from(predicate.roots()[0]),
+            &nodes.nodes,
+            nodes.root,
             &[0, 1],
             &domains,
             &mut LawUsage::default(),
@@ -699,5 +743,167 @@ mod tests {
     #[test]
     fn duplicate_json_keys_are_refused() {
         assert!(specification(br#"{"schema":"a","schema":"b"}"#).is_err());
+    }
+}
+
+#[cfg(test)]
+mod arithmetic_tests {
+    use super::*;
+    fn ok<T, E: std::fmt::Debug>(r: Result<T, E>) -> T {
+        r.unwrap_or_else(|e| panic!("arithmetic fixture: {e:?}"))
+    }
+    fn product_stub(p: &Program, stub: bool) -> Program {
+        ok(Program::try_new(
+            p.inputs().to_vec(),
+            p.outputs().to_vec(),
+            p.nodes()
+                .iter()
+                .map(|n| {
+                    if stub && matches!(n, Instruction::ProductsGe(..)) {
+                        Instruction::Bool(true)
+                    } else {
+                        n.clone()
+                    }
+                })
+                .collect(),
+            p.roots().to_vec(),
+        ))
+    }
+    #[test]
+    fn version_space_arithmetic_final_law_and_transform_controls_fail_with_product_stub() {
+        for rounding in ["floor", "ceil"] {
+            for third in [false, true] {
+                let formula = format!("mul_div_{rounding}(x, 3, 2)");
+                let law = if third {
+                    format!("products_ge(out0, 2, 3, {formula}, 2, 3)")
+                } else {
+                    format!("products_ge(out0, 2, {formula}, 2)")
+                };
+                let spec = ok(specification(
+                    json!({"schema":SCHEMA,
+                    "inputs":[{"name":"x","domain":{"kind":"Int","min":0,"max":4}}],
+                    "outputs":[{"kind":"Int","min":0,"max":10}],"sketch":[formula],
+                    "requirements":[{"id":"product","law":law}]})
+                    .to_string()
+                    .as_bytes(),
+                ));
+                let expression = ok(expr::parse(
+                    &format!("{formula} + div_floor(x, 2) * 0"),
+                    0,
+                    Allow::PLAIN,
+                ));
+                let checked = ok(final_check(
+                    &spec,
+                    &[expression.clone()],
+                    &mut ok(Budget::new(Limits::default())),
+                    &mut LawUsage::default(),
+                ));
+                assert_eq!(checked["status"], "checked");
+                assert!(checked["checks"].as_array().is_some_and(|cs| {
+                    cs.iter()
+                        .all(|c| c["verdict"] == "equivalent" && c["replay"] == "matched")
+                }));
+                let requirement = ok(spec.requirement_programs()).remove(0);
+                let good_obligation = ok(obligation(
+                    &spec,
+                    &[expression],
+                    Some(&spec.requirements[0]),
+                ));
+                let wrong_obligation = ok(obligation(
+                    &spec,
+                    &[Expr::Int(0)],
+                    Some(&spec.requirements[0]),
+                ));
+                let reference = ok(encode(&ok(Program::try_new(
+                    spec.inputs.clone(),
+                    vec![Domain::Bool],
+                    vec![Instruction::Bool(true)],
+                    vec![0],
+                ))));
+                let control = |stub: bool| {
+                    let p = product_stub(&requirement, stub);
+                    let law = ok(law_nodes(&p));
+                    let domains = vec![spec.inputs[0], spec.outputs[0]];
+                    let expected = if rounding == "floor" { 1 } else { 2 };
+                    let accepts_right = library_law(
+                        &law.nodes,
+                        law.root,
+                        &[1, expected],
+                        &domains,
+                        &mut LawUsage::default(),
+                    )
+                    .is_ok();
+                    let rejects_wrong = library_law(
+                        &law.nodes,
+                        law.root,
+                        &[1, 0],
+                        &domains,
+                        &mut LawUsage::default(),
+                    )
+                    .is_err();
+                    let limits = transform::Limits {
+                        steps: transform::DEFAULT_STEP_LIMIT,
+                        input_tuples: 5,
+                    };
+                    let accepts_predicate = checked_obligation(
+                        &reference,
+                        &ok(encode(&product_stub(&good_obligation, stub))),
+                        limits,
+                    )
+                    .is_ok();
+                    let rejects_predicate = checked_obligation(
+                        &reference,
+                        &ok(encode(&product_stub(&wrong_obligation, stub))),
+                        limits,
+                    )
+                    .is_err();
+                    (
+                        accepts_right && rejects_wrong,
+                        accepts_predicate && rejects_predicate,
+                    )
+                };
+                assert_eq!(control(false), (true, true));
+                assert_eq!(
+                    control(true),
+                    (false, false),
+                    "both exact checker controls must fail with stubbed product comparison"
+                );
+            }
+        }
+    }
+    #[test]
+    fn version_space_law_conversion_keeps_full_products_and_remaps_following_nodes() {
+        let spec = ok(specification(
+            json!({"schema":SCHEMA,
+            "inputs":[{"name":"x","domain":{"kind":"Int","min":0,"max":i64::MAX}}],
+            "outputs":[{"kind":"Bool"}],"sketch":["true"],"requirements":[{"id":"wide",
+                "law":"products_ge(mul_div_floor(x, x, x), x, x, x, x, x) && out0 && !products_ge(mul_div_floor(x, x, x), x, 2, x, x, 3)"}]})
+            .to_string()
+            .as_bytes(),
+        ));
+        let p = ok(spec.requirement_programs()).remove(0);
+        let law = ok(law_nodes(&p));
+        assert!(
+            library_law(
+                &law.nodes,
+                law.root,
+                &[i64::MAX, 1],
+                &[spec.inputs[0], Domain::Bool],
+                &mut LawUsage::default()
+            )
+            .is_ok()
+        );
+        for input in [0, -1] {
+            assert!(
+                library_law(
+                    &law.nodes,
+                    law.root,
+                    &[input, 1],
+                    &[spec.inputs[0], Domain::Bool],
+                    &mut LawUsage::default()
+                )
+                .is_err()
+            );
+        }
     }
 }

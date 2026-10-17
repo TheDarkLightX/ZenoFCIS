@@ -407,6 +407,15 @@ fn describe_declares_contract_diff_effects() {
         .unwrap_or_default();
     assert_eq!(
         arguments,
-        ["format", "help", "kb", "kb_task", "new", "no_kb", "old"]
+        [
+            "containment_backend",
+            "format",
+            "help",
+            "kb",
+            "kb_task",
+            "new",
+            "no_kb",
+            "old"
+        ]
     );
 }

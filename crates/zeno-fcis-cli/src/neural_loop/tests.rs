@@ -32,6 +32,65 @@ const FULL: Domain = Domain::Int {
     max: i64::MAX,
 };
 
+#[test]
+fn main_route_arithmetic_json_profiles_and_local_rewriting_preserve_refusals() {
+    for operation in [
+        Op::Mul(0, 1),
+        Op::DivFloor(0, 1),
+        Op::DivCeil(0, 1),
+        Op::MulDivFloor(0, 1, 2),
+        Op::MulDivCeil(0, 1, 2),
+        Op::ProductsGe([0, 1, 2], [2, 1, 0]),
+    ] {
+        let output = if matches!(operation, Op::ProductsGe(..)) {
+            Domain::Bool
+        } else {
+            FULL
+        };
+        let original = program(
+            vec![Domain::Int { min: 0, max: 4 }],
+            vec![output],
+            vec![Op::Input(0), Op::Int(2), Op::Int(3), operation],
+            vec![3],
+        );
+        assert_eq!(Profile::CheckedI64V1.admit(&original), Ok(5));
+        assert_eq!(
+            program_from_json(&program_to_json(&original)),
+            Ok(original.clone())
+        );
+        let candidate = super::local::simplify(&original, false)
+            .unwrap_or_else(|| panic!("arithmetic rewrite refused"));
+        let right: Vec<_> = (0..=4).map(|x| original.evaluate(&[x])).collect();
+        let got: Vec<_> = (0..=4).map(|x| candidate.evaluate(&[x])).collect();
+        assert_eq!(got, right);
+        let mut wrong = right.clone();
+        wrong[0] = Err(zeno_fcis_synthesis::finite::Error::Arithmetic);
+        let control = |compare: &dyn Fn(&Vec<_>, &Vec<_>) -> bool| {
+            compare(&got, &right) && !compare(&got, &wrong)
+        };
+        assert!(control(&|a, b| a == b));
+        assert!(!control(&|_, _| true), "stubbed comparison must fail");
+    }
+    // A dead, undefined instruction still traps eagerly after conservative
+    // rewriting. The local proposer cannot erase its refusal.
+    for operation in [
+        Op::MulDivFloor(0, 0, 1),
+        Op::MulDivCeil(0, 0, 1),
+        Op::ProductsGe([0, 0, 0], [2, 0, 0]),
+    ] {
+        let original = program(
+            vec![],
+            vec![FULL],
+            vec![Op::Int(1), Op::Int(0), Op::Int(-1), operation],
+            vec![0],
+        );
+        let candidate = super::local::simplify(&original, false)
+            .unwrap_or_else(|| panic!("arithmetic rewrite refused"));
+        assert!(original.evaluate(&[]).is_err());
+        assert_eq!(candidate.evaluate(&[]), original.evaluate(&[]));
+    }
+}
+
 fn artifact(name: &str) -> &'static [u8] {
     match name {
         "boolean-kernel-original" => include_bytes!(

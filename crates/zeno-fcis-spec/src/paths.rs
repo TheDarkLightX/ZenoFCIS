@@ -252,6 +252,11 @@ fn value_paths<'a>(expr: &'a ValueExpr, paths: &mut Vec<&'a ProjectionPath>) {
             value_paths(right, paths);
         }
         ValueExpr::Sum { body, .. } => value_paths(body, paths),
+        ValueExpr::MulDiv(_, a, b, d) => {
+            value_paths(a, paths);
+            value_paths(b, paths);
+            value_paths(d, paths);
+        }
     }
 }
 

@@ -90,6 +90,8 @@ pub enum Rounding {
 pub enum Ast {
     Bool(bool),
     Int(i128),
+    /// Candidate reason, available only to rejection/failure laws.
+    DecisionReason,
     Name(String),
     Not(Box<Ast>),
     Neg(Box<Ast>),
@@ -266,7 +268,8 @@ fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
 
 /// The expression as rule text, with only the parentheses its operators
 /// need: `parse` reads it back as the same tree, except that a negative
-/// integer constant reads back as a negated one.
+/// integer constant reads back as a negated one. DecisionReason is a law-only
+/// value, read back through the `.zeno` law parser rather than rule syntax.
 pub fn render(ast: &Ast) -> String {
     let mut text = String::new();
     write(ast, 0, &mut text);
@@ -290,6 +293,7 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
     match ast {
         Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
         Ast::Int(value) => out.push_str(&value.to_string()),
+        Ast::DecisionReason => out.push_str("decision_reason"),
         Ast::Name(name) => out.push_str(name),
         Ast::Not(inner) => {
             out.push('!');
@@ -369,7 +373,7 @@ fn expand_with<'v>(
             }
             None => ast.clone(),
         },
-        Ast::Bool(_) | Ast::Int(_) => ast.clone(),
+        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
         Ast::Not(inner) => Ast::Not(recurse(inner, stack)?),
         Ast::Neg(inner) => Ast::Neg(recurse(inner, stack)?),
         Ast::Binary(operator, left, right) => {
@@ -482,6 +486,22 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
                 Box::new(value(right)?),
             ))
         }
+        ValueExpr::MulDiv(mode, a, b, d) => {
+            let rounding = match mode {
+                DivisionMode::Floor => Rounding::Floor,
+                DivisionMode::Ceil => Rounding::Ceil,
+                DivisionMode::Exact => return Err("fused exact division".to_owned()),
+            };
+            // Compile with the existing full-product graph operation. Do not
+            // turn this into Ast::Div(Ast::Mul(..), ..).
+            Ok(Ast::MulDiv(
+                rounding,
+                Box::new(value(a)?),
+                Box::new(value(b)?),
+                Box::new(value(d)?),
+            ))
+        }
+        ValueExpr::Var(name) if name.as_str() == "decision_reason" => Ok(Ast::DecisionReason),
         ValueExpr::Var(name) => Err(format!("free variable `{}`", name.as_str())),
         ValueExpr::Sum { .. } => Err("sum".to_owned()),
     }

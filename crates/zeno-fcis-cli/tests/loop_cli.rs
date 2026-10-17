@@ -662,6 +662,7 @@ fn describe_declares_loop_effects() {
             json!("capture"),
             json!("decompose"),
             json!("encode"),
+            json!("evaluate"),
             json!("family"),
             json!("learn"),
             json!("meaning"),

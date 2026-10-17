@@ -291,6 +291,9 @@ impl Layout {
             Ast::MulDiv(..) | Ast::ProductsGe(..) => {
                 return Err("arithmetic extension is outside the assembly profile".to_owned());
             }
+            Ast::DecisionReason => {
+                return Err("a local decision reason has no aggregate observation".to_owned());
+            }
             Ast::Div(rounding, left, right) => Ast::Div(
                 *rounding,
                 Box::new(self.renamed(leaf, left)?),

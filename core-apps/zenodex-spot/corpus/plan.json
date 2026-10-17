@@ -1,0 +1,62 @@
+{
+  "schema": "spot-corpus-plan/1",
+  "authority": "none",
+  "native_replay": "not run",
+  "C1": {
+    "rows": 31,
+    "retained": 1,
+    "boundaries": 30,
+    "sha256": "4c32539059cb32e033ac1d7500b7c306e2fc5bd6e7fc3e82861bc03b73197c0a"
+  },
+  "L207": {
+    "status": "normalized source export complete; 105 replay rows, 104 explicitly out of scope",
+    "source_pin": "c86221afa07462955955ff05e2ce5f81e13e78b3",
+    "source_path": "tests/core/test_spot_lp_burn_global_rust_v2.py",
+    "rows": 209,
+    "burns": 207,
+    "swaps": 2,
+    "groups": {
+      "floor": 88,
+      "guard": 103,
+      "history": 8,
+      "capacity": 8,
+      "byte-capacity": 2
+    },
+    "zero_payout_rebases": [
+      "floor-(9999, 20003)-1",
+      "floor-(9999, 9999)-1",
+      "grid-(1, 1)-1-0-1",
+      "grid-(1, 1)-1-50-1",
+      "grid-(1, 1)-1000000-0-1",
+      "grid-(1, 1)-1000000-0-1000000",
+      "grid-(1, 1)-1000000-0-999",
+      "grid-(1, 1)-1000000-50-1",
+      "grid-(1, 1)-1000000-50-1000000",
+      "grid-(1, 1)-1000000-50-999",
+      "grid-(1, 1)-999-0-1",
+      "grid-(1, 1)-999-0-999",
+      "grid-(1, 1)-999-50-1",
+      "grid-(1, 1)-999-50-999",
+      "grid-(10001, 20003)-1000000-0-1",
+      "grid-(10001, 20003)-1000000-50-1",
+      "grid-(7, 9999)-1-0-1",
+      "grid-(7, 9999)-1-50-1",
+      "grid-(7, 9999)-1000000-0-1",
+      "grid-(7, 9999)-1000000-0-999",
+      "grid-(7, 9999)-1000000-50-1",
+      "grid-(7, 9999)-1000000-50-999",
+      "grid-(7, 9999)-999-0-1",
+      "grid-(7, 9999)-999-50-1"
+    ],
+    "out_of_scope": [
+      "nonce",
+      "time",
+      "encoding",
+      "resource",
+      "capacity",
+      "context-only"
+    ],
+    "old_roots": "never compare to this profile's new bytes",
+    "projection": "two ordinary principals; unmodified external balances/metadata omitted explicitly; original source history digests retained across exclusions"
+  }
+}

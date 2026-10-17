@@ -119,6 +119,11 @@ fn specification(bytes: &[u8]) -> Result<Specification, String> {
         operations.push(match s.as_str() {
             "+" => Operation::Add,
             "-" => Operation::Sub,
+            "*" => Operation::Mul,
+            "div_floor" => Operation::DivFloor,
+            "div_ceil" => Operation::DivCeil,
+            "mul_div_floor" => Operation::MulDivFloor,
+            "mul_div_ceil" => Operation::MulDivCeil,
             _ => return Err("learn-arithmetic-operator".into()),
         });
     }
@@ -131,6 +136,10 @@ fn specification(bytes: &[u8]) -> Result<Specification, String> {
         });
     }
     for s in vocab.compare {
+        if s == "products_ge" {
+            operations.extend([Operation::ProductsGe2, Operation::ProductsGe3]);
+            continue;
+        }
         operations.push(match s.as_str() {
             "<" => Operation::Lt,
             "<=" => Operation::Le,
@@ -396,7 +405,7 @@ mod tests {
     fn learn_document_refuses_research_primitives_noise_and_aliases() {
         let mut specimens = Vec::new();
         let mut value = declaration();
-        value["vocabulary"]["arithmetic"] = json!(["*"]);
+        value["vocabulary"]["arithmetic"] = json!(["opaque_product"]);
         specimens.push(value);
         let mut value = declaration();
         value["vocabulary"]["opaque"] = json!([]);
@@ -435,6 +444,34 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn learn_document_admits_only_the_closed_d1_arithmetic_vocabulary() {
+        let mut value = declaration();
+        value["vocabulary"]["arithmetic"] = json!([
+            "*",
+            "div_floor",
+            "div_ceil",
+            "mul_div_floor",
+            "mul_div_ceil"
+        ]);
+        value["vocabulary"]["compare"] = json!(["products_ge"]);
+        let spec = specification(value.to_string().as_bytes()).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            spec.operations,
+            vec![
+                Operation::Mul,
+                Operation::DivFloor,
+                Operation::DivCeil,
+                Operation::MulDivFloor,
+                Operation::MulDivCeil,
+                Operation::ProductsGe2,
+                Operation::ProductsGe3
+            ]
+        );
+        value["vocabulary"]["compare"] = json!(["products_ge", "products_ge"]);
+        assert!(specification(value.to_string().as_bytes()).is_err());
     }
 
     #[test]

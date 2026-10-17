@@ -610,7 +610,7 @@ fn paths(ast: &Ast) -> Vec<Vec<usize>> {
 
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
-        Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) => Vec::new(),
+        Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => Vec::new(),
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
         Ast::Choose(condition, then, otherwise) => vec![condition, then, otherwise],
@@ -653,6 +653,7 @@ pub(super) fn render(ast: &Ast) -> String {
         Ast::Bool(value) => value.to_string(),
         Ast::Int(value) => value.to_string(),
         Ast::Name(name) => name.clone(),
+        Ast::DecisionReason => "decision_reason".to_owned(),
         Ast::Not(inner) => format!("!{}", operand(inner)),
         Ast::Neg(inner) => format!("-{}", operand(inner)),
         Ast::Binary(operator, left, right) => {

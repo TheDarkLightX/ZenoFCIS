@@ -105,14 +105,8 @@ impl Profile {
                 return Err(ProfileRefusal::Opcode { node, opcode });
             }
         }
-        for (node, op) in program.nodes().iter().enumerate() {
-            if op.requires_arithmetic_profile() {
-                return Err(ProfileRefusal::Opcode {
-                    node,
-                    opcode: opcode_name(op),
-                });
-            }
-        }
+        // CheckedI64V1 admits the main-route arithmetic instructions after
+        // the library has checked their types, references and canonical form.
         let size = domain_size(program.inputs())
             .map_err(|position| ProfileRefusal::EmptyInputDomain { position })?;
         let max = self.max_tuples();

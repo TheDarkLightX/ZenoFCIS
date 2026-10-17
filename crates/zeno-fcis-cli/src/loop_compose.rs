@@ -184,7 +184,16 @@ fn rule_text(core: &Core, node: &Expr, truth: bool) -> Result<String> {
             rule_text(core, a, truth)?,
             rule_text(core, b, truth)?
         ),
-        Expr::Bin(Op::Mul, ..) => return refuse("compose-rule-multiplication"),
+        Expr::Call(function, args) => {
+            if !function.accepts(args.len()) {
+                return refuse("compose-rule-call-arity");
+            }
+            let args = args
+                .iter()
+                .map(|a| rule_text(core, a, false))
+                .collect::<Result<Vec<_>>>()?;
+            format!("{}({})", function.name(), args.join(", "))
+        }
         Expr::Bin(op, a, b) => {
             let sides = match op {
                 Op::And | Op::Or | Op::Implies => true,

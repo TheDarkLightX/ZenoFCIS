@@ -204,9 +204,18 @@ fn typed(node: &Expr, want: Kind, vocab: &Vocabulary, holes: bool) -> Result<(),
             typed(a, want, vocab, holes)?;
             typed(b, want, vocab, holes)
         }
+        Expr::Call(function, args) => {
+            if !function.accepts(args.len()) || function.kind() != want {
+                return Err(Stop::Refused("version-space-call-kind-or-arity".into()));
+            }
+            for arg in args {
+                typed(arg, Kind::Int, vocab, holes)?;
+            }
+            Ok(())
+        }
         Expr::Bin(op, a, b) => {
             let (side, result) = match op {
-                Op::Add | Op::Sub => (Kind::Int, Kind::Int),
+                Op::Add | Op::Sub | Op::Mul => (Kind::Int, Kind::Int),
                 Op::And | Op::Or | Op::Implies => (Kind::Bool, Kind::Bool),
                 Op::Eq | Op::Ne | Op::Lt | Op::Le | Op::Gt | Op::Ge => {
                     let side = expr::compare_side(a, b, vocab)?;
@@ -215,7 +224,6 @@ fn typed(node: &Expr, want: Kind, vocab: &Vocabulary, holes: bool) -> Result<(),
                     }
                     (side, Kind::Bool)
                 }
-                Op::Mul => return Err(Stop::Refused("version-space-unsupported-multiply".into())),
             };
             if want != result {
                 return Err(Stop::Refused("version-space-kind".into()));

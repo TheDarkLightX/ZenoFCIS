@@ -79,6 +79,8 @@ pub mod capture;
 pub mod learn;
 
 #[cfg(test)]
+mod arithmetic_tests;
+#[cfg(test)]
 mod tests;
 
 use alloc::string::String;

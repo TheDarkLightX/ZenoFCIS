@@ -43,6 +43,18 @@ pub enum PlanNode {
     Add(usize, usize),
     /// Checked subtraction.
     Sub(usize, usize),
+    /// Checked nonnegative multiplication.
+    Mul(usize, usize),
+    /// Rounded-down division.
+    DivFloor(usize, usize),
+    /// Rounded-up division.
+    DivCeil(usize, usize),
+    /// Full product followed by rounded-down division.
+    MulDivFloor(usize, usize, usize),
+    /// Full product followed by rounded-up division.
+    MulDivCeil(usize, usize, usize),
+    /// Exact comparison of two three-factor products.
+    ProductsGe([usize; 3], [usize; 3]),
     /// Equality.
     Eq(usize, usize),
     /// Integer less-than.
@@ -194,6 +206,12 @@ fn solve_counted(
             Node::Bool(value) => PlanNode::Bool(value),
             Node::Add(a, b) => PlanNode::Add(a, b),
             Node::Sub(a, b) => PlanNode::Sub(a, b),
+            Node::Mul(a, b) => PlanNode::Mul(a, b),
+            Node::DivFloor(a, b) => PlanNode::DivFloor(a, b),
+            Node::DivCeil(a, b) => PlanNode::DivCeil(a, b),
+            Node::MulDivFloor(a, b, d) => PlanNode::MulDivFloor(a, b, d),
+            Node::MulDivCeil(a, b, d) => PlanNode::MulDivCeil(a, b, d),
+            Node::ProductsGe(a, b) => PlanNode::ProductsGe(a, b),
             Node::Eq(a, b) => PlanNode::Eq(a, b),
             Node::Lt(a, b) => PlanNode::Lt(a, b),
             Node::And(a, b) => PlanNode::And(a, b),
@@ -210,6 +228,12 @@ mod tests {
     use alloc::vec;
 
     fn value(plan: &Plan, row: &[i64]) -> Option<i64> {
+        use zeno_fcis_synthesis::finite::Op;
+        let arithmetic = |op: Op, args: &[i64]| {
+            let columns: Vec<Vec<i64>> = args.iter().map(|v| vec![*v]).collect();
+            let columns: Vec<&[i64]> = columns.iter().map(Vec::as_slice).collect();
+            crate::arithmetic::evaluate(op, &columns)?.first().copied()
+        };
         let mut values: Vec<i64> = Vec::new();
         for node in &plan.nodes {
             let at = |index: usize| values.get(index).copied();
@@ -219,6 +243,26 @@ mod tests {
                 PlanNode::Bool(value) => i64::from(value),
                 PlanNode::Add(a, b) => at(a)?.checked_add(at(b)?)?,
                 PlanNode::Sub(a, b) => at(a)?.checked_sub(at(b)?)?,
+                PlanNode::Mul(a, b) => arithmetic(Op::Mul(0, 1), &[at(a)?, at(b)?])?,
+                PlanNode::DivFloor(a, b) => arithmetic(Op::DivFloor(0, 1), &[at(a)?, at(b)?])?,
+                PlanNode::DivCeil(a, b) => arithmetic(Op::DivCeil(0, 1), &[at(a)?, at(b)?])?,
+                PlanNode::MulDivFloor(a, b, d) => {
+                    arithmetic(Op::MulDivFloor(0, 1, 2), &[at(a)?, at(b)?, at(d)?])?
+                }
+                PlanNode::MulDivCeil(a, b, d) => {
+                    arithmetic(Op::MulDivCeil(0, 1, 2), &[at(a)?, at(b)?, at(d)?])?
+                }
+                PlanNode::ProductsGe(a, b) => arithmetic(
+                    Op::ProductsGe([0, 1, 2], [3, 4, 5]),
+                    &[
+                        at(a[0])?,
+                        at(a[1])?,
+                        at(a[2])?,
+                        at(b[0])?,
+                        at(b[1])?,
+                        at(b[2])?,
+                    ],
+                )?,
                 PlanNode::Eq(a, b) => i64::from(at(a)? == at(b)?),
                 PlanNode::Lt(a, b) => i64::from(at(a)? < at(b)?),
                 PlanNode::And(a, b) => i64::from(at(a)? == 1 && at(b)? == 1),

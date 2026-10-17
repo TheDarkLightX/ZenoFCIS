@@ -129,6 +129,15 @@ fn encode(program: &Value) -> Vec<u8> {
                 "Bool" => Op::Bool(n[1].as_bool().unwrap_or_default()),
                 "Add" => Op::Add(id(&n[1]), id(&n[2])),
                 "Sub" => Op::Sub(id(&n[1]), id(&n[2])),
+                "Mul" => Op::Mul(id(&n[1]), id(&n[2])),
+                "DivFloor" => Op::DivFloor(id(&n[1]), id(&n[2])),
+                "DivCeil" => Op::DivCeil(id(&n[1]), id(&n[2])),
+                "MulDivFloor" => Op::MulDivFloor(id(&n[1]), id(&n[2]), id(&n[3])),
+                "MulDivCeil" => Op::MulDivCeil(id(&n[1]), id(&n[2]), id(&n[3])),
+                "ProductsGe" => Op::ProductsGe(
+                    [id(&n[1]), id(&n[2]), id(&n[3])],
+                    [id(&n[4]), id(&n[5]), id(&n[6])],
+                ),
                 "Eq" => Op::Eq(id(&n[1]), id(&n[2])),
                 "Lt" => Op::Lt(id(&n[1]), id(&n[2])),
                 "And" => Op::And(id(&n[1]), id(&n[2])),
@@ -198,6 +207,153 @@ fn confirm(directory: &Directory, original: &[u8], program: &Value, check: &Valu
 
 fn open(directory: &Directory, name: &str) -> (String, Vec<u8>) {
     open_with(directory, name, &[])
+}
+
+#[test]
+fn main_route_arithmetic_reaches_exact_checks_replay_and_point_evaluation() {
+    for (label, instruction, text, wrong, expected, boolean) in [
+        (
+            "floor",
+            json!(["MulDivFloor", 0, 1, 2]),
+            "mul_div_floor(x, 3, 2)",
+            "mul_div_ceil(x, 3, 2)",
+            "10",
+            false,
+        ),
+        (
+            "ceil",
+            json!(["MulDivCeil", 0, 1, 2]),
+            "mul_div_ceil(x, 3, 2)",
+            "mul_div_floor(x, 3, 2)",
+            "11",
+            false,
+        ),
+        (
+            "two",
+            json!(["ProductsGe", 0, 2, 3, 1, 3, 3]),
+            "products_ge(x, 2, 3, 1)",
+            "products_ge(x, 1, 3, 1)",
+            "1",
+            true,
+        ),
+        (
+            "three",
+            json!(["ProductsGe", 0, 2, 3, 1, 3, 3]),
+            "products_ge(x, 2, 1, 3, 1, 1)",
+            "products_ge(x, 1, 1, 3, 1, 1)",
+            "1",
+            true,
+        ),
+    ] {
+        let directory = Directory::new();
+        let output = if boolean {
+            json!({"kind": "Bool"})
+        } else {
+            json!({"kind": "Int", "min": "0", "max": "100"})
+        };
+        let nodes = if boolean {
+            json!([
+                ["Input", 0],
+                ["Int", "3"],
+                ["Int", "2"],
+                ["Int", "1"],
+                instruction
+            ])
+        } else {
+            json!([["Input", 0], ["Int", "3"], ["Int", "2"], instruction])
+        };
+        let original = encode(
+            &json!({"inputs": [{"kind": "Int", "min": "0", "max": "40"}],
+            "outputs": [output], "nodes": nodes, "roots": [if boolean { 4 } else { 3 }]}),
+        );
+        let original_path = directory.write("original.zcve", &original);
+        let session = directory.path("session");
+        let (exit, report) = run(&[
+            "loop",
+            "open",
+            "--original",
+            &original_path.to_string_lossy(),
+            "--session",
+            &session,
+            "--profile",
+            "checked-i64-v1",
+        ]);
+        assert_eq!(exit, Some(0), "{label}: {report}");
+        let make_document = |expression: &str| {
+            json!({"schema": "zeno-fcis/loop-expressions/1",
+            "vocabulary": {"inputs": ["x"]}, "outputs": [expression]})
+        };
+        let right = directory.json("right.json", &make_document(text));
+        let (exit, report) = run(&[
+            "loop",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &right.to_string_lossy(),
+        ]);
+        assert_eq!(exit, Some(0), "{label}: {report}");
+        let door = &report["detail"]["door"];
+        confirm(
+            &directory,
+            &original,
+            &door["lowered"]["program"],
+            &door["check"],
+            label,
+        );
+        let (exit, observed) = run(&[
+            "loop",
+            "evaluate",
+            "--original",
+            &original_path.to_string_lossy(),
+            "--expressions",
+            &right.to_string_lossy(),
+            "--input=7",
+        ]);
+        assert_eq!(exit, Some(0), "{observed}");
+        assert_eq!(observed["detail"]["values"], json!([expected]));
+        assert_eq!(observed["authority"], "none");
+        let wrong = directory.json("wrong.json", &make_document(wrong));
+        let (exit, report) = run(&[
+            "loop",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &wrong.to_string_lossy(),
+        ]);
+        assert_eq!(exit, Some(1), "{label}: {report}");
+        assert_eq!(report["status"], "different", "{report}");
+        let comparison = |good: bool, bad: bool, compare: &dyn Fn(bool, bool) -> bool| {
+            compare(good, true) && !compare(bad, true)
+        };
+        assert!(comparison(true, false, &|a, b| a == b));
+        assert!(
+            !comparison(true, false, &|_, _| true),
+            "stubbed comparison must fail"
+        );
+        for refused in [
+            "mul_div_floor(x, 1, 0)",
+            "mul_div_ceil(x, -1, 1)",
+            "products_ge(x, 1, -1, 1)",
+        ] {
+            let path = directory.json(
+                &format!("refused-{}.json", sha256(refused.as_bytes())),
+                &make_document(refused),
+            );
+            let (exit, report) = run(&[
+                "loop",
+                "evaluate",
+                "--original",
+                &original_path.to_string_lossy(),
+                "--expressions",
+                &path.to_string_lossy(),
+                "--input=7",
+            ]);
+            assert_eq!(exit, Some(1), "{report}");
+            assert_eq!(report["status"], "refused");
+        }
+    }
 }
 
 fn open_with(directory: &Directory, name: &str, extra: &[&str]) -> (String, Vec<u8>) {

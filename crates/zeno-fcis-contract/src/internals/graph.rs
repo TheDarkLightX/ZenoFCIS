@@ -149,6 +149,9 @@ pub trait Graph {
     fn op_node(op: Op) -> Result<Self::Node, String>;
     /// A program input or a law observation.
     fn name(&mut self, name: &str) -> Result<Ref, String>;
+    fn decision_reason(&mut self) -> Result<Ref, String> {
+        Err("decision_reason is a law observation, not a program input".to_owned())
+    }
     /// The value as an integer.
     fn numeric(&mut self, node: Ref) -> Result<Ref, String>;
 
@@ -191,6 +194,7 @@ pub trait Graph {
             Ast::Bool(value) => Ok(self.bool(*value)),
             Ast::Int(value) => self.int(*value),
             Ast::Name(name) => self.name(name),
+            Ast::DecisionReason => self.decision_reason(),
             Ast::Neg(inner) => {
                 // MIN is a legal i64 literal although its positive magnitude is
                 // not. Keep the old lowering for every previously admitted negation.
@@ -568,6 +572,10 @@ impl Graph for LawGraph<'_> {
         }
         let observation = self.observation(name)?;
         self.observe(observation, Kind::Int, None, Atom::I128(0))
+    }
+
+    fn decision_reason(&mut self) -> Result<Ref, String> {
+        self.observe(Observation::Reason, Kind::Int, None, Atom::I128(0))
     }
 
     fn numeric(&mut self, node: Ref) -> Result<Ref, String> {

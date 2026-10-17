@@ -60,6 +60,7 @@
 
 extern crate alloc;
 
+pub mod arithmetic;
 mod diagram;
 mod fold;
 mod ir;

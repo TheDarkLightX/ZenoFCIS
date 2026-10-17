@@ -671,6 +671,18 @@ impl Solver<'_> {
                 best.cloned()
             }
         };
+        let pivot = match pivot {
+            Some(hole)
+                if !crate::inverse::can_derive(node, &path_to_hole(node, hole_id(&hole))?) =>
+            {
+                if matches!(hole, Expr::Hole(_, Hole::Expr)) {
+                    info.verdict = Some(Status::NotFound);
+                    return Ok((Vec::new(), info));
+                }
+                None
+            }
+            other => other,
+        };
         info.pivot = pivot.as_ref().map(hole_id);
         let others: Vec<&Expr> = holes
             .iter()
@@ -860,6 +872,9 @@ impl Solver<'_> {
 /// and every operand beside it is hole-free. Holes in the other branch of a
 /// `c ? a : b` do not count: its tuples take the other route.
 fn alone(node: &Expr, path: &[u8]) -> bool {
+    if !crate::inverse::can_derive(node, path) {
+        return false;
+    }
     let mut node = node;
     for i in path {
         let blocked = match node {
@@ -1089,6 +1104,9 @@ impl Solver<'_> {
             state.exhaustive = false;
             let k = hole_id(hole);
             let path = path_to_hole(&done, k)?;
+            if !crate::inverse::can_derive(&done, &path) {
+                return Ok(());
+            }
             let care = vec![true; self.subject.size];
             let root = Need::exact(self.subject.output_kind(j), &self.subject.targets[j], &care);
             let none = BTreeMap::new();
@@ -1372,7 +1390,8 @@ fn solve_inner(subject: &Subject, outputs: &[Expr], settings: &Settings) -> Resu
     })
 }
 
-/// A bound `B` such that, for a sketch whose only remaining hole is one
+/// For additive/Boolean sketches without multiplication or function calls,
+/// a bound `B` such that, when the only remaining hole is one
 /// constant, every value outside `[-B, B]` gives the same comparison results
 /// as `B` or `-B` and an output different from every target on the domain.
 /// It is the sum of the absolute literals and of the largest absolute input

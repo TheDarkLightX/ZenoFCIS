@@ -726,7 +726,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil")
+                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil")
         );
         if named_predicate {
             let name = self
@@ -830,6 +830,28 @@ impl Parser {
         let name = self
             .take_identifier("value")
             .unwrap_or_else(fallback_identifier);
+        if matches!(name.as_str(), "mul_div_floor" | "mul_div_ceil")
+            && self.take_symbol(&TokenKind::LParen)
+        {
+            let a = self.nested("value.fused.left", ValueExpr::Int(0), |parser| {
+                parser.parse_value()
+            });
+            self.expect_symbol(TokenKind::Comma, "fused division");
+            let b = self.nested("value.fused.right", ValueExpr::Int(0), |parser| {
+                parser.parse_value()
+            });
+            self.expect_symbol(TokenKind::Comma, "fused division");
+            let d = self.nested("value.fused.denominator", ValueExpr::Int(0), |parser| {
+                parser.parse_value()
+            });
+            self.expect_symbol(TokenKind::RParen, "fused division");
+            let mode = if name.as_str() == "mul_div_floor" {
+                DivisionMode::Floor
+            } else {
+                DivisionMode::Ceil
+            };
+            return ValueExpr::MulDiv(mode, Box::new(a), Box::new(b), Box::new(d));
+        }
         if matches!(name.as_str(), "div_exact" | "div_floor" | "div_ceil")
             && self.take_symbol(&TokenKind::LParen)
         {

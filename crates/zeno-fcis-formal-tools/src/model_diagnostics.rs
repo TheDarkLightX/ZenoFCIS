@@ -132,6 +132,7 @@ pub(super) enum ModelReason {
     EmptyTrace,
     HorizonExceeded,
     ResourceLimit,
+    UnsupportedExpression,
 }
 
 /// Three-way relational evaluation result.
@@ -382,6 +383,9 @@ fn eval_value<'formula>(
     fuel.operation()?;
     match value {
         ValueExpr::Int(value) => Ok(*value),
+        // There is no second implementation of full-product arithmetic here.
+        // Only the native library route can check this expression.
+        ValueExpr::MulDiv(..) => Err(ModelReason::UnsupportedExpression),
         ValueExpr::Var(name) => variables
             .iter()
             .rev()
@@ -542,6 +546,11 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
             }
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
+            }
+            ValueExpr::MulDiv(_, a, b, d) => {
+                for child in [a, b, d] {
+                    stack.push((child, current_depth.saturating_add(1)));
+                }
             }
             ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
         }

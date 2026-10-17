@@ -608,7 +608,7 @@ fn law_refusal(
 fn parallel<T: Send>(count: usize, work: impl Fn(usize) -> T + Sync) -> Vec<T> {
     let threads = std::thread::available_parallelism()
         .map_or(1, std::num::NonZeroUsize::get)
-        .min(MAX_THREADS)
+        .min(crate::checker_process::worker_thread_limit(MAX_THREADS))
         .min(count);
     if threads <= 1 {
         return (0..count).map(work).collect();

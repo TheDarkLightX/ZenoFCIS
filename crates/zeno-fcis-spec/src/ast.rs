@@ -789,6 +789,9 @@ pub enum ValueExpr {
     Sub(Box<ValueExpr>, Box<ValueExpr>),
     Mul(Box<ValueExpr>, Box<ValueExpr>),
     Div(DivisionMode, Box<ValueExpr>, Box<ValueExpr>),
+    /// Nonnegative full-product division, distinct from a possibly trapping
+    /// intermediate multiplication. Authored calls use Floor or Ceil.
+    MulDiv(DivisionMode, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
     Sum {
         variable: Identifier,
         start: i128,
@@ -1516,6 +1519,18 @@ fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError>
             encode_value(a, out)?;
             encode_value(b, out)
         }
+        ValueExpr::MulDiv(mode, a, b, d) => {
+            // Append a tag; all pre-existing expression encodings stay intact.
+            out.push(8);
+            out.push(match mode {
+                DivisionMode::Exact => 0,
+                DivisionMode::Floor => 1,
+                DivisionMode::Ceil => 2,
+            });
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
+        }
         ValueExpr::Sum {
             variable,
             start,
@@ -1716,6 +1731,11 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
             }
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
+            }
+            ValueExpr::MulDiv(_, a, b, d) => {
+                for child in [a, b, d] {
+                    stack.push((child, current_depth.saturating_add(1)));
+                }
             }
             ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
         }

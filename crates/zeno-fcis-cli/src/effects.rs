@@ -687,6 +687,12 @@ effects! { crate::loop_command::doors::DoorCommand {
                 true,
                 None,
             ));
+        "evaluate" => Self::Evaluate { .. } => declared((
+                &["original-program", "expressions-document", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
         "meaning" => Self::Meaning { .. } => declared((
                 &[
                     "original-program",
@@ -741,6 +747,12 @@ effects! { crate::loop_command::doors::DoorCommand {
 
 effects! { crate::loop_command::doors::capture::Command {
     leaves {
+        "whole" => Self::Whole { .. } => declared((
+                &["capture-spec", "owner-reference-source", "candidate-json-or-expressions", "caller-cpu-limits"],
+                &["transient-user-unit", "bounded-scratch-file"],
+                true,
+                None,
+            ));
         "open" => Self::Open { .. } => declared((
                 &[
                     "capture-spec",

@@ -471,7 +471,7 @@ fn lowering_keeps_the_exact_abi_and_round_trips_a_program() {
     let s = subject("bounded-counter-c8");
     assert!(lower_outputs(&outputs(&["value", "keep", "keep"]), &s.vocab, &s.original).is_ok());
     for texts in [
-        vec!["value * 2", "keep", "keep"],
+        vec!["value * (value == 0)", "keep", "keep"],
         vec!["?c", "keep", "keep"],
         vec!["$C", "keep", "keep"],
         vec!["nosuch", "keep", "keep"],
@@ -1219,7 +1219,7 @@ fn evaluation_follows_the_lowered_semantics() {
     assert_eq!(eval("flag -> x == 1"), implies);
     let not: Vec<i64> = x.iter().map(|v| i64::from(*v == 0)).collect();
     assert_eq!(eval("!x"), not);
-    assert!(evaluate(&expr("x * 2"), &env, &none).is_err());
+    assert_eq!(eval("x * 2"), x.iter().map(|v| v * 2).collect::<Vec<_>>());
     assert!(evaluate(&expr("?c"), &env, &none).is_err());
     let holes: BTreeMap<usize, HoleValue> = [(0, HoleValue::Choice(1))].into_iter().collect();
     let plus: Vec<i64> = x.iter().map(|v| v + 1).collect();

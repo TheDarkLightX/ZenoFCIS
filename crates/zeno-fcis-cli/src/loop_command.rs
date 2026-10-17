@@ -1701,8 +1701,16 @@ fn storage_io(error: StorageError) -> std::io::Error {
 #[path = "loop_command_tests.rs"]
 mod tests;
 
-// Explicit KB operations are read only and run before containment. They do not
-// open a loop session or write an inbox, including on the legacy command path.
+// Explicit loop KB operations are read only inside the same finite-data
+// boundary. They do not open a loop session or write an inbox.
+pub(crate) fn has_knowledge_operation(command: &crate::Command) -> bool {
+    matches!(
+        command,
+        crate::Command::Loop {
+            command: Command::Doors(doors::DoorCommand::Strategy { kb_op: Some(_), .. })
+        }
+    )
+}
 pub(crate) fn knowledge_operation(
     command: &crate::Command,
     paths: &[PathBuf],
@@ -1752,6 +1760,8 @@ pub(crate) fn knowledge_subjects(command: &crate::Command) -> Option<Vec<String>
         } => vec!["expressions-door"],
         Command::Candidate { .. } => vec!["candidate"],
         Command::Doors(d) => match d {
+            // Scalar observations supply no reusable operation evidence.
+            D::Evaluate { .. } => return None,
             D::Strategy { kb_op: Some(_), .. } => return None,
             D::Strategy {
                 kind: Some(kind), ..

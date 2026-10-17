@@ -178,7 +178,9 @@ def vocabulary(subject: dict) -> dict:
 def from_program(program: dict, names: list, max_size: int = 4096) -> list:
     """Each output of a fixture-vocabulary program as one expression over input names."""
     memo, sizes = [], []
-    ops = {"Add": "+", "Sub": "-", "Eq": "==", "Lt": "<", "And": "&&"}
+    ops = {"Add": "+", "Sub": "-", "Mul": "*", "Eq": "==", "Lt": "<", "And": "&&"}
+    calls = {"DivFloor": "div_floor", "DivCeil": "div_ceil", "MulDivFloor": "mul_div_floor",
+             "MulDivCeil": "mul_div_ceil", "ProductsGe": "products_ge"}
     for node in program["nodes"]:
         code, args = node[0], node[1:]
         if code == "Input":
@@ -193,6 +195,10 @@ def from_program(program: dict, names: list, max_size: int = 4096) -> list:
             expr, size = ("if", *(memo[a] for a in args)), 1 + sum(sizes[a] for a in args)
         elif code in ops:
             expr, size = ("bin", ops[code], memo[args[0]], memo[args[1]]), 1 + sizes[args[0]] + sizes[args[1]]
+        elif code in calls:
+            if len(args) not in Z.FUNCTIONS[calls[code]]:
+                raise Refusal(f"Instruction arity {code}")
+            expr, size = ("call", calls[code], tuple(memo[a] for a in args)), 1 + sum(sizes[a] for a in args)
         else:
             raise Refusal(f"Unknown instruction {code}")
         if size > max_size:
@@ -874,7 +880,12 @@ class LoopWorkspace:
             raise Refusal("a step needs its scenario")
         if [s.get("n") for s in steps] != list(range(1, len(steps) + 1)):
             raise Refusal("scenario-steps-must-be-numbered-from-1")
-        text = J.scenario_text(head.id, head.get("start"), steps, state["subject"])
+        def evaluate_expression(node, env):
+            document = doors.document(vocabulary(state["subject"]), [Z.print_symbolic(node)])
+            path = self._document(state, f"scenario-value-{head.id}", document)
+            original = self.data / state.get("original_program", "original.zcve")
+            return doors.evaluate_expression(self.cli(state), original, path, [env[n] for n in ctx.names])
+        text = J.scenario_text(head.id, head.get("start"), steps, state["subject"], evaluate_expression)
         path = self._document(state, f"scenario-{head.id}", {"scenario": text})
         file = path.with_suffix(".txt")
         file.write_text(text, encoding="ascii")

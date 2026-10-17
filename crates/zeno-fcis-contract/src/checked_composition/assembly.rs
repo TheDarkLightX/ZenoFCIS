@@ -990,7 +990,7 @@ fn split<'a>(ast: &'a Ast, out: &mut Vec<&'a Ast>) {
 fn collect_names(ast: &Ast, out: &mut Vec<String>) {
     match ast {
         Ast::Name(name) => out.push(name.clone()),
-        Ast::Bool(_) | Ast::Int(_) => {}
+        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => {}
         Ast::Not(inner) | Ast::Neg(inner) => collect_names(inner, out),
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => {
             collect_names(left, out);
@@ -1018,7 +1018,7 @@ fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
     let recurse = |ast: &Ast| Box::new(rename(ast, names));
     match ast {
         Ast::Name(name) => Ast::Name(names.get(name).cloned().unwrap_or_else(|| name.clone())),
-        Ast::Bool(_) | Ast::Int(_) => ast.clone(),
+        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
         Ast::Not(inner) => Ast::Not(recurse(inner)),
         Ast::Neg(inner) => Ast::Neg(recurse(inner)),
         Ast::Binary(operator, left, right) => Ast::Binary(*operator, recurse(left), recurse(right)),

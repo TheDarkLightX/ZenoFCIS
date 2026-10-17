@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "support/arithmetic_judges.rs"]
+mod arithmetic_fixture;
+
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const CLI: &str = env!("CARGO_BIN_EXE_zeno-fcis");
 
@@ -81,6 +84,96 @@ fn run(arguments: &[&str]) -> (Option<i32>, Value) {
 
 fn answers(items: &[Value]) -> Value {
     json!({"schema": "zeno-fcis/loop-answers/1", "answers": items})
+}
+
+fn arithmetic_contract(directory: &Directory, successor: &str, condition: &str) -> String {
+    let app = directory.0.join("arithmetic");
+    fs::create_dir_all(app.join("v2")).unwrap();
+    fs::write(app.join("project.zeno"), arithmetic_fixture::project()).unwrap();
+    fs::write(
+        app.join("v2/policy.json"),
+        arithmetic_fixture::policy(successor, condition).to_string(),
+    )
+    .unwrap();
+    app.to_string_lossy().into_owned()
+}
+
+fn arithmetic_rule(id: &str, condition: &str, successor: &str) -> Value {
+    json!({"id":id,"where":condition,"class":"Accept","reason":null,"sets":{"value":successor}})
+}
+
+#[test]
+fn arithmetic_teach_back_cli_rejects_wrong_rounding_and_undefined_successors() {
+    for (target, wrong) in [
+        (arithmetic_fixture::FLOOR, arithmetic_fixture::CEIL),
+        (arithmetic_fixture::CEIL, arithmetic_fixture::FLOOR),
+    ] {
+        let directory = Directory::new();
+        let contract = arithmetic_contract(&directory, target, "true");
+        let rules = directory.json(
+            "rules.json",
+            &json!({"schema":"zeno-fcis/loop-rules/1", "rules":[
+                arithmetic_rule("good", "true", target),
+                arithmetic_rule("wrong", "true", wrong),
+                arithmetic_rule("floor-zero", "true", "mul_div_floor(amount, 1, 0)"),
+                arithmetic_rule("ceil-zero", "true", "mul_div_ceil(amount, 1, 0)"),
+            ]}),
+        );
+        let (exit, report) = run(&[
+            "loop",
+            "teach-back",
+            "--contract",
+            &contract,
+            "--rule",
+            &rules,
+        ]);
+        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(report["authority"], "none");
+        let judged = &report["detail"]["rules"];
+        assert_eq!(judged[0]["verdict"], "exact", "{report}");
+        assert_eq!(judged[1]["verdict"], "wrong", "{report}");
+        assert_eq!(judged[1]["exceptions"], 4);
+        assert_eq!(judged[2]["verdict"], "refused", "{report}");
+        assert_eq!(judged[3]["verdict"], "refused", "{report}");
+    }
+}
+
+#[test]
+fn arithmetic_teach_back_cli_checks_both_product_conditions() {
+    for (good, bad) in [
+        (
+            "products_ge(amount, 2, 3, 1)",
+            "products_ge(amount, 3, 3, 1)",
+        ),
+        (
+            "products_ge(amount, 2, 1, 3, 1, 1)",
+            "products_ge(amount, 3, 1, 3, 1, 1)",
+        ),
+    ] {
+        let directory = Directory::new();
+        let contract = arithmetic_contract(&directory, arithmetic_fixture::FLOOR, good);
+        let rules = directory.json("rules.json", &json!({"schema":"zeno-fcis/loop-rules/1", "rules":[
+            arithmetic_rule("good", good, arithmetic_fixture::FLOOR),
+            arithmetic_rule("wrong", bad, arithmetic_fixture::FLOOR),
+            arithmetic_rule("floor-zero", "products_ge(mul_div_floor(amount, 1, 0), 1, 0, 1)", arithmetic_fixture::FLOOR),
+            arithmetic_rule("ceil-zero", "products_ge(mul_div_ceil(amount, 1, 0), 1, 1, 0, 1, 1)", arithmetic_fixture::FLOOR),
+        ]}));
+        let (exit, report) = run(&[
+            "loop",
+            "teach-back",
+            "--contract",
+            &contract,
+            "--rule",
+            &rules,
+        ]);
+        assert_eq!(exit, Some(0), "{report}");
+        let judged = &report["detail"]["rules"];
+        assert_eq!(judged[0]["verdict"], "exact", "{report}");
+        assert_eq!(judged[1]["verdict"], "wrong", "{report}");
+        assert_eq!(judged[1]["exceptions"], 4);
+        assert_eq!(judged[2]["verdict"], "refused", "{report}");
+        assert_eq!(judged[3]["verdict"], "refused", "{report}");
+    }
 }
 
 #[test]

@@ -15,6 +15,43 @@ use zeno_fcis_synthesis::finite_runtime::import_program;
 const PROJECT: &str = include_str!("../../../examples/arithmetic-fee/project.zeno");
 const RULES: &str = include_str!("../../../examples/arithmetic-fee/v2/policy.json");
 
+#[test]
+fn authored_fused_value_laws_use_existing_full_products_and_refusals() {
+    let project = include_str!("../../../examples/arithmetic-fused/project.zeno");
+    let rules = include_str!("../../../examples/arithmetic-fused/v2/policy.json").replace(
+        "\"501\": \"FeeAndRounding\"",
+        "\"501\": \"FeeAndRounding\", \"502\": \"FeeAndRounding\"",
+    );
+    let large = "(9223372036854775807 * 9223372036854775807)";
+    for (formula, accepted) in [
+        (format!("mul_div_floor({large}, 8, 8) == {large}"), true),
+        (format!("mul_div_ceil({large}, 8, 8) == {large}"), true),
+        ("mul_div_floor(-1, -1, 1) == 1".to_owned(), false),
+        ("mul_div_ceil(1, 1, 0) == 0".to_owned(), false),
+        (format!("mul_div_floor({large}, 8, 1) == 0"), false),
+    ] {
+        let source = format!("{project}\nlaw 502 fused_value on accept = {formula};\n");
+        with_contract(&source, &rules, |contract, schema| {
+            let framer = Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
+            policy::with_authority(contract, schema, |authority| {
+                let actual = evaluate::evaluate(authority, &framer, &[0, 1, 1, 1, 0]);
+                if accepted {
+                    assert!(
+                        matches!(actual, Outcome::Decision(_)),
+                        "{formula}: {actual:?}"
+                    );
+                } else {
+                    assert!(
+                        matches!(actual,Outcome::Refused(ref r) if r.law==Some(502)),
+                        "{formula}: {actual:?}"
+                    );
+                }
+            })
+            .unwrap();
+        });
+    }
+}
+
 fn with_contract(project: &str, source: &str, check: impl FnOnce(&Contract<'_>, &[u8])) {
     let rules = Rules::read(source).unwrap();
     let declarations = Declarations::read(project, &rules.leaf_bindings).unwrap();

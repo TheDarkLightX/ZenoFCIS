@@ -106,6 +106,54 @@ impl<'a> TopDown<'a> {
                 None => {}
             }
         }
+        // Keep the source's arithmetic vocabulary available as exact atoms.
+        // This is bounded by the source graph and the existing cells/work
+        // budgets, rather than a Cartesian product of six-factor candidates.
+        if self.original.nodes.iter().any(|node| {
+            matches!(
+                node,
+                Node::Mul(..)
+                    | Node::DivFloor(..)
+                    | Node::DivCeil(..)
+                    | Node::MulDivFloor(..)
+                    | Node::MulDivCeil(..)
+                    | Node::ProductsGe(..)
+            )
+        }) {
+            let kinds = self.original.kinds();
+            let mut ids: Vec<Option<usize>> = Vec::with_capacity(self.original.nodes.len());
+            let original_nodes = self.original.nodes.clone();
+            for (k, node) in original_nodes.into_iter().enumerate() {
+                let (operands, count) = node.operands();
+                if operands[..count]
+                    .iter()
+                    .any(|id| ids.get(*id).copied().flatten().is_none())
+                {
+                    ids.push(None);
+                    continue;
+                }
+                let renamed = node.map(|id| ids[id].unwrap_or(usize::MAX));
+                let id = self.make(renamed, meter)?;
+                ids.push(id);
+                if matches!(
+                    node,
+                    Node::Mul(..)
+                        | Node::DivFloor(..)
+                        | Node::DivCeil(..)
+                        | Node::MulDivFloor(..)
+                        | Node::MulDivCeil(..)
+                        | Node::ProductsGe(..)
+                ) {
+                    if let Some(id) = id {
+                        if kinds[k] == Kind::Bool {
+                            self.atoms_bool.push(id);
+                        } else {
+                            self.atoms_int.push(id);
+                        }
+                    }
+                }
+            }
+        }
         let mut predicates = Vec::new();
         for (k, domain) in inputs.iter().enumerate() {
             let (min, max) = domain.bounds();
@@ -161,6 +209,22 @@ impl<'a> TopDown<'a> {
             return Ok(Some(*id));
         }
         let size = self.size;
+        // Reserve the library probe's work before evaluating, including on
+        // refusal. Old operators retain their existing work accounting.
+        let extra = if matches!(
+            node,
+            Node::Mul(..)
+                | Node::DivFloor(..)
+                | Node::DivCeil(..)
+                | Node::MulDivFloor(..)
+                | Node::MulDivCeil(..)
+                | Node::ProductsGe(..)
+        ) {
+            node.operands().1.saturating_add(1)
+        } else {
+            0
+        };
+        meter.charge(size.max(1).saturating_mul(extra))?;
         let value_of = |id: usize| self.arena.get(id).map(|entry| &entry.value);
         let pair = |a: usize, b: usize| Some((value_of(a)?, value_of(b)?));
         let value: Option<Vec<i64>> =
@@ -172,6 +236,25 @@ impl<'a> TopDown<'a> {
                     .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_add(*q)).collect()),
                 Node::Sub(a, b) => pair(a, b)
                     .and_then(|(x, y)| x.iter().zip(y).map(|(p, q)| p.checked_sub(*q)).collect()),
+                Node::Mul(..)
+                | Node::DivFloor(..)
+                | Node::DivCeil(..)
+                | Node::MulDivFloor(..)
+                | Node::MulDivCeil(..)
+                | Node::ProductsGe(..) => {
+                    let (operands, count) = node.operands();
+                    let operands = &operands[..count];
+                    let compute = || {
+                        let columns = operands
+                            .iter()
+                            .map(|id| value_of(*id).map(Vec::as_slice))
+                            .collect::<Option<Vec<_>>>()?;
+                        let renamed = node
+                            .map(|id| operands.iter().position(|v| *v == id).unwrap_or(usize::MAX));
+                        crate::arithmetic::evaluate(renamed.library()?, &columns)
+                    };
+                    compute()
+                }
                 Node::Eq(a, b) => pair(a, b)
                     .map(|(x, y)| x.iter().zip(y).map(|(p, q)| i64::from(p == q)).collect()),
                 Node::Lt(a, b) => pair(a, b)

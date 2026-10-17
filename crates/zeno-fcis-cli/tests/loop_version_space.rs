@@ -202,3 +202,60 @@ fn exact_final_phase_budget_boundaries_are_reported() {
         r["detail"]["candidate"]["law_usage"]
     );
 }
+
+#[test]
+fn version_space_cpmm_rounding_answers_reach_checked_singletons() {
+    let d = Directory::new();
+    for bps in [0, 30, 100] {
+        // A declared amount slice for x=y=40; the proposal crate separately
+        // covers all reserve slices through 40. No full-cube CLI claim here.
+        let fee = format!("?{{mul_div_floor(a, {bps}, 10000) | mul_div_ceil(a, {bps}, 10000)}}");
+        let net = format!("(a - mul_div_ceil(a, {bps}, 10000))");
+        let output = format!(
+            "?{{mul_div_floor({net}, 40, 40 + {net}) | mul_div_ceil({net}, 40, 40 + {net})}}"
+        );
+        for (kind, sketch) in [("fee", fee), ("output", output)] {
+            let mut specification = json!({"schema":"zeno-fcis/loop-version-space/1",
+                "inputs":[{"name":"a","domain":{"kind":"Int","min":0,"max":40}}],
+                "outputs":[{"kind":"Int","min":0,"max":40}],"sketch":[sketch],"requirements":[]});
+            let mut finished = false;
+            for round in 0..=1 {
+                let p = d.json("cpmm.json", &specification);
+                let (code, r) = run(&["loop", "question", "--specification", &p]);
+                assert_eq!(code, Some(0), "{r}");
+                if r["status"] == "determined" {
+                    assert_eq!(r["detail"]["candidate"]["status"], "checked");
+                    assert!(
+                        r["detail"]["candidate"]["checks"]
+                            .as_array()
+                            .is_some_and(|checks| checks
+                                .iter()
+                                .all(|c| c["verdict"] == "equivalent" && c["replay"] == "matched"))
+                    );
+                    finished = true;
+                    break;
+                }
+                assert_eq!(r["status"], "question", "{r}");
+                let question = &r["detail"]["question"];
+                let a = question["input"][0]
+                    .as_i64()
+                    .unwrap_or_else(|| panic!("{r}"));
+                let fee = (a * bps + 9999) / 10000;
+                let net = a - fee;
+                let answer = if kind == "fee" {
+                    fee
+                } else {
+                    net * 40 / (40 + net)
+                };
+                specification["requirements"]
+                    .as_array_mut()
+                    .unwrap_or_else(|| panic!("requirements"))
+                    .push(json!({"id":format!("answer_{round}"),"input":[a],"output":[answer]}));
+            }
+            assert!(
+                finished,
+                "two rounding meanings must yield a checked singleton"
+            );
+        }
+    }
+}

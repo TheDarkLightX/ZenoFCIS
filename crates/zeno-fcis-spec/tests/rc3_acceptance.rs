@@ -18,6 +18,36 @@ law 400 same = pre.100 == pre.100;
 claim 500 same cvc5 relational = pre.100 == pre.100;
 "#;
 
+#[test]
+fn fused_value_calls_preserve_their_ast_and_canonical_identity() {
+    use zeno_fcis_spec::{CompareOp, DivisionMode, ValueExpr};
+    for (name, mode) in [
+        ("mul_div_floor", DivisionMode::Floor),
+        ("mul_div_ceil", DivisionMode::Ceil),
+    ] {
+        let source = SOURCE_A.replace(
+            "law 400 same = pre.100 == pre.100;",
+            &format!("law 400 same = {name}(pre.100, pre.100, pre.100 + 1) >= 0;"),
+        );
+        let parsed = spec(&source);
+        let RelExpr::Compare(CompareOp::GreaterEq, ValueExpr::MulDiv(actual, _, _, _), _) =
+            parsed.laws()[0].formula()
+        else {
+            panic!("fused syntax lost its full-product node");
+        };
+        assert_eq!(*actual, mode);
+        let unfused = source.replace(
+            &format!("{name}(pre.100, pre.100, pre.100 + 1)"),
+            "div_floor(pre.100 * pre.100, pre.100 + 1)",
+        );
+        assert_ne!(parsed.canonical_bytes(), spec(&unfused).canonical_bytes());
+        for malformed in [format!("{name}(1, 2)"), format!("{name}(1, 2, 3, 4)")] {
+            let bad = SOURCE_A.replace("pre.100 == pre.100;", &format!("{malformed} >= 0;"));
+            assert!(parse_project(&bad, SourceLimits::default()).is_err());
+        }
+    }
+}
+
 const SOURCE_B: &str = r#"// formatting and declaration order are not identity
 zeno 1; project 1 demo;
 claim 500 same cvc5 relational = pre.100 == pre.100;

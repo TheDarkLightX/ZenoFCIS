@@ -600,6 +600,11 @@ fn ast(
     names: &BTreeMap<String, (Term, Sort)>,
 ) -> Result<(Term, Sort), ContractError> {
     Ok(match expression {
+        Ast::DecisionReason => {
+            return Err(refused(
+                "decision reasons are outside the Tau export profile",
+            ));
+        }
         Ast::Bool(value) => (Term::Bool(*value), Sort::Bool),
         Ast::Int(value) => {
             i64::try_from(*value).map_err(|_| refused("integer outside i64"))?;
@@ -828,6 +833,11 @@ fn ast_ranges(
     names: &BTreeMap<String, (i128, i128)>,
 ) -> Result<(i128, i128), ContractError> {
     let interval = match expression {
+        Ast::DecisionReason => {
+            return Err(refused(
+                "decision reasons are outside the Tau export profile",
+            ));
+        }
         Ast::Bool(_) => (0, 1),
         Ast::Int(value) => (*value, *value),
         Ast::Name(name) => *names

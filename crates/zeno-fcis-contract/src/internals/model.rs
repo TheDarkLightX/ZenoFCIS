@@ -653,6 +653,17 @@ fn laws(
             .transpose()
             .map_err(failed)?;
         let value = graph.compile(&formula).map_err(failed)?;
+        if graph
+            .table
+            .nodes
+            .iter()
+            .any(|node| matches!(node, LawOp::Observe(Observation::Reason)))
+            && (law.genesis || !matches!(law.scope, LawScope::Reject | LawScope::CommittedFailure))
+        {
+            return Err(failed(
+                "decision_reason requires `on reject` or `on failure`, without genesis".to_owned(),
+            ));
+        }
         let mut root = graph.boolean(value).map_err(failed)?;
         graph.require_bindings_used().map_err(failed)?;
         if let Some(bound) = bound {

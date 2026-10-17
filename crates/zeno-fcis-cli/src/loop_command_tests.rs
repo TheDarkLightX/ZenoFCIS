@@ -1020,63 +1020,6 @@ fn a_check_finalized_after_its_deadline_cannot_update_the_incumbent() {
     assert!(session.incumbent().replacement().is_none());
 }
 
-#[cfg(not(target_os = "linux"))]
-#[test]
-fn contained_loop_entry_points_refuse_without_a_supported_backend() {
-    type Invocation = fn(&Path, &Path) -> (u8, Value);
-    let entry_points: [(&str, Invocation); 3] = [
-        ("resume", |session, _| super::resume_command(session)),
-        ("candidate", |session, candidate| {
-            super::candidate_command(session, Some(candidate), None, None)
-        }),
-        ("run", |session, _| {
-            super::run_command(session, super::ProposerArg::Local, None, None, &[])
-        }),
-    ];
-    for (name, command) in entry_points {
-        let directory = Directory::new();
-        let session = directory.0.join(name);
-        let original = directory.write("original.zcve", ORIGINAL);
-        let (exit, opened) = super::open(
-            &original,
-            &session,
-            Profile::FunctionalBoolV1,
-            Limits::CEILING,
-        );
-        assert_eq!(exit, crate::OK, "{opened}");
-        assert_eq!(opened["status"], "opened");
-        let original_ledger =
-            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
-        let candidate = directory.write("candidate.zcve", CANDIDATE);
-        let (exit, report) = command(&session, &candidate);
-        assert_eq!(exit, crate::BLOCKED, "{report}");
-        assert_eq!(report["status"], "resume-inconclusive");
-        assert_eq!(
-            report["detail"]["reason"],
-            "containment-unavailable:platform"
-        );
-        assert_eq!(report["authority"], "none");
-        assert!(report["detail"]["trusted_incumbent"].is_null());
-        let bytes =
-            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
-        assert_eq!(
-            bytes, original_ledger,
-            "{name}: an empty session has nothing to replay"
-        );
-        let ledger = crate::neural_loop::ledger::Ledger::parse_lines(&bytes)
-            .and_then(crate::neural_loop::ledger::Ledger::from_entries)
-            .unwrap_or_else(|error| panic!("{error:?}"));
-        let totals = ledger.accounting();
-        assert_eq!((totals.attempts, totals.checks, totals.replays), (0, 0, 0));
-        assert_eq!(totals.work_reserved, 0);
-        for subdirectory in ["receipts", "artifacts", "witnesses"] {
-            assert_eq!(
-                fs::read_dir(session.join(subdirectory))
-                    .unwrap_or_else(|error| panic!("{error}"))
-                    .count(),
-                0,
-                "{name}: no checked artifact after containment refusal"
-            );
-        }
-    }
-}
+// Entry-point refusal is exercised through the production binary with injected
+// missing capabilities on every host in tests/loop_containment.rs. It includes
+// the former resume/candidate/run ledger and artifact no-change assertions.

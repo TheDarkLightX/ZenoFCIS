@@ -547,7 +547,7 @@ fn collect(
                 }
             }
         }
-        Ast::Bool(_) | Ast::Name(_) => {}
+        Ast::Bool(_) | Ast::Name(_) | Ast::DecisionReason => {}
         Ast::Not(inner) => collect(inner, &[], positions, found),
         Ast::Neg(inner) => collect(inner, expected, positions, found),
         Ast::Binary(operator, left, right) => match operator {

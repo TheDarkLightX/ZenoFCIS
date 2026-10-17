@@ -14,6 +14,140 @@ const I64: Domain = Domain::Int {
     max: i64::MAX,
 };
 
+#[test]
+fn arithmetic_graphs_and_proposers_keep_all_operands_and_checker_controls() {
+    for operation in [
+        Op::MulDivFloor(0, 1, 2),
+        Op::MulDivCeil(0, 1, 2),
+        Op::ProductsGe([0, 1, 2], [2, 1, 1]),
+    ] {
+        let boolean = matches!(operation, Op::ProductsGe(..));
+        let output = if boolean { Domain::Bool } else { I64 };
+        let original = bytes(
+            vec![int(0, 40)],
+            vec![output],
+            vec![Op::Input(0), Op::Int(2), Op::Int(3), operation],
+            vec![3],
+        );
+        let admitted = import(&original);
+        let graph = Graph::from_program(&admitted).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(graph.to_program(), Some(admitted));
+        let wrong = bytes(
+            vec![int(0, 40)],
+            vec![output],
+            if boolean {
+                vec![Op::Bool(false)]
+            } else {
+                vec![Op::Int(0)]
+            },
+            vec![0],
+        );
+        let right_table = table(&original);
+        let wrong_table = table(&wrong);
+        let control = |compare: &dyn Fn(&Vec<Seen>, &Vec<Seen>) -> bool| {
+            compare(&right_table, &right_table) && !compare(&right_table, &wrong_table)
+        };
+        assert!(control(&|a, b| a == b));
+        assert!(!control(&|_, _| true), "stubbed comparison must fail");
+        for settings in [
+            only(true, false, false),
+            only(false, true, false),
+            only(false, false, true),
+        ] {
+            let outcome = search(&original, &[&wrong], &settings);
+            assert!(!matches!(outcome, Outcome::Stopped(_)), "{outcome:?}");
+            assert_exact(&original, &outcome);
+        }
+    }
+}
+
+#[test]
+fn arithmetic_probe_uses_d1_refusals_and_full_product_precision() {
+    use crate::arithmetic::evaluate;
+    let max = [i64::MAX];
+    assert_eq!(
+        evaluate(Op::MulDivFloor(0, 1, 2), &[&max, &max, &max]),
+        Some(vec![i64::MAX])
+    );
+    assert_eq!(
+        evaluate(Op::MulDivCeil(0, 1, 2), &[&max, &max, &max]),
+        Some(vec![i64::MAX])
+    );
+    assert_eq!(
+        evaluate(
+            Op::ProductsGe([0, 1, 2], [0, 1, 3]),
+            &[&max, &max, &max, &[i64::MAX - 1]]
+        ),
+        Some(vec![1])
+    );
+    assert_eq!(
+        evaluate(Op::MulDivFloor(0, 1, 2), &[&max, &max, &[0]]),
+        None
+    );
+    assert_eq!(evaluate(Op::MulDivCeil(0, 1, 2), &[&max, &max, &[1]]), None);
+    assert_eq!(
+        evaluate(Op::ProductsGe([0, 0, 0], [1, 1, 1]), &[&[1], &[-1]]),
+        None
+    );
+}
+
+#[test]
+fn scaled_cpmm_search_reports_an_exact_improvement_or_none() {
+    for bps in [0, 30, 100] {
+        let inputs = vec![int(0, 40); 3];
+        let outputs = vec![int(0, 40), int(0, 40), int(0, 80), int(0, 40), Domain::Bool];
+        let nodes = vec![
+            Op::Input(0),
+            Op::Input(1),
+            Op::Input(2),
+            Op::Int(bps),
+            Op::Int(10000),
+            Op::MulDivCeil(2, 3, 4),
+            Op::Sub(2, 5),
+            Op::Add(0, 6),
+            Op::Int(0),
+            Op::Eq(7, 8),
+            Op::Int(1),
+            Op::Select(9, 10, 7),
+            Op::MulDivFloor(6, 1, 11),
+            Op::Add(0, 2),
+            Op::Sub(1, 12),
+            Op::ProductsGe([13, 14, 10], [0, 1, 10]),
+            Op::Add(12, 8),
+        ];
+        let roots = vec![5, 16, 13, 14, 15];
+        let original = bytes(
+            inputs.clone(),
+            outputs.clone(),
+            nodes.clone(),
+            roots.clone(),
+        );
+        let mut wrong_nodes = nodes;
+        wrong_nodes[16] = Op::Int(0);
+        let wrong = bytes(inputs, outputs, wrong_nodes, roots);
+        assert_ne!(table(&original), table(&wrong));
+        let mut settings = only(false, true, false);
+        settings.budget.rounds = 1;
+        settings.budget.resub_rounds = 1;
+        settings.shape.resub_choices = 8;
+        let outcome = search(&original, &[&wrong], &settings);
+        assert!(
+            !matches!(outcome, Outcome::Stopped(_)),
+            "fee {bps}: {outcome:?}"
+        );
+        assert_exact(&original, &outcome);
+        match outcome {
+            Outcome::Improved(candidate) => {
+                eprintln!("scaled CPMM fee {bps}: {} nodes", candidate.nodes)
+            }
+            Outcome::Unimproved(_) => {
+                eprintln!("scaled CPMM fee {bps}: none found in declared search budget")
+            }
+            Outcome::Stopped(_) => {}
+        }
+    }
+}
+
 fn int(min: i64, max: i64) -> Domain {
     Domain::Int { min, max }
 }
