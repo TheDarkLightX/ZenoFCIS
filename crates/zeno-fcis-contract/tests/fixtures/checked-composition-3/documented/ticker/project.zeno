@@ -1,0 +1,24 @@
+zeno 1;
+project 1 ticker;
+namespace 2 fixtures;
+// A counter whose Accept successor the Authority refuses at the top: law
+// 500 bounds the committed count at 2, and the rules step past it.
+type 100 state Ticker;
+type 101 command Tick;
+type 102 context Operator;
+type 105 int Count in 0..=3;
+type 106 int Step in 0..=1;
+type 108 bool Authorized;
+field 110 100 count 105;
+field 120 101 step 106;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+component 400 ticker {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 <= 2;

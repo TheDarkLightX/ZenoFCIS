@@ -135,6 +135,8 @@ verus! {
                 Some(denotation::Value::Boolean(a)) => Some(denotation::Value::Boolean(!a)),
                 _ => None,
             },
+            Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => None,
             Op::Select(c, a, b) => match at(terms, c, environment) {
                 Some(denotation::Value::Boolean(true)) => at(terms, a, environment),
                 Some(denotation::Value::Boolean(false)) => at(terms, b, environment),
@@ -170,7 +172,8 @@ verus! {
     proof fn expression_refines_runtime(op: Op, domains: Seq<Domain>, input: Seq<Term>,
         terms: Seq<Term>, kinds: Seq<Kind>, kind: Kind, term: Term,
         raw_input: Seq<i64>, previous: Seq<i64>, environment: Map<Seq<char>, denotation::Value>)
-        requires input_values(domains, input, raw_input, environment),
+        requires !crate::evaluation::spec::new_arithmetic(op),
+            input_values(domains, input, raw_input, environment),
             prefix_values(kinds, terms, previous, environment),
             crate::evaluation::admission::spec::kind(op, domains, static_kinds(kinds)) == Ok(boolean(kind)),
             denotation::term(term, environment) == expression(op, domains, input, terms, environment),
@@ -188,6 +191,8 @@ verus! {
             },
             Op::Not(a) => {},
             Op::Select(c, a, b) => {},
+            Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
         }
     }
 
@@ -259,13 +264,17 @@ fn operand(
 /// # Errors
 /// `Failure` naming the refusal; the caller adds its position.
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures
-    // All variants of the pinned Op are handled below. Keep the native
-    // non-exhaustive fallback for a future library instruction.
-    match result { Ok(_) => true, Err(error) => error != Failure::Instruction },
+    // Exact unsupported refusal for the separately admitted arithmetic extension.
+    match result {
+        Ok(_) => !crate::evaluation::spec::new_arithmetic(*op),
+        Err(Failure::Instruction) => crate::evaluation::spec::new_arithmetic(*op),
+        Err(_) => !crate::evaluation::spec::new_arithmetic(*op),
+    },
     terms@.len() == kinds@.len() && input@.len() == inputs@.len() ==>
         match result {
             Ok((kind, _)) => crate::evaluation::admission::spec::kind(
                 *op, inputs@, static_kinds(kinds@)) == Ok(boolean(kind)),
+            Err(Failure::Instruction) => crate::evaluation::spec::new_arithmetic(*op),
             Err(_) => crate::evaluation::admission::spec::kind(
                 *op, inputs@, static_kinds(kinds@)).is_err(),
         },
@@ -297,6 +306,9 @@ pub(super) fn encode(
 ) -> Result<(Kind, Term), Failure> {
     #[cfg(verus_keep_ghost)]
     proof! { reveal(<Term as View>::view); }
+    if op.requires_arithmetic_profile() {
+        return Err(Failure::Instruction);
+    }
     let result = match *op {
         Op::Input(id) => {
             let id = usize::from(id);
@@ -486,6 +498,8 @@ pub(super) fn encode(
                 },
                 Op::Not(a) => { assert(a < terms@.len()); },
                 Op::Select(c, a, b) => { assert(c < terms@.len() && a < terms@.len() && b < terms@.len()); },
+                Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
+                | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
             }
         }
         assert forall|left: Map<Seq<char>, denotation::Value>, right: Map<Seq<char>, denotation::Value>|
@@ -514,6 +528,8 @@ pub(super) fn encode(
                 },
                 Op::Not(a) => {},
                 Op::Select(c, a, b) => {},
+            Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
             }
         }
         assert(depends_on(result.1, input@, terms@, kinds@));

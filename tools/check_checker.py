@@ -517,7 +517,7 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
     environment.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'], VERUS_Z3_PATH=str(tool / 'z3'),
                        CARGO_BUILD_JOBS='1', CARGO_INCREMENTAL='0', RUST_TEST_THREADS='1')
     command = [str(tool / 'verus'), '--crate-type=lib', '--edition=2024', '--no-cheating',
-               '--no-external-by-default', '--num-threads', '1', '-V', 'spinoff-all',
+               '--no-external-by-default', '--num-threads', verifier.proof_threads('1'), '-V', 'spinoff-all',
                '--output-json', '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
     positive, report = run_logged([*command, '--log-dir', str(out / 'vir'), str(HARNESS)], ROOT, environment, out / 'positive')
     verifier.require_success(positive)
@@ -613,7 +613,7 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--cache', type=Path, default=Path.home() / '.cache/zeno-fcis/verus')
+    parser.add_argument('--cache', type=Path, default=verifier.cache_directory())
     parser.add_argument('--out', type=Path, required=True, help='new retained evidence directory')
     parser.add_argument('--positive-only', action='store_true')
     parser.add_argument('--refresh-coverage', action='store_true', help='emit an unreviewed candidate, never acceptance')

@@ -33,6 +33,7 @@ SEMANTIC_FAILURES = frozenset((
     'assertion failed', 'postcondition not satisfied', 'precondition not satisfied',
     'requires not satisfied', 'invariant not satisfied at end of loop body',
     'loop invariant not satisfied', 'invariant not satisfied',
+    'invariant not satisfied before loop',
     'possible arithmetic underflow/overflow',
 ))
 ERROR_HEADER = re.compile(r'^error(?:\[[A-Za-z0-9]+\])?: (.*)$', re.M)
@@ -49,15 +50,23 @@ def function_lines(source: str, name: str) -> tuple[int, int]:
     if len(matches) != 1:
         raise ValueError(f'not one intended function: {name}')
     index = matches[0]
-    start = source.rfind('#[cfg_attr(verus_keep_ghost', 0, functions[index].start())
-    if start < 0:
-        raise ValueError(f'intended function lacks an annotated contract: {name}')
+    contracts = list(re.finditer(r'#\[\s*cfg_attr\(\s*verus_keep_ghost\s*,\s*verus_spec\(', source))
+    previous = functions[index - 1].end() if index else 0
+    preceding = [match.start() for match in contracts
+                 if previous <= match.start() < functions[index].start()]
+    start = preceding[-1] if preceding else -1
     end = len(source)
     if index + 1 < len(functions):
         end = functions[index + 1].start()
-        attribute = source.rfind('#[cfg_attr(verus_keep_ghost', functions[index].end(), end)
-        if attribute >= 0:
-            end = attribute
+        following = [match.start() for match in contracts
+                     if functions[index].end() < match.start() < end]
+        if following:
+            end = following[-1]
+    if start < 0:
+        body = source[functions[index].end():end]
+        if re.search(r'\bverus_proof_expr!\s*\(\s*ensures\s*\(', body) is None:
+            raise ValueError(f'intended function lacks an annotated contract: {name}')
+        start = functions[index].start()
     return source.count('\n', 0, start) + 1, source.count('\n', 0, end)
 
 
@@ -130,6 +139,15 @@ def proof_succeeded(report: dict, pin: dict) -> bool:
             and result.get('is-verifying-entire-crate') is True)
 
 
+def proof_threads(default="2", environment=None) -> str:
+    """Preserve each gate's default; an assigned lane may select one to six workers."""
+    settings = os.environ if environment is None else environment
+    value = settings.get('ZENO_FCIS_VERUS_THREADS', default)
+    if value not in ('1', '2', '3', '4', '5', '6'):
+        raise ValueError('proof worker count must be an integer from one to six')
+    return value
+
+
 def digest(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
@@ -144,6 +162,12 @@ def verify_tool_files(directory: Path, pin: dict) -> None:
         file = directory / name
         if file.is_symlink() or not file.is_file() or digest(file) != expected:
             raise RuntimeError(f"pinned Verus file missing or changed: {file}")
+
+
+def cache_directory() -> Path:
+    """Locate installed tools; every selected file still requires its pinned hash."""
+    configured = os.environ.get("ZENO_FCIS_VERUS_CACHE")
+    return Path(configured) if configured else Path.home() / ".cache/zeno-fcis/verus"
 
 
 def prepare_tools(cache: Path, pin: dict, install: bool) -> Path:
@@ -314,7 +338,7 @@ def check(cache: Path, install: bool) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     try:

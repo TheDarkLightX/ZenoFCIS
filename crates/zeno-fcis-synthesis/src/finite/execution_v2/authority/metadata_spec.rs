@@ -81,6 +81,12 @@ ScalarOp::Lt(a,b)=>seq![Part::Word(6),Part::Word(a as u128),Part::Word(b as u128
 ScalarOp::And(a,b)=>seq![Part::Word(7),Part::Word(a as u128),Part::Word(b as u128)],
 ScalarOp::Not(a)=>seq![Part::Word(8),Part::Word(a as u128)],
 ScalarOp::Select(c,a,b)=>seq![Part::Word(9),Part::Word(c as u128),Part::Word(a as u128),Part::Word(b as u128)],
+ScalarOp::Mul(a,b)=>seq![Part::Word(10),Part::Word(a as u128),Part::Word(b as u128)],
+ScalarOp::DivFloor(a,b)=>seq![Part::Word(11),Part::Word(a as u128),Part::Word(b as u128)],
+ScalarOp::DivCeil(a,b)=>seq![Part::Word(12),Part::Word(a as u128),Part::Word(b as u128)],
+ScalarOp::MulDivFloor(a,b,d)=>seq![Part::Word(13),Part::Word(a as u128),Part::Word(b as u128),Part::Word(d as u128)],
+ScalarOp::MulDivCeil(a,b,d)=>seq![Part::Word(14),Part::Word(a as u128),Part::Word(b as u128),Part::Word(d as u128)],
+ScalarOp::ProductsGe(a,b)=>seq![Part::Word(15),Part::Word(a[0] as u128),Part::Word(a[1] as u128),Part::Word(a[2] as u128),Part::Word(b[0] as u128),Part::Word(b[1] as u128),Part::Word(b[2] as u128)],
 } }
 
 pub open spec fn scalar_ops_prefix<'a>(values:Seq<ScalarOp>,n:nat)->Seq<Part<'a>>
@@ -162,6 +168,7 @@ laws::Op::Sub(a,b)=>seq![Part::Word(3)]+seq![Part::Word(a as u128),Part::Word(b 
 laws::Op::Mul(a,b)=>seq![Part::Word(4)]+seq![Part::Word(a as u128),Part::Word(b as u128)],
 laws::Op::Div(round,a,b)=>seq![Part::Word(5)]+division(round)+seq![Part::Word(a as u128),Part::Word(b as u128)],
 laws::Op::ToI128(a)=>seq![Part::Word(6)]+seq![Part::Word(a as u128)],
+laws::Op::ToU128(a)=>seq![Part::Word(16),Part::Word(a as u128)],
 laws::Op::Eq(a,b)=>seq![Part::Word(7)]+seq![Part::Word(a as u128),Part::Word(b as u128)],
 laws::Op::Lt(a,b)=>seq![Part::Word(8)]+seq![Part::Word(a as u128),Part::Word(b as u128)],
 laws::Op::And(a,b)=>seq![Part::Word(9)]+seq![Part::Word(a as u128),Part::Word(b as u128)],

@@ -1,0 +1,1 @@
+{"schema": "zeno-fcis/loop-expressions/1", "vocabulary": {"inputs": ["value", "action", "authorized"], "variants": {"action": {"Inc": 150, "Dec": 151}}, "cases": 5}, "outputs": ["!authorized ? 0 : action == Inc && value == 2 ? 1 : action == Dec && value == 1 ? 2 : action == Inc ? 3 : 4", "value + 2", "value - 1"]}

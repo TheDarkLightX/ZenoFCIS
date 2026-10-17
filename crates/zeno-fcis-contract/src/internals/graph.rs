@@ -22,7 +22,7 @@ pub struct Ref {
     pub kind: Kind,
 }
 
-/// Operations both program forms share; laws also have `Mul`, `Div` and `ToI128`.
+/// Operations both program forms share, with explicit law-side numeric projections.
 #[derive(Clone, Copy, Debug)]
 pub enum Op {
     Not(usize),
@@ -35,6 +35,9 @@ pub enum Op {
     Div(Rounding, usize, usize),
     Select(usize, usize, usize),
     ToI128(usize),
+    ToU128(usize),
+    MulDiv(Rounding, usize, usize, usize),
+    ProductsGe([usize; 3], [usize; 3]),
 }
 
 /// A typed value inside a law program.
@@ -83,6 +86,9 @@ pub enum LawOp {
     Mul(usize, usize),
     Div(Rounding, usize, usize),
     ToI128(usize),
+    ToU128(usize),
+    MulDiv(Rounding, usize, usize, usize),
+    ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
     And(usize, usize),
@@ -97,6 +103,10 @@ pub enum ScalarOp {
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
+    Mul(usize, usize),
+    Div(Rounding, usize, usize),
+    MulDiv(Rounding, usize, usize, usize),
+    ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
     And(usize, usize),
@@ -166,6 +176,15 @@ pub trait Graph {
         self.op(Op::Eq(node.index, one.index), Kind::Bool)
     }
 
+    /// Nonnegative product arguments have an explicit checked widening in laws.
+    fn product_operand(&mut self, node: Ref) -> Result<Ref, String> {
+        self.numeric(node)
+    }
+    /// A law's wide unsigned quotient converts back to the signed expression kind.
+    fn product_result(&mut self, node: Ref) -> Result<Ref, String> {
+        Ok(node)
+    }
+
     /// Compiles an expression whose variables are already expanded.
     fn compile(&mut self, ast: &Ast) -> Result<Ref, String> {
         match ast {
@@ -173,6 +192,13 @@ pub trait Graph {
             Ast::Int(value) => self.int(*value),
             Ast::Name(name) => self.name(name),
             Ast::Neg(inner) => {
+                // MIN is a legal i64 literal although its positive magnitude is
+                // not. Keep the old lowering for every previously admitted negation.
+                if matches!(inner.as_ref(), Ast::Int(v) if *v == i64::MAX as i128 + 1)
+                    && Self::int_node(i64::MAX as i128 + 1).is_err()
+                {
+                    return self.int(i64::MIN as i128);
+                }
                 let zero = self.int(0)?;
                 let inner = self.compile(inner)?;
                 let inner = self.numeric(inner)?;
@@ -201,6 +227,35 @@ pub trait Graph {
                 let left = self.compile(left)?;
                 let right = self.compile(right)?;
                 self.binary(*operator, left, right)
+            }
+            Ast::MulDiv(rounding, a, b, d) => {
+                let a = self.compile(a)?;
+                let a = self.product_operand(a)?;
+                let b = self.compile(b)?;
+                let b = self.product_operand(b)?;
+                let d = self.compile(d)?;
+                let d = self.product_operand(d)?;
+                let result =
+                    self.op(Op::MulDiv(*rounding, a.index, b.index, d.index), Kind::Int)?;
+                self.product_result(result)
+            }
+            Ast::ProductsGe(arguments) => {
+                if arguments.len() != 4 && arguments.len() != 6 {
+                    return Err("products_ge needs four or six arguments".to_owned());
+                }
+                let mut refs = Vec::with_capacity(arguments.len());
+                for argument in arguments.iter() {
+                    let node = self.compile(argument)?;
+                    refs.push(self.product_operand(node)?.index);
+                }
+                let (a, b) = if refs.len() == 4 {
+                    let one = self.int(1)?;
+                    let one = self.product_operand(one)?.index;
+                    ([refs[0], refs[1], one], [refs[2], refs[3], one])
+                } else {
+                    ([refs[0], refs[1], refs[2]], [refs[3], refs[4], refs[5]])
+                };
+                self.op(Op::ProductsGe(a, b), Kind::Bool)
             }
             Ast::Div(rounding, left, right) => {
                 let left = self.compile(left)?;
@@ -311,8 +366,13 @@ impl Graph for ScalarGraph<'_> {
             Op::Add(a, b) => ScalarOp::Add(a, b),
             Op::Sub(a, b) => ScalarOp::Sub(a, b),
             Op::Select(c, a, b) => ScalarOp::Select(c, a, b),
-            Op::Mul(..) => return Err("decision rules have no multiplication".to_owned()),
-            Op::Div(..) => return Err("decision rules have no division".to_owned()),
+            Op::Mul(a, b) => ScalarOp::Mul(a, b),
+            Op::Div(r, a, b) => ScalarOp::Div(r, a, b),
+            Op::MulDiv(r, a, b, d) => ScalarOp::MulDiv(r, a, b, d),
+            Op::ProductsGe(a, b) => ScalarOp::ProductsGe(a, b),
+            Op::ToU128(_) => {
+                return Err("scalar widening is explicit in the arithmetic evaluator".to_owned());
+            }
             Op::ToI128(_) => return Err("decision programs convert by selection".to_owned()),
         })
     }
@@ -463,6 +523,14 @@ impl<'d> LawGraph<'d> {
 impl Graph for LawGraph<'_> {
     type Node = LawOp;
 
+    fn product_operand(&mut self, node: Ref) -> Result<Ref, String> {
+        let node = self.numeric(node)?;
+        self.op(Op::ToU128(node.index), Kind::Raw)
+    }
+    fn product_result(&mut self, node: Ref) -> Result<Ref, String> {
+        self.op(Op::ToI128(node.index), Kind::Int)
+    }
+
     fn table(&mut self) -> &mut Table<LawOp> {
         &mut self.table
     }
@@ -487,6 +555,9 @@ impl Graph for LawGraph<'_> {
             Op::Div(rounding, a, b) => LawOp::Div(rounding, a, b),
             Op::Select(c, a, b) => LawOp::Select(c, a, b),
             Op::ToI128(a) => LawOp::ToI128(a),
+            Op::ToU128(a) => LawOp::ToU128(a),
+            Op::MulDiv(r, a, b, d) => LawOp::MulDiv(r, a, b, d),
+            Op::ProductsGe(a, b) => LawOp::ProductsGe(a, b),
         })
     }
 

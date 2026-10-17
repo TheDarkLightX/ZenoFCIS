@@ -4,6 +4,234 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## 2.4.0 - 2026-10-15
+
+- Add checked scalar multiplication, floor/ceiling division, fused mul-div and
+  exact product comparisons to authored rules, with explicit arithmetic profiles
+  and refusal boundaries. Existing narrow and fused operations remain distinct.
+- Inline four closed evaluator adapters. Earlier paired measurements on one
+  serial workload showed lower instruction and elapsed costs; no release-wide
+  performance claim is made.
+- Add the Spot arithmetic proof pilot for fee splits, bounded exact-in swaps,
+  liquidity burns and closed graph bounds. Its scope is arithmetic, not business
+  acceptance, authorization or arbitrary histories.
+- Add structured usage-knowledge reasoning, evidence-bound advisory records and
+  optional loop replanning. Knowledge proposals cannot authorize programs or
+  replace exact checking and replay.
+- Add bounded search diagnostics and reference-enabled learn/split completion
+  through complete capture, exact checking and receipt replay. Unsupported
+  references and exhausted budgets remain unqualified.
+
+- Add requirements-only version-space questions to `loop question
+  --specification`: propose distinct full-domain meanings, minimax answer
+  partitions and minimum conflicts relative to a finite sketch, without an
+  existing core. A single meaning is reported as checked only after the
+  library law evaluator checks every requirement and `transform check`
+  receipts replay. Owner tuple answers and stop use the existing ZAL terminal
+  channel; model suggestions remain advisory. Budget stops are inconclusive
+  (exit 2), expose no count or candidate and spend no attempt. No intent
+  beyond the declared grammar/domain or optimal conversation is claimed.
+- Freeze the sketch meanings search's joint pivot, initial spaces and hole
+  order. Charge terminal assignments or disjoint pruned subtrees separately
+  from internal visits and class-value work. Partial class construction
+  cannot establish an empty space. This changes proposal traversal and
+  accounting; it claims no runtime improvement.
+- Add `loop capture open|packet|candidate|status`: contained Python-function
+  reference acquisition over a declared finite domain and example-only proposals.
+  `captured-exact` requires the existing `transform check` and receipt replay
+  against the complete frozen observed table; `examples-equivalent` is only an
+  intermediate proposal. Pre-decision budget stops spend no candidate attempt;
+  decided refutations are charged before advisory feedback. Add paired
+  `zal/fcis-loop/1` capture acts and five example-only `zal_capture_*` MCP tools;
+  provisioning and private status stay owner-side. Unsupported containment is
+  refused. Future executable equivalence assumes a pure deterministic reference;
+  no live model, arbitrary native format, adoption or release qualification is
+  claimed.
+
+<!-- BEGIN bounded strategy knowledge engine -->
+- Add bounded stratified Datalog, queries, public-schema consistency checks and
+  type-directed plan proposals under the existing `loop strategy`. Load user-supplied knowledge through explicit external `--kb PATH` values,
+  which take precedence over `ZENO_FCIS_KB`. Without `--kb`, load the
+  environment variable as an OS-separated path list; with neither configured,
+  use the neutral compiled example. Reuse the closed type algebra,
+  keep plan results advisory, and refuse every other `.kb` file in source and
+  release packages. Add example-only paired ZAL acts and independent controls.
+  No private knowledge, evidence-derived recommendations, executable primitive,
+  program acceptance or owner-answer authority is included.
+<!-- END bounded strategy knowledge engine -->
+
+<!-- BEGIN typed strategy algebra and modes -->
+- Extend the existing `loop strategy` with typed case composition, conditional
+  weak-fault diagnosis and questions that distinguish finite readings only
+  when they change an answer. Share closed, budgeted plan type checking and
+  trace conformance with `loop pipeline` and strategy selection. Split
+  programs require existing full-domain transform check and receipt replay;
+  other outcomes remain proposals. Add the named learn-corpus interface, both
+  ZAL surfaces, existing owner-gate routing and independent reference controls.
+  No direct owner-answer path, interpretation completeness, actual-fault,
+  performance or release qualification is claimed.
+<!-- END typed strategy algebra and modes -->
+
+- Add `loop pipeline`, `loop strategy` and `loop rules`: guarded completion,
+  repair and optimization; fixed-grammar strategy selection frozen before
+  distinct evaluation tasks; and concrete rewrite discovery with target-domain
+  and whole-program rechecks. These are proposers. Qualification requires the
+  existing `transform check` and matched receipt replay over the complete
+  declared finite domain. Budget stops are inconclusive and spend no attempt.
+  Add both `zal/fcis-loop/1` surfaces, workspace routing, independent table and
+  grammar references, planted-fault controls and acceptance scenarios. No
+  optimality, universal rewrite, model-quality, owner-intent or deployment
+  claim is made; strategy gate-work figures are conservative pair allowances.
+
+- Add `loop learn --spec FILE` for the fixed checked vocabulary: bottom-up
+  expression enumeration, smallest vocabulary-cost representatives, minimax
+  questions and minimum example conflicts. Counts, uniqueness, partitions and
+  outside-vocabulary results remain bounded proposals. The existing library
+  evaluator checks the lowered program against every provided or confirmed
+  example; incomplete search/checking is `inconclusive` (exit 2) with no count,
+  program or attempt. Add learn acts in both `zal/fcis-loop/1` surfaces and
+  owner-only terminal confirmation. No multiplication, supplied primitives,
+  noise-based acceptance, hidden-reference equivalence, adoption or optimum
+  beyond the declared vocabulary cost is claimed.
+
+- Add the specification-gap judge to `contract review --gaps` (packet
+  `zeno-fcis/contract-review/3`). Over the whole declared domain it proposes
+  every decision a contract of the same schema could make without deliveries
+  and asks the library's law evaluator which the declared laws admit: tuples
+  the laws determine, how many classes, reject reasons and successors they
+  leave open, each law's activation, whether they admit a core that rejects
+  everything, and which mutants the Authority refuses on at least one input
+  where they differ (caught) or never refuses there (admitted). `--gaps-laws`
+  checks proposed laws against the contract's decisions before measuring them,
+  and the repeat measure is bounded by `--max-work` too. The
+  extended mutant catalog `zeno-fcis/contract-review-mutants/2` keeps every
+  version 1 mutant and its number and adds `negate-guard`, `drop-case`,
+  `flip-class` and `perturb-successor`. Without `--gaps` the review packet is
+  unchanged, version 2.
+- Add `contract profile` (valid, reachable and Moore-minimal states, memory
+  bits and behaviour on pre-states that break a state law), `contract lemma`
+  (candidate state invariants judged by induction over the declared domain,
+  with the first counterexample to induction and a shortest trace when false),
+  `contract scenario` (runs of decision examples under `# scenario NAME`
+  headers, replayed through the contract, every mutant and the
+  reject-everything core, crediting kills only when every scenario passes on
+  the contract) and `contract probe` (`explain`, `reachable`, `count`,
+  `implies`, `decisions`, `depends`). Every judge is advisory and binds the
+  contract to the library Authority as an application does. Every judge except
+  `scenario` and `probe explain` enumerates the declared domain and is
+  inconclusive (exit 2) over `--max-tuples`, as `review --gaps` is over
+  `--max-work`, never a pass. A judge's malformed input exits 65. See
+  [contract judges](docs/CONTRACT_JUDGES.md).
+- Check the judges on all 77 core-component instances and four variants
+  against a separately written reference, `tools/contract_judges_reference.py`,
+  which recomputes the profile, the admissible counts, activation and
+  reject-everything verdict, lemma verdicts, scenario verdicts and three probes,
+  but not mutant classifications; with recorded known answers and fault
+  controls routed through each comparison (`tools/check_contract_judges.py`;
+  ATDD `specification-gaps` and `core-profile`). This is bounded evidence about
+  those subjects, not a proof about other contracts.
+- Add the composed-domain profile to `contract check-composition`: manifest
+  `zeno-fcis/checked-composition/3`. Every participating component decides each
+  request in merge order on one pre-state, with inputs bound from the request
+  and earlier components' pre-state; a Reject or any refusal ends the step with
+  no change, and the first CommittedFailure commits the successors up to and
+  including its own. The checker plans `local`, `assume` and `couple`
+  obligations with exact sizes, and the decision and formula tables the check
+  builds, refuses a plan over budget before evaluating anything
+  (`evaluated: 0`), and checks a plan within budget exhaustively,
+  without enumerating the global product. Verdicts are `proved`, `violated`
+  with the first witness, or `refused`. The claim rests on these finite checks
+  and an induction argument stated in the guide; it is not machine-checked.
+  A component may own no state: `/3` binds its state read-only and requires
+  every committing decision to leave it unchanged, while `/1` and `/2` keep
+  refusing such a leaf, and a contract with no state field at all has no route
+  through the contract compiler. Results and receipts have schemas
+  `zeno-fcis/composed-domain-result/1` and `zeno-fcis/composed-domain-receipt/1`;
+  `--replay` carries the receipt's verdict (`replayed-violated` and
+  `replayed-refused` exit 1); `--joint-table` prints the joint step on every
+  reachable pair, and `JointComposition` exposes it as a library API.
+  `--aggregate` and
+  `--write-aggregate` are refused for `/3`. See
+  [composed-domain composition](docs/COMPOSED_DOMAIN_COMPOSITION.md).
+- Check the profile against a separately written reference,
+  `tools/composition_domain_reference.py`, and a fresh-seed run of random
+  compositions of the declared core-component instances
+  (`tools/composition_domain_soundness.py`), which compares every verdict with
+  a breadth-first oracle over the reachable product and the joint step on
+  every reachable pair; ATDD `composed-domain-*`. This is evidence over the
+  generated cases and fixtures, not a proof about other compositions.
+
+- Build a macOS executable for Apple silicon (`aarch64-apple-darwin`, minimum
+  macOS 11.0) on GitHub's macOS 15 arm64 image beside the Linux x86_64 one. The
+  release workflow installs each host's archive as the installation guide
+  documents and uses it (`tools/check_installed_cli.py`), merges both hosts into
+  one manifest, checksum list and bundle (`rc_package.py merge-hosts` and
+  `downloads-list`), and checks the set against its source commit by content
+  (`tools/check_release_custody.py`). CI adds macOS Clippy and portable tests.
+  On macOS the contained checker runtime and `synth verify` execution exit 2
+  without running; the executable is ad-hoc signed only, not notarized.
+  Document the Linux executable's glibc 2.39 floor.
+- The SQLite shell sets `synchronous=EXTRA` instead of `FULL` on every
+  platform, so each commit also syncs its rollback-journal deletion. On Apple
+  platforms it also turns on `fullfsync`, so SQLite's file syncs use
+  `F_FULLFSYNC`. Durability against power loss still depends on the drive.
+- Add the OCaml scalar consumer to the acceptance portfolio
+  (`ocaml-scalar-consumer`), with the Ubuntu 24.04 OCaml 4.14.1 packages pinned
+  by version and installed-file hash.
+- Extend the library evaluator with signed/unsigned 128-bit values and whole
+  declared compound values. Numeric graphs have a 4,096-node/64-output cap;
+  legacy upgrade equivalence refuses programs above its 256-node budget.
+  Add the original zUSD characterization corpus and CLI capacity regressions.
+- Contain parallel checker workers under the caller's CPU policy and runtime
+  ceiling. Failed offline runs publish no receipt; durable loop stage receipts
+  remain replay-checked history. Add physical containment and mutation controls.
+- Preserve JSON layout and escaped key spellings when adopting a decision
+  program; support compact and CRLF rule files without rewriting existing bytes.
+- Add six closed composed application profiles with independent references,
+  complete finite corpora, durable journeys and planted law violations.
+  Final combined qualification and publication remain pending.
+- Add `zeno-fcis-program-search` (2.4.0): an untrusted, deterministic search
+  for smaller programs that behave like a given finite decision program, by
+  don't-care resubstitution, top-down synthesis, decision-list folding and
+  decision-diagram resynthesis, under explicit budgets. It proposes; `transform
+  check` decides. Add the `search_program` example driver,
+  `tools/measure_program_search.py` and an independent table reference for
+  tests and controls.
+- Add the bounded loop's doors (2.4.0): `loop candidate --expressions`,
+  `loop sketch`, `loop family` and `loop transfer`, with the untrusted
+  `zeno-fcis-loop-doors` crate (the loop expression language with holes and
+  family parameters, lowering, inverse semantics, failing regions, repair
+  sites and repairs, sketch completion searching over meanings, family fits
+  and transfer), and `loop meaning`, which keys a program by its observation
+  on every declared input (equal keys exactly when `transform check` finds
+  two programs equivalent, within its limits). The loop workspace answers a
+  refuted program written another way from memory. Add `loop question`,
+  `loop teach-back` and `loop decompose`, and route the loop workspace's
+  laws, invariants (with counterexamples to induction as feedback),
+  scenarios and probes to the contract judges. Their results hold over the
+  contract's declared finite domain only. A question's answer becomes laws
+  checked by the gaps judge; an answer's reject reason has no law form, so
+  only the question door applies it and the gaps judge does not see it.
+  `loop decompose` steps 1 to 3 are the door's own evaluation of the
+  components' tables and claim no composition; with `--compose`, the
+  composition checker's joint step is compared with the core on every
+  declared input, and its `proved` obligation check says only that the
+  generated composition is well formed and stays in its domains. The doors
+  propose; every program a session door reports accepted, completed or
+  "checked repair" has passed `transform check` and its receipt replay.
+  Family results hold on the checked instances only. Add ZAL's loop profile
+  `zal/fcis-loop/1` in `integrations/zal` (both surfaces, the shared loop
+  workspace, the owner's `terminal.py loop` commands and five `zal_loop_*`
+  MCP tools with no answer tool), `tools/loop_doors_reference.py` (an
+  independent reference for regions, unrealizable claims, teach-back and
+  question counts, rule meaning keys and interface counterexamples),
+  `tools/loop_doors_controls.py` and
+  `tools/loop_judges_controls.py`. Add a
+  care-masked top-down entry to `zeno-fcis-program-search` for these doors.
+
+
+The component catalog’s declared laws do not fully specify its decisions. Finite-domain contract-judge runs across all 77 supported instances (107,518 input tuples) found 0 decisions uniquely determined by those laws; in every instance the laws also admitted a core that rejects every request. All 77 declared state laws were inductive over their respective finite domains. These invariant checks establish bounded state preservation, while acceptance conditions and rejection reasons still require additional specification and behavior examples. Mutant results cover only the finite mutation catalog, and these advisory checks provide neither a general proof nor release qualification.
+
 ## 2.3.0 - 2026-10-13
 
 V2.2 and V2.3 development is consolidated into one source version for the
@@ -1802,7 +2030,7 @@ First public release candidate for the reusable ZenoFCIS core library family.
   using the library;
 - the authenticated sparse tree remains a bounded reference implementation;
 - SQLite qualification is limited to the documented reference deployment;
-- concrete Lean, SMT, CVC5, Kani, Flux, or private ESSO adapters and proof
+- concrete Lean, SMT, CVC5, Kani, Flux, or private checker adapters and proof
   artifacts remain project-owned;
 - concurrent execution and effect interpretation remain external shell work;
 - final independent exact-head review and release attestation remain required

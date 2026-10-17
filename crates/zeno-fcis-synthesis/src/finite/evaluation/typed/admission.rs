@@ -58,6 +58,12 @@ fn kind(op: NumericOp, inputs: &[Domain<'_>], previous: &[Kind]) -> Result<Kind,
             }
         }
         Instruction::Literal(_, kind) => Ok(kind),
+        // These adapters are never produced by typed_instruction. Refuse them
+        // here rather than extending the existing public numeric instruction set.
+        Instruction::ScalarMul(..)
+        | Instruction::ScalarDiv(..)
+        | Instruction::ScalarMulDiv(..)
+        | Instruction::ScalarProductsGe(..) => Err(AdmissionFailure::TypeMismatch),
         Instruction::MulDiv(_, a, b, den) => {
             require_kind(previous, a, Kind::Unsigned)?;
             require_kind(previous, b, Kind::Unsigned)?;

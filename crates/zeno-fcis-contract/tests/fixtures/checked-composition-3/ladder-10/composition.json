@@ -1,0 +1,283 @@
+{
+  "checker": "zeno-fcis/composed-domain-checker/1",
+  "components": [
+    {
+      "assume": "amount >= 2 && amount <= 6",
+      "bind": {
+        "amount": "qty + qty",
+        "authorized": "authorized"
+      },
+      "invariant": "true",
+      "name": "budget",
+      "owns": [
+        "budget.remaining"
+      ],
+      "participates": "op == 0",
+      "path": "budget",
+      "policy_sha256": "682ad5794aaaa26c55930dee89098fa52cbc6ad56f1f8601bd9e4a88d7a5c9c6",
+      "program_sha256": "c59a11e30687d0e31bab54197ae7876df266b1c95319d9f8eaa3a8f4a78340bd",
+      "project_sha256": "b4502dc7b820fae974b6422bd501df63c14c75af9fec3004a3afd1325cffc31c"
+    },
+    {
+      "assume": "action == 150 || action == 152",
+      "bind": {
+        "action": "choose(op == 0, 150, 152)",
+        "authorized": "authorized",
+        "quantity": "qty"
+      },
+      "invariant": "available + reserved <= 4",
+      "name": "pool",
+      "owns": [
+        "pool.available",
+        "pool.reserved"
+      ],
+      "participates": "op == 0 || op == 1",
+      "path": "pool",
+      "policy_sha256": "5cb9db9a3daa26fcf4dfb33669299efcb6c76ee8ceea65efaa7cb7ae6a061b5d",
+      "program_sha256": "e6dfa4252f4b3acf4c96376d40d23756e75e08f7bcefbced799a765765618d6e",
+      "project_sha256": "a87e9d8e0c539626e18fcb355dfb15b4a4aa1b614b3d0bfa9b04f2d38cf50464"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "action": "150",
+        "authorized": "authorized"
+      },
+      "invariant": "true",
+      "name": "counter",
+      "owns": [
+        "counter.value"
+      ],
+      "participates": "op == 0",
+      "path": "counter",
+      "policy_sha256": "7d285ee02f6b006a31c05f94d9befc24a864507360897198e70bb0dc8eece6a9",
+      "program_sha256": "8aa22099f3bf4817de9a92f7a25fa747f4eef3cceab135272d482961f5c2b753",
+      "project_sha256": "9c0c51265ed01c2138dbc5b6307a3492f57c7f6b7ef0f0e878d1082834368cdd"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "command": "150",
+        "now": "now"
+      },
+      "invariant": "true",
+      "name": "limiter",
+      "owns": [
+        "limiter.start",
+        "limiter.used"
+      ],
+      "participates": "op == 0",
+      "path": "limiter",
+      "policy_sha256": "5dff6a62232f83792d890b0b0370c21d45ef59fc470dde96ce715cbb53efd958",
+      "program_sha256": "9a87101fa7f3ae918817b830fae2e89d3bf3eb4758be5fc77716e778494109a9",
+      "project_sha256": "16c623af52ff69a4e1f6e35dd8b873e7bfe2e0b4a8830251ec2d881938512f55"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "command_key": "key",
+        "command_value": "val"
+      },
+      "invariant": "true",
+      "name": "dedup",
+      "owns": [
+        "dedup.seen",
+        "dedup.key",
+        "dedup.value"
+      ],
+      "participates": "op == 0",
+      "path": "dedup",
+      "policy_sha256": "27c64640bc727e2a45c00f70dadc7045486d7b90395ad2bfa37bd1768faa2d5c",
+      "program_sha256": "0d98f46b3b7bb33432e358727d61e515248830440622d18c010c931fd241f5e2",
+      "project_sha256": "b89a056148d34671aa948bd6011616629ffe53de71cce25adaf16e950410cd86"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "finish": "qty == 3"
+      },
+      "invariant": "true",
+      "name": "retry",
+      "owns": [
+        "retry.remaining",
+        "retry.closed"
+      ],
+      "participates": "op == 2",
+      "path": "retry",
+      "policy_sha256": "1713a5cb897a4ea9c36bb04b953c258e4f5ce3995345a4803fd212852d2e714f",
+      "program_sha256": "250e3f26dab70a1b45f18118a2b8e7bcd2dd373c3f871dafa962a0eed500d1eb",
+      "project_sha256": "ab8fdb6357284e6edc191ff8e52c101c2dc807a705eda8c70c01657763c5ab22"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "expected_version": "ver",
+        "new_value": "val"
+      },
+      "invariant": "true",
+      "name": "register",
+      "owns": [
+        "register.value",
+        "register.version"
+      ],
+      "participates": "op == 3",
+      "path": "register",
+      "policy_sha256": "5c05245fc6c2ee73c1da28e723994cd12373d6cc3354edc5d5605f3ac3aa06e7",
+      "program_sha256": "2ef1225b6893cc21df0f7549bf554787fc88c0c6c80e202c3509c50080b95e4a",
+      "project_sha256": "038df1ae0f20d416e26c1bf0c271969d558ecf7ea0f1c9ec2b8f7adfcfb269a5"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "now": "now"
+      },
+      "invariant": "true",
+      "name": "deadline",
+      "owns": [
+        "deadline.deadline",
+        "deadline.last_seen",
+        "deadline.reached"
+      ],
+      "participates": "op == 3",
+      "path": "deadline",
+      "policy_sha256": "4502430409844f3a6c8e2afe0cfc4c4c3ef3cfc0906ab2414f1a284ee7a1e93e",
+      "program_sha256": "cde4303ab64b2aac8bd47e2037111a3d8fc23052f4a017e7cf9991ff8d27d5ea",
+      "project_sha256": "d275b8347c59cef2e545d161bf014079915939569528401f09aee502c11f8c72"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "reset": "op == 3 && qty == 1"
+      },
+      "invariant": "true",
+      "name": "phase",
+      "owns": [
+        "phase.phase"
+      ],
+      "participates": "op == 2 || op == 3",
+      "path": "phase",
+      "policy_sha256": "582c5bc5f51eee1532cf84a7f4a03a0b2e61b01748c5b84eee544303daaeeeef",
+      "program_sha256": "649770f6caeb3716d5be310148556e9528f3136679766ca0168408db2a5d31e8",
+      "project_sha256": "ed43b048fe14e4544492115c8339cd1da7458fc5b9d13acb78694f866703796e"
+    },
+    {
+      "assume": "true",
+      "bind": {
+        "action": "159 + qty",
+        "authorized": "authorized",
+        "principal": "principal"
+      },
+      "invariant": "true",
+      "name": "approval",
+      "owns": [
+        "approval.phase",
+        "approval.vote0",
+        "approval.vote1",
+        "approval.vote2"
+      ],
+      "participates": "op == 1",
+      "path": "approval",
+      "policy_sha256": "e9175fa92d59d345024a5259b6f5cc760635769ee1a6ef9d54c3d2ca55433c9f",
+      "program_sha256": "14caf380e25ece2efef9767b6f31b5ca096e6b1bbbd0e267ab12a34de3050072",
+      "project_sha256": "4a9a2a7925c6b4c95e03dbd6e08d00264cbd6911eabc027664dd170a753bfdc9"
+    }
+  ],
+  "couplings": [
+    {
+      "invariant": "counter.value + pool.available <= 4",
+      "members": [
+        "pool",
+        "counter"
+      ],
+      "name": "count"
+    },
+    {
+      "invariant": "counter.value >= limiter.used",
+      "members": [
+        "counter",
+        "limiter"
+      ],
+      "name": "rate"
+    },
+    {
+      "invariant": "budget.remaining + pool.reserved + pool.reserved <= 8",
+      "members": [
+        "budget",
+        "pool"
+      ],
+      "name": "spend"
+    }
+  ],
+  "name": "ladder-10",
+  "request": [
+    {
+      "domain": {
+        "kind": "int",
+        "max": 3,
+        "min": 0
+      },
+      "name": "op"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 3,
+        "min": 1
+      },
+      "name": "qty"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 8,
+        "min": 0
+      },
+      "name": "key"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 8,
+        "min": 0
+      },
+      "name": "val"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 6,
+        "min": 0
+      },
+      "name": "now"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 2,
+        "min": 0
+      },
+      "name": "principal"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 8,
+        "min": 0
+      },
+      "name": "ver"
+    },
+    {
+      "domain": {
+        "kind": "bool"
+      },
+      "name": "authorized"
+    }
+  ],
+  "schema": "zeno-fcis/checked-composition/3"
+}

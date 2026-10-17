@@ -49,7 +49,7 @@ physical delivery remain trusted shell work.
 
 The library supports closed finite/control declarations and a full-width Account
 producer. Account-lockout uses that library-owned producer over its original
-timestamp domains; it does not fall back to a handwritten authority callback.
+timestamp domains; it does not fall back to an application-supplied authority callback.
 Unsupported profiles return named refusals and grant no publication capability.
 Independent acceptance models and source-bound proof qualification remain
 separate from these authoring tools.

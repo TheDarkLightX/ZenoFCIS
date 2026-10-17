@@ -14,6 +14,7 @@ import zipfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
+from verus_coverage import profile_inventory
 import check_verus as verifier
 from check_finite_execution import once
 from verus_contract_controls import contract_rejected
@@ -177,6 +178,27 @@ def proof_rejected(proc, report: dict, pin: dict, profile: dict,
         target_functions=profile["target_functions"])
 
 
+def coverage_control(vir, profile, name):
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = profile['namespace'] + 'schema::'
+    if name == 'add_uncontracted_schema_function':
+        target = prefix + 'uncontracted_schema_length'
+        intended = (set(actual) == set(expected) | {target}
+            and target not in expected and actual[target]['mode'] == 'Exec'
+            and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        target = prefix + 'spec::encoding_matches'
+        intended = (set(actual) == set(expected)
+            and actual[target]['body_sha256'] != expected[target]['body_sha256'])
+    return intended, refusal
+
 def native_check(directory: Path, cwd: Path, pin: dict, environment: dict) -> dict:
     executable = directory / "schema-binding-tests"
     command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
@@ -272,8 +294,10 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
                     require_coverage((specimen / "logs/crate.vir").read_text(), profile)
                 except ValueError as error:
                     refusal = str(error)
-            killed = (mutant.returncode == 0 and result.get("success") is True
-                and result.get("errors") == 0 and refusal is not None)
+            intended, refusal = coverage_control((specimen / "logs/crate.vir").read_text(), profile, name)
+            killed = (mutant.returncode == 0 and verifier.proof_succeeded(report_for_control, pin)
+                and not verifier.ERROR_HEADER.search(mutant.stderr)
+                and not verifier.NON_SEMANTIC.search(mutant.stderr) and intended)
         row = {"name": name, "expected_failure": expected, "killed": killed,
             "changed_source": str(path), "original_sha256": before[str(path)],
             "changed_sha256": verifier.digest(specimen / path), "command": mutant_command,
@@ -306,7 +330,7 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

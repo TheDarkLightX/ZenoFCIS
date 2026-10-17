@@ -1367,6 +1367,18 @@ fn contract_op(op: &LibraryOp, place: &str) -> Result<ScalarOp, ContractError> {
         LibraryOp::Bool(value) => ScalarOp::Bool(value),
         LibraryOp::Add(a, b) => ScalarOp::Add(index(a), index(b)),
         LibraryOp::Sub(a, b) => ScalarOp::Sub(index(a), index(b)),
+        LibraryOp::Mul(a, b) => ScalarOp::Mul(index(a), index(b)),
+        LibraryOp::DivFloor(a, b) => {
+            ScalarOp::Div(super::expr::Rounding::Floor, index(a), index(b))
+        }
+        LibraryOp::DivCeil(a, b) => ScalarOp::Div(super::expr::Rounding::Ceil, index(a), index(b)),
+        LibraryOp::MulDivFloor(a, b, d) => {
+            ScalarOp::MulDiv(super::expr::Rounding::Floor, index(a), index(b), index(d))
+        }
+        LibraryOp::MulDivCeil(a, b, d) => {
+            ScalarOp::MulDiv(super::expr::Rounding::Ceil, index(a), index(b), index(d))
+        }
+        LibraryOp::ProductsGe(a, b) => ScalarOp::ProductsGe(a.map(index), b.map(index)),
         LibraryOp::Eq(a, b) => ScalarOp::Eq(index(a), index(b)),
         LibraryOp::Lt(a, b) => ScalarOp::Lt(index(a), index(b)),
         LibraryOp::And(a, b) => ScalarOp::And(index(a), index(b)),

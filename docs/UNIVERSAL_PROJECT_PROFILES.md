@@ -155,7 +155,7 @@ Privileged instructions and unsafe architecture code remain in a tiny machine in
 
 ## Private and future backends
 
-ESSO, Morph, theorem provers, solvers, compilers, LLMs, and project-specific optimizers must enter through a generic backend protocol rather than a crate named after a private engine. A backend proposes closed artifacts and evidence; independent validators decide whether they satisfy the reviewed project profile. Backend identity, exact source/tool hashes, bounds, traces, counterexamples, and claims must be content-bound.
+Private engines, theorem provers, solvers, compilers, LLMs, and project-specific optimizers must enter through a generic backend protocol rather than a crate named after a private engine. A backend proposes closed artifacts and evidence; independent validators decide whether they satisfy the reviewed project profile. Backend identity, exact source/tool hashes, bounds, traces, counterexamples, and claims must be content-bound.
 
 ## Cross-repository validation
 

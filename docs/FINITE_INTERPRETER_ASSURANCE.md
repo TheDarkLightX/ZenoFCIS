@@ -37,8 +37,9 @@ claim as unprovable would confuse those two quantifiers.
 Likewise, a theorem about all possible future reinterpretations does not stop
 us proving an integer reader or a complete declared decision relation. It does
 not justify leaving application-owned functions or composition bridges
-unchecked. See the [candidate assurance scope](RELEASE_CANDIDATES.md) for the
-currently supported decision path and its limits.
+unchecked. See the
+[2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
+for that source line's supported decision path and its limits.
 
 ## Changes to our assurance practice
 

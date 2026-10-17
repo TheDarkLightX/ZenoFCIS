@@ -57,8 +57,18 @@ def hashes(root, paths):
 
 
 def run_controls(root, out, environment, controls, run_logged):
+    # A scratch checkout must not replace ordinary CLI binaries in the caller's
+    # Cargo target. Keep mutation artifacts private and reclaim them on refusal.
+    parent = Path(environment.get('CARGO_TARGET_DIR', root / 'target')).resolve()
+    parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='checker-native-', dir=parent) as target:
+        owned_environment = dict(environment, CARGO_TARGET_DIR=target)
+        return _run_controls(root, out, owned_environment, controls, run_logged)
+
+
+def _run_controls(root, out, environment, controls, run_logged):
     out.mkdir(parents=True, exist_ok=False)
-    specimen = Path(tempfile.mkdtemp(prefix='zfc-g10-controls-', dir='/tmp'))
+    specimen = Path(tempfile.mkdtemp(prefix='zfc-g10-controls-', dir=environment.get('TMPDIR', '/tmp')))
     (out / 'specimen.json').write_text(json.dumps({'path': str(specimen)}) + '\n')
     paths = source_files(root)
     original = hashes(root, paths)

@@ -1,0 +1,43 @@
+"""Heavy real-CLI capture grammar regression; invoked by the Rust integration gate."""
+import os
+from pathlib import Path
+import tempfile
+import unittest
+
+import capture_workspace as W
+import loop_language as Z
+
+
+class CaptureCliGrammarTests(unittest.TestCase):
+    def test_real_cli_accepts_paired_int_bool_equality_and_conditionals(self):
+        cli = os.environ.get('ZENO_CAPTURE_TEST_CLI')
+        if not cli:
+            self.skipTest('real CLI required; the Rust capture integration gate supplies it')
+        for english in (False, True):
+            with self.subTest(english=english), tempfile.TemporaryDirectory() as directory:
+                folder = Path(directory)
+                spec = folder / 'spec.json'
+                spec.write_text('{"inputs":[{"kind":"Int","min":"0","max":"3"},{"kind":"Bool"}],'
+                                '"outputs":[{"kind":"Int","min":"0","max":"3"},{"kind":"Bool"},'
+                                '{"kind":"Int","min":"0","max":"3"}]}')
+                source = folder / 'reference.py'
+                source.write_text('def reference(p): return [p[0],int(p[1]==1),3-p[0] if p[1]==1 else p[0]]\n')
+                workspace = W.CaptureWorkspace(folder / 'capture.json', cli=cli)
+                workspace.init(spec, source, folder / 'session')
+                ctx = workspace.ctx(workspace.load())
+                expressions = ('x0', 'x1 == true', 'x1 ? 3 - x0 : x0')
+                document = Z.Document(ctx.subject_ref, 'model', tuple(
+                    Z.act('capture', 'p1', output=f'out{i}', expr=Z.read(text, ctx, False))
+                    for i, text in enumerate(expressions)))
+                proposal = Z.render(document, ctx, english)
+                self.assertEqual(Z.parse(proposal, ctx), document)
+                events = workspace.submit(proposal)
+                acts = tuple(a for event in events[1:] for a in Z.parse(event['symbolic'], ctx).acts)
+                self.assertTrue(any(a.kind == 'captured-exact' for a in acts), events)
+                self.assertFalse(any(a.kind == 'capture-result' for a in acts), events)
+                for event in events:
+                    self.assertEqual(Z.parse(event['symbolic'], ctx), Z.parse(event['english'], ctx))
+
+
+if __name__ == '__main__':
+    unittest.main()

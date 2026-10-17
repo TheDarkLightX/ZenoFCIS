@@ -1,11 +1,87 @@
-# ZenoFCIS 2.3.0
+# ZenoFCIS 2.4.0
 
-ZenoFCIS 2.3.0 combines the V2.2 and V2.3 source line into one version, with
-no separate stable 2.2.0 release. V2 deliberately changes the 1.1.0 API.
-These notes describe the source prepared for the stable release; final
-acceptance, hosted platform qualification and stable publication are not
-claimed here. The earlier prereleases retain their
-[candidate records](RELEASE_CANDIDATES.md).
+2.4.0 is the current release source. These notes describe the changes recorded
+in the [changelog](../CHANGELOG.md#240---2026-10-15). Final source qualification,
+hosted checks, packaging, signing and publication remain separate gates; these
+notes do not claim those gates have passed. Published downloads must be checked
+against their signed checksum list as the [installation guide](INSTALLATION.md)
+describes.
+
+## Arithmetic and execution
+
+- Authored rules gain checked scalar multiplication, floor/ceiling division,
+  fused mul-div and exact product comparisons, with explicit arithmetic
+  profiles and refusal boundaries. Narrow and fused operations remain distinct.
+- The Spot arithmetic pilot covers fee splits, bounded exact-in swaps,
+  liquidity burns and closed graph bounds. It does not establish business
+  acceptance, authorization or correctness of arbitrary histories.
+- Four closed evaluator adapters are inlined. Earlier paired measurements on
+  one serial workload do not establish a release-wide performance improvement.
+- Parallel checker containment follows the caller's CPU policy and runtime
+  ceiling. Failed offline runs publish no receipt; retained loop receipts
+  remain replay-checked history.
+
+## Search, dialogue and knowledge
+
+- `zeno-fcis-program-search` proposes smaller finite decision programs under
+  explicit budgets. `transform check` and matched receipt replay decide
+  equivalence; the search itself supplies no adoption or publication authority.
+- The bounded loop adds expression candidates, sketch completion, family fits,
+  transfer, meaning keys, teach-back and decomposition. `loop pipeline`,
+  `loop strategy` and `loop rules` add guarded completion, repair, strategy
+  selection and rewrite proposals. Family claims hold only on checked instances.
+- `loop question --specification` searches finite sketch meanings without an
+  existing core. Counts, minimax partitions and conflicts are relative to that
+  grammar and domain. A budget stop is inconclusive and spends no attempt.
+- `loop learn --spec FILE` searches the declared checked vocabulary. Native
+  reference completion and `loop capture` require complete finite capture,
+  exact checking and receipt replay. Example agreement alone is a proposal;
+  unsupported containment and incomplete work remain unqualified.
+- Structured usage knowledge, bounded stratified Datalog and typed strategy
+  plans remain advisory. Explicit `--kb PATH` values override `ZENO_FCIS_KB`;
+  without `--kb`, that environment variable supplies an OS-separated path
+  list. With neither configured, the neutral compiled example is used. Private
+  knowledge and evidence remain outside source and release packages.
+
+## Contract judges and composition
+
+- `contract review --gaps`, `profile`, `lemma`, `scenario` and `probe` expose
+  specification ambiguity, state behavior and counterexamples over declared
+  finite domains. Malformed inputs and exhausted budgets cannot become passes.
+- `contract check-composition` adds the composed-domain `/3` profile: merge-order
+  joint steps and bounded local, assumption and coupling obligations. The
+  induction argument is documented, not machine-checked.
+- `loop decompose --compose` compares the composition checker's joint step
+  with the core over every declared input. This no-outbox profile refuses
+  source channels or deliveries with `compose-core-deliveries-unsupported`.
+  Bounds obligations alone do not establish behavioral equivalence.
+
+The component catalog’s declared laws do not fully specify its decisions. Finite-domain contract-judge runs across all 77 supported instances (107,518 input tuples) found 0 decisions uniquely determined by those laws; in every instance the laws also admitted a core that rejects every request. All 77 declared state laws were inductive over their respective finite domains. These invariant checks establish bounded state preservation, while acceptance conditions and rejection reasons still require additional specification and behavior examples. Mutant results cover only the finite mutation catalog, and these advisory checks provide neither a general proof nor release qualification.
+
+## Platforms, storage and compatibility
+
+- The release set requires Linux x86_64 GNU (glibc 2.39 or later) and Apple
+  silicon macOS executables, each with its own build, custody and installed
+  binary checks. Linux containment and `synth verify` execution remain
+  unavailable on macOS (exit 2); the macOS binary is ad-hoc signed, not notarized.
+- SQLite uses `synchronous=EXTRA`; Apple builds also use `fullfsync`. Durability
+  against power loss still depends on the drive. The OCaml scalar consumer
+  joins the acceptance portfolio.
+- The checked program and private publication boundary introduced in 2.3.0
+  remains the supported V2 route. Canonical protocol identifiers are versioned
+  independently. Historical fixtures and qualification counts below keep
+  their original subjects and are not 2.4.0 qualification evidence.
+
+## Historical 2.3.0 source and qualification
+
+ZenoFCIS 2.3.0 introduced the first stable V2 source line. It combines the
+V2.2 and V2.3 source line into one version, with no separate stable 2.2.0
+release. V2 deliberately changes the 1.1.0 API. These
+notes describe the release's source changes and locally observed checks. They
+do not themselves claim final acceptance or hosted platform qualification;
+each published artifact's qualification belongs to its release workflow run,
+and the signed `DOWNLOADS.sha256` lists the published assets. The earlier
+prereleases retain their [candidate records](RELEASE_CANDIDATES.md).
 
 An application declares its original schema, decision program, reasons,
 channels and laws as data. The library admits the inputs, computes the
@@ -15,7 +91,7 @@ cannot replace this route with decision or law callbacks, caller-reported
 usage or caller-built publications. Authoring, search and evidence tools
 grant no publication authority.
 
-## Library and contract authoring
+### Library and contract authoring
 
 - The crate root and prelude use the checked program API. `bind_catalog` and
   `bind_program` admit declarations; `Program::publish` evaluates original
@@ -41,7 +117,7 @@ grant no publication authority.
   contracts support up to 4,096 nodes, 64 inputs and 64 outputs with checked
   signed 64-bit expressions. See [wide values](WIDE_VALUE_EXECUTION.md).
 
-## Durable stores and migrations
+### Durable stores and migrations
 
 The schema-10 SQLite store checks identity, freshness and the complete
 database schema inside a transaction. Opening a lineage replays its history;
@@ -73,7 +149,7 @@ rollback-journal deletion at commit. Apple builds also enable `fullfsync`
 for SQLite file syncs. Power-loss durability still depends on the drive
 honouring the requested syncs.
 
-## Equivalence and bounded search
+### Equivalence and bounded search
 
 `transform check` compares outputs and exact failure classes on every tuple
 of the declared finite domain under eager semantics. `transform replay`
@@ -99,7 +175,7 @@ space. No release-wide speedup is asserted. `transform`, `optimize` and
 `loop` retain their 256-node and 16-output bound. Enumeration defaults to
 10^8 tuples; contract review and migration admission default to 2^20.
 
-## Certificates, composition and integrations
+### Certificates, composition and integrations
 
 `transform check-certificates` and `replay-certificates` support declared
 domains beyond enumeration for quantifier-free Boolean and linear integer
@@ -162,7 +238,7 @@ decisions, laws and storage. ZAL remains an optional finite-model authoring
 prototype, outside the released API; supplied labels and scripted review
 are not human approval or authenticated authorization.
 
-## Observed assurance scope
+### Observed assurance scope
 
 Installed Verus profiles currently record the following positive inventory
 snapshots. Whole-crate counts include shared dependencies; rows and
@@ -193,17 +269,17 @@ end-to-end theorem. No check establishes that supplied laws, labels or
 examples capture human intent. Supplied principals, authorization, time and
 context are application inputs; ZenoFCIS does not authenticate them.
 
-## Platforms and upgrading
+### Platforms and upgrading
 
-Binary support is planned for these targets, conditioned on completed
-platform qualification, installation and release-custody checks:
+The release process publishes a binary for each of these targets only after
+its platform qualification, installation and release-custody checks pass:
 
 | Target | Requirements and qualification boundary |
 | --- | --- |
-| Linux x86_64 GNU | Planned glibc 2.39 floor; qualification belongs to the completed matching Linux host run |
+| Linux x86_64 GNU | glibc 2.39 floor; qualification belongs to the completed matching Linux host run |
 | macOS on Apple silicon | `aarch64-apple-darwin`; minimum-version metadata is macOS 11.0; qualification belongs to the completed macOS 15 arm64 run, not every macOS version |
 
-No Windows or Intel macOS binary is planned. Linux-only containment and
+There is no Windows or Intel macOS binary. Linux-only containment and
 emitted-code execution for `synth verify` do not become macOS-qualified
 features. A configured workflow or minimum-version field does not establish
 a qualified host, published executable, notarization or verified download
@@ -222,7 +298,6 @@ becomes `Value::boolean(true)` and `TransitionDecision` becomes
 `PublicationOutcome`. Older databases are not migrated implicitly. See the
 [migration guide](V2_PROGRAM_API_MIGRATION.md) for the exact source changes.
 
-After stable publication, the security policy targets the 2.3.x line and
-supersedes 1.1.x and 1.0.x; candidates remain unsupported. Until then,
-[`SECURITY.md`](../SECURITY.md) states the active policy and private reporting
-route. These notes assert no active 2.3.x support or published signing set.
+The security policy supports the 2.3.x line and supersedes 1.1.x and 1.0.x;
+candidates are unsupported. [`SECURITY.md`](../SECURITY.md) states the policy
+and the private reporting route.

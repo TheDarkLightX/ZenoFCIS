@@ -16,7 +16,11 @@ mod draft_command;
 mod durable_counter;
 mod effects;
 mod inventory_reservation;
+mod judge_command;
+mod knowledge_command;
+mod knowledge_evidence;
 mod loop_command;
+mod loop_knowledge;
 mod loop_proposers;
 mod neural_loop;
 mod optimize;
@@ -65,6 +69,9 @@ const INVALID: u8 = 1;
 const BLOCKED: u8 = 2;
 const FAILURE: u8 = 3;
 const USAGE: u8 = 64;
+/// A judge's own input, a formula, scenario file or proposed law, or the
+/// contract it judges, has no contract form.
+const MALFORMED: u8 = 65;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const MINIMAL: &str = r#"zeno 1;
@@ -128,17 +135,33 @@ claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pr
     disable_help_subcommand = true
 )]
 struct Cli {
+    /// Ordered external KB files; omission consults ZENO_FCIS_KB for loop sessions.
+    #[arg(long, global = true)]
+    kb: Vec<PathBuf>,
+    /// Disable automatic KB consultation, including stored session configuration.
+    #[arg(long, global = true)]
+    no_kb: bool,
+    /// Explicit task/size/environment facts for automatic loop advice.
+    #[arg(long, global = true, default_value = "")]
+    kb_task: String,
+    #[arg(long, global = true, hide = true)]
+    kb_snapshot: Option<String>,
+    #[arg(long, global = true, hide = true)]
+    kb_invocation: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
 
 /// The `contract` group: F2's advisory review, F6's checked adoption, G8's
-/// change classification, G14.1's reviewed rule change and the export of a
-/// contract's decision program.
+/// change classification, G14.1's reviewed rule change, the export of a
+/// contract's decision program, and the advisory judges over a contract's
+/// declared domain: profile, lemma, scenario and probe.
 #[derive(Subcommand)]
 enum ContractCommand {
     #[command(flatten)]
     Review(review_command::Command),
+    #[command(flatten)]
+    Judge(judge_command::Command),
     #[command(flatten)]
     Composition(composition_command::Command),
     #[command(flatten)]
@@ -168,6 +191,11 @@ enum ContractCommand {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Read-only structured usage knowledge operations.
+    Kb {
+        #[command(subcommand)]
+        operation: knowledge_command::Operation,
+    },
     /// Describe commands, arguments, defaults, and effects as JSON without reading projects.
     Describe {
         /// Optional command path, for example: backend verify.
@@ -376,10 +404,80 @@ enum SmtBackend {
 fn main() -> ExitCode {
     match Cli::try_parse() {
         Ok(cli) => {
-            if let Some(code) = checker_process::dispatch(&cli.command) {
-                return ExitCode::from(code);
+            if let Command::Kb { operation } = cli.command {
+                return ExitCode::from(knowledge_command::execute(&cli.kb, operation));
             }
-            let code = run(cli.command);
+            if let Some(result) =
+                loop_command::knowledge_operation(&cli.command, &cli.kb, &cli.kb_task)
+            {
+                print_json(&result.1);
+                return ExitCode::from(result.0);
+            }
+            let knowledge = match loop_knowledge::prepare(
+                &cli.command,
+                &cli.kb,
+                &cli.kb_task,
+                cli.kb_snapshot.as_deref(),
+                cli.kb_invocation.as_deref(),
+                cli.no_kb,
+            ) {
+                Ok(k) => k,
+                Err(_) if cli.kb_snapshot.is_some() => {
+                    print_json(
+                        &json!({"authority":"none","status":"inconclusive","reason":"kb-snapshot-changed"}),
+                    );
+                    return ExitCode::from(BLOCKED);
+                }
+                Err(_) => {
+                    eprintln!(
+                        "knowledge: consultation-unavailable; ordinary exact checkers retained"
+                    );
+                    None
+                }
+            };
+            if let Some(k) = &knowledge {
+                k.show();
+            }
+            let code = if knowledge.as_ref().is_some_and(|k| k.blocked) {
+                print_json(
+                    &json!({"schema":"zeno-fcis/loop-knowledge/1","authority":"none","status":"inconclusive","reason":"knowledge-step-excluded","advice_applied":true}),
+                );
+                BLOCKED
+            } else if let Some(code) = checker_process::dispatch(
+                &cli.command,
+                knowledge.as_ref().map(|k| k.policy.snapshot.as_str()),
+                knowledge.as_ref().map(|k| k.invocation()),
+                if cli.kb_task.is_empty() {
+                    knowledge.as_ref().map(|k| k.task())
+                } else {
+                    None
+                },
+                if cli.kb.is_empty() {
+                    knowledge.as_ref().map(|k| k.paths())
+                } else {
+                    None
+                },
+            ) {
+                code
+            } else {
+                match cli.command {
+                    Command::Loop { command } => loop_command::run_with_policy(
+                        command,
+                        knowledge.as_ref().map(|k| &k.policy),
+                    ),
+                    other => run(other),
+                }
+            };
+            let code = if let Some(k) = knowledge {
+                if k.finish(code).is_err() {
+                    eprintln!("knowledge: inbox-proposal-write-failed");
+                    BLOCKED
+                } else {
+                    code
+                }
+            } else {
+                code
+            };
             checker_process::shutdown(code);
             ExitCode::from(code)
         }
@@ -397,6 +495,7 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 
 fn run(command: Command) -> u8 {
     match command {
+        Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
         Command::Transform { command } => transform_command::run(command),
@@ -404,6 +503,7 @@ fn run(command: Command) -> u8 {
         Command::Loop { command } => loop_command::run(command),
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
+            ContractCommand::Judge(command) => judge_command::run(command),
             ContractCommand::Composition(command) => composition_command::run(command),
             ContractCommand::Draft(command) => draft_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
@@ -505,6 +605,8 @@ fn describe(path: &[String]) -> u8 {
     print_json(&json!({
         "schema": DESCRIPTION_SCHEMA,
         "cli_version": env!("CARGO_PKG_VERSION"),
+        "source_identity": {"kind":"compiled-loop-program-sources/1",
+            "sha256":loop_command::implementation_identity()},
         "authority": "diagnostic-only",
         "normal_program": {
             "declaration_api": "zeno_fcis::program", "authority": "none",
@@ -524,7 +626,8 @@ fn describe(path: &[String]) -> u8 {
             {"code": INVALID, "meaning": "invalid input, refuted claim, or generated drift"},
             {"code": BLOCKED, "meaning": "blocked prerequisite or indeterminate evidence"},
             {"code": FAILURE, "meaning": "filesystem, tool, or bounded execution failure"},
-            {"code": USAGE, "meaning": "invalid command-line arguments"}
+            {"code": USAGE, "meaning": "invalid command-line arguments"},
+            {"code": MALFORMED, "meaning": "invalid judge formula, proposal, or scenario input"}
         ],
         "command": describe_tree(selected, path)
     }));
@@ -1789,14 +1892,36 @@ mod tests {
         let mut found = Vec::new();
         leaves(&tree, &mut found);
         // Every loop command, named by the parser, so a new one needs review.
-        let example = |name: &str| -> &[&str] {
-            match name {
-                "open" => &["--original", "p.zcve", "--session", "s"],
-                "candidate" => &["--session", "s", "--candidate", "c.zcve"],
-                "run" => &["--session", "s", "--proposer", "local"],
-                "resume" => &["--session", "s"],
-                "encode" => &["--program", "p.json", "--out", "p.zcve"],
-                _ => panic!("loop {name}: review its containment and effects"),
+        let example = |path: &[&str]| -> &[&str] {
+            match path {
+                ["loop", "capture", "open"] => {
+                    &["--spec", "s.json", "--reference", "r.py", "--session", "s"]
+                }
+                ["loop", "capture", "candidate"] => {
+                    &["--session", "s", "--candidate-json", "c.json"]
+                }
+                ["loop", "capture", "packet" | "status"] => &["--session", "s"],
+                ["loop", name] => match *name {
+                    "open" => &["--original", "p.zcve", "--session", "s"],
+                    "candidate" => &["--session", "s", "--candidate", "c.zcve"],
+                    "run" => &["--session", "s", "--proposer", "local"],
+                    "resume" => &["--session", "s"],
+                    "encode" => &["--program", "p.json", "--out", "p.zcve"],
+                    "sketch" => &["--session", "s", "--sketch", "k.json"],
+                    "family" => &["--instances", "m.json", "--program", "p.json"],
+                    "transfer" => &["--from", "p.json", "--to-instances", "m.json"],
+                    "meaning" => &["--original", "p.zcve", "--candidate", "c.zcve"],
+                    "question" => &["--contract", "app"],
+                    "teach-back" => &["--contract", "app", "--rule", "r.json"],
+                    "decompose" => &["--contract", "app", "--architecture", "a.json"],
+                    // Composable program loops: retain the containment/effects test for every command.
+                    "pipeline" => &["--original", "p.zcve", "--proposal", "p.json"],
+                    "strategy" => &["--tasks", "t.json"],
+                    "rules" => &["--original", "p.zcve"],
+                    "learn" => &["--spec", "s.json"],
+                    _ => panic!("loop {name}: review its containment and effects"),
+                },
+                _ => panic!("{path:?}: review its containment and effects"),
             }
         };
         let mut contained = 0;
@@ -1805,9 +1930,14 @@ mod tests {
             let line: Vec<&str> = line.iter().map(String::as_str).collect();
             // Whether only a flag routes the command through `dispatch`.
             let (command, conditional) = match line.as_slice() {
-                ["loop", name, ..] => {
-                    let mut arguments = vec!["loop", *name];
-                    arguments.extend_from_slice(example(name));
+                ["loop", ..] => {
+                    let prefix = if line.get(1) == Some(&"capture") {
+                        3
+                    } else {
+                        2
+                    };
+                    let mut arguments = line[..prefix].to_vec();
+                    arguments.extend_from_slice(example(&line[..prefix]));
                     (parsed(&arguments), false)
                 }
                 ["transform", "check", ..] => {
@@ -1846,7 +1976,15 @@ mod tests {
                 );
             }
         }
-        assert_eq!(contained, 6, "five loop commands and the parallel check");
+        let loop_commands = found
+            .iter()
+            .filter(|(line, _)| line.first().is_some_and(|s| s == "loop"))
+            .count();
+        assert_eq!(
+            contained,
+            loop_commands + 1,
+            "every loop command and the parallel check"
+        );
         // Leaves whose required arguments alone do not parse; none is a loop
         // command or a check, so none can be contained.
         assert_eq!(unparsed, Vec::<String>::new());

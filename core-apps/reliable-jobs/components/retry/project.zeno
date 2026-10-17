@@ -28,5 +28,5 @@ law 502 exact_finish on accept = (command.101.120 == 1 -> (post.100.110 == pre.1
 law 503 exact_attempt on accept = (command.101.120 == 0 -> (post.100.110 + 1 == pre.100.110 && post.100.111 == 0));
 // Core seed retry-budget/1; parameters {"C": 3}.
 // Instance source-set SHA256 e730ad96ea84380b6cf3c9dec3479ab4a4e95b694bd53724217f28c0549cf99f.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 16dfc6b3600dd5a40f43dc7c212b536b763dc399ac1b2f6713d63987d51d3e6c; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/retry-budget.json SHA256 ddc87b80a5c78384268e273aa4a6aa0567972e9df610ced7a9785abc8f8291d3; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

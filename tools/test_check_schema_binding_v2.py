@@ -41,6 +41,64 @@ error: aborting due to 7 previous errors
 
 
 class SchemaCoverage(unittest.TestCase):
+    def test_coverage_controls_use_their_own_complete_verifier_report(self):
+        # Synthetic runner integration: this does not execute or establish a proof.
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+        positive = {
+            "verus": {"version": pin["version"], "commit": pin["commit"],
+                      "toolchain": pin["rust_toolchain"]},
+            "verification-results": {"success": True, "errors": 0,
+                "verified": profile["expected_verified"], "encountered-error": False,
+                "encountered-vir-error": False, "is-verifying-entire-crate": True},
+            "func-details": {key: {} for key in profile["target_functions"]},
+        }
+        name = "equivalent_schema_specification_change"
+        selected = gate.mutation_sources((gate.ROOT / gate.SUBJECT).read_text(),
+            (gate.ROOT / gate.ADMISSION).read_text(), (gate.ROOT / gate.SPEC).read_text())[name]
+        for mode in ("complete", "wrong-tool", "filtered", "malformed", "error-header",
+                     "nonzero-exit", "unrelated-coverage"):
+            current = copy.deepcopy(positive)
+            if mode == "wrong-tool":
+                current["verus"]["commit"] = "other"
+            if mode == "filtered":
+                current["verification-results"]["is-verifying-entire-crate"] = False
+            with self.subTest(mode=mode), TemporaryDirectory() as temporary, ExitStack() as stack:
+                root = Path(temporary)
+                def run(command, cwd, environment):
+                    mutated = cwd != gate.ROOT
+                    value = current if mutated else positive
+                    if "--log-dir" in command:
+                        logs = Path(command[command.index("--log-dir") + 1])
+                        logs.mkdir(parents=True, exist_ok=True)
+                        (logs / "crate.vir").write_text("synthetic translated input")
+                    output = "{" if mutated and mode == "malformed" else json.dumps(value)
+                    stderr = "error: failed synthetic query\n" if mutated and mode == "error-header" else ""
+                    code = 1 if mutated and mode == "nonzero-exit" else 0
+                    return subprocess.CompletedProcess(command, code, output, stderr)
+                stack.enter_context(patch.object(gate.verifier, "prepare_tools", return_value=root / "tools"))
+                stack.enter_context(patch.object(gate.verifier, "run", side_effect=run))
+                stack.enter_context(patch.object(gate.verifier, "verify_tool_files"))
+                stack.enter_context(patch.object(gate, "native_check", return_value={"build_exit": 0, "exit_code": 0}))
+                stack.enter_context(patch.object(gate, "require_coverage", return_value={}))
+                stack.enter_context(patch.object(gate, "coverage_control",
+                    return_value=(mode != "unrelated-coverage", "synthetic intended refusal")))
+                stack.enter_context(patch.object(gate, "mutation_sources", return_value={name: selected}))
+                stack.enter_context(patch.object(gate, "adjust_specimen_source_lengths"))
+                stack.enter_context(patch.object(gate.subprocess, "check_output", return_value="synthetic"))
+                if mode == "complete":
+                    result = gate.check(root / "cache", False, root)
+                    self.assertEqual(result["status"], "passed")
+                    self.assertEqual(len(result["mutations"]), 1)
+                    self.assertTrue(result["mutations"][0]["killed"])
+                    self.assertEqual(result["mutations"][0]["verification_results"], current["verification-results"])
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "survived or failed for an unrelated reason"):
+                        gate.check(root / "cache", False, root)
+
     def test_every_executable_has_total_contract_and_body_guard(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         executable = {name for name, row in profile["functions"].items() if row["mode"] == "Exec"}

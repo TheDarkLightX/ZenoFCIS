@@ -1,0 +1,20 @@
+{
+  "schema": "zeno-fcis/loop-architecture/1",
+  "components": [
+    {
+      "name": "counter",
+      "owns": [
+        "value"
+      ],
+      "reads": [
+        "action",
+        "authorized"
+      ],
+      "decides": [
+        "not_authorized",
+        "at_capacity",
+        "at_zero"
+      ]
+    }
+  ]
+}

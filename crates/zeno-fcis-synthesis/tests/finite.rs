@@ -601,12 +601,13 @@ fn language_adapters_keep_distinct_identities_extensions_and_stated_abis() {
     let javascript = JavaScriptEmitter.target();
     assert_eq!(javascript.language, "javascript");
     assert_eq!(javascript.extension, "mjs");
-    assert_eq!(javascript.revision, 1);
+    assert_eq!(javascript.revision, 2);
     assert!(JavaScriptEmitter.abi().contains("primitive string"));
     // A copied adapter that kept another emitter's identity, extension, or ABI
     // would let one target's conformance evidence stand in for another's.
     let adapters: [&dyn TargetEmitter; 3] = [&RustEmitter, &PythonEmitter, &JavaScriptEmitter];
     for (position, left) in adapters.iter().enumerate() {
+        assert_eq!(left.target().revision, 2, "arithmetic adapter revision");
         let identity = left.identity();
         assert_eq!(identity, left.identity(), "identity must be stable");
         assert!(!left.abi().is_empty());

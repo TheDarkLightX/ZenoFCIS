@@ -372,6 +372,15 @@ def _human_text(result):
 
 
 def main():
+    import sys
+    # Owner-only capture provisioning; no equivalent MCP initialization tool.
+    if sys.argv[1:2] == ["capture"]:
+        from capture_workspace import terminal as capture_terminal
+        raise SystemExit(capture_terminal(sys.argv[2:]))
+    if sys.argv[1:2] == ["loop"]:
+        # The owner's loop workspace commands: init, show, next, answer, say (loop_workspace.py).
+        from loop_workspace import terminal as loop_terminal
+        raise SystemExit(loop_terminal(sys.argv[2:]))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["init", "review"])
     parser.add_argument("--workspace", type=Path, required=True)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for complete-decision proof/coverage mutation controls."""
 import unittest
+from test_negative_retention import StrictGateMutationTests
 import check_decision_v2 as gate
 import verus_contract_controls as contract_controls
 from test_verus_contract_controls import PIN,assert_strict_classification,report

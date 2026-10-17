@@ -1,5 +1,5 @@
 format = "zeno-fcis/package-set/1"
-version = "2.3.0"
+version = "2.4.0"
 rust_toolchain = "1.97.1"
 
 # Dependency-first order for crates.io publication. The checker rejects a
@@ -26,6 +26,8 @@ publish_order = [
     "zeno-fcis-secret",
     "zeno-fcis-domain",
     "zeno-fcis-synthesis",
+    "zeno-fcis-program-search",
+    "zeno-fcis-loop-doors",
     "zeno-fcis-contract",
     "zeno-fcis-collections",
     "zeno-fcis-profile-zenodex",

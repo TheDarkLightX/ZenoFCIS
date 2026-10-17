@@ -18,6 +18,7 @@ import zipfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
+from verus_coverage import profile_inventory
 import check_verus as verifier
 from check_finite_execution import once
 from verus_contract_controls import contract_rejected
@@ -125,12 +126,33 @@ def classify_mutation(proc, report, name, path, changed, specimen, pin, profile,
     if (expected != "coverage" or proc.returncode != 0 or vir is None
             or not verifier.proof_succeeded(report, pin) or verifier.ERROR_HEADER.search(proc.stderr)):
         return False, None, None
+    intended, refusal = coverage_control(vir, profile, name)
+    if intended:
+        return True, refusal, None
+    return False, None, None
+
+
+def coverage_control(vir, profile, name):
+    """Require the exact specification edit or uncontracted function."""
     try:
         require_coverage(vir, profile)
     except ValueError as error:
-        return True, str(error), None
-    return False, None, None
-
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = profile['namespace'] + 'envelope::'
+    if name == 'add_uncontracted_function':
+        target = prefix + 'uncontracted_frame_length'
+        intended = (set(actual) == set(expected) | {target}
+            and target not in expected and actual[target]['mode'] == 'Exec'
+            and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        target = prefix + 'spec::frame'
+        intended = (set(actual) == set(expected)
+            and actual[target]['body_sha256'] != expected[target]['body_sha256'])
+    return intended, refusal
 
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     executable = directory / "envelope-frame-tests"
@@ -230,7 +252,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

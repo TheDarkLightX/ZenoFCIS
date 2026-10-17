@@ -1,0 +1,6550 @@
+[
+ {
+  "candidate": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     1,
+     3
+    ],
+    [
+     "Int",
+     "7"
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Select",
+     4,
+     5,
+     6
+    ],
+    [
+     "Eq",
+     2,
+     7
+    ],
+    [
+     "Int",
+     "149"
+    ],
+    [
+     "Int",
+     "147"
+    ],
+    [
+     "Select",
+     8,
+     9,
+     10
+    ],
+    [
+     "Sub",
+     1,
+     11
+    ],
+    [
+     "Select",
+     0,
+     12,
+     6
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Add",
+     2,
+     14
+    ],
+    [
+     "Sub",
+     2,
+     14
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    13,
+    15,
+    16
+   ]
+  },
+  "expect": "accepted",
+  "kind": "region",
+  "name": "region-counter-shared-fields",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "region": {
+   "of": 36,
+   "per_output": {
+    "out0": 2
+   },
+   "shared_fields": {
+    "action": "Inc",
+    "authorized": true
+   },
+   "tuples": 2
+  },
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "candidate": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     1,
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     0,
+     3
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     5,
+     6
+    ],
+    [
+     "Lt",
+     6,
+     5
+    ],
+    [
+     "Eq",
+     7,
+     8
+    ],
+    [
+     "Select",
+     4,
+     9,
+     8
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     13,
+     14
+    ],
+    [
+     "Lt",
+     14,
+     13
+    ],
+    [
+     "Eq",
+     15,
+     16
+    ],
+    [
+     "Select",
+     17,
+     9,
+     7
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     19,
+     20
+    ],
+    [
+     "Eq",
+     11,
+     20
+    ],
+    [
+     "Select",
+     22,
+     0,
+     1
+    ],
+    [
+     "Select",
+     21,
+     2,
+     23
+    ],
+    [
+     "And",
+     15,
+     24
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "And",
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     3,
+     27
+    ],
+    [
+     "Int",
+     "155"
+    ],
+    [
+     "Sub",
+     13,
+     29
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     16,
+     31,
+     30
+    ],
+    [
+     "Select",
+     28,
+     30,
+     32
+    ],
+    [
+     "Select",
+     25,
+     26,
+     33
+    ],
+    [
+     "Select",
+     18,
+     34,
+     19
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Select",
+     12,
+     35,
+     36
+    ],
+    [
+     "Select",
+     10,
+     11,
+     37
+    ],
+    [
+     "Select",
+     0,
+     0,
+     22
+    ],
+    [
+     "Eq",
+     20,
+     36
+    ],
+    [
+     "Select",
+     1,
+     1,
+     40
+    ],
+    [
+     "Select",
+     2,
+     2,
+     21
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    38,
+    39,
+    41,
+    42
+   ]
+  },
+  "expect": "accepted",
+  "kind": "region",
+  "name": "region-queue-formula",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     0,
+     1
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Select",
+     3,
+     5,
+     6
+    ],
+    [
+     "Select",
+     4,
+     5,
+     6
+    ],
+    [
+     "Add",
+     7,
+     8
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     10,
+     5,
+     6
+    ],
+    [
+     "Add",
+     9,
+     11
+    ],
+    [
+     "Eq",
+     12,
+     6
+    ],
+    [
+     "Not",
+     13
+    ],
+    [
+     "And",
+     2,
+     14
+    ],
+    [
+     "Int",
+     "152"
+    ],
+    [
+     "Eq",
+     0,
+     16
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Lt",
+     12,
+     18
+    ],
+    [
+     "And",
+     17,
+     19
+    ],
+    [
+     "Not",
+     15
+    ],
+    [
+     "Not",
+     20
+    ],
+    [
+     "And",
+     21,
+     22
+    ],
+    [
+     "Not",
+     23
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Not",
+     25
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "160"
+    ],
+    [
+     "Eq",
+     27,
+     28
+    ],
+    [
+     "Not",
+     2
+    ],
+    [
+     "And",
+     29,
+     30
+    ],
+    [
+     "Not",
+     17
+    ],
+    [
+     "Not",
+     31
+    ],
+    [
+     "And",
+     32,
+     33
+    ],
+    [
+     "Not",
+     34
+    ],
+    [
+     "Not",
+     29
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     0,
+     37
+    ],
+    [
+     "Not",
+     38
+    ],
+    [
+     "And",
+     36,
+     39
+    ],
+    [
+     "Not",
+     35
+    ],
+    [
+     "Not",
+     40
+    ],
+    [
+     "And",
+     41,
+     42
+    ],
+    [
+     "Not",
+     43
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     27,
+     45
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     47,
+     6
+    ],
+    [
+     "And",
+     48,
+     3
+    ],
+    [
+     "Eq",
+     47,
+     5
+    ],
+    [
+     "And",
+     50,
+     4
+    ],
+    [
+     "Not",
+     49
+    ],
+    [
+     "Not",
+     51
+    ],
+    [
+     "And",
+     52,
+     53
+    ],
+    [
+     "Not",
+     54
+    ],
+    [
+     "Eq",
+     47,
+     18
+    ],
+    [
+     "And",
+     56,
+     10
+    ],
+    [
+     "Not",
+     55
+    ],
+    [
+     "Not",
+     57
+    ],
+    [
+     "And",
+     58,
+     59
+    ],
+    [
+     "Not",
+     60
+    ],
+    [
+     "And",
+     46,
+     61
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "162"
+    ],
+    [
+     "Eq",
+     27,
+     64
+    ],
+    [
+     "And",
+     65,
+     19
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Int",
+     "5"
+    ],
+    [
+     "Int",
+     "6"
+    ],
+    [
+     "Int",
+     "7"
+    ],
+    [
+     "Select",
+     46,
+     69,
+     70
+    ],
+    [
+     "Select",
+     29,
+     68,
+     71
+    ],
+    [
+     "Select",
+     66,
+     67,
+     72
+    ],
+    [
+     "Select",
+     62,
+     63,
+     73
+    ],
+    [
+     "Select",
+     44,
+     18,
+     74
+    ],
+    [
+     "Select",
+     26,
+     5,
+     75
+    ],
+    [
+     "Select",
+     24,
+     6,
+     76
+    ],
+    [
+     "Not",
+     3
+    ],
+    [
+     "Not",
+     48
+    ],
+    [
+     "And",
+     78,
+     79
+    ],
+    [
+     "Not",
+     80
+    ],
+    [
+     "Not",
+     4
+    ],
+    [
+     "Not",
+     50
+    ],
+    [
+     "And",
+     82,
+     83
+    ],
+    [
+     "Not",
+     84
+    ],
+    [
+     "Not",
+     10
+    ],
+    [
+     "Not",
+     56
+    ],
+    [
+     "And",
+     86,
+     87
+    ],
+    [
+     "Not",
+     88
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    77,
+    81,
+    85,
+    89
+   ]
+  },
+  "region": {
+   "formula": "exact on every tuple of the domain",
+   "of": 432,
+   "per_output": {
+    "out0": 54
+   },
+   "tuples": 54,
+   "where": "phase == Executed && (vote0 ? !vote1 && !vote2 : vote1 ? !vote2 : vote2)"
+  },
+  "vocabulary": {
+   "cases": 8,
+   "inputs": [
+    "phase",
+    "vote0",
+    "vote1",
+    "vote2",
+    "action",
+    "principal",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Enqueue": 160,
+     "Execute": 162,
+     "Vote": 161
+    },
+    "phase": {
+     "Empty": 150,
+     "Executed": 152,
+     "Pending": 151
+    }
+   }
+  }
+ },
+ {
+  "candidate": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     1,
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     0,
+     3
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     5,
+     6
+    ],
+    [
+     "Lt",
+     6,
+     5
+    ],
+    [
+     "Eq",
+     7,
+     8
+    ],
+    [
+     "Select",
+     4,
+     9,
+     8
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     13,
+     14
+    ],
+    [
+     "Lt",
+     14,
+     13
+    ],
+    [
+     "Eq",
+     15,
+     16
+    ],
+    [
+     "Select",
+     17,
+     9,
+     7
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     19,
+     20
+    ],
+    [
+     "Eq",
+     11,
+     20
+    ],
+    [
+     "Select",
+     22,
+     0,
+     1
+    ],
+    [
+     "Select",
+     21,
+     2,
+     23
+    ],
+    [
+     "And",
+     15,
+     24
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "And",
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     3,
+     27
+    ],
+    [
+     "Int",
+     "155"
+    ],
+    [
+     "Sub",
+     13,
+     29
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     16,
+     31,
+     30
+    ],
+    [
+     "Select",
+     28,
+     30,
+     32
+    ],
+    [
+     "Select",
+     25,
+     26,
+     33
+    ],
+    [
+     "Select",
+     18,
+     34,
+     19
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Select",
+     12,
+     35,
+     36
+    ],
+    [
+     "Select",
+     10,
+     11,
+     37
+    ],
+    [
+     "Select",
+     0,
+     0,
+     22
+    ],
+    [
+     "Eq",
+     20,
+     36
+    ],
+    [
+     "Select",
+     1,
+     1,
+     40
+    ],
+    [
+     "Select",
+     2,
+     2,
+     21
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    38,
+    39,
+    41,
+    42
+   ]
+  },
+  "expect": "rejected",
+  "kind": "region",
+  "name": "region-queue-planted-wrong-formula",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     0,
+     1
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Select",
+     3,
+     5,
+     6
+    ],
+    [
+     "Select",
+     4,
+     5,
+     6
+    ],
+    [
+     "Add",
+     7,
+     8
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     10,
+     5,
+     6
+    ],
+    [
+     "Add",
+     9,
+     11
+    ],
+    [
+     "Eq",
+     12,
+     6
+    ],
+    [
+     "Not",
+     13
+    ],
+    [
+     "And",
+     2,
+     14
+    ],
+    [
+     "Int",
+     "152"
+    ],
+    [
+     "Eq",
+     0,
+     16
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Lt",
+     12,
+     18
+    ],
+    [
+     "And",
+     17,
+     19
+    ],
+    [
+     "Not",
+     15
+    ],
+    [
+     "Not",
+     20
+    ],
+    [
+     "And",
+     21,
+     22
+    ],
+    [
+     "Not",
+     23
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Not",
+     25
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "160"
+    ],
+    [
+     "Eq",
+     27,
+     28
+    ],
+    [
+     "Not",
+     2
+    ],
+    [
+     "And",
+     29,
+     30
+    ],
+    [
+     "Not",
+     17
+    ],
+    [
+     "Not",
+     31
+    ],
+    [
+     "And",
+     32,
+     33
+    ],
+    [
+     "Not",
+     34
+    ],
+    [
+     "Not",
+     29
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     0,
+     37
+    ],
+    [
+     "Not",
+     38
+    ],
+    [
+     "And",
+     36,
+     39
+    ],
+    [
+     "Not",
+     35
+    ],
+    [
+     "Not",
+     40
+    ],
+    [
+     "And",
+     41,
+     42
+    ],
+    [
+     "Not",
+     43
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     27,
+     45
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     47,
+     6
+    ],
+    [
+     "And",
+     48,
+     3
+    ],
+    [
+     "Eq",
+     47,
+     5
+    ],
+    [
+     "And",
+     50,
+     4
+    ],
+    [
+     "Not",
+     49
+    ],
+    [
+     "Not",
+     51
+    ],
+    [
+     "And",
+     52,
+     53
+    ],
+    [
+     "Not",
+     54
+    ],
+    [
+     "Eq",
+     47,
+     18
+    ],
+    [
+     "And",
+     56,
+     10
+    ],
+    [
+     "Not",
+     55
+    ],
+    [
+     "Not",
+     57
+    ],
+    [
+     "And",
+     58,
+     59
+    ],
+    [
+     "Not",
+     60
+    ],
+    [
+     "And",
+     46,
+     61
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "162"
+    ],
+    [
+     "Eq",
+     27,
+     64
+    ],
+    [
+     "And",
+     65,
+     19
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Int",
+     "5"
+    ],
+    [
+     "Int",
+     "6"
+    ],
+    [
+     "Int",
+     "7"
+    ],
+    [
+     "Select",
+     46,
+     69,
+     70
+    ],
+    [
+     "Select",
+     29,
+     68,
+     71
+    ],
+    [
+     "Select",
+     66,
+     67,
+     72
+    ],
+    [
+     "Select",
+     62,
+     63,
+     73
+    ],
+    [
+     "Select",
+     44,
+     18,
+     74
+    ],
+    [
+     "Select",
+     26,
+     5,
+     75
+    ],
+    [
+     "Select",
+     24,
+     6,
+     76
+    ],
+    [
+     "Not",
+     3
+    ],
+    [
+     "Not",
+     48
+    ],
+    [
+     "And",
+     78,
+     79
+    ],
+    [
+     "Not",
+     80
+    ],
+    [
+     "Not",
+     4
+    ],
+    [
+     "Not",
+     50
+    ],
+    [
+     "And",
+     82,
+     83
+    ],
+    [
+     "Not",
+     84
+    ],
+    [
+     "Not",
+     10
+    ],
+    [
+     "Not",
+     56
+    ],
+    [
+     "And",
+     86,
+     87
+    ],
+    [
+     "Not",
+     88
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    77,
+    81,
+    85,
+    89
+   ]
+  },
+  "region": {
+   "formula": "exact on every tuple of the domain",
+   "of": 432,
+   "per_output": {
+    "out0": 54
+   },
+   "tuples": 54,
+   "where": "phase == Pending && (vote0 ? !vote1 && !vote2 : vote1 ? !vote2 : vote2)"
+  },
+  "vocabulary": {
+   "cases": 8,
+   "inputs": [
+    "phase",
+    "vote0",
+    "vote1",
+    "vote2",
+    "action",
+    "principal",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Enqueue": 160,
+     "Execute": 162,
+     "Vote": 161
+    },
+    "phase": {
+     "Empty": 150,
+     "Executed": 152,
+     "Pending": 151
+    }
+   }
+  }
+ },
+ {
+  "candidate": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     1,
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     0,
+     3
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     5,
+     6
+    ],
+    [
+     "Lt",
+     6,
+     5
+    ],
+    [
+     "Eq",
+     7,
+     8
+    ],
+    [
+     "Select",
+     4,
+     9,
+     8
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     13,
+     14
+    ],
+    [
+     "Lt",
+     14,
+     13
+    ],
+    [
+     "Eq",
+     15,
+     16
+    ],
+    [
+     "Select",
+     17,
+     9,
+     7
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     19,
+     20
+    ],
+    [
+     "Eq",
+     11,
+     20
+    ],
+    [
+     "Select",
+     22,
+     0,
+     1
+    ],
+    [
+     "Select",
+     21,
+     2,
+     23
+    ],
+    [
+     "And",
+     15,
+     24
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "And",
+     1,
+     2
+    ],
+    [
+     "Select",
+     0,
+     3,
+     27
+    ],
+    [
+     "Int",
+     "155"
+    ],
+    [
+     "Sub",
+     13,
+     29
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     16,
+     31,
+     30
+    ],
+    [
+     "Select",
+     28,
+     30,
+     32
+    ],
+    [
+     "Select",
+     25,
+     26,
+     33
+    ],
+    [
+     "Select",
+     18,
+     34,
+     19
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Select",
+     12,
+     35,
+     36
+    ],
+    [
+     "Select",
+     10,
+     11,
+     37
+    ],
+    [
+     "Select",
+     0,
+     0,
+     22
+    ],
+    [
+     "Eq",
+     20,
+     36
+    ],
+    [
+     "Select",
+     1,
+     1,
+     40
+    ],
+    [
+     "Select",
+     2,
+     2,
+     21
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    38,
+    39,
+    41,
+    42
+   ]
+  },
+  "expect": "rejected",
+  "kind": "region",
+  "name": "region-queue-planted-wrong-count",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "152",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Int",
+     "max": "162",
+     "min": "160"
+    },
+    {
+     "kind": "Int",
+     "max": "2",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     0,
+     1
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Input",
+     2
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Select",
+     3,
+     5,
+     6
+    ],
+    [
+     "Select",
+     4,
+     5,
+     6
+    ],
+    [
+     "Add",
+     7,
+     8
+    ],
+    [
+     "Input",
+     3
+    ],
+    [
+     "Select",
+     10,
+     5,
+     6
+    ],
+    [
+     "Add",
+     9,
+     11
+    ],
+    [
+     "Eq",
+     12,
+     6
+    ],
+    [
+     "Not",
+     13
+    ],
+    [
+     "And",
+     2,
+     14
+    ],
+    [
+     "Int",
+     "152"
+    ],
+    [
+     "Eq",
+     0,
+     16
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Lt",
+     12,
+     18
+    ],
+    [
+     "And",
+     17,
+     19
+    ],
+    [
+     "Not",
+     15
+    ],
+    [
+     "Not",
+     20
+    ],
+    [
+     "And",
+     21,
+     22
+    ],
+    [
+     "Not",
+     23
+    ],
+    [
+     "Input",
+     6
+    ],
+    [
+     "Not",
+     25
+    ],
+    [
+     "Input",
+     4
+    ],
+    [
+     "Int",
+     "160"
+    ],
+    [
+     "Eq",
+     27,
+     28
+    ],
+    [
+     "Not",
+     2
+    ],
+    [
+     "And",
+     29,
+     30
+    ],
+    [
+     "Not",
+     17
+    ],
+    [
+     "Not",
+     31
+    ],
+    [
+     "And",
+     32,
+     33
+    ],
+    [
+     "Not",
+     34
+    ],
+    [
+     "Not",
+     29
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     0,
+     37
+    ],
+    [
+     "Not",
+     38
+    ],
+    [
+     "And",
+     36,
+     39
+    ],
+    [
+     "Not",
+     35
+    ],
+    [
+     "Not",
+     40
+    ],
+    [
+     "And",
+     41,
+     42
+    ],
+    [
+     "Not",
+     43
+    ],
+    [
+     "Int",
+     "161"
+    ],
+    [
+     "Eq",
+     27,
+     45
+    ],
+    [
+     "Input",
+     5
+    ],
+    [
+     "Eq",
+     47,
+     6
+    ],
+    [
+     "And",
+     48,
+     3
+    ],
+    [
+     "Eq",
+     47,
+     5
+    ],
+    [
+     "And",
+     50,
+     4
+    ],
+    [
+     "Not",
+     49
+    ],
+    [
+     "Not",
+     51
+    ],
+    [
+     "And",
+     52,
+     53
+    ],
+    [
+     "Not",
+     54
+    ],
+    [
+     "Eq",
+     47,
+     18
+    ],
+    [
+     "And",
+     56,
+     10
+    ],
+    [
+     "Not",
+     55
+    ],
+    [
+     "Not",
+     57
+    ],
+    [
+     "And",
+     58,
+     59
+    ],
+    [
+     "Not",
+     60
+    ],
+    [
+     "And",
+     46,
+     61
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "162"
+    ],
+    [
+     "Eq",
+     27,
+     64
+    ],
+    [
+     "And",
+     65,
+     19
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Int",
+     "5"
+    ],
+    [
+     "Int",
+     "6"
+    ],
+    [
+     "Int",
+     "7"
+    ],
+    [
+     "Select",
+     46,
+     69,
+     70
+    ],
+    [
+     "Select",
+     29,
+     68,
+     71
+    ],
+    [
+     "Select",
+     66,
+     67,
+     72
+    ],
+    [
+     "Select",
+     62,
+     63,
+     73
+    ],
+    [
+     "Select",
+     44,
+     18,
+     74
+    ],
+    [
+     "Select",
+     26,
+     5,
+     75
+    ],
+    [
+     "Select",
+     24,
+     6,
+     76
+    ],
+    [
+     "Not",
+     3
+    ],
+    [
+     "Not",
+     48
+    ],
+    [
+     "And",
+     78,
+     79
+    ],
+    [
+     "Not",
+     80
+    ],
+    [
+     "Not",
+     4
+    ],
+    [
+     "Not",
+     50
+    ],
+    [
+     "And",
+     82,
+     83
+    ],
+    [
+     "Not",
+     84
+    ],
+    [
+     "Not",
+     10
+    ],
+    [
+     "Not",
+     56
+    ],
+    [
+     "And",
+     86,
+     87
+    ],
+    [
+     "Not",
+     88
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "7",
+     "min": "0"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "roots": [
+    77,
+    81,
+    85,
+    89
+   ]
+  },
+  "region": {
+   "formula": "exact on every tuple of the domain",
+   "of": 432,
+   "per_output": {
+    "out0": 54
+   },
+   "tuples": 55,
+   "where": "phase == Executed && (vote0 ? !vote1 && !vote2 : vote1 ? !vote2 : vote2)"
+  },
+  "stub_sensitive": false,
+  "vocabulary": {
+   "cases": 8,
+   "inputs": [
+    "phase",
+    "vote0",
+    "vote1",
+    "vote2",
+    "action",
+    "principal",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Enqueue": 160,
+     "Execute": 162,
+     "Vote": 161
+    },
+    "phase": {
+     "Empty": 150,
+     "Executed": 152,
+     "Pending": 151
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "door": "sketch",
+   "evaluated": 1,
+   "evidence": {
+    "input": {
+     "action": "Inc",
+     "authorized": true,
+     "value": 0
+    },
+    "kind": "witness",
+    "ordinal": 1,
+    "output": "out0"
+   },
+   "holes": {},
+   "reason": "no completion of out0",
+   "searched": [
+    {
+     "assignments": "1",
+     "holes": [
+      0
+     ],
+     "output": "out0",
+     "pivot": {
+      "hole": 0,
+      "space": {
+       "derived": "exact over all integers",
+       "enumeration_bound": 462,
+       "kind": "constant",
+       "range": null
+      }
+     },
+     "search": "single",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 1,
+     "verdict": "unrealizable",
+     "witness": {
+      "input": {
+       "action": "Inc",
+       "authorized": true,
+       "value": 0
+      },
+      "ordinal": 1,
+      "output": "out0"
+     }
+    }
+   ],
+   "sketch": [
+    "authorized ? action - 149 : ?c",
+    "keep",
+    "keep"
+   ],
+   "status": "unrealizable"
+  },
+  "expect": "accepted",
+  "kind": "unrealizable",
+  "name": "unrealizable-witness",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? action - 149 : ?c",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "door": "sketch",
+   "evaluated": 1,
+   "evidence": {
+    "kind": "witness",
+    "ordinal": 1,
+    "output": "out0"
+   },
+   "holes": {},
+   "reason": "no completion of out0",
+   "searched": [
+    {
+     "assignments": "1",
+     "holes": [
+      0
+     ],
+     "output": "out0",
+     "pivot": {
+      "hole": 0,
+      "space": {
+       "derived": "exact over all integers",
+       "enumeration_bound": 462,
+       "kind": "constant",
+       "range": null
+      }
+     },
+     "search": "single",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 1,
+     "verdict": "unrealizable",
+     "witness": {
+      "input": {
+       "action": "Inc",
+       "authorized": true,
+       "value": 0
+      },
+      "ordinal": 1,
+      "output": "out0"
+     }
+    }
+   ],
+   "sketch": [
+    "authorized ? action - 149 : ?c",
+    "keep",
+    "keep"
+   ],
+   "status": "unrealizable"
+  },
+  "expect": "rejected",
+  "kind": "unrealizable",
+  "name": "unrealizable-planted-false-witness",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? action - (value == (action == Inc ? 8 : 0) ? ?c : 147) : 0",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "door": "sketch",
+   "evaluated": 11,
+   "evidence": {
+    "kind": "complete-space-exhausted",
+    "output": "out0"
+   },
+   "holes": {},
+   "reason": "no completion of out0",
+   "searched": [
+    {
+     "assignments": "10",
+     "holes": [
+      0,
+      1
+     ],
+     "output": "out0",
+     "pivot": null,
+     "search": "meanings",
+     "searched": [
+      {
+       "complete": true,
+       "hole": 0,
+       "kind": "constant",
+       "listed": [
+        0,
+        -1,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+       ],
+       "max": 8,
+       "min": -1,
+       "values": 10
+      }
+     ],
+     "solved_alone": 0,
+     "tried": 11,
+     "verdict": "unrealizable",
+     "witness": null
+    }
+   ],
+   "sketch": [
+    "authorized ? action - (value == ?c ? ?c : 147) : 0",
+    "keep",
+    "keep"
+   ],
+   "status": "unrealizable"
+  },
+  "expect": "accepted",
+  "kind": "unrealizable",
+  "name": "unrealizable-exhausted-space",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? action - (value == ?c ? ?c : 147) : 0",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "check": {
+    "candidate_sha256": "40bbc9d15016ab187bd4c4191d48e7a6de075ccc02c703880ad8ff2d126b47c7",
+    "checker": "zeno-fcis/transform-check/1",
+    "receipt_sha256": "e26bce6ef7ba11b78f05e1a8678d54b7b6b476039184a71c15500fabd631b6fb",
+    "replay": "matched",
+    "verdict": "equivalent"
+   },
+   "completion": {
+    "bytes": 1198,
+    "nodes": 17,
+    "program": {
+     "inputs": [
+      {
+       "kind": "Int",
+       "max": "8",
+       "min": "0"
+      },
+      {
+       "kind": "Int",
+       "max": "151",
+       "min": "150"
+      },
+      {
+       "kind": "Bool"
+      }
+     ],
+     "nodes": [
+      [
+       "Input",
+       2
+      ],
+      [
+       "Input",
+       1
+      ],
+      [
+       "Input",
+       0
+      ],
+      [
+       "Int",
+       "150"
+      ],
+      [
+       "Eq",
+       1,
+       3
+      ],
+      [
+       "Int",
+       "8"
+      ],
+      [
+       "Int",
+       "0"
+      ],
+      [
+       "Select",
+       4,
+       5,
+       6
+      ],
+      [
+       "Eq",
+       2,
+       7
+      ],
+      [
+       "Int",
+       "149"
+      ],
+      [
+       "Int",
+       "147"
+      ],
+      [
+       "Select",
+       8,
+       9,
+       10
+      ],
+      [
+       "Sub",
+       1,
+       11
+      ],
+      [
+       "Select",
+       0,
+       12,
+       6
+      ],
+      [
+       "Int",
+       "1"
+      ],
+      [
+       "Add",
+       2,
+       14
+      ],
+      [
+       "Sub",
+       2,
+       14
+      ]
+     ],
+     "outputs": [
+      {
+       "kind": "Int",
+       "max": "4",
+       "min": "0"
+      },
+      {
+       "kind": "Int",
+       "max": "9223372036854775807",
+       "min": "-9223372036854775808"
+      },
+      {
+       "kind": "Int",
+       "max": "9223372036854775807",
+       "min": "-9223372036854775808"
+      }
+     ],
+     "roots": [
+      13,
+      15,
+      16
+     ]
+    },
+    "sha256": "40bbc9d15016ab187bd4c4191d48e7a6de075ccc02c703880ad8ff2d126b47c7"
+   },
+   "door": "sketch",
+   "evaluated": 1,
+   "evidence": {
+    "kind": "complete-space-exhausted",
+    "output": "out0"
+   },
+   "expressions": [
+    "authorized ? action - (value == (action == Inc ? 8 : 0) ? 149 : 147) : 0",
+    "keep",
+    "keep"
+   ],
+   "holes": {
+    "0": {
+     "fill": "149",
+     "value": 149
+    },
+    "1": {
+     "fill": "147",
+     "value": 147
+    }
+   },
+   "reason": null,
+   "searched": [
+    {
+     "assignments": "1",
+     "holes": [
+      0,
+      1
+     ],
+     "output": "out0",
+     "pivot": null,
+     "search": "meanings",
+     "searched": [],
+     "solved_alone": 2,
+     "tried": 1,
+     "verdict": null,
+     "witness": null
+    },
+    {
+     "assignments": "1",
+     "holes": [],
+     "output": "out1",
+     "pivot": null,
+     "search": "single",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 0,
+     "verdict": null,
+     "witness": null
+    },
+    {
+     "assignments": "1",
+     "holes": [],
+     "output": "out2",
+     "pivot": null,
+     "search": "single",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 0,
+     "verdict": null,
+     "witness": null
+    }
+   ],
+   "sketch": [
+    "authorized ? action - (value == (action == Inc ? 8 : 0) ? ?c[140..150] : ?c[140..150]) : 0",
+    "keep",
+    "keep"
+   ],
+   "status": "completed"
+  },
+  "expect": "rejected",
+  "kind": "unrealizable",
+  "name": "unrealizable-planted-false-exhaustion",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? action - (value == (action == Inc ? 8 : 0) ? ?c[140..150] : ?c[140..150]) : 0",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "door": "sketch",
+   "evaluated": 1,
+   "evidence": {
+    "input": {
+     "action": "Inc",
+     "authorized": false,
+     "value": 0
+    },
+    "kind": "witness",
+    "ordinal": 0,
+    "output": "out0"
+   },
+   "holes": {},
+   "reason": "no completion of out0",
+   "searched": [
+    {
+     "assignments": "1",
+     "holes": [
+      0,
+      1
+     ],
+     "output": "out0",
+     "pivot": null,
+     "search": "meanings",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 1,
+     "verdict": "unrealizable",
+     "witness": {
+      "input": {
+       "action": "Inc",
+       "authorized": false,
+       "value": 0
+      },
+      "ordinal": 0,
+      "output": "out0"
+     }
+    }
+   ],
+   "sketch": [
+    "authorized ? (action == Inc ? ?c : ?c) : 5",
+    "keep",
+    "keep"
+   ],
+   "status": "unrealizable"
+  },
+  "expect": "accepted",
+  "kind": "unrealizable",
+  "name": "unrealizable-several-holes-witness",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? (action == Inc ? ?c : ?c) : 5",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "door": {
+   "door": "sketch",
+   "evaluated": 1,
+   "evidence": {
+    "kind": "witness",
+    "ordinal": 1,
+    "output": "out0"
+   },
+   "holes": {},
+   "reason": "no completion of out0",
+   "searched": [
+    {
+     "assignments": "1",
+     "holes": [
+      0,
+      1
+     ],
+     "output": "out0",
+     "pivot": null,
+     "search": "meanings",
+     "searched": [],
+     "solved_alone": 0,
+     "tried": 1,
+     "verdict": "unrealizable",
+     "witness": null
+    }
+   ],
+   "sketch": [
+    "authorized ? (action == Inc ? ?c : ?c) : 0",
+    "keep",
+    "keep"
+   ],
+   "status": "unrealizable"
+  },
+  "expect": "rejected",
+  "kind": "unrealizable",
+  "name": "unrealizable-several-holes-planted-false-witness",
+  "original": {
+   "inputs": [
+    {
+     "kind": "Int",
+     "max": "8",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "151",
+     "min": "150"
+    },
+    {
+     "kind": "Bool"
+    }
+   ],
+   "nodes": [
+    [
+     "Input",
+     2
+    ],
+    [
+     "Not",
+     0
+    ],
+    [
+     "Int",
+     "0"
+    ],
+    [
+     "Input",
+     1
+    ],
+    [
+     "Int",
+     "150"
+    ],
+    [
+     "Eq",
+     3,
+     4
+    ],
+    [
+     "Input",
+     0
+    ],
+    [
+     "Int",
+     "8"
+    ],
+    [
+     "Eq",
+     6,
+     7
+    ],
+    [
+     "And",
+     5,
+     8
+    ],
+    [
+     "Int",
+     "1"
+    ],
+    [
+     "Int",
+     "151"
+    ],
+    [
+     "Eq",
+     3,
+     11
+    ],
+    [
+     "Eq",
+     6,
+     2
+    ],
+    [
+     "And",
+     12,
+     13
+    ],
+    [
+     "Int",
+     "2"
+    ],
+    [
+     "Int",
+     "3"
+    ],
+    [
+     "Int",
+     "4"
+    ],
+    [
+     "Select",
+     5,
+     16,
+     17
+    ],
+    [
+     "Select",
+     14,
+     15,
+     18
+    ],
+    [
+     "Select",
+     9,
+     10,
+     19
+    ],
+    [
+     "Select",
+     1,
+     2,
+     20
+    ],
+    [
+     "Add",
+     6,
+     10
+    ],
+    [
+     "Sub",
+     6,
+     10
+    ]
+   ],
+   "outputs": [
+    {
+     "kind": "Int",
+     "max": "4",
+     "min": "0"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    },
+    {
+     "kind": "Int",
+     "max": "9223372036854775807",
+     "min": "-9223372036854775808"
+    }
+   ],
+   "roots": [
+    21,
+    22,
+    23
+   ]
+  },
+  "sketch": [
+   "authorized ? (action == Inc ? ?c : ?c) : 0",
+   "keep",
+   "keep"
+  ],
+  "vocabulary": {
+   "cases": 5,
+   "inputs": [
+    "value",
+    "action",
+    "authorized"
+   ],
+   "variants": {
+    "action": {
+     "Dec": 151,
+     "Inc": 150
+    }
+   }
+  }
+ },
+ {
+  "expect": "accepted",
+  "judged": {
+   "applies": 2,
+   "applies_reachable": 2,
+   "claim": {
+    "class": "Reject",
+    "reason": "at_capacity"
+   },
+   "domain": 16,
+   "exact_on_reachable": false,
+   "exception_groups": [
+    {
+     "actual": {
+      "class": "Reject",
+      "reason": "not_authorized"
+     },
+     "count": 1,
+     "input": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 3
+     },
+     "ordinal": 12,
+     "where": "!authorized && (value == 3 && action == Inc)"
+    }
+   ],
+   "exceptions": 1,
+   "exceptions_reachable": 1,
+   "holds_on": 1,
+   "id": "t1",
+   "meaning": "2b70d5dc0f919c7e16bdb01688a23551c44221282457517e069135cb00b45a91",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "verdict": "wrong",
+   "where": "action == Inc && value == 3"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-wrong-rule",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "t1",
+   "reason": "at_capacity",
+   "where": "action == Inc && value == 3"
+  }
+ },
+ {
+  "expect": "rejected",
+  "judged": {
+   "applies": 2,
+   "applies_reachable": 2,
+   "claim": {
+    "class": "Reject",
+    "reason": "at_capacity"
+   },
+   "domain": 16,
+   "exact_on_reachable": false,
+   "exception_groups": [
+    {
+     "actual": {
+      "class": "Reject",
+      "reason": "not_authorized"
+     },
+     "count": 1,
+     "input": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 3
+     },
+     "ordinal": 12,
+     "where": "!authorized && (value == 3 && action == Inc)"
+    }
+   ],
+   "exceptions": 0,
+   "exceptions_reachable": 1,
+   "holds_on": 1,
+   "id": "t1",
+   "meaning": "2b70d5dc0f919c7e16bdb01688a23551c44221282457517e069135cb00b45a91",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "verdict": "exact",
+   "where": "action == Inc && value == 3"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-planted-false-exact",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "t1",
+   "reason": "at_capacity",
+   "where": "action == Inc && value == 3"
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "at_capacity",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "accepted",
+  "judged": {
+   "applies": 8,
+   "applies_reachable": 8,
+   "claim": {
+    "class": "Reject",
+    "reason": "not_authorized"
+   },
+   "domain": 16,
+   "exact_on_reachable": true,
+   "exception_groups": [],
+   "exceptions": 0,
+   "exceptions_reachable": 0,
+   "holds_on": 8,
+   "id": "old_core",
+   "meaning": "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "required": {
+    "alternatives": [],
+    "example": null,
+    "forbidden": 8,
+    "forbidden_example": {
+     "admitted": [
+      {
+       "class": "Reject",
+       "reason": "at_capacity"
+      }
+     ],
+     "input": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 0
+     }
+    },
+    "forced": 0,
+    "of": 8,
+    "open": 0
+   },
+   "verdict": "exact",
+   "where": "!authorized"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-required-forbidden",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "old_core",
+   "reason": "not_authorized",
+   "where": "!authorized"
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "at_capacity",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "rejected",
+  "judged": {
+   "applies": 8,
+   "applies_reachable": 8,
+   "claim": {
+    "class": "Reject",
+    "reason": "not_authorized"
+   },
+   "domain": 16,
+   "exact_on_reachable": true,
+   "exception_groups": [],
+   "exceptions": 0,
+   "exceptions_reachable": 0,
+   "holds_on": 8,
+   "id": "old_core",
+   "meaning": "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "required": {
+    "alternatives": [],
+    "example": null,
+    "forbidden": 0,
+    "forbidden_example": {
+     "admitted": [
+      {
+       "class": "Reject",
+       "reason": "at_capacity"
+      }
+     ],
+     "input": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 0
+     }
+    },
+    "forced": 8,
+    "of": 8,
+    "open": 0
+   },
+   "verdict": "exact",
+   "where": "!authorized"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-planted-required-despite-a-contradiction",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "old_core",
+   "reason": "not_authorized",
+   "where": "!authorized"
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "accepted",
+  "judged": {
+   "applies": 8,
+   "applies_reachable": 8,
+   "claim": {
+    "class": "Reject",
+    "reason": "not_authorized"
+   },
+   "domain": 16,
+   "exact_on_reachable": true,
+   "exception_groups": [],
+   "exceptions": 0,
+   "exceptions_reachable": 0,
+   "holds_on": 8,
+   "id": "old_core",
+   "meaning": "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "required": {
+    "alternatives": [],
+    "example": null,
+    "forbidden": 0,
+    "forced": 8,
+    "of": 8,
+    "open": 0
+   },
+   "verdict": "exact",
+   "where": "!authorized"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-required-forced",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "old_core",
+   "reason": "not_authorized",
+   "where": "!authorized"
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "rejected",
+  "judged": {
+   "applies": 8,
+   "applies_reachable": 8,
+   "claim": {
+    "class": "Reject",
+    "reason": "not_authorized"
+   },
+   "domain": 16,
+   "exact_on_reachable": true,
+   "exception_groups": [],
+   "exceptions": 0,
+   "exceptions_reachable": 0,
+   "holds_on": 8,
+   "id": "old_core",
+   "meaning": "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "missing": 0,
+   "missing_reachable": 0,
+   "missing_region": null,
+   "required": {
+    "alternatives": [],
+    "example": null,
+    "forbidden": 8,
+    "forced": 0,
+    "of": 8,
+    "open": 0
+   },
+   "verdict": "exact",
+   "where": "!authorized"
+  },
+  "kind": "teach-back",
+  "name": "teach-back-planted-forbidden-though-forced",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rule": {
+   "class": "Reject",
+   "id": "old_core",
+   "reason": "not_authorized",
+   "where": "!authorized"
+  }
+ },
+ {
+  "architecture": {
+   "components": [
+    {
+     "decides": [
+      "not_authorized"
+     ],
+     "name": "guard",
+     "reads": [
+      "authorized"
+     ]
+    },
+    {
+     "decides": [
+      "at_capacity",
+      "at_zero"
+     ],
+     "name": "counter",
+     "owns": [
+      "value"
+     ]
+    }
+   ],
+   "schema": "zeno-fcis/loop-architecture/1"
+  },
+  "clash": {
+   "component": "counter",
+   "inputs": [
+    {
+     "action": "Inc",
+     "authorized": true,
+     "value": 0
+    },
+    {
+     "action": "Dec",
+     "authorized": true,
+     "value": 0
+    }
+   ],
+   "pair": [
+    1,
+    3
+   ],
+   "required": [
+    {
+     "class": "Accept",
+     "reason": null
+    },
+    {
+     "class": "Reject",
+     "reason": "at_zero"
+    }
+   ],
+   "separating_fields": [
+    "action"
+   ],
+   "suggested_reads": [
+    "action"
+   ],
+   "suggested_reads_owned_later": [],
+   "what": "decision"
+  },
+  "expect": "accepted",
+  "kind": "interface",
+  "name": "interface-missing-read",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n"
+ },
+ {
+  "architecture": {
+   "components": [
+    {
+     "decides": [
+      "not_authorized"
+     ],
+     "name": "guard",
+     "reads": [
+      "authorized"
+     ]
+    },
+    {
+     "decides": [
+      "at_capacity",
+      "at_zero"
+     ],
+     "name": "counter",
+     "owns": [
+      "value"
+     ]
+    }
+   ],
+   "schema": "zeno-fcis/loop-architecture/1"
+  },
+  "clash": {
+   "component": "counter",
+   "inputs": [
+    {
+     "action": "Inc",
+     "authorized": true,
+     "value": 0
+    },
+    {
+     "action": "Dec",
+     "authorized": true,
+     "value": 0
+    }
+   ],
+   "pair": [
+    1,
+    2
+   ],
+   "required": [
+    {
+     "class": "Accept",
+     "reason": null
+    },
+    {
+     "class": "Reject",
+     "reason": "at_zero"
+    }
+   ],
+   "separating_fields": [
+    "action"
+   ],
+   "suggested_reads": [
+    "action"
+   ],
+   "suggested_reads_owned_later": [],
+   "what": "decision"
+  },
+  "expect": "rejected",
+  "kind": "interface",
+  "name": "interface-planted-pair-that-differs-on-a-read",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n"
+ },
+ {
+  "architecture": {
+   "components": [
+    {
+     "decides": [
+      "not_authorized"
+     ],
+     "name": "guard",
+     "reads": [
+      "authorized"
+     ]
+    },
+    {
+     "decides": [
+      "at_capacity",
+      "at_zero"
+     ],
+     "name": "counter",
+     "owns": [
+      "value"
+     ]
+    }
+   ],
+   "schema": "zeno-fcis/loop-architecture/1"
+  },
+  "clash": {
+   "component": "counter",
+   "inputs": [
+    {
+     "action": "Inc",
+     "authorized": true,
+     "value": 0
+    },
+    {
+     "action": "Dec",
+     "authorized": true,
+     "value": 0
+    }
+   ],
+   "pair": [
+    1,
+    3
+   ],
+   "required": [
+    {
+     "class": "Accept",
+     "reason": null
+    },
+    {
+     "class": "Reject",
+     "reason": "at_zero"
+    }
+   ],
+   "separating_fields": [
+    "action"
+   ],
+   "suggested_reads": [],
+   "suggested_reads_owned_later": [],
+   "what": "decision"
+  },
+  "expect": "rejected",
+  "kind": "interface",
+  "name": "interface-planted-too-few-reads",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n"
+ },
+ {
+  "answers": [
+   {
+    "case": 0,
+    "class": "Reject",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "accepted",
+  "kind": "question",
+  "name": "question-after-an-answer",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 8"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c8",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=8;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 8;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 8;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 8}.\n// Instance source-set SHA256 16618bc74ea1850b94eb42f60b5105416d5ade6395ad0e382c795ea9e7be1d6e.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "question": {
+   "case": 3,
+   "core": {
+    "class": "Accept",
+    "current": true,
+    "reason": null,
+    "sets": {
+     "value": "value + 1"
+    }
+   },
+   "example": {
+    "action": "Inc",
+    "authorized": true,
+    "value": 0
+   },
+   "options": [
+    {
+     "class": "Accept",
+     "current": true,
+     "reason": null,
+     "sets": {
+      "value": "value + 1"
+     }
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "not_authorized"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_capacity"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_zero"
+    }
+   ],
+   "tuples": 8,
+   "where": "authorized && !(action == Inc && value == 8) && !(action == Dec && value == 0) && action == Inc",
+   "where_law": "(((context.102.130 == 1) && (!((command.101.120 == 150) && (pre.100.110 == 8)))) && (!((command.101.120 == 151) && (pre.100.110 == 0)))) && (command.101.120 == 150)"
+  },
+  "records": [
+   {
+    "answer": 0,
+    "inputs": 18,
+    "laws": [
+     {
+      "formula": "!(!(context.102.130 == 1))",
+      "scope": "accept"
+     }
+    ],
+    "reason_requirement": "not_authorized",
+    "status": "recorded",
+    "where": "!authorized"
+   }
+  ],
+  "stats": {
+   "determined": 18,
+   "determined_rate": 0.5,
+   "inconsistent": 0,
+   "open": 18,
+   "reference_refused": 0,
+   "regions": 4,
+   "tuples": 36
+  }
+ },
+ {
+  "answers": [
+   {
+    "case": 0,
+    "class": "Reject",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   }
+  ],
+  "expect": "rejected",
+  "kind": "question",
+  "name": "question-planted-wrong-count",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 8"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c8",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=8;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 8;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 8;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 8}.\n// Instance source-set SHA256 16618bc74ea1850b94eb42f60b5105416d5ade6395ad0e382c795ea9e7be1d6e.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "question": {
+   "case": 3,
+   "core": {
+    "class": "Accept",
+    "current": true,
+    "reason": null,
+    "sets": {
+     "value": "value + 1"
+    }
+   },
+   "example": {
+    "action": "Inc",
+    "authorized": true,
+    "value": 0
+   },
+   "options": [
+    {
+     "class": "Accept",
+     "current": true,
+     "reason": null,
+     "sets": {
+      "value": "value + 1"
+     }
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "not_authorized"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_capacity"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_zero"
+    }
+   ],
+   "tuples": 8,
+   "where": "authorized && !(action == Inc && value == 8) && !(action == Dec && value == 0) && action == Inc",
+   "where_law": "(((context.102.130 == 1) && (!((command.101.120 == 150) && (pre.100.110 == 8)))) && (!((command.101.120 == 151) && (pre.100.110 == 0)))) && (command.101.120 == 150)"
+  },
+  "records": [
+   {
+    "answer": 0,
+    "inputs": 18,
+    "laws": [
+     {
+      "formula": "!(!(context.102.130 == 1))",
+      "scope": "accept"
+     }
+    ],
+    "reason_requirement": "not_authorized",
+    "status": "recorded",
+    "where": "!authorized"
+   }
+  ],
+  "stats": {
+   "determined": 19,
+   "determined_rate": 0.5,
+   "inconsistent": 0,
+   "open": 18,
+   "reference_refused": 0,
+   "regions": 4,
+   "tuples": 36
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "at_zero",
+    "where": "!value"
+   }
+  ],
+  "expect": "accepted",
+  "kind": "question",
+  "name": "question-negated-number",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "question": {
+   "case": 0,
+   "core": {
+    "class": "Reject",
+    "current": true,
+    "reason": "not_authorized"
+   },
+   "example": {
+    "action": "Inc",
+    "authorized": false,
+    "value": 1
+   },
+   "options": [
+    {
+     "class": "Reject",
+     "current": true,
+     "reason": "not_authorized"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_capacity"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_zero"
+    }
+   ],
+   "tuples": 6,
+   "where": "!authorized && !(value == 0)",
+   "where_law": "(!(context.102.130 == 1)) && (!(pre.100.110 == 0))"
+  },
+  "records": [
+   {
+    "answer": 0,
+    "disagreement": {
+     "core": {
+      "class": "Reject",
+      "reason": "not_authorized"
+     },
+     "example": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 0
+     },
+     "inputs": 3,
+     "owner": {
+      "class": "Reject",
+      "current": false,
+      "reason": "at_zero"
+     }
+    },
+    "false_alarm": {
+     "contract": {
+      "class": "Accept",
+      "post": [
+       1
+      ],
+      "reason": null
+     },
+     "input": [
+      0,
+      150,
+      1
+     ],
+     "law": 772315535
+    },
+    "inputs": 4,
+    "laws": [
+     {
+      "formula": "!(pre.100.110 == 0)",
+      "scope": "accept"
+     }
+    ],
+    "reason_requirement": "at_zero",
+    "status": "disagreement",
+    "where": "!value"
+   }
+  ],
+  "stats": {
+   "determined": 4,
+   "determined_rate": 0.25,
+   "inconsistent": 0,
+   "open": 12,
+   "reference_refused": 0,
+   "regions": 4,
+   "tuples": 16
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Reject",
+    "reason": "at_zero",
+    "where": "!value"
+   }
+  ],
+  "expect": "rejected",
+  "kind": "question",
+  "name": "question-planted-mistranslated-negation",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "question": {
+   "case": 0,
+   "core": {
+    "class": "Reject",
+    "current": true,
+    "reason": "not_authorized"
+   },
+   "example": {
+    "action": "Inc",
+    "authorized": false,
+    "value": 1
+   },
+   "options": [
+    {
+     "class": "Reject",
+     "current": true,
+     "reason": "not_authorized"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_capacity"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_zero"
+    }
+   ],
+   "tuples": 6,
+   "where": "!authorized && !(value == 0)",
+   "where_law": "(!(context.102.130 == 1)) && (!(pre.100.110 == 0))"
+  },
+  "records": [
+   {
+    "answer": 0,
+    "disagreement": {
+     "core": {
+      "class": "Reject",
+      "reason": "not_authorized"
+     },
+     "example": {
+      "action": "Inc",
+      "authorized": false,
+      "value": 0
+     },
+     "inputs": 3,
+     "owner": {
+      "class": "Reject",
+      "current": false,
+      "reason": "at_zero"
+     }
+    },
+    "false_alarm": {
+     "contract": {
+      "class": "Accept",
+      "post": [
+       1
+      ],
+      "reason": null
+     },
+     "input": [
+      0,
+      150,
+      1
+     ],
+     "law": 772315535
+    },
+    "inputs": 4,
+    "laws": [
+     {
+      "formula": "!(!(pre.100.110 == 1))",
+      "scope": "accept"
+     }
+    ],
+    "reason_requirement": "at_zero",
+    "status": "disagreement",
+    "where": "!value"
+   }
+  ],
+  "stats": {
+   "determined": 4,
+   "determined_rate": 0.25,
+   "inconsistent": 0,
+   "open": 12,
+   "reference_refused": 0,
+   "regions": 4,
+   "tuples": 16
+  }
+ },
+ {
+  "answers": [
+   {
+    "class": "Accept",
+    "sets": {
+     "value": "0"
+    },
+    "where": "authorized && action == Inc && value == 1"
+   }
+  ],
+  "expect": "accepted",
+  "kind": "question",
+  "name": "question-successor-answer",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "question": {
+   "case": 0,
+   "core": {
+    "class": "Reject",
+    "current": true,
+    "reason": "not_authorized"
+   },
+   "example": {
+    "action": "Inc",
+    "authorized": false,
+    "value": 0
+   },
+   "options": [
+    {
+     "class": "Reject",
+     "current": true,
+     "reason": "not_authorized"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_capacity"
+    },
+    {
+     "class": "Reject",
+     "current": false,
+     "reason": "at_zero"
+    }
+   ],
+   "tuples": 8,
+   "where": "!authorized",
+   "where_law": "!(context.102.130 == 1)"
+  },
+  "records": [
+   {
+    "answer": 0,
+    "disagreement": {
+     "core": {
+      "class": "Accept",
+      "reason": null,
+      "sets": {
+       "value": 2
+      }
+     },
+     "example": {
+      "action": "Inc",
+      "authorized": true,
+      "value": 1
+     },
+     "inputs": 1,
+     "owner": {
+      "class": "Accept",
+      "current": false,
+      "reason": null,
+      "sets": {
+       "value": 0
+      }
+     }
+    },
+    "false_alarm": {
+     "contract": {
+      "class": "Accept",
+      "post": [
+       2
+      ],
+      "reason": null
+     },
+     "input": [
+      1,
+      150,
+      1
+     ],
+     "law": 772315536
+    },
+    "inputs": 1,
+    "laws": [
+     {
+      "formula": "!(((context.102.130 == 1) && (command.101.120 == 150)) && (pre.100.110 == 1))",
+      "scope": "reject"
+     },
+     {
+      "formula": "(((context.102.130 == 1) && (command.101.120 == 150)) && (pre.100.110 == 1)) -> (post.100.110 == 0)",
+      "scope": "accept"
+     }
+    ],
+    "reason_requirement": null,
+    "status": "disagreement",
+    "where": "authorized && action == Inc && value == 1"
+   }
+  ],
+  "stats": {
+   "determined": 1,
+   "determined_rate": 0.0625,
+   "inconsistent": 0,
+   "open": 15,
+   "reference_refused": 0,
+   "regions": 5,
+   "tuples": 16
+  }
+ },
+ {
+  "expect": "accepted",
+  "keys": [
+   "eeb5dfc39c6c53b694e6ec2ab057ba420e2140d9ac7579b5e8e6ec1597bcb3e4",
+   "eeb5dfc39c6c53b694e6ec2ab057ba420e2140d9ac7579b5e8e6ec1597bcb3e4"
+  ],
+  "kind": "rule-meaning",
+  "name": "rule-meaning-respelled",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rules": [
+   {
+    "class": "Accept",
+    "id": "k1",
+    "sets": {
+     "value": "value + 1"
+    },
+    "where": "authorized && action == Inc && value < 3"
+   },
+   {
+    "class": "Accept",
+    "id": "k2",
+    "sets": {
+     "value": "1 + value"
+    },
+    "where": "action == Inc && authorized && !(value >= 3)"
+   }
+  ]
+ },
+ {
+  "expect": "accepted",
+  "keys": [
+   "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "78bf2de090804e2b46860520d2c2f4a19072118c30d462cc0623e2f43ef1b719",
+   "d1fbd53cad138e256d4a7b202064a9db3910b8b4a234d20b01116b019c8a147d"
+  ],
+  "kind": "rule-meaning",
+  "name": "rule-meaning-other-reason",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rules": [
+   {
+    "class": "Reject",
+    "id": "k4",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   },
+   {
+    "class": "Reject",
+    "id": "k5",
+    "reason": "at_zero",
+    "where": "!authorized"
+   }
+  ]
+ },
+ {
+  "expect": "rejected",
+  "keys": [
+   "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f",
+   "c93c24657bdf432f1a8bd35ee133dc3f3e613ba67956dca9b054de9ecbacb15f"
+  ],
+  "kind": "rule-meaning",
+  "name": "rule-meaning-planted-equal-keys",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rules": [
+   {
+    "class": "Reject",
+    "id": "k4",
+    "reason": "not_authorized",
+    "where": "!authorized"
+   },
+   {
+    "class": "Reject",
+    "id": "k5",
+    "reason": "at_zero",
+    "where": "!authorized"
+   }
+  ]
+ },
+ {
+  "expect": "accepted",
+  "keys": [
+   "eeb5dfc39c6c53b694e6ec2ab057ba420e2140d9ac7579b5e8e6ec1597bcb3e4",
+   "d1fbd53cad138e256d4a7b202064a9db3910b8b4a234d20b01116b019c8a147d"
+  ],
+  "kind": "rule-meaning",
+  "name": "rule-meaning-successor-outside-the-region",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rules": [
+   {
+    "class": "Accept",
+    "id": "k1",
+    "sets": {
+     "value": "value + 1"
+    },
+    "where": "authorized && action == Inc && value < 3"
+   },
+   {
+    "class": "Accept",
+    "id": "k6",
+    "sets": {
+     "value": "action == Inc ? value + 1 : value - 1"
+    },
+    "where": "authorized && action == Inc && value < 3"
+   }
+  ]
+ },
+ {
+  "expect": "rejected",
+  "keys": [
+   "eeb5dfc39c6c53b694e6ec2ab057ba420e2140d9ac7579b5e8e6ec1597bcb3e4",
+   "eeb5dfc39c6c53b694e6ec2ab057ba420e2140d9ac7579b5e8e6ec1597bcb3e4"
+  ],
+  "kind": "rule-meaning",
+  "name": "rule-meaning-planted-region-only-key",
+  "policy": {
+   "cases": [
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 200,
+     "when": "!authorized"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 201,
+     "when": "action == 150 && value == 3"
+    },
+    {
+     "class": "Reject",
+     "outbox": [],
+     "post": {},
+     "reason": 202,
+     "when": "action == 151 && value == 0"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value + 1"
+     },
+     "reason": null,
+     "when": "action == 150"
+    },
+    {
+     "class": "Accept",
+     "outbox": [],
+     "post": {
+      "110": "value - 1"
+     },
+     "reason": null,
+     "when": "true"
+    }
+   ],
+   "genesis": {
+    "110": 0
+   },
+   "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+   },
+   "leaf_bindings": {
+    "108": [
+     "Bool"
+    ]
+   },
+   "roots": {
+    "command": 101,
+    "context": 102,
+    "state": 100
+   },
+   "schema": "zeno-fcis/template-declarative-policy/2",
+   "template": "bounded-counter-c3",
+   "variables": {
+    "action": "command.101.120",
+    "authorized": "context.102.130",
+    "value": "pre.100.110"
+   }
+  },
+  "project": "zeno 1;\nproject 1 bounded_counter;\nnamespace 2 core;\ntype 100 state Counter;\ntype 101 command Change;\ntype 102 context Operator;\ntype 105 int Units in 0..=3;\ntype 107 data Action;\ntype 108 bool Authorized;\nfield 110 100 value 105;\nfield 120 101 action 107;\nfield 130 102 authorized 108;\nvariant 150 107 Inc none;\nvariant 151 107 Dec none;\nreason 200 not_authorized precedence 0;\nreason 201 at_capacity precedence 1;\nreason 202 at_zero precedence 2;\ncomponent 400 counter {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 64;\n}\nmerge [400];\nlaw 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;\nlaw 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3;\nlaw 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);\n// Core seed bounded-counter/1; parameters {\"C\": 3}.\n// Instance source-set SHA256 8c3b078208cb772315534d1bb10f5e8bc945edeefe051601fb0cf4120eddf017.\n// Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.\n// Qualification procedure: tools/check_core_components.py in the source tree.\n",
+  "rules": [
+   {
+    "class": "Accept",
+    "id": "k1",
+    "sets": {
+     "value": "value + 1"
+    },
+    "where": "authorized && action == Inc && value < 3"
+   },
+   {
+    "class": "Accept",
+    "id": "k6",
+    "sets": {
+     "value": "action == Inc ? value + 1 : value - 1"
+    },
+    "where": "authorized && action == Inc && value < 3"
+   }
+  ]
+ }
+]

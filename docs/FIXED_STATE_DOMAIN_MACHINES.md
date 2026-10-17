@@ -216,13 +216,13 @@ This package does not:
 - convert output ports into non-executable commit evidence or durable outbox obligations inside
   this crate; that mapping belongs to `zeno-fcis-composed-program`;
 - provide canonical decoders for fixed-domain artifacts in version 1;
-- verify a proof artifact or make ESSO, Lean, SMT, Z3, CVC5, Kani, Flux, or any
-  other backend mandatory;
+- verify a proof artifact or make a private checker, Lean, SMT, Z3, CVC5, Kani,
+  Flux, or any other backend mandatory;
 - establish compiler, database, chain, operating-system, or hardware
   refinement;
 - grant production authority by itself.
 
-Private tools such as ESSO may consume or verify the canonical artifacts through
+Private tools may consume or verify the canonical artifacts through
 the existing tool-neutral backend protocol. Universal users may plug in Lean,
 SMT, Z3, CVC5, Kani, Flux, or another independent checker without changing this
 semantic interface.

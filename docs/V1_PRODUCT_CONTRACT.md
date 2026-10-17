@@ -11,7 +11,7 @@ feature supports an adopter journey below with an explicit assurance boundary.
 | Library adopter | Compile a minimal immutable transition through the umbrella crate and select only the required features. |
 | Project author | Create, check, explain, graph, and reproducibly generate a typed composition from one inert `.zeno` file. |
 | Software architect | Define reviewed project meaning, narrow fixed domain machines, explicit global composition, laws, and nominal authority. |
-| Formal-tool integrator | Mount Lean, SMT/Z3, CVC5, Kani, Flux, private ESSO, or another checker behind the common bounded backend and evidence protocols. |
+| Formal-tool integrator | Mount Lean, SMT/Z3, CVC5, Kani, Flux, a private checker, or another checker behind the common bounded backend and evidence protocols. |
 | Runtime integrator | Compare complete mounted decisions, publish authorized transitions atomically, and deliver exact durable outbox obligations. |
 | Release maintainer | Rebuild the complete crate family, documentation, source, binaries, SBOM, provenance inputs, and checksums from one exact revision. |
 
@@ -28,7 +28,7 @@ V1 contains these product features:
 4. Proof-carrying deterministic-parallel planning whose promoted results must
    equal the canonical sequential result under the exact composition context.
 5. Tool-neutral bounded backend, evidence, refinement, synthesis, and
-   exhaustive-domain protocols. Concrete provers and private ESSO remain
+   exhaustive-domain protocols. Concrete provers and private checkers remain
    optional integrations.
 6. Bounded authenticated-state reference semantics, candidate-bound
    authenticated authority, persistent collections, and a crash-atomic SQLite
@@ -80,8 +80,8 @@ V1 supports these acceptance criteria:
 - every major adopter goal has one named public entry point;
 - the bootstrap path clearly separates generated scaffolding from owner-chosen
   protocol meaning;
-- backend documentation shows that ESSO, Lean, SMT, CVC5, and other tools share
-  one public boundary without bundling or trusting them;
+- backend documentation shows that private checkers, Lean, SMT, CVC5, and
+  other tools share one public boundary without bundling or trusting them;
 - every production-facing guide identifies the nominal authorization type and
   the raw reference type that must not cross the boundary;
 - failures explain the missing authority, evidence, resource, schema, or

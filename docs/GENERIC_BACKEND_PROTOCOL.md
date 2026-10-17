@@ -1,6 +1,6 @@
 # Generic checked backend protocol
 
-ZenoFCIS does not grant authority to a particular synthesis engine, theorem prover, compiler, optimizer, LLM, ESSO installation, Morph installation, or private service. `zeno-fcis-backend` defines one project-neutral exchange through which any such engine may propose closed artifacts for independent validation.
+ZenoFCIS does not grant authority to a particular synthesis engine, theorem prover, compiler, optimizer, LLM, private engine installation, or private service. `zeno-fcis-backend` defines one project-neutral exchange through which any such engine may propose closed artifacts for independent validation.
 
 ## Authority boundary
 
@@ -89,17 +89,17 @@ A `BackendVerifier` is separate from the engine. It receives the exact request a
 
 Only a nonzero attestation creates a `BackendCertificate`. The certificate binds request, response, backend implementation, independent verifier, and verification claim.
 
-## ESSO and Morph
+## Private engines
 
-Private ESSO and Morph deployments should implement `BackendEngine` in their private repositories or service adapters. Their private types, prompts, solvers, proof state, and internal representations must not cross the protocol boundary. They translate from the closed request into private execution and return only a bounded `BackendResponse`.
+Private engine deployments should implement `BackendEngine` in their private repositories or service adapters. Their private types, prompts, solvers, proof state, and internal representations must not cross the protocol boundary. They translate from the closed request into private execution and return only a bounded `BackendResponse`.
 
 Recommended division:
 
 ```text
-ESSO
+private synthesis engine
     candidate-domain construction and deterministic synthesis proposals
 
-Morph
+private reformulation engine
     semantics-preserving reformulation, transformation, and equivalence proposals
 
 independent project validators
@@ -107,7 +107,7 @@ independent project validators
     canonical encoding, and promotion decisions
 ```
 
-The public ZenoFCIS crate contains no private source and does not assume either engine exists.
+The public ZenoFCIS crate contains no private source and does not assume any private engine exists.
 
 ## Deterministic synthesis integration
 

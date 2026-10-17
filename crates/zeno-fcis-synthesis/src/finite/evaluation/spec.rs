@@ -24,6 +24,15 @@ pub open spec fn admitted(domains: Seq<Domain>, values: Seq<i64>) -> bool {
         && forall|i: int| 0 <= i < domains.len() ==> contains(domains[i], values[i])
 }
 
+pub(crate) open spec fn new_arithmetic(op: Op) -> bool {
+    matches!(op, Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
+        | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..))
+}
+
+pub(crate) open spec fn scalar_result(value: Option<i64>) -> Result<i64, Failure> {
+    match value {Some(v)=>Ok(v),None=>Err(Failure::Arithmetic)}
+}
+
 pub(crate) open spec fn node(op: Op, input: Seq<i64>, values: Seq<i64>) -> Result<i64, Failure> {
     match op {
         Op::Input(id) => if id < input.len() {
@@ -37,6 +46,31 @@ pub(crate) open spec fn node(op: Op, input: Seq<i64>, values: Seq<i64>) -> Resul
         Op::Select(c, a, b) => if c < values.len() && a < values.len() && b < values.len() {
             Ok(if values[c as int] == 1 { values[a as int] } else { values[b as int] })
         } else { Err(Failure::Reference) },
+        Op::Mul(a,b) | Op::DivFloor(a,b) | Op::DivCeil(a,b) => {
+            if a>=values.len() || b>=values.len() {Err(Failure::Reference)} else {
+                let x=values[a as int];let y=values[b as int];
+                scalar_result(match op {
+                    Op::Mul(..)=>super::super::value::scalar::multiply_value(x,y),
+                    _=>super::super::value::scalar::division_value(matches!(op,Op::DivCeil(..)),x,y),
+                })
+            }
+        },
+        Op::MulDivFloor(a,b,d) | Op::MulDivCeil(a,b,d) => {
+            if a>=values.len() || b>=values.len() || d>=values.len() {Err(Failure::Reference)} else {
+                scalar_result(super::super::value::scalar::mul_div_value(matches!(op,Op::MulDivCeil(..)),
+                    values[a as int],values[b as int],values[d as int]))
+            }
+        },
+        Op::ProductsGe(a,b) => {
+            if a[0]>=values.len() || a[1]>=values.len() || a[2]>=values.len()
+                || b[0]>=values.len() || b[1]>=values.len() || b[2]>=values.len() {Err(Failure::Reference)}
+            else { match super::super::value::scalar::products_ge_value(
+                values[a[0] as int],values[a[1] as int],values[a[2] as int],
+                values[b[0] as int],values[b[1] as int],values[b[2] as int]) {
+                    Some(v)=>Ok(if v{1i64}else{0i64}),None=>Err(Failure::Arithmetic),
+                }
+            }
+        },
         Op::Add(a, b) | Op::Sub(a, b) | Op::Eq(a, b) | Op::Lt(a, b) | Op::And(a, b) => {
             if a >= values.len() || b >= values.len() {
                 Err(Failure::Reference)

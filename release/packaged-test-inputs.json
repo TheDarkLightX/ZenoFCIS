@@ -4,6 +4,18 @@
     {
       "package": "zeno-fcis-cli",
       "target": "bin:zeno-fcis",
+      "path": "crates/zeno-fcis-loop-doors/tests/data/aq-k1-explicit-answers.json",
+      "sha256": "be45afb7706efe889fdd42063baeb15bcb1dabf6208792111b42bf473f421e33"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "crates/zeno-fcis-loop-doors/tests/data/bc-c3-explicit-answers.json",
+      "sha256": "91b3e6bf019d7450470317254eff59bbcad028275179b4d77e09450b55e010c5"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
       "path": "docs/benchmarks/cases.json",
       "sha256": "52f2af85e465dd69cb2baa13edb7875ff00d3133c673a261f23b75317e23afe0"
     },
@@ -74,6 +86,60 @@
       "sha256": "52f2af85e465dd69cb2baa13edb7875ff00d3133c673a261f23b75317e23afe0"
     },
     {
+      "package": "zeno-fcis-cli",
+      "target": "test:loop_compose",
+      "path": "crates/zeno-fcis-loop-doors/tests/data/rb-arch-cases-planted.json",
+      "sha256": "a6ec0043726348c5a8d094708bc03bd3305df79adc48c9c2db74ca2bf1db82b6"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "test:loop_judges",
+      "path": "crates/zeno-fcis-loop-doors/tests/data/aq-arch.json",
+      "sha256": "5ccd849197e95d07d1150dd749ef5bd5dca81725bb7c774eeaceeab6d5f5fb9b"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "test:loop_judges",
+      "path": "crates/zeno-fcis-loop-doors/tests/data/bc-c3-explicit-answers.json",
+      "sha256": "91b3e6bf019d7450470317254eff59bbcad028275179b4d77e09450b55e010c5"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-fee/project.zeno",
+      "sha256": "fd9d4ffe8e513d4f519618c23b83b7643f6b3c708255d7d1479b19a61e33e83d"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-fee/v2/policy.json",
+      "sha256": "196a891caec0bc87847d91da1c814ea86a8b4aaab97be42b99edba8543ea090c"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-fused/project.zeno",
+      "sha256": "61ca7a0e0f59e5d1caafd8ec93d468b5c03541b62ae887d9e94a3da708bbb70d"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-fused/v2/policy.json",
+      "sha256": "ed79a8a84712b88a7d2c9c74ac432883b417ba297fc271af72ed6bfceb78c802"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-quote/project.zeno",
+      "sha256": "a0a87213a5216d4628aea0f0de1e9bc946fee999a935ef048b2e40fa821b142c"
+    },
+    {
+      "package": "zeno-fcis-contract",
+      "target": "test:arithmetic_rules",
+      "path": "examples/arithmetic-quote/v2/policy.json",
+      "sha256": "fe63ad4d420b0dae29eda11cf5b1a21bc70a5f47f316745e6ae2998b765797d4"
+    },
+    {
       "package": "zeno-fcis-formal-tools",
       "target": "lib:zeno_fcis_formal_tools",
       "path": "verification/kernel-laws/src/oracle/formal_tools/lean_items.rs",
@@ -131,7 +197,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:behaviour_change",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "384f91a443e2f5c5bc16210799853f3273c0849eba043c14298608671c1b9380"
+      "sha256": "90b9d98c2a555949807cd871460bdeecb181ca0d48021366433058b7ad5a83eb"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -275,7 +341,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:upgrade",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "384f91a443e2f5c5bc16210799853f3273c0849eba043c14298608671c1b9380"
+      "sha256": "90b9d98c2a555949807cd871460bdeecb181ca0d48021366433058b7ad5a83eb"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -381,6 +447,30 @@
     },
     {
       "package": "zeno-fcis-synthesis",
+      "target": "test:arithmetic_pilot",
+      "path": "verification/arithmetic/graphs.rs",
+      "sha256": "a2d09208a105bf67585f7186b88034ccb7fccd95c637556c4f29c32649cbfa81"
+    },
+    {
+      "package": "zeno-fcis-synthesis",
+      "target": "test:arithmetic_pilot",
+      "path": "verification/arithmetic/spot.rs",
+      "sha256": "b912c5b4ee7795f844c089f94a2e9c2b4c8dd0b0782030a7569b94c40b717df8"
+    },
+    {
+      "package": "zeno-fcis-synthesis",
+      "target": "test:arithmetic_pilot",
+      "path": "verification/arithmetic/spot_bounds.rs",
+      "sha256": "9900857abf7d47bf9cc5c066f3b6f1e1c88940830c701e342afc841689ca70e0"
+    },
+    {
+      "package": "zeno-fcis-synthesis",
+      "target": "test:scalar_arithmetic",
+      "path": "tools/test-data/scalar-arithmetic/vectors.tsv",
+      "sha256": "fae367b7e05500f8e74a55e60911400296cf92da42574730b508040171faa4a2"
+    },
+    {
+      "package": "zeno-fcis-synthesis",
       "target": "test:v2_abstraction",
       "path": "crates/zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs",
       "sha256": "ad3b67d86733fdf73287eb4e1c5a81c7388eb4dec36eb8401d97def3c768baab"
@@ -455,7 +545,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_evaluator_identity",
       "path": "verification/verus/authority_v2_sources.json",
-      "sha256": "19439fa8152997769ccef59f4b2e81b91d92292cb6507fecf4216b46f1bf1e22"
+      "sha256": "eeb990daed7334c00eb718694f6e37d9b03fbaad7146e0426db16629b888687e"
     },
     {
       "package": "zeno-fcis-synthesis",

@@ -50,6 +50,7 @@ jobs:
         include:
           - {gate: shared-runtime, script: check_verus.py, output: receipt.json}
           - {gate: scalar-query, script: check_scalar_query_refinement.py, output: receipt.json}
+          - {gate: scalar-arithmetic, script: check_scalar_arithmetic.py, output: run}
           - {gate: finite-execution, script: check_finite_execution.py, output: receipt.json}
           - {gate: metered-execution, script: check_metered_execution.py, output: receipt.json}
           - {gate: shared-finite-checker, script: check_checker.py, output: run}
@@ -88,6 +89,11 @@ jobs:
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup toolchain install 1.98.1 --profile minimal
+      - name: Install the pinned JavaScript runtime for arithmetic conformance
+        if: matrix.gate == 'scalar-arithmetic'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
       - name: Fetch locked crates for offline repository tools
         uses: ./.github/actions/fetch-locked-crates
       - name: Prepare the pinned verifier and the evidence directory
@@ -109,6 +115,20 @@ jobs:
         env:
           GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}/${{ matrix.output }}
         run: python3 "tools/${GATE_SCRIPT}" --out "$GATE_OUTPUT"
+      - name: Require arithmetic comparison-disabling controls to fail semantically
+        if: matrix.gate == 'scalar-arithmetic'
+        env:
+          ARITHMETIC_STUB_OUTPUT: ${{ runner.temp }}/v2-evidence/scalar-arithmetic/stub
+        run: |
+          python3 - <<'PYCONTROL'
+          import json, os, subprocess
+          from pathlib import Path
+          path=Path(os.environ['ARITHMETIC_STUB_OUTPUT'])
+          result=subprocess.run(['python3','tools/check_scalar_arithmetic.py','--out',str(path),'--stub-comparison'])
+          receipt=json.loads((path/'receipt.json').read_text())
+          if result.returncode != 1 or receipt.get('error') != 'semantic emitted-code mutant survived the comparison':
+              raise SystemExit('arithmetic comparison-disabling control failed for an unrelated reason')
+          PYCONTROL
       - name: Retain source, commands, diagnostics and receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

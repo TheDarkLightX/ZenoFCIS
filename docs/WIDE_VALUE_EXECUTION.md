@@ -1,8 +1,11 @@
 # Wide values and larger decision programs
 
-This document describes the unreleased development source. Final combined
-qualification is pending; the published candidate has its separately stated
-[release scope](RELEASE_CANDIDATES.md).
+This document describes wide values in the current 2.4.0 release source. The
+historical
+[2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
+state that source line's scope and limits; the earlier public candidates have
+their own
+[candidate record](RELEASE_CANDIDATES.md).
 
 The mandatory library route admits a contract, evaluates original input
 bytes, checks its declared laws, and returns a private publication capability
@@ -12,6 +15,7 @@ Application callbacks cannot replace the decision or law evaluator on this route
 | Profile | Supported source route | Boundary |
 |---|---|---|
 | Larger scalar decisions | CLI contract generation and ordinary generated apps | At most 4,096 nodes and 64 outputs; scalar expression arithmetic remains checked signed 64-bit arithmetic. |
+| Scalar arithmetic extension (qualification pending) | Authored rules, generated apps and the same library evaluator | Standalone checked multiplication, signed floor/ceiling division, nonnegative fused mul-div and exact two/three-factor products. Separately admitted finite-i64/3 or /4; public values remain i64. |
 | Wide numeric decisions | Library descriptors and the checked numeric evaluator | Signed and unsigned 128-bit values, with width-explicit checked arithmetic and resource limits. |
 | Original compound values | Library schema admission and immutable decoded witnesses | Whole declared compound values can be carried through decisions; nested field selection is unsupported. |
 
@@ -20,6 +24,14 @@ Its library fixtures exercise the actual publication, replay and store route.
 They do not supply a business decision callback. The legacy `transform`,
 `optimize` and `loop` checker path retains its 256-node/16-output bound;
 larger programs must not acquire an equivalence receipt through that path.
+The small arithmetic profile `/3` can be imported and checked by complete
+finite execution within the original limits. Older program readers refuse
+its profile and tags. The linear SMT/Carcara program encoding and legacy
+proposal/search profiles return unsupported for its new arithmetic. Existing
+U128 library mul-div and ProductsGe retain their separate meanings and domains.
+One logical Step is charged before each attempted arithmetic instruction,
+including refusals; this is not a measure of limb operations or CPU time.
+
 Upgrade equivalence reports that a comparison is not established when either
 program exceeds the checker's complete execution budget.
 

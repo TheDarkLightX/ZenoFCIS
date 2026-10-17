@@ -50,7 +50,7 @@ and normal contract generation, regeneration and review. It checks full Cartesia
 coverage independently of packet tallies, decodes every actual decision and
 compares exact observations with the separately authored reference, requires
 zero technical refusals over ALL raw inputs, and records positive witnesses.
-The code never evaluates an application decision in a handwritten callback.
+The tool never evaluates an application decision in a callback of its own.
 Before the first CLI dispatch, it snapshots every family's source/checker inputs,
 the compiler/evaluator inventory and the executable bytes. Certificates retain
 those initial bindings. Any input or executable drift refuses issuance before

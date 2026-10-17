@@ -15,8 +15,8 @@ default = ["std"]
 std = []
 
 [dependencies]
-zeno-fcis-codec = { version = "=2.3.0", path = "../zeno-fcis-codec" }
-zeno-fcis-refine = { version = "=2.3.0", path = "../zeno-fcis-refine" }
+zeno-fcis-codec = { version = "=2.4.0", path = "../zeno-fcis-codec" }
+zeno-fcis-refine = { version = "=2.4.0", path = "../zeno-fcis-refine" }
 
 [lints]
 workspace = true

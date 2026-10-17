@@ -14,13 +14,13 @@ from verus_coverage import inventory, require_coverage
 
 # Verbatim retained stderr of the legacy-form change_declared_law_order (hosted run
 # 37404295156 at rlimit 10, and the rlimit 40 rerun in
-# claude-selected-evidence/guarded-laws-changed-20261006T070311Z): exhausted inside
+# guarded-laws-evidence/changed-order-rlimit-40): exhausted inside
 # evaluate_into. It stays an inconclusive refusal, never a kill; this original
 # specimen is now declared native and is never proof-run here.
 LEGACY_LAW_ORDER_SHA256 = '55021af79009d390af1935f979047fd591c938ac0e3f238c33f3045f07647702'
 # Withdrawn inconclusive symbolic retargets, never kills: laws[0].id (7ce5b1d5…a11d)
 # mixed a postcondition error with loop exhaustion at rlimit 10 and 40; laws[i].id ^ 1
-# (claude-selected-evidence/guarded-laws-final-identity) only exhausted at rlimit 10.
+# (guarded-laws-evidence/withdrawn-xor-identity) only exhausted at rlimit 10.
 WITHDRAWN_XOR_SHA256 = '789a2e2c61e4a6a4b72073efa92c7562e4f037cb6c761d5e37fe4affe37a87f4'
 EXHAUSTED = """error: while loop: Resource limit (rlimit) exceeded; consider rerunning with --profile for more details
    --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/laws.rs:199:5
@@ -43,6 +43,51 @@ def semantic_report():
 
 
 class GuardedLawCoverage(unittest.TestCase):
+    def test_refresh_never_promotes_or_overwrites_the_reviewed_profile(self):
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        report = semantic_report()
+        report['verification-results'].update(success=True, errors=0, verified=1,
+            **{'encountered-error': False})
+        report['func-details'] = {'guarded_laws::probe': {}}
+        vir = ('(Function (Fun :path guarded_laws::probe) :mode Exec :typ_bounds () '
+               ':params () :ret () :require () :ensure ((Bool true)) :d () :body (Int 0))')
+        for positive_only, selected in ((False, None), (True, None), (False, ['guard_direction'])):
+            with self.subTest(positive_only=positive_only, selected=selected), \
+                    tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                old_profile = root / gate.PROFILE
+                old_profile.parent.mkdir(parents=True)
+                old_profile.write_bytes(b'previous reviewed profile\n')
+                pin_path = root / gate.verifier.PIN
+                pin_path.write_text(json.dumps(pin))
+                out = root / 'evidence'
+                (out / 'positive').mkdir(parents=True)
+                (out / 'positive/crate.vir').write_text(vir)
+                proc = subprocess.CompletedProcess([], 0, json.dumps(report), '')
+                with patch.object(gate, 'ROOT', root), \
+                        patch.object(gate, 'snapshot', return_value={'source': 'unchanged'}), \
+                        patch.object(gate.authority, 'check_generated_sources', return_value={}), \
+                        patch.object(gate.verifier, 'verify_tool_files'), \
+                        patch.object(gate, 'saved_run', return_value=proc), \
+                        patch.object(gate, 'native_commands') as native:
+                    receipt = gate.check(out, True, positive_only, selected)
+                self.assertEqual(receipt['status'], 'profile-review-required')
+                self.assertFalse(receipt['review_accepted'])
+                self.assertFalse(receipt['all_controls'])
+                self.assertEqual(old_profile.read_bytes(), b'previous reviewed profile\n')
+                native.assert_not_called()
+                candidate = json.loads((out / 'candidate-profile.json').read_text())
+                self.assertFalse(candidate['reviewed'])
+                self.assertEqual(candidate['body_covered_functions'], ['guarded_laws::probe'])
+                self.assertIn('body_sha256', candidate['functions']['guarded_laws::probe'])
+        for section, key, value in (('verus', 'version', 'other'),
+                ('verification-results', 'errors', 1),
+                ('verification-results', 'is-verifying-entire-crate', False)):
+            wrong = copy.deepcopy(report)
+            wrong[section][key] = value
+            with self.assertRaisesRegex(ValueError, 'failed or differently pinned'):
+                gate.candidate_profile(vir, wrong, pin)
+
     def test_whole_registered_closure_has_exact_total_contracts_and_raw_bodies(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         functions = profile['functions']
@@ -88,6 +133,15 @@ class GuardedLawCoverage(unittest.TestCase):
                 self.assertGreater(last, first)
             elif control['kind'] == 'coverage':
                 self.assertIn(control['field'], ('body_sha256', 'ensures_sha256', 'requires_sha256', 'inventory'))
+
+    def test_guard_opcode_control_preserves_the_rule_division_opcode(self):
+        source = (gate.ROOT / gate.METADATA).read_text()
+        changed = gate.controls()['canonical_guarded_opcode']['changed']
+        split = source.index('pub(super) fn law_op')
+        self.assertEqual(changed[:split], source[:split])
+        self.assertIn('parts.push(Part::Word(12));', source[split:])
+        self.assertNotIn('parts.push(Part::Word(12));', changed[split:])
+        self.assertIn('parts.push(Part::Word(11));', changed[split:])
 
     def test_native_ordinal_control_requires_exact_independent_before_and_after(self):
         baseline = SimpleNamespace(returncode=0, stdout=f'test {gate.ORDINAL_TEST} ... ok\n')

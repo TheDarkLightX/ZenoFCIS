@@ -509,6 +509,21 @@ class SharedCheckerGate(unittest.TestCase):
                     self.assertEqual(gate.main(), 1)
             self.assertFalse(json.loads((out / 'receipt.json').read_text())['review_accepted'])
 
+    def test_native_control_specimen_stays_in_the_supplied_scratch_directory(self):
+        import checker_native_controls as controls
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            scratch = base / 'scratch'
+            scratch.mkdir()
+            evidence = base / 'evidence'
+            with mock.patch.object(controls, 'NATIVE_TARGETS', {}), \
+                    mock.patch.object(controls, 'source_files', return_value=()):
+                self.assertEqual(controls.run_controls(
+                    base / 'source', evidence, {'TMPDIR': str(scratch)}, {}, None), [])
+            specimen = Path(json.loads((evidence / 'specimen.json').read_text())['path'])
+            self.assertEqual(specimen.parent, scratch)
+            self.assertTrue(specimen.is_dir())
+
     def test_native_mutation_requires_exact_assertion_failure_after_running_test(self):
         from checker_native_controls import native_result
         name = 'tests::expected'

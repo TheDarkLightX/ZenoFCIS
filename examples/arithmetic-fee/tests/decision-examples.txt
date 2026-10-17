@@ -1,0 +1,6 @@
+# Reduced deterministic arithmetic examples; qualification pending.
+0 0 0 3 0 | accept - 0 0 | -
+0 0 1 1 0 | accept - 1 0 | -
+0 0 10 1 0 | accept - 1 9 | -
+0 0 11 1 1 | accept - 2 9 | -
+0 0 20 3 1 | accept - 6 14 | -

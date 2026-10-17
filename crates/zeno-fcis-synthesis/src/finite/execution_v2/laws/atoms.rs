@@ -274,3 +274,12 @@ pub(super) fn product_compare<'a>(
         _ => Err(Failure::Undefined),
     }
 }
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures spec::value_result(result)==spec::to_u128(spec::atom(value)),))]
+pub(super) fn to_u128<'a>(value: Atom<'a>) -> Result<Atom<'a>, Failure> {
+    match value {
+        Atom::I128(v) if v >= 0 => Ok(Atom::U128(v as u128)),
+        Atom::U128(v) => Ok(Atom::U128(v)),
+        _ => Err(Failure::Undefined),
+    }
+}

@@ -1,0 +1,1 @@
+{"schema": "zeno-fcis/loop-architecture/1", "components": [{"name": "lifecycle", "owns": ["phase"], "reads": ["vote0", "vote1", "vote2", "action", "authorized"], "decides": ["invalid_state", "not_authorized", "wrong_phase", "quorum_missing"]}, {"name": "ballot", "owns": ["vote0", "vote1", "vote2"], "reads": ["action", "principal"], "decides": ["duplicate_vote"]}]}

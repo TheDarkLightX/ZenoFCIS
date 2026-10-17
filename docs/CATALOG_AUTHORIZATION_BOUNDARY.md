@@ -99,9 +99,9 @@ type from minting a value accepted by that commit port.
 
 The law manifest and evidence protocol are tool-neutral. Public deployments
 can mount Lean, Z3, CVC5, Kani, Flux, or other checked adapters. An owner with
-private ESSO access can mount an ESSO checker in a private crate through the
-same interfaces; public ZenoFCIS has no ESSO dependency or universal ESSO
-requirement.
+a private checker can mount it in a private crate through the same interfaces;
+public ZenoFCIS has no dependency on any private checker and no universal
+requirement for one.
 
 The generic `CommitmentHasher` trait remains available to reference and
 research APIs. Production authorization accepts only the sealed

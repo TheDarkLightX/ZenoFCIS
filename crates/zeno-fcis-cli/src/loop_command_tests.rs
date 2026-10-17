@@ -718,7 +718,9 @@ fn the_engine_fuses_the_loops_checked_candidates() {
             std::slice::from_ref(&first)
         ),
         SearchReport::Failed {
-            reason: String::from("engine:no-checked-improvement")
+            reason: String::from(
+                "engine:no-checked-improvement; bounded-search:Limits { max_enodes: 20000, max_classes: 10000, max_rewrites_per_round: 10000, max_extraction_rounds: 8, max_work: 100000 }; request a supported lowerable primitive or sketch for the same requirements"
+            )
         }
     );
     // With both, fusion makes each output x.

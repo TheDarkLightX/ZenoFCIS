@@ -32,6 +32,26 @@ class GateTests(unittest.TestCase):
             self.assertFalse(gate.semantic_refusal(
                 subprocess.CompletedProcess([],1,'',text),report,path,region=(17,65)))
 
+    def test_candidate_inventory_never_promotes_or_overwrites_the_profile(self):
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        report = {'verus': {key: pin[key] for key in ('version', 'commit')},
+                  'verification-results': {'success': True, 'errors': 0, 'verified': 1,
+                     'is-verifying-entire-crate': True, 'encountered-error': False,
+                     'encountered-vir-error': False},
+                  'func-details': {'authority_v2::probe': {}}}
+        report['verus']['toolchain'] = pin['rust_toolchain']
+        vir = ('(Function (Fun :path authority_v2::probe) :mode Exec :typ_bounds () '
+               ':params () :ret () :require () :ensure ((Bool true)) :d () :body (Int 0))')
+        before = (gate.ROOT / gate.PROFILE).read_bytes()
+        candidate = gate.candidate_profile(vir, report, pin)
+        self.assertFalse(candidate['reviewed'])
+        self.assertEqual(candidate['body_covered_functions'], ['authority_v2::probe'])
+        self.assertIn('body_sha256', candidate['functions']['authority_v2::probe'])
+        self.assertEqual((gate.ROOT / gate.PROFILE).read_bytes(), before)
+        report['verification-results']['errors'] = 1
+        with self.assertRaisesRegex(ValueError, 'failed or differently pinned'):
+            gate.candidate_profile(vir, report, pin)
+
     def test_solver_exhaustion_does_not_count_as_a_semantic_refusal(self):
         pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
         report = {'verus': {'version': pin['version'], 'commit': pin['commit'],
@@ -92,7 +112,8 @@ class GateTests(unittest.TestCase):
 
     def test_evaluator_matches_complete_approved_generation(self):
         result = gate.check_generated_sources()
-        self.assertEqual(result['paths'], 119)
+        self.assertEqual(result['paths'], 120)
+        self.assertIn('crates/zeno-fcis-synthesis/src/finite/value/scalar.rs', gate.source_manifest(gate.ROOT / gate.SOURCE_MANIFEST)['paths'])
         self.assertEqual(result['pins'], 3)
         self.assertEqual(result['approved_manifest_sha256'], gate.APPROVED_SOURCE_CLOSURE_SHA256)
 

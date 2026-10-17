@@ -45,10 +45,32 @@ fn op(a: &Op, b: &Op) -> bool {
         (Op::Not(a), Op::Not(b)) => *a == *b,
         (Op::Add(a, b), Op::Add(c, d))
         | (Op::Sub(a, b), Op::Sub(c, d))
+        | (Op::Mul(a, b), Op::Mul(c, d))
+        | (Op::DivFloor(a, b), Op::DivFloor(c, d))
+        | (Op::DivCeil(a, b), Op::DivCeil(c, d))
         | (Op::Eq(a, b), Op::Eq(c, d))
         | (Op::Lt(a, b), Op::Lt(c, d))
         | (Op::And(a, b), Op::And(c, d)) => *a == *c && *b == *d,
-        (Op::Select(a, b, c), Op::Select(d, e, f)) => *a == *d && *b == *e && *c == *f,
+        (Op::Select(a, b, c), Op::Select(d, e, f))
+        | (Op::MulDivFloor(a, b, c), Op::MulDivFloor(d, e, f))
+        | (Op::MulDivCeil(a, b, c), Op::MulDivCeil(d, e, f)) => *a == *d && *b == *e && *c == *f,
+        (Op::ProductsGe(a, b), Op::ProductsGe(c, d)) => {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                if a[0] == c[0] && a[1] == c[1] && a[2] == c[2] {
+                    assert(*a =~= *c);
+                }
+                if b[0] == d[0] && b[1] == d[1] && b[2] == d[2] {
+                    assert(*b =~= *d);
+                }
+            }
+            a[0] == c[0]
+                && a[1] == c[1]
+                && a[2] == c[2]
+                && b[0] == d[0]
+                && b[1] == d[1]
+                && b[2] == d[2]
+        }
         _ => false,
     }
 }

@@ -220,7 +220,7 @@ pub(crate) fn validate_contract(
             "declares a channel or a delivery; the profile has no effects or outbox",
         ));
     }
-    let nodes: Vec<Node> = contract.nodes.iter().map(node).collect();
+    let nodes: Vec<Node> = contract.nodes.iter().map(node).collect::<Result<_, _>>()?;
     eager(contract, &nodes)?;
     let law_nodes: usize = contract.laws.iter().map(|law| law.nodes.len()).sum();
     let needed = u64::try_from(nodes.len() + law_nodes).unwrap_or(u64::MAX);
@@ -257,8 +257,8 @@ pub(crate) fn validate_contract(
     })
 }
 
-fn node(op: &ScalarOp) -> Node {
-    match *op {
+fn node(op: &ScalarOp) -> Result<Node, Refusal> {
+    Ok(match *op {
         ScalarOp::Input(index) => Node::Input(index),
         ScalarOp::Int(value) => Node::Int(value),
         ScalarOp::Bool(value) => Node::Bool(value),
@@ -269,7 +269,14 @@ fn node(op: &ScalarOp) -> Node {
         ScalarOp::And(a, b) => Node::And(a, b),
         ScalarOp::Not(a) => Node::Not(a),
         ScalarOp::Select(c, a, b) => Node::Select(c, a, b),
-    }
+        ScalarOp::Mul(..) | ScalarOp::Div(..) | ScalarOp::MulDiv(..) | ScalarOp::ProductsGe(..) => {
+            return Err(refuse(
+                Obligation::EagerNodesTotal,
+                "program",
+                "arithmetic extension is outside the assembly profile",
+            ));
+        }
+    })
 }
 
 /// The aggregate's fields follow the assembly profile's map, with the
@@ -662,7 +669,7 @@ fn route_terms(
             "an aggregate input is a whole root",
         )
     })?;
-    let leaf_nodes: Vec<Node> = leaf.nodes.iter().map(node).collect();
+    let leaf_nodes: Vec<Node> = leaf.nodes.iter().map(node).collect::<Result<_, _>>()?;
     let leaf_bindings = &leaf.bindings;
     let leaf_ids = term::canonical(arena, &leaf_nodes, |arena, index| {
         let (source, field) = leaf_bindings.get(index)?;
@@ -859,7 +866,7 @@ pub(crate) fn specialization(
     contract: &Contract<'_>,
 ) -> Result<(Arena, Vec<RouteTerms>), Refusal> {
     let layout = Layout::of(manifest, compiled, edges)?;
-    let nodes: Vec<Node> = contract.nodes.iter().map(node).collect();
+    let nodes: Vec<Node> = contract.nodes.iter().map(node).collect::<Result<_, _>>()?;
     let mut arena = Arena::new(boolean_inputs(contract));
     let mut routes = Vec::with_capacity(compiled.len());
     for (position, leaf) in compiled.iter().enumerate() {
@@ -989,6 +996,16 @@ fn collect_names(ast: &Ast, out: &mut Vec<String>) {
             collect_names(left, out);
             collect_names(right, out);
         }
+        Ast::MulDiv(_, a, b, d) => {
+            collect_names(a, out);
+            collect_names(b, out);
+            collect_names(d, out);
+        }
+        Ast::ProductsGe(arguments) => {
+            for a in arguments.iter() {
+                collect_names(a, out);
+            }
+        }
         Ast::Choose(condition, then, otherwise) => {
             collect_names(condition, out);
             collect_names(then, out);
@@ -1009,6 +1026,10 @@ fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
             Ast::Choose(recurse(condition), recurse(then), recurse(otherwise))
         }
         Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
+        Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+        Ast::ProductsGe(arguments) => {
+            Ast::ProductsGe(arguments.iter().map(|a| *recurse(a)).collect())
+        }
     }
 }
 

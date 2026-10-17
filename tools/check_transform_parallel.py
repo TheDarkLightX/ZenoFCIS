@@ -29,7 +29,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / 'docs/benchmarks/cases.json'
 ARTIFACTS = ROOT / 'docs/benchmarks/withdrawal-queue/artifacts'
-VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/1'
+VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/3'
 ARTIFACT_PAIRS = (
     ('kernel', 'boolean-kernel-original', 'boolean-kernel-candidate'),
     ('kernel-padded', 'boolean-kernel-original', 'boolean-kernel-padded'),

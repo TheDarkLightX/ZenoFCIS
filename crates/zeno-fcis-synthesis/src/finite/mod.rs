@@ -42,8 +42,8 @@ pub use execution_v2::{
     execute as execute_v2, project_record as project_record_v2, zero_limits as v2_zero_limits,
 };
 pub use ir::{
-    Domain, EXTENDED_PROFILE, MAX_EXTENDED_INPUTS, MAX_EXTENDED_NODES, MAX_EXTENDED_OUTPUTS,
-    MAX_FIELDS, MAX_NODES, Op, PROFILE, Program,
+    ARITHMETIC_EXTENDED_PROFILE, ARITHMETIC_PROFILE, Domain, EXTENDED_PROFILE, MAX_EXTENDED_INPUTS,
+    MAX_EXTENDED_NODES, MAX_EXTENDED_OUTPUTS, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program,
 };
 
 /// V2 instruction-attempt accounting, separate from the scalar wire profile.
@@ -179,6 +179,10 @@ const SEMANTIC_SOURCES: &[(&str, &[u8])] = &[
     ("ir.rs", include_bytes!("ir.rs") as &[u8]),
     ("ir/program.rs", include_bytes!("ir/program.rs") as &[u8]),
     ("value/mod.rs", include_bytes!("value/mod.rs") as &[u8]),
+    (
+        "value/scalar.rs",
+        include_bytes!("value/scalar.rs") as &[u8],
+    ),
     ("value/spec.rs", include_bytes!("value/spec.rs") as &[u8]),
     ("value/wide.rs", include_bytes!("value/wide.rs") as &[u8]),
 ];

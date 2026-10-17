@@ -1,7 +1,7 @@
 //! Pure target adapters. An emitter consumes only closed IR, never its contract.
 //! Output is source code, not semantic evidence or runtime authority.
 
-use super::{Error, Op, PROFILE, Program};
+use super::{ARITHMETIC_PROFILE, Error, Op, PROFILE, Program};
 use alloc::{format, string::String};
 use core::fmt::Write;
 use zeno_fcis_codec::{CommitmentHasher, Hash32};
@@ -64,13 +64,16 @@ fn identity(language: &str) -> Hash32 {
         language.as_bytes(),
         b"\0",
         include_bytes!("emit.rs"),
+        ARITHMETIC_PROFILE.as_bytes(),
+        include_bytes!("value/scalar.rs"),
+        include_bytes!("value/wide.rs"),
     ])
 }
 impl TargetEmitter for RustEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "rust",
-            revision: 1,
+            revision: 2,
             extension: "rs",
         }
     }
@@ -111,6 +114,19 @@ impl TargetEmitter for RustEmitter {
                 Op::Bool(a) => format!("{}_i64", i64::from(a)),
                 Op::Add(a, b) => format!("v{a}.checked_add(v{b})?"),
                 Op::Sub(a, b) => format!("v{a}.checked_sub(v{b})?"),
+                Op::Mul(a, b) => format!("arithmetic::scalar::multiply(v{a},v{b})?"),
+                Op::DivFloor(a, b) => format!("arithmetic::scalar::divide(false,v{a},v{b})?"),
+                Op::DivCeil(a, b) => format!("arithmetic::scalar::divide(true,v{a},v{b})?"),
+                Op::MulDivFloor(a, b, d) => {
+                    format!("arithmetic::scalar::mul_div(false,v{a},v{b},v{d})?")
+                }
+                Op::MulDivCeil(a, b, d) => {
+                    format!("arithmetic::scalar::mul_div(true,v{a},v{b},v{d})?")
+                }
+                Op::ProductsGe(a, b) => format!(
+                    "i64::from(arithmetic::scalar::products_ge(v{},v{},v{},v{},v{},v{})?)",
+                    a[0], a[1], a[2], b[0], b[1], b[2]
+                ),
                 Op::Eq(a, b) => format!("i64::from(v{a} == v{b})"),
                 Op::Lt(a, b) => format!("i64::from(v{a} < v{b})"),
                 Op::And(a, b) => format!("i64::from(v{a} == 1 && v{b} == 1)"),
@@ -138,6 +154,14 @@ impl TargetEmitter for RustEmitter {
             write!(source, "v{id},").map_err(|_| Error::Invalid("format"))?;
         }
         source.push_str("])\n}\n");
+        if program.nodes().iter().any(Op::requires_arithmetic_profile) {
+            source = source.replacen(PROFILE, program.profile(), 1);
+            source.push_str("\n#[allow(dead_code)]\nmod arithmetic {\n    pub(crate) mod wide {\n");
+            source.push_str(include_str!("value/wide.rs"));
+            source.push_str("\n}\n    pub(crate) mod scalar {\n");
+            source.push_str(include_str!("value/scalar.rs"));
+            source.push_str("\n}\n}\n");
+        }
         Ok(source)
     }
 }
@@ -145,7 +169,7 @@ impl TargetEmitter for PythonEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "python",
-            revision: 1,
+            revision: 2,
             extension: "py",
         }
     }
@@ -170,12 +194,36 @@ impl TargetEmitter for PythonEmitter {
             writeln!(source,"    if type(input[{i}]) is not int or not ({min} <= input[{i}] <= {max}):\n        return None").map_err(|_|Error::Invalid("format"))?;
         }
         for (i, op) in program.nodes().iter().enumerate() {
+            let invalid = match *op {
+                Op::DivFloor(_, b) | Op::DivCeil(_, b) => Some(format!("v{b} == 0")),
+                Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+                    Some(format!("v{a} < 0 or v{b} < 0 or v{d} <= 0"))
+                }
+                Op::ProductsGe(a, b) => Some(format!(
+                    "v{} < 0 or v{} < 0 or v{} < 0 or v{} < 0 or v{} < 0 or v{} < 0",
+                    a[0], a[1], a[2], b[0], b[1], b[2]
+                )),
+                _ => None,
+            };
+            if let Some(invalid) = invalid {
+                writeln!(source, "    if {invalid}:\n        return None")
+                    .map_err(|_| Error::Invalid("format"))?;
+            }
             let expression = match *op {
                 Op::Input(a) => format!("input[{a}]"),
                 Op::Int(a) => format!("{a}"),
                 Op::Bool(a) => format!("{}", i64::from(a)),
                 Op::Add(a, b) => format!("v{a} + v{b}"),
                 Op::Sub(a, b) => format!("v{a} - v{b}"),
+                Op::Mul(a, b) => format!("v{a} * v{b}"),
+                Op::DivFloor(a, b) => format!("v{a} // v{b}"),
+                Op::DivCeil(a, b) => format!("-((-v{a}) // v{b})"),
+                Op::MulDivFloor(a, b, d) => format!("(v{a} * v{b}) // v{d}"),
+                Op::MulDivCeil(a, b, d) => format!("(v{a} * v{b} + v{d} - 1) // v{d}"),
+                Op::ProductsGe(a, b) => format!(
+                    "int(v{} * v{} * v{} >= v{} * v{} * v{})",
+                    a[0], a[1], a[2], b[0], b[1], b[2]
+                ),
                 Op::Eq(a, b) => format!("int(v{a} == v{b})"),
                 Op::Lt(a, b) => format!("int(v{a} < v{b})"),
                 Op::And(a, b) => format!("int(v{a} == 1 and v{b} == 1)"),
@@ -183,7 +231,16 @@ impl TargetEmitter for PythonEmitter {
                 Op::Select(c, a, b) => format!("v{a} if v{c} == 1 else v{b}"),
             };
             writeln!(source, "    v{i} = {expression}").map_err(|_| Error::Invalid("format"))?;
-            if matches!(op, Op::Add(..) | Op::Sub(..)) {
+            if matches!(
+                op,
+                Op::Add(..)
+                    | Op::Sub(..)
+                    | Op::Mul(..)
+                    | Op::DivFloor(..)
+                    | Op::DivCeil(..)
+                    | Op::MulDivFloor(..)
+                    | Op::MulDivCeil(..)
+            ) {
                 writeln!(source,"    if not (-9223372036854775808 <= v{i} <= 9223372036854775807):\n        return None").map_err(|_|Error::Invalid("format"))?;
             }
         }
@@ -200,6 +257,9 @@ impl TargetEmitter for PythonEmitter {
             write!(source, "v{id},").map_err(|_| Error::Invalid("format"))?;
         }
         source.push_str(")\n");
+        if program.nodes().iter().any(Op::requires_arithmetic_profile) {
+            source = source.replacen(PROFILE, program.profile(), 1);
+        }
         Ok(source)
     }
 }
@@ -265,7 +325,7 @@ impl TargetEmitter for JavaScriptEmitter {
     fn target(&self) -> TargetId {
         TargetId {
             language: "javascript",
-            revision: 1,
+            revision: 2,
             extension: "mjs",
         }
     }
@@ -277,6 +337,10 @@ impl TargetEmitter for JavaScriptEmitter {
     }
     fn emit(&self, program: &Program) -> Result<String, Error> {
         let mut source = String::from(JAVASCRIPT_PRELUDE);
+        if program.nodes().iter().any(Op::requires_arithmetic_profile) {
+            source = source.replacen(PROFILE, program.profile(), 1);
+            source.push_str("\nfunction divRounded(a, b, up) {\n  const q = a / b;\n  const r = a % b;\n  if (r === 0n) { return q; }\n  const negative = (a < 0n) !== (b < 0n);\n  return up ? q + (negative ? 0n : 1n) : q - (negative ? 1n : 0n);\n}\n");
+        }
         // Reject every non-string before any method, index, or coercion hook
         // can run, then admit the exact declared arity instead of a length.
         writeln!(
@@ -294,12 +358,36 @@ impl TargetEmitter for JavaScriptEmitter {
             .map_err(|_| Error::Invalid("format"))?;
         }
         for (i, op) in program.nodes().iter().enumerate() {
+            let invalid = match *op {
+                Op::DivFloor(_, b) | Op::DivCeil(_, b) => Some(format!("v{b} === 0n")),
+                Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+                    Some(format!("v{a} < 0n || v{b} < 0n || v{d} <= 0n"))
+                }
+                Op::ProductsGe(a, b) => Some(format!(
+                    "v{} < 0n || v{} < 0n || v{} < 0n || v{} < 0n || v{} < 0n || v{} < 0n",
+                    a[0], a[1], a[2], b[0], b[1], b[2]
+                )),
+                _ => None,
+            };
+            if let Some(invalid) = invalid {
+                writeln!(source, "  if ({invalid}) {{ return null; }}")
+                    .map_err(|_| Error::Invalid("format"))?;
+            }
             let expression = match *op {
                 Op::Input(a) => format!("fields[{a}]"),
                 Op::Int(a) => format!("{a}n"),
                 Op::Bool(a) => format!("{}n", i64::from(a)),
                 Op::Add(a, b) => format!("v{a} + v{b}"),
                 Op::Sub(a, b) => format!("v{a} - v{b}"),
+                Op::Mul(a, b) => format!("v{a} * v{b}"),
+                Op::DivFloor(a, b) => format!("divRounded(v{a}, v{b}, false)"),
+                Op::DivCeil(a, b) => format!("divRounded(v{a}, v{b}, true)"),
+                Op::MulDivFloor(a, b, d) => format!("(v{a} * v{b}) / v{d}"),
+                Op::MulDivCeil(a, b, d) => format!("(v{a} * v{b} + v{d} - 1n) / v{d}"),
+                Op::ProductsGe(a, b) => format!(
+                    "v{} * v{} * v{} >= v{} * v{} * v{} ? 1n : 0n",
+                    a[0], a[1], a[2], b[0], b[1], b[2]
+                ),
                 Op::Eq(a, b) => format!("v{a} === v{b} ? 1n : 0n"),
                 Op::Lt(a, b) => format!("v{a} < v{b} ? 1n : 0n"),
                 Op::And(a, b) => format!("(v{a} === 1n && v{b} === 1n) ? 1n : 0n"),
@@ -310,7 +398,16 @@ impl TargetEmitter for JavaScriptEmitter {
             // unbounded, so each add and sub carries its own i64 trap check.
             writeln!(source, "  const v{i} = {expression};")
                 .map_err(|_| Error::Invalid("format"))?;
-            if matches!(op, Op::Add(..) | Op::Sub(..)) {
+            if matches!(
+                op,
+                Op::Add(..)
+                    | Op::Sub(..)
+                    | Op::Mul(..)
+                    | Op::DivFloor(..)
+                    | Op::DivCeil(..)
+                    | Op::MulDivFloor(..)
+                    | Op::MulDivCeil(..)
+            ) {
                 writeln!(
                     source,
                     "  if (v{i} < I64_MIN || v{i} > I64_MAX) {{ return null; }}"

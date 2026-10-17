@@ -37,6 +37,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
+#[path = "loop_doors_command.rs"]
+pub(crate) mod doors;
+
+/// Scoped compiled loop-source fingerprint used by the CLI description.
+pub(crate) fn implementation_identity() -> String {
+    doors::pipeline::implementation()
+}
+
 const RESULT_SCHEMA: &str = "zeno-fcis/transform-loop/1";
 /// NSR-002: a checker worker's external deadline.
 const CHECK_DEADLINE: Duration = Duration::from_secs(2);
@@ -89,6 +97,9 @@ pub(super) enum ProposerArg {
     Hosted,
 }
 
+// One parsed invocation owns this fixed-size value; boxing adds an allocation
+// and indirection solely to shrink a few hundred bytes of command scratch.
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 pub(super) enum Command {
     /// Admit an original program and open a new session directory.
@@ -132,13 +143,16 @@ pub(super) enum Command {
         /// Canonical candidate program.
         #[arg(
             long,
-            conflicts_with = "candidate_json",
-            required_unless_present = "candidate_json"
+            conflicts_with_all = ["candidate_json", "expressions"],
+            required_unless_present_any = ["candidate_json", "expressions"]
         )]
         candidate: Option<PathBuf>,
         /// Candidate in the fixture vocabulary (inputs, outputs, nodes, roots); encoded canonically before admission.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "expressions")]
         candidate_json: Option<PathBuf>,
+        /// Candidate as one expression per output (zeno-fcis/loop-expressions/1); a refuted one gets a region, repair sites and a checked repair.
+        #[arg(long)]
+        expressions: Option<PathBuf>,
         /// Optional JSON recorded as the proposer's untrusted provenance.
         #[arg(long)]
         provenance: Option<PathBuf>,
@@ -175,9 +189,22 @@ pub(super) enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    #[command(flatten)]
+    Doors(doors::DoorCommand),
+}
+
+// Capture has typed containment refusals and no ordinary loop subject view.
+pub(crate) fn is_capture(command: &Command) -> bool {
+    matches!(command, Command::Doors(doors::DoorCommand::Capture { .. }))
 }
 
 pub(super) fn run(command: Command) -> u8 {
+    run_with_policy(command, None)
+}
+pub(crate) fn run_with_policy(
+    command: Command,
+    knowledge: Option<&crate::loop_knowledge::LoopPolicy>,
+) -> u8 {
     let (exit, report) = match command {
         Command::Open {
             original,
@@ -207,9 +234,16 @@ pub(super) fn run(command: Command) -> u8 {
         }
         Command::Candidate {
             session,
+            expressions: Some(expressions),
+            provenance,
+            ..
+        } => doors::expressions(&session, &expressions, provenance.as_deref()),
+        Command::Candidate {
+            session,
             candidate,
             candidate_json,
             provenance,
+            expressions: None,
         } => candidate_command(
             &session,
             candidate.as_deref(),
@@ -231,7 +265,16 @@ pub(super) fn run(command: Command) -> u8 {
         ),
         Command::Resume { session } => resume_command(&session),
         Command::Encode { program, out } => encode_command(&program, &out),
+        Command::Doors(command) => match knowledge {
+            Some(k) => doors::run_with_policy(command, Some(k)),
+            None => doors::run(command),
+        },
     };
+    if let Some(k) = knowledge
+        && k.record_outcome(exit, &report).is_err()
+    {
+        eprintln!("knowledge: outcome-observation-unavailable");
+    }
     crate::print_json(&report);
     exit
 }
@@ -288,6 +331,9 @@ impl StrategyEngine for OptimizeEngine {
             };
         }
         strategy.profile = Some(profile);
+        // L1: the requested portfolio is an envelope, not an impossibility
+        // result. Preserve it in an actionable diagnostic if it offers no win.
+        let search_bounds = format!("{:?}", strategy.limits);
         // The loop's checked candidates are fused into the search; the
         // optimizer judges them again before using them.
         let plan = optimize::strategy::Plan::single(strategy);
@@ -303,14 +349,19 @@ impl StrategyEngine for OptimizeEngine {
                 },
                 // Nothing better than what the loop already holds.
                 _ => SearchReport::Failed {
-                    reason: String::from("engine:no-checked-improvement"),
+                    reason: format!(
+                        "engine:no-checked-improvement; bounded-search:{search_bounds}; request a supported lowerable primitive or sketch for the same requirements"
+                    ),
                 },
             },
             optimize::Outcome::Refused(refused) => SearchReport::Failed {
                 reason: format!("engine-refused:{refused:?}"),
             },
-            optimize::Outcome::Inconclusive(_) => SearchReport::Unavailable {
-                reason: String::from("engine:domain-above-search-cap"),
+            optimize::Outcome::Inconclusive(domain) => SearchReport::Unavailable {
+                reason: format!(
+                    "engine:domain-above-search-cap; max_input_tuples={},needed={:?}; request a better-shaped primitive within the declared domain and checker limits",
+                    domain.limit, domain.size
+                ),
             },
         }
     }
@@ -1649,3 +1700,127 @@ fn storage_io(error: StorageError) -> std::io::Error {
 #[cfg(test)]
 #[path = "loop_command_tests.rs"]
 mod tests;
+
+// Explicit KB operations are read only and run before containment. They do not
+// open a loop session or write an inbox, including on the legacy command path.
+pub(crate) fn knowledge_operation(
+    command: &crate::Command,
+    paths: &[PathBuf],
+    task: &str,
+) -> Option<(u8, Value)> {
+    let crate::Command::Loop {
+        command:
+            Command::Doors(doors::DoorCommand::Strategy {
+                kb_op: Some(op),
+                query,
+                have,
+                want,
+                kb_max_steps,
+                kb_max_states,
+                limits,
+                ..
+            }),
+    } = command
+    else {
+        return None;
+    };
+    Some(doors::knowledge_operation(
+        paths,
+        op,
+        query.as_deref(),
+        have.as_deref(),
+        want.as_deref(),
+        task,
+        *kb_max_steps,
+        *kb_max_states,
+        *limits,
+    ))
+}
+/// Only public operation names cross this interface. No subject path or KB fact
+/// is serialized into the session/checker protocol.
+pub(crate) fn knowledge_subjects(command: &crate::Command) -> Option<Vec<String>> {
+    use doors::DoorCommand as D;
+    let crate::Command::Loop { command } = command else {
+        return None;
+    };
+    let names = match command {
+        Command::Encode { .. } => return None,
+        Command::Open { .. } | Command::Run { .. } | Command::Resume { .. } => vec!["loop-runtime"],
+        Command::Candidate {
+            expressions: Some(_),
+            ..
+        } => vec!["expressions-door"],
+        Command::Candidate { .. } => vec!["candidate"],
+        Command::Doors(d) => match d {
+            D::Strategy { kb_op: Some(_), .. } => return None,
+            D::Strategy {
+                kind: Some(kind), ..
+            } => {
+                let plan = zeno_fcis_loop_doors::strategy_algebra::named(kind, 64)?;
+                fn collect(
+                    n: &zeno_fcis_loop_doors::strategy_algebra::Node,
+                    out: &mut Vec<String>,
+                ) {
+                    use zeno_fcis_loop_doors::strategy_algebra::Node;
+                    match n {
+                        Node::Step(s) => out.push(s.name().into()),
+                        Node::Seq(ns) => {
+                            for n in ns {
+                                collect(n, out);
+                            }
+                        }
+                        Node::Branch { cases, .. } => {
+                            for n in cases {
+                                collect(n, out);
+                            }
+                        }
+                        Node::Repeat { body, .. } => collect(body, out),
+                    }
+                }
+                let mut out = vec![kind.clone()];
+                collect(plan.node(), &mut out);
+                return Some(out);
+            }
+            D::Strategy { .. } => vec![
+                "strategy",
+                "complete",
+                "repair",
+                "canonical",
+                "resubstitute",
+            ],
+            D::Pipeline { .. } => vec![
+                "pipeline",
+                "complete",
+                "repair",
+                "canonical",
+                "resubstitute",
+            ],
+            D::Capture { .. } => vec!["capture"],
+            D::Rules { .. } => vec!["rules"],
+            D::Learn { .. } => vec!["learn"],
+            D::Sketch { .. } => vec!["sketch"],
+            D::Family { .. } => vec!["family"],
+            D::Transfer { .. } => vec!["transfer"],
+            D::Meaning { .. } => vec!["meaning"],
+            D::Question { .. } => vec!["question-door"],
+            D::TeachBack { .. } => vec!["teach-back"],
+            D::Decompose { .. } => vec!["decompose"],
+        },
+    };
+    Some(names.into_iter().map(str::to_owned).collect())
+}
+
+/// Configuration sidecar location only; it is outside the authoritative session store.
+pub(crate) fn knowledge_session(command: &crate::Command) -> Option<(&Path, bool)> {
+    let crate::Command::Loop { command } = command else {
+        return None;
+    };
+    match command {
+        Command::Open { session, .. } => Some((session, true)),
+        Command::Candidate { session, .. }
+        | Command::Run { session, .. }
+        | Command::Resume { session } => Some((session, false)),
+        Command::Doors(d) => doors::knowledge_session(d),
+        _ => None,
+    }
+}

@@ -92,6 +92,10 @@ pub(crate) enum Instruction {
     Select(BooleanEncoding, u16, u16, u16),
     MulDiv(bool, u16, u16, u16),
     ProductsGe([u16; 3], [u16; 3]),
+    ScalarMul(u16, u16),
+    ScalarDiv(bool, u16, u16),
+    ScalarMulDiv(bool, u16, u16, u16),
+    ScalarProductsGe([u16; 3], [u16; 3]),
 }
 
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -139,6 +143,7 @@ impl<'s, 'a> Values<'s, 'a> {
     }
 }
 
+#[inline(always)]
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::legacy_instruction(*op),))]
 pub(crate) fn legacy_instruction(op: &Op) -> Instruction {
     use BooleanEncoding::LegacyInteger01 as L;
@@ -153,6 +158,12 @@ pub(crate) fn legacy_instruction(op: &Op) -> Instruction {
         Op::And(a, b) => Instruction::And(L, a, b),
         Op::Not(a) => Instruction::Not(L, a),
         Op::Select(c, a, b) => Instruction::Select(L, c, a, b),
+        Op::Mul(a, b) => Instruction::ScalarMul(a, b),
+        Op::DivFloor(a, b) => Instruction::ScalarDiv(false, a, b),
+        Op::DivCeil(a, b) => Instruction::ScalarDiv(true, a, b),
+        Op::MulDivFloor(a, b, d) => Instruction::ScalarMulDiv(false, a, b, d),
+        Op::MulDivCeil(a, b, d) => Instruction::ScalarMulDiv(true, a, b, d),
+        Op::ProductsGe(a, b) => Instruction::ScalarProductsGe(a, b),
     }
 }
 
@@ -204,6 +215,9 @@ pub(crate) fn project(value: Atom<'_>) -> Option<i64> {
 }
 
 /// All references are resolved before kind/range checks, including both Select arms.
+// Keep the closed adapters visible to the caller's optimizer. In particular,
+// the metered driver always supplies Typed scratch; no runtime mode test is needed.
+#[inline(always)]
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::node(op,input.view(),values.view()),))]
 pub(crate) fn node<'a>(
     op: Instruction,
@@ -222,6 +236,65 @@ pub(crate) fn node<'a>(
             }
         },
         Instruction::Literal(v, _) => Ok(v),
+        Instruction::ScalarMul(a, b) | Instruction::ScalarDiv(_, a, b) => {
+            let (Some(a), Some(b)) = (values.get(a as usize), values.get(b as usize)) else {
+                return Err(Failure::Reference);
+            };
+            let (Some(a), Some(b)) = (project(a), project(b)) else {
+                return Err(Failure::Arithmetic);
+            };
+            let result = match op {
+                Instruction::ScalarMul(..) => value::scalar::multiply(a, b),
+                Instruction::ScalarDiv(up, _, _) => value::scalar::divide(up, a, b),
+                _ => None,
+            };
+            match result {
+                Some(v) => Ok(Atom::I128(v as i128)),
+                None => Err(Failure::Arithmetic),
+            }
+        }
+        Instruction::ScalarMulDiv(up, a, b, d) => {
+            let (Some(a), Some(b), Some(d)) = (
+                values.get(a as usize),
+                values.get(b as usize),
+                values.get(d as usize),
+            ) else {
+                return Err(Failure::Reference);
+            };
+            let (Some(a), Some(b), Some(d)) = (project(a), project(b), project(d)) else {
+                return Err(Failure::Arithmetic);
+            };
+            match value::scalar::mul_div(up, a, b, d) {
+                Some(v) => Ok(Atom::I128(v as i128)),
+                None => Err(Failure::Arithmetic),
+            }
+        }
+        Instruction::ScalarProductsGe(a, b) => {
+            let (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f)) = (
+                values.get(a[0] as usize),
+                values.get(a[1] as usize),
+                values.get(a[2] as usize),
+                values.get(b[0] as usize),
+                values.get(b[1] as usize),
+                values.get(b[2] as usize),
+            ) else {
+                return Err(Failure::Reference);
+            };
+            let (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f)) = (
+                project(a),
+                project(b),
+                project(c),
+                project(d),
+                project(e),
+                project(f),
+            ) else {
+                return Err(Failure::Arithmetic);
+            };
+            match value::scalar::products_ge(a, b, c, d, e, f) {
+                Some(v) => Ok(boolean(BooleanEncoding::LegacyInteger01, v)),
+                None => Err(Failure::Arithmetic),
+            }
+        }
         Instruction::MulDiv(up, a, b, den) => {
             let (Some(a), Some(b), Some(den)) = (
                 values.get(a as usize),

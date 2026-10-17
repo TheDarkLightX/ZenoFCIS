@@ -4,7 +4,7 @@
 //! authority or upgrade the synthesis certificate.
 
 use crate::SynthesisError;
-use crate::finite::{Domain, Error, Op, PROFILE, Program};
+use crate::finite::{ARITHMETIC_PROFILE, Domain, Error, Op, PROFILE, Program};
 use alloc::vec::Vec;
 use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Hash32, decode_value};
 use zeno_fcis_value::{Value, ValueLimits, ValueRef};
@@ -31,7 +31,7 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
             max_input_bytes: 64 * 1024,
             value: ValueLimits {
                 max_depth: 4,
-                max_nodes: 2048,
+                max_nodes: 4096,
                 max_payload_bytes: 128,
                 max_collection_len: 256,
             },
@@ -53,7 +53,7 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
     else {
         return Err(invalid());
     };
-    if profile != PROFILE {
+    if profile != PROFILE && profile != ARITHMETIC_PROFILE {
         return Err(invalid());
     }
     let [inputs, outputs] = schema else {
@@ -120,6 +120,19 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
             [7, a, b] => Ok(Op::And(id(*a)?, id(*b)?)),
             [8, a] => Ok(Op::Not(id(*a)?)),
             [9, c, a, b] => Ok(Op::Select(id(*c)?, id(*a)?, id(*b)?)),
+            [10, a, b] if profile == ARITHMETIC_PROFILE => Ok(Op::Mul(id(*a)?, id(*b)?)),
+            [11, a, b] if profile == ARITHMETIC_PROFILE => Ok(Op::DivFloor(id(*a)?, id(*b)?)),
+            [12, a, b] if profile == ARITHMETIC_PROFILE => Ok(Op::DivCeil(id(*a)?, id(*b)?)),
+            [13, a, b, d] if profile == ARITHMETIC_PROFILE => {
+                Ok(Op::MulDivFloor(id(*a)?, id(*b)?, id(*d)?))
+            }
+            [14, a, b, d] if profile == ARITHMETIC_PROFILE => {
+                Ok(Op::MulDivCeil(id(*a)?, id(*b)?, id(*d)?))
+            }
+            [15, a, b, c, d, e, f] if profile == ARITHMETIC_PROFILE => Ok(Op::ProductsGe(
+                [id(*a)?, id(*b)?, id(*c)?],
+                [id(*d)?, id(*e)?, id(*f)?],
+            )),
             _ => Err(invalid()),
         }
     };

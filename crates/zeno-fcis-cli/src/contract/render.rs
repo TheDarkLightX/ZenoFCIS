@@ -967,6 +967,21 @@ fn law_op(op: &LawOp) -> Syntax {
             ],
         ),
         LawOp::ToI128(a) => indexes("l::Op::ToI128", &[*a]),
+        LawOp::ToU128(a) => indexes("l::Op::ToU128", &[*a]),
+        LawOp::MulDiv(r, a, b, d) => indexes(
+            match r {
+                Rounding::Floor => "l::Op::MulDivFloor",
+                Rounding::Ceil => "l::Op::MulDivCeil",
+            },
+            &[*a, *b, *d],
+        ),
+        LawOp::ProductsGe(a, b) => Syntax::call(
+            "l::Op::ProductsGe",
+            vec![
+                Syntax::array(a.iter().map(Syntax::literal).collect()),
+                Syntax::array(b.iter().map(Syntax::literal).collect()),
+            ],
+        ),
         LawOp::Eq(a, b) => indexes("l::Op::Eq", &[*a, *b]),
         LawOp::Lt(a, b) => indexes("l::Op::Lt", &[*a, *b]),
         LawOp::And(a, b) => indexes("l::Op::And", &[*a, *b]),
@@ -1095,6 +1110,28 @@ fn scalar_op(op: &ScalarOp) -> Syntax {
         ScalarOp::Bool(value) => Syntax::call("Op::Bool", vec![Syntax::literal(value)]),
         ScalarOp::Add(a, b) => indexes("Op::Add", &[*a, *b]),
         ScalarOp::Sub(a, b) => indexes("Op::Sub", &[*a, *b]),
+        ScalarOp::Mul(a, b) => indexes("Op::Mul", &[*a, *b]),
+        ScalarOp::Div(r, a, b) => indexes(
+            match r {
+                Rounding::Floor => "Op::DivFloor",
+                Rounding::Ceil => "Op::DivCeil",
+            },
+            &[*a, *b],
+        ),
+        ScalarOp::MulDiv(r, a, b, d) => indexes(
+            match r {
+                Rounding::Floor => "Op::MulDivFloor",
+                Rounding::Ceil => "Op::MulDivCeil",
+            },
+            &[*a, *b, *d],
+        ),
+        ScalarOp::ProductsGe(a, b) => Syntax::call(
+            "Op::ProductsGe",
+            vec![
+                Syntax::array(a.iter().map(Syntax::literal).collect()),
+                Syntax::array(b.iter().map(Syntax::literal).collect()),
+            ],
+        ),
         ScalarOp::Eq(a, b) => indexes("Op::Eq", &[*a, *b]),
         ScalarOp::Lt(a, b) => indexes("Op::Lt", &[*a, *b]),
         ScalarOp::And(a, b) => indexes("Op::And", &[*a, *b]),

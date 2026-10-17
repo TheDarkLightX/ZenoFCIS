@@ -38,6 +38,7 @@ fn pure_node<'a>(op: &Op<'a>, values: &[Atom<'a>]) -> Result<Atom<'a>, Failure> 
             at(values, right[2])?,
         ),
         Op::ToI128(a) => super::atoms::to_i128(at(values, a)?),
+        Op::ToU128(a) => super::atoms::to_u128(at(values, a)?),
         Op::Sub(a, b) => super::atoms::binary(1, at(values, a)?, at(values, b)?),
         Op::Eq(a, b) => super::atoms::binary(2, at(values, a)?, at(values, b)?),
         Op::Lt(a, b) => super::atoms::binary(3, at(values, a)?, at(values, b)?),
@@ -161,7 +162,7 @@ pub(super) fn shape(program: &Program<'_>) -> bool {
             | Op::Eq(a, b)
             | Op::Lt(a, b)
             | Op::And(a, b) => a < i && b < i,
-            Op::Not(a) | Op::ToI128(a) => a < i,
+            Op::Not(a) | Op::ToI128(a) | Op::ToU128(a) => a < i,
             Op::Select(a, b, c) | Op::MulDivFloor(a, b, c) | Op::MulDivCeil(a, b, c) => {
                 a < i && b < i && c < i
             }

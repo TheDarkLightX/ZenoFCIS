@@ -15,6 +15,16 @@ class ScaffoldVersions(unittest.TestCase):
     def test_current_template_and_contract_pins_match_the_release(self):
         release.validate_scaffold_versions(self.version)
 
+    def test_cli_program_search_is_a_direct_pinned_and_locked_dependency(self):
+        cli = tomllib.loads((release.ROOT / 'crates/zeno-fcis-cli/Cargo.toml').read_text())
+        dependency = cli['dependencies'].get('zeno-fcis-program-search')
+        self.assertIsNotNone(dependency, 'direct imports require a direct Cargo dependency')
+        self.assertEqual(dependency['path'], '../zeno-fcis-program-search')
+        self.assertEqual(dependency['version'], '=' + self.version)
+        locked = tomllib.loads((release.ROOT / 'Cargo.lock').read_text())
+        package = next(p for p in locked['package'] if p['name'] == 'zeno-fcis-cli')
+        self.assertIn('zeno-fcis-program-search', package['dependencies'])
+
     def test_each_template_with_a_stale_pin_is_refused(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -17,6 +17,11 @@ pub const PROFILE: &str = "zeno-fcis/finite-i64/1";
 /// Larger bounded profile with the same checked-i64, eager semantics.
 pub const EXTENDED_PROFILE: &str = "zeno-fcis/finite-i64/2";
 
+/// Checked i64 arithmetic extension under the original 256-node/16-output caps.
+pub const ARITHMETIC_PROFILE: &str = "zeno-fcis/finite-i64/3";
+/// The arithmetic extension under the 4,096-node/64-output caps.
+pub const ARITHMETIC_EXTENDED_PROFILE: &str = "zeno-fcis/finite-i64/4";
+
 impl Domain {
     pub(super) fn value(self) -> Result<Value, EncodeError> {
         let (min, max) = self.bounds();
@@ -51,6 +56,22 @@ impl Op {
             Self::And(a, b) => ints(7, &[a.into(), b.into()]),
             Self::Not(a) => ints(8, &[a.into()]),
             Self::Select(c, a, b) => ints(9, &[c.into(), a.into(), b.into()]),
+            Self::Mul(a, b) => ints(10, &[a.into(), b.into()]),
+            Self::DivFloor(a, b) => ints(11, &[a.into(), b.into()]),
+            Self::DivCeil(a, b) => ints(12, &[a.into(), b.into()]),
+            Self::MulDivFloor(a, b, d) => ints(13, &[a.into(), b.into(), d.into()]),
+            Self::MulDivCeil(a, b, d) => ints(14, &[a.into(), b.into(), d.into()]),
+            Self::ProductsGe(a, b) => ints(
+                15,
+                &[
+                    a[0].into(),
+                    a[1].into(),
+                    a[2].into(),
+                    b[0].into(),
+                    b[1].into(),
+                    b[2].into(),
+                ],
+            ),
         }
     }
 }
@@ -98,13 +119,15 @@ impl Program {
     /// The shape-selected semantic profile included in canonical program data.
     #[must_use]
     pub fn profile(&self) -> &'static str {
-        if self.inputs.len() > 2 * MAX_FIELDS
+        let extended = self.inputs.len() > 2 * MAX_FIELDS
             || self.outputs.len() > MAX_FIELDS
-            || self.nodes.len() > MAX_NODES
-        {
-            EXTENDED_PROFILE
-        } else {
-            PROFILE
+            || self.nodes.len() > MAX_NODES;
+        let arithmetic = self.nodes.iter().any(Op::requires_arithmetic_profile);
+        match (arithmetic, extended) {
+            (false, false) => PROFILE,
+            (false, true) => EXTENDED_PROFILE,
+            (true, false) => ARITHMETIC_PROFILE,
+            (true, true) => ARITHMETIC_EXTENDED_PROFILE,
         }
     }
     /// Evaluates explicit inputs without any ambient state or effects.

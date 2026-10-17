@@ -188,7 +188,7 @@ def check(directory: Path, positive_only: bool = False) -> dict:
     (directory / 'source_sha256.json').write_text(json.dumps(before,indent=2,sort_keys=True)+'\n')
     pin = json.loads((ROOT / verifier.PIN).read_text())
     profile = json.loads((ROOT / PROFILE).read_text())
-    tool = verifier.prepare_tools(Path.home() / '.cache/zeno-fcis/verus',pin,False)
+    tool = verifier.prepare_tools(verifier.cache_directory(),pin,False)
     env = {k:v for k,v in os.environ.items() if not k.startswith(('VERUS_','VARGO_')) and k not in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'],VERUS_Z3_PATH=str(tool/'z3'),
                CARGO_TARGET_DIR=str(TARGET),CARGO_BUILD_JOBS='1',RUST_TEST_THREADS='1',CARGO_NET_OFFLINE='true',CARGO_INCREMENTAL='0')

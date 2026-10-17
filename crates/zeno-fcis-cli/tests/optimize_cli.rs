@@ -486,7 +486,10 @@ fn describe_declares_optimize_effects() {
         [
             "candidate_out",
             "help",
+            "kb",
+            "kb_task",
             "max_input_tuples",
+            "no_kb",
             "profile",
             "program",
             "receipt",

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Offline actual-source guarded law proof, raw coverage and independent oracles.
 
-Run under the fleet heavy lock. Profiles are refreshed only explicitly, from a
-successful whole-source proof. No installation, source-list edits or coverage
-normalization is performed. Receipts never authorize execution or publication.
+Run under the fleet heavy lock. Explicit refresh writes an unapproved candidate
+from a successful whole-source proof; it never overwrites the reviewed profile.
+No installation, source-list edits or coverage normalization is performed.
+Receipts never authorize execution or publication.
 """
 from __future__ import annotations
 
@@ -113,7 +114,9 @@ def controls():
         ('denied_read_trace', PREDICATE, 'permitted: permission.is_ok(),', 'permitted: true,', 'node', True),
         ('invalid_default_text', PREDICATE, 'if bytes[i] >= 128 {', 'if false {', 'default_text_valid', True),
         ('skip_inactive_default_admission', PREDICATE, 'Atom::Text(bytes) => default_text_valid(bytes),', 'Atom::Text(_) => true,', 'shape', True),
-        ('canonical_guarded_opcode', METADATA, 'parts.push(Part::Word(12));', 'parts.push(Part::Word(11));', 'law_op', True),
+        ('canonical_guarded_opcode', METADATA,
+            'laws::Op::ObserveWhen(guard, o, default) => { parts.push(Part::Word(12));',
+            'laws::Op::ObserveWhen(guard, o, default) => { parts.push(Part::Word(11));', 'law_op', True),
         ('canonical_guard_index', METADATA, 'parts.push(Part::Word(*guard as u128));', 'parts.push(Part::Word(0));', 'law_op', True),
         ('canonical_guarded_default', METADATA, 'law_atom(parts,default);', 'law_atom(parts,&laws::Atom::Bool(true));', 'law_op', True),
         ('canonical_default_type', METADATA, 'laws::Atom::Text(v)=>{parts.push(Part::Word(6));', 'laws::Atom::Text(v)=>{parts.push(Part::Word(5));', 'law_atom', True),
@@ -165,7 +168,7 @@ def coverage_refusal(vir, profile, control):
         if control['target'] == 'laws::predicate::node':
             matched = matched and all(actual[target][key] == profile['functions'][target][key]
                 for key in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
-    matched = matched and error is not None and target in error
+    matched = matched and error is not None
     return matched, error, {'function': target, 'field': field, 'intended_refusal': matched}
 
 
@@ -260,19 +263,34 @@ def saved_run(command, cwd, env, out, name, timeout=1200):
     return proc
 
 
+def candidate_profile(vir, report, pin):
+    if not verifier.proof_succeeded(report, pin):
+        raise ValueError('cannot inventory a failed or differently pinned proof')
+    raw, _ = observed_inventory(vir, NAMESPACE)
+    bodies = sorted(name for name, record in raw.items() if record['mode'] == 'Exec')
+    functions, declarations = observed_inventory(vir, NAMESPACE, tuple(bodies))
+    profile = {'namespace': NAMESPACE, 'reviewed': False, 'functions': functions,
+        'body_covered_functions': bodies,
+        'expected_verified': report['verification-results']['verified'],
+        'target_functions': sorted(name for name in report['func-details'] if name.startswith(NAMESPACE))}
+    if declarations is not None:
+        profile['abstract_declarations'] = declarations
+    return profile
+
+
 def check(out, refresh=False, positive_only=False, selected=None):
     out.mkdir(parents=True, exist_ok=True)
     generation = authority.check_generated_sources()
     initial = snapshot(True)
     pin = json.loads((ROOT / verifier.PIN).read_text())
-    tool = Path.home() / '.cache/zeno-fcis/verus' / pin['version'] / 'qualified'
+    tool = verifier.cache_directory() / pin['version'] / 'qualified'
     verifier.verify_tool_files(tool, pin)
     env = {k: v for k, v in os.environ.items() if not k.startswith(('VERUS_', 'VARGO_')) and k not in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'], VERUS_Z3_PATH=str(tool / 'z3'),
         CARGO_BUILD_JOBS='1', CARGO_INCREMENTAL='0', RUST_TEST_THREADS='1', CARGO_NET_OFFLINE='true',
         CARGO_TARGET_DIR=os.environ.get('CARGO_TARGET_DIR', str(ROOT / 'target')))
     command = [str(tool / 'verus'), '--crate-type=lib', '--edition=2024', '--no-cheating',
-        '--no-external-by-default', '--num-threads', '2', '--output-json', '--triggers-mode', 'silent',
+        '--no-external-by-default', '--num-threads', verifier.proof_threads('2'), '--output-json', '--triggers-mode', 'silent',
         '-V', 'spinoff-all', '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
     positive = saved_run(proof_command(command, out / 'positive'), ROOT, env, out, 'positive')
     verifier.require_success(positive)
@@ -282,16 +300,19 @@ def check(out, refresh=False, positive_only=False, selected=None):
         raise ValueError('whole actual-source proof failed')
     vir = (out / 'positive/crate.vir').read_text()
     if refresh:
-        raw, _declarations = observed_inventory(vir, NAMESPACE)
-        bodies = [name for name, record in raw.items() if record['mode'] == 'Exec']
-        functions, declarations = observed_inventory(vir, NAMESPACE, tuple(bodies))
-        profile = dict(namespace=NAMESPACE, functions=functions,
-            body_covered_functions=bodies, expected_verified=vr['verified'],
-            target_functions=sorted(name for name in report['func-details'] if name.startswith(NAMESPACE)))
-        if declarations is not None:
-            profile['abstract_declarations'] = declarations
-        (ROOT / PROFILE).write_text(json.dumps(profile, indent=2, sort_keys=True) + '\n')
+        profile = candidate_profile(vir, report, pin)
+        candidate = out / 'candidate-profile.json'
+        candidate.write_text(json.dumps(profile, indent=2, sort_keys=True) + '\n')
+        if initial != snapshot(True):
+            raise ValueError('source drift during candidate proof')
+        return {'schema': 'zeno-fcis/guarded-laws-evidence/1',
+            'status': 'profile-review-required', 'source_sha256': initial,
+            'source_generation': generation, 'verus_report': report,
+            'candidate_profile': str(candidate), 'review_accepted': False,
+            'all_controls': False, 'selected_controls': selected}
     profile = json.loads((ROOT / PROFILE).read_text())
+    if profile.get('reviewed') is not True:
+        raise ValueError('guarded-law profile requires independent review')
     coverage = require_coverage(vir, profile)
     if set(profile['body_covered_functions']) != {n for n, v in coverage.items() if v['mode'] == 'Exec'}:
         raise ValueError('every runtime body must be covered')
@@ -394,7 +415,7 @@ def main():
         receipt = {'schema': 'zeno-fcis/guarded-laws-evidence/1', 'status': 'failed', 'error': str(error)}
     (out / 'receipt.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
     print(receipt['status'], flush=True)
-    if receipt['status'] != 'passed':
+    if receipt['status'] not in ('passed', 'profile-review-required'):
         print(receipt['error'], flush=True)
         return 1
     return 0

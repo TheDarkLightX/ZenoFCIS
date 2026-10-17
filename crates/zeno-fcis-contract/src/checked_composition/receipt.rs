@@ -11,13 +11,23 @@
 //! check again on the sources, writes the receipt of that result, and
 //! requires the two to be byte-identical. A receipt with a changed count,
 //! digest, identity or pin, or sources that changed since, is refused.
+//!
+//! A composed-domain result has its own receipt,
+//! `zeno-fcis/composed-domain-receipt/1`, written and replayed the same
+//! way by [`DomainResult::receipt`] and [`replay_domain`]; it records the
+//! verdict, whichever it is.
 
 use serde_json::{Map, Value, json};
 
-use super::{CheckedComposition, CompositionSources, Refusal, check};
+use super::{
+    CheckedComposition, CompositionSources, DomainResult, DomainSources, Refusal, check,
+    check_domain,
+};
 
 /// The schema of a checked composition's receipt.
 pub const RECEIPT_SCHEMA: &str = "zeno-fcis/checked-composition-receipt/1";
+/// The schema of a composed-domain result's receipt.
+pub const DOMAIN_RECEIPT_SCHEMA: &str = "zeno-fcis/composed-domain-receipt/1";
 
 /// What is wrong with a receipt's form.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,6 +123,14 @@ impl CheckedComposition {
     }
 }
 
+impl DomainResult {
+    /// The canonical receipt of this result.
+    #[must_use]
+    pub fn receipt(&self) -> String {
+        canonical(&json!({"schema": DOMAIN_RECEIPT_SCHEMA, "result": self.json()}))
+    }
+}
+
 /// Runs every check on `sources` again and requires `receipt`, byte for
 /// byte.
 ///
@@ -123,6 +141,37 @@ pub fn replay(
     receipt: &str,
     sources: CompositionSources<'_>,
 ) -> Result<CheckedComposition, ReplayRefusal> {
+    replay_against(receipt, RECEIPT_SCHEMA, || {
+        let checked = check(sources)?;
+        let recomputed = checked.receipt();
+        Ok((checked, recomputed))
+    })
+}
+
+/// Runs a composed-domain check on `sources` again and requires `receipt`,
+/// byte for byte.
+///
+/// # Errors
+/// A receipt that is not canonical, the check's refusal at validation, or
+/// the first difference between the receipt and the recomputed one.
+pub fn replay_domain(
+    receipt: &str,
+    sources: &DomainSources<'_>,
+) -> Result<DomainResult, ReplayRefusal> {
+    replay_against(receipt, DOMAIN_RECEIPT_SCHEMA, || {
+        let result = check_domain(sources)?;
+        let recomputed = result.receipt();
+        Ok((result, recomputed))
+    })
+}
+
+/// Requires `receipt` to be a canonical receipt of `schema`, runs the check
+/// and requires its receipt byte for byte.
+fn replay_against<T>(
+    receipt: &str,
+    schema: &str,
+    run: impl FnOnce() -> Result<(T, String), Refusal>,
+) -> Result<T, ReplayRefusal> {
     let recorded: Value = serde_json::from_str(receipt)
         .map_err(|_| ReplayRefusal::Malformed(ReceiptForm::NotJson))?;
     if canonical(&recorded) != receipt {
@@ -130,14 +179,13 @@ pub fn replay(
     }
     let closed = recorded.as_object().is_some_and(|fields| {
         fields.len() == 2
-            && fields.get("schema") == Some(&json!(RECEIPT_SCHEMA))
+            && fields.get("schema") == Some(&json!(schema))
             && fields.get("result").is_some_and(Value::is_object)
     });
     if !closed {
         return Err(ReplayRefusal::Malformed(ReceiptForm::Schema));
     }
-    let checked = check(sources).map_err(ReplayRefusal::Check)?;
-    let recomputed = checked.receipt();
+    let (checked, recomputed) = run().map_err(ReplayRefusal::Check)?;
     if recomputed == receipt {
         return Ok(checked);
     }

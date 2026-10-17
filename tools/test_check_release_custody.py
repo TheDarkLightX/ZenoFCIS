@@ -418,6 +418,37 @@ class CustodyTest(unittest.TestCase):
                 self.assertIn("C11-download-list", self.failed(self.check(signing_key=given)), label)
 
 
+class PackagedRegressionInputsTest(unittest.TestCase):
+    def test_manifest_matches_every_current_input(self):
+        for row in rc_package.load_packaged_test_inputs():
+            with self.subTest(package=row["package"], target=row["target"], path=row["path"]):
+                self.assertEqual(rc_package.sha256(rc_package.ROOT / row["path"]), row["sha256"])
+
+    def test_public_arithmetic_inputs_stage_only_at_the_reviewed_digest(self):
+        entries = [row for row in rc_package.load_packaged_test_inputs()
+                   if row["path"].startswith(("examples/arithmetic-", "tools/test-data/scalar-arithmetic/"))]
+        self.assertEqual(len(entries), 7)
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            staged = rc_package.stage_repository_inputs(
+                entries, target, read_blob=lambda name: (rc_package.ROOT / name).read_bytes())
+            self.assertEqual(len(staged), 7)
+            for row in staged:
+                self.assertEqual(rc_package.sha256(target / row["path"]), row["sha256"])
+            with self.assertRaises(rc_package.RcError):
+                rc_package.stage_repository_inputs(entries, target, read_blob=lambda name: b"changed")
+
+    def test_other_examples_and_traversal_do_not_enter_the_fixture_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "inputs.json"
+            for name in ("examples/unreviewed/project.zeno", "tools/private/input.txt",
+                         "examples/arithmetic-fee/../private/input.txt"):
+                row = {"package": "example", "target": "test:input", "path": name, "sha256": "0" * 64}
+                path.write_text(json.dumps({"format": rc_package.PACKAGED_TEST_INPUTS_FORMAT, "inputs": [row]}))
+                with self.assertRaises(rc_package.RcError):
+                    rc_package.load_packaged_test_inputs(path)
+
+
 class PackagedLockTest(unittest.TestCase):
     """The Cargo.lock that cargo +1.97.1 packaged into zeno-fcis-project-2.3.0-rc.1.crate of the v2.3.0-rc.1
     set, byte for byte, checked against the entries of that commit's workspace lock it names."""

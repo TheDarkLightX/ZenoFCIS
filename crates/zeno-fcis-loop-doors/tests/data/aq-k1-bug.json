@@ -1,0 +1,33 @@
+{
+ "schema": "zeno-fcis/loop-expressions/1",
+ "vocabulary": {
+  "inputs": [
+   "phase",
+   "vote0",
+   "vote1",
+   "vote2",
+   "action",
+   "principal",
+   "authorized"
+  ],
+  "variants": {
+   "phase": {
+    "Empty": 150,
+    "Pending": 151,
+    "Executed": 152
+   },
+   "action": {
+    "Enqueue": 160,
+    "Vote": 161,
+    "Execute": 162
+   }
+  },
+  "cases": 8
+ },
+ "outputs": [
+  "(phase == Empty && vote0 + vote1 + vote2 != 0) || (phase == Executed && vote0 + vote1 + vote2 < 1) ? 0 : phase == Executed || (action == Enqueue && phase != Empty) || (action != Enqueue && phase != Pending) ? 2 : !authorized ? 1 : action == Vote && ((principal == 0 && vote0) || (principal == 1 && vote1) || (principal == 2 && vote2)) ? 3 : action == Execute && vote0 + vote1 + vote2 < 1 ? 4 : action == Enqueue ? 5 : action == Vote ? 6 : 7",
+  "vote0 || principal == 0",
+  "vote1 || principal == 1",
+  "vote2 || principal == 2"
+ ]
+}

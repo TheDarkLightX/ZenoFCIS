@@ -455,7 +455,11 @@ fn the_command_is_described_with_its_effects() {
     assert_eq!(description["effects"]["classification"], "declared");
     assert_eq!(
         description["effects"]["reads"],
-        serde_json::json!(["application-contract", "decision-examples"])
+        serde_json::json!([
+            "application-contract",
+            "decision-examples",
+            "optional-proposed-laws"
+        ])
     );
     assert_eq!(
         description["effects"]["writes"],

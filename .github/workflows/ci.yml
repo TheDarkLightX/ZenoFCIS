@@ -47,6 +47,13 @@ jobs:
           python3 tools/test_miri_exclusions.py
           python3 tools/test_authority_source_bundle.py
           python3 tools/test_proof_challenge.py
+      # BEGIN neutral knowledge source and packaging guards.
+      - name: Knowledge file include policy and engine reference
+        run: |
+          python3 -B tools/check_knowledge_files.py
+          python3 -B tools/test_strategy_knowledge_reference.py
+          python3 -B tools/test_knowledge_files.py
+      # END neutral knowledge guards.
 
       - name: Format
         run: cargo +1.97.1 fmt --all -- --check

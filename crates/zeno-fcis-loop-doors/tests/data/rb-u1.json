@@ -1,0 +1,1 @@
+{"schema": "zeno-fcis/loop-expressions/1", "vocabulary": {"inputs": ["remaining", "closed", "finish", "authorized"], "cases": 5}, "outputs": ["!authorized ? 0 : closed ? 1 : remaining == ?c ? 2 : finish ? 3 : 4", "keep"]}

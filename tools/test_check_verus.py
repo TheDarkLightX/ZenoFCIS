@@ -11,6 +11,16 @@ import check_verus as gate
 
 
 class EvidenceAdmission(unittest.TestCase):
+    def test_proof_workers_preserve_defaults_and_refuse_unassigned_counts(self):
+        self.assertEqual(gate.proof_threads('1', {}), '1')
+        self.assertEqual(gate.proof_threads('2', {}), '2')
+        for workers in range(1, 7):
+            self.assertEqual(gate.proof_threads(environment={'ZENO_FCIS_VERUS_THREADS': str(workers)}), str(workers))
+        for invalid in ('0', '7', '-1', '1.5', 'six', '', True, None):
+            with self.assertRaises(ValueError):
+                gate.proof_threads(environment={'ZENO_FCIS_VERUS_THREADS': invalid})
+
+
     def setUp(self):
         self.pin = json.loads((gate.ROOT / gate.PIN).read_text())
         # A synthetic protocol fixture; no proof result is claimed by this test.
@@ -86,6 +96,8 @@ class EvidenceAdmission(unittest.TestCase):
                 current, self.pin, path, cwd, region=(10, 20),
                 target_functions=self.pin['target_functions'])
         self.assertTrue(classify(diagnostic + summary))
+        self.assertTrue(classify(diagnostic.replace('postcondition not satisfied',
+            'invariant not satisfied before loop') + summary))
         self.assertTrue(classify(diagnostic * 2 + 'error: aborting due to 2 previous errors\n'))
         for wrong in (
             diagnostic + 'note: SMT result UNKNOWN\n' + summary,
@@ -120,6 +132,56 @@ class EvidenceAdmission(unittest.TestCase):
         changed['func-details'].pop(self.pin['target_functions'][0])
         self.assertFalse(classify(diagnostic + summary, changed))
 
+    def test_function_region_includes_contract_before_trailing_rlimit(self):
+        source = """#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == value,))]
+#[cfg_attr(verus_keep_ghost, verifier::rlimit(30))]
+pub fn intended(value: u64) -> u64 {
+    value
+}
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures true,))]
+#[cfg_attr(verus_keep_ghost, verifier::rlimit(10))]
+pub fn unrelated() -> u64 { 0 }
+"""
+        self.assertEqual(gate.function_lines(source, 'intended'), (1, 6))
+        self.assertEqual(gate.function_lines(source, 'unrelated'), (7, 10))
+        actual = (gate.ROOT / 'crates/zeno-fcis-synthesis/src/finite/execution_v2/decision.rs').read_text()
+        start, end = gate.function_lines(actual, 'construct')
+        self.assertIn('ensures', '\n'.join(actual.splitlines()[start - 1:end]))
+        self.assertNotIn('fn decide', '\n'.join(actual.splitlines()[start - 1:end]))
+
+    def test_function_region_includes_inline_postcondition_without_next_function(self):
+        source = """pub fn intended(value: u64) -> u64 {
+    #[cfg(verus_keep_ghost)]
+    verus_proof_expr!(ensures(|result: u64| result == value));
+    value
+}
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]
+pub fn unrelated() -> u64 { 0 }
+"""
+        self.assertEqual(gate.function_lines(source, 'intended'), (1, 5))
+        actual = (gate.ROOT / 'crates/zeno-fcis-cli/src/symbolic/program/library.rs').read_text()
+        start, end = gate.function_lines(actual, 'of')
+        self.assertIn('result.inputs@ == program.view().0',
+                      '\n'.join(actual.splitlines()[start - 1:end]))
+
+    def test_function_region_never_borrows_another_functions_contract(self):
+        before = """#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]
+pub fn previous() -> u64 { 0 }
+pub fn intended() -> u64 { 0 }
+"""
+        after = """pub fn intended() -> u64 { 0 }
+pub fn following() -> u64 {
+    verus_proof_expr!(ensures(|result: u64| result == 0));
+    0
+}
+"""
+        for source in (before, after):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, 'lacks an annotated contract'):
+                    gate.function_lines(source, 'intended')
+
     def test_coverage_fault_success_allows_a_deliberate_count_change(self):
         report = copy.deepcopy(self.report)
         report['verus']['toolchain'] = self.pin['rust_toolchain']
@@ -150,6 +212,26 @@ class NativeRuntime(unittest.TestCase):
             subprocess.run(command, cwd=gate.ROOT, check=True, timeout=60)
             subprocess.run([str(executable)], cwd=gate.ROOT, check=True, timeout=60)
 
+
+class InstalledCacheOverride(unittest.TestCase):
+    def test_override_keeps_tool_hash_checks_and_explicit_cache_selection(self):
+        import os
+        import hashlib
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory)
+            pin = {"version": "synthetic", "files": {"verus": hashlib.sha256(b"pinned").hexdigest()}}
+            qualified = cache / "synthetic/qualified"
+            qualified.mkdir(parents=True)
+            (qualified / "verus").write_bytes(b"pinned")
+            with mock.patch.dict(os.environ, {"ZENO_FCIS_VERUS_CACHE": str(cache)}):
+                self.assertEqual(gate.cache_directory(), cache)
+                self.assertEqual(gate.prepare_tools(gate.cache_directory(), pin, False), qualified)
+                (qualified / "verus").write_bytes(b"altered")
+                with self.assertRaises(RuntimeError):
+                    gate.prepare_tools(gate.cache_directory(), pin, False)
+                with self.assertRaises(RuntimeError):
+                    gate.prepare_tools(cache / "explicit-missing", pin, False)
 
 if __name__ == "__main__":
     unittest.main()

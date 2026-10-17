@@ -655,6 +655,19 @@ pub fn scalar_op(op: &ScalarOp) -> Result<Op, ContractError> {
         ScalarOp::Bool(value) => Op::Bool(value),
         ScalarOp::Add(a, b) => Op::Add(small(a)?, small(b)?),
         ScalarOp::Sub(a, b) => Op::Sub(small(a)?, small(b)?),
+        ScalarOp::Mul(a, b) => Op::Mul(small(a)?, small(b)?),
+        ScalarOp::Div(r, a, b) => match r {
+            Rounding::Floor => Op::DivFloor(small(a)?, small(b)?),
+            Rounding::Ceil => Op::DivCeil(small(a)?, small(b)?),
+        },
+        ScalarOp::MulDiv(r, a, b, d) => match r {
+            Rounding::Floor => Op::MulDivFloor(small(a)?, small(b)?, small(d)?),
+            Rounding::Ceil => Op::MulDivCeil(small(a)?, small(b)?, small(d)?),
+        },
+        ScalarOp::ProductsGe(a, b) => Op::ProductsGe(
+            [small(a[0])?, small(a[1])?, small(a[2])?],
+            [small(b[0])?, small(b[1])?, small(b[2])?],
+        ),
         ScalarOp::Eq(a, b) => Op::Eq(small(a)?, small(b)?),
         ScalarOp::Lt(a, b) => Op::Lt(small(a)?, small(b)?),
         ScalarOp::And(a, b) => Op::And(small(a)?, small(b)?),
@@ -761,6 +774,12 @@ pub fn law_op(op: &LawOp) -> l::Op<'_> {
             *b,
         ),
         LawOp::ToI128(a) => l::Op::ToI128(*a),
+        LawOp::ToU128(a) => l::Op::ToU128(*a),
+        LawOp::MulDiv(r, a, b, d) => match r {
+            Rounding::Floor => l::Op::MulDivFloor(*a, *b, *d),
+            Rounding::Ceil => l::Op::MulDivCeil(*a, *b, *d),
+        },
+        LawOp::ProductsGe(a, b) => l::Op::ProductsGe(*a, *b),
         LawOp::Eq(a, b) => l::Op::Eq(*a, *b),
         LawOp::Lt(a, b) => l::Op::Lt(*a, *b),
         LawOp::And(a, b) => l::Op::And(*a, *b),

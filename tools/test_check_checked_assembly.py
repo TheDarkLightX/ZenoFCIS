@@ -86,6 +86,40 @@ class Controls(unittest.TestCase):
 
 
 class Admission(unittest.TestCase):
+    def test_an_emitted_unreviewed_candidate_cannot_enter_normal_acceptance(self):
+        gate.require_reviewed_profile({})
+        gate.require_reviewed_profile({'reviewed': True})
+        for flag in (False, None, 0, 1, 'true'):
+            with self.assertRaisesRegex(ValueError, 'independent technical review'):
+                gate.require_reviewed_profile({'reviewed': flag})
+
+    def test_candidate_is_whole_pinned_and_unreviewed_with_proof_only_scope(self):
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+        report = {'verus': {'version': pin['version'], 'commit': pin['commit'],
+            'toolchain': pin['rust_toolchain']},
+            'verification-results': {'success': True, 'errors': 0, 'verified': 1204,
+                'encountered-error': False, 'encountered-vir-error': False,
+                'is-verifying-entire-crate': True},
+            'func-details': {**dict.fromkeys(profile['functions'], {}), 'outside::exec': {}}}
+        process = subprocess.CompletedProcess([], 0, '', '')
+        candidate = gate.candidate_profile(process, report, pin, profile, profile['functions'])
+        self.assertFalse(candidate['reviewed'])
+        self.assertEqual(candidate['namespaces'], list(gate.NAMESPACES))
+        self.assertEqual(candidate['module_verified'], profile['module_verified'])
+        self.assertEqual(candidate['inventory']['Exec'], 0)
+        self.assertEqual(candidate['target_functions'], sorted(profile['functions']))
+        for section, key, value in (('verus', 'commit', 'other'),
+                ('verification-results', 'errors', 1),
+                ('verification-results', 'is-verifying-entire-crate', False)):
+            wrong = copy.deepcopy(report); wrong[section][key] = value
+            with self.assertRaises(ValueError):
+                gate.candidate_profile(process, wrong, pin, profile, profile['functions'])
+        with self.assertRaises(ValueError):
+            gate.candidate_profile(subprocess.CompletedProcess([], 1, '', ''), report,
+                pin, profile, profile['functions'])
+
+
     def setUp(self):
         self.pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
         self.profile = json.loads((gate.ROOT / gate.PROFILE).read_text())

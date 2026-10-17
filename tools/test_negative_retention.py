@@ -14,6 +14,11 @@ from unittest import mock
 
 import check_finite_execution
 import check_metered_execution
+import check_envelope_frame_v2
+import check_schema_binding_v2
+import check_decision_v2
+from verus_coverage import inventory
+import v2_proof_sources
 import check_protected_input
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,7 +127,7 @@ class NegativeRetentionTests(unittest.TestCase):
                 target = ''
                 if gate is check_finite_execution:
                     name = vir.split(': ', 1)[1]
-                    target = profile['namespace'] + (
+                    target = 'finite_execution::evaluation::' + (
                         'unchecked_identity' if name == 'add_uncontracted_function' else 'evaluate_into')
                 raise ValueError(f'mock reviewed coverage refusal {target}')
             return profile['functions']
@@ -133,12 +138,29 @@ class NegativeRetentionTests(unittest.TestCase):
             name = vir.split(': ', 1)[1]
             self.assertEqual(mutants[name][2], 'coverage')
             actual = copy.deepcopy(profile['functions'])
-            target = profile['namespace']
-            if name == 'add_uncontracted_function':
-                actual[target + 'unchecked_identity'] = {'mode': 'Exec', 'requires': 0, 'ensures': 0}
+            if gate is check_finite_execution:
+                target = 'finite_execution::evaluation::'
+                if name == 'add_uncontracted_function':
+                    actual[target + 'unchecked_identity'] = {'mode': 'Exec', 'requires': 0, 'ensures': 0}
+                else:
+                    field = 'requires_sha256' if name == 'narrow_execution_domain' else 'ensures_sha256'
+                    record = actual[target + 'evaluate_into']
+                    record[field] = '0' * 64
+                    record['requires' if name == 'narrow_execution_domain' else 'ensures'] = 0 if name == 'omit_execution_contract' else 1
             else:
-                field = 'requires_sha256' if name == 'narrow_execution_domain' else 'ensures_sha256'
-                actual[target + 'evaluate_into'][field] = '0' * 64
+                if gate is check_metered_execution:
+                    prefix = profile['namespace'] + 'execution_v2::'
+                    extra = ('add_uncontracted_work', 'uncharged_identity')
+                    edits = {'execute_before_charging': ('numeric::evaluate','body_sha256'), 'omit_metered_contract': ('execute','ensures_sha256'), 'weaken_usage_contract': ('execute','ensures_sha256'), 'narrow_input_domain': ('execute','requires_sha256'), 'inject_caller_usage_argument': ('execute','signature_sha256'), 'change_charge_specification': ('spec::charge','body_sha256')}
+                else:
+                    prefix = profile['namespace'] + 'execution_v2::input_view::'
+                    extra = ('add_uncontracted_projection_work', 'uncontracted_record_probe')
+                    edits = {'parse_header_before_ingress': ('typed::project_into','body_sha256'), 'parse_field_before_read': ('typed::project_fields','body_sha256'), 'weaken_projection_contract': ('project','ensures_sha256'), 'narrow_projection_domain': ('project','requires_sha256'), 'inject_caller_usage': ('project','signature_sha256'), 'change_projection_specification': ('spec::projection','body_sha256')}
+                if name == extra[0]:
+                    actual[prefix + extra[1]] = {'mode': 'Exec', 'requires': 0, 'ensures': 0}
+                else:
+                    relative, field = edits[name]
+                    actual[prefix + relative][field] = '0' * 64
             return actual
 
         with ExitStack() as stack:
@@ -149,8 +171,7 @@ class NegativeRetentionTests(unittest.TestCase):
             stack.enter_context(mock.patch.object(gate.verifier, 'run', side_effect=fake_run))
             stack.enter_context(mock.patch.object(gate.verifier, 'require_success', side_effect=require_success_after_retention))
             stack.enter_context(mock.patch.object(gate, 'require_coverage', side_effect=coverage))
-            if gate is check_finite_execution:
-                stack.enter_context(mock.patch.object(gate, 'profile_inventory', side_effect=inventory))
+            stack.enter_context(mock.patch.object(gate, 'profile_inventory', side_effect=inventory))
             # Copy only the source fixtures used by the fake verifier.
             # Compilation and native execution remain explicitly mocked.
             stack.enter_context(mock.patch.object(gate, 'UNIT_SOURCES',
@@ -201,7 +222,7 @@ class NegativeRetentionTests(unittest.TestCase):
         for gate in GATES:
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate)
-                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 16)
+                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 24 if gate is check_finite_execution else 16)
                 self.assertEqual(len(observed), 1 + len(mutants))
                 self.assertEqual([entry['name'] for entry in receipt['mutations']], list(mutants))
                 self.assertTrue(all(entry['killed'] for entry in receipt['mutations']))
@@ -257,6 +278,109 @@ class NegativeRetentionTests(unittest.TestCase):
                 self.assertNotEqual(first['logs'], second['logs'])
                 self.assertTrue(Path(first['logs']).is_dir())
                 self.assertTrue(Path(second['logs']).is_dir())
+
+class StrictGateMutationTests(unittest.TestCase):
+    def test_every_copy_list_binds_both_source_registry_files(self):
+        for gate in (check_finite_execution, check_metered_execution, check_protected_input,
+                     check_envelope_frame_v2, check_schema_binding_v2, check_decision_v2):
+            sources = set(gate.UNIT_SOURCES)
+            self.assertIn(v2_proof_sources.SOURCE_MANIFEST, sources)
+            self.assertIn(v2_proof_sources.TEST_MANIFEST, sources)
+            bound = gate.snapshot()
+            for path in (v2_proof_sources.SOURCE_MANIFEST, v2_proof_sources.TEST_MANIFEST):
+                self.assertEqual(bound[str(path)], gate.verifier.digest(gate.ROOT / path))
+        production = json.loads((ROOT / v2_proof_sources.SOURCE_MANIFEST).read_text())['paths']
+        self.assertNotIn(str(v2_proof_sources.TEST_MANIFEST), production)
+
+
+    """Synthetic diagnostics exercise admission; they are not verifier evidence."""
+    def test_declared_targets_are_complete_and_reject_unrelated_failures(self):
+        for gate in (check_metered_execution, check_protected_input, check_envelope_frame_v2,
+                     check_schema_binding_v2, check_decision_v2):
+            pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+            profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
+            if gate is check_metered_execution:
+                paths = (gate.SUBJECT, gate.METER, gate.SPEC, gate.RESOURCE, gate.NUMERIC)
+            elif gate is check_protected_input:
+                paths = (gate.SUBJECT, gate.SPEC, gate.TYPED)
+            elif gate is check_schema_binding_v2:
+                paths = (gate.SUBJECT, gate.ADMISSION, gate.SPEC)
+            else:
+                paths = (gate.SUBJECT, gate.SPEC)
+            create = gate.mutations if gate is check_decision_v2 else gate.mutation_sources
+            controls = create(*((gate.ROOT / p).read_text() for p in paths))
+            names = {name for name, row in controls.items() if row[2] == 'proof'}
+            targets = (gate.SEMANTIC_TARGETS if hasattr(gate, 'SEMANTIC_TARGETS')
+                       else gate.PROOF_FUNCTIONS if hasattr(gate, 'PROOF_FUNCTIONS') else dict.fromkeys(names, 'frame'))
+            self.assertEqual(set(targets), names)
+            for name in names:
+                path, changed, *_ = controls[name]
+                target = targets[name]
+                if isinstance(target, tuple):
+                    self.assertEqual(path, target[0])
+                    target = target[1]
+                region = gate.verifier.function_lines(changed, target)
+                report = {'verus': {'version': pin['version'], 'commit': pin['commit'],
+                    'toolchain': pin['rust_toolchain']},
+                    'func-details': dict.fromkeys(profile['target_functions'], {}),
+                    'verification-results': {'success': False, 'errors': 1, 'verified': 1,
+                        'encountered-error': True, 'encountered-vir-error': False,
+                        'is-verifying-entire-crate': True}}
+                diagnostic = f'error: postcondition not satisfied\n --> {path}:{region[0]}:1\n'
+                summary = 'error: aborting due to 1 previous error\n'
+                def classify(stderr, current=report):
+                    return gate.verifier.semantic_refusal(
+                        subprocess.CompletedProcess([], 1, '', stderr), current, pin,
+                        path, gate.ROOT, region=region,
+                        target_functions=profile['target_functions'])
+                self.assertTrue(classify(diagnostic + summary), (gate.__name__, name))
+                for wrong in (diagnostic.replace(str(path), 'unrelated.rs') + summary,
+                        diagnostic.replace(f':{region[0]}:1', f':{region[1] + 1}:1') + summary,
+                        diagnostic.replace('error: ', 'error[E0308]: ') + summary,
+                        diagnostic + 'note: resource limit exceeded\n' + summary,
+                        diagnostic + 'note: timed out\n' + summary,
+                        diagnostic + 'note: out of memory\n' + summary):
+                    self.assertFalse(classify(wrong), (gate.__name__, name, wrong))
+                other = copy.deepcopy(report)
+                other['verus']['commit'] = 'unqualified'
+                self.assertFalse(classify(diagnostic + summary, other))
+
+    def test_coverage_controls_require_the_intended_target_and_fault(self):
+        cases = (
+            (check_metered_execution, 'metered_execution::', 'execution_v2::',
+             'execute_before_charging', 'numeric::evaluate', 'add_uncontracted_work', 'uncharged_identity'),
+            (check_protected_input, 'protected_input::', 'execution_v2::input_view::',
+             'parse_header_before_ingress', 'typed::project_into',
+             'add_uncontracted_projection_work', 'uncontracted_record_probe'),
+            (check_envelope_frame_v2, 'envelope_frame::canonical_v2::', 'envelope::',
+             'change_frame_specification', 'spec::frame', 'add_uncontracted_function', 'uncontracted_frame_length'),
+            (check_schema_binding_v2, 'schema_binding::canonical_v2::', 'schema::',
+             'equivalent_schema_specification_change', 'spec::encoding_matches',
+             'add_uncontracted_schema_function', 'uncontracted_schema_length'),
+            (check_decision_v2, 'decision::', 'execution_v2::decision::',
+             'resolve_before_write_charge', 'assignments', 'uncontracted_helper', 'uncontracted_decision_probe'),
+        )
+        def function(name, body='0', mode='Exec', ensures='((Bool true))'):
+            return (f'(Function (Fun :path {name}) :mode {mode} :typ_bounds () '
+                f':params () :ret () :require () :ensure {ensures} :d () :body (Int {body}))')
+        for gate, namespace, suffix, control, target_suffix, add, extra_suffix in cases:
+            target = namespace + suffix + target_suffix
+            other = namespace + 'identity'
+            extra = namespace + suffix + extra_suffix
+            mode = 'Spec' if gate in (check_envelope_frame_v2, check_schema_binding_v2) else 'Exec'
+            original = function(target, mode=mode) + function(other, mode='Spec')
+            bodies = [target] if mode == 'Exec' else []
+            profile = {'namespace': namespace, 'body_covered_functions': bodies,
+                'functions': inventory(original, namespace, tuple(bodies))}
+            intended = function(target, body='1', mode=mode) + function(other, mode='Spec')
+            incidental = function(target, mode=mode) + function(other, body='1', mode='Spec')
+            unchecked = function(extra, ensures='()')
+            self.assertTrue(gate.coverage_control(intended, profile, control)[0])
+            self.assertFalse(gate.coverage_control(incidental, profile, control)[0])
+            self.assertFalse(gate.coverage_control(intended + unchecked, profile, control)[0])
+            self.assertTrue(gate.coverage_control(original + unchecked, profile, add)[0])
+            self.assertFalse(gate.coverage_control(original + function(extra), profile, add)[0])
+            self.assertFalse(gate.coverage_control(original + unchecked + function(namespace + 'unexpected'), profile, add)[0])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

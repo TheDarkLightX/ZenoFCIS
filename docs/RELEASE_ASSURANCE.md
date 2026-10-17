@@ -310,7 +310,7 @@ The repository currently supplies reviewed reference implementations and strict 
 - that the reference sparse Merkle tree is a production database or a vetted Jellyfish Merkle Tree implementation;
 - that projector evidence or a relation witness is sound without the
   deployment-selected independent verifier and reviewed relation engine;
-- that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
+- that a concrete private engine, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
 - that equality between untrusted `NormalizedDecision` values grants
   production promotion authority;

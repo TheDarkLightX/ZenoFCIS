@@ -19,6 +19,7 @@ import tempfile
 import zipfile
 
 from v2_proof_sources import execution_sources
+import scalar_arithmetic_controls as arithmetic_controls
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from verus_coverage import profile_inventory, require_coverage
@@ -40,6 +41,8 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("verification/verus/admission_baseline.rs"),
            Path("verification/verus/admission_differential_tests.rs"),
            Path("tools/check_finite_execution.py"), Path("tools/verus_coverage.py"),
+           Path("tools/scalar_arithmetic_controls.py"), Path("tools/test_scalar_arithmetic_controls.py"),
+           Path("tools/scalar_arithmetic_reference.py"), Path("tools/test-data/scalar-arithmetic/vectors.tsv"),
            Path("tools/check_verus.py"), Path("tools/test_check_finite_execution.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
@@ -58,6 +61,8 @@ SEMANTIC_TARGETS = {
     'expose_partial_results': 'evaluate_into', 'accept_wrong_operand_kind': 'require_node',
     'admit_excess_node_count': 'validate_shape', 'accept_wrong_root_kind': 'validate_roots',
 }
+SEMANTIC_TARGETS.update(arithmetic_controls.targets())
+
 
 
 def snapshot() -> dict[str, str]:
@@ -108,7 +113,8 @@ def mutation_sources(execution: str, admission: str, typed: str, value: str) -> 
     ):
         mutations[name] = (path, once(source, before, after), "proof")
     for name, before, after in (
-        ("skip_last_eager_node", "while index < nodes.len() {", "while index + 1 < nodes.len() {"),
+        ("skip_last_eager_node", "while index < nodes.len() {",
+         "while index < nodes.len() && index != nodes.len() - 1 {"),
         ("wrong_output_projection", "output.push(value);", "output.push(0);"),
         ("bypass_input_domain", "if !admitted(inputs, input) {", "if false {"),
         ("bypass_output_domain", "if !admitted(outputs, output) {", "if false {"),
@@ -130,6 +136,7 @@ def mutation_sources(execution: str, admission: str, typed: str, value: str) -> 
         mutations[name] = (SUBJECT, final_contract(execution, replacement), "coverage")
     mutations["add_uncontracted_function"] = (
         SUBJECT, execution + "\nfn unchecked_identity(value: i64) -> i64 { value }\n", "coverage")
+    mutations.update(arithmetic_controls.specimens(ROOT))
     return mutations
 
 
@@ -154,12 +161,18 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
     target = prefix + ('unchecked_identity' if name == 'add_uncontracted_function' else 'evaluate_into')
     if name == 'add_uncontracted_function':
         intended = (set(actual) == set(expected) | {target} and target not in expected
-                    and target in refusal and actual[target]['mode'] == 'Exec'
+                    and actual[target]['mode'] == 'Exec'
                     and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
     else:
+        # Contract edits can shift Verus expression IDs in later declarations.
+        # Grade the intended target record even when that raw mismatch is reported first.
         field = 'requires_sha256' if name == 'narrow_execution_domain' else 'ensures_sha256'
-        intended = (set(actual) == set(expected) and target in refusal
-                    and actual[target][field] != expected[target][field])
+        intended = (set(actual) == set(expected) and target in expected
+                    and actual[target]['mode'] == 'Exec'
+                    and actual[target][field] != expected[target][field]
+                    and ((name == 'omit_execution_contract' and actual[target]['ensures'] == 0)
+                         or (name == 'weaken_execution_contract' and actual[target]['ensures'] == 1)
+                         or (name == 'narrow_execution_domain' and actual[target]['requires'] == 1)))
     return intended, refusal
 
 
@@ -180,8 +193,19 @@ def native_tests(directory: Path, pin: dict, environment: dict) -> subprocess.Co
                       "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
                       *native_dependency_args(ROOT, directory, environment),
                       str(HARNESS), "-o", str(executable)]
-    verifier.require_success(verifier.run(native_command, ROOT, environment))
+    compiled = verifier.run(native_command, ROOT, environment)
+    (directory / "native-compile.stdout").write_text(compiled.stdout)
+    (directory / "native-compile.stderr").write_text(compiled.stderr)
+    (directory / "native-compile.json").write_text(json.dumps({
+        "command": native_command, "cwd": str(ROOT), "exit": compiled.returncode,
+    }, indent=2) + "\n")
+    verifier.require_success(compiled)
     native = verifier.run([str(executable)], ROOT, environment)
+    (directory / "native.stdout").write_text(native.stdout)
+    (directory / "native.stderr").write_text(native.stderr)
+    (directory / "native-process.json").write_text(json.dumps({
+        "command": [str(executable)], "cwd": str(ROOT), "exit": native.returncode,
+    }, indent=2) + "\n")
     verifier.require_success(native)
     return native
 
@@ -201,7 +225,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
     environment["RUSTUP_TOOLCHAIN"] = pin["rust_toolchain"]
     environment["VERUS_Z3_PATH"] = str(tools / "z3")
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024",
-               "--no-cheating", "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json",
+               "--no-cheating", "--no-external-by-default", "--num-threads", verifier.proof_threads('2'), "-V", "spinoff-all", "--output-json",
                "--log", "vir", "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
     context = (nullcontext(str(retained_directory)) if retained_directory is not None
@@ -292,7 +316,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install", action="store_true")
-    parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
+    parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)

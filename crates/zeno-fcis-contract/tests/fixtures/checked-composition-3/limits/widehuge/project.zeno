@@ -1,0 +1,24 @@
+zeno 1;
+project 1 wide;
+namespace 2 fixtures;
+// A guard with one wide command field, `amount`: a binding to it has as
+// many target values as the field's domain. Planner and cost limits only.
+type 100 state Guard;
+type 101 command Request;
+type 102 context Operator;
+type 105 int Mark in 0..=0;
+type 106 int Amount in 0..=4611686018427387903;
+type 108 bool Authorized;
+field 110 100 mark 105;
+field 120 101 amount 106;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+component 400 guard {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 unmarked on commit, genesis = post.100.110 == 0;

@@ -1,0 +1,65 @@
+{
+  "checker": "zeno-fcis/composed-domain-checker/1",
+  "components": [
+    {
+      "assume": "true",
+      "bind": {
+        "authorized": "authorized",
+        "mark": "0",
+        "request": "0"
+      },
+      "invariant": "mark == 0",
+      "name": "guard",
+      "owns": [],
+      "participates": "true",
+      "path": "guard",
+      "policy_sha256": "f1f852e9cef9eab5b93df08960f6a513d5600827bc3b1aeb2c3055b4263857ba",
+      "program_sha256": "bba13133081c0b1e773ac2d6c6bdabec4a6b2416cbce1b0a6f262fc55b7f0e16",
+      "project_sha256": "e0b22b648a977c4168b6fcb46521fcfbb1786f33016a94735e6515697e9b001a"
+    },
+    {
+      "assume": "authorized == 1",
+      "bind": {
+        "amount": "amount",
+        "authorized": "true"
+      },
+      "invariant": "remaining <= 3",
+      "name": "budget",
+      "owns": [
+        "budget.remaining"
+      ],
+      "participates": "true",
+      "path": "budget",
+      "policy_sha256": "4d32dce8ef6cc804bfabe3d6f445ff1aedd70417b0e6348d826d3e71daa754dc",
+      "program_sha256": "631c1e43c621be0a76deb700037a2b251ae592750f4b784f1b7522c3ea306141",
+      "project_sha256": "6a98f9ef0eb1c6b3bd4b7ed556dc1cbaa7cd71edf7ba34b381389390f7eba5d3"
+    }
+  ],
+  "couplings": [],
+  "name": "guarded-budget",
+  "request": [
+    {
+      "domain": {
+        "kind": "int",
+        "max": 3,
+        "min": 0
+      },
+      "name": "amount"
+    },
+    {
+      "domain": {
+        "kind": "bool"
+      },
+      "name": "authorized"
+    },
+    {
+      "domain": {
+        "kind": "int",
+        "max": 50000000,
+        "min": 0
+      },
+      "name": "pad"
+    }
+  ],
+  "schema": "zeno-fcis/checked-composition/3"
+}

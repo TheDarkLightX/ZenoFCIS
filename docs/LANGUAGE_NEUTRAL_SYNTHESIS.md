@@ -181,7 +181,7 @@ A sketch node can instead be a hole:
 Every alternative is type-checked before search. Alternatives can select
 operations and references, as well as constants. Hole IDs and alternatives are
 unique, and alternative insertion order cannot affect the result. The grammar
-is the complete declared finite set; an LLM or external ESSO adapter may propose
+is the complete declared finite set; an LLM or an external private adapter may propose
 it, but an owner must review the contract and bounds before treating a result
 as useful evidence.
 

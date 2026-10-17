@@ -166,6 +166,18 @@ impl Predicate {
         })
     }
 
+    /// A state predicate over a law graph the caller compiled, whose every
+    /// observation is a `post.100.f` read of a field of `fields`: a
+    /// composed-domain formula, whose names the caller bound to such reads.
+    pub(crate) fn from_state_graph(nodes: Vec<LawOp>, root: usize, fields: BTreeSet<u16>) -> Self {
+        Self {
+            nodes,
+            root,
+            form: Form::State,
+            fields,
+        }
+    }
+
     /// Every field the predicate observes.
     pub(crate) fn fields(&self) -> &BTreeSet<u16> {
         &self.fields

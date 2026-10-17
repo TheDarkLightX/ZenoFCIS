@@ -4,13 +4,14 @@
 //! of the successor state and of the outbox. A refusal keeps the law the
 //! library's own law diagnostics name as refusing, and whether a pre-state
 //! satisfies the contract's state laws is the library's law evaluator's
-//! verdict.
+//! verdict. The contract's own law programs also run, through that evaluator,
+//! on decisions a judge proposes and on states alone.
 
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_synthesis::finite::{
-    V2ExecutionFailure, canonical_v2::output, v2_authority, v2_authority::Authority,
-    v2_composition as c, v2_laws as laws,
+    V2ExecutionFailure, V2Limits, V2Usage, canonical_v2::output, v2_authority,
+    v2_authority::Authority, v2_composition as c, v2_laws as laws,
 };
 
 use super::super::declarations::{ROOTS, Source};
@@ -301,6 +302,22 @@ impl Framer {
             .unwrap_or_default()
     }
 
+    /// A root as the law evaluator views it: one scalar, or `fields`, the
+    /// root's fields as [`Self::fields`] gives them.
+    pub fn view<'f>(
+        &self,
+        root: &RootFrame,
+        tuple: &[i64],
+        fields: &'f [c::Field<'static>],
+    ) -> laws::RootView<'f, 'static> {
+        match root.positions.first() {
+            Some((_, index)) if !root.record => {
+                laws::RootView::Leaf(atom(self.kinds[*index], tuple[*index]))
+            }
+            _ => laws::RootView::Record(fields),
+        }
+    }
+
     /// A record root's fields in field-ID order, as the library admits them.
     pub fn fields(&self, root: &RootFrame, tuple: &[i64]) -> Vec<c::Field<'static>> {
         let mut fields: Vec<c::Field<'static>> = root
@@ -423,6 +440,196 @@ pub fn first_unsatisfied_state_law(
         }
     }
     None
+}
+
+/// A decision a judge proposes for a tuple, which need not be the one the
+/// contract makes: a class, a reason, and for a committing class every state
+/// value of the successor, in state position order.
+#[derive(Clone, Copy, Debug)]
+pub struct Proposed<'v> {
+    pub class: Class,
+    pub reason: Option<u32>,
+    /// The successor's state values in state position order; a reject's is
+    /// ignored, since a reject has no successor.
+    pub post: &'v [i64],
+}
+
+/// Some of a contract's own law programs, run by the library's law
+/// evaluator on frames a judge builds: the transition frame of a tuple with a
+/// proposed decision, or a tuple's pre-state as a genesis frame. Every
+/// verdict is the library evaluator's; nothing here reads a law.
+///
+/// The evaluator accepts only a complete law set, one with every mandatory
+/// kind, so the set holds all of the contract's laws with the selected ones
+/// first. It evaluates in order and stops at the first refusal, so the
+/// selected laws' verdicts are complete whenever none of them refuses; a
+/// verdict of a law after them is ignored.
+pub struct LawSet<'d> {
+    laws: Vec<laws::Law<'d>>,
+    /// How many laws, from the first, are selected.
+    selected: usize,
+    required: &'d [u32],
+    limits: V2Limits,
+    /// A proposed decision has no execution, so no usage of its own. The
+    /// library constructs usage only as an evaluation's report, and no law
+    /// observation reads it; the report of an evaluation of no law stands in.
+    usage: V2Usage,
+}
+
+impl<'d> LawSet<'d> {
+    /// The descriptor's laws whose IDs `ids` lists, in that order, then
+    /// every other law of the descriptor. An ID the descriptor lacks is
+    /// skipped.
+    pub fn new(descriptor: &c::Descriptor<'d>, ids: &[u32]) -> Self {
+        let copy = |law: &laws::Law<'d>| laws::Law {
+            id: law.id,
+            kind: law.kind,
+            scope: law.scope,
+            genesis: law.genesis,
+            program: laws::Program {
+                nodes: law.program.nodes,
+                root: law.program.root,
+            },
+        };
+        let mut laws: Vec<laws::Law<'d>> = ids
+            .iter()
+            .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
+            .map(copy)
+            .collect();
+        let selected = laws.len();
+        laws.extend(
+            descriptor
+                .laws
+                .iter()
+                .filter(|law| !ids.contains(&law.id))
+                .map(copy),
+        );
+        let empty: [c::Field<'static>; 0] = [];
+        let frame = laws::Frame::Genesis {
+            initial: laws::RootView::Record(&empty),
+        };
+        let (_, usage, _, _) = laws::evaluate(&[], &[], &frame, descriptor.limits).into_parts();
+        Self {
+            laws,
+            selected,
+            required: descriptor.required,
+            limits: descriptor.limits,
+            usage,
+        }
+    }
+
+    /// The IDs of the selected laws, in order.
+    pub fn ids(&self) -> Vec<u32> {
+        self.laws[..self.selected]
+            .iter()
+            .map(|law| law.id)
+            .collect()
+    }
+
+    /// The selected laws' diagnostics, in order, when every one was
+    /// evaluated, or `None` when the evaluator stopped before or on one of
+    /// them for a reason other than a selected law's refusal.
+    fn selected<'a>(&self, diagnostics: &'a [laws::Diagnostic]) -> Option<&'a [laws::Diagnostic]> {
+        diagnostics.get(..self.selected)
+    }
+
+    /// Whether no selected law refuses on the transition frame of `tuple`
+    /// and `proposed`, with the selected laws' diagnostics: each skipped,
+    /// satisfied or, last, refused. When the evaluator stops before the
+    /// selected laws, it admits nothing and its diagnostics are returned.
+    pub fn on_transition(
+        &self,
+        framer: &Framer,
+        tuple: &[i64],
+        proposed: &Proposed<'_>,
+    ) -> (bool, Vec<laws::Diagnostic>) {
+        let views = [0, 1, 2].map(|index| framer.fields(&framer.roots[index], tuple));
+        let pre = framer.view(&framer.roots[0], tuple, &views[0]);
+        let command = framer.view(&framer.roots[1], tuple, &views[1]);
+        let context = framer.view(&framer.roots[2], tuple, &views[2]);
+        let state = &framer.roots[0];
+        let committing = proposed.class != Class::Reject;
+        let after = |number: usize| atom(framer.kinds[number], proposed.post[number]);
+        let before = |number: usize| atom(framer.kinds[number], tuple[number]);
+        let mut post_fields: Vec<c::Field<'static>> = Vec::new();
+        let mut patch: Vec<laws::Patch<'static>> = Vec::new();
+        if committing {
+            for (id, number) in &state.positions {
+                if proposed.post[*number] != tuple[*number] {
+                    patch.push(laws::Patch {
+                        field: *id,
+                        before: before(*number),
+                        after: after(*number),
+                    });
+                }
+                if state.record {
+                    post_fields.push(c::Field {
+                        id: *id,
+                        value: after(*number),
+                    });
+                }
+            }
+            post_fields.sort_by_key(|field| field.id);
+            patch.sort_by_key(|change| change.field);
+        }
+        let post = match state.positions.first() {
+            Some((_, number)) if committing && !state.record => {
+                laws::RootView::Leaf(after(*number))
+            }
+            _ => laws::RootView::Record(&post_fields),
+        };
+        let candidate = laws::Candidate {
+            class: match proposed.class {
+                Class::Accept => c::Class::Accept,
+                Class::Reject => c::Class::Reject,
+                Class::CommittedFailure => c::Class::CommittedFailure,
+            },
+            reason: proposed.reason,
+            post,
+            patch: &patch,
+            effects: &[],
+            outbox: &[],
+            reads: &[],
+            attempts: &[],
+            usage: self.usage,
+        };
+        let frame = laws::Frame::Transition {
+            pre,
+            command,
+            context,
+            candidate: &candidate,
+        };
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, &frame, self.limits).into_parts();
+        // A selected law's refusal ends the evaluation on it; a shorter list
+        // means the evaluator stopped earlier, so no verdict is admitted.
+        let selected = self.selected(&diagnostics).map(<[_]>::to_vec);
+        let admitted = selected.as_ref().is_some_and(|selected| {
+            selected
+                .iter()
+                .all(|diagnostic| !matches!(diagnostic.verdict, laws::Verdict::Refused(_)))
+        });
+        (admitted, selected.unwrap_or(diagnostics))
+    }
+
+    /// Whether every selected law is satisfied on the tuple's pre-state as a
+    /// genesis frame, where a law that reads the successor reads that state.
+    /// A selected law that does not apply at genesis, or reads anything a
+    /// genesis frame does not hold, counts as not satisfied.
+    pub fn on_state(&self, framer: &Framer, tuple: &[i64]) -> bool {
+        let root = &framer.roots[0];
+        let fields = framer.fields(root, tuple);
+        let frame = laws::Frame::Genesis {
+            initial: framer.view(root, tuple, &fields),
+        };
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, &frame, self.limits).into_parts();
+        self.selected(&diagnostics).is_some_and(|selected| {
+            selected
+                .iter()
+                .all(|diagnostic| diagnostic.verdict == laws::Verdict::Satisfied)
+        })
+    }
 }
 
 fn decision(candidate: &c::Candidate<'_>) -> Outcome {

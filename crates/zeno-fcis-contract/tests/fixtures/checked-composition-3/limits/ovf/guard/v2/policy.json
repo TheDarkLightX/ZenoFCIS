@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "guard",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {"108": ["Bool"]},
+  "variables": {"authorized": "context.102.130"},
+  "cases": [
+    {"when": "!authorized", "class": "Reject", "reason": 200, "post": {}, "outbox": []},
+    {"when": "true", "class": "Accept", "reason": null, "post": {}, "outbox": []}
+  ],
+  "genesis": {"110": 0},
+  "law_kinds": {"500": "StateInvariant"}
+}

@@ -1,5 +1,6 @@
 {
   "paths": [
+    "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs",
     "crates/zeno-fcis-shell-sqlite/tests/v2_original_compound.rs",
     "crates/zeno-fcis-shell-sqlite/tests/v2_original_zusd.rs",
     "crates/zeno-fcis-shell-sqlite/tests/v2_original_zusd_authority.rs",

@@ -21,9 +21,9 @@
   },
   "assignments_evaluated": 67,
   "authority": "none",
-  "certificate": "002a098e4cd0a26756b312c45eee8ebd400cf03826b8496805ea7c529358a752",
+  "certificate": "da6743ef114d98f1297888a02723565ffe3ae1338ae07f4e16f90a78b384df05",
   "contract": "1404c6533f4a5bf7792954948c1a05554499b238cb3373ab6570801154023a3a",
-  "emitter_sha256": "20e23f551bb121d035c84f61c7f232b952db99898ccb855fde4927b36fcec904",
+  "emitter_sha256": "6c51dc6f8f64e603097a59cd70b7fefd6c2633f9973df9437fa799addeae6265",
   "files": [
     {
       "bytes": 5823,
@@ -73,7 +73,7 @@
   "status": "selected",
   "target": {
     "language": "rust",
-    "revision": 1
+    "revision": 2
   },
   "trace": "3cd45198557a5cef3b06ba135ec7b7f5278841a21f483f0191abf92c08fe83f5"
 }

@@ -1,6 +1,12 @@
 # Shared-source Verus verification
 
-The [Verus workflow](../../.github/workflows/verus.yml) runs 19 qualification
+The scalar arithmetic extension in development source changes the evaluator
+and law source closure. Its new scalar bodies, node/admission cases, unsigned
+law projection and signed-law division projection require fresh whole-source
+proofs and reviewed translated inventories. Historical counts and receipts
+below do not qualify these changed bytes. Qualification is pending.
+
+The [Verus workflow](../../.github/workflows/verus.yml) runs 20 qualification
 gates. Each gate first runs its script's own tests, then the script itself;
 for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
 `python3 tools/check_verus.py --out` with an evidence path. The script requires
@@ -11,6 +17,7 @@ checks the authority and synthesis crates without default features.
 | --- | --- | --- |
 | `shared-runtime` | `check_verus.py` | [Finite-domain arithmetic](#arithmetic-unit) in the shared runtime source |
 | `scalar-query` | `check_scalar_query_refinement.py` | Scalar runtime/query correspondence |
+| `scalar-arithmetic` | `check_scalar_arithmetic.py` | Independently graded native emitted arithmetic; not a Verus theorem |
 | `finite-execution` | `check_finite_execution.py` | [Finite admission and eager evaluation](#v2-finite-admission-and-eager-execution) |
 | `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
 | `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
@@ -151,8 +158,10 @@ route call these functions. The proof covers:
 
 - Exact structural refusal and its order: shape and domain bounds, every
   instruction's type and preceding-node references, then output root kinds.
-- Exact Boolean 0/1 and inclusive integer admission, all ten scalar instruction
-  cases, checked `i64` addition/subtraction, and invalid references.
+- Exact Boolean 0/1 and inclusive integer admission, the original ten scalar instruction cases, checked `i64` addition/subtraction,
+  and invalid references. The development extension adds checked multiplication,
+  mathematical floor/ceiling division, explicitly nonnegative fused mul-div and
+  exact product comparison, with separately admitted canonical program profiles.
 - Eager graph evaluation, including unused or unselected nodes, projection in
   ABI order, and output-domain refusal.
 - Empty scratch and output buffers on every failed evaluation.
