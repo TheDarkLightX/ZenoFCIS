@@ -39,3 +39,23 @@ pub(crate) use crash::CrashPoint;
 /// The concrete library memory destination and its collision failure.
 /// These reexports preserve their original nominal shell-crate identities.
 pub use zeno_fcis_shell::{DeliveryCollision, MemoryDestination};
+
+/// Source text for internal tool fingerprints; not a stable application API.
+/// Include `LIB` as well as leaf entries so fingerprints bind this mapping.
+#[doc(hidden)]
+pub mod source_fingerprint {
+    /// Exact source bytes owned by this crate.
+    pub const LIB: &str = include_str!("lib.rs");
+    /// Exact source bytes owned by this crate.
+    pub const V2_EQUIVALENCE_CHECKER: &str = include_str!("v2/equivalence/checker.rs");
+    /// Exact source bytes owned by this crate.
+    pub const V2_EQUIVALENCE_CHECKER_API: &str = include_str!("v2/equivalence/checker_api.rs");
+    /// Exact source bytes owned by this crate.
+    pub const V2_EQUIVALENCE_CHECKER_EQUALITY: &str =
+        include_str!("v2/equivalence/checker_equality.rs");
+    /// Exact source bytes owned by this crate.
+    pub const V2_EQUIVALENCE_CHECKER_RANGES: &str =
+        include_str!("v2/equivalence/checker_ranges.rs");
+    /// Exact source bytes owned by this crate.
+    pub const V2_EQUIVALENCE_CHECKER_SPEC: &str = include_str!("v2/equivalence/checker_spec.rs");
+}

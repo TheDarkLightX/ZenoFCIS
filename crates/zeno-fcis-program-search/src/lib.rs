@@ -677,3 +677,31 @@ fn run(original: &[u8], seeds: &[&[u8]], settings: &Settings) -> Result<Outcome,
         provenance,
     }))
 }
+
+/// Source text for internal tool fingerprints; not a stable application API.
+/// Include `LIB` as well as leaf entries so fingerprints bind this mapping.
+#[doc(hidden)]
+pub mod source_fingerprint {
+    /// Exact source bytes owned by this crate.
+    pub const CONCRETE: &str = include_str!("concrete.rs");
+    /// Exact source bytes owned by this crate.
+    pub const DIAGRAM: &str = include_str!("diagram.rs");
+    /// Exact source bytes owned by this crate.
+    pub const FOLD: &str = include_str!("fold.rs");
+    /// Exact source bytes owned by this crate.
+    pub const IR: &str = include_str!("ir.rs");
+    /// Exact source bytes owned by this crate.
+    pub const LIB: &str = include_str!("lib.rs");
+    /// Exact source bytes owned by this crate.
+    pub const POOL: &str = include_str!("pool.rs");
+    /// Exact source bytes owned by this crate.
+    pub const RESUB: &str = include_str!("resub.rs");
+    /// Exact source bytes owned by this crate.
+    pub const SPACE: &str = include_str!("space.rs");
+    /// Exact source bytes owned by this crate.
+    pub const TARGET: &str = include_str!("target.rs");
+    /// Exact source bytes owned by this crate.
+    pub const TOPDOWN: &str = include_str!("topdown.rs");
+    /// Exact source bytes owned by this crate.
+    pub const UTIL: &str = include_str!("util.rs");
+}

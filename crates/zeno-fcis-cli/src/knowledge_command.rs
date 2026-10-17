@@ -246,10 +246,11 @@ fn implementation() -> String {
         include_str!("loop_pipeline.rs"),
         include_str!("main.rs"),
         include_str!("checker_process.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_algebra.rs"),
+        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE,
+        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE_REASONING,
+        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA,
         K::EXAMPLE,
+        zeno_fcis_loop_doors::source_fingerprint::LIB,
     ];
     let mut bytes = Vec::new();
     for s in sources {
@@ -406,9 +407,8 @@ pub(crate) fn invoke(given: &[PathBuf], op: Operation) -> (u8, Value) {
 /// availability, empirical usefulness, or a universal generalization.
 fn public_validation(limits: K::Limits) -> Result<(Vec<K::Validation>, u64), Value> {
     let max_work = limits.work;
-    let dependency = sha256_hex(include_bytes!(
-        "../../zeno-fcis-loop-doors/src/strategy_algebra.rs"
-    ));
+    let dependency =
+        sha256_hex(zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA.as_bytes());
     let context = "task(tool,zeno-fcis).task(version,v241).";
     let fixtures = [
         (

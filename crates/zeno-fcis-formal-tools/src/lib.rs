@@ -3172,11 +3172,23 @@ impl ContainedChild {
 
         let group_result = killpg(self.process_group, Signal::SIGKILL);
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        let waited = self.child.wait();
         self.armed = false;
         match group_result {
             Ok(()) => Ok(()),
-            Err(Errno::ESRCH) if observed_exit => Ok(()),
+            // The group can disappear after the child exits but before the
+            // caller's first try_wait (notably on macOS). A successful wait
+            // also establishes that the owned child has been reaped.
+            Err(Errno::ESRCH) if observed_exit || waited.is_ok() => Ok(()),
+            // Darwin reports EPERM for a group containing only zombies. Once
+            // our child is reaped, require the group to be absent. Signal zero
+            // only probes; it cannot kill a process if the group ID was reused.
+            #[cfg(target_os = "macos")]
+            Err(Errno::EPERM)
+                if waited.is_ok() && killpg(self.process_group, None) == Err(Errno::ESRCH) =>
+            {
+                Ok(())
+            }
             Err(_) => Err(ToolFailure::ProcessContainmentFailed),
         }
     }
@@ -4650,6 +4662,32 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    fn cleanup_accepts_an_exit_before_the_first_status_observation() {
+        use std::os::unix::process::CommandExt as _;
+
+        for _ in 0..8 {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", "exit 0"]).process_group(0);
+            let child = command
+                .spawn()
+                .unwrap_or_else(|error| panic!("spawn helper: {error}"));
+            let mut owned = ContainedChild::new(child).unwrap_or_else(|_| unreachable!());
+            thread::sleep(Duration::from_millis(30));
+            owned
+                .terminate(false)
+                .unwrap_or_else(|error| panic!("cleanup exited helper: {error:?}"));
+            assert!(
+                owned
+                    .child
+                    .try_wait()
+                    .unwrap_or_else(|_| unreachable!())
+                    .is_some()
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
     fn busy_executables_are_retried_briefly_then_fail_closed() {
         use std::os::unix::fs::PermissionsExt as _;
 
@@ -5171,21 +5209,23 @@ mod tests {
             ToolRunStatus::Failed(ToolFailure::Crash(Some(23)))
         );
 
-        assert!(matches!(
-            run_fixed(
-                &executable,
-                &[
-                    "--ignored",
-                    "--exact",
-                    "tests::process_helper_output_limit",
-                    "--nocapture",
-                ],
-                None,
-                1_000,
-                64,
-            ),
-            Err(ToolFailure::OutputLimit)
-        ));
+        let overflow = run_fixed(
+            &executable,
+            &[
+                "--ignored",
+                "--exact",
+                "tests::process_helper_output_limit",
+                "--nocapture",
+            ],
+            None,
+            1_000,
+            64,
+        );
+        assert!(
+            matches!(&overflow, Err(ToolFailure::OutputLimit)),
+            "unexpected output-limit result: {:?}",
+            overflow.map(|output| output.status)
+        );
     }
 
     #[test]
