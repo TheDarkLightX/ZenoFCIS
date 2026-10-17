@@ -5,13 +5,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
 
 from build_contracts import source_hash
 
-PINNED_CLI = Path("/home/trevormoc/Downloads/ZenoFCIS-evidence-archive/v231-crucible-port/release-24/bin/zeno-fcis-2.4.0")
+PINNED_CLI = Path(os.environ.get("ZENO_FCIS_CLI", "zeno-fcis"))
 LEMMAS = {"create": "post.100.113 >= 0 && post.100.113 <= 1",
           "lp": "post.100.110 >= 1000 && post.100.110 <= 1002",
           "swap-in": "post.100.110 > 0 && post.100.111 > 0 && post.100.112 == 1000",

@@ -246,6 +246,42 @@ def compose():
                     delivery(2, actor, actor, v["mint"], 2)])
     accepting(True, [delivery(2, actor, actor, expr(0) - a, 0), delivery(0, 2, recipient, v["payout0"], 1),
                      delivery(1, 2, recipient, v["payout1"], 2)])
+    # Bind actual channel-303 metadata, independently of the rule variables.
+    # Every accepted command emits exactly one observation. On swaps all eight
+    # positions are checked against explicit policy inputs, never their names
+    # in the candidate-producing program. The delivery compiler supplies the
+    # mandatory five-delivery cap and reads the actual candidate payload.
+    from build_contracts import mc, mf, denominator
+    x = numeric_if(direction.eq(0), field("pre", 110), field("pre", 111), equals_indicator(direction, 0))
+    y = numeric_if(direction.eq(0), field("pre", 111), field("pre", 110), equals_indicator(direction, 0))
+    gross = numeric_if(swap_out, mc(mc(x, a, denominator(y - a)), 10000, 9970), a,
+                       equals_indicator(action, 2))
+    fee = mc(gross, 30, 10000)
+    protocol = mf(fee, 2000, 10000)
+    net = gross - fee
+    quote = mf(y, net, denominator(x + net))
+    paid = numeric_if(swap_out, a, quote, equals_indicator(action, 2))
+    gap = mc(quote - a, 10000, denominator(a))
+    expected = [gross, paid, fee, protocol, fee - protocol, net,
+                numeric_if(swap_out, quote, 0, equals_indicator(action, 2)),
+                numeric_if(swap_out, gap, 0, equals_indicator(action, 2))]
+    actual_count = expr("outbox.107")
+    metadata = all_of([expr(f"outbox.107.{3010+i}").eq(e) for i, e in enumerate(expected)])
+    c.law("fee_event_matches_computed_split", "accept", actual_count.eq(1) & ((~swap) | metadata), "FeeAndRounding")
+    law_id = str(c.laws[-1][0])
+    c.delivery_laws[law_id] = {"max_deliveries": 5, "observations": {
+        "outbox.107": {"channel": 303},
+        **{f"outbox.107.{3010+i}": {"channel": 303, "field": 3010+i} for i in range(8)}}}
+    # A concrete legal creation is also an independent liveness witness for
+    # the complete law set. An implementation that rejects every command must
+    # fail this declared reject law, even without framework comparator 991.
+    # This is deliberately a bounded acceptance witness, not full progress.
+    example = {("pre", 2016): 1001, ("pre", 2020): 1001,
+               ("command", 122): 1001, ("command", 123): 1001,
+               ("command", 126): 1001, ("context", 134): 1}
+    known_creation = all_of([field(root, number).eq(example.get((root, number), 0))
+                             for root, number, *_ in c.fields])
+    c.law("known_legitimate_creation_is_accepted", "reject", ~known_creation, "RejectNoAuthority")
     return c
 
 

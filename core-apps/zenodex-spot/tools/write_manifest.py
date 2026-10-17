@@ -13,7 +13,6 @@ from build_contracts import APP, source_hash
 from build_composition import KEYS
 from replay_corpus import INTEGRATION_CLI
 
-SPEC=Path("/home/trevormoc/Downloads/ZenoFCIS-evidence-archive/v231-crucible-port/post-reset/spec")
 
 
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -21,9 +20,14 @@ def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec",type=Path,default=SPEC)
+    parser.add_argument("--spec",type=Path)
     parser.add_argument("--cli",type=Path,default=INTEGRATION_CLI)
+    parser.add_argument("--preserve-input-pins", action="store_true",
+                        help="retain the existing specification and starting-source pins while refreshing authored files and CLI")
     args=parser.parse_args()
+    previous = json.loads((APP/"SOURCE_PINS.json").read_text()) if args.preserve_input_pins else None
+    if previous is None and args.spec is None:
+        parser.error("select --spec explicitly, or retain existing external pins with --preserve-input-pins")
     source=(APP/"project.zeno").read_text()
     state_fields=[int(n) for n in re.findall(r"^field (\d+) 100 ",source,re.M)]
     composition={"schema":"zeno-fcis/core-application-composition/1","application":"zenodex-spot",
@@ -73,8 +77,11 @@ def main():
               "starting_source_manifest_sha256":"bdca784516973287a59731112d2b70b0215e3884a06f1133c90d232432626b87",
               "cli":{"path":str(args.cli),"sha256":sha(args.cli),
                      "observed_version":subprocess.check_output([str(args.cli),"--version"],text=True).strip()},
-              "specification":{name:sha(args.spec/name) for name in ("SPOT_CORE_SPEC.md","OWNER_ANSWERS.md","PRIOR_OWNER_ANSWERS.md")},
+              "specification":previous["specification"] if previous is not None else {name:sha(args.spec/name) for name in ("SPOT_CORE_SPEC.md","OWNER_ANSWERS.md","PRIOR_OWNER_ANSWERS.md")},
               "files":files,"qualification":"bounded authoring evidence; not full-range proof or release acceptance"}
+    if previous is not None:
+        for name in ("starting_head", "starting_source_manifest_sha256", "specification"):
+            manifest[name] = previous[name]
     (APP/"SOURCE_PINS.json").write_text(json.dumps(manifest,indent=2)+"\n")
     print(json.dumps({"frozen_files":len(files),"manifest_sha256":sha(APP/"SOURCE_PINS.json")}))
 

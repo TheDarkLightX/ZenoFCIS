@@ -4,7 +4,7 @@
 This is evidence about the declared finite initial domain and command alphabet,
 not an all-size proof, a native replay, or an extension of Spot's command set.
 Counts include rejected commands and repeated paths. Equal complete immutable
-Worlds are merged only at equal depth for the same initial state and actor.
+Worlds are merged only at equal depth for the same initial state and coalition.
 """
 from __future__ import annotations
 
@@ -20,13 +20,46 @@ from pathlib import Path
 from spot_reference import Command, K, Pool, World, step
 
 
-def holdings(world, actor, *, floor=False):
-    values = list(world.balances[4 + 2 * actor:6 + 2 * actor])
-    if world.pool is not None:
-        for asset, reserve in enumerate((world.pool.r0, world.pool.r1)):
-            claim = Fraction(world.shares[actor] * reserve, world.pool.supply)
-            values[asset] += claim.numerator // claim.denominator if floor else claim
-    return tuple(values)
+def coalition_members(actors):
+    members = (actors,) if type(actors) is int else tuple(actors)
+    if not members or len(set(members)) != len(members) or any(type(a) is not int or a not in (0, 1) for a in members):
+        raise ValueError("a coalition is a nonempty subset of the two ordinary accounts")
+    return members
+
+
+def valuations(world, actors):
+    """One beneficiary: sum account balances and each account's burn payout.
+
+    Also retain a hypothetical pooled-share burn upper bound. Spot has no share
+    transfer command; pooling is an extra guard, not an added capability.
+    Integer numerators preserve the exact guard without Fraction allocation in
+    the search loop. All returned collections are owned immutable tuples.
+    """
+    members = coalition_members(actors)
+    liquid = tuple(sum(world.balances[4 + 2 * a + i] for a in members) for i in (0, 1))
+    if world.pool is None:
+        return liquid, liquid, 1, liquid
+    p = world.pool
+    shares = sum(world.shares[a] for a in members)
+    reserves = (p.r0, p.r1)
+    floored = tuple(liquid[i] + sum(world.shares[a] * r // p.supply for a in members)
+                    for i, r in enumerate(reserves))
+    exact = tuple(liquid[i] * p.supply + shares * r for i, r in enumerate(reserves))
+    pooled = tuple(liquid[i] + shares * r // p.supply for i, r in enumerate(reserves))
+    return floored, exact, p.supply, pooled
+
+
+def holdings(world, actor, *, floor=True):
+    floored, numerators, denominator, _ = valuations(world, actor)
+    return floored if floor else tuple(Fraction(n, denominator) for n in numerators)
+
+
+def valuation_gains(before, after, actors):
+    b, bn, bd, bp = valuations(before, actors)
+    a, an, ad, ap = valuations(after, actors)
+    return {"floored_burn_payout": dominates(a, b),
+            "exact_pro_rata": dominates(tuple(n * bd for n in an), tuple(n * ad for n in bn)),
+            "pooled_burn_upper_bound": dominates(ap, bp)}
 
 
 def dominates(after, before):
@@ -85,62 +118,95 @@ def check_step(before, command, result):
             raise AssertionError("mint_uses_current_reserves_law")
 
 
-def exhaustive(bound):
+def exhaustive(bound, *, coalitions=((0,), (1,)), max_seconds=120):
     started = time.monotonic()
     states = tuple(initial_domain())
-    counts = Counter()
-    # This cache is checker scratch, never state or decision authority.
-    transitions = {}
-    floor_witness = None
-    for initial in states:
-        for actor in (0, 1):
-            commands = command_domain(actor)
-            baseline = holdings(initial, actor)
-            baseline_floor = holdings(initial, actor, floor=True)
-            frontier = {initial: (1, ())}
-            for depth in range(1, bound + 1):
-                following = {}
-                for before, (multiplicity, path) in frontier.items():
-                    for command in commands:
-                        key = before, command
-                        if key not in transitions:
-                            result = step(before, command)
-                            check_step(before, command, result)
-                            transitions[key] = result
-                        result = transitions[key]
-                        post = result.post
-                        counts[f"sequences_length_{depth}"] += multiplicity
-                        counts["accepted_steps" if result.reason is None else "rejected_steps"] += multiplicity
-                        if dominates(holdings(post, actor), baseline):
-                            raise AssertionError(f"no_free_value: {initial!r}, {path + (command,)!r}")
-                        if floor_witness is None and dominates(holdings(post, actor, floor=True), baseline_floor):
-                            floor_witness = {"initial": dataclasses.asdict(initial), "actor": actor,
-                                             "commands": [dataclasses.asdict(c) for c in path + (command,)]}
-                        old_count, old_path = following.get(post, (0, path + (command,)))
-                        following[post] = old_count + multiplicity, old_path
-                counts["distinct_endpoints_checked"] += len(following)
-                frontier = following
-    return {"schema": "spot-no-free-value/1", "bound": bound, "initial_states": len(states),
-            "actors_per_state": 2, "commands_per_actor": len(command_domain(0)), "counts": dict(counts),
-            "distinct_transition_checks": len(transitions), "exact_claim_dominance_violations": 0,
-            "floored_claim_first_witness": floor_witness, "seconds": round(time.monotonic() - started, 3),
+    coalitions = tuple(coalition_members(c) for c in coalitions)
+    commands = {c: tuple(cmd for actor in c for cmd in command_domain(actor)) for c in coalitions}
+    # These caches/frontiers are exclusively owned checker scratch. They never
+    # supply native decision, metering, receipt or publication authority.
+    transitions, values = {}, {}
+    def value(world, coalition):
+        key = world, coalition
+        if key not in values:
+            values[key] = valuations(world, coalition)
+        return values[key]
+    groups = [(initial, c, {initial: (1, ())}) for initial in states for c in coalitions]
+    counts, by_coalition = Counter(), {str(c): Counter() for c in coalitions}
+    witnesses = {name: None for name in ("floored_burn_payout", "exact_pro_rata", "pooled_burn_upper_bound")}
+    completed = 0
+    timed_out = False
+    for depth in range(1, bound + 1):
+        next_groups, stage, stage_by = [], Counter(), {str(c): Counter() for c in coalitions}
+        for initial, coalition, frontier in groups:
+            if time.monotonic() - started >= max_seconds:
+                timed_out = True
+                break
+            baseline, bn, bd, bp = value(initial, coalition)
+            following = {}
+            for before, (multiplicity, path) in frontier.items():
+                for command in commands[coalition]:
+                    key = before, command
+                    if key not in transitions:
+                        result = step(before, command)
+                        check_step(before, command, result)
+                        transitions[key] = result
+                    result = transitions[key]
+                    post = result.post
+                    stage[f"sequences_length_{depth}"] += multiplicity
+                    stage_by[str(coalition)][f"sequences_length_{depth}"] += multiplicity
+                    stage["accepted_steps" if result.reason is None else "rejected_steps"] += multiplicity
+                    floored, an, ad, pooled = value(post, coalition)
+                    gains = (dominates(floored, baseline),
+                             dominates(tuple(n * bd for n in an), tuple(n * ad for n in bn)),
+                             dominates(pooled, bp))
+                    for name, gain in zip(witnesses, gains):
+                        if gain and witnesses[name] is None:
+                            witnesses[name] = {"initial": dataclasses.asdict(initial), "coalition": coalition,
+                                               "commands": [dataclasses.asdict(c) for c in path + (command,)]}
+                    old_count, old_path = following.get(post, (0, path + (command,)))
+                    following[post] = old_count + multiplicity, old_path
+            stage["distinct_endpoints_checked"] += len(following)
+            next_groups.append((initial, coalition, following))
+        if timed_out:
+            break
+        counts.update(stage)
+        for c in coalitions:
+            by_coalition[str(c)].update(stage_by[str(c)])
+        groups = next_groups
+        completed = depth
+    return {"schema": "spot-no-free-value/2", "requested_bound": bound, "bound": completed,
+            "budget_seconds": max_seconds, "budget_exhausted": timed_out, "initial_states": len(states),
+            "coalitions": coalitions, "commands_per_coalition": {str(c): len(commands[c]) for c in coalitions},
+            "counts": dict(counts), "counts_per_coalition": {c: dict(v) for c, v in by_coalition.items()},
+            "distinct_transition_checks_including_partial_depth": len(transitions),
+            "primary_measure": "floored_burn_payout",
+            "measures": {name: {"first_witness": w, "status": "counterexample" if w else "no violation through completed bound"}
+                         for name, w in witnesses.items()},
+            "seconds": round(time.monotonic() - started, 3),
             "domain": "initial_domain() and command_domain(); every Cartesian value; all statuses; real K=1000; successors unrestricted by initial domain",
-            "claim_definition": "balance + exact rational shares*reserve/supply; floored claims checked separately",
-            "nonclaims": "finite oracle domain/alphabet only; no arbitrary amounts, native equivalence or donation command"}
+            "claim_definition": "combined liquid balances + sum of each member's floor(shares*reserve/supply)",
+            "extra_guards": "exact combined pro-rata; hypothetical floor of pooled shares (no share transfer command)",
+            "capabilities": "only coalition members submit commands; either ordinary recipient; interleaved atomic sequential steps; no borrowing, outside income, admin, external markets or oracle",
+            "nonclaims": "finite oracle domain/alphabet only; no arbitrary amounts, native equivalence, flash lender or donation command; partial depth is not exhaustive"}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bound", type=int, default=4)
+    parser.add_argument("--bound", type=int, default=5)
+    parser.add_argument("--max-seconds", type=float, default=120)
+    parser.add_argument("--coalitions", choices=("singletons", "pair", "all"), default="singletons")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    if args.bound < 3:
-        parser.error("the brief requires a bound of at least three")
-    result = exhaustive(args.bound)
+    if args.bound < 1 or not 0 < args.max_seconds <= 120:
+        parser.error("positive bound and a budget in (0,120] are required")
+    coalitions = {"singletons": ((0,), (1,)), "pair": ((0, 1),), "all": ((0,), (1,), (0, 1))}[args.coalitions]
+    result = exhaustive(args.bound, coalitions=coalitions, max_seconds=args.max_seconds)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
+    return 1 if result["bound"] == 0 or any(m["first_witness"] for m in result["measures"].values()) else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

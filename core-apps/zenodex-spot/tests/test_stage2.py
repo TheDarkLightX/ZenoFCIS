@@ -133,14 +133,14 @@ class Stage2(unittest.TestCase):
         first = step(before, Command(1, a=10000))
         second = step(first.post, Command(1, direction=1, a=first.outputs[1]))
         self.assertIsNone(second.reason)
-        self.assertFalse(dominates(holdings(second.post, 0), holdings(before, 0)))
+        self.assertFalse(dominates(holdings(second.post, 0, floor=False), holdings(before, 0, floor=False)))
 
     def test_add_then_burn(self):
         before = funded()
         added = step(before, Command(3, a=1001, b=1001))
         burned = step(added.post, Command(4, a=added.outputs[2]))
         self.assertIsNone(burned.reason)
-        self.assertFalse(dominates(holdings(burned.post, 0), holdings(before, 0)))
+        self.assertFalse(dominates(holdings(burned.post, 0, floor=False), holdings(before, 0, floor=False)))
 
     def test_split_versus_single_swap(self):
         before = funded(1000000, 1000000, 1001)
@@ -149,8 +149,8 @@ class Stage2(unittest.TestCase):
         split = step(first.post, Command(1, a=5000))
         self.assertIsNone(single.reason)
         self.assertIsNone(split.reason)
-        self.assertFalse(dominates(holdings(single.post, 0), holdings(before, 0)))
-        self.assertFalse(dominates(holdings(split.post, 0), holdings(before, 0)))
+        self.assertFalse(dominates(holdings(single.post, 0, floor=False), holdings(before, 0, floor=False)))
+        self.assertFalse(dominates(holdings(split.post, 0, floor=False), holdings(before, 0, floor=False)))
         self.assertLessEqual(first.outputs[1] + split.outputs[1], single.outputs[1])
 
     def test_donation_then_deposit_boundary(self):
@@ -167,8 +167,8 @@ class Stage2(unittest.TestCase):
     def test_dominance_includes_claims_and_detects_free_credit(self):
         before = funded()
         richer = dataclasses.replace(before, balances=(*before.balances[:4], before.balances[4] + 1, *before.balances[5:]))
-        self.assertTrue(dominates(holdings(richer, 0), holdings(before, 0)))
-        self.assertEqual(holdings(before, 0), (100001, 100001))
+        self.assertTrue(dominates(holdings(richer, 0, floor=False), holdings(before, 0, floor=False)))
+        self.assertEqual(holdings(before, 0, floor=False), (100001, 100001))
 
 
 if __name__ == "__main__":

@@ -44,7 +44,11 @@ def check(root: Path) -> list[str]:
     ).decode().split("\0")
     # Ignored drafts in docs also require review if somebody adds them forcibly.
     docs = [str(path.relative_to(root)) for path in (root / "docs").rglob("*") if path.is_file()]
+    # The cached index also names tracked files removed from the working tree.
+    # Check the candidate contents; missing approved documents still fail the
+    # independent inventory check above. Keep symlinks visible for refusal.
     actual = {name for name in [*tracked, *docs] if name and
+              ((root / name).is_file() or (root / name).is_symlink()) and
               (name.startswith("docs/") or Path(name).suffix in DOCUMENT_SUFFIXES
                or name in EXTRA_DOCUMENTS)}
     for name in sorted(actual - set(rows)):

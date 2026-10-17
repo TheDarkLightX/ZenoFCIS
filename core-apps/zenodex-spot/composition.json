@@ -52,8 +52,8 @@
   "stateless_components": [],
   "physical_component": 400,
   "complete_contract": {
-    "project.zeno": "db3193b3e803b992572b0e96ef0f264d51b431949e042bec2e8d5dac9872b516",
-    "v2/policy.json": "6d0ba0ba9d2a79327c1cdf4167fc191960f002c69600d82795c9b44ba8299c56"
+    "project.zeno": "b85eb044ad6bb7a9cfe3565432a0c0a78ac838004eb9a1342409c539de7e887d",
+    "v2/policy.json": "bd8ea637c6cf23312893e24794269f0c8bbda7eeb1c3c2897d961c8b07fb2483"
   },
   "components": [
     {

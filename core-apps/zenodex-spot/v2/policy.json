@@ -1449,6 +1449,50 @@
     "533": "AssetConservation",
     "534": "AssetConservation",
     "535": "AssetConservation",
-    "536": "AssetConservation"
+    "536": "AssetConservation",
+    "537": "FeeAndRounding",
+    "538": "RejectNoAuthority"
+  },
+  "delivery_laws": {
+    "537": {
+      "max_deliveries": 5,
+      "observations": {
+        "outbox.107": {
+          "channel": 303
+        },
+        "outbox.107.3010": {
+          "channel": 303,
+          "field": 3010
+        },
+        "outbox.107.3011": {
+          "channel": 303,
+          "field": 3011
+        },
+        "outbox.107.3012": {
+          "channel": 303,
+          "field": 3012
+        },
+        "outbox.107.3013": {
+          "channel": 303,
+          "field": 3013
+        },
+        "outbox.107.3014": {
+          "channel": 303,
+          "field": 3014
+        },
+        "outbox.107.3015": {
+          "channel": 303,
+          "field": 3015
+        },
+        "outbox.107.3016": {
+          "channel": 303,
+          "field": 3016
+        },
+        "outbox.107.3017": {
+          "channel": 303,
+          "field": 3017
+        }
+      }
+    }
   }
 }
