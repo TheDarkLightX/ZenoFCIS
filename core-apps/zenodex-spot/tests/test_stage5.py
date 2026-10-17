@@ -177,10 +177,11 @@ class Stage5(unittest.TestCase):
         failed = self.counter_submit(db, '2'*64, 121)
         rejected = self.counter_submit(db, '3'*64, 120, 0)
         self.assertEqual([p['class'] for p in (accepted, failed, rejected)], ['Accept', 'CommittedFailure', 'Reject'])
+        original_history = (('1'*64, (120,), (1,)), ('2'*64, (121,), (1,)), ('3'*64, (120,), (0,)))
         for packet, key, command, context in ((accepted, '1'*64, 120, 1), (failed, '2'*64, 121, 1),
                                                (rejected, '3'*64, 120, 0)):
             native = invoke(self.counter, 'probe', ' '.join(map(str, packet['pre'])), command, context)
-            inspect(packet, native)
+            inspect(packet, native, binary=self.counter, history=original_history, replay_key=key)
             independent = self.counter_submit(replay, key, command, context)
             if DEFECT == 'substituted-commit-plan':
                 independent['commit_plan'] = '00'
@@ -199,8 +200,10 @@ class Stage5(unittest.TestCase):
     def test_adopter_refuses_missing_or_substituted_artifacts(self):
         db = self.root / 'counter.db'
         invoke(self.counter, 'init', db)
+        original_history = ()
         for key, command in (('1'*64, 120), ('2'*64, 121)):
             packet = self.counter_submit(db, key, command)
+            original_history += ((key, (command,), (1,)),)
             native = invoke(self.counter, 'probe', ' '.join(map(str, packet['pre'])), command, 1)
             for field in ('patch', 'commit_plan', 'outbox', 'receipt', 'authorization', 'deliveries'):
                 for replacement in (None, '00'):
@@ -209,7 +212,7 @@ class Stage5(unittest.TestCase):
                     if DEFECT == 'adopter-skips-artifact-check':
                         bad = packet
                     with self.assertRaises(ValueError, msg=field):
-                        inspect(bad, native)
+                        inspect(bad, native, binary=self.counter, history=original_history, replay_key=key)
 
     def test_process_kill_before_commit_is_atomic(self):
         db = self.root / 'counter.db'

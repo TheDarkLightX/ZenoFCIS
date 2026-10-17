@@ -32,6 +32,15 @@ ROUND2_CONTROLS = {
     'component-decision-mismatch': 'test_standalone_component_native_decisions',
     'fixture-half-applied': 'test_funded_create_kill_before_commit_is_atomic',
 }
+ROUND3_CONTROLS = {
+    'adopter-ignores-receipt-digest': 'test_adopter_refuses_receipt_digest_corruption',
+    'adopter-ignores-outbox-channel': 'test_adopter_refuses_outbox_channel_corruption',
+    'adopter-ignores-outbox-payload': 'test_adopter_refuses_outbox_payload_corruption',
+    'adopter-ignores-commit-row': 'test_adopter_refuses_commit_row_corruption',
+    'adopter-ignores-patch': 'test_adopter_refuses_patch_byte_corruption',
+    'adopter-uses-latest-key': 'test_adopter_reconstructs_original_key_after_later_commits',
+    'adopter-trusts-report-as-replay': 'test_adopter_requires_separate_immutable_history',
+}
 
 
 def run(argv, out, name, env, expected=0, timeout=120):
@@ -67,6 +76,7 @@ def main():
                PYTHONPATH=str(APP/'tests'), SPOT_STAGE5_TRANSCRIPT=str(a.out.resolve()/'native-transcripts.jsonl'))
     env.pop('SPOT_STAGE5_DEFECT', None)
     env.pop('SPOT_ROUND2_DEFECT', None)
+    env.pop('SPOT_ROUND3_DEFECT', None)
     baseline = run([sys.executable, '-m', 'unittest', 'discover', '-s', APP/'tests', '-v'],
                    a.out, 'baseline', env, timeout=600)
     controls = []
@@ -81,6 +91,12 @@ def main():
                      a.out, defect, dict(env, SPOT_ROUND2_DEFECT=defect), expected=1)
         if name not in result['stderr'] or 'FAIL' not in result['stderr']:
             raise ValueError(defect + ': named round-2 test did not turn red')
+        controls.append({'defect': defect, 'named_test': name, 'exit_code': 1})
+    for defect, name in ROUND3_CONTROLS.items():
+        result = run([sys.executable, '-m', 'unittest', 'test_stage5_round3.Round3.'+name, '-v'],
+                     a.out, defect, dict(env, SPOT_ROUND3_DEFECT=defect), expected=1)
+        if name not in result['stderr'] or 'FAIL' not in result['stderr']:
+            raise ValueError(defect + ': named round-3 test did not turn red')
         controls.append({'defect': defect, 'named_test': name, 'exit_code': 1})
     summary = {'baseline_exit': baseline['exit_code'], 'planted_defects': controls,
                'scope': 'HTTP byte-stream handler plus native SQLite; TCP is separately gated'}

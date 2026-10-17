@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
 
 
 def parts(data, count):
@@ -36,19 +41,71 @@ def lane(data, sequence, lane_id):
     return rows
 
 
-def inspect(packet, native):
-    """Compare the complete decision and native authorization, then its plan.
+def _reconstruct(binary, history, replay_key):
+    """Replay trusted acquisition inputs in an exclusively owned scratch store.
 
-    Reject has explicit absent committing artifacts. Its authorization is the
-    native rejection evaluation, never a fabricated commit receipt.
+    History is an immutable tuple of (key, command tuple, context tuple), in
+    original submission order, including the selected key. It must come from
+    the adopter's original history, never from the report being inspected.
+    The configured executable binds the contract and its exact genesis.
+    """
+    if binary is None or type(history) is not tuple or not history:
+        raise ValueError('native executable and original immutable history required')
+    keys = set()
+    for entry in history:
+        if type(entry) is not tuple or len(entry) != 3:
+            raise ValueError('immutable key/command/context entry required')
+        key, command, context = entry
+        if (type(key) is not str or len(key) != 64 or any(c not in '0123456789abcdef' for c in key)
+                or key in keys):
+            raise ValueError('unique canonical replay key required')
+        if any(type(values) is not tuple or any(type(n) is not int for n in values)
+               for values in (command, context)):
+            raise ValueError('immutable exact integer command/context required')
+        keys.add(key)
+    if type(replay_key) is not str or replay_key not in keys:
+        raise ValueError('original replay key absent from trusted history')
+    binary = str(Path(binary).resolve())
+    def invoke(*arguments):
+        result = subprocess.run([binary, *map(str, arguments)], capture_output=True,
+                                text=True, timeout=35, check=False)
+        if result.returncode:
+            raise ValueError('independent native replay refused: ' + result.stderr)
+        return json.loads(result.stdout)
+    # Preparation is shell work; this store never supplies deployment authority.
+    with tempfile.TemporaryDirectory(prefix='spot-adopter-', dir=os.environ.get('TMPDIR')) as tmp:
+        database = Path(tmp)/'replay.db'
+        invoke('init', database)
+        selected = None
+        for key, command, context in history:
+            result = invoke('keyed', database, key, ' '.join(map(str, command)),
+                            ' '.join(map(str, context)))
+            if key == replay_key:
+                selected = result
+        return selected
+
+
+def inspect(packet, native, *, binary=None, history=None, replay_key=None):
+    """Compare reports to a probe and complete independently replayed artifacts.
+
+    The caller supplies the trusted executable, original submission history and
+    original key separately from packet. Neither report supplies those roots.
+    Results are descriptive only; this does not authenticate external history.
     """
     keys = {'schema', 'class', 'reason', 'pre', 'post', 'deliveries', 'authorization',
             'patch', 'commit_plan', 'outbox', 'receipt', 'commit'}
     if type(packet) is not dict or set(packet) != keys:
         raise ValueError('complete mounted report required')
-    for key in ('schema', 'class', 'reason', 'pre', 'post', 'deliveries', 'authorization', 'patch'):
+    for key in ('schema', 'class', 'reason', 'pre', 'post', 'deliveries', 'authorization'):
         if packet[key] != native[key]:
             raise ValueError('native replay differs: ' + key)
+    reconstructed = _reconstruct(binary, history, replay_key)
+    for key in ('schema', 'class', 'reason', 'pre', 'post', 'deliveries', 'authorization', 'commit'):
+        if packet[key] != reconstructed[key]:
+            raise ValueError('original history/key differs: ' + key)
+    for key in ('receipt', 'outbox', 'commit_plan', 'patch'):
+        if packet[key] != reconstructed[key]:
+            raise ValueError('reconstructed publication differs: ' + key)
     if packet['class'] == 'Reject':
         if any(packet[key] is not None for key in ('patch', 'commit_plan', 'outbox', 'receipt', 'commit')):
             raise ValueError('reject has committing artifacts')
@@ -58,25 +115,8 @@ def inspect(packet, native):
     if type(packet['commit']) is not int or packet['commit'] <= 0:
         raise ValueError('committing position required')
     try:
-        plan, outbox, receipt, patch = (bytes.fromhex(packet[k]) for k in ('commit_plan', 'outbox', 'receipt', 'patch'))
+        plan, receipt = (bytes.fromhex(packet[k]) for k in ('commit_plan', 'receipt'))
     except (TypeError, ValueError) as error:
         raise ValueError('committing artifacts required') from error
-    magic = b'ZFCIS-SQL-PUBLICATION-BUNDLE\0\x0a'
-    if not plan.startswith(magic):
-        raise ValueError('wrong native plan schema')
-    commit, state, effects, actual_outbox = parts(plan[len(magic):], 4)
-    row = parts(commit, 11)
-    state = parts(state, 5)
-    sequence = packet['commit']
-    if (int.from_bytes(row[0], 'big') != sequence or row[8] != patch or row[10] != receipt
-            or actual_outbox != outbox or state != [b'\0'*7+b'\1', row[0], patch, row[3], row[5]]):
-        raise ValueError('substituted native plan components')
-    certificate_magic = b'ZFCISV2-CERT\0'
-    if (not receipt.startswith(certificate_magic) or len(receipt) != len(certificate_magic)+8+5*32
-            or receipt[len(certificate_magic):len(certificate_magic)+8] != row[0]
-            or receipt[len(certificate_magic)+8:len(certificate_magic)+8+128] != b''.join(row[1:5])):
-        raise ValueError('receipt subject differs')
-    lane(effects, sequence, 0)
-    lane(outbox, sequence, 1)
     return {'class': packet['class'], 'receipt': hashlib.sha256(receipt).hexdigest(),
             'plan_bytes': len(plan)}
