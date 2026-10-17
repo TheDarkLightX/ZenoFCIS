@@ -83,6 +83,7 @@ class SchemaCoverage(unittest.TestCase):
                 stack.enter_context(patch.object(gate.verifier, "run", side_effect=run))
                 stack.enter_context(patch.object(gate.verifier, "verify_tool_files"))
                 stack.enter_context(patch.object(gate, "native_check", return_value={"build_exit": 0, "exit_code": 0}))
+                stack.enter_context(patch.object(gate, "prepare_native_dependencies"))
                 stack.enter_context(patch.object(gate, "require_coverage", return_value={}))
                 stack.enter_context(patch.object(gate, "coverage_control",
                     return_value=(mode != "unrelated-coverage", "synthetic intended refusal")))

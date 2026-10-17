@@ -60,8 +60,8 @@ def mutations(root):
     change('R7_missing_full_coverage', RANGES,
            '    if report.hi != size {\n        return Err(RangeError::IncompleteCoverage);\n    }\n', '')
     change('R8_wrong_unrank_width', RANGES,
-           'let width = ((max as i128) - (min as i128) + 1) as u128;',
-           'let width = ((max as i128) - (min as i128)) as u128;')
+           'let maybe_width = interval_width(min, max);',
+           'let maybe_width = match interval_width(min, max) { Some(width) => Some(width - 1), None => None };')
     contract = 'ensures two_ranges_result(original, candidate, cap, step_limit, split, reserved_work, result),'
     change('range_weaken_projection', RANGES, contract, contract[:-1] + ' || true,', 'coverage')
     change('range_narrow_domain', RANGES, contract, 'requires false, ' + contract, 'coverage')

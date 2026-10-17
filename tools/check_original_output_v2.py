@@ -6,6 +6,8 @@ installs tools, refreshes coverage expectations, or grants runtime authority.
 """
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 import collections
 import hashlib
@@ -19,7 +21,7 @@ sys.dont_write_bytecode = True
 import tempfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 import check_verus as verifier
 from verus_contract_controls import contract_rejected
 from verus_coverage import require_coverage
@@ -63,6 +65,7 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("tools/v2_native_dependencies.py"),
                                 Path("verification/verus/authority_v2_sources.json"),
                                 Path("tools/verus_contract_controls.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 TARGET = Path(os.environ.get('CARGO_TARGET_DIR', str(ROOT / 'target')))
 
 
@@ -138,15 +141,17 @@ def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, s
 
 def run(command: list[str], cwd: Path, env: dict, directory: Path, name: str,
         timeout: int = 600) -> subprocess.CompletedProcess:
+    if command[0] == 'rustc' and '--test' in command:
+        env = native_test_environment(cwd, env)
     directory.mkdir(parents=True, exist_ok=True)
     (directory / (name + '.command.json')).write_text(json.dumps(command, indent=2) + '\n')
     context = {'cwd':str(cwd), 'environment':{k:env[k] for k in
-        ('RUSTUP_TOOLCHAIN', 'VERUS_Z3_PATH', 'CARGO_TARGET_DIR', 'CARGO_BUILD_JOBS',
+        ('RUSTUP_TOOLCHAIN', 'VERUS_Z3_PATH', 'CARGO_MANIFEST_DIR', 'CARGO_TARGET_DIR', 'CARGO_BUILD_JOBS',
          'RUST_TEST_THREADS', 'CARGO_NET_OFFLINE', 'CARGO_INCREMENTAL') if k in env},
         'removed_environment':['VERUS_*', 'VARGO_*', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS']}
     (directory / (name + '.context.json')).write_text(json.dumps(context, indent=2) + '\n')
     try:
-        result = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True, timeout=timeout)
+        result = verifier.run(command, cwd, env, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         (directory / (name + '.stdout')).write_bytes(e.stdout or b'')
         (directory / (name + '.stderr')).write_bytes(e.stderr or b'')
@@ -158,11 +163,9 @@ def run(command: list[str], cwd: Path, env: dict, directory: Path, name: str,
     return result
 
 
-def native_build_command(root: Path, binary: Path, libraries: dict) -> list[str]:
+def native_build_command(root: Path, binary: Path, dependency_args: list[str]) -> list[str]:
     result = ['rustc', '+1.97.1', '--edition=2024', '--test', '--check-cfg', 'cfg(verus_keep_ghost)',
-              '--check-cfg', 'cfg(test)', '-L', 'dependency=' + str(TARGET / 'debug/deps')]
-    for name, path in sorted(libraries.items()):
-        result += ['--extern', name + '=' + path]
+              '--check-cfg', 'cfg(test)', *dependency_args]
     return [*result, str(root / HARNESS), '-o', str(binary)]
 
 
@@ -200,10 +203,11 @@ def check(directory: Path, positive_only: bool = False) -> dict:
         raise ValueError('positive proof lacks exact whole-harness or toolchain qualification')
     coverage = require_coverage((directory / 'positive/logs/crate.vir').read_text(), profile)
     print('Original output: whole-harness proof and strict translated inventory passed', flush=True)
-    native_dependency_args(ROOT, directory / 'native', env)
+    dependencies = prepare_native_dependencies(ROOT, directory / 'native', env)
     dependency_receipt = json.loads((directory / 'native/native-dependencies/result.json').read_text())
     libraries = {name: record['path'] for name, record in dependency_receipt['libraries'].items()}
-    native_command = native_build_command(source, directory / 'native/tests', libraries)
+    arguments = native_dependency_args(ROOT, directory / 'native/positive-binding', env, prepared=dependencies)
+    native_command = native_build_command(source, directory / 'native/tests', arguments)
     verifier.require_success(run(native_command, source, env, directory / 'native', 'build'))
     native = run([str(directory / 'native/tests'), 'output::tests', '--test-threads=1'], source, env, directory / 'native', 'tests')
     verifier.require_success(native)
@@ -230,7 +234,8 @@ def check(directory: Path, positive_only: bool = False) -> dict:
         raise ValueError('strict Clippy reports an owned original-output diagnostic')
     mutations = []
     if not positive_only:
-        for name, (path, changed, kind) in mutation_sources((source / SUBJECT).read_text(), (source / SPEC).read_text()).items():
+        def run_control(control_item):
+            (name, (path, changed, kind)) = control_item
             specimen = directory / 'mutations' / name
             for unit in UNIT_SOURCES:
                 dest = specimen / unit
@@ -242,7 +247,8 @@ def check(directory: Path, positive_only: bool = False) -> dict:
             proof_command = None
             if kind == 'native':
                 binary = specimen / 'native-tests'
-                verifier.require_success(run(native_build_command(specimen, binary, libraries), specimen, env, specimen, 'build'))
+                arguments = native_dependency_args(ROOT, specimen / 'native-binding', env, prepared=dependencies)
+                verifier.require_success(run(native_build_command(specimen, binary, arguments), specimen, env, specimen, 'build'))
                 result = run([str(binary), 'output::tests', '--test-threads=1'], specimen, env, specimen, 'native')
                 killed = result.returncode == 101 and 'test result: FAILED' in result.stdout and 'assertion' in result.stdout
                 detail = {'native_stdout': str(specimen / 'native.stdout')}
@@ -270,14 +276,18 @@ def check(directory: Path, positive_only: bool = False) -> dict:
                    'changed_source':str(path), 'original_sha256':before[str(path)],
                    'changed_sha256':verifier.digest(specimen / path), 'command':proof_command,
                    'coverage_refusal':refusal, 'contract_outcome':outcome, 'result':detail, 'logs':str(specimen)}
-            mutations.append(row)
-            (directory / 'mutations.json').write_text(json.dumps(mutations, indent=2, sort_keys=True) + '\n')
+            control_result = row
             print(f'Original output: {name}: {"caught" if killed else "FAILED"} ({kind})', flush=True)
-            if not killed: raise ValueError(f'control {name} survived or failed for an unrelated reason')
+            if not killed: raise ControlRefused(control_result, f'control {name} survived or failed for an unrelated reason')
+            return control_result
+        def publish_control(control_result):
+            mutations.append(control_result)
+            (directory / 'mutations.json').write_text(json.dumps(mutations, indent=2, sort_keys=True) + '\n')
+        run_controls(run_control, mutation_sources((source / SUBJECT).read_text(), (source / SPEC).read_text()).items(), timings=directory / 'control-timings.json', publish=publish_control)
     verifier.verify_tool_files(tools, pin)
     if snapshot() != before: raise ValueError('source changed during qualification')
     return {'schema':'zeno-fcis/original-output-evidence/1', 'status':'positive_only' if positive_only else 'passed',
-            'source_sha256':before, 'toolchain':pin, 'verus_report':report,
+            'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS), 'toolchain':pin, 'verus_report':report,
             'translated_function_coverage':coverage, 'coverage_modes':dict(collections.Counter(x['mode'] for x in coverage.values())),
             'native':{'exit_code':native.returncode,'output':native.stdout,'oracle_artifacts':libraries,
                       'oracle_artifact_sha256':{k:verifier.digest(Path(p)) for k,p in libraries.items()}},

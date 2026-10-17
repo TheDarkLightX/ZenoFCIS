@@ -202,6 +202,165 @@ pub fn following() -> u64 {
             self.assertFalse(gate.proof_succeeded(changed, self.pin))
 
 
+class MutantAdmission(unittest.TestCase):
+    """Exercise the actual gate, with external processes replaced by fixtures."""
+    def run_gate(self, diagnostic=None, *, wrong_function=False):
+        import os
+        from unittest.mock import patch
+        pin = json.loads((gate.ROOT / gate.PIN).read_text())
+        controls = gate.mutation_sources((gate.ROOT / gate.SUBJECT).read_text())
+        self.assertEqual(set(gate.SEMANTIC_TARGETS), {n for n, (_, kind) in controls.items() if kind == 'proof'})
+        for jobs in (1, 2):
+            seen = []
+            def fake(command, cwd, environment, **kwargs):
+                if '--output-json' not in command:
+                    return subprocess.CompletedProcess(command, 0, 'mock native/version', '')
+                name = Path(cwd).name
+                mutant = cwd != gate.ROOT
+                proof = mutant and controls[name][1] == 'proof'
+                report = {'verus': {k: pin[k] for k in ('version', 'commit')},
+                    'func-details': dict.fromkeys(pin['target_functions'], {}),
+                    'verification-results': {'success': not proof, 'errors': int(proof),
+                        'verified': pin['expected_verified'] - int(mutant),
+                        'encountered-error': proof, 'encountered-vir-error': False,
+                        'is-verifying-entire-crate': True}}
+                report['verus']['toolchain'] = pin['rust_toolchain']
+                stderr = ''
+                if mutant:
+                    seen.append(name)
+                    if not proof:
+                        report['func-details'].pop('domain_bounds::finite_bounds::interval_width')
+                if proof:
+                    target = gate.SEMANTIC_TARGETS[name]
+                    if wrong_function and name == 'wrong_interval_width':
+                        target = 'bounded_product'
+                    line, _ = gate.function_lines(controls[name][0], target)
+                    stderr = (f'error: postcondition not satisfied\n --> {gate.SUBJECT}:{line}:1\n'
+                              'error: aborting due to 1 previous error\n')
+                    if diagnostic is not None and name == 'wrong_interval_width':
+                        stderr = diagnostic
+                return subprocess.CompletedProcess(command, int(proof), json.dumps(report), stderr)
+            with self.subTest(jobs=jobs), patch.dict(os.environ, {'ZENO_FCIS_CONTROL_JOBS': str(jobs)}), \
+                    patch.object(gate, 'prepare_tools', return_value=Path('/tmp/sol-q25/not-executed')), \
+                    patch.object(gate, 'verify_tool_files'), patch.object(gate, 'snapshot', return_value={}), \
+                    patch.object(gate, 'run', side_effect=fake), \
+                    patch.object(gate.subprocess, 'check_output', return_value='fixture'):
+                if diagnostic is not None or wrong_function:
+                    with self.assertRaisesRegex(gate.ControlRefused, 'wrong_interval_width') as caught:
+                        gate.check(Path('/tmp/sol-q25/not-executed'), False)
+                    self.assertFalse(caught.exception.result['killed'])
+                else:
+                    self.assertEqual(gate.check(Path('/tmp/sol-q25/not-executed'), False)['status'], 'passed')
+            self.assertCountEqual(seen, controls)
+
+    def test_resource_limit_witness_is_never_a_kill(self):
+        self.run_gate('error: resource limit exceeded\n')
+
+    def test_smt_solver_unknown_witness_is_never_a_kill(self):
+        self.run_gate('error: SMT solver returned UNKNOWN\n')
+
+    def test_semantic_failure_in_another_function_is_refused(self):
+        self.run_gate(wrong_function=True)
+
+    def test_attributed_semantic_mutants_still_qualify(self):
+        self.run_gate()
+
+
+class CoverageAdmission(unittest.TestCase):
+    """Reviewer matrix: 15 unqualified cases refuse; 3 intended omissions pass."""
+    def run_case(self, case, jobs):
+        import os
+        from unittest.mock import patch
+        pin = json.loads((gate.ROOT/gate.PIN).read_text())
+        positive = {'verus':{k:pin[k] for k in ('version','commit','rust_toolchain')},
+            'func-details':dict.fromkeys(pin['target_functions'], {}),
+            'verification-results':{'success':True,'verified':3,'errors':0,
+                'encountered-error':False,'encountered-vir-error':False,'is-verifying-entire-crate':True}}
+        positive['verus']['toolchain'] = positive['verus'].pop('rust_toolchain')
+        controls = gate.mutation_sources((gate.ROOT/gate.SUBJECT).read_text())
+        seen = []
+        def fake(command, cwd, environment, **kwargs):
+            if '--output-json' not in command:
+                return subprocess.CompletedProcess(command,0,'mock native/version','')
+            report = copy.deepcopy(positive)
+            name = Path(cwd).name
+            stderr = ''
+            if cwd != gate.ROOT:
+                seen.append(name)
+                if controls[name][1] == 'proof':
+                    report['verification-results'].update(success=False, errors=1, verified=2,
+                        **{'encountered-error':True})
+                    line, _ = gate.function_lines(controls[name][0], gate.SEMANTIC_TARGETS[name])
+                    stderr = (f'error: postcondition not satisfied\n --> {gate.SUBJECT}:{line}:1\n'
+                              'error: aborting due to 1 previous error\n')
+                else:
+                    if case in ('valid_coverage','unknown_diagnostic','resource_limit_diagnostic'):
+                        report['verification-results']['verified'] = 2
+                        report['func-details'].pop('domain_bounds::finite_bounds::interval_width')
+                    if case == 'wrong_version_no_coverage_delta':
+                        report['verus']['version'] = 'unqualified-version'
+                    elif case == 'incomplete_crate_no_coverage_delta':
+                        report['verification-results']['is-verifying-entire-crate'] = False
+                    elif case == 'reported_error_no_coverage_delta':
+                        report['verification-results'].update(errors=1, **{'encountered-error':True})
+                        stderr = 'error: unrelated verifier failure\n'
+                    elif case == 'unknown_diagnostic':
+                        stderr = 'error: SMT solver returned UNKNOWN\n'
+                    elif case == 'resource_limit_diagnostic':
+                        stderr = 'error: resource limit exceeded\n'
+            return subprocess.CompletedProcess(command, int(not report['verification-results']['success']), json.dumps(report), stderr)
+        with patch.dict(os.environ, {'ZENO_FCIS_CONTROL_JOBS':str(jobs)}), \
+                patch.object(gate,'prepare_tools',return_value=Path('/tmp/sol-q25/not-executed')), \
+                patch.object(gate,'verify_tool_files'), patch.object(gate,'snapshot',return_value={}), \
+                patch.object(gate,'run',side_effect=fake), \
+                patch.object(gate.subprocess,'check_output',return_value='fixture'):
+            if case == 'valid_coverage':
+                receipt = gate.check(Path('/tmp/sol-q25/not-executed'),False)
+                self.assertTrue(all(row['killed'] for row in receipt['mutations']))
+            else:
+                with self.assertRaises(gate.ControlRefused) as caught:
+                    gate.check(Path('/tmp/sol-q25/not-executed'),False)
+                self.assertEqual(caught.exception.result['name'],'omit_interval_contract')
+                self.assertFalse(caught.exception.result['killed'])
+        self.assertCountEqual(seen, controls)
+
+    def test_count_alone_or_another_missing_obligation_is_refused(self):
+        pin = json.loads((gate.ROOT/gate.PIN).read_text())
+        positive = {'verus':{k:pin[k] for k in ('version','commit')},
+            'func-details':dict.fromkeys(pin['target_functions'], {}),
+            'verification-results':{'success':True,'verified':3,'errors':0,
+                'encountered-error':False,'encountered-vir-error':False,'is-verifying-entire-crate':True}}
+        positive['verus']['toolchain'] = pin['rust_toolchain']
+        omitted = 'domain_bounds::finite_bounds::interval_width'
+        valid = copy.deepcopy(positive)
+        valid['verification-results']['verified'] = 2
+        valid['func-details'].pop(omitted)
+        proc = subprocess.CompletedProcess([],0,'','')
+        self.assertTrue(gate.coverage_refusal(proc,valid,pin,'omit_interval_contract',positive))
+        for missing in (None, 'domain_bounds::finite_bounds::bounded_product'):
+            bad = copy.deepcopy(positive)
+            bad['verification-results']['verified'] = 2
+            if missing is not None:bad['func-details'].pop(missing)
+            self.assertFalse(gate.coverage_refusal(proc,bad,pin,'omit_interval_contract',positive))
+        for count in (True,0,1,3,4):
+            bad = copy.deepcopy(valid)
+            bad['verification-results']['verified'] = count
+            self.assertFalse(gate.coverage_refusal(proc,bad,pin,'omit_interval_contract',positive))
+        extra = copy.deepcopy(valid)
+        extra['func-details']['unexpected::obligation'] = {}
+        self.assertFalse(gate.coverage_refusal(proc,extra,pin,'omit_interval_contract',positive))
+        self.assertFalse(gate.coverage_refusal(proc,valid,pin,'unrecognized_mutant',positive))
+
+
+for _jobs in (1,2,4):
+    for _case in ('wrong_version_no_coverage_delta','incomplete_crate_no_coverage_delta',
+                  'reported_error_no_coverage_delta','unknown_diagnostic',
+                  'resource_limit_diagnostic','valid_coverage'):
+        def _test(self, case=_case, jobs=_jobs):
+            self.run_case(case,jobs)
+        setattr(CoverageAdmission, f'test_{_case}_jobs_{_jobs}', _test)
+
+
 class NativeRuntime(unittest.TestCase):
     def test_machine_boundaries_on_the_runtime_toolchain(self):
         with tempfile.TemporaryDirectory(prefix="zeno-verus-native-") as temporary:

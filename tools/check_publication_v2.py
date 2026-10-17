@@ -5,6 +5,8 @@ Invoke under the shared heavy-check.lock. Coverage expectations are reviewed
 source, never refreshed by this gate. No evidence here authorizes a shell commit.
 """
 from __future__ import annotations
+
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import collections
 import hashlib
@@ -19,7 +21,7 @@ sys.dont_write_bytecode = True
 import check_authority_v2 as authority
 import check_original_output_v2 as output
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies
 import check_verus as verifier
 from verus_coverage import inventory, profile_inventory, require_coverage
 
@@ -50,6 +52,7 @@ SOURCES = tuple(sorted({*UNIT_SOURCES, *output.ORACLE_SOURCES, *output.NATIVE_SO
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("tools/v2_native_dependencies.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 once = output.once
 
 
@@ -131,11 +134,9 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
     return bool(intended and refusal),refusal,{'function':target,'field':field,'intended_refusal':bool(intended)}
 
 
-def native_command(source: Path, binary: Path, libraries: dict) -> list[str]:
+def native_command(source: Path, binary: Path, dependency_args: list[str]) -> list[str]:
     command = ['rustc', '+1.97.1', '--edition=2024', '--test', '--check-cfg', 'cfg(verus_keep_ghost)',
-               '--check-cfg', 'cfg(test)', '-L', 'dependency=' + str(TARGET / 'debug/deps')]
-    for name,path in sorted(libraries.items()):
-        command += ['--extern',name + '=' + path]
+               '--check-cfg', 'cfg(test)', *dependency_args]
     return [*command,str(source / HARNESS),'-o',str(binary)]
 
 
@@ -201,10 +202,11 @@ def check(directory: Path, positive_only: bool = False) -> dict:
         raise ValueError('whole publication closure not proved by exact pinned toolchain')
     coverage = require_coverage((directory/'positive/logs/crate.vir').read_text(),profile)
     print('Publication: whole-closure proof and raw translated coverage passed',flush=True)
-    native_dependency_args(ROOT, directory / 'native', env)
+    dependencies = prepare_native_dependencies(ROOT, directory / 'native', env)
     dependency_receipt=json.loads((directory/'native/native-dependencies/result.json').read_text())
     libraries={name:record['path'] for name,record in dependency_receipt['libraries'].items()}
-    verifier.require_success(run(native_command(source,directory/'native/tests',libraries),source,env,directory/'native','build'))
+    arguments = native_dependency_args(ROOT, directory/'native/positive-binding', env, prepared=dependencies)
+    verifier.require_success(run(native_command(source,directory/'native/tests',arguments),source,env,directory/'native','build'))
     native = run([str(directory/'native/tests'),'public_publication::','--test-threads=1'],source,env,directory/'native','tests')
     verifier.require_success(native)
     if '6 passed; 0 failed' not in native.stdout:
@@ -225,7 +227,8 @@ def check(directory: Path, positive_only: bool = False) -> dict:
     verifier.require_success(clippy)
     controls = []
     if not positive_only:
-        for name,(path,changed,kind) in mutations().items():
+        def run_control(control_item):
+            (name, (path, changed, kind)) = control_item
             specimen = directory/'mutations'/name
             for p in UNIT_SOURCES:
                 dest=specimen/p;dest.parent.mkdir(parents=True,exist_ok=True)
@@ -233,7 +236,8 @@ def check(directory: Path, positive_only: bool = False) -> dict:
             adjustments=adjust_specimen_source_lengths(specimen)
             refusal=None;intended=None
             if kind=='native':
-                verifier.require_success(run(native_command(specimen,specimen/'tests',libraries),specimen,env,specimen,'build'))
+                arguments = native_dependency_args(ROOT, specimen/'native-binding', env, prepared=dependencies)
+                verifier.require_success(run(native_command(specimen,specimen/'tests',arguments),specimen,env,specimen,'build'))
                 result=run([str(specimen/'tests'),'public_publication::','--test-threads=1'],specimen,env,specimen,'native')
                 killed=result.returncode==101 and 'test result: FAILED' in result.stdout and ('assertion' in result.stdout or 'panicked at' in result.stdout)
                 details={'stdout':str(specimen/'native.stdout')}
@@ -251,16 +255,20 @@ def check(directory: Path, positive_only: bool = False) -> dict:
             row={'name':name,'kind':kind,'killed':bool(killed),'exit_code':result.returncode,'source':str(path),
                  'source_sha256':verifier.digest(specimen/path),'source_array_length_adjustments':adjustments,
                  'coverage_refusal':refusal,'intended_coverage_control':intended,'result':details,'logs':str(specimen)}
-            controls.append(row)
-            (directory/'mutations.json').write_text(json.dumps(controls,indent=2,sort_keys=True)+'\n')
+            control_result = row
             print(f'Publication: {name}: {"caught" if killed else "FAILED"} ({kind})',flush=True)
             if not killed:
-                raise ValueError('semantic/coverage control survived or failed for unrelated reason: '+name)
+                raise ControlRefused(control_result, 'semantic/coverage control survived or failed for unrelated reason: '+name)
+            return control_result
+        def publish_control(control_result):
+            controls.append(control_result)
+            (directory/'mutations.json').write_text(json.dumps(controls,indent=2,sort_keys=True)+'\n')
+        run_controls(run_control, mutations().items(), timings=directory / 'control-timings.json', publish=publish_control)
     verifier.verify_tool_files(tool,pin)
     if snapshot()!=before:
         raise ValueError('publication source changed during qualification')
     return {'schema':'zeno-fcis/publication-v2-evidence/1','status':'positive_only' if positive_only else 'passed',
-        'source_sha256':before,'source_generation':generation,'toolchain':pin,'verus_report':report,
+        'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'source_generation':generation,'toolchain':pin,'verus_report':report,
         'translated_function_coverage':coverage,'coverage_modes':dict(collections.Counter(r['mode'] for r in coverage.values())),
         'native':{'exit_code':native.returncode,'output':native.stdout,'oracle_artifacts':libraries,
                   'oracle_artifact_sha256':{k:verifier.digest(Path(p)) for k,p in libraries.items()}},

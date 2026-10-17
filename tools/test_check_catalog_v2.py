@@ -2,6 +2,7 @@
 import unittest
 import copy
 import json
+from pathlib import Path
 import check_catalog_v2 as gate
 from verus_coverage import descriptor_inventory, require_coverage
 
@@ -153,6 +154,70 @@ class Controls(unittest.TestCase):
         self.assertFalse(gate.proof_control(result,"omit_policy_equality",gate.MATCHING,diagnostics))
         result["report"]["verification-results"]["encountered-vir-error"]=True
         self.assertFalse(gate.proof_control(result,"omit_unused_outbox",gate.MATCHING,diagnostics))
+
+class FailureOrder(unittest.TestCase):
+    def test_first_survivor_precedes_later_timeout_and_cli_retains_all_rows(self):
+        from contextlib import ExitStack
+        import os
+        import subprocess
+        import sys
+        import tempfile
+        from unittest.mock import patch
+        pin = (gate.ROOT/gate.verifier.PIN).read_text()
+        for jobs in (1, 2):
+            for proof_refusal in (False, True):
+                with self.subTest(jobs=jobs, proof_refusal=proof_refusal), \
+                        tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+                    root = Path(tmp)
+                    subject = Path('subject.rs')
+                    (root/subject).write_text('old')
+                    for path, content in ((gate.verifier.PIN, pin), (gate.PROFILE, '{"expected_verified":1}')):
+                        (root/path).parent.mkdir(parents=True, exist_ok=True)
+                        (root/path).write_text(content)
+                    seen = []
+                    prepared = object()
+                    def run(source, directory, command, environment):
+                        directory.mkdir(parents=True)
+                        (directory/'crate.vir').write_text('fixture')
+                        (directory/'stderr').write_text('')
+                        return {'report':{'verification-results':{'verified':1}}, 'stderr':str(directory/'stderr')}
+                    def native(source, directory, environment, **kwargs):
+                        self.assertIs(kwargs['prepared'], prepared)
+                        directory.mkdir(parents=True)
+                        positive = source == root
+                        if not positive:
+                            seen.append(source.name)
+                            if source.name == 'second-timeout':
+                                raise subprocess.TimeoutExpired('native', 1)
+                        killed = not positive and (proof_refusal or source.name == 'last-killed')
+                        (directory/'test.stdout').write_text('test result: FAILED.' if killed else
+                            'test result: ok. 8 passed; 0 failed; 0 ignored')
+                        return {'compile_exit':0, 'test_exit':101 if killed else 0, 'stdout':str(directory/'test.stdout')}
+                    controls = [(name, subject, 'old', 'new', 'proof') for name in
+                                ('first-survivor', 'second-timeout', 'last-killed')]
+                    replacements = {'ROOT':root, 'snapshot':lambda *_:{str(subject):'fixture'},
+                        'run':run, 'native_tests':native, 'prepare_native_dependencies':lambda *a:prepared,
+                        'qualified':lambda *a:True, 'observed_inventory':lambda *a:({'catalog_v2::x':{'mode':'Exec'}}, None),
+                        'require_coverage':lambda *a:None, 'require_reviewed_profile':lambda *a:None,
+                        'adjust_specimen_source_lengths':lambda *a:None, 'mutations':lambda:controls,
+                        'proof_control':lambda result, name, *a:name != 'first-survivor'}
+                    stack.enter_context(patch.dict(os.environ, {'ZENO_FCIS_CONTROL_JOBS':str(jobs)}))
+                    for name, value in replacements.items():
+                        stack.enter_context(patch.object(gate, name, value))
+                    stack.enter_context(patch.object(gate.verifier, 'prepare_tools', return_value=root/'tools'))
+                    stack.enter_context(patch.object(gate.verifier, 'verify_tool_files'))
+                    stack.enter_context(patch.object(gate.verifier, 'evidence_bindings', return_value={}))
+                    output = root/'receipt.json'
+                    stack.enter_context(patch.object(sys, 'argv', ['catalog', '--out', str(output)]))
+                    self.assertEqual(gate.main(), 1)
+                    receipt = json.loads(output.read_text())
+                    self.assertIn('first-survivor', receipt['failure'])
+                    self.assertEqual(receipt['status'], 'unfinished')
+                    self.assertEqual([r['name'] for r in receipt['mutations']], [c[0] for c in controls])
+                    self.assertEqual([r['killed'] for r in receipt['mutations']], [False, False, True])
+                    self.assertEqual(receipt['mutations'][1]['error_type'], 'TimeoutExpired')
+                    self.assertCountEqual(seen, [c[0] for c in controls])
+
 
 if __name__=="__main__":
     unittest.main()

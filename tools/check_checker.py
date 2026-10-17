@@ -6,6 +6,8 @@ owner lane skips mutation execution explicitly; CI runs the complete controls.
 """
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls as run_independent_controls
+
 import argparse
 import json
 import os
@@ -19,7 +21,7 @@ import check_verus as verifier
 import checker_controls as g10
 from check_finite_execution import once
 from v2_proof_sources import execution_sources
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, native_test_environment
 from verus_coverage import inventory, observed_inventory, parse_vir, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +107,7 @@ def source_paths(root: Path = ROOT, *, profile: bool = True) -> tuple[Path, ...]
                   Path('verification/verus/metered-execution.json'),
                   Path('tools/check_checker.py'), Path('tools/test_check_checker.py'),
                   Path('tools/check_verus.py'), Path('tools/check_finite_execution.py'),
-                  Path('tools/v2_proof_sources.py'), Path('tools/v2_native_dependencies.py'),
+                  Path('tools/v2_proof_sources.py'), *verifier.QUALIFICATION_SOURCES, Path('tools/v2_native_dependencies.py'),
                   Path('tools/verus_coverage.py'), Path('tools/atdd.py'),
                   Path('.github/workflows/verus.yml'),
                   Path('.github/workflows/ci.yml'),
@@ -197,7 +199,8 @@ def mutations(source: str, spec: str, equality: str, api: str) -> dict[str, tupl
     for name, before, after in (
         ('skip_last_tuple', 'if !advance(domains, &mut input) {', 'if visited == size - 1 || !advance(domains, &mut input) {'),
         ('repeat_carry', 'tuple[position] += 1;', 'tuple[position] += 0;'),
-        ('width_minus_one', '(max as i128) - (min as i128) + 1', '(max as i128) - (min as i128)'),
+        ('width_minus_one', 'let width = interval_width(min, max);',
+         'let width = match interval_width(min, max) { Some(width) => Some(width - 1), None => None };'),
         ('lose_trapping_usage', 'steps: usage.used(V2Resource::Step)', 'steps: 0'),
         ('wrong_strict_limit', 'if original > limit {', 'if original >= limit {'),
         ('wrong_candidate_more', 'if candidate > original {', 'if candidate >= original {'),
@@ -213,10 +216,10 @@ def mutations(source: str, spec: str, equality: str, api: str) -> dict[str, tupl
         'position -= 1;\n        let index = tuple.len().min(domains.len()) - position - 1;\n        let (min, max) = domains[index].bounds();\n        if tuple[index] < max {\n            tuple[index] += 1;')
     forward = once(forward, 'tuple[position] = min;', 'tuple[index] = min;')
     controls['first_input_fastest'] = (SUBJECT, forward, 'proof')
-    controls['wrap_product'] = (SUBJECT, once(source, 'Some(n) => n.checked_mul(width),',
-        'Some(n) => Some(n.wrapping_mul(width)),'), 'proof')
-    controls['overflow_before_late_empty'] = (SUBJECT, once(source, 'Some(n) => n.checked_mul(width),',
-        'Some(n) => match n.checked_mul(width) { Some(next) => Some(next), None => return Ok(None) },'), 'proof')
+    controls['wrap_product'] = (SUBJECT, once(source, '(Some(n), Some(width)) => n.checked_mul(width),',
+        '(Some(n), Some(width)) => Some(n.wrapping_mul(width)),'), 'proof')
+    controls['overflow_before_late_empty'] = (SUBJECT, once(source, '(Some(n), Some(width)) => n.checked_mul(width),',
+        '(Some(n), Some(width)) => match n.checked_mul(width) { Some(next) => Some(next), None => return Ok(None) },'), 'proof')
     controls['identity_before_cap'] = (SUBJECT, once(source,
         'let size = validate_pair(original, candidate, cap)?;\n    if equality::nodes',
         'let size = 1;\n    if equality::nodes'), 'proof')
@@ -469,6 +472,7 @@ def run_logged(command: list[str], cwd: Path, environment: dict, output: Path,
 
 
 def native(directory: Path, pin: dict, environment: dict) -> dict:
+    environment = native_test_environment(ROOT, environment)
     version_command = ['rustc', '+' + pin['runtime_rust'], '--version', '--verbose']
     version, _ = run_logged(version_command, ROOT, environment, directory / 'compiler')
     verifier.require_success(version)
@@ -546,9 +550,8 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
         all_controls = mutations((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(),
                                  (ROOT / EQUALITY).read_text(), (ROOT / API).read_text())
         all_controls.update(g10.mutations(ROOT))
-        for name, (path, changed, expected) in all_controls.items():
-            if expected == 'native':
-                continue
+        def run_control(control_item):
+            name, (path, changed, expected) = control_item
             specimen = out / ('control-' + name)
             for relative in source_paths():
                 target = specimen / relative
@@ -568,10 +571,10 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
                               'source_stable': specimen_before == snapshot(specimen),
                               'attribution': attribution}
                 (specimen / 'classification.json').write_text(json.dumps(classified, indent=2) + '\n')
-                controls.append(classified)
+                control_result = classified
                 if not killed or not classified['source_stable']:
                     raise ValueError(f'route control {name} survived or source changed')
-                continue
+                return control_result
             run, record = run_logged([*command, '--log-dir', str(specimen / 'vir'), str(HARNESS)], specimen, environment, specimen / 'run')
             specimen_after = snapshot(specimen)
             (specimen / 'source-after.json').write_text(json.dumps(specimen_after, indent=2) + '\n')
@@ -589,9 +592,12 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
             classified = {'name': name, 'expected': expected, 'killed': killed,
                           'source_stable': True, 'attribution': attribution}
             (specimen / 'classification.json').write_text(json.dumps(classified, indent=2) + '\n')
-            controls.append(classified)
+            control_result = classified
             if not killed:
                 raise ValueError(f'control {name} survived or failed for another reason')
+            return control_result
+        proof_controls = [(name, control) for name, control in all_controls.items() if control[2] != "native"]
+        controls.extend(run_independent_controls(run_control, proof_controls, timings=out / "control-timings.json"))
         from checker_native_controls import run_controls
         controls.extend(run_controls(ROOT, out / 'native-controls', environment,
                                      all_controls, run_logged))
@@ -603,7 +609,7 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool,
     return {'schema': 'zeno-fcis/shared-checker-evidence/1', 'status': status,
             'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'working_tree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
-            'source_sha256': before, 'toolchain': pin, 'verus_report': report,
+            'source_sha256': before, "source_bindings": verifier.evidence_bindings(before, HARNESS), 'toolchain': pin, 'verus_report': report,
             'translated_function_coverage': coverage, 'native': native_report, 'mutations': controls,
             'review_accepted': not refresh and profile.get('reviewed') is True,
             'unproved': ['canonical byte importer and scalar adapter refinement', 'compiler correctness and binary equivalence',

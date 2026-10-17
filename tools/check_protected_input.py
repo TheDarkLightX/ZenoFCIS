@@ -7,6 +7,8 @@ cannot prove. Neither result closes the raw-state or mandatory-authority bridge.
 """
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 from contextlib import nullcontext
 import json
@@ -19,7 +21,7 @@ import tempfile
 import zipfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, native_test_environment
 from verus_coverage import profile_inventory
 import check_verus as verifier
 from check_finite_execution import once
@@ -51,6 +53,7 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 
 
 PROOF_FUNCTIONS = {
@@ -214,6 +217,7 @@ def coverage_control(vir, profile, name):
     return intended, refusal
 
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
+    environment = native_test_environment(ROOT, environment)
     rust = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024",
             "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)"]
     rust += native_dependency_args(ROOT, directory, environment)
@@ -286,8 +290,8 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
         coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
         native = native_checks(directory, pin, environment)
         print("V2 input: exact proof coverage and native/API boundaries passed", flush=True)
-        for name, (path, changed, expected) in mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(),
-                                                                 (ROOT / TYPED).read_text()).items():
+        def run_control(control_item):
+            (name, (path, changed, expected)) = control_item
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
@@ -320,20 +324,24 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                 killed = (mutant.returncode == 0 and verifier.proof_succeeded(mutant_report, pin)
                           and not verifier.ERROR_HEADER.search(mutant.stderr)
                           and not verifier.NON_SEMANTIC.search(mutant.stderr) and intended)
-            mutations.append({"name": name, "expected_failure": expected, "killed": killed,
+            control_result = {"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": coverage_error, "logs": str(specimen)})
-            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+                              "coverage_refusal": coverage_error, "logs": str(specimen)}
             if not killed:
-                raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
+                raise ControlRefused(control_result, f"mutation {name} survived or failed for an unrelated reason")
             print(f"V2 input: caught {name} ({expected})", flush=True)
+            return control_result
+        def publish_control(control_result):
+            mutations.append(control_result)
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+        run_controls(run_control, mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(), (ROOT / TYPED).read_text()).items(), timings=directory / 'control-timings.json', publish=publish_control)
     verifier.verify_tool_files(tools, pin)
     if before != snapshot():
         raise RuntimeError("meter proof or integration source changed during verification")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
     return {"schema": "zeno-fcis/protected-input-evidence/1", "status": "passed",
-            "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before,
+            "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
             "toolchain": pin, "command": positive_command, "exit_code": positive.returncode,
             "verus_report": report, "translated_function_coverage": coverage,
             "operational_order_evidence": "reviewed body inventory; cached header/field parsing before charge verifies but is refused",

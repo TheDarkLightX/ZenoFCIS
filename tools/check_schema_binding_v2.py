@@ -2,6 +2,8 @@
 """Check complete original schema bytes, closed metadata and private custody."""
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 import json
 import os
@@ -13,7 +15,7 @@ import tempfile
 import zipfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 from verus_coverage import profile_inventory
 import check_verus as verifier
 from check_finite_execution import once
@@ -81,6 +83,7 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
                                 Path("tools/verus_contract_controls.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 
 
 def snapshot() -> dict[str, str]:
@@ -199,12 +202,13 @@ def coverage_control(vir, profile, name):
             and actual[target]['body_sha256'] != expected[target]['body_sha256'])
     return intended, refusal
 
-def native_check(directory: Path, cwd: Path, pin: dict, environment: dict) -> dict:
+def native_check(directory: Path, cwd: Path, pin: dict, environment: dict, *, prepared=None) -> dict:
+    environment = native_test_environment(cwd, environment)
     executable = directory / "schema-binding-tests"
     command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
         "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
         str(HARNESS), "-o", str(executable)]
-    command += native_dependency_args(ROOT, directory, environment)
+    command += native_dependency_args(ROOT, directory, environment, prepared=prepared)
     build = verifier.run(command, cwd, environment)
     (directory / "native-build.stdout").write_text(build.stdout)
     (directory / "native-build.stderr").write_text(build.stderr)
@@ -244,7 +248,8 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
     if not verifier.accepted(report, report_pin):
         raise RuntimeError("schema proof lacks pinned tools or complete obligation coverage")
     coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
-    native = native_check(directory, ROOT, pin, environment)
+    dependencies = prepare_native_dependencies(ROOT, directory / 'common-native', environment)
+    native = native_check(directory, ROOT, pin, environment, prepared=dependencies)
     if native["build_exit"] or native["exit_code"]:
         raise RuntimeError("independent schema native comparison failed")
     public_command = ["cargo", f"+{pin['runtime_rust']}", "test", "--locked", "--offline",
@@ -255,8 +260,8 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
     verifier.require_success(public)
     print("V2 schema: exact proof, complete coverage and independent native comparisons passed", flush=True)
     mutations = []
-    for name, (path, changed, expected) in mutation_sources(
-        (ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text(), (ROOT / SPEC).read_text()).items():
+    def run_control(control_item):
+        (name, (path, changed, expected)) = control_item
         specimen = directory / name
         for unit in UNIT_SOURCES:
             target = specimen / unit
@@ -280,7 +285,7 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
         if expected == "proof":
             killed = proof_rejected(mutant, report_for_control, pin, profile,
                 name, path, changed, specimen)
-            mutant_native = native_check(specimen, specimen, pin, environment)
+            mutant_native = native_check(specimen, specimen, pin, environment, prepared=dependencies)
             killed = killed and mutant_native["build_exit"] == 0 and mutant_native["exit_code"] not in (None, 0)
         elif expected == "proof_contract":
             # Runtime code is unchanged, so no native test can fail; the positive
@@ -304,18 +309,22 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
             "exit_code": mutant.returncode, "verification_results": result,
             "coverage_refusal": refusal, "contract_outcome": outcome,
             "native": mutant_native, "logs": str(specimen)}
-        mutations.append(row)
-        (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+        control_result = row
         if not killed:
-            raise RuntimeError(f"schema mutation {name} survived or failed for an unrelated reason")
+            raise ControlRefused(control_result, f"schema mutation {name} survived or failed for an unrelated reason")
         print(f"V2 schema: caught {name} ({expected})", flush=True)
+        return control_result
+    def publish_control(control_result):
+        mutations.append(control_result)
+        (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+    run_controls(run_control, mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text(), (ROOT / SPEC).read_text()).items(), timings=directory / 'control-timings.json', publish=publish_control)
     verifier.verify_tool_files(tools, pin)
     if before != snapshot():
         raise RuntimeError("schema proof or native integration source changed during verification")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
     return {"schema": "zeno-fcis/schema-binding-evidence/1", "status": "passed",
-        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before,
+        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
         "toolchain": pin, "command": positive_command, "exit_code": positive.returncode,
         "verus_report": report, "translated_function_coverage": coverage,
         "native": native, "public_native": {"command": public_command, "exit_code": public.returncode, "test_output": public.stdout},

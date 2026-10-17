@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check actual-source complete typed decisions; byte/authority composition is separate."""
 from __future__ import annotations
+
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import json
 import os
@@ -8,7 +10,7 @@ import re
 from pathlib import Path
 import subprocess
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 import check_verus as verifier
 from check_metered_execution import UNIT_SOURCES as BASE
 from verus_contract_controls import contract_rejected
@@ -44,6 +46,7 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
                                 Path("tools/verus_contract_controls.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 
 def once(source,before,after):
     tokens=re.findall(r'\w+|[^\w\s]',before)
@@ -137,10 +140,11 @@ def coverage_control(vir, profile, name):
     return intended, refusal
 
 
-def native(directory,environment,root,filtered=False):
+def native(directory,environment,root,filtered=False,*,prepared=None):
+    environment = native_test_environment(root, environment)
     binary=directory/'native-tests'
     args=['rustc','+1.97.1','--edition=2024','--test','--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',str(HARNESS),'-o',str(binary)]
-    args += native_dependency_args(ROOT, directory, environment)
+    args += native_dependency_args(ROOT, directory, environment, prepared=prepared)
     build=verifier.run(args,root,environment,timeout=180)
     (directory/'native-build.stdout').write_text(build.stdout)
     (directory/'native-build.stderr').write_text(build.stderr)
@@ -165,13 +169,15 @@ def check(out:Path,positive_only=False):
     verifier.require_success(positive);report=json.loads(positive.stdout)
     if not verifier.accepted(report,report_pin):raise RuntimeError('unaccepted whole-crate proof/toolchain/inventory count')
     coverage=require_coverage((evidence/'positive/crate.vir').read_text(),profile)
-    base_native=native(evidence,env,ROOT)
+    dependencies=prepare_native_dependencies(ROOT,evidence/'common-native',env)
+    base_native=native(evidence,env,ROOT,prepared=dependencies)
     (evidence/'native.stdout').write_text(base_native.stdout);(evidence/'native.stderr').write_text(base_native.stderr)
     verifier.require_success(base_native)
     print('Complete decision positive proof, coverage and native tests passed',flush=True)
     results=[]
     if not positive_only:
-        for name,(path,changed,expected,native_control) in mutations((ROOT/SUBJECT).read_text(),(ROOT/SPEC).read_text()).items():
+        def run_control(control_item):
+            (name, (path, changed, expected, native_control)) = control_item
             specimen=evidence/'specimens'/name
             if specimen.exists():raise ValueError('use a fresh evidence directory')
             for unit in (*UNIT_SOURCES,*TEST_SOURCES):
@@ -199,14 +205,18 @@ def check(out:Path,positive_only=False):
                     and not verifier.NON_SEMANTIC.search(proof.stderr))
             native_status=None
             if native_control:
-                n=native(specimen,env,specimen,True);native_status=n.returncode
+                n=native(specimen,env,specimen,True,prepared=dependencies);native_status=n.returncode
                 (evidence/f'{name}.native.stdout').write_text(n.stdout);(evidence/f'{name}.native.stderr').write_text(n.stderr)
                 killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout
-            results.append(dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status,
-                command=proof_command,changed_source=str(path),original_sha256=before[str(path)],changed_sha256=verifier.digest(specimen/path),contract_outcome=outcome))
-            (evidence/'mutations.json').write_text(json.dumps(results,indent=2,sort_keys=True)+'\n')
-            if not killed:raise RuntimeError(f'mutation {name} survived or failed for unrelated reason: {results[-1]}')
+            control_result = dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status,
+                command=proof_command,changed_source=str(path),original_sha256=before[str(path)],changed_sha256=verifier.digest(specimen/path),contract_outcome=outcome)
+            if not killed:raise ControlRefused(control_result, f'mutation {name} survived or failed for unrelated reason: {control_result}')
             print(f'Caught {name} ({expected}; native={native_status})',flush=True)
+            return control_result
+        def publish_control(control_result):
+            results.append(control_result)
+            (evidence/'mutations.json').write_text(json.dumps(results,indent=2,sort_keys=True)+'\n')
+        run_controls(run_control, mutations((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text()).items(), timings=evidence / 'control-timings.json', publish=publish_control)
     if before!=snapshot():raise RuntimeError('source drift during gate')
     verifier.verify_tool_files(tool,pin)
     return dict(schema='zeno-fcis/decision-v2-evidence/1',status='passed',revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),source_sha256=before,verus_report=report,translated_function_coverage=coverage,mutations=results,native_exit_code=base_native.returncode,proof_exit_code=positive.returncode,positive_only=positive_only,

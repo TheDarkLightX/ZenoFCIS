@@ -72,10 +72,10 @@ def fingerprint(node: list) -> str:
 
 
 def _inventory(source: str, namespace: str, body_functions: tuple[str, ...],
-               declaration_modes: dict[str, str]) -> tuple[dict, dict]:
+               declaration_modes: dict[str, str], nodes=None) -> tuple[dict, dict]:
     functions = {}
     declarations = {}
-    for node in parse_vir(source):
+    for node in parse_vir(source) if nodes is None else nodes:
         if not node or node[0] != "Function":
             continue
         if (len(node) < 4 or not isinstance(node[1], list)
@@ -125,13 +125,13 @@ def _inventory(source: str, namespace: str, body_functions: tuple[str, ...],
     return dict(sorted(functions.items())), dict(sorted(declarations.items()))
 
 
-def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = ()) -> dict:
+def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = (), *, _nodes=None) -> dict:
     """Strict concrete-body inventory; abstract declarations are refused."""
-    return _inventory(source, namespace, body_functions, {})[0]
+    return _inventory(source, namespace, body_functions, {}, _nodes)[0]
 
 
 def descriptor_inventory(source: str, namespace: str, descriptor_prefix: str,
-                         body_functions: tuple[str, ...] = ()) -> tuple[dict, dict]:
+                         body_functions: tuple[str, ...] = (), *, _nodes=None) -> tuple[dict, dict]:
     """Retain the two closed descriptor declarations separately from real bodies.
 
     The pinned VIR names both sealed implementations explicitly. Missing bodies,
@@ -148,7 +148,7 @@ def descriptor_inventory(source: str, namespace: str, descriptor_prefix: str,
     implementations = {descriptor_prefix + f"impl&%{index}::{method}": mode
                        for index in (2, 3) for method, mode in (("model", "Spec"), ("project", "Exec"))}
     bodies = tuple(dict.fromkeys((*body_functions, *implementations)))
-    functions, abstract = _inventory(source, namespace, bodies, declarations)
+    functions, abstract = _inventory(source, namespace, bodies, declarations, _nodes)
     for name, mode in implementations.items():
         record = functions.get(name)
         if (record is None or record["mode"] != mode or "body_sha256" not in record
@@ -190,6 +190,10 @@ def require_coverage(source: str, profile: dict) -> dict:
             or not profile["namespace"].endswith("::")
             or not isinstance(profile.get("functions"), dict) or not profile["functions"]):
         raise ValueError("malformed VIR coverage profile")
+    nodes = None
+    if "compiler_id_reference" in profile:
+        from verus_ids import restore
+        nodes = restore(parse_vir(source), profile["namespace"], profile["compiler_id_reference"])
     body_functions = profile.get("body_covered_functions", [])
     if (not isinstance(body_functions, list)
             or any(not isinstance(name, str) for name in body_functions)
@@ -201,12 +205,12 @@ def require_coverage(source: str, profile: dict) -> dict:
             raise ValueError("malformed descriptor declaration coverage")
         prefix = profile["namespace"] + "execution_v2::composition::descriptor::"
         observed, actual_declarations = descriptor_inventory(
-            source, profile["namespace"], prefix, tuple(body_functions)
+            source, profile["namespace"], prefix, tuple(body_functions), _nodes=nodes
         )
         if actual_declarations != declarations:
             raise ValueError("translated descriptor declarations changed")
     else:
-        observed = inventory(source, profile["namespace"], tuple(body_functions))
+        observed = inventory(source, profile["namespace"], tuple(body_functions), _nodes=nodes)
     if any(name not in observed or observed[name]["mode"] != "Exec" for name in body_functions):
         raise ValueError("operational body coverage names a missing or non-runtime function")
     expected = profile["functions"]

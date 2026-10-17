@@ -8,6 +8,8 @@ Receipts never authorize execution or publication.
 """
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 import json
 import os
@@ -18,7 +20,7 @@ import subprocess
 
 import check_authority_v2 as authority
 import check_laws_v2 as legacy
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 import check_verus as verifier
 from check_finite_execution import once
 from verus_coverage import inventory, observed_inventory, profile_inventory, require_coverage
@@ -208,11 +210,11 @@ NATIVE_ORACLES = {'shrink_delivery_ordinals': (ORDINAL_TEST, native_ordinal_refu
     'change_declared_law_order': (LAW_ORDER_TEST, native_law_order_refusal)}
 
 
-def native_commands(out, env, cwd, name, filtered=False, exact=None):
+def native_commands(out, env, cwd, name, filtered=False, exact=None, *, prepared=None):
     rust = ['rustc', '+1.97.1', '--edition=2024', '--check-cfg', 'cfg(verus_keep_ghost)', '--check-cfg', 'cfg(test)']
-    binary = out / 'native-current'
-    native_env = {**env, 'CARGO_MANIFEST_DIR': str(cwd / 'crates/zeno-fcis-synthesis')}
-    rust += native_dependency_args(ROOT, out / (name + '.deps'), env)
+    binary = out / (name + '-native')
+    native_env = native_test_environment(cwd, env)
+    rust += native_dependency_args(ROOT, out / (name + '.deps'), env, prepared=prepared)
     build = saved_run([*rust, '--test', str(HARNESS), '-o', str(binary)], cwd, native_env, out, name + '.build', 240)
     verifier.require_success(build)
     command = [str(binary), '--test-threads=1']
@@ -319,7 +321,8 @@ def check(out, refresh=False, positive_only=False, selected=None):
     if not verifier.accepted(report, {**pin, 'expected_verified': profile['expected_verified'], 'target_functions': profile['target_functions']}):
         raise ValueError('inexact pinned report')
     before = snapshot()
-    native = native_commands(out, env, ROOT, 'positive')
+    dependencies = prepare_native_dependencies(ROOT, out / 'common-native', env)
+    native = native_commands(out, env, ROOT, 'positive', prepared=dependencies)
     verifier.require_success(native)
     no_std = saved_run(['rustc', '+1.97.1', '--edition=2024', '--check-cfg', 'cfg(verus_keep_ghost)',
         '--check-cfg', 'cfg(test)', '--crate-type=rlib', str(HARNESS), '-o', str(out / 'libguarded_laws.rlib')], ROOT, env, out, 'no-std', 240)
@@ -332,7 +335,8 @@ def check(out, refresh=False, positive_only=False, selected=None):
             if set(selected) - set(mutations):
                 raise ValueError('unknown mutation selection')
             mutations = {name: mutations[name] for name in selected}
-        for name, control in mutations.items():
+        def run_control(control_item):
+            (name, control) = control_item
             specimen = out / 'specimens' / name
             if specimen.exists():
                 raise ValueError('use a fresh evidence directory; never overwrite prior specimens')
@@ -350,7 +354,7 @@ def check(out, refresh=False, positive_only=False, selected=None):
             refusal = None
             if control['kind'] == 'native':
                 test, oracle = NATIVE_ORACLES[name]
-                n = native_commands(out, env, specimen, name, exact=test)
+                n = native_commands(out, env, specimen, name, exact=test, prepared=dependencies)
                 killed, intended = oracle(native, n)
             else:
                 proc = saved_run(proof_command(command, out / name), specimen, env, out, name)
@@ -364,7 +368,7 @@ def check(out, refresh=False, positive_only=False, selected=None):
                         and matched and not verifier.ERROR_HEADER.search(proc.stderr)
                         and not verifier.NON_SEMANTIC.search(proc.stderr))
                 if control['native']:
-                    n = native_commands(out, env, specimen, name, True)
+                    n = native_commands(out, env, specimen, name, True, prepared=dependencies)
                     killed = killed and n.returncode != 0 and 'test result: FAILED' in n.stdout
             failed_tests = [] if n is None else re.findall(r'^test (\S+) \.\.\. FAILED$', n.stdout, re.M)
             if n is not None:
@@ -380,15 +384,19 @@ def check(out, refresh=False, positive_only=False, selected=None):
                 'native_failed_tests': failed_tests, 'mutated_path': str(control['path']),
                 'mutated_sha256': verifier.digest(specimen / control['path']),
                 'generated_sha256': verifier.digest(specimen / authority.EVALUATOR)}
-            results.append(row)
-            (out / 'control-progress.json').write_text(json.dumps({'source_sha256': before, 'controls': results}, indent=2, sort_keys=True) + '\n')
+            control_result = row
             if not killed:
-                raise RuntimeError(f'control survived or unrelated failure: {name}; inspect retained target and logs')
+                raise ControlRefused(control_result, f'control survived or unrelated failure: {name}; inspect retained target and logs')
             print(f'Caught {name} ({control["kind"]})', flush=True)
+            return control_result
+        def publish_control(control_result):
+            results.append(control_result)
+            (out / 'control-progress.json').write_text(json.dumps({'source_sha256': before, "source_bindings": verifier.evidence_bindings(before, HARNESS), 'controls': results}, indent=2, sort_keys=True) + '\n')
+        run_controls(run_control, mutations.items(), timings=out / 'control-timings.json', publish=publish_control)
     if initial != snapshot(True) or before != snapshot():
         raise ValueError('source drift during guarded-law checks')
     verifier.verify_tool_files(tool, pin)
-    return {'schema': 'zeno-fcis/guarded-laws-evidence/1', 'status': 'passed', 'source_sha256': before,
+    return {'schema': 'zeno-fcis/guarded-laws-evidence/1', 'status': 'passed', 'source_sha256': before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
         'source_generation': generation, 'verus_report': report, 'translated_function_coverage': coverage,
         'proof_exit': positive.returncode, 'native_exit': native.returncode, 'no_std_exit': no_std.returncode,
         'custody_refusals': custody,

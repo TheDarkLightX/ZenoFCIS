@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check exact canonical artifacts on their complete registered source closure."""
 from __future__ import annotations
+
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import json
 import os
@@ -12,6 +14,8 @@ import check_verus as verifier
 import evaluator_identity as evaluator
 from verus_coverage import descriptor_inventory, inventory, require_coverage
 from verus_coverage import observed_inventory
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
+from v2_proof_sources import NATIVE_TEST_DATA
 ROOT=Path(__file__).resolve().parents[1]
 HARNESS=Path('verification/verus/authority_v2.rs')
 PROFILE=Path('verification/verus/authority_v2.json')
@@ -81,7 +85,7 @@ def adjust_specimen_source_lengths(specimen):
 
 def sources():
     closure=sorted(p.relative_to(ROOT) for d in ('evaluation','canonical_v2','execution_v2') for p in (ROOT/BASE/d).rglob('*.rs'))
-    paths=[HARNESS,PUBLIC_TEST,Path("crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs"),Path("verification/verus/evaluator_encoding_vector.txt"),*closure,Path('crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs'),PROFILE,verifier.PIN,
+    paths=[Path("tools/v2_native_dependencies.py"),Path("tools/v2_proof_sources.py"),*NATIVE_TEST_DATA,HARNESS,PUBLIC_TEST,Path("crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs"),Path("verification/verus/evaluator_encoding_vector.txt"),*closure,Path('crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs'),PROFILE,verifier.PIN,
         Path('tools/check_authority_v2.py'),Path('tools/test_check_authority_v2.py'),Path('tools/evaluator_identity.py'),Path('tools/test_evaluator_identity.py'),Path('tools/check_evaluator_replay.py'),Path('tools/check_verus.py'),Path('tools/verus_coverage.py'),Path('tools/check_decision_v2.py'),Path('tools/check_metered_execution.py'),Path('tools/check_finite_execution.py'),Path('README.md')]
     if (ROOT/SOURCE_MANIFEST).exists():
         names=source_manifest(ROOT/SOURCE_MANIFEST)['paths']
@@ -94,7 +98,7 @@ def sources():
             raise ValueError('invalid native authority test source closure')
         for name in tests['paths']:evaluator.read_regular(ROOT/name)
         paths.extend([SOURCE_MANIFEST,EVALUATOR,test_manifest,*map(Path,names),*map(Path,tests['paths'])])
-    return list(dict.fromkeys(paths))
+    return list(dict.fromkeys([*paths, *verifier.QUALIFICATION_SOURCES]))
 
 def snapshot(skip_profile=False):
     paths=[p for p in sources() if not(skip_profile and p==PROFILE)]
@@ -313,27 +317,15 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     profile=json.loads((ROOT/PROFILE).read_text());coverage=require_coverage(vir,profile)
     if not verifier.accepted(report,{**pin,'expected_verified':profile['expected_verified'],'target_functions':profile['target_functions']}):raise RuntimeError('toolchain or exact function count mismatch')
     before=snapshot()
-    target=Path(os.environ.get('CARGO_TARGET_DIR',ROOT/'target'))
-    native_build_env={**env,'CARGO_TARGET_DIR':str(target),'CARGO_INCREMENTAL':'0'}
-    oracle_build=verifier.run(['cargo',f"+{pin['runtime_rust']}",'build','--locked','--offline',
-        '-p','zeno-fcis-codec','--message-format=json'],ROOT,native_build_env,timeout=600)
-    (out/'positive.oracle-build.stdout').write_text(oracle_build.stdout)
-    (out/'positive.oracle-build.stderr').write_text(oracle_build.stderr)
-    verifier.require_success(oracle_build)
-    libraries={}
-    for line in oracle_build.stdout.splitlines():
-        item=json.loads(line)
-        if item.get('reason')=='compiler-artifact' and item['target']['name'] in ('zeno_fcis_codec','zeno_fcis_value'):
-            libraries[item['target']['name']]=next(p for p in item['filenames'] if p.endswith('.rlib'))
-    if set(libraries)!={'zeno_fcis_codec','zeno_fcis_value'}:
-        raise RuntimeError('independent original codec/value oracle artifacts missing')
-    rust=['rustc',f"+{pin['runtime_rust']}",'--edition=2024','--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)',
-        '-L','dependency='+str(target/'debug/deps')]
-    for name,path in sorted(libraries.items()):rust.extend(['--extern',name+'='+path])
+    target=Path(env.get('CARGO_TARGET_DIR',str(ROOT/'target')))
+    target.mkdir(parents=True,exist_ok=True)
+    dependencies=prepare_native_dependencies(ROOT,out/'native-dependencies',env)
+    rust=['rustc',f"+{pin['runtime_rust']}",'--edition=2024','--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)']
     def native(cwd,name,filtered=False):
         binary=out/(name+'-native')
-        native_env={**env,'CARGO_MANIFEST_DIR':str(cwd/'crates/zeno-fcis-synthesis')}
-        build=verifier.run([*rust,'--test',str(HARNESS),'-o',str(binary)],cwd,native_env,timeout=180)
+        native_env=native_test_environment(cwd,env)
+        arguments=native_dependency_args(ROOT,out/(name+'.deps'),env,prepared=dependencies)
+        build=verifier.run([*rust,*arguments,'--test',str(HARNESS),'-o',str(binary)],cwd,native_env,timeout=180)
         (out/(name+'.build.stdout')).write_text(build.stdout);(out/(name+'.build.stderr')).write_text(build.stderr)
         verifier.require_success(build)
         args=[str(binary),'--test-threads=1']
@@ -341,10 +333,11 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
         (out/(name+'.native.stdout')).write_text(proc.stdout);(out/(name+'.native.stderr')).write_text(proc.stderr)
         return proc
     native_result=native(ROOT,'positive');verifier.require_success(native_result)
-    no_std=verifier.run([*rust,'--crate-type=rlib',str(HARNESS),'-o',str(out/'libauthority_v2.rlib')],ROOT,env,timeout=180)
+    bound_rust=[*rust,*native_dependency_args(ROOT,out/'custody-deps',env,prepared=dependencies)]
+    no_std=verifier.run([*bound_rust,'--crate-type=rlib',str(HARNESS),'-o',str(out/'libauthority_v2.rlib')],ROOT,env,timeout=180)
     (out/'positive.no_std.stdout').write_text(no_std.stdout);(out/'positive.no_std.stderr').write_text(no_std.stderr)
     verifier.require_success(no_std)
-    custody=custody_controls(out,rust,env)
+    custody=custody_controls(out,bound_rust,env)
     results=[]
     if not positive_only:
         controls=mutations()
@@ -353,7 +346,8 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
             if unknown:raise ValueError(f'unknown controls: {sorted(unknown)}')
             controls={name:controls[name] for name in selected}
         temporary=out/'source-mutants';temporary.mkdir()
-        for name,(path,changed,expected,native_control) in controls.items():
+        def run_control(control_item):
+            (name, (path, changed, expected, native_control)) = control_item
             specimen=Path(temporary)/name
             for unit in sources():
                 target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
@@ -374,7 +368,7 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
             failed_tests=[] if n is None else re.findall(r'^test (\S+) \.\.\. FAILED$',n.stdout,re.MULTILINE)
             if n is not None:killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout and bool(failed_tests)
             if name.startswith(('getter_','constructor_','approved_source_')) and n is not None:killed=killed and any(t.startswith('public_authority::') for t in failed_tests)
-            row={'name':name,'expected':expected,'killed':killed,'proof_exit':proc.returncode,'verification_results':r,'coverage_refusal':refusal,'intended_coverage_control':intended,'source_array_length_adjustments':adjustments,'native_exit':None if n is None else n.returncode};results.append(row)
+            row={'name':name,'expected':expected,'killed':killed,'proof_exit':proc.returncode,'verification_results':r,'coverage_refusal':refusal,'intended_coverage_control':intended,'source_array_length_adjustments':adjustments,'native_exit':None if n is None else n.returncode};control_result = row
             row['proof_command']=proc.args
             row['mutated_path']=str(path);row['mutated_sha256']=verifier.digest(specimen/path);row['native_failed_tests']=failed_tests
             retained=out/'specimens'/name;retained.mkdir(parents=True)
@@ -382,12 +376,16 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
             for changed_path in dict.fromkeys([path,EVALUATOR]):
                 saved=retained/changed_path;saved.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(specimen/changed_path,saved)
                 row['retained_source_sha256'][str(changed_path)]=verifier.digest(saved)
-            (out/'control-progress.json').write_text(json.dumps({'source_sha256':before,'controls':results},sort_keys=True,indent=2)+'\n')
-            if not killed:raise RuntimeError(f'mutation survived or unrelated failure: {row}')
+            if not killed:raise ControlRefused(control_result, f'mutation survived or unrelated failure: {row}')
             print(f'Caught {name} ({expected})',flush=True)
+            return control_result
+        def publish_control(control_result):
+            results.append(control_result)
+            (out/'control-progress.json').write_text(json.dumps({'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'controls':results},sort_keys=True,indent=2)+'\n')
+        run_controls(run_control, controls.items(), timings=out / 'control-timings.json', publish=publish_control)
     if initial!=snapshot(True) or before!=snapshot():raise RuntimeError('source drift during checks')
     verifier.verify_tool_files(tool,pin)
-    return {'schema':'zeno-fcis/authority-v2-evidence/1','status':'passed','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'source_sha256':before,'source_generation':generation,'verus_report':report,'translated_function_coverage':coverage,'mutations':results,'custody_controls':custody,'proof_exit':positive.returncode,'native_exit':native_result.returncode,'no_std_exit':no_std.returncode,'positive_only':positive_only,'selected_controls':selected,'all_mutation_controls':not positive_only and not selected,'unproved':['compiler/platform/allocator and external shell','root combined Miri/ATDD/template/law and ledger/migration integration','whole V2 release and exact-head review/CI']}
+    return {'schema':'zeno-fcis/authority-v2-evidence/1','status':'passed','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'source_generation':generation,'verus_report':report,'translated_function_coverage':coverage,'mutations':results,'custody_controls':custody,'proof_exit':positive.returncode,'native_exit':native_result.returncode,'no_std_exit':no_std.returncode,'positive_only':positive_only,'selected_controls':selected,'all_mutation_controls':not positive_only and not selected,'unproved':['compiler/platform/allocator and external shell','root combined Miri/ATDD/template/law and ledger/migration integration','whole V2 release and exact-head review/CI']}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path);p.add_argument('--refresh-coverage',action='store_true');p.add_argument('--positive-only',action='store_true');p.add_argument('--controls',nargs='+');p.add_argument('--generate-sources',type=Path);p.add_argument('--check-sources',action='store_true');a=p.parse_args()

@@ -6,6 +6,8 @@ runtime or release authority. --development retains failures without accepting
 an unfrozen coverage manifest; only an ordinary run can produce status passed.
 """
 from __future__ import annotations
+
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import json
 import re
@@ -16,7 +18,7 @@ import subprocess
 import sys
 import time
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 import check_verus as verifier
 from verus_coverage import inventory, observed_inventory, profile_inventory, require_coverage
 
@@ -44,7 +46,7 @@ def sources(root: Path) -> list[Path]:
     if (root / PROFILE).exists():
         paths.append(PROFILE)
     paths += list(execution_sources(root))
-    paths += [Path("tools/v2_proof_sources.py"), Path("verification/verus/authority_v2_sources.json")]
+    paths += [Path("tools/v2_proof_sources.py"), *verifier.QUALIFICATION_SOURCES, Path("verification/verus/authority_v2_sources.json")]
     paths.append(Path("tools/v2_native_dependencies.py"))
     return sorted(set(paths))
 
@@ -90,7 +92,7 @@ def run(root: Path, directory: Path, command: list[str], environment: dict) -> d
     directory.mkdir(parents=True, exist_ok=False)
     cmd = [*command, "--log-dir", str(directory), str(HARNESS)]
     started = time.monotonic()
-    process = subprocess.run(cmd, cwd=root, env=environment, capture_output=True, text=True, timeout=1200)
+    process = verifier.run(cmd, root, environment, timeout=1200)
     (directory / "stdout.json").write_text(process.stdout)
     (directory / "stderr.log").write_text(process.stderr)
     try:
@@ -102,7 +104,8 @@ def run(root: Path, directory: Path, command: list[str], environment: dict) -> d
             "stdout": str(directory/"stdout.json"), "stderr": str(directory/"stderr.log")}
 
 
-def native_tests(root: Path, directory: Path, environment: dict) -> dict:
+def native_tests(root: Path, directory: Path, environment: dict, *, prepared=None) -> dict:
+    environment = native_test_environment(root, environment)
     directory.mkdir(parents=True, exist_ok=False)
     executable = directory / "catalog-tests"
     commands = [
@@ -111,11 +114,11 @@ def native_tests(root: Path, directory: Path, environment: dict) -> dict:
          "-o", str(executable)],
         [str(executable), "execution_v2::catalog::tests::", "--test-threads=1"],
     ]
-    commands[0] += native_dependency_args(ROOT, directory, environment)
+    commands[0] += native_dependency_args(ROOT, directory, environment, prepared=prepared)
     result = {"compile_exit": None, "test_exit": None, "commands": commands,
               "stdout": str(directory / "test.stdout"), "stderr": str(directory / "test.stderr")}
     for label, command in zip(("compile", "test"), commands):
-        process = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True, timeout=120)
+        process = verifier.run(command, root, environment, timeout=120)
         (directory / (label + ".stdout")).write_text(process.stdout)
         (directory / (label + ".stderr")).write_text(process.stderr)
         result[label + "_exit"] = process.returncode
@@ -221,7 +224,7 @@ def check(args) -> dict:
     directory.mkdir(parents=True, exist_ok=False)
     positive = run(ROOT, directory/"positive", command, environment)
     receipt = {"schema":"zeno-fcis/catalog-evidence/1", "status":"unfinished",
-               "source_sha256":before, "toolchain":pin, "positive":positive, "mutations":[],
+               "source_sha256":before, "source_bindings": verifier.evidence_bindings(before, HARNESS), "toolchain":pin, "positive":positive, "mutations":[],
                "nonclaims":["combined V2 qualification", "frontend intent", "recomputed schema SHA", "release authority"]}
     if not qualified(positive,pin):
         receipt["failure"] = "Whole-source positive proof did not qualify; inspect retained diagnostics."
@@ -249,25 +252,26 @@ def check(args) -> dict:
     require_coverage(vir,profile)
     if profile["expected_verified"] != positive["report"]["verification-results"]["verified"]:
         raise ValueError("verification count differs from reviewed profile")
-    receipt["positive_native"] = native_tests(ROOT, directory/"positive-native", environment)
+    dependencies = prepare_native_dependencies(ROOT, directory/"common-native", environment)
+    receipt["positive_native"] = native_tests(ROOT, directory/"positive-native", environment, prepared=dependencies)
     native_positive = receipt["positive_native"]
     if (native_positive["compile_exit"] != 0 or native_positive["test_exit"] != 0
             or "test result: ok. 8 passed; 0 failed; 0 ignored" not in Path(native_positive["stdout"]).read_text()):
         receipt["failure"] = "Positive native catalog fixtures did not qualify"
         return receipt
-    for name,path,old,new,expected in mutations():
+    def run_control(control_item):
+        name, path, old, new, expected = control_item
         specimen = directory/name
         for unit in before:
             target = specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(ROOT/unit,target)
         target=specimen/path;target.write_text(replace_once(target.read_text(),old,new))
         adjust_specimen_source_lengths(specimen)
-        native = native_tests(specimen, specimen/"native", environment) if expected=="proof" else None
+        native = native_tests(specimen, specimen/"native", environment, prepared=dependencies) if expected=="proof" else None
         if native is not None and (native["compile_exit"] != 0 or native["test_exit"] != 101
                                    or "test result: FAILED." not in Path(native["stdout"]).read_text()):
-            receipt["mutations"].append({"name":name,"expected":expected,"killed":False,"native":native})
-            receipt["failure"] = "Runtime mutation survived or failed to compile: " + name
-            return receipt
+            control_result = {"name":name,"expected":expected,"killed":False,"native":native}
+            raise ControlRefused(control_result, "Runtime mutation survived or failed to compile: " + name)
         result=run(specimen,specimen/"proof",command,environment)
         refused=None
         intended=None
@@ -275,12 +279,18 @@ def check(args) -> dict:
             caught,refused,intended=coverage_control((specimen/"proof/crate.vir").read_text(),profile,name)
         diagnostics=Path(result["stderr"]).read_text()
         killed=proof_control(result,name,path,diagnostics) if expected=="proof" else (qualified(result,pin) and caught)
-        receipt["mutations"].append({"name":name,"expected":expected,"killed":killed,"coverage_refusal":refused,
-                                     "intended_coverage_control":intended,"native":native,**result})
+        control_result = {"name":name,"expected":expected,"killed":killed,"coverage_refusal":refused,
+                                     "intended_coverage_control":intended,"native":native,**result}
         if not killed:
-            receipt["failure"]="Control survived or failed for an unrelated reason: "+name
-            return receipt
+            raise ControlRefused(control_result, "Control survived or failed for an unrelated reason: "+name)
         print(f"catalog: {name}: {expected} control caught",flush=True)
+        return control_result
+    try:
+        run_controls(run_control, mutations(), timings=directory / "control-timings.json",
+                     publish=receipt["mutations"].append)
+    except Exception as error:
+        receipt["failure"] = str(error)
+        return receipt
     verifier.verify_tool_files(tools,pin)
     if snapshot(ROOT)!=before:
         receipt["failure"]="Source drift during proof/control suite"
