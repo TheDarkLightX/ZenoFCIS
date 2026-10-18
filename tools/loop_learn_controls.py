@@ -19,11 +19,14 @@ import loop_learn_reference as R
 from test_loop_learn_reference import comparison_self_test
 
 CASES = Path(__file__).parent / "test_data/loop_learn/cases.json"
+# Finite-data commands stay on POSIX even when the environment selects systemd.
+FINITE_DATA = ("--containment-backend", "auto")
 
 
 def call(cli, arguments):
     try:
-        done = subprocess.run([str(cli), *map(str, arguments)], capture_output=True, timeout=35, check=False)
+        done = subprocess.run([str(cli), *FINITE_DATA, *map(str, arguments)], capture_output=True, timeout=35,
+                              check=False)
         if len(done.stdout) > 8 << 20:
             raise ValueError("control-output-limit")
         report = json.loads(done.stdout)

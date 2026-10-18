@@ -78,7 +78,8 @@ def fixture(data):
         nodes.append((OP[tag], *args))
     if type(data["roots"]) is not list or any(type(a) is not int for a in data["roots"]):
         raise ValueError("root shape")
-    p = IR.Program(inputs, outputs, tuple(nodes), tuple(data["roots"]))
+    # The capture model stays the narrower checked-i64 one (see report_rows).
+    p = IR.Program(inputs, outputs, tuple(nodes), tuple(data["roots"]), IR.I64_PROFILE)
     IR._type_check(p)
     return p
 
@@ -122,7 +123,7 @@ def policies(spec, rows, candidate, examples, anchor=None):
     for j, (tag, *args) in enumerate(p.nodes):
         if tag != 9:
             continue
-        prefix = IR.Program(p.inputs, ((True, 0, 1),), p.nodes[:j], (args[0],))
+        prefix = IR.Program(p.inputs, ((True, 0, 1),), p.nodes[:j], (args[0],), p.profile)
         values = [IR.run(prefix, point) for point in ps]
         for outcome in (0, 1):
             ordinals = [i for i, v in enumerate(values) if v == ("ok", (outcome,))]

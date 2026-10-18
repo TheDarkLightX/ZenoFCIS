@@ -14,6 +14,9 @@ import subprocess
 
 import loop_composable_reference as C
 
+# Finite-data commands stay on POSIX even when the environment selects systemd.
+FINITE_DATA = ("--containment-backend", "auto")
+
 
 def qualifies(code: int, report: dict, expected: str) -> bool:
     return code == (0 if expected == "qualified" else 1) and report.get("status") == expected
@@ -41,7 +44,7 @@ def campaign(cli: Path, work: Path) -> dict:
         return path
 
     def run(*arguments):
-        done = subprocess.run([str(cli), *map(str, arguments)], capture_output=True, timeout=120)
+        done = subprocess.run([str(cli), *FINITE_DATA, *map(str, arguments)], capture_output=True, timeout=120)
         if len(done.stdout) > 8 << 20:
             raise RuntimeError("control-output-bound")
         return done.returncode, json.loads(done.stdout)

@@ -3,7 +3,8 @@
 
 Standard library only, and sharing no code with the program-search crate or
 the ZenoFCIS checker. It reads the canonical `program.zcve` encoding of the
-`zeno-fcis/finite-i64/1` profile and evaluates every declared input tuple:
+current `zeno-fcis/finite-i128/1` profile, or of the historical
+`zeno-fcis/finite-i64/1` profile, and evaluates every declared input tuple:
 
 - values use ZCVE/1 tags (0x01 false, 0x02 true, 0x03 u128, 0x04 i128,
   0x06 text, 0x08 tuple), big-endian lengths and integers, and must be
@@ -12,9 +13,12 @@ the ZenoFCIS checker. It reads the canonical `program.zcve` encoding of the
   nodes, roots); a domain is (is-Boolean, min, max); a node is its opcode
   (0 input, 1 int, 2 bool, 3 add, 4 sub, 5 eq, 6 lt, 7 and, 8 not, 9 select)
   followed by its arguments; roots are u128 node indices;
-- evaluation is eager: every node runs in order, add and subtract trap on i64
-  overflow (the tuple's result is then an `arithmetic` failure), and an
-  output outside its declared domain is an `output-domain` failure;
+- the profile fixes the integer width: domain bounds and integer literals
+  must fit it (signed i128 for finite-i128/1, signed i64 for finite-i64/1);
+- evaluation is eager: every node runs in order, add and subtract trap on
+  overflow of the profile's width (the tuple's result is then an `arithmetic`
+  failure), and an output outside its declared domain is an `output-domain`
+  failure;
 - tuples are enumerated with the last input fastest, Booleans 0 then 1.
 
 Two programs agree when they have the same input and output domains and, on
@@ -30,8 +34,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-PROFILE = b"zeno-fcis/finite-i64/1"
+PROFILE = b"zeno-fcis/finite-i128/1"
+I64_PROFILE = b"zeno-fcis/finite-i64/1"
 I64_MIN, I64_MAX = -(1 << 63), (1 << 63) - 1
+I128_MIN, I128_MAX = -(1 << 127), (1 << 127) - 1
+BOUNDS = {PROFILE: (I128_MIN, I128_MAX), I64_PROFILE: (I64_MIN, I64_MAX)}
 MAX_BYTES = 64 * 1024
 MAX_TUPLES = 1 << 22
 ARITY = {0: 1, 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 1, 9: 3}
@@ -47,6 +54,7 @@ class Program:
     outputs: tuple[tuple[bool, int, int], ...]
     nodes: tuple[tuple[int, ...], ...]
     roots: tuple[int, ...]
+    profile: bytes = PROFILE
 
 
 class _Reader:
@@ -78,7 +86,7 @@ class _Reader:
             raise ProgramRefused("expected u128")
         return int.from_bytes(self.take(16), "big")
 
-    def domain(self) -> tuple[bool, int, int]:
+    def domain(self, bounds: tuple[int, int]) -> tuple[bool, int, int]:
         if self.tuple() != 3:
             raise ProgramRefused("domain shape")
         tag = self.tag()
@@ -86,7 +94,7 @@ class _Reader:
             raise ProgramRefused("domain flag")
         low, high = self.signed(), self.signed()
         boolean = tag == 0x02
-        if not I64_MIN <= low <= high <= I64_MAX or (boolean and (low, high) != (0, 1)):
+        if not bounds[0] <= low <= high <= bounds[1] or (boolean and (low, high) != (0, 1)):
             raise ProgramRefused("domain bounds")
         return boolean, low, high
 
@@ -99,12 +107,13 @@ def decode(body: bytes) -> Program:
         raise ProgramRefused("program shape")
     if reader.tag() != 0x06:
         raise ProgramRefused("expected profile text")
-    if reader.take(int.from_bytes(reader.take(4), "big")) != PROFILE:
+    profile = reader.take(int.from_bytes(reader.take(4), "big"))
+    if profile not in BOUNDS:
         raise ProgramRefused("profile")
     if reader.tuple() != 2:
         raise ProgramRefused("schema shape")
-    inputs = tuple(reader.domain() for _ in range(reader.tuple()))
-    outputs = tuple(reader.domain() for _ in range(reader.tuple()))
+    inputs = tuple(reader.domain(BOUNDS[profile]) for _ in range(reader.tuple()))
+    outputs = tuple(reader.domain(BOUNDS[profile]) for _ in range(reader.tuple()))
     nodes = []
     for _ in range(reader.tuple()):
         width = reader.tuple()
@@ -115,13 +124,16 @@ def decode(body: bytes) -> Program:
     roots = tuple(reader.unsigned() for _ in range(reader.tuple()))
     if reader.at != len(body):
         raise ProgramRefused("trailing bytes")
-    program = Program(inputs, outputs, tuple(nodes), roots)
+    program = Program(inputs, outputs, tuple(nodes), roots, profile)
     _type_check(program)
     return program
 
 
 def _type_check(program: Program) -> None:
     """Backward references and exact operand kinds; True means Boolean."""
+    if program.profile not in BOUNDS:
+        raise ProgramRefused("profile")
+    least, most = BOUNDS[program.profile]
     kinds: list[bool] = []
     for index, (opcode, *args) in enumerate(program.nodes):
         if opcode == 0:
@@ -130,7 +142,7 @@ def _type_check(program: Program) -> None:
             kinds.append(program.inputs[args[0]][0])
             continue
         if opcode in (1, 2):
-            if opcode == 1 and not I64_MIN <= args[0] <= I64_MAX:
+            if opcode == 1 and not least <= args[0] <= most:
                 raise ProgramRefused("integer literal")
             if opcode == 2 and args[0] not in (0, 1):
                 raise ProgramRefused("Boolean literal")
@@ -158,6 +170,7 @@ def _type_check(program: Program) -> None:
 
 def run(program: Program, point: tuple[int, ...]) -> tuple:
     """`("ok", outputs)` or `("error", kind)` for one tuple."""
+    least, most = BOUNDS[program.profile]
     values: list[int] = []
     for opcode, *args in program.nodes:
         if opcode == 0:
@@ -167,7 +180,7 @@ def run(program: Program, point: tuple[int, ...]) -> tuple:
         elif opcode in (3, 4):
             a, b = values[args[0]], values[args[1]]
             value = a + b if opcode == 3 else a - b
-            if not I64_MIN <= value <= I64_MAX:
+            if not least <= value <= most:
                 return ("error", "arithmetic")
         elif opcode == 5:
             value = int(values[args[0]] == values[args[1]])

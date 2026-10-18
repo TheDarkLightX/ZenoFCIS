@@ -32,8 +32,12 @@ class Controls:
         (self.directory / "parent-only.txt").write_text("parent descriptor control", encoding="ascii")
 
     def call(self, *args):
+        # Acquisition keeps the environment's backend choice; frozen-table
+        # operations stay on finite-data POSIX even when that choice is systemd.
+        acquisition = tuple(args[:3]) in (("loop", "capture", "open"), ("loop", "capture", "whole"))
+        backend = () if acquisition else ("--containment-backend", "auto")
         with (self.directory / "parent-only.txt").open("rb") as inherited:
-            done = subprocess.run([self.cli, *map(str, args)], capture_output=True, timeout=35,
+            done = subprocess.run([self.cli, *backend, *map(str, args)], capture_output=True, timeout=35,
                                   env={**os.environ, "CAPTURE_CONTROL_SECRET": "parent-environment-control"},
                                   pass_fds=(inherited.fileno(),))
         if len(done.stdout) > 8 << 20:

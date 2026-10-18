@@ -1,10 +1,11 @@
 """Pure comparator tests; no native compiler or interpreter is launched."""
+import re
 import unittest
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from check_scalar_arithmetic import execute, grade
-from scalar_arithmetic_reference import Case
+from check_scalar_arithmetic import BITS, RUST_DRIVER, execute, grade
+from scalar_arithmetic_reference import Case, boundary_cases, result
 from scalar_arithmetic_controls import replace_once
 
 class ConformanceAdmission(unittest.TestCase):
@@ -38,6 +39,18 @@ class ConformanceAdmission(unittest.TestCase):
             with self.subTest(anchor=anchor):
                 changed = replace_once(emitted_helpers, anchor, replacement)
                 self.assertNotEqual(changed, emitted_helpers)
+
+    def test_driver_and_corpus_use_the_emitted_integer_width(self):
+        root = Path(__file__).resolve().parents[1]
+        emit = (root / "crates/zeno-fcis-synthesis/src/finite/emit.rs").read_text()
+        element = re.search(r"pub fn transition\(input: &\[(\w+)\]\)", emit).group(1)
+        self.assertEqual(element, f"i{BITS}")
+        self.assertIn(f"let fields:Vec<{element}>=", RUST_DRIVER)
+        top = (1 << (BITS - 1)) - 1
+        cases = boundary_cases(BITS)
+        self.assertIn(Case("mul", (top, 2)), cases)
+        self.assertIsNone(result(Case("mul", (top, 2)), BITS))
+        self.assertEqual(result(Case("mul", ((1 << 63) - 1, 2)), BITS), (1 << 64) - 2)
 
     def test_disabled_comparison_fails_the_same_negative_suite(self):
         mutants={"wrong_round":([0],[1]),"always_refuse":([None],[6])}

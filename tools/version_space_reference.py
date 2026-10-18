@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integrations" / "z
 import loop_language as Z
 from behavior import Refusal
 
-I64 = (-(1 << 63), (1 << 63) - 1)
+I64 = (-(1 << 63), (1 << 63) - 1)  # Declared domains and report coordinates.
+I128 = (-(1 << 127), (1 << 127) - 1)  # Eager checked evaluation.
 
 
 def scalar(node, env, assignment):
@@ -62,8 +63,8 @@ def scalar(node, env, assignment):
             raise Refusal("unsupported reference operator")
     else:
         raise Refusal("unsupported reference expression")
-    if not I64[0] <= value <= I64[1]:
-        raise OverflowError("eager i64 overflow")
+    if not I128[0] <= value <= I128[1]:
+        raise OverflowError("eager i128 overflow")
     return value
 
 
@@ -196,8 +197,8 @@ def program_table(program):
                 a, b = (values[k] for k in args)
                 value = {"Add": lambda: a+b, "Sub": lambda: a-b, "Eq": lambda: int(a == b),
                          "Lt": lambda: int(a < b), "And": lambda: int(a == 1 and b == 1)}[code]()
-            if not I64[0] <= value <= I64[1]:
-                raise OverflowError("program i64 overflow")
+            if not I128[0] <= value <= I128[1]:
+                raise OverflowError("program i128 overflow")
             values.append(value)
         row = tuple(values[k] for k in program["roots"])
         if any(not int(lo) <= v <= int(hi) for v, (lo, hi) in zip(row, map(bounds, program["outputs"]))):

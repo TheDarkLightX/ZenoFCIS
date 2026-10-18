@@ -12,7 +12,6 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 import check_installed_cli as installed
 import program_search_reference as reference
@@ -43,12 +42,13 @@ class BlockTest(unittest.TestCase):
         programs = []
         for name in ("boolean-kernel-original", "boolean-kernel-candidate"):
             old = reference.decode((legacy / f"{name}.zcve").read_bytes())
-            # This independent reference uses the same canonical i128 integer
-            # encoding for both profiles. These programs use only Boolean
-            # domains and instructions, so its i64 overflow rule is irrelevant.
-            with patch.object(reference, "PROFILE", b"zeno-fcis/finite-i128/1"):
-                current = reference.decode((installed.ARTIFACTS / f"{name}.zcve").read_bytes())
-            self.assertEqual(current, old)
+            # Both profiles use the same canonical i128 integer encoding. These
+            # programs use only Boolean domains and instructions, so the
+            # profiles' different overflow widths are irrelevant.
+            current = reference.decode((installed.ARTIFACTS / f"{name}.zcve").read_bytes())
+            self.assertEqual((old.profile, current.profile), (reference.I64_PROFILE, reference.PROFILE))
+            self.assertEqual((current.inputs, current.outputs, current.nodes, current.roots),
+                             (old.inputs, old.outputs, old.nodes, old.roots))
             self.assertTrue(all(domain[0] for domain in current.inputs + current.outputs))
             self.assertFalse(any(node[0] in (1, 3, 4, 6) for node in current.nodes))
             self.assertEqual(reference.size(current), 16)

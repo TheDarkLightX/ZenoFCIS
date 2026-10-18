@@ -52,7 +52,7 @@ def program(value: dict) -> R.Program:
         if type(d) is not dict or set(d) != {"kind", "min", "max"} or d["kind"] != "Int":
             raise ValueError("domain-shape")
         lo, hi = _decimal(d["min"]), _decimal(d["max"])
-        if not R.I64_MIN <= lo <= hi <= R.I64_MAX:
+        if not R.I128_MIN <= lo <= hi <= R.I128_MAX:
             raise ValueError("domain-bounds")
         return False, lo, hi
 
@@ -98,7 +98,7 @@ def encoding(p: R.Program) -> bytes:
         return b"\x08" + len(parts).to_bytes(4, "big") + b"".join(parts)
     def domain(d):
         return sequence([b"\x02" if d[0] else b"\x01", signed(d[1]), signed(d[2])])
-    profile = R.PROFILE
+    profile = p.profile
     return sequence([b"\x06" + len(profile).to_bytes(4, "big") + profile,
                      sequence([sequence([domain(d) for d in p.inputs]), sequence([domain(d) for d in p.outputs])]),
                      sequence([sequence([signed(n) for n in node]) for node in p.nodes]),
@@ -123,7 +123,7 @@ def partitions(terms: list[dict]) -> tuple[list[list[int]], list[list[int]]]:
     groups, rejected = {}, []
     for index, value in enumerate(terms):
         p = program(value)
-        if len(p.outputs) != 1 or p.outputs[0] not in ((True, 0, 1), (False, R.I64_MIN, R.I64_MAX)):
+        if len(p.outputs) != 1 or p.outputs[0] not in ((True, 0, 1), (False, R.I128_MIN, R.I128_MAX)):
             raise ValueError("full-term-output")
         rows = R.table(p, max_tuples=1 << 17)
         errors = [i for i, row in enumerate(rows) if row[0] != "ok"]
@@ -277,7 +277,7 @@ def check_rules(report: dict) -> list[str]:
 def self_test() -> list[str]:
     """A positive and planted-negative case for each reference comparison."""
     from copy import deepcopy
-    integer = {"kind": "Int", "min": str(R.I64_MIN), "max": str(R.I64_MAX)}
+    integer = {"kind": "Int", "min": str(R.I128_MIN), "max": str(R.I128_MAX)}
     x = {"inputs": [{"kind": "Int", "min": "0", "max": "3"}], "outputs": [integer],
          "nodes": [["Input", 0]], "roots": [0]}
     long = {**x, "nodes": [["Input", 0], ["Add", 0, 0], ["Sub", 1, 0]], "roots": [2]}

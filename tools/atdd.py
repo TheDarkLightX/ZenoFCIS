@@ -573,6 +573,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "transform_parallel::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
           "equivalence::checker::ranges::"),
+         ("python3", "tools/test_containment_selection.py"),
          ("python3", "tools/check_transform_parallel.py")),
     ),
     "checked-optimizer": AcceptanceScenario(

@@ -9,7 +9,7 @@ import loop_composable_reference as C
 def scalar(nodes, root, lo=0, hi=3, boolean=False):
     return {"inputs": [{"kind": "Int", "min": str(lo), "max": str(hi)}],
             "outputs": [{"kind": "Bool"}] if boolean else
-                       [{"kind": "Int", "min": str(-(1 << 63)), "max": str((1 << 63) - 1)}],
+                       [{"kind": "Int", "min": str(-(1 << 127)), "max": str((1 << 127) - 1)}],
             "nodes": nodes, "roots": [root]}
 
 
@@ -69,7 +69,7 @@ class Reference(unittest.TestCase):
         self.assertEqual((result["status"], result["ordinal"]), ("counterexample", 1))
 
     def test_whole_program_unused_and_unselected_eager_errors(self):
-        dead = scalar([["Input", 0], ["Int", str((1 << 63) - 1)], ["Int", "1"], ["Add", 1, 2]], 0)
+        dead = scalar([["Input", 0], ["Int", str((1 << 127) - 1)], ["Int", "1"], ["Add", 1, 2]], 0)
         branch = deepcopy(dead)
         branch["nodes"] += [["Bool", False], ["Select", 4, 3, 0]]
         branch["roots"] = [5]

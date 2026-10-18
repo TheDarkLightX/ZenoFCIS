@@ -41,7 +41,12 @@ SUBJECTS = 37
 WORKERS = (1, 2, 4)
 CHUNKS = (4096, 3, 1)
 MAX_CHUNKS = 65_536
-PARALLEL_ONLY = ('progress',)
+# A contained parallel run also names its group-resources containment; the
+# semantic report and receipt bytes must still equal the serial run's.
+PARALLEL_ONLY = ('progress', 'backend', 'containment', 'required_profile')
+# Encoding and serial checks stay on finite-data POSIX even when the environment
+# selects systemd; offline parallel checks keep the environment's choice.
+FINITE_DATA = ('--containment-backend', 'auto')
 SOURCES = ('crates', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo',
            'docs/benchmarks/cases.json',
            'docs/benchmarks/withdrawal-queue/artifacts', 'crates/zeno-fcis-cli/tests/fixtures/transform-check',
@@ -76,7 +81,7 @@ def encode(cli, work, name, case, side):
     source = work / f'{name}.{side}.json'
     source.write_text(json.dumps(program))
     target = work / f'{name}.{side}.zcve'
-    code, out, err, _ = run([cli, 'loop', 'encode', '--program', source, '--out', target])
+    code, out, err, _ = run([cli, *FINITE_DATA, 'loop', 'encode', '--program', source, '--out', target])
     return target if code == 0 and target.is_file() else None, (out + err).strip()
 
 
@@ -125,7 +130,8 @@ def comparable(report):
 
 def invoke(cli, work, subject, label, flags, receipt=True):
     path = work / f'{subject["name"]}.{label}.receipt.json'
-    command = [cli, 'transform', 'check', '--original', subject['original'],
+    backend = () if '--offline-parallel' in flags else FINITE_DATA
+    command = [cli, *backend, 'transform', 'check', '--original', subject['original'],
                '--candidate', subject['candidate'], *subject['extra'], *flags]
     if receipt:
         command += ['--receipt', path]
@@ -207,6 +213,10 @@ def parallel_runs(cli, work, subject, serial, tuples):
                 lo, _, hi = part.partition('-')
                 cpus.update(range(int(lo), int(hi or lo) + 1))
             require(cpus and cpus <= os.sched_getaffinity(0), f'{name}: caller CPU affinity escaped')
+            containment = row['report'].get('containment')
+            require(row['report'].get('required_profile') == 'group-resources/1' and isinstance(containment, dict)
+                    and containment.get('backend') == row['report'].get('backend'),
+                    f'{name}: missing group-resources containment record')
             require(scheduling['nice'] >= os.getpriority(os.PRIO_PROCESS, 0),
                     f'{name}: caller scheduling priority escaped')
             planned_needed = None if tuples is None else -(-tuples // chunk)

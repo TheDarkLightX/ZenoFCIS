@@ -147,6 +147,19 @@ class AdmissionTests(unittest.TestCase):
                 gate.require_body_only_change("translated VIR", profile, "target")
 
 
+class NativeCorpusTests(unittest.TestCase):
+    def test_pinned_native_counts_match_the_declared_rust_tests(self):
+        # Static drift guard: each filter selects exactly the tests these files declare.
+        def tests(*paths):
+            return sum(path.read_text().count("#[test]") for path in paths)
+        root = gate.ROOT / "crates"
+        symbolic = sorted((root / "zeno-fcis-cli/src/symbolic").rglob("*.rs"))
+        owned = root / "zeno-fcis-synthesis/src/finite/evaluation_tests.rs"
+        expected = {name: count for name, _, count in gate.NATIVE_CORPUS}
+        self.assertEqual(expected, {"symbolic": tests(*symbolic), "contract-runtime": 1,
+                                    "owned-program": tests(owned)})
+
+
 if __name__ == "__main__":
     unittest.main()
 

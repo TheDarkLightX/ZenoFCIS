@@ -44,7 +44,7 @@ class StrategyReference(unittest.TestCase):
         self.assertTrue(R.conforms(p,["observe","check-program"]))
 
     def test_case_tree_committee_and_region_replay(self):
-        domain={"kind":"Int","min":"0","max":"3"};out={"kind":"Int","min":str(R.C.R.I64_MIN),"max":str(R.C.R.I64_MAX)}
+        domain={"kind":"Int","min":"0","max":"3"};out={"kind":"Int","min":str(R.C.R.I128_MIN),"max":str(R.C.R.I128_MAX)}
         original={"inputs":[domain],"outputs":[out],"nodes":[["Input",0],["Int","2"],["Lt",0,1],["Int","7"],["Select",2,3,0]],"roots":[4]}
         constant={**original,"nodes":[["Int","7"]],"roots":[0]};identity={**original,"nodes":[["Input",0]],"roots":[0]}
         pred={**original,"outputs":[{"kind":"Bool"}],"nodes":original["nodes"][:3],"roots":[2]}
@@ -59,7 +59,7 @@ class StrategyReference(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"query-budget"):R.case_search(problem,original)
 
     def test_region_guidance_probes_a_rare_exception_inside_a_learned_case(self):
-        domain={"kind":"Int","min":"0","max":"7"};out={"kind":"Int","min":str(R.C.R.I64_MIN),"max":str(R.C.R.I64_MAX)}
+        domain={"kind":"Int","min":"0","max":"7"};out={"kind":"Int","min":str(R.C.R.I128_MIN),"max":str(R.C.R.I128_MAX)}
         original={"inputs":[domain],"outputs":[out],"nodes":[["Input",0],["Int","4"],["Lt",0,1],["Int","2"],["Eq",0,3],["Int","9"],["Int","5"],["Select",4,5,6],["Int","7"],["Select",2,7,8]],"roots":[9]}
         terms=[{**original,"nodes":[["Int",str(v)]],"roots":[0]} for v in (5,7,9)]
         predicates=[{**original,"outputs":[{"kind":"Bool"}],"nodes":[["Input",0],["Int",str(v)],[op,0,1]],"roots":[2]} for v,op in ((4,"Lt"),(2,"Eq"))]

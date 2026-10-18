@@ -14,6 +14,9 @@ import subprocess
 import tempfile
 import loop_strategy_reference as R
 
+# Finite-data commands stay on POSIX even when the environment selects systemd.
+FINITE_DATA = ("--containment-backend", "auto")
+
 
 def classifies(code, report, status):
     wanted = 2 if status == "inconclusive" else 1 if status in ("refused","refuted") else 0
@@ -44,10 +47,10 @@ def campaign(cli, work):
         with path.open("x",encoding="ascii") as stream: json.dump(value,stream,sort_keys=True)
         return path
     def run(*arguments):
-        done = subprocess.run([str(cli),*map(str,arguments)],capture_output=True,timeout=120)
+        done = subprocess.run([str(cli),*FINITE_DATA,*map(str,arguments)],capture_output=True,timeout=120)
         if len(done.stdout) > 8 << 20: raise ValueError("control-output-bound")
         return done.returncode,json.loads(done.stdout)
-    domain={"kind":"Int","min":"0","max":"3"};out={"kind":"Int","min":str(R.C.R.I64_MIN),"max":str(R.C.R.I64_MAX)}
+    domain={"kind":"Int","min":"0","max":"3"};out={"kind":"Int","min":str(R.C.R.I128_MIN),"max":str(R.C.R.I128_MAX)}
     original={"inputs":[domain],"outputs":[out],"nodes":[["Input",0],["Int","2"],["Lt",0,1],["Int","7"],["Select",2,3,0]],"roots":[4]}
     constant={**original,"nodes":[["Int","7"]],"roots":[0]};identity={**original,"nodes":[["Input",0]],"roots":[0]}
     pred={**original,"outputs":[{"kind":"Bool"}],"nodes":original["nodes"][:3],"roots":[2]}
