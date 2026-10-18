@@ -352,6 +352,103 @@ theorem excess_telescope (e : Rat) (es : List Rat) :
       simp only [List.getLastD_cons]
       grind
 
+/- Closing LP positions restores supply because the outside shares q are fixed.
+   This concerns cash balances, not a floored valuation of an open position. -/
+theorem closed_liquid_no_profit (q : Rat) (a b : State)
+    (va : Valid q a) (vb : Valid q b) (h : Trace q a b)
+    (closed_supply : b.supply = a.supply) :
+    ¬ (a.liquid0 ≤ b.liquid0 ∧ a.liquid1 ≤ b.liquid1 ∧
+      (a.liquid0 < b.liquid0 ∨ a.liquid1 < b.liquid1)) := by
+  intro ⟨h0, h1, hs⟩
+  rcases trace_invariants q a b h with ⟨hp, t0, t1, o0, o1⟩
+  unfold total0 at t0
+  unfold total1 at t1
+  rw [closed_supply] at t0 t1
+  have hx : b.x ≤ a.x := by
+    apply Rat.le_of_mul_le_mul_left (c := a.supply) _ va.2.2.1
+    grind
+  have hy : b.y ≤ a.y := by
+    apply Rat.le_of_mul_le_mul_left (c := a.supply) _ va.2.2.1
+    grind
+  have hstrict : b.x < a.x ∨ b.y < a.y := by
+    cases hs with
+    | inl hs =>
+      left
+      apply Rat.lt_of_mul_lt_mul_left (c := a.supply) _ (Rat.le_of_lt va.2.2.1)
+      grind
+    | inr hs =>
+      right
+      apply Rat.lt_of_mul_lt_mul_left (c := a.supply) _ (Rat.le_of_lt va.2.2.1)
+      grind
+  have bad := product_strict a.x a.y b.x b.y va.1 vb.2.1 hx hy hstrict
+  grind
+
+/- Every account used in a finite strategy has a slot from the start, including
+   initially empty accounts. n is arbitrary; it is not the native two-slot cap.
+   Debt is accounting only: the native command surface has no borrowing route. -/
+structure AccountPosition where
+  shares : Rat
+  cash0 : Rat
+  cash1 : Rat
+  debt0 : Rat
+  debt1 : Rat
+
+def accountSum {n : Nat} (book : Fin n → AccountPosition)
+    (field : AccountPosition → Rat) : Rat := (List.ofFn fun i => field (book i)).sum
+
+structure AccountsMatch {n : Nat} (q : Rat) (book : Fin n → AccountPosition)
+    (s : State) : Prop where
+  supply : s.supply = q + accountSum book AccountPosition.shares
+  cash0 : s.liquid0 = accountSum book AccountPosition.cash0
+  cash1 : s.liquid1 = accountSum book AccountPosition.cash1
+
+/- Aggregate restoration suffices, so restoring each account separately is a
+   special case. Equal debts make net-cash dominance equivalent to cash dominance.
+   No desired wealth inequality is a premise of this theorem. -/
+theorem finite_coalition_closed_no_profit {n : Nat} (q : Rat) (a b : State)
+    (before after : Fin n → AccountPosition)
+    (va : Valid q a) (vb : Valid q b) (h : Trace q a b)
+    (ma : AccountsMatch q before a) (mb : AccountsMatch q after b)
+    (shares_restored : accountSum before AccountPosition.shares =
+      accountSum after AccountPosition.shares)
+    (debt0_restored : accountSum before AccountPosition.debt0 =
+      accountSum after AccountPosition.debt0)
+    (debt1_restored : accountSum before AccountPosition.debt1 =
+      accountSum after AccountPosition.debt1) :
+    ¬ (accountSum before AccountPosition.cash0 - accountSum before AccountPosition.debt0 ≤
+         accountSum after AccountPosition.cash0 - accountSum after AccountPosition.debt0 ∧
+       accountSum before AccountPosition.cash1 - accountSum before AccountPosition.debt1 ≤
+         accountSum after AccountPosition.cash1 - accountSum after AccountPosition.debt1 ∧
+       (accountSum before AccountPosition.cash0 - accountSum before AccountPosition.debt0 <
+          accountSum after AccountPosition.cash0 - accountSum after AccountPosition.debt0 ∨
+        accountSum before AccountPosition.cash1 - accountSum before AccountPosition.debt1 <
+          accountSum after AccountPosition.cash1 - accountSum after AccountPosition.debt1)) := by
+  have supply_restored : b.supply = a.supply := by
+    rw [ma.supply, mb.supply, shares_restored]
+  have no_cash_gain := closed_liquid_no_profit q a b va vb h supply_restored
+  rw [ma.cash0, mb.cash0, ma.cash1, mb.cash1] at no_cash_gain
+  rw [debt0_restored, debt1_restored]
+  grind
+
+/- An absent-pool prefix pays for creation. Even without closing LP positions,
+   final spendable cash cannot dominate the original cash endowment. -/
+theorem creation_liquid_no_profit (q initial0 initial1 outside0 outside1 : Rat)
+    (a b : State) (hq : 0 < q) (va : Valid q a) (vb : Valid q b)
+    (h : Trace q a b)
+    (c0 : initial0 + outside0 = total0 a) (c1 : initial1 + outside1 = total1 a)
+    (o0 : outside0 ≤ a.outside0) (o1 : outside1 ≤ a.outside1) :
+    ¬ (initial0 ≤ b.liquid0 ∧ initial1 ≤ b.liquid1 ∧
+      (initial0 < b.liquid0 ∨ initial1 < b.liquid1)) := by
+  have cost := creation_cost q initial0 initial1 outside0 outside1 a hq va c0 c1 o0 o1
+  have no_gain := exact_no_free_value_from_creation q initial0 initial1 a b hq va vb h cost
+  have h0 := Rat.mul_nonneg (show 0 ≤ b.supply-q by grind [Valid]) (Rat.le_of_lt vb.1)
+  have h1 := Rat.mul_nonneg (show 0 ≤ b.supply-q by grind [Valid]) (Rat.le_of_lt vb.2.1)
+  unfold wealth0 wealth1 at no_gain
+  grind
+
+#print axioms closed_liquid_no_profit
+#print axioms finite_coalition_closed_no_profit
+#print axioms creation_liquid_no_profit
 #print axioms exact_no_free_value
 #print axioms cumulative_floored_bound
 #print axioms exact_no_free_value_from_creation
