@@ -21,6 +21,22 @@ use alloc::{vec, vec::Vec};
 use zeno_fcis_synthesis::finite::{Domain as ScalarDomain, Op, V2ScalarProgram};
 ";
 
+const NUMERIC_HEADER: &str = "\
+// Generated declarative data. Review v2/policy.json and project.zeno.
+// Regenerate or check with `zeno-fcis generate contract`; no runtime mapper.
+extern crate alloc;
+use alloc::{vec, vec::Vec};
+use zeno_fcis_synthesis::finite::{
+    V2InputField as InputField, V2NumericDomain, V2Resource as Resource, canonical_v2::schema as s,
+    v2_authority as authority, v2_catalog as catalog, v2_composition as c, v2_laws as l,
+    v2_zero_limits,
+};
+use zeno_fcis_synthesis::finite::{
+    V2IntegerWidth as Width, V2NumericDomain as ScalarDomain, V2NumericOp as Op,
+    V2NumericProgram as V2ScalarProgram,
+};
+";
+
 const IMPORTS_WITH_VARIANTS: &str = "\
 use zeno_fcis_synthesis::finite::{
     V2InputField as InputField, V2InputLeaf as InputLeaf, V2InputVariant as InputVariant,
@@ -238,16 +254,30 @@ pub(super) fn source(
     options: Options<'_>,
 ) -> Result<String, ContractError> {
     let declarations = contract.declarations;
-    let mut text = String::from(HEADER);
+    let unsigned = contract.unsigned;
+    let numeric_nodes = if unsigned {
+        Some(
+            contract
+                .nodes
+                .iter()
+                .map(|op| super::policy::numeric_op(op).and_then(|op| numeric_op(&op)))
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+    } else {
+        None
+    };
+    let mut text = String::from(if unsigned { NUMERIC_HEADER } else { HEADER });
     let any_variants = declarations
         .types
         .values()
         .any(|declared| matches!(declared.form, Form::Sum(_)));
-    text.push_str(if any_variants {
-        IMPORTS_WITH_VARIANTS
-    } else {
-        IMPORTS
-    });
+    if !unsigned {
+        text.push_str(if any_variants {
+            IMPORTS_WITH_VARIANTS
+        } else {
+            IMPORTS
+        });
+    }
     text.push_str(
         &ORIGINALS
             .replace("{schema}", options.schema)
@@ -350,7 +380,7 @@ pub(super) fn source(
          /// Borrow the full raw-input, complete-decision and law contract.\n    #[must_use]\n    \
          pub fn descriptor(&self) -> c::Descriptor<'_> {{\n        {}\n    }}\n}}\n",
         body(&new(contract))?,
-        body(&descriptor(contract))?,
+        body(&descriptor(contract, numeric_nodes))?,
     );
     let (types, fields, variants) = contract.schema_counts();
     let _ = write!(
@@ -367,6 +397,21 @@ pub(super) fn source(
     );
     text.push_str(BINDING);
     lineage(&mut text, options)?;
+    if unsigned {
+        if !options.receipts.is_empty() || !options.evolutions.is_empty() {
+            return Err(ContractError::new(
+                "unsigned lineage",
+                "U128SubjectUnsupported",
+            ));
+        }
+        text=text            .replace("Vec<InputField>","Vec<InputField<InputLeaf>>")
+            .replace("c::Descriptor", "c::NumericDescriptor")
+            .replace("catalog::BoundCatalog<'a>","NumericCatalog<'a>")
+            .replace("catalog::BoundCatalog<'_>","NumericCatalog<'_>")
+            .replace("authority::Authority<'a>","NumericAuthority<'a>")
+            .replace("pub fn with_lineage<R>(\n    f: impl FnOnce(&[&NumericCatalog<'_>]) -> R,\n) -> Result<R, catalog::Failure> {", "pub fn with_lineage<R>(f: impl FnOnce(&[&NumericCatalog<'_>]) -> R) -> Result<R, catalog::Failure> {");
+        text.push_str("\ntype InputLeaf = V2NumericDomain<'static>;\ntype NumericCatalog<'a> = catalog::BoundCatalog<'a, c::NumericDescriptor<'a>>;\ntype NumericAuthority<'a> = authority::Authority<'a, c::NumericDescriptor<'a>>;\n");
+    }
     Ok(text)
 }
 
@@ -726,6 +771,7 @@ fn description(contract: &Contract<'_>) -> Syntax {
                     )],
                 ),
                 Form::Leaf(Leaf::Bool) => Syntax::path("s::Kind::Bool"),
+                Form::Leaf(Leaf::U128 { min, max }) => bounds("s::Kind::U128", min, max),
                 Form::Leaf(Leaf::I128 { min, max }) => bounds("s::Kind::I128", min, max),
                 Form::Leaf(Leaf::Text { min, max }) => bounds("s::Kind::Text", min, max),
             };
@@ -894,6 +940,7 @@ fn domain(value: &Domain) -> Syntax {
     match value {
         Domain::Bool => Syntax::path("c::Domain::Bool"),
         Domain::Text => Syntax::path("c::Domain::Text"),
+        Domain::U128 { min, max } => bounds("c::Domain::U128", min, max),
         Domain::I128 { min, max } => bounds("c::Domain::I128", min, max),
         Domain::Sum { type_id, variants } => record(
             "c::Domain::Sum",
@@ -1033,6 +1080,7 @@ pub(super) fn scope_name(scope: zeno_fcis_spec::LawScope) -> &'static str {
 fn input_leaf(leaf: &InputLeaf) -> Syntax {
     match leaf {
         InputLeaf::Bool => Syntax::path("InputLeaf::Bool"),
+        InputLeaf::U128 { min, max } => bounds("InputLeaf::U128", min, max),
         InputLeaf::I128 { min, max } => bounds("InputLeaf::I128", min, max),
         InputLeaf::Sum { type_id, variants } => record(
             "InputLeaf::Sum",
@@ -1068,6 +1116,21 @@ fn input_leaf(leaf: &InputLeaf) -> Syntax {
     }
 }
 
+fn typed_leaf(leaf: &InputLeaf) -> Syntax {
+    match leaf {
+        InputLeaf::Sum { type_id, variants } => record(
+            "InputLeaf::Sum",
+            vec![
+                ("type_id", Syntax::literal(type_id)),
+                (
+                    "variants",
+                    Syntax::slice(variants.iter().map(Syntax::literal).collect()),
+                ),
+            ],
+        ),
+        _ => input_leaf(leaf),
+    }
+}
 fn new(contract: &Contract<'_>) -> Syntax {
     let mut fields: Vec<(&'static str, Syntax)> = ["state", "command", "context"]
         .into_iter()
@@ -1080,19 +1143,47 @@ fn new(contract: &Contract<'_>) -> Syntax {
                         .map(|(id, leaf)| {
                             record(
                                 "InputField",
-                                vec![("id", Syntax::literal(id)), ("leaf", input_leaf(leaf))],
+                                vec![
+                                    ("id", Syntax::literal(id)),
+                                    (
+                                        "leaf",
+                                        if contract.unsigned {
+                                            typed_leaf(leaf)
+                                        } else {
+                                            input_leaf(leaf)
+                                        },
+                                    ),
+                                ],
                             )
                         })
                         .collect(),
                 ),
-                RootSchema::Leaf(leaf) => input_leaf(leaf),
+                RootSchema::Leaf(leaf) => {
+                    if contract.unsigned {
+                        typed_leaf(leaf)
+                    } else {
+                        input_leaf(leaf)
+                    }
+                }
             };
             (name, value)
         })
         .collect();
     fields.push((
         "output_types",
-        Syntax::vec(contract.output_types.iter().map(input_leaf).collect()),
+        Syntax::vec(
+            contract
+                .output_types
+                .iter()
+                .map(|leaf| {
+                    if contract.unsigned {
+                        typed_leaf(leaf)
+                    } else {
+                        input_leaf(leaf)
+                    }
+                })
+                .collect(),
+        ),
     ));
     record("Self", fields)
 }
@@ -1100,12 +1191,14 @@ fn new(contract: &Contract<'_>) -> Syntax {
 fn scalar_domain(domain: &ScalarDomain) -> Syntax {
     match domain {
         ScalarDomain::Bool => Syntax::path("ScalarDomain::Bool"),
+        ScalarDomain::Unsigned { min, max } => bounds("ScalarDomain::U128", min, max),
         ScalarDomain::Int { min, max } => bounds("ScalarDomain::Int", min, max),
     }
 }
 
 fn scalar_op(op: &ScalarOp) -> Syntax {
     match op {
+        ScalarOp::Numeric(_) => Syntax::path("U128SubjectUnsupported"),
         ScalarOp::Input(index) => indexes("Op::Input", &[*index]),
         ScalarOp::Int(value) => Syntax::call("Op::Int", vec![Syntax::literal(value)]),
         ScalarOp::Bool(value) => Syntax::call("Op::Bool", vec![Syntax::literal(value)]),
@@ -1171,7 +1264,8 @@ fn channel(channel: &ChannelSchema) -> Syntax {
     )
 }
 
-fn descriptor(contract: &Contract<'_>) -> Syntax {
+fn descriptor(contract: &Contract<'_>, numeric_nodes: Option<Vec<Syntax>>) -> Syntax {
+    let unsigned = numeric_nodes.is_some();
     let mut fields: Vec<(&'static str, Syntax)> = ["state", "command", "context"]
         .into_iter()
         .zip(&contract.roots)
@@ -1194,15 +1288,41 @@ fn descriptor(contract: &Contract<'_>) -> Syntax {
         vec![
             (
                 "inputs",
-                Syntax::slice(contract.input_domains.iter().map(scalar_domain).collect()),
+                Syntax::slice(
+                    contract
+                        .input_domains
+                        .iter()
+                        .map(|d| {
+                            if unsigned {
+                                numeric_domain(d)
+                            } else {
+                                scalar_domain(d)
+                            }
+                        })
+                        .collect(),
+                ),
             ),
             (
                 "outputs",
-                Syntax::slice(contract.output_domains.iter().map(scalar_domain).collect()),
+                Syntax::slice(
+                    contract
+                        .output_domains
+                        .iter()
+                        .map(|d| {
+                            if unsigned {
+                                numeric_domain(d)
+                            } else {
+                                scalar_domain(d)
+                            }
+                        })
+                        .collect(),
+                ),
             ),
             (
                 "nodes",
-                Syntax::slice(contract.nodes.iter().map(scalar_op).collect()),
+                Syntax::slice(
+                    numeric_nodes.unwrap_or_else(|| contract.nodes.iter().map(scalar_op).collect()),
+                ),
             ),
             (
                 "roots",
@@ -1286,4 +1406,92 @@ fn descriptor(contract: &Contract<'_>) -> Syntax {
         ("limits", limits),
     ]);
     record("c::Descriptor", fields)
+}
+
+fn numeric_domain(d: &ScalarDomain) -> Syntax {
+    match d {
+        ScalarDomain::Bool => Syntax::path("ScalarDomain::Bool"),
+        ScalarDomain::Int { min, max } => bounds("ScalarDomain::I128", min, max),
+        ScalarDomain::Unsigned { min, max } => bounds("ScalarDomain::U128", min, max),
+    }
+}
+fn numeric_op(op: &zeno_fcis_synthesis::finite::V2NumericOp) -> Result<Syntax, ContractError> {
+    use zeno_fcis_synthesis::finite::{V2IntegerWidth as W, V2NumericOp as N};
+    let args = |name: &str, ids: &[u16]| {
+        indexes(
+            name,
+            &ids.iter().map(|i| usize::from(*i)).collect::<Vec<_>>(),
+        )
+    };
+    let wide = |name: &str, w: W, a: u16, b: u16| {
+        Syntax::call(
+            name,
+            vec![
+                Syntax::path(match w {
+                    W::Signed64 => "Width::Signed64",
+                    W::Signed128 => "Width::Signed128",
+                    W::Unsigned128 => "Width::Unsigned128",
+                }),
+                Syntax::literal(a),
+                Syntax::literal(b),
+            ],
+        )
+    };
+    Ok(match *op {
+        N::Input(a) => args("Op::Input", &[a]),
+        N::ToI128(a) => args("Op::ToI128", &[a]),
+        N::ToU128(a) => args("Op::ToU128", &[a]),
+        N::Bool(v) => Syntax::call("Op::Bool", vec![Syntax::literal(v)]),
+        N::I128(v) => Syntax::call("Op::I128", vec![Syntax::literal(v)]),
+        N::U128(v) => Syntax::call("Op::U128", vec![Syntax::literal(v)]),
+        N::Add(w, a, b) => wide("Op::Add", w, a, b),
+        N::Sub(w, a, b) => wide("Op::Sub", w, a, b),
+        N::Mul(w, a, b) => wide("Op::Mul", w, a, b),
+        N::DivFloor(w, a, b) => wide("Op::DivFloor", w, a, b),
+        N::DivCeil(w, a, b) => wide("Op::DivCeil", w, a, b),
+        N::Eq(a, b) => args("Op::Eq", &[a, b]),
+        N::Lt(a, b) => args("Op::Lt", &[a, b]),
+        N::And(a, b) => args("Op::And", &[a, b]),
+        N::Not(a) => args("Op::Not", &[a]),
+        N::Select(c, a, b) => args("Op::Select", &[c, a, b]),
+        N::MulDivFloor(a, b, d) => args("Op::MulDivFloor", &[a, b, d]),
+        N::MulDivCeil(a, b, d) => args("Op::MulDivCeil", &[a, b, d]),
+        N::SignedMulDivFloor(a, b, d) => args("Op::SignedMulDivFloor", &[a, b, d]),
+        N::NonnegativeMulDivFloor(w, a, b, d) | N::NonnegativeMulDivCeil(w, a, b, d) => {
+            Syntax::call(
+                if matches!(op, N::NonnegativeMulDivFloor(..)) {
+                    "Op::NonnegativeMulDivFloor"
+                } else {
+                    "Op::NonnegativeMulDivCeil"
+                },
+                vec![
+                    Syntax::path(match w {
+                        W::Signed64 => "Width::Signed64",
+                        W::Signed128 => "Width::Signed128",
+                        W::Unsigned128 => "Width::Unsigned128",
+                    }),
+                    Syntax::literal(a),
+                    Syntax::literal(b),
+                    Syntax::literal(d),
+                ],
+            )
+        }
+        N::ProductsGe(a, b) | N::NonnegativeProductsGe(a, b) => Syntax::call(
+            if matches!(op, N::ProductsGe(..)) {
+                "Op::ProductsGe"
+            } else {
+                "Op::NonnegativeProductsGe"
+            },
+            vec![
+                Syntax::array(a.iter().map(Syntax::literal).collect()),
+                Syntax::array(b.iter().map(Syntax::literal).collect()),
+            ],
+        ),
+        _ => {
+            return Err(ContractError::new(
+                "numeric render",
+                "unsupported numeric operation",
+            ));
+        }
+    })
 }

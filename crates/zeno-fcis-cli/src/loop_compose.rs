@@ -71,6 +71,7 @@ struct Fields {
 
 fn fields(core: &Core) -> Result<Fields> {
     let rules = Rules::read(core.rules_text())?;
+    rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(core.project(), &rules.leaf_bindings)?;
     // Generated leaves and the core decision projection have no outbox.
     // Refuse even unused channels: this profile cannot compare deliveries.
@@ -114,6 +115,7 @@ fn fields(core: &Core) -> Result<Fields> {
         .iter()
         .filter(|p| p.source == Source::State)
         .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
+            Some(Constant::U128(_)) => refuse("U128SubjectUnsupported"),
             Some(Constant::Bool(b)) => Ok(i128::from(*b)),
             Some(Constant::Int(v)) => Ok(*v),
             None => refuse("compose-genesis-missing"),
@@ -529,6 +531,7 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
 /// the program's node count.
 fn program_identity(project: &str, policy_text: &str) -> Result<(String, usize)> {
     let rules = Rules::read(policy_text)?;
+    rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;

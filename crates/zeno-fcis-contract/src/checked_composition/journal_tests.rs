@@ -100,6 +100,7 @@ pub(super) fn journal(files: &AggregateSources, steps: &[Step]) -> Journal {
         .map(|position| {
             let field = position.field.unwrap_or_else(|| fail("a root state"));
             let value = match built.rules.genesis.get(&field) {
+                Some(Constant::U128(_)) => panic!("U128SubjectUnsupported: legacy journal fixture"),
                 Some(Constant::Bool(value)) => i128::from(*value),
                 Some(Constant::Int(value)) => *value,
                 None => least(position),

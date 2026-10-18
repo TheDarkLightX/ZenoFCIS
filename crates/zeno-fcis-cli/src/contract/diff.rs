@@ -351,7 +351,7 @@ struct Version {
     version: u32,
     policy_sha256: String,
     schema_sha256: String,
-    program_sha256: String,
+    program_sha256: Option<String>,
     program_nodes: usize,
     /// See [`LIMITS`].
     limits: [u64; 5],
@@ -365,7 +365,7 @@ impl Version {
             version: generated.summary().version,
             policy_sha256: sha256_hex(generated.policy()),
             schema_sha256: sha256_hex(generated.schema()),
-            program_sha256: sha256_hex(generated.program()),
+            program_sha256: generated.program().map(sha256_hex),
             program_nodes: current.contract.nodes.len(),
             limits: [
                 budgets.read,
@@ -747,6 +747,9 @@ impl Shape {
 
     fn text(&self) -> String {
         match self {
+            Self::Leaf(Leaf::U128 { min, max }) => {
+                format!("an unsigned integer from {min} to {max}")
+            }
             Self::Leaf(Leaf::Bool) => "a boolean".to_owned(),
             Self::Leaf(Leaf::I128 { min, max }) => format!("an integer from {min} to {max}"),
             Self::Leaf(Leaf::Text { min, max }) => format!("text of {min} to {max} bytes"),
@@ -2082,6 +2085,7 @@ fn constant(declarations: &Declarations, type_id: u32, value: Constant) -> Strin
         _ => None,
     };
     match value {
+        Constant::U128(value) => format!("u128({value})"),
         Constant::Bool(value) => value.to_string(),
         Constant::Int(value) => variant(value).unwrap_or_else(|| value.to_string()),
     }

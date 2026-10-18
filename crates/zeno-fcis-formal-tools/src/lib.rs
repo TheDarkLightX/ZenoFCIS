@@ -1359,6 +1359,8 @@ impl ObligationScope {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ExportError {
+    /// The complete subject uses unsigned scalar semantics outside this exporter.
+    U128SubjectUnsupported,
     BackendNotSelected,
     UnsupportedMode,
     InvalidFormula,
@@ -1517,7 +1519,10 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::SignedMulDivFloor(..)
+                ValueExpr::U128(..)
+                | ValueExpr::ToI128(..)
+                | ValueExpr::ToU128(..)
+                | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
@@ -1652,6 +1657,12 @@ pub fn export_smt_with_limits(
     backend: ToolBackend,
     limits: ExportLimits,
 ) -> Result<ExportedObligation, ExportError> {
+    if match claim.formula() {
+        ClaimFormula::Relational(v) => v.uses_u128(),
+        ClaimFormula::Temporal(v) => v.uses_u128(),
+    } {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     if !matches!(backend, ToolBackend::Cvc5 | ToolBackend::Z3)
         || !claim.backends().contains(&backend.spec_backend())
     {
@@ -1751,6 +1762,9 @@ pub fn export_inductive_smt_with_limits(
     backend: ToolBackend,
     limits: ExportLimits,
 ) -> Result<ExportedObligation, ExportError> {
+    if spec.uses_u128() {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     if !matches!(backend, ToolBackend::Cvc5 | ToolBackend::Z3)
         || !claim.backends().contains(&backend.spec_backend())
     {
@@ -3597,7 +3611,10 @@ fn render_value_smt(
         // backend has no matching full-product semantics: refuse, never emit
         // an intermediate signed multiplication with different overflow rules.
         ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
-        ValueExpr::SignedMulDivFloor(..)
+        ValueExpr::U128(..)
+        | ValueExpr::ToI128(..)
+        | ValueExpr::ToU128(..)
+        | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
@@ -4018,13 +4035,15 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
             collect_value(b, paths);
             collect_value(d, paths);
         }
-        ValueExpr::Sum { body, .. } => collect_value(body, paths),
+        ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
+            collect_value(body, paths)
+        }
         ValueExpr::MulDiv(_, a, b, d) => {
             collect_value(a, paths);
             collect_value(b, paths);
             collect_value(d, paths);
         }
-        ValueExpr::Int(_) | ValueExpr::Var(_) => {}
+        ValueExpr::U128(_) | ValueExpr::Int(_) | ValueExpr::Var(_) => {}
     }
 }
 
@@ -6828,3 +6847,49 @@ mod legacy_cli;
 #[cfg(test)]
 #[path = "../../../verification/kernel-laws/src/oracle/formal_tools/model_comparison.rs"]
 mod model_comparison;
+#[cfg(test)]
+mod u128_binding_tests {
+    use super::*;
+    struct Missing;
+    impl original_logic::PredicateProvider for Missing {
+        fn evaluate(&self, _: &Identifier, _: &[i128]) -> Option<bool> {
+            None
+        }
+    }
+    #[test]
+    fn u128_exporters_and_kernel_oracles_refuse_before_short_circuit() {
+        for value in [0, 1, u128::MAX] {
+            let formula = RelExpr::And(
+                Box::new(RelExpr::Bool(false)),
+                Box::new(RelExpr::Compare(
+                    CompareOp::Eq,
+                    ValueExpr::U128(value),
+                    ValueExpr::U128(value),
+                )),
+            );
+            let claim = ClaimDecl::new(
+                StableId::new(600).unwrap(),
+                Identifier::try_new("unsigned_check").unwrap(),
+                vec![BackendId::Z3],
+                ClaimMode::Relational,
+                ClaimFormula::Relational(formula.clone()),
+            );
+            assert_eq!(
+                export_smt(&claim, ToolBackend::Z3).unwrap_err(),
+                ExportError::U128SubjectUnsupported
+            );
+            let step = original_logic::TraceStep::try_new(vec![]).unwrap();
+            let context = original_logic::EvaluationContext::new(
+                &step,
+                &Missing,
+                original_logic::EvalLimits::default(),
+            );
+            assert_eq!(
+                original_logic::evaluate_relational(&formula, context),
+                original_logic::EvalOutcome::Indeterminate(
+                    original_logic::IndeterminateReason::U128SubjectUnsupported
+                )
+            );
+        }
+    }
+}

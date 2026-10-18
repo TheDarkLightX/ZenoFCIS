@@ -217,6 +217,19 @@ pub fn elaborate_project(
         &mut diagnostics,
     );
 
+    for value in &types {
+        if value.kind() == TypeKind::U128 && value.unsigned_range().is_none() {
+            push(
+                &mut diagnostics,
+                DiagnosticCode::InvalidDeclaration,
+                span_for(&spans, 1, value.id()),
+                format!("type.{}.range", value.id().get()),
+                "explicit unsigned bounds",
+                "missing bounds",
+                "declare u128 in MIN..=MAX",
+            );
+        }
+    }
     let type_map: BTreeMap<StableId, TypeKind> = types
         .iter()
         .map(|value| (value.id(), value.kind()))

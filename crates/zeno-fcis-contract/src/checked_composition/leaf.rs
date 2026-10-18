@@ -209,6 +209,9 @@ pub(crate) fn bind(
         )
     };
     let rules = Rules::read(rules).map_err(route)?;
+    rules
+        .refuse_unsigned("checked composition")
+        .map_err(route)?;
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
         return Err(Refusal::new(
             Stage::Binding,
@@ -226,6 +229,9 @@ pub(crate) fn bind(
             "quantity interfaces require a quantity-aware composition profile",
         ));
     }
+    declarations
+        .refuse_unsigned("checked composition")
+        .map_err(route)?;
     let schema = schema::encode(&declarations).map_err(route)?;
     let commitment = schema_commitment(&schema).map_err(route)?;
     let contract = Contract::build(&declarations, &rules, commitment).map_err(route)?;
@@ -1200,4 +1206,27 @@ fn quantity_interfaces_refuse_before_legacy_composition_erasure() {
         error.reason(),
         "quantity interfaces require a quantity-aware composition profile"
     );
+}
+#[cfg(test)]
+#[test]
+fn u128_subject_refuses_at_composition_binding_even_if_all_values_are_small() {
+    for max in [1u128, u128::MAX] {
+        let source = format!(
+            "zeno 1; project 1 unsigned_leaf; type 100 state State; type 105 u128 Amount in 0..={max}; field 110 100 amount 105; merge []; "
+        );
+        let rules = r#"{"schema":"zeno-fcis/template-declarative-policy/4","template":"unsigned-leaf","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{},"variables":{},"cases":[{"when":true,"class":"Accept","reason":null,"post":{},"outbox":[]}],"genesis":{},"law_kinds":{}}"#;
+        let result = bind(
+            "unsigned",
+            false,
+            &sha256(source.as_bytes()),
+            &sha256(rules.as_bytes()),
+            &source,
+            rules,
+        );
+        let Err(e) = result else {
+            panic!("unsigned composition admitted")
+        };
+        assert_eq!(e.stage(), Stage::Binding);
+        assert_eq!(e.reason(), "U128SubjectUnsupported");
+    }
 }

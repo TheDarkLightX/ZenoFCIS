@@ -66,6 +66,23 @@ const APPLICATION: &[(&str, &str)] = &[
         include_str!("../contract-app/tests/decisions.rs"),
     ),
 ];
+const NUMERIC_APPLICATION: &[(&str, &str)] = &[
+    ("src/lib.rs", include_str!("../contract-app/numeric/lib.rs")),
+    (
+        "src/main.rs",
+        include_str!("../contract-app/numeric/main.rs"),
+    ),
+    (
+        "src/examples.rs",
+        include_str!("../contract-app/src/numeric_examples.rs"),
+    ),
+    (
+        "tests/decisions.rs",
+        include_str!("../contract-app/numeric/decisions.rs"),
+    ),
+];
+const NUMERIC_MANIFEST: &str = include_str!("../contract-app/numeric/Cargo.toml.in");
+const NUMERIC_README: &str = include_str!("../contract-app/numeric/README.md.in");
 const MANIFEST: &str = include_str!("../contract-app/Cargo.toml.in");
 const README: &str = include_str!("../contract-app/README.md.in");
 /// The examples file of an application whose contract supplies none.
@@ -421,15 +438,24 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
                 ),
             ));
         }
-        let manifest = MANIFEST
-            .replace("{package}", &package)
-            .replace("{version}", env!("CARGO_PKG_VERSION"));
+        let manifest = if generated.program().is_none() {
+            NUMERIC_MANIFEST
+        } else {
+            MANIFEST
+        }
+        .replace("{package}", &package)
+        .replace("{version}", env!("CARGO_PKG_VERSION"));
         let binding = binding::bind(&manifest, source).map_err(Failure::Binding)?;
         let manifest = format!("{manifest}{}", binding.patch);
         let lock = binding
             .application_lock(&manifest)
             .map_err(Failure::Binding)?;
-        let readme = README.replace("{package}", &package);
+        let readme = if generated.program().is_none() {
+            NUMERIC_README
+        } else {
+            README
+        }
+        .replace("{package}", &package);
         let mut files: Vec<(String, Vec<u8>)> = vec![
             ("Cargo.toml".to_owned(), manifest.into_bytes()),
             ("Cargo.lock".to_owned(), lock),
@@ -444,14 +470,22 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
                 .into_iter()
                 .map(|(name, bytes)| (name, bytes.to_vec())),
         );
-        files.extend(APPLICATION.iter().map(|(name, source)| {
-            (
-                (*name).to_owned(),
-                source
-                    .replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION"))
-                    .into_bytes(),
-            )
-        }));
+        files.extend(
+            if generated.program().is_none() {
+                NUMERIC_APPLICATION
+            } else {
+                APPLICATION
+            }
+            .iter()
+            .map(|(name, source)| {
+                (
+                    (*name).to_owned(),
+                    source
+                        .replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION"))
+                        .into_bytes(),
+                )
+            }),
+        );
         if let Some(toolchain) = binding.toolchain {
             files.push(("rust-toolchain.toml".to_owned(), toolchain));
         }
@@ -507,7 +541,13 @@ pub(crate) fn export_program(dir: &Path, out: &Path, format: OutputFormat) -> u8
         Ok(generated) => generated,
         Err(failure) => return report_failure(dir, failure, format),
     };
-    let program = generated.program();
+    let Some(program) = generated.program() else {
+        return refuse(
+            "U128SubjectUnsupported",
+            "raw program export does not support U128".to_owned(),
+            INVALID,
+        );
+    };
     if let Err(error) = atomic_create(out, program) {
         let message = format!("write {}: {error}", out.display());
         return refuse("program-write-failed", message, FAILURE);

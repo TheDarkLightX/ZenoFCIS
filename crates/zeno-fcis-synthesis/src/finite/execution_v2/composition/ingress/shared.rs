@@ -51,6 +51,17 @@ pub(in super::super) fn reify(leaf: LeafView<'_>, code: Atom<'static>) -> Option
             Atom::I128(v) => super::reify(l, v),
             _ => None,
         },
+        LeafView::Numeric(Domain::Sum { type_id, variants }) => match code {
+            Atom::I128(v) => {
+                let variant = u16::try_from(v).ok()?;
+                if variants.contains(&variant) {
+                    Some(Atom::Sum { type_id, variant })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
         LeafView::Numeric(d) => {
             if super::super::schema_validation::atom(d, code) {
                 Some(code)
@@ -80,7 +91,7 @@ fn reify_fields(fields: FieldsView<'_>, codes: &[Atom<'static>]) -> Option<Vec<F
             while i < fs.len() {
                 result.push(Field {
                     id: fs[i].id,
-                    value: codes[i],
+                    value: reify(LeafView::Numeric(fs[i].leaf), codes[i])?,
                 });
                 i += 1;
             }

@@ -29,7 +29,7 @@ sign or leading zero.
 <!-- policy-keys: file -->
 | Key | Required | Value |
 |---|---|---|
-| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"` for historical declarations, or `/3` for declarations with units and scales. |
+| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"` for historical declarations, `/3` for declarations with units and scales, or `/4` for typed U128 contracts. |
 | `template` | yes | The application's name. `new --contract` uses it as the Cargo package name, so there it must be at most 64 lowercase letters, digits and `-`, starting with a letter. |
 | `roots` | yes | Always `{"state": 100, "command": 101, "context": 102}`; see [Roots](#roots). |
 | `leaf_bindings` | yes | Type ID to leaf; see [Leaf bindings](#leaf-bindings). May be `{}`. |
@@ -121,7 +121,7 @@ integer, or expression text. Expression text has:
 | `>=` | at least |
 | `+` | add |
 | `-` | subtract; also prefix negation |
-| `*` | checked signed i128 multiply in rules and signed laws |
+| `*` | checked multiply of matching integer kinds in rules and laws |
 
   Prefix `!` negates a boolean. Other binary operators group to the left.
 
@@ -131,9 +131,12 @@ integer, or expression text. Expression text has:
 | Function | Meaning |
 |---|---|
 | `choose` | `choose(c, a, b)` is `a` when `c` holds, else `b`. |
+| `u128` | `u128(0)` writes an unsigned decimal literal in 0..=2^128-1, with no sign or leading zero. |
+| `to_i128` | `to_i128(a)` explicitly converts U128 to I128, refusing above 2^127-1. |
+| `to_u128` | `to_u128(a)` explicitly converts I128 to U128, refusing negative values. |
 | `div_floor` | `div_floor(a, b)`: mathematical division rounded down, including negative divisors. |
 | `div_ceil` | `div_ceil(a, b)`: mathematical division rounded up, including negative divisors. |
-| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative i128 factors, positive denominator, exact intermediate product and final i128 fit. |
+| `mul_div_floor` | `mul_div_floor(a, b, d)`: explicit fused floor in rules, with nonnegative matching I128 or U128 factors, positive denominator, exact intermediate product and final result-kind fit. |
 | `signed_mul_div_floor` | `signed_mul_div_floor(a, b, d)`: signed exact-product floor division with a positive denominator and a final i128 fit check. |
 | `mul_div_ceil` | `mul_div_ceil(a, b, d)`: the same fused rule operation rounded up. |
 | `products_ge` | `products_ge(a, b, c, d)` compares `a*b >= c*d`. Every factor is nonnegative; products are exact, with no intermediate narrowing. Rules and laws support this predicate. |
@@ -207,6 +210,29 @@ Those policies also bound source alias expansion to 65,536 visits and depth
 256. Policy/3 may be used without quantity annotations to select these limits.
 Historical policy/2 contracts using only historical syntax retain their
 original admission, canonical bytes, eager traps and resource budgets.
+
+Policy/4 supports `type 105 u128 Amount in 0..=340282366920938463463374607431768211455;`.
+It also permits explicit opt-in for a signed-only contract. Strict kinds then
+apply to every expression binding, including unused variables. The selected
+profile is bound in the policy identity.
+Bounds are mandatory. Genesis values use `"u128(0)"` expression strings.
+Bool, I128 and U128 are distinct kinds: arithmetic, comparisons and select
+arms require matching kinds; conversions are explicit. Unsigned add, subtract
+and multiply check the full U128 range. Fused unsigned floor and ceiling use
+an exact wide product and check the final quotient, including ceiling's
+increment. Quantity rules above also apply to U128 with unsigned fit bounds;
+casts preserve units and scales. Arithmetic traps refuse the whole decision,
+including in unused eager branches. Laws and delivery sums retain full-width
+unsigned values and refuse overflow. The schema uses its existing U128 kind
+and canonical value tag. Prior policy/2 and policy/3 bytes are retained.
+
+The supported typed path is contract build, new, review, gaps and lemma,
+through the original library Authority and catalog. Review of a large domain
+reports bounded probes rather than exhaustive coverage. U128 tables, scalar
+program exports, emitters, symbolic/Tau exports, search, optimizer, loop
+doors, composition, SQLite migration and kernel-law oracles refuse U128
+subjects at binding. Source-proof qualification is deferred to the 2.5.1
+freeze; native checks alone do not qualify these changes for release.
 
 ## Cases
 

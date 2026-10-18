@@ -35,6 +35,7 @@ pub(crate) mod seeds;
 mod table;
 #[cfg(test)]
 mod tests;
+mod unsigned;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -97,7 +98,7 @@ pub(crate) struct ReviewSources<'a> {
 pub(crate) struct Review {
     packet: String,
     summary: Summary,
-    law_refusals: Vec<LawRefusal>,
+    law_refusals: Vec<String>,
     gaps: Option<gaps::Gaps>,
 }
 
@@ -118,7 +119,7 @@ impl Review {
 
     /// One line for each law-refusal finding.
     pub(crate) fn law_refusal_lines(&self) -> Vec<String> {
-        self.law_refusals.iter().map(LawRefusal::line).collect()
+        self.law_refusals.clone()
     }
 }
 
@@ -317,6 +318,9 @@ fn review_with(
     gap_options: Option<gaps::Options<'_>>,
 ) -> Result<Review, ContractError> {
     let rules = Rules::read(sources.rules)?;
+    if rules.unsigned {
+        return unsigned::review(sources, max_tuples, gap_options);
+    }
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;
@@ -518,7 +522,7 @@ fn review_with(
     Ok(Review {
         packet: crate::transform::canonical_json(&packet),
         summary,
-        law_refusals,
+        law_refusals: law_refusals.iter().map(LawRefusal::line).collect(),
         gaps: gap_result,
     })
 }

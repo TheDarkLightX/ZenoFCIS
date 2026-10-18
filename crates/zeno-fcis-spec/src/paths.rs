@@ -242,6 +242,8 @@ fn relation_paths<'a>(expr: &'a RelExpr, paths: &mut Vec<&'a ProjectionPath>) {
 
 fn value_paths<'a>(expr: &'a ValueExpr, paths: &mut Vec<&'a ProjectionPath>) {
     match expr {
+        ValueExpr::U128(_) => {}
+        ValueExpr::ToI128(v) | ValueExpr::ToU128(v) => value_paths(v, paths),
         ValueExpr::Int(_) | ValueExpr::Var(_) => {}
         ValueExpr::Projection(path) => paths.push(path),
         ValueExpr::Add(left, right)

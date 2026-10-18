@@ -33,6 +33,11 @@ pub fn encode(declarations: &Declarations) -> Result<Vec<u8>, ContractError> {
         text(&mut bytes, &declared.name)?;
         match &declared.form {
             Form::Leaf(Leaf::Bool) => bytes.push(BOOL),
+            Form::Leaf(Leaf::U128 { min, max }) => {
+                bytes.push(2);
+                bytes.extend_from_slice(&min.to_be_bytes());
+                bytes.extend_from_slice(&max.to_be_bytes());
+            }
             Form::Leaf(Leaf::I128 { min, max }) => {
                 bytes.push(I128);
                 bytes.extend_from_slice(&min.to_be_bytes());

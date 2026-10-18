@@ -26,10 +26,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::U128(_)
+            | ValueExpr::Int(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)

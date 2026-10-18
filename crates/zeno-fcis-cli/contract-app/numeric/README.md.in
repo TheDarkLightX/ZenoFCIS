@@ -1,0 +1,15 @@
+# {package}
+
+The contract's declarations and policy generate a typed library Authority.
+Run `cargo test --locked --offline` to check the decision examples, original
+publication bytes, genesis and replay. `cargo run --locked --offline` checks
+all decision examples. Unsigned decimal values retain all 128 bits.
+
+The library exposes `authority`, `wire`, `genesis`, `examples` and `check`.
+The Authority evaluates and publishes; these helpers only frame inputs and
+compare complete decisions. The scaffold does not provide the signed SQLite
+session or migration commands; passing an operational argument refuses with
+`U128SubjectUnsupported`.
+
+Regenerate contract data after editing `project.zeno` or `v2/policy.json`.
+Examples describe intended behavior; generation alone does not establish it.

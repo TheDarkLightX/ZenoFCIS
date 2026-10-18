@@ -120,6 +120,7 @@ impl Default for DiagnosticLimits {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ModelReason {
+    U128SubjectUnsupported,
     MissingProjection,
     MissingPredicate,
     Overflow,
@@ -231,6 +232,9 @@ impl Fuel {
 /// Evaluates one relational formula over an immutable context.
 #[must_use]
 pub(super) fn check_relation(formula: &RelExpr, context: ModelContext<'_>) -> DiagnosticOutcome {
+    if formula.uses_u128() {
+        return DiagnosticOutcome::Indeterminate(ModelReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_rel(formula);
     if formula_exceeds_hard_limits(shape) || shape.0 > operation_bound(context.limits) {
         return DiagnosticOutcome::Indeterminate(ModelReason::ResourceLimit);
@@ -252,6 +256,9 @@ pub(super) fn check_trace(
     trace: &[ModelStep],
     limits: DiagnosticLimits,
 ) -> TemporalDiagnosis {
+    if formula.uses_u128() {
+        return TemporalDiagnosis::Indeterminate(ModelReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_temporal(formula);
     if formula_exceeds_hard_limits(shape) {
         return TemporalDiagnosis::Indeterminate(ModelReason::ResourceLimit);
@@ -403,7 +410,10 @@ fn eval_value<'formula>(
         ValueExpr::Mul(left, right) => eval_value(left, step, variables, fuel)?
             .checked_mul(eval_value(right, step, variables, fuel)?)
             .ok_or(ModelReason::Overflow),
-        ValueExpr::SignedMulDivFloor(..)
+        ValueExpr::U128(..)
+        | ValueExpr::ToI128(..)
+        | ValueExpr::ToU128(..)
+        | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => Err(ModelReason::UnsupportedArithmetic),
         ValueExpr::Div(mode, left, right) => divide(
@@ -556,7 +566,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((b, next));
                 stack.push((d, next));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
             ValueExpr::MulDiv(_, a, b, d) => {
@@ -564,7 +574,10 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                     stack.push((child, current_depth.saturating_add(1)));
                 }
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::U128(_)
+            | ValueExpr::Int(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)

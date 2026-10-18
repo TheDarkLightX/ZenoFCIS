@@ -125,6 +125,9 @@ fn compare(ring: &Ring, n: usize) -> u64 {
         .input_domains
         .iter()
         .map(|domain| match domain {
+            ScalarDomain::Unsigned { .. } => {
+                panic!("U128SubjectUnsupported: legacy differential fixture")
+            }
             ScalarDomain::Bool => (0, 1),
             ScalarDomain::Int { min, max } => (*min, *max),
         })

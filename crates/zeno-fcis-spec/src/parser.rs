@@ -2,6 +2,7 @@
 
 use alloc::boxed::Box;
 use alloc::format;
+use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -152,6 +153,7 @@ impl Parser {
             "data" => TypeKind::Data,
             "bool" => TypeKind::Bool,
             "int" => TypeKind::Int,
+            "u128" => TypeKind::U128,
             _ => {
                 self.error(
                     DiagnosticCode::InvalidDeclaration,
@@ -166,7 +168,24 @@ impl Parser {
         let name = self.take_identifier("type.name")?;
         let declared = TypeDecl::new(id, kind, name);
         let declared = if self.take_keyword("in") {
-            self.parse_int_range(declared)
+            if kind == TypeKind::U128 {
+                let min = self.take_unsigned("u128.min")?;
+                self.expect_symbol(TokenKind::Range, "u128 range");
+                self.expect_symbol(TokenKind::Equal, "u128 inclusive range");
+                let max = self.take_unsigned("u128.max")?;
+                declared.with_unsigned_range(min, max).or_else(|| {
+                    self.error(
+                        DiagnosticCode::InvalidDeclaration,
+                        "u128.range",
+                        "min <= max",
+                        "reversed",
+                        "use inclusive unsigned bounds",
+                    );
+                    None
+                })?
+            } else {
+                self.parse_int_range(declared)
+            }
         } else {
             declared
         };
@@ -175,8 +194,43 @@ impl Parser {
         } else {
             declared
         };
+        if kind == TypeKind::U128 && declared.unsigned_range().is_none() {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "u128.range",
+                "in MIN..=MAX",
+                "missing",
+                "declare unsigned bounds",
+            );
+        }
         self.expect_symbol(TokenKind::Semicolon, "type");
         Some(declared)
+    }
+    fn take_unsigned(&mut self, context: &str) -> Option<u128> {
+        if let TokenKind::Number(n) = self.current().kind {
+            let span = self.current().span;
+            self.advance();
+            if span.end() - span.start() != n.to_string().len() as u32 {
+                self.error(
+                    DiagnosticCode::InvalidNumber,
+                    context,
+                    "canonical unsigned decimal",
+                    "leading zero",
+                    "use canonical unsigned decimal",
+                );
+                return None;
+            }
+            Some(n)
+        } else {
+            self.error(
+                DiagnosticCode::InvalidNumber,
+                context,
+                "unsigned decimal",
+                "invalid",
+                "use canonical unsigned decimal",
+            );
+            None
+        }
     }
     fn parse_scale(&mut self) -> Option<u8> {
         let text = self.take_identifier("quantity.scale")?;
@@ -789,7 +843,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor")
+                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor" | "u128" | "to_i128" | "to_u128")
         );
         if named_predicate {
             let name = self
@@ -905,6 +959,24 @@ impl Parser {
             });
             self.expect_symbol(TokenKind::RParen, "value");
             return value;
+        }
+        if self.take_keyword("u128") {
+            self.expect_symbol(TokenKind::LParen, "u128 literal");
+            let value = self.take_unsigned("u128.literal").unwrap_or(0);
+            self.expect_symbol(TokenKind::RParen, "u128 literal");
+            return ValueExpr::U128(value);
+        }
+        for (name, signed) in [("to_i128", true), ("to_u128", false)] {
+            if self.take_keyword(name) {
+                self.expect_symbol(TokenKind::LParen, "numeric cast");
+                let value = self.nested("numeric cast", ValueExpr::Int(0), |p| p.parse_value());
+                self.expect_symbol(TokenKind::RParen, "numeric cast");
+                return if signed {
+                    ValueExpr::ToI128(Box::new(value))
+                } else {
+                    ValueExpr::ToU128(Box::new(value))
+                };
+            }
         }
         let name = self
             .take_identifier("value")

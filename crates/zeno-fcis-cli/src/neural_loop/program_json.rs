@@ -16,6 +16,8 @@ use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 /// Why a JSON program could not become an admitted canonical program.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProgramJsonError {
+    /// Typed unsigned subjects have no signed scalar artifact ABI.
+    U128SubjectUnsupported,
     /// The value is not an object with exactly inputs, outputs, nodes, roots.
     Shape,
     /// A domain object is malformed.
@@ -55,6 +57,7 @@ fn domain(value: &Value, position: usize) -> Result<Domain, ProgramJsonError> {
     let error = || ProgramJsonError::Domain { position };
     let fields = value.as_object().ok_or_else(error)?;
     match (fields.get("kind").and_then(Value::as_str), fields.len()) {
+        (Some("U128"), _) => Err(ProgramJsonError::U128SubjectUnsupported),
         (Some("Bool"), 1) => Ok(Domain::Bool),
         (Some("Int"), 3) => Ok(Domain::Int {
             min: decimal(fields.get("min").ok_or_else(error)?)?,
@@ -73,6 +76,9 @@ fn node(value: &Value, index: usize) -> Result<Op, ProgramJsonError> {
     let items = value.as_array().ok_or_else(error)?;
     let id = |position: usize| reference(items.get(position)?);
     let op = match (items.first().and_then(Value::as_str), items.len()) {
+        (Some("U128" | "ToU128" | "ToI128"), _) => {
+            return Err(ProgramJsonError::U128SubjectUnsupported);
+        }
         (Some("Input"), 2) => Op::Input(id(1).ok_or_else(error)?),
         (Some("Int"), 2) => Op::Int(decimal(&items[1])?),
         (Some("Bool"), 2) => Op::Bool(items[1].as_bool().ok_or_else(error)?),
@@ -232,6 +238,7 @@ pub(crate) fn typed_values(domains: &[Domain], values: &[i128]) -> Value {
 impl ProgramJsonError {
     pub(crate) fn json(&self) -> Value {
         match self {
+            ProgramJsonError::U128SubjectUnsupported => json!({"reason":"U128SubjectUnsupported"}),
             ProgramJsonError::Shape => json!({"reason": "program-json-shape"}),
             ProgramJsonError::Domain { position } => {
                 json!({"reason": "program-json-domain", "position": position})

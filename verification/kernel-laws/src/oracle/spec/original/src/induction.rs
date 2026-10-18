@@ -79,6 +79,13 @@ pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr
 
 fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
     Some(match value {
+        ValueExpr::U128(_)
+        | ValueExpr::ToI128(_)
+        | ValueExpr::ToU128(_)
+        | ValueExpr::MulDiv(..)
+        | ValueExpr::SignedMulDivFloor(..)
+        | ValueExpr::ScaledMulDiv(..)
+        | ValueExpr::RepeatMulDiv(..) => return None,
         ValueExpr::Int(value) => ValueExpr::Int(*value),
         ValueExpr::Var(name) => ValueExpr::Var(name.clone()),
         ValueExpr::Projection(path) if path.root() == ProjectionRoot::Pre => {

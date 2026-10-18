@@ -1203,7 +1203,10 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     );
     assert_eq!(generated.previous()[0].policy(), counter.policy);
     assert_ne!(generated.policy(), counter.policy, "the program changed");
-    assert_eq!(generated.program(), padded_once);
+    assert_eq!(
+        generated.program().expect("legacy signed program"),
+        padded_once
+    );
     assert!(generated.source().contains("pub const VERSION: u32 = 2;"));
     assert!(
         generated
@@ -1453,7 +1456,11 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
         counter.policy,
         "the edit changes the policy"
     );
-    assert_eq!(fresh.program(), original, "but not the decision program");
+    assert_eq!(
+        fresh.program().expect("legacy signed program"),
+        original,
+        "but not the decision program"
+    );
     let refused = generate_contract(ContractSources {
         rules: &adopted,
         adoptions: &files,

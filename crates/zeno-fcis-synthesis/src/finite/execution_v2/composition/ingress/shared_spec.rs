@@ -23,18 +23,19 @@ pub(in super::super::super) open spec fn valid(schema:SchemaView)->bool {
 pub(in super::super::super) open spec fn reify(leaf:LeafView,code:Atom<'static>)->Option<Atom<'static>> {
     match leaf {
         LeafView::Legacy(l)=>match code {Atom::I128(v)=>if i128::MIN<=v<=i128::MAX {legacy::reify(*l,v as i128)}else{None},_=>None},
+        LeafView::Numeric(Domain::Sum{type_id,variants})=>match code{Atom::I128(v)=>if 0<=v<=u16::MAX&&(exists|i:int|0<=i<variants@.len()&&variants@[i] as int==v){Some(Atom::Sum{type_id,variant:v as u16})}else{None},_=>None},
         LeafView::Numeric(d)=>if super::super::super::schema_validation::spec::atom(d,code){Some(code)}else{None},
     }
 }
 pub(in super::super::super) open spec fn numeric_fields(fs:Seq<input_view::Field<Domain>>,codes:Seq<Atom<'static>>,n:nat)->Seq<Field<'static>> {
-    Seq::new(n,|i:int|Field{id:fs[i].id,value:codes[i]})
+    Seq::new(n,|i:int|Field{id:fs[i].id,value:match reify(LeafView::Numeric(fs[i].leaf),codes[i]){Some(v)=>v,None=>Atom::I128(0)}})
 }
 pub(in super::super::super) open spec fn fields(fs:FieldsView,codes:Seq<Atom<'static>>)->Option<Seq<Field<'static>>> {
     match fs {
         FieldsView::Legacy(fs)=>match super::super::super::super::numeric::spec::project_all(codes) {
             None=>None,Some(values)=>legacy::fields(fs@,values,fs@.len()),
         },
-        FieldsView::Numeric(fs)=>if fs@.len()!=codes.len(){None}else{Some(numeric_fields(fs@,codes,fs@.len()))},
+        FieldsView::Numeric(fs)=>if fs@.len()!=codes.len() || !(forall|i:int|0<=i<codes.len()==>reify(LeafView::Numeric(fs@[i].leaf),codes[i]).is_some()){None}else{Some(numeric_fields(fs@,codes,fs@.len()))},
     }
 }
 pub(in super::super::super) open spec fn decoded<'a>(d:Decoded<'a,Atom<'static>>)->(legacy::ValueView<'a>,Seq<Atom<'static>>) {

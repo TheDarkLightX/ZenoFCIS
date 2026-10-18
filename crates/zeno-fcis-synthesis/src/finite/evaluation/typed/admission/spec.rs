@@ -26,8 +26,10 @@ pub(crate) open spec fn kind(op:NumericOp,inputs:Seq<Domain>,previous:Seq<Kind>)
  let k=if matches!(w,IntegerWidth::Unsigned128){Kind::Unsigned}else{Kind::Signed};pair(previous,a,b,k,k)
  },
  NumericOp::Mul(w,a,b)|NumericOp::DivFloor(w,a,b)|NumericOp::DivCeil(w,a,b)=>{
-     if w==IntegerWidth::Unsigned128 {Err(AdmissionFailure::TypeMismatch)}else{pair(previous,a,b,Kind::Signed,Kind::Signed)}
+     let k=if w==IntegerWidth::Unsigned128{Kind::Unsigned}else{Kind::Signed};pair(previous,a,b,k,k)
  },
+ NumericOp::ToI128(a)=>match require_kind(previous,a,Kind::Unsigned){Err(e)=>Err(e),Ok(())=>Ok(Kind::Signed)},
+ NumericOp::ToU128(a)=>match require_kind(previous,a,Kind::Signed){Err(e)=>Err(e),Ok(())=>Ok(Kind::Unsigned)},
  NumericOp::SignedMulDivFloor(a,b,d)=>signed_triple(previous,a,b,d),
  NumericOp::NonnegativeMulDivFloor(w,a,b,d)|NumericOp::NonnegativeMulDivCeil(w,a,b,d)=>{
      if w==IntegerWidth::Unsigned128 {Err(AdmissionFailure::TypeMismatch)}else{signed_triple(previous,a,b,d)}

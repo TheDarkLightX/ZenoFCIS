@@ -62,7 +62,7 @@ pub fn bind(
                     declarations
                         .kind(declared.type_id)
                         .map_err(|error| error.to_string())?,
-                    TypeKind::I128 { .. }
+                    TypeKind::I128 { .. } | TypeKind::U128 { .. }
                 ) {
                     return Err(format!(
                         "channel {} payload field {field} must be an I128 integer",
@@ -78,8 +78,22 @@ pub fn bind(
                 channel.id
             ));
         }
+        let unsigned = match observation.field {
+            Some(id) => declarations
+                .fields(channel.payload)
+                .ok()
+                .and_then(|fields| fields.iter().find(|f| f.id == id))
+                .and_then(|f| declarations.kind(f.type_id).ok())
+                .is_some_and(|k| matches!(k, TypeKind::U128 { .. })),
+            None => false,
+        };
+        let kind = if unsigned { Kind::Unsigned } else { Kind::Int };
         let selected_channel = graph.int(i128::from(channel.id))?;
-        let zero = graph.int(0)?;
+        let zero = if unsigned {
+            graph.uint(0)
+        } else {
+            graph.int(0)?
+        };
         let one = graph.int(1)?;
         let mut total = zero;
         // Even a zero bound retains an inactive observation in the canonical
@@ -110,10 +124,14 @@ pub fn bind(
                     Observation::OutboxPayload(index, field),
                     Kind::Raw,
                     Some(matches),
-                    Atom::I128(0),
+                    if unsigned {
+                        Atom::U128(0)
+                    } else {
+                        Atom::I128(0)
+                    },
                 )?,
             };
-            total = graph.op(Op::Add(total.index, amount.index), Kind::Int)?;
+            total = graph.op(Op::Add(total.index, amount.index), kind)?;
         }
         graph.bind(name.clone(), total);
     }

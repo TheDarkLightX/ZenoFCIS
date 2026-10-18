@@ -352,6 +352,13 @@ pub fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i128]) -> O
         command: &frames[1],
         context: &frames[2],
     });
+    from_evaluation(&evaluation)
+}
+
+/// Normalize an actual evaluation without projecting unsigned values through i128.
+pub fn from_evaluation(
+    evaluation: &zeno_fcis_synthesis::finite::v2_authority::Evaluation<'_>,
+) -> Outcome {
     match evaluation.result() {
         Ok(candidate) => decision(candidate),
         Err(refusal) => {
@@ -481,6 +488,18 @@ impl<'d> LawSet<'d> {
     /// every other law of the descriptor. An ID the descriptor lacks is
     /// skipped.
     pub fn new(descriptor: &c::Descriptor<'d>, ids: &[u32]) -> Self {
+        Self::from_parts(descriptor.laws, descriptor.required, descriptor.limits, ids)
+    }
+    /// The same selected-law check for a full-width numeric descriptor.
+    pub fn new_numeric(descriptor: &c::NumericDescriptor<'d>, ids: &[u32]) -> Self {
+        Self::from_parts(descriptor.laws, descriptor.required, descriptor.limits, ids)
+    }
+    fn from_parts(
+        all_laws: &[laws::Law<'d>],
+        required: &'d [u32],
+        limits: V2Limits,
+        ids: &[u32],
+    ) -> Self {
         let copy = |law: &laws::Law<'d>| laws::Law {
             id: law.id,
             kind: law.kind,
@@ -493,13 +512,12 @@ impl<'d> LawSet<'d> {
         };
         let mut laws: Vec<laws::Law<'d>> = ids
             .iter()
-            .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
+            .filter_map(|id| all_laws.iter().find(|law| law.id == *id))
             .map(copy)
             .collect();
         let selected = laws.len();
         laws.extend(
-            descriptor
-                .laws
+            all_laws
                 .iter()
                 .filter(|law| !ids.contains(&law.id))
                 .map(copy),
@@ -508,14 +526,25 @@ impl<'d> LawSet<'d> {
         let frame = laws::Frame::Genesis {
             initial: laws::RootView::Record(&empty),
         };
-        let (_, usage, _, _) = laws::evaluate(&[], &[], &frame, descriptor.limits).into_parts();
+        let (_, usage, _, _) = laws::evaluate(&[], &[], &frame, limits).into_parts();
         Self {
             laws,
             selected,
-            required: descriptor.required,
-            limits: descriptor.limits,
+            required: required,
+            limits: limits,
             usage,
         }
+    }
+    /// Evaluate selected laws on an explicit immutable frame, with no decision authority.
+    pub fn on_frame(&self, frame: &laws::Frame<'_>) -> (bool, Vec<laws::Diagnostic>) {
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, frame, self.limits).into_parts();
+        let selected = self.selected(&diagnostics).map(<[_]>::to_vec);
+        let ok = selected.as_ref().is_some_and(|ds| {
+            ds.iter()
+                .all(|d| !matches!(d.verdict, laws::Verdict::Refused(_)))
+        });
+        (ok, selected.unwrap_or(diagnostics))
     }
 
     /// The IDs of the selected laws, in order.

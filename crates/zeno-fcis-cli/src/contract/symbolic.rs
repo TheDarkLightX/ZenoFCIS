@@ -197,7 +197,9 @@ pub(crate) fn check(
     solve: &mut Solve<'_>,
 ) -> Result<Checked, ContractError> {
     let rules = Rules::read(sources.rules)?;
+    rules.refuse_unsigned("symbolic export")?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
+    declarations.refuse_unsigned("symbolic export")?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;
     let contract = Contract::build(&declarations, &rules, commitment)?;

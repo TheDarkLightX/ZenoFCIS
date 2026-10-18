@@ -203,6 +203,7 @@ impl Core {
 
     fn from_sources(project: String, rules_text: String) -> Result<Self> {
         let rules = Rules::read(&rules_text)?;
+        rules.refuse_unsigned("loop binding")?;
         let declarations = Declarations::read(&project, &rules.leaf_bindings)?;
         let positions = domain::positions(&declarations)?;
         match domain::domain_size(&positions) {
@@ -329,6 +330,7 @@ impl Core {
         let genesis_values: Vec<i128> = positions[..state_width]
             .iter()
             .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
+                Some(Constant::U128(_)) => invalid("U128SubjectUnsupported"),
                 Some(Constant::Bool(b)) => Ok(i128::from(*b)),
                 Some(Constant::Int(v)) => Ok(*v),
                 None => invalid("v2/policy.json genesis misses a state field"),

@@ -150,6 +150,7 @@ impl Default for EvalLimits {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IndeterminateReason {
+    U128SubjectUnsupported,
     MissingProjection,
     MissingPredicate,
     Overflow,
@@ -268,6 +269,9 @@ pub fn evaluate_relational<P: PredicateProvider + ?Sized>(
     formula: &RelExpr,
     context: EvaluationContext<'_, P>,
 ) -> EvalOutcome {
+    if formula.uses_u128() {
+        return EvalOutcome::Indeterminate(IndeterminateReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_rel(formula);
     if formula_exceeds_hard_limits(shape) || shape.0 > operation_bound(context.limits) {
         return EvalOutcome::Indeterminate(IndeterminateReason::ResourceLimit);
@@ -296,6 +300,9 @@ pub fn evaluate_temporal<P: PredicateProvider + ?Sized>(
     predicates: &P,
     limits: EvalLimits,
 ) -> TemporalEvaluation {
+    if formula.uses_u128() {
+        return TemporalEvaluation::Indeterminate(IndeterminateReason::U128SubjectUnsupported);
+    }
     let shape = formula_shape_temporal(formula);
     if formula_exceeds_hard_limits(shape) {
         return TemporalEvaluation::Indeterminate(IndeterminateReason::ResourceLimit);
@@ -435,6 +442,9 @@ fn eval_value<'formula>(
         | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => Err(IndeterminateReason::MissingPredicate),
+        ValueExpr::U128(_) | ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
+            Err(IndeterminateReason::U128SubjectUnsupported)
+        }
         ValueExpr::Int(value) => Ok(*value),
         ValueExpr::Var(name) => variables
             .iter()

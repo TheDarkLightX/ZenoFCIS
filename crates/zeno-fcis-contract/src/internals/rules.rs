@@ -416,6 +416,7 @@ impl LawKind {
 pub enum Constant {
     Bool(bool),
     Int(i128),
+    U128(u128),
 }
 
 #[derive(Clone, Debug)]
@@ -457,6 +458,7 @@ pub struct DeliveryObservation {
 #[derive(Clone, Debug)]
 pub struct Rules {
     pub quantities: bool,
+    pub unsigned: bool,
     pub template: String,
     pub leaf_bindings: BTreeMap<u32, Leaf>,
     pub variables: BTreeMap<String, Ast>,
@@ -471,12 +473,41 @@ pub struct Rules {
 }
 
 impl Rules {
+    /// Refuse the entire typed subject before a legacy consumer inspects any values.
+    pub fn refuse_unsigned(&self, consumer: &str) -> Result<(), super::ContractError> {
+        if self.unsigned
+            || self.variables.values().any(super::expr::uses_unsigned)
+            || self
+                .genesis
+                .values()
+                .any(|v| matches!(v, Constant::U128(_)))
+            || self.cases.iter().any(|case| {
+                super::expr::uses_unsigned(&case.when)
+                    || case.post.values().any(super::expr::uses_unsigned)
+                    || case
+                        .outbox
+                        .iter()
+                        .any(|delivery| delivery.payload.values().any(super::expr::uses_unsigned))
+            })
+        {
+            Err(super::ContractError::new(
+                consumer,
+                "U128SubjectUnsupported",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn read(source: &str) -> Result<Self, ContractError> {
         let json = parse(source)?;
         let file = Object::new(&json, FILE)?;
         file.only(&FILE_KEYS)?;
         let schema = file.text("schema")?;
-        if schema != RULES_SCHEMA && schema != "zeno-fcis/template-declarative-policy/3" {
+        if schema != RULES_SCHEMA
+            && schema != "zeno-fcis/template-declarative-policy/3"
+            && schema != "zeno-fcis/template-declarative-policy/4"
+        {
             return Err(file.error(
                 "schema",
                 format!("expected `{RULES_SCHEMA}`, found `{schema}`"),
@@ -544,6 +575,12 @@ impl Rules {
                 let constant = match value {
                     Json::Bool(value) => Constant::Bool(*value),
                     Json::Int(value) => Constant::Int(*value),
+                    Json::Text(value) => {
+                        match expr::parse(value).map_err(|e| file.error("genesis", e))? {
+                            Ast::U128(n) => Constant::U128(n),
+                            _ => return Err(file.error("genesis", "expected U128 literal")),
+                        }
+                    }
                     _ => {
                         return Err(ContractError::new(
                             place,
@@ -606,7 +643,8 @@ impl Rules {
                 .collect::<Result<_, ContractError>>()?,
         };
         Ok(Self {
-            quantities: schema.ends_with("/3"),
+            quantities: schema.ends_with("/3") || schema.ends_with("/4"),
+            unsigned: schema.ends_with("/4"),
             template: template.to_owned(),
             leaf_bindings,
             variables,

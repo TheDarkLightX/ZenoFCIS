@@ -176,6 +176,7 @@ fn genesis_values(loaded: &Loaded) -> Option<Vec<i128>> {
         .iter()
         .map(
             |position| match loaded.rules.genesis.get(&position.field?)? {
+                Constant::U128(_) => None,
                 Constant::Bool(value) => Some(i128::from(*value)),
                 Constant::Int(value) => Some(*value),
             },

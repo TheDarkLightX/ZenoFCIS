@@ -10,6 +10,9 @@ pub(crate) mod spec;
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::leaf(domain),))]
 pub(in super::super) fn leaf(domain: Domain<'_>) -> bool {
     match domain {
+        Domain::Sum { variants, .. } => {
+            !variants.is_empty() && variants.windows(2).all(|w| w[0] < w[1])
+        }
         Domain::Bool => true,
         Domain::I128 { min, max } => min <= max,
         Domain::U128 { min, max } => min <= max,
@@ -20,10 +23,34 @@ pub(in super::super) fn leaf(domain: Domain<'_>) -> bool {
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::same_domain(a,b),))]
 pub(in super::super) fn same_domain(a: Domain<'_>, b: Domain<'_>) -> bool {
     match (a, b) {
+        (
+            Domain::Sum {
+                type_id: a,
+                variants: x,
+            },
+            Domain::Sum {
+                type_id: b,
+                variants: y,
+            },
+        ) => a == b && x == y,
         (Domain::Bool, Domain::Bool) => true,
         (Domain::I128 { min: a, max: b }, Domain::I128 { min: c, max: d }) => a == c && b == d,
         (Domain::U128 { min: a, max: b }, Domain::U128 { min: c, max: d }) => a == c && b == d,
         _ => false,
+    }
+}
+
+/// A payload-free sum projects only its exact variant code into the numeric ABI.
+/// This is distinct from equality of original schema domains.
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::code_matches(original,numeric),))]
+fn code_matches(original: Domain<'_>, numeric: Domain<'_>) -> bool {
+    match (original, numeric) {
+        (Domain::Sum { variants, .. }, Domain::I128 { min, max }) => {
+            !variants.is_empty()
+                && i128::from(variants[0]) == min
+                && i128::from(variants[variants.len() - 1]) == max
+        }
+        _ => same_domain(original, numeric),
     }
 }
 
@@ -174,13 +201,13 @@ fn bindings(d: &NumericDescriptor<'_>) -> bool {
             proof! {assert(!spec::binding_valid(d,i as int));}
             return false;
         };
-        if !same_domain(domain, d.program.inputs[i]) {
+        if !code_matches(domain, d.program.inputs[i]) {
             #[cfg(verus_keep_ghost)]
             proof! {assert(!spec::binding_valid(d,i as int));}
             return false;
         }
         let mut j = 0usize;
-        #[cfg_attr(verus_keep_ghost,verus_spec(invariant j<=i<d.bindings.len(),b==d.bindings@[i as int],d.bindings.len()==d.program.inputs.len(),d.bindings@.len()==spec::count(d.state) as int+spec::count(d.command) as int+spec::count(d.context) as int,spec::find(spec::schema(d,b.source),b.selector)==Some(domain),spec::same_domain(domain,d.program.inputs@[i as int]),forall|k:int|0<=k<i ==> spec::binding_valid(d,k),forall|k:int|0<=k<j ==> !super::spec::same_binding(d.bindings@[k],b),decreases i-j,))]
+        #[cfg_attr(verus_keep_ghost,verus_spec(invariant j<=i<d.bindings.len(),b==d.bindings@[i as int],d.bindings.len()==d.program.inputs.len(),d.bindings@.len()==spec::count(d.state) as int+spec::count(d.command) as int+spec::count(d.context) as int,spec::find(spec::schema(d,b.source),b.selector)==Some(domain),spec::code_matches(domain,d.program.inputs@[i as int]),forall|k:int|0<=k<i ==> spec::binding_valid(d,k),forall|k:int|0<=k<j ==> !super::spec::same_binding(d.bindings@[k],b),decreases i-j,))]
         while j < i {
             if same_binding(d.bindings[j], b) {
                 #[cfg(verus_keep_ghost)]
@@ -206,7 +233,7 @@ fn outputs(d: &NumericDescriptor<'_>) -> bool {
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.output_types.len(),d.output_types.len()==d.program.outputs.len(),d.decision_output<d.output_types.len(),d.output_types@[d.decision_output as int] is I128,forall|j:int|0<=j<i ==> spec::output_valid(d,j),decreases d.output_types.len()-i,))]
     while i < d.output_types.len() {
-        if !leaf(d.output_types[i]) || !same_domain(d.output_types[i], d.program.outputs[i]) {
+        if !leaf(d.output_types[i]) || !code_matches(d.output_types[i], d.program.outputs[i]) {
             #[cfg(verus_keep_ghost)]
             proof! {assert(!spec::output_valid(d,i as int));}
             return false;

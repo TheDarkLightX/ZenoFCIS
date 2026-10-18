@@ -87,7 +87,7 @@ pub enum Domain<'a> {
 }
 /// Arithmetic width is independent of the original wire atom.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum IntegerWidth {
     /// Checked signed 64-bit arithmetic, represented by I128 atoms.
     Signed64,

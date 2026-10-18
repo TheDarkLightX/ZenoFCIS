@@ -72,6 +72,9 @@ pub(crate) fn valid(view: FieldsView<'_>) -> bool {
                     return false;
                 }
                 let admitted = match fields[i].leaf {
+                    Domain::Sum { variants, .. } => {
+                        !variants.is_empty() && variants.windows(2).all(|w| w[0] < w[1])
+                    }
                     Domain::Bool => true,
                     Domain::I128 { min, max } => min <= max,
                     Domain::U128 { min, max } => min <= max,
@@ -254,6 +257,21 @@ pub(crate) fn decode_value(
             }
             let (code, end) = decode_variant(bytes, payload_offset, *type_id, variants, true)?;
             Some((Atom::I128(code), end))
+        }
+        LeafView::Numeric(Domain::Sum { type_id, variants }) => {
+            if tag != 0x0a {
+                return None;
+            }
+            let (actual, start) = read_big_endian(bytes, payload_offset, 4)?;
+            let (variant, end) = read_big_endian(bytes, start, 2)?;
+            let (payload, end) = read_big_endian(bytes, end, 1)?;
+            if actual != u128::from(type_id)
+                || payload != 0
+                || !variants.iter().any(|v| u128::from(*v) == variant)
+            {
+                return None;
+            }
+            Some((Atom::I128(variant as i128), end))
         }
         LeafView::Numeric(Domain::Bool) => match tag {
             0x01 => Some((Atom::Bool(false), payload_offset)),

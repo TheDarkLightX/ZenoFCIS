@@ -10,6 +10,12 @@ fn preflight_export(
     kind: ExportKind,
     limits: ExportLimits,
 ) -> Result<(), ExportError> {
+    if match claim.formula() {
+        ClaimFormula::Relational(v) => v.uses_u128(),
+        ClaimFormula::Temporal(v) => v.uses_u128(),
+    } {
+        return Err(ExportError::U128SubjectUnsupported);
+    }
     let (root, multiplier, temporal_width) = match (kind, claim.mode(), claim.formula()) {
         (ExportKind::Smt, ClaimMode::Relational, ClaimFormula::Relational(value)) => {
             (ExportNode::Rel(value), 1, 1)
@@ -121,13 +127,19 @@ fn preflight_export(
                 }
             },
             ExportNode::Value(value) => match value {
+                ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
+                    return Err(ExportError::U128SubjectUnsupported);
+                }
                 ValueExpr::MulDiv(..)
                 | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => {
                     return Err(ExportError::UnsupportedMode);
                 }
-                ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+                ValueExpr::U128(_)
+                | ValueExpr::Int(_)
+                | ValueExpr::Var(_)
+                | ValueExpr::Projection(_) => {}
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
                 | ValueExpr::Mul(left, right)
@@ -440,6 +452,9 @@ fn render_value_lean(
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => {
             return Err(ExportError::UnsupportedMode);
+        }
+        ValueExpr::U128(_) | ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
+            return Err(ExportError::U128SubjectUnsupported);
         }
         ValueExpr::Int(value) => LeanValue {
             term: lean_int(*value),

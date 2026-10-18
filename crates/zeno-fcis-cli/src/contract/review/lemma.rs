@@ -72,6 +72,9 @@ pub(crate) fn judge(
     lemmas: &[String],
     max_tuples: u64,
 ) -> Result<Lemmas, ContractError> {
+    if super::super::rules::Rules::read(rules)?.unsigned {
+        return super::unsigned::lemmas(project, rules, lemmas, max_tuples, false);
+    }
     let loaded = Loaded::read(project, rules)?;
     let observation = match machine::observe_contract(&loaded, max_tuples)? {
         Ok(observation) => observation,
@@ -102,6 +105,9 @@ pub(crate) fn judge_transitions(
             "transition lemmas",
             "requires at least one relation",
         ));
+    }
+    if super::super::rules::Rules::read(rules)?.unsigned {
+        return super::unsigned::lemmas(project, rules, lemmas, max_tuples, true);
     }
     let loaded = Loaded::read(project, rules)?;
     let observation = match machine::observe_contract(&loaded, max_tuples)? {

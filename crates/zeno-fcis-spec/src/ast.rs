@@ -90,6 +90,7 @@ pub enum TypeKind {
     Data,
     Bool,
     Int,
+    U128,
 }
 
 impl TypeKind {
@@ -104,6 +105,7 @@ impl TypeKind {
             Self::Data => 6,
             Self::Bool => 7,
             Self::Int => 8,
+            Self::U128 => 10,
         }
     }
 }
@@ -202,6 +204,7 @@ pub struct TypeDecl {
     pub(crate) kind: TypeKind,
     pub(crate) name: Identifier,
     pub(crate) range: Option<IntRange>,
+    pub(crate) unsigned_range: Option<(u128, u128)>,
     pub(crate) quantity: Option<Quantity>,
 }
 impl TypeDecl {
@@ -213,6 +216,7 @@ impl TypeDecl {
             kind,
             name,
             range: None,
+            unsigned_range: None,
             quantity: None,
         }
     }
@@ -226,9 +230,21 @@ impl TypeDecl {
         self.range = Some(range);
         Some(self)
     }
+    /// Sets the mandatory inclusive unsigned bounds.
+    pub fn with_unsigned_range(mut self, min: u128, max: u128) -> Option<Self> {
+        if self.kind != TypeKind::U128 || min > max {
+            return None;
+        }
+        self.unsigned_range = Some((min, max));
+        Some(self)
+    }
+    /// Inclusive unsigned bounds, distinct from the signed range.
+    pub fn unsigned_range(&self) -> Option<(u128, u128)> {
+        self.unsigned_range
+    }
     /// Adds a quantity annotation only to an integer declaration.
     pub fn with_quantity(mut self, quantity: Quantity) -> Option<Self> {
-        if self.kind != TypeKind::Int {
+        if !matches!(self.kind, TypeKind::Int | TypeKind::U128) {
             return None;
         }
         self.quantity = Some(quantity);
@@ -851,6 +867,9 @@ pub enum DivisionMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ValueExpr {
     Int(i128),
+    U128(u128),
+    ToI128(Box<ValueExpr>),
+    ToU128(Box<ValueExpr>),
     Var(Identifier),
     Projection(ProjectionPath),
     Add(Box<ValueExpr>, Box<ValueExpr>),
@@ -1395,10 +1414,21 @@ impl ProjectSpec {
 }
 
 impl ProjectSpec {
+    /// Whether the project declares the unsigned scalar kind.
+    pub fn uses_u128(&self) -> bool {
+        self.types.iter().any(|t| t.kind == TypeKind::U128)
+            || self.laws.iter().any(|l| l.formula.uses_u128())
+            || self.claims.iter().any(|c| match &c.formula {
+                ClaimFormula::Relational(v) => v.uses_u128(),
+                ClaimFormula::Temporal(v) => v.uses_u128(),
+            })
+    }
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if self.types.iter().any(|t| t.quantity.is_some()) {
+        let format = if self.uses_u128() {
+            3u16
+        } else if self.types.iter().any(|t| t.quantity.is_some()) {
             2u16
         } else {
             PROJECT_SPEC_FORMAT_VERSION
@@ -1409,7 +1439,7 @@ impl ProjectSpec {
         put_slice(output, &self.namespaces, encode_namespace)?;
         put_length(output, self.types.len())?;
         for declared in &self.types {
-            if format == 2 {
+            if format >= 2 {
                 output.push(u8::from(declared.quantity.is_some()));
             }
             encode_type(declared, output)?;
@@ -1473,12 +1503,18 @@ const RANGED_INT_TAG: u8 = 9;
 
 fn encode_type(value: &TypeDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.id.encode_to(out)?;
-    match value.range {
-        None => out.push(value.kind.tag()),
-        Some(range) => {
-            out.push(RANGED_INT_TAG);
-            out.extend_from_slice(&range.min.to_be_bytes());
-            out.extend_from_slice(&range.max.to_be_bytes());
+    if let Some((min, max)) = value.unsigned_range {
+        out.push(10);
+        out.extend_from_slice(&min.to_be_bytes());
+        out.extend_from_slice(&max.to_be_bytes());
+    } else {
+        match value.range {
+            None => out.push(value.kind.tag()),
+            Some(range) => {
+                out.push(RANGED_INT_TAG);
+                out.extend_from_slice(&range.min.to_be_bytes());
+                out.extend_from_slice(&range.max.to_be_bytes());
+            }
         }
     }
     value.name.encode_to(out)?;
@@ -1581,6 +1617,19 @@ fn encode_wiring(value: &WiringDecl, out: &mut Vec<u8>) -> Result<(), EncodeErro
 }
 fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     match value {
+        ValueExpr::U128(v) => {
+            out.push(12);
+            out.extend_from_slice(&v.to_be_bytes());
+            Ok(())
+        }
+        ValueExpr::ToI128(v) => {
+            out.push(13);
+            encode_value(v, out)
+        }
+        ValueExpr::ToU128(v) => {
+            out.push(14);
+            encode_value(v, out)
+        }
         ValueExpr::Int(v) => {
             out.push(0);
             out.extend_from_slice(&v.to_be_bytes());
@@ -1840,6 +1889,50 @@ fn encode_claim(value: &ClaimDecl, out: &mut Vec<u8>) -> Result<(), EncodeError>
     }
 }
 
+impl ValueExpr {
+    /// Unsigned syntax anywhere in this expression, including explicit casts.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::U128(_) | Self::ToI128(_) | Self::ToU128(_) => true,
+            Self::Add(a, b) | Self::Sub(a, b) | Self::Mul(a, b) | Self::Div(_, a, b) => {
+                a.uses_u128() || b.uses_u128()
+            }
+            Self::MulDiv(_, a, b, d)
+            | Self::SignedMulDivFloor(a, b, d)
+            | Self::ScaledMulDiv(_, _, a, b, d, _)
+            | Self::RepeatMulDiv(_, a, b, d, _) => a.uses_u128() || b.uses_u128() || d.uses_u128(),
+            Self::Sum { body, .. } => body.uses_u128(),
+            _ => false,
+        }
+    }
+}
+impl RelExpr {
+    /// Whether this formula uses an unsigned literal or explicit conversion.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::Not(a) | Self::ForAll { body: a, .. } | Self::Exists { body: a, .. } => {
+                a.uses_u128()
+            }
+            Self::And(a, b) | Self::Or(a, b) | Self::Implies(a, b) => {
+                a.uses_u128() || b.uses_u128()
+            }
+            Self::Compare(_, a, b) => a.uses_u128() || b.uses_u128(),
+            Self::Predicate { arguments, .. } => arguments.iter().any(ValueExpr::uses_u128),
+            Self::Bool(_) => false,
+        }
+    }
+}
+impl TemporalFormula {
+    /// Whether any relational atom uses unsigned syntax.
+    pub fn uses_u128(&self) -> bool {
+        match self {
+            Self::Atom(a) => a.uses_u128(),
+            Self::Not(a) | Self::Next(a) | Self::Always(a) | Self::Eventually(a) => a.uses_u128(),
+            Self::And(a, b) | Self::Or(a, b) | Self::Until(a, b) => a.uses_u128() || b.uses_u128(),
+        }
+    }
+}
+
 fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
     let mut stack = Vec::new();
     stack.push((value, 1usize));
@@ -1856,7 +1949,7 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
             }
-            ValueExpr::Sum { body, .. } => {
+            ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
             ValueExpr::MulDiv(_, a, b, d)
@@ -1867,7 +1960,10 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                     stack.push((child, current_depth.saturating_add(1)));
                 }
             }
-            ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+            ValueExpr::Int(_)
+            | ValueExpr::U128(_)
+            | ValueExpr::Var(_)
+            | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)

@@ -13,6 +13,8 @@ use zeno_fcis_spec::{ProjectSpec, StableId, TypeKind as AuthoredKind};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum SchemaLoweringError {
+    /// Authored U128 subjects require the typed contract path.
+    U128SubjectUnsupported,
     /// Quantity annotations require the quantity-aware contract compiler.
     QuantityRequiresContract(StableId),
     /// The selected root is absent or is not declared as state.
@@ -47,6 +49,7 @@ impl From<SchemaError> for SchemaLoweringError {
 impl fmt::Display for SchemaLoweringError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::U128SubjectUnsupported => formatter.write_str("U128SubjectUnsupported"),
             Self::QuantityRequiresContract(id) => write!(
                 formatter,
                 "type {} requires the quantity-aware contract compiler",
@@ -112,6 +115,9 @@ pub fn lower_schema(
     leaf_bindings: Vec<(StableId, TypeKind)>,
     limits: SchemaLimits,
 ) -> Result<Schema, SchemaLoweringError> {
+    if project.uses_u128() {
+        return Err(SchemaLoweringError::U128SubjectUnsupported);
+    }
     if let Some(ty) = project.types().iter().find(|ty| ty.quantity().is_some()) {
         return Err(SchemaLoweringError::QuantityRequiresContract(ty.id()));
     }

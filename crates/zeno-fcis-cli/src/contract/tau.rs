@@ -33,12 +33,14 @@ pub(crate) fn export(
     samples: usize,
 ) -> Result<Value, ContractError> {
     let rules = Rules::read(source)?;
+    rules.refuse_unsigned("Tau export")?;
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
         return Err(refused(
             "adopted or evolved lineages are outside this Tau profile",
         ));
     }
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
+    declarations.refuse_unsigned("Tau export")?;
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
     let positions = domain::positions(&declarations)?;
@@ -283,7 +285,9 @@ pub(crate) fn reference_queries(
     metadata: &Value,
 ) -> Result<Vec<Value>, ContractError> {
     let rules = Rules::read(source)?;
+    rules.refuse_unsigned("Tau export")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
+    declarations.refuse_unsigned("Tau export")?;
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
     let positions = domain::positions(&declarations)?;
@@ -604,6 +608,9 @@ fn ast(
     names: &BTreeMap<String, (Term, Sort)>,
 ) -> Result<(Term, Sort), ContractError> {
     Ok(match expression {
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
+            return Err(refused("U128SubjectUnsupported"));
+        }
         Ast::DecisionReason => {
             return Err(refused(
                 "decision reasons are outside the Tau export profile",
@@ -843,6 +850,9 @@ fn ast_ranges(
     names: &BTreeMap<String, (i128, i128)>,
 ) -> Result<(i128, i128), ContractError> {
     let interval = match expression {
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
+            return Err(refused("U128SubjectUnsupported"));
+        }
         Ast::DecisionReason => {
             return Err(refused(
                 "decision reasons are outside the Tau export profile",

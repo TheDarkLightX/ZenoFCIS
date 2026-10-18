@@ -44,6 +44,8 @@ pub(crate) mod symbolic;
 pub(crate) mod tau;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod u128_tests;
 
 // The compiler core lives in the `zeno-fcis-contract` library; these
 // re-exports keep its modules at their former paths for this module's files.
@@ -200,7 +202,7 @@ pub(crate) struct GeneratedContract {
     policy: Vec<u8>,
     previous: Vec<PreviousContract>,
     summary: ContractSummary,
-    program: Vec<u8>,
+    program: Option<Vec<u8>>,
     replayed: Vec<Replayed>,
     /// The inductive claims compiled for a behaviour change or migration into this
     /// contract; computed only when generation needs them.
@@ -235,8 +237,8 @@ impl GeneratedContract {
 
     /// The current decision program's canonical bytes: what the next
     /// adoption's receipt names as its original.
-    pub(crate) fn program(&self) -> &[u8] {
-        &self.program
+    pub(crate) fn program(&self) -> Option<&[u8]> {
+        self.program.as_deref()
     }
 
     /// Every adoption's replayed receipt, oldest first.
@@ -367,6 +369,7 @@ fn with_current<R>(
     use_current: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
 ) -> Result<R, ContractError> {
     let rules = Rules::read(sources.rules)?;
+    rules.refuse_unsigned("contract evolution binding")?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let mut contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
@@ -540,6 +543,13 @@ fn generate(
     receipts: Receipts,
 ) -> Result<GeneratedContract, ContractError> {
     let rules = Rules::read(sources.rules)?;
+    if rules.unsigned && (!rules.adoptions.is_empty() || !rules.evolutions.is_empty()) {
+        return Err(ContractError::new(
+            "lineage binding",
+            "U128SubjectUnsupported",
+        ));
+    }
+
     if sources.evolutions.len() != rules.evolutions.len() {
         return Err(ContractError::new(
             "v2/policy.json evolutions",
@@ -1353,7 +1363,11 @@ fn generate_era(
             ));
         }
     }
-    let program = program_bytes(&contract.program()?)?;
+    let program = if contract.unsigned {
+        None
+    } else {
+        Some(program_bytes(&contract.program()?)?)
+    };
     let claims = if placement.claims {
         model::compiled_claims(&declarations, &rules, &contract.laws)?
     } else {

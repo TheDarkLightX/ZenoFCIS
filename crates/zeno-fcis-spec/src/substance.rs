@@ -248,7 +248,7 @@ fn relation_always_defined(expr: &RelExpr) -> bool {
 const fn value_always_defined(expr: &ValueExpr) -> bool {
     matches!(
         expr,
-        ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_)
+        ValueExpr::U128(_) | ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_)
     )
 }
 
@@ -269,6 +269,8 @@ fn relation_reads(expr: &RelExpr, scope: ReadScope) -> bool {
 
 fn value_reads(expr: &ValueExpr, scope: ReadScope) -> bool {
     match expr {
+        ValueExpr::U128(_) => false,
+        ValueExpr::ToI128(v) | ValueExpr::ToU128(v) => value_reads(v, scope),
         ValueExpr::Int(_) | ValueExpr::Var(_) => false,
         ValueExpr::Projection(path) => scope.accepts(path.root()),
         ValueExpr::Add(left, right)

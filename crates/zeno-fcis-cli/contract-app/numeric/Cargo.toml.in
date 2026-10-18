@@ -1,0 +1,22 @@
+[package]
+name = "{package}"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace]
+
+[lib]
+name = "application"
+
+[dependencies]
+zeno-fcis-synthesis = { version = "={version}", default-features = false }
+
+[[bin]]
+name = "{package}"
+path = "src/main.rs"
+
+[profile.dev]
+debug = 0
+incremental = false

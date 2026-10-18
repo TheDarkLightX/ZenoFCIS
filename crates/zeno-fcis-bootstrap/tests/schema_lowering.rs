@@ -339,3 +339,15 @@ fn quantity_metadata_cannot_be_erased_by_legacy_schema_lowering() {
         Err(SchemaLoweringError::QuantityRequiresContract(_))
     ));
 }
+#[test]
+fn authored_unsigned_subject_refuses_at_schema_emitter_binding() {
+    for max in [1u128, u128::MAX] {
+        let spec = project(&format!(
+            "{SOURCE}\ntype 120 u128 UnsignedAmount in 0..={max};\n"
+        ));
+        assert_eq!(
+            lower_schema(&spec, id(100), 1, leaves(), SchemaLimits::default()),
+            Err(SchemaLoweringError::U128SubjectUnsupported)
+        );
+    }
+}

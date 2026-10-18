@@ -84,6 +84,9 @@ impl LeafDomain {
 /// The domain of a scalar type; text has none.
 pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDomain, ContractError> {
     Ok(match declarations.kind(type_id)? {
+        TypeKind::U128 { .. } => {
+            return Err(ContractError::new("review", "U128ReviewRequiresTypedPath"));
+        }
         TypeKind::Bool => LeafDomain::Bool,
         TypeKind::I128 { min, max } => LeafDomain::Int { min, max },
         TypeKind::Sum(variants) => LeafDomain::Sum {
@@ -129,6 +132,7 @@ impl Position {
 /// The program input positions in the order the program, and every decision
 /// example, reads them.
 pub fn positions(declarations: &Declarations) -> Result<Vec<Position>, ContractError> {
+    declarations.refuse_unsigned("scalar consumer binding")?;
     declarations
         .inputs()?
         .into_iter()
@@ -224,6 +228,8 @@ pub fn input_set(
     examples: &[&[i128]],
     max_tuples: u64,
 ) -> Result<InputSet, ContractError> {
+    rules.refuse_unsigned("scalar review binding")?;
+    declarations.refuse_unsigned("scalar review binding")?;
     let width = positions.len();
     let domain_size = domain_size(positions);
     let limit = u128::from(max_tuples);
@@ -284,14 +290,20 @@ pub fn input_set(
         .map(
             |(index, position)| match (position.source, position.field) {
                 (Source::State, Some(field)) => match rules.genesis.get(&field) {
-                    Some(Constant::Bool(value)) => i128::from(*value),
-                    Some(Constant::Int(value)) => *value,
-                    None => values[index][0],
+                    Some(Constant::Bool(value)) => Ok(i128::from(*value)),
+                    Some(Constant::U128(_)) => Err(ContractError::new(
+                        "scalar genesis binding",
+                        "U128SubjectUnsupported",
+                    )),
+                    Some(Constant::Int(value)) => {
+                        Ok(*value)
+                    }
+                    None => Ok(values[index][0]),
                 },
-                _ => values[index][0],
+                _ => Ok(values[index][0]),
             },
         )
-        .collect();
+        .collect::<Result<_, _>>()?;
     bases.push(("genesis".to_owned(), genesis));
     for (index, example) in examples.iter().enumerate() {
         if example.len() == width && !bases.iter().any(|(_, base)| base == example) {
@@ -533,6 +545,8 @@ fn collect(
         hints
     };
     match ast {
+        Ast::U128(_) => {}
+        Ast::ToI128(v) | Ast::ToU128(v) => collect(v, expected, positions, found),
         Ast::Int(value) => {
             for type_id in expected {
                 found.entry(*type_id).or_default().insert(*value);

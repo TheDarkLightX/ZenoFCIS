@@ -12,6 +12,9 @@ use super::expr::{Ast, Binary, Rounding};
 pub enum Kind {
     Bool,
     Int,
+    Unsigned,
+    /// Original sum input, projected to its exact variant code only by internal numeric use.
+    Variant,
     /// An observation or atom compared as it is, never converted.
     Raw,
 }
@@ -100,6 +103,7 @@ pub enum LawOp {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ScalarOp {
+    Numeric(zeno_fcis_synthesis::finite::V2NumericOp),
     Input(usize),
     Int(i128),
     Bool(bool),
@@ -148,8 +152,21 @@ pub trait Graph {
 
     fn table(&mut self) -> &mut Table<Self::Node>;
     fn declarations(&self) -> &Declarations;
+    fn strict(&self) -> bool;
     fn bool_node(value: bool) -> Self::Node;
     fn int_node(value: i128) -> Result<Self::Node, String>;
+    fn unsigned_node(value: u128) -> Self::Node;
+    fn unsigned_op_node(op: Op) -> Result<Self::Node, String> {
+        Self::op_node(op)
+    }
+    fn unsigned_operation(&mut self, op: Op, kind: Kind) -> Result<Ref, String> {
+        let node = Self::unsigned_op_node(op)?;
+        Ok(self.table().put(node, kind))
+    }
+    fn uint(&mut self, value: u128) -> Ref {
+        let node = Self::unsigned_node(value);
+        self.table().put(node, Kind::Unsigned)
+    }
     fn op_node(op: Op) -> Result<Self::Node, String>;
     /// A program input or a law observation.
     fn name(&mut self, name: &str) -> Result<Ref, String>;
@@ -160,7 +177,11 @@ pub trait Graph {
     fn numeric(&mut self, node: Ref) -> Result<Ref, String>;
 
     fn op(&mut self, op: Op, kind: Kind) -> Result<Ref, String> {
-        let node = Self::op_node(op)?;
+        let node = if kind == Kind::Unsigned {
+            Self::unsigned_op_node(op)?
+        } else {
+            Self::op_node(op)?
+        };
         Ok(self.table().put(node, kind))
     }
 
@@ -178,6 +199,9 @@ pub trait Graph {
     fn boolean(&mut self, node: Ref) -> Result<Ref, String> {
         if node.kind == Kind::Bool {
             return Ok(node);
+        }
+        if self.strict() {
+            return Err("U128ConditionKindMismatch".into());
         }
         let one = self.int(1)?;
         self.op(Op::Eq(node.index, one.index), Kind::Bool)
@@ -201,10 +225,12 @@ pub trait Graph {
     /// new authoring boundary adds admission/lowering, not runtime authority.
     fn compile_with_limits(&mut self, ast: &Ast, bounded: bool) -> Result<Ref, String> {
         if bounded
+            || self.strict()
             || super::quantity::typed(self.declarations())
             || super::expr::uses_new_arithmetic(ast)
         {
-            let lowered = super::quantity::lower(self.declarations(), ast)?;
+            let lowered =
+                super::quantity::lower_with_strict(self.declarations(), ast, self.strict())?;
             self.compile_raw(&lowered)
         } else {
             self.compile_raw(ast)
@@ -213,6 +239,22 @@ pub trait Graph {
 
     fn compile_raw(&mut self, ast: &Ast) -> Result<Ref, String> {
         match ast {
+            Ast::U128(value) => Ok(self.uint(*value)),
+            Ast::ToI128(v) | Ast::ToU128(v) => {
+                let a = self.compile_raw(v)?;
+                let signed = matches!(ast, Ast::ToI128(_));
+                if a.kind != if signed { Kind::Unsigned } else { Kind::Int } {
+                    return Err("U128CastKindMismatch".into());
+                }
+                self.unsigned_operation(
+                    if signed {
+                        Op::ToI128(a.index)
+                    } else {
+                        Op::ToU128(a.index)
+                    },
+                    if signed { Kind::Int } else { Kind::Unsigned },
+                )
+            }
             Ast::Bool(value) => Ok(self.bool(*value)),
             Ast::Int(value) => self.int(*value),
             Ast::Name(name) => self.name(name),
@@ -221,6 +263,9 @@ pub trait Graph {
                 // The parser admits MIN directly; every other negation remains eager.
                 let zero = self.int(0)?;
                 let inner = self.compile_raw(inner)?;
+                if inner.kind == Kind::Unsigned {
+                    return Err("U128NegationUnsupported".into());
+                }
                 let inner = self.numeric(inner)?;
                 self.op(Op::Sub(zero.index, inner.index), Kind::Int)
             }
@@ -235,6 +280,12 @@ pub trait Graph {
                 let mut then = self.compile_raw(then)?;
                 let mut otherwise = self.compile_raw(otherwise)?;
                 if then.kind != otherwise.kind {
+                    if self.strict()
+                        || then.kind == Kind::Unsigned
+                        || otherwise.kind == Kind::Unsigned
+                    {
+                        return Err("U128SelectKindMismatch".into());
+                    }
                     then = self.numeric(then)?;
                     otherwise = self.numeric(otherwise)?;
                 }
@@ -268,7 +319,11 @@ pub trait Graph {
                         let d = self.product_operand(d)?;
                         let result = self.op(
                             Op::MulDiv(Rounding::Floor, x.index, a.index, d.index),
-                            Kind::Int,
+                            if value.kind == Kind::Unsigned {
+                                Kind::Unsigned
+                            } else {
+                                Kind::Int
+                            },
                         )?;
                         self.product_result(result)?
                     };
@@ -286,44 +341,97 @@ pub trait Graph {
             }
             Ast::MulDiv(rounding, a, b, d) => {
                 let a = self.compile_raw(a)?;
+                let result_kind = if a.kind == Kind::Unsigned {
+                    Kind::Unsigned
+                } else {
+                    Kind::Int
+                };
                 let a = self.product_operand(a)?;
                 let b = self.compile_raw(b)?;
                 let b = self.product_operand(b)?;
                 let d = self.compile_raw(d)?;
                 let d = self.product_operand(d)?;
-                let result =
-                    self.op(Op::MulDiv(*rounding, a.index, b.index, d.index), Kind::Int)?;
+                let result = self.op(
+                    Op::MulDiv(*rounding, a.index, b.index, d.index),
+                    result_kind,
+                )?;
                 self.product_result(result)
             }
             Ast::ProductsGe(arguments) => {
                 if arguments.len() != 4 && arguments.len() != 6 {
                     return Err("products_ge needs four or six arguments".to_owned());
                 }
+                let mut unsigned = false;
                 let mut refs = Vec::with_capacity(arguments.len());
                 for argument in arguments.iter() {
                     let node = self.compile_raw(argument)?;
+                    unsigned |= node.kind == Kind::Unsigned;
                     refs.push(self.product_operand(node)?.index);
                 }
                 let (a, b) = if refs.len() == 4 {
-                    let one = self.int(1)?;
+                    let one = if unsigned { self.uint(1) } else { self.int(1)? };
                     let one = self.product_operand(one)?.index;
                     ([refs[0], refs[1], one], [refs[2], refs[3], one])
                 } else {
                     ([refs[0], refs[1], refs[2]], [refs[3], refs[4], refs[5]])
                 };
-                self.op(Op::ProductsGe(a, b), Kind::Bool)
+                if unsigned {
+                    self.unsigned_operation(Op::ProductsGe(a, b), Kind::Bool)
+                } else {
+                    self.op(Op::ProductsGe(a, b), Kind::Bool)
+                }
             }
             Ast::Div(rounding, left, right) => {
                 let left = self.compile_raw(left)?;
                 let right = self.compile_raw(right)?;
                 let left = self.numeric(left)?;
                 let right = self.numeric(right)?;
-                self.op(Op::Div(*rounding, left.index, right.index), Kind::Int)
+                if left.kind != right.kind {
+                    return Err("U128KindMismatch".into());
+                }
+                self.op(Op::Div(*rounding, left.index, right.index), left.kind)
             }
         }
     }
 
     fn binary(&mut self, operator: Binary, left: Ref, right: Ref) -> Result<Ref, String> {
+        if left.kind == Kind::Unsigned || right.kind == Kind::Unsigned {
+            if left.kind != right.kind {
+                return Err("U128KindMismatch".into());
+            }
+            let (a, b) = (left.index, right.index);
+            return match operator {
+                Binary::Add => self.op(Op::Add(a, b), Kind::Unsigned),
+                Binary::Sub => self.op(Op::Sub(a, b), Kind::Unsigned),
+                Binary::Mul => self.op(Op::Mul(a, b), Kind::Unsigned),
+                Binary::Eq | Binary::Ne | Binary::Lt | Binary::Le | Binary::Gt | Binary::Ge => {
+                    let op = match operator {
+                        Binary::Eq | Binary::Ne => Op::Eq(a, b),
+                        Binary::Lt | Binary::Ge => Op::Lt(a, b),
+                        _ => Op::Lt(b, a),
+                    };
+                    let out = self.unsigned_operation(op, Kind::Bool)?;
+                    if matches!(operator, Binary::Ne | Binary::Le | Binary::Ge) {
+                        self.op(Op::Not(out.index), Kind::Bool)
+                    } else {
+                        Ok(out)
+                    }
+                }
+                _ => Err("U128LogicKindMismatch".into()),
+            };
+        }
+        if self.strict()
+            && matches!(operator, Binary::Eq | Binary::Ne)
+            && left.kind == Kind::Bool
+            && right.kind == Kind::Bool
+        {
+            let v = self.op(Op::Eq(left.index, right.index), Kind::Bool)?;
+            return if operator == Binary::Ne {
+                self.op(Op::Not(v.index), Kind::Bool)
+            } else {
+                Ok(v)
+            };
+        }
         let logic =
             |graph: &mut Self| Ok::<_, String>((graph.boolean(left)?, graph.boolean(right)?));
         let values = |graph: &mut Self| {
@@ -383,6 +491,7 @@ pub trait Graph {
 pub struct ScalarGraph<'d> {
     pub table: Table<ScalarOp>,
     declarations: &'d Declarations,
+    strict: bool,
     inputs: &'d [Input],
 }
 
@@ -391,13 +500,50 @@ impl<'d> ScalarGraph<'d> {
         Self {
             table: Table::new(),
             declarations,
+            strict: declarations.unsigned(),
             inputs,
         }
     }
 }
 
+impl ScalarGraph<'_> {
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict |= strict;
+        self
+    }
+}
+
 impl Graph for ScalarGraph<'_> {
     type Node = ScalarOp;
+    fn strict(&self) -> bool {
+        self.strict
+    }
+    fn unsigned_node(value: u128) -> ScalarOp {
+        ScalarOp::Numeric(zeno_fcis_synthesis::finite::V2NumericOp::U128(value))
+    }
+    fn unsigned_op_node(op: Op) -> Result<ScalarOp, String> {
+        use zeno_fcis_synthesis::finite::{V2IntegerWidth as W, V2NumericOp as N};
+        let id = |x| u16::try_from(x).map_err(|_| "numeric node reference exceeds u16".to_owned());
+        Ok(ScalarOp::Numeric(match op {
+            Op::Add(a, b) => N::Add(W::Unsigned128, id(a)?, id(b)?),
+            Op::Sub(a, b) => N::Sub(W::Unsigned128, id(a)?, id(b)?),
+            Op::Mul(a, b) => N::Mul(W::Unsigned128, id(a)?, id(b)?),
+            Op::Div(Rounding::Floor, a, b) => N::DivFloor(W::Unsigned128, id(a)?, id(b)?),
+            Op::Div(Rounding::Ceil, a, b) => N::DivCeil(W::Unsigned128, id(a)?, id(b)?),
+            Op::Eq(a, b) => N::Eq(id(a)?, id(b)?),
+            Op::Lt(a, b) => N::Lt(id(a)?, id(b)?),
+            Op::Select(c, a, b) => N::Select(id(c)?, id(a)?, id(b)?),
+            Op::MulDiv(Rounding::Floor, a, b, d) => N::MulDivFloor(id(a)?, id(b)?, id(d)?),
+            Op::MulDiv(Rounding::Ceil, a, b, d) => N::MulDivCeil(id(a)?, id(b)?, id(d)?),
+            Op::ToI128(a) => N::ToI128(id(a)?),
+            Op::ToU128(a) => N::ToU128(id(a)?),
+            Op::ProductsGe(a, b) => N::ProductsGe(
+                [id(a[0])?, id(a[1])?, id(a[2])?],
+                [id(b[0])?, id(b[1])?, id(b[2])?],
+            ),
+            _ => return Err("unsupported unsigned operation".into()),
+        }))
+    }
 
     fn declarations(&self) -> &Declarations {
         self.declarations
@@ -449,14 +595,25 @@ impl Graph for ScalarGraph<'_> {
             .map_err(|error| error.to_string())?
         {
             TypeKind::Bool => Kind::Bool,
+            TypeKind::U128 { .. } => Kind::Unsigned,
+            TypeKind::Sum(_) if self.strict() => Kind::Variant,
             _ => Kind::Int,
         };
         Ok(self.table.put(ScalarOp::Input(index), kind))
     }
 
     fn numeric(&mut self, node: Ref) -> Result<Ref, String> {
-        if node.kind == Kind::Int {
+        if matches!(node.kind, Kind::Int | Kind::Unsigned) {
             return Ok(node);
+        }
+        if node.kind == Kind::Variant {
+            return Ok(Ref {
+                index: node.index,
+                kind: Kind::Int,
+            });
+        }
+        if self.strict() {
+            return Err("U128NumericKindMismatch".into());
         }
         let one = self.int(1)?;
         let zero = self.int(0)?;
@@ -470,6 +627,7 @@ pub struct LawGraph<'d> {
     bindings: BTreeMap<String, Ref>,
     used_bindings: BTreeSet<String>,
     declarations: &'d Declarations,
+    strict: bool,
 }
 
 impl<'d> LawGraph<'d> {
@@ -494,6 +652,7 @@ impl<'d> LawGraph<'d> {
             bindings: BTreeMap::new(),
             used_bindings: BTreeSet::new(),
             declarations,
+            strict: declarations.unsigned(),
         }
     }
 
@@ -513,6 +672,14 @@ impl<'d> LawGraph<'d> {
         let raw = self.table.put(node, Kind::Raw);
         match kind {
             Kind::Raw => Ok(raw),
+            Kind::Variant => Ok(Ref {
+                index: raw.index,
+                kind: Kind::Variant,
+            }),
+            Kind::Unsigned => Ok(Ref {
+                index: raw.index,
+                kind: Kind::Unsigned,
+            }),
             Kind::Bool => Ok(Ref {
                 index: raw.index,
                 kind: Kind::Bool,
@@ -579,19 +746,39 @@ impl<'d> LawGraph<'d> {
     }
 }
 
+impl LawGraph<'_> {
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict |= strict;
+        self
+    }
+}
+
 impl Graph for LawGraph<'_> {
     type Node = LawOp;
+    fn strict(&self) -> bool {
+        self.strict
+    }
+    fn unsigned_node(value: u128) -> LawOp {
+        LawOp::Literal(Atom::U128(value))
+    }
 
     fn declarations(&self) -> &Declarations {
         self.declarations
     }
 
     fn product_operand(&mut self, node: Ref) -> Result<Ref, String> {
+        if node.kind == Kind::Unsigned {
+            return Ok(node);
+        }
         let node = self.numeric(node)?;
         self.op(Op::ToU128(node.index), Kind::Raw)
     }
     fn product_result(&mut self, node: Ref) -> Result<Ref, String> {
-        self.op(Op::ToI128(node.index), Kind::Int)
+        if node.kind == Kind::Unsigned {
+            Ok(node)
+        } else {
+            self.op(Op::ToI128(node.index), Kind::Int)
+        }
     }
 
     fn table(&mut self) -> &mut Table<LawOp> {
@@ -631,7 +818,44 @@ impl Graph for LawGraph<'_> {
             return Ok(value);
         }
         let observation = self.observation(name)?;
-        self.observe(observation, Kind::Int, None, Atom::I128(0))
+        let parts: Vec<_> = name.split('.').collect();
+        let ty = parts
+            .get(1)
+            .and_then(|x| x.parse::<u32>().ok())
+            .and_then(|root| {
+                if parts.len() == 2 {
+                    Some(root)
+                } else {
+                    self.declarations
+                        .fields(root)
+                        .ok()?
+                        .iter()
+                        .find(|f| f.id.to_string() == parts[2])
+                        .map(|f| f.type_id)
+                }
+            });
+        if ty
+            .and_then(|id| self.declarations.kind(id).ok())
+            .is_some_and(|k| matches!(k, TypeKind::U128 { .. }))
+        {
+            let mut value = self.observe(observation, Kind::Raw, None, Atom::U128(0))?;
+            value.kind = Kind::Unsigned;
+            Ok(value)
+        } else if self.strict()
+            && ty
+                .and_then(|id| self.declarations.kind(id).ok())
+                .is_some_and(|k| matches!(k, TypeKind::Sum(_)))
+        {
+            self.observe(observation, Kind::Variant, None, Atom::I128(0))
+        } else if self.strict()
+            && ty
+                .and_then(|id| self.declarations.kind(id).ok())
+                .is_some_and(|k| matches!(k, TypeKind::Bool))
+        {
+            self.observe(observation, Kind::Bool, None, Atom::Bool(false))
+        } else {
+            self.observe(observation, Kind::Int, None, Atom::I128(0))
+        }
     }
 
     fn decision_reason(&mut self) -> Result<Ref, String> {
@@ -639,8 +863,11 @@ impl Graph for LawGraph<'_> {
     }
 
     fn numeric(&mut self, node: Ref) -> Result<Ref, String> {
-        if node.kind == Kind::Int {
+        if matches!(node.kind, Kind::Int | Kind::Unsigned) {
             return Ok(node);
+        }
+        if self.strict() && node.kind == Kind::Bool {
+            return Err("U128NumericKindMismatch".into());
         }
         self.op(Op::ToI128(node.index), Kind::Int)
     }

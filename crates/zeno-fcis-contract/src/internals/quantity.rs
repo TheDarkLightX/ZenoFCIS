@@ -15,6 +15,8 @@ struct Value {
     steps: u8,
     literal: bool,
     boolean: bool,
+    unsigned: bool,
+    unsigned_bounds: Option<(u128, u128)>,
 }
 
 pub fn typed(declarations: &Declarations) -> bool {
@@ -24,11 +26,19 @@ pub fn typed(declarations: &Declarations) -> bool {
 /// Check the destination before erasing annotations. Literals are raw atoms
 /// of the declared destination, not casts of an already typed expression.
 pub fn assignment(declarations: &Declarations, ast: &Ast, destination: u32) -> Result<(), String> {
-    if !typed(declarations) {
+    if !typed(declarations) && !declarations.unsigned() {
         return Ok(());
     }
     let mut fuel = MAX_VISITS;
-    let value = infer(declarations, ast, &mut fuel)?;
+    let value = infer(declarations, ast, &mut fuel, true)?;
+    if value.unsigned
+        != matches!(
+            declarations.kind(destination).map_err(|e| e.to_string())?,
+            Kind::U128 { .. }
+        )
+    {
+        return Err("U128AssignmentKindMismatch".into());
+    }
     if typed(declarations) {
         let target = &declarations
             .get(destination)
@@ -50,11 +60,11 @@ pub fn assignment(declarations: &Declarations, ast: &Ast, destination: u32) -> R
 }
 
 pub fn condition(declarations: &Declarations, ast: &Ast) -> Result<(), String> {
-    if !typed(declarations) {
+    if !typed(declarations) && !declarations.unsigned() {
         return Ok(());
     }
     let mut fuel = MAX_VISITS;
-    let value = infer(declarations, ast, &mut fuel)?;
+    let value = infer(declarations, ast, &mut fuel, true)?;
     if typed(declarations) && !value.boolean {
         return Err("quantity cannot be used as a boolean".into());
     }
@@ -62,8 +72,19 @@ pub fn condition(declarations: &Declarations, ast: &Ast) -> Result<(), String> {
 }
 
 pub fn lower(declarations: &Declarations, ast: &Ast) -> Result<Ast, String> {
+    lower_with_strict(declarations, ast, false)
+}
+
+/// Policy /4 opts into strict inference even without unsigned declarations.
+/// Legacy callers retain declaration-based inference through `lower`.
+pub fn lower_with_strict(
+    declarations: &Declarations,
+    ast: &Ast,
+    strict: bool,
+) -> Result<Ast, String> {
     let mut fuel = MAX_VISITS;
-    Ok(infer(declarations, ast, &mut fuel)?.ast)
+    let strict = strict || typed(declarations) || declarations.unsigned();
+    Ok(infer(declarations, ast, &mut fuel, strict)?.ast)
 }
 
 fn numeric(value: &Value) -> Result<&Quantity, String> {
@@ -74,6 +95,9 @@ fn numeric(value: &Value) -> Result<&Quantity, String> {
 }
 
 fn same(a: &Value, b: &Value) -> Result<Option<Quantity>, String> {
+    if a.unsigned != b.unsigned {
+        return Err("U128KindMismatch".into());
+    }
     // An unbound literal can take the other operand's raw atom type.
     if a.literal && b.quantity.is_some() {
         return Ok(b.quantity.clone());
@@ -127,6 +151,8 @@ fn node(
         steps,
         literal,
         boolean,
+        unsigned: false,
+        unsigned_bounds: None,
     })
 }
 
@@ -141,13 +167,34 @@ fn interval(
     Some((*values.iter().min()?, *values.iter().max()?))
 }
 
-fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String> {
+fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize, strict: bool) -> Result<Value, String> {
     *fuel = fuel
         .checked_sub(1)
         .ok_or("expanded expression exceeds admission work cap")?;
-    let strict = typed(d);
     let plain = || Some(Quantity::dimensionless());
     match ast {
+        Ast::U128(n) => mark(
+            node(ast.clone(), plain(), None, 0, true, false),
+            true,
+            Some((*n, *n)),
+        ),
+        Ast::ToI128(v) | Ast::ToU128(v) => {
+            let mut value = infer(d, v, fuel, strict)?;
+            let signed = matches!(ast, Ast::ToI128(_));
+            if value.boolean || value.unsigned != signed {
+                return Err("U128CastKindMismatch".into());
+            }
+            value.ast = if signed {
+                Ast::ToI128(Box::new(value.ast))
+            } else {
+                Ast::ToU128(Box::new(value.ast))
+            };
+            value.bounds = None;
+            value.unsigned_bounds = None;
+            value.unsigned = !signed;
+            value.literal = false;
+            Ok(value)
+        }
         Ast::Bool(_) => node(ast.clone(), None, None, 0, false, true),
         Ast::Int(n) => node(ast.clone(), plain(), Some((*n, *n)), 0, true, false),
         Ast::DecisionReason => node(ast.clone(), plain(), None, 0, false, false),
@@ -192,16 +239,44 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
             };
             node(
                 ast.clone(),
-                declared.quantity.clone(),
+                declared.quantity.clone().or_else(|| {
+                    if !typed(d) && !matches!(d.kind(type_id).ok(), Some(Kind::Bool)) {
+                        plain()
+                    } else {
+                        None
+                    }
+                }),
                 bounds,
                 0,
                 false,
                 matches!(d.kind(type_id).map_err(|e| e.to_string())?, Kind::Bool),
             )
+            .and_then(|v| {
+                mark(
+                    Ok(v),
+                    matches!(
+                        declared.form,
+                        Form::Leaf(super::declarations::Leaf::U128 { .. })
+                    ),
+                    if parts[0] == "outbox" {
+                        None
+                    } else {
+                        match declared.form {
+                            Form::Leaf(super::declarations::Leaf::U128 { min, max }) => {
+                                Some((min, max))
+                            }
+                            _ => None,
+                        }
+                    },
+                )
+            })
         }
         Ast::Neg(inner) | Ast::Not(inner) => {
-            let v = infer(d, inner, fuel)?;
+            let v = infer(d, inner, fuel, strict)?;
             let not = matches!(ast, Ast::Not(_));
+            if !not && v.unsigned {
+                return Err("U128NegationUnsupported".into());
+            }
             if strict && (not && !v.boolean || !not && v.quantity.is_none()) {
                 return Err("invalid quantity unary operand".into());
             }
@@ -223,9 +298,9 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
             )
         }
         Ast::Choose(c, a, b) => {
-            let c = infer(d, c, fuel)?;
-            let a = infer(d, a, fuel)?;
-            let b = infer(d, b, fuel)?;
+            let c = infer(d, c, fuel, strict)?;
+            let a = infer(d, a, fuel, strict)?;
+            let b = infer(d, b, fuel, strict)?;
             if strict && !c.boolean {
                 return Err("quantity select condition is not boolean".into());
             }
@@ -240,6 +315,11 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 .map(|((lo, hi), (low, high))| (lo.min(low), hi.max(high)));
             let steps = c.steps.max(a.steps).max(b.steps);
             let boolean = a.boolean;
+            let unsigned = a.unsigned;
+            let ub = a
+                .unsigned_bounds
+                .zip(b.unsigned_bounds)
+                .map(|((a, b), (c, d))| (a.min(c), b.max(d)));
             node(
                 Ast::Choose(Box::new(c.ast), Box::new(a.ast), Box::new(b.ast)),
                 q,
@@ -248,15 +328,32 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 false,
                 boolean,
             )
+            .and_then(|v| mark(Ok(v), unsigned, ub))
         }
         Ast::Binary(op, a, b) => {
-            let a = infer(d, a, fuel)?;
-            let b = infer(d, b, fuel)?;
+            let a = infer(d, a, fuel, strict)?;
+            let b = infer(d, b, fuel, strict)?;
             let logic = matches!(op, Binary::And | Binary::Or | Binary::Implies);
             let compare = matches!(
                 op,
                 Binary::Eq | Binary::Ne | Binary::Lt | Binary::Le | Binary::Gt | Binary::Ge
             );
+            if a.unsigned != b.unsigned {
+                return Err("U128KindMismatch".into());
+            }
+            let unsigned = a.unsigned && !compare && !logic;
+            let ub = match op {
+                Binary::Add => {
+                    unsigned_interval(a.unsigned_bounds, b.unsigned_bounds, u128::checked_add)
+                }
+                Binary::Sub => {
+                    unsigned_interval(a.unsigned_bounds, b.unsigned_bounds, u128::checked_sub)
+                }
+                Binary::Mul => {
+                    unsigned_interval(a.unsigned_bounds, b.unsigned_bounds, u128::checked_mul)
+                }
+                _ => None,
+            };
             let mut q = a.quantity.clone();
             if strict {
                 if logic {
@@ -288,10 +385,15 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 false,
                 compare || logic,
             )
+            .and_then(|v| mark(Ok(v), unsigned, ub))
         }
         Ast::Div(r, a, b) => {
-            let a = infer(d, a, fuel)?;
-            let b = infer(d, b, fuel)?;
+            let a = infer(d, a, fuel, strict)?;
+            let b = infer(d, b, fuel, strict)?;
+            if a.unsigned != b.unsigned {
+                return Err("U128KindMismatch".into());
+            }
+            let unsigned = a.unsigned;
             let q = if strict {
                 Some(combine(&a, &b, true)?)
             } else {
@@ -306,22 +408,29 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 false,
                 false,
             )
+            .and_then(|v| mark(Ok(v), unsigned, None))
         }
-        Ast::MulDiv(r, a, b, h) => fused(d, *r, false, (a, b, h), None, fuel),
-        Ast::SignedMulDivFloor(a, b, h) => fused(d, Rounding::Floor, true, (a, b, h), None, fuel),
+        Ast::MulDiv(r, a, b, h) => fused(d, *r, false, (a, b, h), None, fuel, strict),
+        Ast::SignedMulDivFloor(a, b, h) => {
+            fused(d, Rounding::Floor, true, (a, b, h), None, fuel, strict)
+        }
         Ast::ScaledMulDiv(r, signed, a, b, h, q) => {
-            if !strict {
+            if !typed(d) {
                 return Err("scaled call requires declared units and scales".into());
             }
-            fused(d, *r, *signed, (a, b, h), Some(*q), fuel)
+            fused(d, *r, *signed, (a, b, h), Some(*q), fuel, strict)
         }
         Ast::RepeatMulDiv(signed, x, a, h, p) => {
             if *p > 16 {
                 return Err("repeat count outside 0..16".into());
             }
-            let x = infer(d, x, fuel)?;
-            let a = infer(d, a, fuel)?;
-            let h = infer(d, h, fuel)?;
+            let x = infer(d, x, fuel, strict)?;
+            let a = infer(d, a, fuel, strict)?;
+            let h = infer(d, h, fuel, strict)?;
+            let unsigned = x.unsigned;
+            if x.unsigned != a.unsigned || x.unsigned != h.unsigned || (*signed && unsigned) {
+                return Err("U128KindMismatch".into());
+            }
             let steps = x
                 .steps
                 .max(a.steps)
@@ -367,12 +476,16 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 false,
                 false,
             )
+            .and_then(|v| mark(Ok(v), unsigned, None))
         }
         Ast::ProductsGe(args) => {
             let values = args
                 .iter()
-                .map(|a| infer(d, a, fuel))
+                .map(|a| infer(d, a, fuel, strict))
                 .collect::<Result<Vec<_>, _>>()?;
+            if values.iter().any(|v| v.unsigned != values[0].unsigned) {
+                return Err("U128KindMismatch".into());
+            }
             if strict {
                 let half = values.len() / 2;
                 let product = |slice: &[Value]| -> Result<Quantity, String> {
@@ -413,13 +526,18 @@ fn fused(
     (a, b, h): (&Ast, &Ast, &Ast),
     target: Option<u8>,
     fuel: &mut usize,
+    strict: bool,
 ) -> Result<Value, String> {
     if signed && r != Rounding::Floor {
         return Err("signed fused ceiling is unsupported".into());
     }
-    let a = infer(d, a, fuel)?;
-    let b = infer(d, b, fuel)?;
-    let h = infer(d, h, fuel)?;
+    let a = infer(d, a, fuel, strict)?;
+    let b = infer(d, b, fuel, strict)?;
+    let h = infer(d, h, fuel, strict)?;
+    let unsigned = a.unsigned;
+    if a.unsigned != b.unsigned || a.unsigned != h.unsigned || (signed && unsigned) {
+        return Err("U128KindMismatch".into());
+    }
     let steps = a
         .steps
         .max(b.steps)
@@ -447,27 +565,48 @@ fn fused(
                 .ok_or("unit quotient overflow")?,
         );
     }
-    let mut aa = a.ast;
-    let mut bb = b.ast;
-    let mut hh = h.ast;
+    let mut aa = a.ast.clone();
+    let mut bb = b.ast.clone();
+    let mut hh = h.ast.clone();
     if k != 0 {
         let power = u32::from(k.unsigned_abs());
         let factor = 10i128
             .checked_pow(power)
             .filter(|_| power <= 38)
             .ok_or("unsupported scale lowering: remaining exponent exceeds 38")?;
-        let fits = |bounds| interval(bounds, Some((factor, factor)), i128::checked_mul).is_some();
-        let scale = |v| Ast::Binary(Binary::Mul, Box::new(v), Box::new(Ast::Int(factor)));
+        let fits = |v: &Value| {
+            if unsigned {
+                unsigned_interval(
+                    v.unsigned_bounds,
+                    Some((factor as u128, factor as u128)),
+                    u128::checked_mul,
+                )
+                .is_some()
+            } else {
+                interval(v.bounds, Some((factor, factor)), i128::checked_mul).is_some()
+            }
+        };
+        let scale = |v| {
+            Ast::Binary(
+                Binary::Mul,
+                Box::new(v),
+                Box::new(if unsigned {
+                    Ast::U128(factor as u128)
+                } else {
+                    Ast::Int(factor)
+                }),
+            )
+        };
         if k < 0 {
-            if !fits(h.bounds) {
+            if !fits(&h) {
                 return Err(
                     "unsupported scale lowering: denominator fit is not established".into(),
                 );
             }
             hh = scale(hh);
-        } else if fits(a.bounds) {
+        } else if fits(&a) {
             aa = scale(aa);
-        } else if fits(b.bounds) {
+        } else if fits(&b) {
             bb = scale(bb);
         } else {
             return Err("unsupported scale lowering: numerator fit is not established".into());
@@ -478,5 +617,26 @@ fn fused(
     } else {
         Ast::MulDiv(r, Box::new(aa), Box::new(bb), Box::new(hh))
     };
-    node(ast, q, None, steps, false, false)
+    mark(node(ast, q, None, steps, false, false), unsigned, None)
+}
+
+fn mark(
+    value: Result<Value, String>,
+    unsigned: bool,
+    bounds: Option<(u128, u128)>,
+) -> Result<Value, String> {
+    let mut value = value?;
+    value.unsigned = unsigned;
+    value.unsigned_bounds = bounds;
+    Ok(value)
+}
+fn unsigned_interval(
+    a: Option<(u128, u128)>,
+    b: Option<(u128, u128)>,
+    op: fn(u128, u128) -> Option<u128>,
+) -> Option<(u128, u128)> {
+    let (a, bounds) = a?;
+    let (c, d) = b?;
+    let v = [op(a, c)?, op(a, d)?, op(bounds, c)?, op(bounds, d)?];
+    Some((*v.iter().min()?, *v.iter().max()?))
 }

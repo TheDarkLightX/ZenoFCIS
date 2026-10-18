@@ -46,6 +46,7 @@ impl Loaded {
     /// # Errors
     /// The first declaration with no contract form.
     pub(super) fn with(project: &str, rules: Rules) -> Result<Self, ContractError> {
+        rules.refuse_unsigned("scalar review consumer binding")?;
         let declarations = Declarations::read(project, &rules.leaf_bindings)?;
         let schema = schema::encode(&declarations)?;
         let commitment = schema_commitment(&schema)?;
@@ -398,6 +399,10 @@ fn genesis(space: &Space, positions: &[Position], rules: &Rules) -> Result<usize
                 ContractError::new("project.zeno", "a scalar state root has no genesis field")
             })?;
             match rules.genesis.get(&field) {
+                Some(Constant::U128(_)) => Err(ContractError::new(
+                    "legacy machine",
+                    "U128SubjectUnsupported",
+                )),
                 Some(Constant::Bool(value)) => Ok(i128::from(*value)),
                 Some(Constant::Int(value)) => Ok(*value),
                 None => Err(ContractError::new(
