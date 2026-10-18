@@ -67,6 +67,7 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/internals/graph.rs",
     "src/internals/model.rs",
     "src/internals/policy.rs",
+    "src/internals/quantity.rs",
     "src/internals/review.rs",
     "src/internals/review/domain.rs",
     "src/internals/review/evaluate.rs",

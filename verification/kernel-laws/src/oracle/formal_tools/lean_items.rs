@@ -121,7 +121,10 @@ fn preflight_export(
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::MulDiv(..) | ValueExpr::SignedMulDivFloor(..) => {
+                ValueExpr::MulDiv(..)
+                | ValueExpr::SignedMulDivFloor(..)
+                | ValueExpr::ScaledMulDiv(..)
+                | ValueExpr::RepeatMulDiv(..) => {
                     return Err(ExportError::UnsupportedMode);
                 }
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
@@ -432,7 +435,10 @@ fn render_value_lean(
 ) -> Result<LeanValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
-        ValueExpr::MulDiv(..) | ValueExpr::SignedMulDivFloor(..) => {
+        ValueExpr::MulDiv(..)
+        | ValueExpr::SignedMulDivFloor(..)
+        | ValueExpr::ScaledMulDiv(..)
+        | ValueExpr::RepeatMulDiv(..) => {
             return Err(ExportError::UnsupportedMode);
         }
         ValueExpr::Int(value) => LeanValue {

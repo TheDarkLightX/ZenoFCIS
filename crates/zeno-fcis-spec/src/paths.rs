@@ -251,7 +251,9 @@ fn value_paths<'a>(expr: &'a ValueExpr, paths: &mut Vec<&'a ProjectionPath>) {
             value_paths(left, paths);
             value_paths(right, paths);
         }
-        ValueExpr::SignedMulDivFloor(a, b, d) => {
+        ValueExpr::SignedMulDivFloor(a, b, d)
+        | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
+        | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
             value_paths(a, paths);
             value_paths(b, paths);
             value_paths(d, paths);

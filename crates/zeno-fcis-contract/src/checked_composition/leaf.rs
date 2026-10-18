@@ -218,6 +218,14 @@ pub(crate) fn bind(
         ));
     }
     let declarations = Declarations::read(project, &rules.leaf_bindings).map_err(route)?;
+    if crate::internals::quantity::typed(&declarations) {
+        return Err(Refusal::new(
+            Stage::Binding,
+            Obligation::CheckedProfile,
+            place("project.zeno"),
+            "quantity interfaces require a quantity-aware composition profile",
+        ));
+    }
     let schema = schema::encode(&declarations).map_err(route)?;
     let commitment = schema_commitment(&schema).map_err(route)?;
     let contract = Contract::build(&declarations, &rules, commitment).map_err(route)?;
@@ -1157,4 +1165,39 @@ fn list(fields: &[u16]) -> String {
 
 pub(crate) fn sha256(bytes: &[u8]) -> [u8; 32] {
     *RustCryptoSha256::hash(bytes).as_bytes()
+}
+
+#[cfg(test)]
+#[test]
+fn quantity_interfaces_refuse_before_legacy_composition_erasure() {
+    let source = include_str!("../../../../examples/arithmetic-fused/project.zeno")
+        .replace(
+            "Scalar in 0..=9223372036854775807;",
+            "Scalar in 0..=9223372036854775807 unit USD scale e0;",
+        )
+        .replace(
+            "Denominator in 1..=9223372036854775807;",
+            "Denominator in 1..=9223372036854775807 unit 1 scale e0;",
+        );
+    let rules = include_str!("../../../../examples/arithmetic-fused/v2/policy.json").replace(
+        "template-declarative-policy/2",
+        "template-declarative-policy/3",
+    );
+    let result = bind(
+        "quantity-test",
+        false,
+        &sha256(source.as_bytes()),
+        &sha256(rules.as_bytes()),
+        &source,
+        &rules,
+    );
+    let Err(error) = result else {
+        panic!("quantity interfaces must refuse before composition erasure");
+    };
+    assert_eq!(error.stage(), Stage::Binding);
+    assert_eq!(error.obligation(), Obligation::CheckedProfile);
+    assert_eq!(
+        error.reason(),
+        "quantity interfaces require a quantity-aware composition profile"
+    );
 }

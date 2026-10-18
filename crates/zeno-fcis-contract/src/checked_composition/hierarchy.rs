@@ -741,6 +741,12 @@ impl Scope {
             }
             Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
             Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+            Ast::ScaledMulDiv(r, signed, a, b, d, scale) => {
+                Ast::ScaledMulDiv(*r, *signed, recurse(a), recurse(b), recurse(d), *scale)
+            }
+            Ast::RepeatMulDiv(signed, a, b, d, count) => {
+                Ast::RepeatMulDiv(*signed, recurse(a), recurse(b), recurse(d), *count)
+            }
             Ast::SignedMulDivFloor(a, b, d) => {
                 Ast::SignedMulDivFloor(recurse(a), recurse(b), recurse(d))
             }

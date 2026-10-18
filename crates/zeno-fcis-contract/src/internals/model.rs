@@ -160,12 +160,60 @@ pub struct Contract<'d> {
     pub genesis: Vec<(u16, Atom)>,
 }
 
+/// One immutable authoring decision, shared by rule and law compilation.
+/// New syntax anywhere in the policy opts the whole contract into its limits.
+fn bounded_arithmetic(declarations: &Declarations, rules: &Rules) -> bool {
+    use zeno_fcis_spec::ClaimFormula;
+
+    if rules.quantities
+        || super::quantity::typed(declarations)
+        || rules.variables.values().any(expr::uses_new_arithmetic)
+        || declarations
+            .laws
+            .iter()
+            .any(|law| expr::uses_new_arithmetic(&law.formula))
+    {
+        return true;
+    }
+    for case in &rules.cases {
+        if std::iter::once(&case.when)
+            .chain(case.post.values())
+            .chain(
+                case.outbox
+                    .iter()
+                    .flat_map(|delivery| delivery.payload.values()),
+            )
+            .any(expr::uses_new_arithmetic)
+        {
+            return true;
+        }
+    }
+    declarations.notes.claims.iter().any(|claim| {
+        matches!(claim.formula(), ClaimFormula::Relational(formula)
+            if expr::law(formula).is_ok_and(|ast| expr::uses_new_arithmetic(&ast)))
+    })
+}
+
 impl<'d> Contract<'d> {
     pub fn build(
         declarations: &'d Declarations,
         rules: &Rules,
         commitment: [u8; 32],
     ) -> Result<Self, ContractError> {
+        if super::quantity::typed(declarations) && !rules.quantities {
+            return Err(rules_error(
+                "schema",
+                "quantity declarations require policy/3",
+            ));
+        }
+        let bounded = bounded_arithmetic(declarations, rules);
+        // New-feature bindings still undergo admission, and cannot hide long chains
+        // or erase units. Evaluation remains the existing graph's eager order.
+        for (name, value) in rules.variables.iter().filter(|_| bounded) {
+            let ast = expr::expand_with_limits(value, &rules.variables, bounded)
+                .map_err(|e| rules_error(name, e))?;
+            super::quantity::lower(declarations, &ast).map_err(|e| rules_error(name, e))?;
+        }
         let inputs = declarations.inputs()?;
         if inputs.len() > MAX_INPUTS {
             return Err(rules_error(
@@ -198,7 +246,8 @@ impl<'d> Contract<'d> {
             .collect::<Result<Vec<_>, _>>()?;
         let variables = &rules.variables;
         let expand = |ast: &Ast, place: &str| {
-            expr::expand(ast, variables).map_err(|reason| rules_error(place, reason))
+            expr::expand_with_limits(ast, variables, bounded)
+                .map_err(|reason| rules_error(place, reason))
         };
         let last = rules.cases.len() - 1;
         // Written `true`, not merely a variable equal to it.
@@ -214,7 +263,9 @@ impl<'d> Contract<'d> {
         let mut selection = Ast::Int(index_value(last));
         for (index, case) in rules.cases.iter().enumerate().take(last).rev() {
             let place = format!("cases[{index}].when");
-            check_program(declarations, &inputs, &expand(&case.when, &place)?, &place)?;
+            let when = expand(&case.when, &place)?;
+            super::quantity::condition(declarations, &when).map_err(|e| rules_error(&place, e))?;
+            check_program(declarations, &inputs, &when, &place, bounded)?;
             selection = Ast::Choose(
                 Box::new(case.when.clone()),
                 Box::new(Ast::Int(index_value(index))),
@@ -268,6 +319,7 @@ impl<'d> Contract<'d> {
                             &expand(value, &place)?,
                             *type_id,
                             &place,
+                            bounded,
                         )?,
                         domain: domain(declarations, *type_id)?,
                     });
@@ -314,7 +366,14 @@ impl<'d> Contract<'d> {
                     let value = expand(&delivery.payload[&field.id], &place)?;
                     payload.push((
                         field.id,
-                        outputs.expression(declarations, &inputs, &value, field.type_id, &place)?,
+                        outputs.expression(
+                            declarations,
+                            &inputs,
+                            &value,
+                            field.type_id,
+                            &place,
+                            bounded,
+                        )?,
                     ));
                 }
                 outbox.push(Plan {
@@ -338,7 +397,7 @@ impl<'d> Contract<'d> {
         for (ast, _) in &outputs.entries {
             program_roots.push(
                 program
-                    .compile(ast)
+                    .compile_with_limits(ast, bounded)
                     .map_err(|reason| rules_error("", reason))?
                     .index,
             );
@@ -552,7 +611,10 @@ impl Outputs {
         ast: &Ast,
         type_id: u32,
         place: &str,
+        bounded: bool,
     ) -> Result<Expr, ContractError> {
+        super::quantity::assignment(declarations, ast, type_id)
+            .map_err(|e| rules_error(place, e))?;
         match ast {
             Ast::Bool(_) | Ast::Int(_) => {
                 let value = atom(declarations, ast, type_id)
@@ -594,7 +656,7 @@ impl Outputs {
                 if let Some(index) = self.entries.iter().position(|entry| *entry == key) {
                     return Ok(Expr::Output(index));
                 }
-                check_program(declarations, inputs, ast, place)?;
+                check_program(declarations, inputs, ast, place, bounded)?;
                 let kind = declarations.kind(type_id)?;
                 let wide = matches!(kind, TypeKind::I128 { .. });
                 let leaf = input_leaf(declarations, type_id, wide)?;
@@ -639,7 +701,13 @@ fn laws(
             ));
         }
         let failed = |reason: String| ContractError::new(&place, reason);
-        let formula = expr::expand(&law.formula, &rules.variables).map_err(failed)?;
+        let formula = expr::expand_with_limits(
+            &law.formula,
+            &rules.variables,
+            bounded_arithmetic(declarations, rules),
+        )
+        .map_err(failed)?;
+        super::quantity::condition(declarations, &formula).map_err(failed)?;
         let mut graph = LawGraph::new(declarations);
         let bound = rules
             .delivery_laws
@@ -652,7 +720,9 @@ fn laws(
             })
             .transpose()
             .map_err(failed)?;
-        let value = graph.compile(&formula).map_err(failed)?;
+        let value = graph
+            .compile_with_limits(&formula, bounded_arithmetic(declarations, rules))
+            .map_err(failed)?;
         if graph
             .table
             .nodes
@@ -862,9 +932,16 @@ pub fn compiled_claims(
         })?;
         let ast = expr::law(&over_state)
             .map_err(|reason| failed(format!("{reason} has no contract form")))?;
-        let formula = expr::expand(&ast, &rules.variables).map_err(failed)?;
+        let formula = expr::expand_with_limits(
+            &ast,
+            &rules.variables,
+            bounded_arithmetic(declarations, rules),
+        )
+        .map_err(failed)?;
         let mut graph = LawGraph::new(declarations);
-        let value = graph.compile(&formula).map_err(failed)?;
+        let value = graph
+            .compile_with_limits(&formula, bounded_arithmetic(declarations, rules))
+            .map_err(failed)?;
         let root = graph.boolean(value).map_err(failed)?;
         if let Some(name) = graph.table.nodes.iter().find_map(|node| match node {
             LawOp::Observe(observation) | LawOp::ObserveWhen(_, observation, _) => {
@@ -917,8 +994,15 @@ fn conformance(
     for (index, case) in rules.cases.iter().enumerate() {
         let place = format!("cases[{index}]");
         let failed = |reason: String| rules_error(&place, reason);
-        let when = expr::expand(&case.when, &rules.variables).map_err(failed)?;
-        let holds = graph.compile(&when).map_err(failed)?;
+        let when = expr::expand_with_limits(
+            &case.when,
+            &rules.variables,
+            bounded_arithmetic(declarations, rules),
+        )
+        .map_err(failed)?;
+        let holds = graph
+            .compile_with_limits(&when, bounded_arithmetic(declarations, rules))
+            .map_err(failed)?;
         let holds = graph.boolean(holds).map_err(failed)?;
         let guard = graph
             .op(Op::And(remaining.index, holds.index), Kind::Bool)
@@ -1080,7 +1164,11 @@ fn observed_value(
     default: Atom,
 ) -> Result<Ref, String> {
     let actual = graph.observe(observation, Kind::Raw, Some(guard), default)?;
-    let expected = expr::expand(expected, &rules.variables)?;
+    let expected = expr::expand_with_limits(
+        expected,
+        &rules.variables,
+        bounded_arithmetic(declarations, rules),
+    )?;
     let equal = match expected {
         Ast::Bool(_) | Ast::Int(_) => {
             let wanted = graph.literal(atom(declarations, &expected, type_id)?);
@@ -1088,7 +1176,8 @@ fn observed_value(
         }
         _ => {
             let actual = graph.numeric(actual)?;
-            let value = graph.compile(&expected)?;
+            let value =
+                graph.compile_with_limits(&expected, bounded_arithmetic(declarations, rules))?;
             let value = graph.numeric(value)?;
             graph.op(Op::Eq(actual.index, value.index), Kind::Bool)?
         }
@@ -1354,9 +1443,10 @@ fn check_program(
     inputs: &[super::declarations::Input],
     ast: &Ast,
     place: &str,
+    bounded: bool,
 ) -> Result<(), ContractError> {
     ScalarGraph::new(declarations, inputs)
-        .compile(ast)
+        .compile_with_limits(ast, bounded)
         .map(|_| ())
         .map_err(|reason| rules_error(place, reason))
 }

@@ -297,6 +297,7 @@ const SYNTHETIC_INTEGER: u32 = 1;
 fn integer_declarations() -> Declarations {
     let integer = Type {
         name: "Integer".to_owned(),
+        quantity: None,
         form: TypeForm::Leaf(Leaf::I128 {
             min: i128::from(i128::MIN),
             max: i128::from(i128::MAX),
@@ -334,7 +335,10 @@ fn children(ast: &Ast) -> Vec<&Ast> {
         Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => Vec::new(),
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
-        Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => vec![a, b, d],
+        Ast::MulDiv(_, a, b, d)
+        | Ast::SignedMulDivFloor(a, b, d)
+        | Ast::ScaledMulDiv(_, _, a, b, d, _)
+        | Ast::RepeatMulDiv(_, a, b, d, _) => vec![a, b, d],
         Ast::ProductsGe(arguments) => arguments.iter().collect(),
         Ast::Choose(condition, then, otherwise) => vec![condition, then, otherwise],
     }

@@ -170,8 +170,71 @@ impl Parser {
         } else {
             declared
         };
+        let declared = if self.take_keyword("unit") {
+            self.parse_quantity(declared)?
+        } else {
+            declared
+        };
         self.expect_symbol(TokenKind::Semicolon, "type");
         Some(declared)
+    }
+    fn parse_scale(&mut self) -> Option<u8> {
+        let text = self.take_identifier("quantity.scale")?;
+        let scale = text
+            .as_str()
+            .strip_prefix('e')
+            .and_then(|s| s.parse::<u8>().ok())
+            .filter(|s| *s <= 38);
+        if scale.is_none() {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "quantity.scale",
+                "e0..e38",
+                text.as_str(),
+                "declare a literal decimal exponent",
+            );
+        }
+        scale
+    }
+    fn parse_quantity(&mut self, declared: TypeDecl) -> Option<TypeDecl> {
+        let mut factors = Vec::new();
+        let mut sign = 1;
+        loop {
+            if self.current().kind == TokenKind::Number(1) {
+                self.advance();
+            } else {
+                factors.push((self.take_identifier("quantity.unit")?, sign));
+            }
+            if self.take_symbol(&TokenKind::Star) {
+                sign = 1;
+            } else if self.take_symbol(&TokenKind::Slash) {
+                sign = -1;
+            } else {
+                break;
+            }
+        }
+        if !self.take_keyword("scale") {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "quantity.scale",
+                "scale eP",
+                self.describe_current(),
+                "both unit and scale are required",
+            );
+            return None;
+        }
+        let quantity = Quantity::try_new(factors, self.parse_scale()?)?;
+        let result = declared.with_quantity(quantity);
+        if result.is_none() {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "quantity",
+                "int",
+                "non-integer",
+                "only integer declarations carry units",
+            );
+        }
+        result
     }
     /// Parses `MIN..=MAX` after `in` in a type declaration. The bounds are
     /// inclusive, as in the schema; `..` alone is refused, because quantifiers
@@ -726,7 +789,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor")
+                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor")
         );
         if named_predicate {
             let name = self
@@ -846,42 +909,57 @@ impl Parser {
         let name = self
             .take_identifier("value")
             .unwrap_or_else(fallback_identifier);
-        if matches!(name.as_str(), "mul_div_floor" | "mul_div_ceil")
-            && self.take_symbol(&TokenKind::LParen)
+        if matches!(
+            name.as_str(),
+            "mul_div_floor"
+                | "mul_div_ceil"
+                | "signed_mul_div_floor"
+                | "repeat_mul_div_floor"
+                | "repeat_signed_mul_div_floor"
+        ) && self.take_symbol(&TokenKind::LParen)
         {
-            let a = self.nested("value.fused.left", ValueExpr::Int(0), |parser| {
-                parser.parse_value()
-            });
+            let a = self.nested("value.fused.left", ValueExpr::Int(0), |p| p.parse_value());
             self.expect_symbol(TokenKind::Comma, "fused division");
-            let b = self.nested("value.fused.right", ValueExpr::Int(0), |parser| {
-                parser.parse_value()
-            });
+            let b = self.nested("value.fused.right", ValueExpr::Int(0), |p| p.parse_value());
             self.expect_symbol(TokenKind::Comma, "fused division");
-            let d = self.nested("value.fused.denominator", ValueExpr::Int(0), |parser| {
-                parser.parse_value()
+            let d = self.nested("value.fused.denominator", ValueExpr::Int(0), |p| {
+                p.parse_value()
             });
-            self.expect_symbol(TokenKind::RParen, "fused division");
-            let mode = if name.as_str() == "mul_div_floor" {
-                DivisionMode::Floor
-            } else {
+            let signed = name.as_str().contains("signed");
+            let a = Box::new(a);
+            let b = Box::new(b);
+            let d = Box::new(d);
+            if name.as_str().starts_with("repeat_") {
+                self.expect_symbol(TokenKind::Comma, "repeat count");
+                let count = self.take_u16("repeat count").filter(|p| *p <= 16);
+                if count.is_none() {
+                    self.error(
+                        DiagnosticCode::InvalidDeclaration,
+                        "repeat count",
+                        "literal 0..16",
+                        "unsupported",
+                        "use a bounded literal count",
+                    );
+                }
+                self.expect_symbol(TokenKind::RParen, "repeat");
+                return ValueExpr::RepeatMulDiv(signed, a, b, d, count.unwrap_or(0) as u8);
+            }
+            let mode = if name.as_str() == "mul_div_ceil" {
                 DivisionMode::Ceil
+            } else {
+                DivisionMode::Floor
             };
-            return ValueExpr::MulDiv(mode, Box::new(a), Box::new(b), Box::new(d));
-        }
-        if name.as_str() == "signed_mul_div_floor" && self.take_symbol(&TokenKind::LParen) {
-            let a = self.nested("value.signed_mul_div_floor.a", ValueExpr::Int(0), |p| {
-                p.parse_value()
-            });
-            self.expect_symbol(TokenKind::Comma, "signed_mul_div_floor");
-            let b = self.nested("value.signed_mul_div_floor.b", ValueExpr::Int(0), |p| {
-                p.parse_value()
-            });
-            self.expect_symbol(TokenKind::Comma, "signed_mul_div_floor");
-            let d = self.nested("value.signed_mul_div_floor.d", ValueExpr::Int(0), |p| {
-                p.parse_value()
-            });
-            self.expect_symbol(TokenKind::RParen, "signed_mul_div_floor");
-            return ValueExpr::SignedMulDivFloor(Box::new(a), Box::new(b), Box::new(d));
+            if self.take_symbol(&TokenKind::Comma) {
+                let scale = self.parse_scale().unwrap_or(0);
+                self.expect_symbol(TokenKind::RParen, "scaled division");
+                return ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale);
+            }
+            self.expect_symbol(TokenKind::RParen, "fused division");
+            return if signed {
+                ValueExpr::SignedMulDivFloor(a, b, d)
+            } else {
+                ValueExpr::MulDiv(mode, a, b, d)
+            };
         }
         if matches!(name.as_str(), "div_exact" | "div_floor" | "div_ceil")
             && self.take_symbol(&TokenKind::LParen)

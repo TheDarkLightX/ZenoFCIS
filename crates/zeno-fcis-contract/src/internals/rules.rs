@@ -456,6 +456,7 @@ pub struct DeliveryObservation {
 
 #[derive(Clone, Debug)]
 pub struct Rules {
+    pub quantities: bool,
     pub template: String,
     pub leaf_bindings: BTreeMap<u32, Leaf>,
     pub variables: BTreeMap<String, Ast>,
@@ -475,7 +476,7 @@ impl Rules {
         let file = Object::new(&json, FILE)?;
         file.only(&FILE_KEYS)?;
         let schema = file.text("schema")?;
-        if schema != RULES_SCHEMA {
+        if schema != RULES_SCHEMA && schema != "zeno-fcis/template-declarative-policy/3" {
             return Err(file.error(
                 "schema",
                 format!("expected `{RULES_SCHEMA}`, found `{schema}`"),
@@ -605,6 +606,7 @@ impl Rules {
                 .collect::<Result<_, ContractError>>()?,
         };
         Ok(Self {
+            quantities: schema.ends_with("/3"),
             template: template.to_owned(),
             leaf_bindings,
             variables,

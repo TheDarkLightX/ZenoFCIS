@@ -679,7 +679,11 @@ fn ast(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
-        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
+        Ast::MulDiv(..)
+        | Ast::SignedMulDivFloor(..)
+        | Ast::ScaledMulDiv(..)
+        | Ast::RepeatMulDiv(..)
+        | Ast::ProductsGe(..) => {
             return Err(refused(
                 "arithmetic extension is outside the Tau export profile",
             ));
@@ -899,7 +903,11 @@ fn ast_ranges(
             }
         }
         Ast::Div(..) => return Err(refused("division is outside the Tau export profile")),
-        Ast::MulDiv(..) | Ast::SignedMulDivFloor(..) | Ast::ProductsGe(..) => {
+        Ast::MulDiv(..)
+        | Ast::SignedMulDivFloor(..)
+        | Ast::ScaledMulDiv(..)
+        | Ast::RepeatMulDiv(..)
+        | Ast::ProductsGe(..) => {
             return Err(refused(
                 "arithmetic extension is outside the Tau export profile",
             ));

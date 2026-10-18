@@ -423,7 +423,10 @@ fn expression(
                 names(then, found);
                 names(otherwise, found);
             }
-            Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => {
+            Ast::MulDiv(_, a, b, d)
+            | Ast::SignedMulDivFloor(a, b, d)
+            | Ast::ScaledMulDiv(_, _, a, b, d, _)
+            | Ast::RepeatMulDiv(_, a, b, d, _) => {
                 names(a, found);
                 names(b, found);
                 names(d, found);

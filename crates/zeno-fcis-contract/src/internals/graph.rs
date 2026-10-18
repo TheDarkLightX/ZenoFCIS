@@ -147,6 +147,7 @@ pub trait Graph {
     type Node: Clone + Ord;
 
     fn table(&mut self) -> &mut Table<Self::Node>;
+    fn declarations(&self) -> &Declarations;
     fn bool_node(value: bool) -> Self::Node;
     fn int_node(value: i128) -> Result<Self::Node, String>;
     fn op_node(op: Op) -> Result<Self::Node, String>;
@@ -193,6 +194,24 @@ pub trait Graph {
 
     /// Compiles an expression whose variables are already expanded.
     fn compile(&mut self, ast: &Ast) -> Result<Ref, String> {
+        self.compile_with_limits(ast, false)
+    }
+
+    /// Historical expressions follow the original compiler directly. The
+    /// new authoring boundary adds admission/lowering, not runtime authority.
+    fn compile_with_limits(&mut self, ast: &Ast, bounded: bool) -> Result<Ref, String> {
+        if bounded
+            || super::quantity::typed(self.declarations())
+            || super::expr::uses_new_arithmetic(ast)
+        {
+            let lowered = super::quantity::lower(self.declarations(), ast)?;
+            self.compile_raw(&lowered)
+        } else {
+            self.compile_raw(ast)
+        }
+    }
+
+    fn compile_raw(&mut self, ast: &Ast) -> Result<Ref, String> {
         match ast {
             Ast::Bool(value) => Ok(self.bool(*value)),
             Ast::Int(value) => self.int(*value),
@@ -201,20 +220,20 @@ pub trait Graph {
             Ast::Neg(inner) => {
                 // The parser admits MIN directly; every other negation remains eager.
                 let zero = self.int(0)?;
-                let inner = self.compile(inner)?;
+                let inner = self.compile_raw(inner)?;
                 let inner = self.numeric(inner)?;
                 self.op(Op::Sub(zero.index, inner.index), Kind::Int)
             }
             Ast::Not(inner) => {
-                let inner = self.compile(inner)?;
+                let inner = self.compile_raw(inner)?;
                 let inner = self.boolean(inner)?;
                 self.op(Op::Not(inner.index), Kind::Bool)
             }
             Ast::Choose(condition, then, otherwise) => {
-                let condition = self.compile(condition)?;
+                let condition = self.compile_raw(condition)?;
                 let condition = self.boolean(condition)?;
-                let mut then = self.compile(then)?;
-                let mut otherwise = self.compile(otherwise)?;
+                let mut then = self.compile_raw(then)?;
+                let mut otherwise = self.compile_raw(otherwise)?;
                 if then.kind != otherwise.kind {
                     then = self.numeric(then)?;
                     otherwise = self.numeric(otherwise)?;
@@ -225,25 +244,52 @@ pub trait Graph {
                 )
             }
             Ast::Binary(operator, left, right) => {
-                let left = self.compile(left)?;
-                let right = self.compile(right)?;
+                let left = self.compile_raw(left)?;
+                let right = self.compile_raw(right)?;
                 self.binary(*operator, left, right)
             }
-            Ast::SignedMulDivFloor(a, b, d) => {
-                let a = self.compile(a)?;
+            Ast::ScaledMulDiv(..) => Err("scaled call was not lowered".to_owned()),
+            Ast::RepeatMulDiv(signed, x, a, d, count) => {
+                let x = self.compile_raw(x)?;
+                let mut value = self.numeric(x)?;
+                let a = self.compile_raw(a)?;
                 let a = self.numeric(a)?;
-                let b = self.compile(b)?;
+                let d = self.compile_raw(d)?;
+                let d = self.numeric(d)?;
+                for _ in 0..*count {
+                    value = if *signed {
+                        self.op(
+                            Op::SignedMulDivFloor(value.index, a.index, d.index),
+                            Kind::Int,
+                        )?
+                    } else {
+                        let x = self.product_operand(value)?;
+                        let a = self.product_operand(a)?;
+                        let d = self.product_operand(d)?;
+                        let result = self.op(
+                            Op::MulDiv(Rounding::Floor, x.index, a.index, d.index),
+                            Kind::Int,
+                        )?;
+                        self.product_result(result)?
+                    };
+                }
+                Ok(value)
+            }
+            Ast::SignedMulDivFloor(a, b, d) => {
+                let a = self.compile_raw(a)?;
+                let a = self.numeric(a)?;
+                let b = self.compile_raw(b)?;
                 let b = self.numeric(b)?;
-                let d = self.compile(d)?;
+                let d = self.compile_raw(d)?;
                 let d = self.numeric(d)?;
                 self.op(Op::SignedMulDivFloor(a.index, b.index, d.index), Kind::Int)
             }
             Ast::MulDiv(rounding, a, b, d) => {
-                let a = self.compile(a)?;
+                let a = self.compile_raw(a)?;
                 let a = self.product_operand(a)?;
-                let b = self.compile(b)?;
+                let b = self.compile_raw(b)?;
                 let b = self.product_operand(b)?;
-                let d = self.compile(d)?;
+                let d = self.compile_raw(d)?;
                 let d = self.product_operand(d)?;
                 let result =
                     self.op(Op::MulDiv(*rounding, a.index, b.index, d.index), Kind::Int)?;
@@ -255,7 +301,7 @@ pub trait Graph {
                 }
                 let mut refs = Vec::with_capacity(arguments.len());
                 for argument in arguments.iter() {
-                    let node = self.compile(argument)?;
+                    let node = self.compile_raw(argument)?;
                     refs.push(self.product_operand(node)?.index);
                 }
                 let (a, b) = if refs.len() == 4 {
@@ -268,8 +314,8 @@ pub trait Graph {
                 self.op(Op::ProductsGe(a, b), Kind::Bool)
             }
             Ast::Div(rounding, left, right) => {
-                let left = self.compile(left)?;
-                let right = self.compile(right)?;
+                let left = self.compile_raw(left)?;
+                let right = self.compile_raw(right)?;
                 let left = self.numeric(left)?;
                 let right = self.numeric(right)?;
                 self.op(Op::Div(*rounding, left.index, right.index), Kind::Int)
@@ -352,6 +398,10 @@ impl<'d> ScalarGraph<'d> {
 
 impl Graph for ScalarGraph<'_> {
     type Node = ScalarOp;
+
+    fn declarations(&self) -> &Declarations {
+        self.declarations
+    }
 
     fn table(&mut self) -> &mut Table<ScalarOp> {
         &mut self.table
@@ -531,6 +581,10 @@ impl<'d> LawGraph<'d> {
 
 impl Graph for LawGraph<'_> {
     type Node = LawOp;
+
+    fn declarations(&self) -> &Declarations {
+        self.declarations
+    }
 
     fn product_operand(&mut self, node: Ref) -> Result<Ref, String> {
         let node = self.numeric(node)?;

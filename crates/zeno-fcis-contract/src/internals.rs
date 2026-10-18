@@ -12,6 +12,7 @@ pub mod expr;
 pub mod graph;
 pub mod model;
 pub mod policy;
+pub mod quantity;
 pub mod review;
 pub mod rules;
 pub mod schema;

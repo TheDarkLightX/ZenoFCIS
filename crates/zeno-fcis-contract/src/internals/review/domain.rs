@@ -581,7 +581,10 @@ fn collect(
             collect(left, &with(right), positions, found);
             collect(right, &with(left), positions, found);
         }
-        Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => {
+        Ast::MulDiv(_, a, b, d)
+        | Ast::SignedMulDivFloor(a, b, d)
+        | Ast::ScaledMulDiv(_, _, a, b, d, _)
+        | Ast::RepeatMulDiv(_, a, b, d, _) => {
             collect(a, expected, positions, found);
             collect(b, expected, positions, found);
             collect(d, expected, positions, found);

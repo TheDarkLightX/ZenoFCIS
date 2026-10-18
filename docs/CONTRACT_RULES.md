@@ -29,7 +29,7 @@ sign or leading zero.
 <!-- policy-keys: file -->
 | Key | Required | Value |
 |---|---|---|
-| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"`. |
+| `schema` | yes | `"zeno-fcis/template-declarative-policy/2"` for historical declarations, or `/3` for declarations with units and scales. |
 | `template` | yes | The application's name. `new --contract` uses it as the Cargo package name, so there it must be at most 64 lowercase letters, digits and `-`, starting with a letter. |
 | `roots` | yes | Always `{"state": 100, "command": 101, "context": 102}`; see [Roots](#roots). |
 | `leaf_bindings` | yes | Type ID to leaf; see [Leaf bindings](#leaf-bindings). May be `{}`. |
@@ -138,6 +138,11 @@ integer, or expression text. Expression text has:
 | `mul_div_ceil` | `mul_div_ceil(a, b, d)`: the same fused rule operation rounded up. |
 | `products_ge` | `products_ge(a, b, c, d)` compares `a*b >= c*d`. Every factor is nonnegative; products are exact, with no intermediate narrowing. Rules and laws support this predicate. |
 | `products_ge` | `products_ge(a, b, c, d, e, f)` compares `a*b*c >= d*e*f`, with the same nonnegative domain and exact products. |
+| `mul_div_floor` | `mul_div_floor(a, b, d, e8)` specifies an explicit target raw-atom exponent, in e0..e38, rounded down once. Requires declared quantities. |
+| `mul_div_ceil` | `mul_div_ceil(a, b, d, e8)` uses the same exact quantity expression, rounded up once, with nonnegative factors. |
+| `signed_mul_div_floor` | `signed_mul_div_floor(a, b, d, e8)` permits signed factors, with a positive denominator and a checked i128 result. |
+| `repeat_mul_div_floor` | `repeat_mul_div_floor(x, a, d, 2)` eagerly evaluates x, a and d once, then applies the nonnegative fused floor operation twice. The count must be a literal in 0..16. |
+| `repeat_signed_mul_div_floor` | `repeat_signed_mul_div_floor(x, a, d, 2)` applies the signed floor operation at every prefix, with the same literal count limit. |
 
 These arithmetic extensions describe development source whose native and
 source-proof qualification is pending. Rules compile to the same library
@@ -151,11 +156,11 @@ is -1 and `div_ceil(-1, 2)` is 0; negative divisors follow mathematical rounding
 first checks and can refuse the narrow multiplication; the second preserves
 the exact product and narrows only the quotient. For `M = 2^127 - 1`, the fused
 `mul_div_floor(M, M, M)` has result M while the standalone product refuses.
-Negative fused factors and a nonpositive denominator refuse even when a zero
-factor would make the mathematical product zero. A variant is its ID:
+Nonnegative fused calls refuse negative factors. All fused calls refuse a
+nonpositive denominator, including when the numerator is zero. A variant is its ID:
 `status == 151`.
-A boolean used as a number is 0 or 1, and a number used as a boolean holds
-when it equals 1. Decision arithmetic is 64-bit, and the program evaluates
+In historical untyped contracts, a boolean used as a number is 0 or 1, and a
+number used as a boolean holds when it equals 1. Decision arithmetic is i128, and the program evaluates
 every node, both branches of `choose` included, so an overflow anywhere
 refuses the decision. A contract has at most 4,096 program nodes and 64
 program outputs: the case selection and each distinct computed value. A graph
@@ -166,6 +171,42 @@ Program-file commands admit `/1` and `/3`; they refuse the larger `/2` and `/4`
 profiles. Legacy search, optimizer, migration and linear certificate consumers
 refuse the arithmetic extension. See
 [Contract program export](CLI_REFERENCE.md#contract-program-export).
+
+Units and scales are development authoring features, with source-proof
+qualification pending. For example, `type 105 int Price in 0..=1000000 unit
+USD/COLL scale e8;` declares raw atoms n with value n/10^8 USD/COLL. Products
+and quotients of nominal identifiers are canonical; `unit 1 scale e4` is
+dimensionless. Every integer type in a quantity contract must carry both
+annotations. Addition, subtraction, comparison, select arms, assignments and
+payload fields must agree in unit, scale and i128 width. A directly written
+integer literal can denote raw atoms of its contextual destination; in a
+product or quotient it is dimensionless e0. There is no implicit cast of an
+already typed quantity, and quantities cannot be used as booleans.
+
+For input exponents P, T, J and target Q, a four-argument fused call denotes
+R(n*m*10^(Q+J)/(h*10^(P+T))), with h > 0 and the named floor or ceiling R.
+The compiler cancels powers of ten before lowering to the existing fused
+nodes. It refuses unsupported lowering if a remaining exponent exceeds 38
+or a scaled operand's i128 fit does not follow from constants or checked
+bounds. A delivery sum does not inherit one payload field's range bound.
+Three-argument calls keep raw semantics and derive exponent P+T-J,
+which must lie in 0..38. Nominal metadata is bound into the schema identity;
+a raw program receipt alone supplies no typed equivalence claim. Existing
+composition profiles and legacy schema lowering refuse quantity contracts.
+
+In policy/3, and in any policy using quantity annotations, four-argument
+scaled calls or repeat calls, a dependent mul-div chain has at most 16 steps, including across variable
+bindings. Independent chains retain the total graph cap. Repeat operands
+remain eager at count zero, which returns x without division. Integer powers
+use `repeat_mul_div_floor(1, a, 1, 2)` with the desired literal count. Every
+prefix must fit; the first failing node refuses even if a later zero or an
+unused select arm would hide it. Usage follows the expanded graph and its
+actual failing prefix. Staged rounding is observable: applying floor to
+1,001 times 3/4 twice yields 750 then 562, whereas one final floor yields 563.
+Those policies also bound source alias expansion to 65,536 visits and depth
+256. Policy/3 may be used without quantity annotations to select these limits.
+Historical policy/2 contracts using only historical syntax retain their
+original admission, canonical bytes, eager traps and resource budgets.
 
 ## Cases
 
@@ -238,9 +279,9 @@ use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
 Signed law multiplication/division retains its existing checked i128 meaning.
 Product predicates explicitly convert nonnegative values to U128 and use the
 existing exact wide comparison, including the constant-one factors of a
-two-factor comparison. The fused rule functions are not additional `.zeno`
-value-function syntax; generated conformance laws use the existing fused law
-opcodes. Quantifiers, sums, other named predicates,
+two-factor comparison. Fused floor/ceiling calls, explicit target scales and
+bounded repeats also have `.zeno` law syntax. The compiler checks quantity
+relations before lowering them to the existing law opcodes. Quantifiers, sums, other named predicates,
 free variables, `div_exact` and effect and event projections have
 no contract form. Outbox projections require the explicit delivery-law bindings below. The library Authority evaluates every law that applies on
 every decision, and a decision that breaks one is not committed.

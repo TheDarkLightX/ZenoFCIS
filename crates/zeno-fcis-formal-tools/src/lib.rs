@@ -1517,7 +1517,9 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 }
             },
             ExportNode::Value(value) => match value {
-                ValueExpr::SignedMulDivFloor(..) => return Err(ExportError::UnsupportedMode),
+                ValueExpr::SignedMulDivFloor(..)
+                | ValueExpr::ScaledMulDiv(..)
+                | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::MulDiv(_, a, b, d) => {
                     for child in [a, b, d] {
@@ -3595,7 +3597,9 @@ fn render_value_smt(
         // backend has no matching full-product semantics: refuse, never emit
         // an intermediate signed multiplication with different overflow rules.
         ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
-        ValueExpr::SignedMulDivFloor(..) => return Err(ExportError::UnsupportedMode),
+        ValueExpr::SignedMulDivFloor(..)
+        | ValueExpr::ScaledMulDiv(..)
+        | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
             let left = render_value_smt(left, step, environment, budget)?;
             let right = render_value_smt(right, step, environment, budget)?;
@@ -4007,7 +4011,9 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
             collect_value(a, paths);
             collect_value(b, paths)
         }
-        ValueExpr::SignedMulDivFloor(a, b, d) => {
+        ValueExpr::SignedMulDivFloor(a, b, d)
+        | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
+        | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
             collect_value(a, paths);
             collect_value(b, paths);
             collect_value(d, paths);
@@ -4033,6 +4039,21 @@ fn fused_value_calls_refuse_in_unextended_backends() {
     );
     for value in [
         value.clone(),
+        ValueExpr::ScaledMulDiv(
+            DivisionMode::Floor,
+            false,
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
+            Box::new(ValueExpr::Int(3)),
+            8,
+        ),
+        ValueExpr::RepeatMulDiv(
+            false,
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
+            Box::new(ValueExpr::Int(3)),
+            2,
+        ),
         ValueExpr::SignedMulDivFloor(
             Box::new(ValueExpr::Int(-1)),
             Box::new(ValueExpr::Int(1)),

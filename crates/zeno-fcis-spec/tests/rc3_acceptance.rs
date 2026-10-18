@@ -390,3 +390,37 @@ fn diagnostic_code_registry_is_complete_and_unique() {
     assert_eq!(codes.first(), Some(&"ZENO-E0001"));
     assert_eq!(codes.last(), Some(&"ZENO-E0302"));
 }
+
+#[test]
+fn quantity_declarations_use_version_two_canonical_metadata() {
+    let source = "zeno 1; project 1 q; type 100 int Price in 0..=1000 unit USD*COLL/COLL scale e8;";
+    let a = spec(source);
+    let b = spec(&source.replace("USD*COLL/COLL", "USD"));
+    let old = spec(&source.replace(" unit USD*COLL/COLL scale e8", ""));
+    assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    let bytes = a.canonical_bytes().unwrap();
+    let prefix = b"ZFCIS-PROJECT-SPEC\0".len();
+    assert_eq!(&bytes[prefix..prefix + 2], &2u16.to_be_bytes());
+    assert_eq!(
+        &old.canonical_bytes().unwrap()[prefix..prefix + 2],
+        &1u16.to_be_bytes()
+    );
+    assert_ne!(
+        a.canonical_bytes(),
+        spec(&source.replace("scale e8", "scale e9")).canonical_bytes()
+    );
+    for annotation in [
+        "unit USD",
+        "unit USD scale e39",
+        "unit USD scale 8",
+        "unit 0 scale e8",
+    ] {
+        assert!(
+            parse_project(
+                &source.replace("unit USD*COLL/COLL scale e8", annotation),
+                SourceLimits::default()
+            )
+            .is_err()
+        );
+    }
+}

@@ -91,6 +91,21 @@ fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
             Box::new(value_at(left, root)?),
             Box::new(value_at(right, root)?),
         ),
+        ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale) => ValueExpr::ScaledMulDiv(
+            *mode,
+            *signed,
+            Box::new(value_at(a, root)?),
+            Box::new(value_at(b, root)?),
+            Box::new(value_at(d, root)?),
+            *scale,
+        ),
+        ValueExpr::RepeatMulDiv(signed, a, b, d, count) => ValueExpr::RepeatMulDiv(
+            *signed,
+            Box::new(value_at(a, root)?),
+            Box::new(value_at(b, root)?),
+            Box::new(value_at(d, root)?),
+            *count,
+        ),
         ValueExpr::SignedMulDivFloor(a, b, d) => ValueExpr::SignedMulDivFloor(
             Box::new(value_at(a, root)?),
             Box::new(value_at(b, root)?),

@@ -155,6 +155,13 @@ impl CompiledAggregate {
         }
         let declarations =
             Declarations::read(&aggregate.project, &rules.leaf_bindings).map_err(route_error)?;
+        if crate::internals::quantity::typed(&declarations) {
+            return Err(refuse(
+                Obligation::AssemblyProfile,
+                "aggregate project.zeno",
+                "quantity interfaces require a quantity-aware composition profile",
+            ));
+        }
         let schema = schema::encode(&declarations).map_err(route_error)?;
         let commitment = schema_commitment(&schema).map_err(route_error)?;
         Ok(Self {
@@ -1000,7 +1007,10 @@ fn collect_names(ast: &Ast, out: &mut Vec<String>) {
             collect_names(left, out);
             collect_names(right, out);
         }
-        Ast::MulDiv(_, a, b, d) | Ast::SignedMulDivFloor(a, b, d) => {
+        Ast::MulDiv(_, a, b, d)
+        | Ast::SignedMulDivFloor(a, b, d)
+        | Ast::ScaledMulDiv(_, _, a, b, d, _)
+        | Ast::RepeatMulDiv(_, a, b, d, _) => {
             collect_names(a, out);
             collect_names(b, out);
             collect_names(d, out);
@@ -1031,6 +1041,12 @@ fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
         }
         Ast::Div(rounding, left, right) => Ast::Div(*rounding, recurse(left), recurse(right)),
         Ast::MulDiv(r, a, b, d) => Ast::MulDiv(*r, recurse(a), recurse(b), recurse(d)),
+        Ast::ScaledMulDiv(r, signed, a, b, d, scale) => {
+            Ast::ScaledMulDiv(*r, *signed, recurse(a), recurse(b), recurse(d), *scale)
+        }
+        Ast::RepeatMulDiv(signed, a, b, d, count) => {
+            Ast::RepeatMulDiv(*signed, recurse(a), recurse(b), recurse(d), *count)
+        }
         Ast::SignedMulDivFloor(a, b, d) => {
             Ast::SignedMulDivFloor(recurse(a), recurse(b), recurse(d))
         }
