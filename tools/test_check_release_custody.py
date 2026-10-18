@@ -71,6 +71,20 @@ class CustodyTest(unittest.TestCase):
         self.assertEqual(len(report["checks"]), 11)
         self.assertEqual(report["checks"]["C7-compiled-inputs"]["counts"]["registry_inputs"], 2)
 
+    def test_assembled_set_without_signing_inputs_checks_c1_through_c9(self):
+        report = self.check(bindings=None, downloads=None)
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(len(report["checks"]), 9)
+        self.assertEqual(report["not_requested"], ["C10-cross-job", "C11-download-list"])
+        journey = self.release / "hosts" / fixture.LINUX / "INSTALLED-JOURNEY.json"
+        journey.unlink()
+        self.assertIn("C6-binary-archives", self.failed(self.check(bindings=None, downloads=None)))
+
+    def test_signing_key_without_download_list_still_refuses(self):
+        key = self.root / "RELEASE-SIGNING-KEY.pub"
+        key.write_text("ssh-ed25519 AAAA\n")
+        self.assertIn("C11-download-list", self.failed(self.check(downloads=None, signing_key=key)))
+
     def test_a_stat_only_index_rewrite_still_passes(self):
         index = self.source.repo / ".git" / "index"
         before = index.read_bytes()
@@ -358,7 +372,7 @@ class CustodyTest(unittest.TestCase):
         self.assertIn("C9-release-index", self.failed(self.check()))
 
     def test_bindings_and_rustc_must_agree(self):
-        self.assertIn("C10-cross-job", self.failed(self.check(bindings=None)))
+        self.assertIn("C10-cross-job", self.failed(self.check(bindings={})))
         bindings = self.source.bindings(self.release)
         bindings[fixture.MAC]["journey_sha256"] = "0" * 64
         self.assertIn("C10-cross-job", self.failed(self.check(bindings=bindings)))
@@ -386,7 +400,7 @@ class CustodyTest(unittest.TestCase):
                 self.assertEqual(self.failed(self.check(bindings=bindings)), {"C10-cross-job"}, label)
 
     def test_download_list_controls(self):
-        self.assertIn("C11-download-list", self.failed(self.check(downloads=None)))
+        self.assertIn("C11-download-list", self.failed(self.check(downloads=self.root / "missing-list")))
         lines = self.downloads.read_text().splitlines()
         names = [line.split("  ")[1] for line in lines]
         self.assertEqual(names, sorted([f"zeno-fcis-{fixture.VERSION}-{fixture.LINUX}.tar.gz",

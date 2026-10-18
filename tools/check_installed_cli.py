@@ -63,7 +63,8 @@ HOSTS = {("Linux", "x86_64"): "x86_64-unknown-linux-gnu", ("Darwin", "arm64"): "
 MAC = "aarch64-apple-darwin"
 INCONCLUSIVE = {"status": "inconclusive", "authority": "none", "reason": "containment-unavailable:platform",
                 "accounting_complete": False}
-ARTIFACTS = ROOT / "docs/benchmarks/withdrawal-queue/artifacts"
+# Exercise the current release profile, as the shared-checker and parallel gates do.
+ARTIFACTS = ROOT / "crates/zeno-fcis-cli/tests/fixtures/i128-programs"
 FIXTURES = Path("crates/zeno-fcis-cli/tests/fixtures")
 
 

@@ -12,8 +12,10 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import check_installed_cli as installed
+import program_search_reference as reference
 import rc_package
 
 ROOT = installed.ROOT
@@ -36,6 +38,24 @@ def fake_archive(path: Path, prefix: str, version: str) -> None:
 
 
 class BlockTest(unittest.TestCase):
+    def test_serial_fixture_profile_is_current_and_preserves_the_full_boolean_table(self):
+        legacy = ROOT / "docs/benchmarks/withdrawal-queue/artifacts"
+        programs = []
+        for name in ("boolean-kernel-original", "boolean-kernel-candidate"):
+            old = reference.decode((legacy / f"{name}.zcve").read_bytes())
+            # This independent reference uses the same canonical i128 integer
+            # encoding for both profiles. These programs use only Boolean
+            # domains and instructions, so its i64 overflow rule is irrelevant.
+            with patch.object(reference, "PROFILE", b"zeno-fcis/finite-i128/1"):
+                current = reference.decode((installed.ARTIFACTS / f"{name}.zcve").read_bytes())
+            self.assertEqual(current, old)
+            self.assertTrue(all(domain[0] for domain in current.inputs + current.outputs))
+            self.assertFalse(any(node[0] in (1, 3, 4, 6) for node in current.nodes))
+            self.assertEqual(reference.size(current), 16)
+            self.assertEqual(reference.table(current), reference.table(old))
+            programs.append(current)
+        self.assertEqual(reference.table(programs[0]), reference.table(programs[1]))
+
     def test_hosts(self):
         self.assertEqual(installed.host_triple("Linux", "x86_64"), LINUX)
         self.assertEqual(installed.host_triple("Darwin", "arm64"), MAC)
