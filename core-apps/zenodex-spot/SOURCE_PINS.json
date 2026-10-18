@@ -5,7 +5,7 @@
   "starting_source_manifest_sha256": "bdca784516973287a59731112d2b70b0215e3884a06f1133c90d232432626b87",
   "cli": {
     "path": "../sol-251asm-target/debug/zeno-fcis",
-    "sha256": "57d4366a34756901c0226414199fc8f7bd1a0b23f3d902a49627f5948daa7d94",
+    "sha256": "16b244daad7263f5d219472f0deaff583c4f8b04656ffa9ae00aacb483b4109e",
     "observed_version": "zeno-fcis 2.5.0"
   },
   "specification": {

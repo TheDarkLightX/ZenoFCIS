@@ -271,6 +271,13 @@ pub enum AssumptionGap {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ScopeMismatch {
+    /// This tool-neutral manifest cannot enforce a reason-specific scope.
+    ReasonScopeUnsupported {
+        /// The declared law.
+        law: SemanticId,
+        /// The reason subset requiring the native law engine.
+        reason: u32,
+    },
     /// The project declares a scope for a law the manifest does not define.
     Missing {
         /// The law.
@@ -302,6 +309,8 @@ const fn declared_scope(scope: LawScope) -> DecisionScope {
         LawScope::Always => DecisionScope::Always,
         LawScope::Accept => DecisionScope::Accept,
         LawScope::Reject => DecisionScope::Reject,
+        // A reason subset cannot establish enforcement on every Reject.
+        LawScope::RejectReason(_) => DecisionScope::Reject,
         LawScope::CommittedFailure => DecisionScope::CommittedFailure,
         LawScope::Committing => DecisionScope::Committing,
     }
@@ -724,6 +733,10 @@ impl LawManifest {
                 mismatches.push(ScopeMismatch::Missing { law: id });
                 continue;
             };
+            if let LawScope::RejectReason(reason) = applicability.scope() {
+                mismatches.push(ScopeMismatch::ReasonScopeUnsupported { law: id, reason });
+                continue;
+            }
             let declared = declared_scope(applicability.scope());
             if definition.scope() != declared {
                 mismatches.push(ScopeMismatch::Scope {

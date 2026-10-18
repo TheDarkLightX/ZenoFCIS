@@ -761,6 +761,14 @@ fn laws(
     }
     let mut laws = Vec::new();
     for law in &declarations.laws {
+        if let LawScope::RejectReason(reason) = law.scope {
+            if law.genesis || !reasons(declarations, rules)?.contains(&(reason, Class::Reject)) {
+                return Err(ContractError::new(
+                    format!("project.zeno law {}", law.id),
+                    "reason scope requires a declared Reject reason and excludes genesis",
+                ));
+            }
+        }
         let place = format!("project.zeno law {}", law.id);
         let kind = rules.law_kinds[&law.id];
         if let Some((scope, genesis, written)) = required_declaration(kind)
@@ -803,6 +811,24 @@ fn laws(
         {
             return Err(failed(
                 "decision_reason requires `on reject` or `on failure`, without genesis".to_owned(),
+            ));
+        }
+        if matches!(law.scope, LawScope::RejectReason(_))
+            && graph.table.nodes.iter().any(|node| match node {
+                LawOp::Observe(o) | LawOp::ObserveWhen(_, o, _) => !matches!(
+                    o,
+                    Observation::PreRoot
+                        | Observation::CommandRoot
+                        | Observation::ContextRoot
+                        | Observation::Pre(_)
+                        | Observation::Command(_)
+                        | Observation::Context(_)
+                ),
+                _ => false,
+            })
+        {
+            return Err(failed(
+                "reason predicates may read only the original input".to_owned(),
             ));
         }
         let mut root = graph.boolean(value).map_err(failed)?;

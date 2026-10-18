@@ -36,8 +36,52 @@ fn kind_tag(kind: Kind) -> u8 {
         Kind::InitialCondition => 9,
     }
 }
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::input_node(*node),))]
+fn input_node(node: &Op<'_>) -> bool {
+    let observation = match node {
+        Op::Observe(o) | Op::ObserveWhen(_, o, _) => Some(o),
+        _ => None,
+    };
+    match observation {
+        None => true,
+        Some(o) => matches!(
+            o,
+            Observation::PreRoot
+                | Observation::CommandRoot
+                | Observation::ContextRoot
+                | Observation::Pre(_)
+                | Observation::Command(_)
+                | Observation::Context(_)
+        ),
+    }
+}
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::law_scope(law),))]
 fn law_scope(law: &Law<'_>) -> bool {
+    if let Scope::RejectReason(reason) = law.scope {
+        if reason == 0 || law.genesis {
+            return false;
+        }
+        let mut i = 0;
+        #[cfg_attr(verus_keep_ghost, verus_spec(
+            invariant i <= law.program.nodes.len(), law.scope == Scope::RejectReason(reason), reason != 0, !law.genesis, forall|j:int| 0<=j<i ==> spec::input_node(law.program.nodes@[j]),
+            decreases law.program.nodes.len()-i,
+        ))]
+        while i < law.program.nodes.len() {
+            if !input_node(&law.program.nodes[i]) {
+                #[cfg(verus_keep_ghost)]
+                proof! {
+                    assert(!spec::input_node(law.program.nodes@[i as int]));
+                    assert(!(forall|j:int| 0<=j<law.program.nodes.len() ==> spec::input_node(law.program.nodes@[j]))) by {
+                        if (forall|j:int| 0<=j<law.program.nodes.len() ==> spec::input_node(law.program.nodes@[j])) {
+                            assert(spec::input_node(law.program.nodes@[i as int]));
+                        }
+                    }
+                }
+                return false;
+            }
+            i += 1;
+        }
+    }
     match law.kind {
         Kind::StateInvariant => matches!(law.scope, Scope::Committing) && law.genesis,
         Kind::RejectNoAuthority => matches!(law.scope, Scope::Reject) && !law.genesis,
@@ -61,6 +105,9 @@ fn applies(law: &Law<'_>, frame: &Frame<'_>) -> bool {
                 Scope::Always => true,
                 Scope::Accept => matches!(candidate.class, Class::Accept),
                 Scope::Reject => matches!(candidate.class, Class::Reject),
+                Scope::RejectReason(reason) => {
+                    matches!(candidate.class, Class::Reject) && candidate.reason == Some(reason)
+                }
                 Scope::CommittedFailure => matches!(candidate.class, Class::CommittedFailure),
                 Scope::Committing => !matches!(candidate.class, Class::Reject),
             }

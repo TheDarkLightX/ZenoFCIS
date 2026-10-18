@@ -746,12 +746,14 @@ fn class_name(class: Class) -> &'static str {
     }
 }
 
-fn scope(scope: LawScope) -> &'static str {
+fn scope(scope: LawScope) -> String {
     match scope {
         LawScope::Always => "any",
         LawScope::Accept => "accept",
         LawScope::Reject => "reject",
         LawScope::CommittedFailure => "failure",
         LawScope::Committing => "commit",
+        LawScope::RejectReason(reason) => return format!("reject:{reason}"),
     }
+    .to_owned()
 }

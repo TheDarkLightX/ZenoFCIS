@@ -1738,3 +1738,48 @@ fn signed_floor_law_uses_shared_node_with_eager_usage_and_retry() {
         Err(Failure::Undefined)
     );
 }
+
+#[test]
+fn reason_subset_skips_other_reasons_and_refuses_output_observations() {
+    let truth = [Op::Literal(Atom::Bool(true))];
+    let falsehood = [Op::Literal(Atom::Bool(false))];
+    let mut laws = base(&truth);
+    laws.push(Law {
+        id: 60,
+        kind: Kind::AuthoritySubjectRecipient,
+        scope: Scope::RejectReason(201),
+        genesis: false,
+        program: Program {
+            nodes: &falsehood,
+            root: 0,
+        },
+    });
+    let reject = candidate(Class::Reject, &[]);
+    let frame = transition(&[], &reject);
+    let result = evaluate(&laws, &[], &frame, limits());
+    assert_eq!(result.result, Ok(()));
+    assert_eq!(result.diagnostics.last().unwrap().verdict, Verdict::Skipped);
+    laws.last_mut().unwrap().scope = Scope::RejectReason(200);
+    assert_eq!(
+        evaluate(&laws, &[], &frame, limits()).result,
+        Err(Failure::Violated)
+    );
+    let post = [Op::Observe(Observation::PostLength)];
+    laws.last_mut().unwrap().program = Program {
+        nodes: &post,
+        root: 0,
+    };
+    assert_eq!(
+        evaluate(&laws, &[], &frame, limits()).result,
+        Err(Failure::Metadata)
+    );
+    laws.last_mut().unwrap().program = Program {
+        nodes: &truth,
+        root: 0,
+    };
+    laws.last_mut().unwrap().genesis = true;
+    assert_eq!(
+        evaluate(&laws, &[], &frame, limits()).result,
+        Err(Failure::Metadata)
+    );
+}

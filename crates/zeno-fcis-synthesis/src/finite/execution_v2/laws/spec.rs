@@ -301,8 +301,14 @@ pub(in super::super) open spec fn kind_tag(kind:Kind)->u8 {
         Kind::DebitCreditEffectEquality=>3,Kind::FeeAndRounding=>4,Kind::AuthoritySubjectRecipient=>5,
         Kind::RejectNoAuthority=>6,Kind::CommittedFailureEffects=>7,Kind::DecisionConformance=>8,Kind::InitialCondition=>9}
 }
+pub(in super::super) open spec fn input_node(node:Op)->bool {
+    match node {
+        Op::Observe(o) | Op::ObserveWhen(_,o,_) => matches!(o, Observation::PreRoot | Observation::CommandRoot | Observation::ContextRoot | Observation::Pre(_) | Observation::Command(_) | Observation::Context(_)),
+        _=>true,
+    }
+}
 pub(in super::super) open spec fn law_scope(law:&Law)->bool {
-    match law.kind {
+    (match law.scope { Scope::RejectReason(reason)=>reason!=0&&!law.genesis&&(forall|i:int| 0<=i<law.program.nodes.len() ==> input_node(law.program.nodes@[i])), _=>true }) && match law.kind {
         Kind::StateInvariant=>law.scope==Scope::Committing&&law.genesis,
         Kind::RejectNoAuthority=>law.scope==Scope::Reject&&!law.genesis,
         Kind::CommittedFailureEffects=>law.scope==Scope::CommittedFailure&&!law.genesis,
@@ -318,6 +324,7 @@ pub(in super::super) open spec fn applies(law:&Law,frame:&Frame)->bool {
             Scope::Always=>true,Scope::Accept=>candidate.class==Class::Accept,
             Scope::Reject=>candidate.class==Class::Reject,Scope::CommittedFailure=>candidate.class==Class::CommittedFailure,
             Scope::Committing=>candidate.class!=Class::Reject,
+            Scope::RejectReason(reason)=>candidate.class==Class::Reject&&candidate.reason==Some(reason),
         },
     }
 }

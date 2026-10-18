@@ -9,8 +9,8 @@
 //!
 //! - admissible decisions: for each tuple, every decision a contract of this
 //!   schema could make (a reject with each declared reason; an accept with
-//!   each declared state; when a case commits a failure, a committed failure
-//!   with each reason and state), checked against the declared laws by the
+//!   each declared state; a committed failure with each reason and state),
+//!   checked against the declared laws by the
 //!   library's law evaluator. A tuple is determined when exactly one decision
 //!   is admitted. Tuples where the contract's own decision is refused are
 //!   counted apart.
@@ -147,7 +147,7 @@ pub(crate) fn judge(
     options: Options<'_>,
 ) -> Result<Gaps, ContractError> {
     let loaded = Loaded::read(project, rules)?;
-    if let Some(reason) = out_of_scope(&loaded.rules) {
+    if let Some(reason) = out_of_scope(&loaded) {
         return Ok(Gaps::OutOfScope(reason));
     }
     let space = match Space::new(&loaded.positions, loaded.state_width, options.max_tuples) {
@@ -258,9 +258,19 @@ impl From<ContractError> for Stop {
     }
 }
 
-/// Why the judge does not run on these rules: it proposes decisions without
-/// deliveries, so a contract that delivers is outside it.
-fn out_of_scope(rules: &Rules) -> Option<String> {
+/// The same declaration admission and scalar profile used before gap enumeration.
+/// Question preparation calls this over its owned source snapshot.
+pub(crate) fn profile_scope(project: &str, rules: &str) -> Result<Option<String>, ContractError> {
+    let loaded = Loaded::read(project, rules)?;
+    Ok(out_of_scope(&loaded))
+}
+
+/// Why the scalar decision universe cannot cover this contract.
+fn out_of_scope(loaded: &Loaded) -> Option<String> {
+    if !loaded.declarations.channels.is_empty() {
+        return Some("declared channels require a complete delivery decision universe".to_owned());
+    }
+    let rules = &loaded.rules;
     if rules.cases.iter().any(|case| !case.outbox.is_empty()) || !rules.delivery_laws.is_empty() {
         return Some(
             "the contract delivers; the judge proposes decisions without deliveries".to_owned(),
@@ -285,16 +295,9 @@ fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
     .len() as u128;
     let reasons = loaded.reasons().len() as u128;
     let states = space.states as u128;
-    let failure = u128::from(has_failure(&loaded.rules));
+    let failure = 1;
     let candidates = reasons + states * (1 + failure * reasons);
     Ok((space.tuples() as u128) * candidates * laws.max(1))
-}
-
-fn has_failure(rules: &Rules) -> bool {
-    rules
-        .cases
-        .iter()
-        .any(|case| case.class == Class::CommittedFailure)
 }
 
 /// Every measure of one contract.
@@ -328,7 +331,8 @@ impl Measured {
                 "tuples": admissible.tuples,
                 "reference_refused": admissible.refused,
                 "determined": admissible.determined,
-                "undetermined": admissible.tuples - admissible.refused - admissible.determined,
+                "zero_outcome": admissible.zero,
+                "undetermined": admissible.tuples - admissible.determined,
                 "freedom": {
                     "class": admissible.class,
                     "reject_reason": admissible.reason,
@@ -361,6 +365,17 @@ impl Measured {
                 "valid_states": valid_states,
                 "state_laws": self.state_laws,
             },
+            "completeness": {
+                "status": if self.admissible[0].determined == space.tuples() && self.admissible[0].refused == 0 && self.machine.observed.iter().any(|o| matches!(o, Observed::Decided { class: Class::Accept, .. })) { "complete-finite" } else { "incomplete" },
+                "law_991_used": false,
+                "decision_universe": "all declared scalar successors with canonical difference patches, every declared reason, Accept/Reject/CommittedFailure; effects and channels structurally excluded by the scalar profile",
+                "exactly_one": self.admissible[0].determined,
+                "zero_outcome": self.admissible[0].zero,
+                "execution_refusals": self.admissible[0].refused,
+                "accepted_rows": self.machine.observed.iter().filter(|o| matches!(o, Observed::Decided { class: Class::Accept, .. })).count(),
+                "residual_witnesses": self.admissible[0].examples.iter().map(|e| e.json(space)).collect::<Vec<_>>(),
+                "meaning": "the declared laws only; compare against an independent reviewed relation before adoption",
+            },
             "declared_laws": self.declared,
             "work": work.to_string(),
             "max_work": max_work,
@@ -387,6 +402,7 @@ struct Admissible {
     tuples: usize,
     refused: usize,
     determined: usize,
+    zero: usize,
     /// Undetermined tuples where more than one class is admitted, more than
     /// one reject reason, or more than one committed successor.
     class: usize,
@@ -441,7 +457,7 @@ fn measure(
 ) -> Result<Measured, Stop> {
     let declared = loaded.declared_laws();
     let reasons = loaded.reasons();
-    let failure = has_failure(&loaded.rules);
+    let failure = true;
     let (machine, valid, state_laws, gaps) = loaded.bind(&loaded.rules, |authority, framer| {
         let descriptor = authority.descriptor();
         let machine = Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
@@ -456,7 +472,18 @@ fn measure(
                     .is_none()
             })
             .collect();
-        let laws = LawSet::new(descriptor, &declared);
+        // The compiler's closed no-failure profile is independent of case order.
+        // Its mandatory false law excludes CF even for legacy incomplete laws.
+        let mut selected = declared.clone();
+        if !loaded
+            .rules
+            .law_kinds
+            .values()
+            .any(|kind| *kind == LawKind::CommittedFailureEffects)
+        {
+            selected.push(loaded.rules.failure_law);
+        }
+        let laws = LawSet::new(descriptor, &selected);
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let gaps = parallel(space.tuples(), |ordinal| {
             tuple_gap(&laws, framer, &machine, &states, &reasons, failure, ordinal)
@@ -479,11 +506,11 @@ fn measure(
             counts.tuples += 1;
             if gap.refused {
                 counts.refused += 1;
-                continue;
             }
             for (count, active) in activation[index].iter_mut().zip(&gap.active) {
                 *count += usize::from(*active);
             }
+            counts.zero += usize::from(gap.admissible == 0);
             if gap.admissible == 1 {
                 counts.determined += 1;
                 continue;
@@ -551,22 +578,13 @@ fn tuple_gap(
     let tuple = space.at(ordinal);
     let state = ordinal / space.inputs;
     let reference = machine.observed[ordinal];
-    let Observed::Decided {
-        class,
-        reason,
-        next,
-    } = reference
-    else {
-        return TupleGap {
-            refused: true,
-            admissible: 0,
-            classes: 0,
-            reasons: 0,
-            successors: 0,
-            also: Vec::new(),
-            active: Vec::new(),
-            mismatch: false,
-        };
+    let decided = match reference {
+        Observed::Decided {
+            class,
+            reason,
+            next,
+        } => Some((class, reason, next)),
+        _ => None,
     };
     let check = |class: Class, reason: Option<u32>, post: &[i128]| {
         laws.on_transition(
@@ -579,15 +597,16 @@ fn tuple_gap(
             },
         )
     };
-    // The contract's own decision, framed as every candidate is.
-    let (admitted, diagnostics) = check(class, reason, &states[next]);
+    // Enumeration is independent of executable totality, including on refusals.
+    let (admitted, diagnostics) = decided.map_or((true, Vec::new()), |(class, reason, next)| {
+        check(class, reason, &states[next])
+    });
     let active = laws
         .ids()
         .iter()
         .map(|id| {
-            diagnostics.iter().any(|diagnostic| {
-                diagnostic.id == *id
-                    && diagnostic.verdict != zeno_fcis_synthesis::finite::v2_laws::Verdict::Skipped
+            diagnostics.iter().any(|d| {
+                d.id == *id && d.verdict != zeno_fcis_synthesis::finite::v2_laws::Verdict::Skipped
             })
         })
         .collect();
@@ -605,7 +624,8 @@ fn tuple_gap(
             }
         }
     }
-    let own = (class, reason, (class != Class::Reject).then_some(next));
+    let own = decided
+        .map(|(class, reason, next)| (class, reason, (class != Class::Reject).then_some(next)));
     let mut admissible = 0;
     let mut classes = BTreeSet::new();
     let mut reject_reasons = BTreeSet::new();
@@ -627,12 +647,12 @@ fn tuple_gap(
                 successors.insert((class.code(), successor));
             }
         }
-        if candidate != own && also.len() < EXAMPLES {
+        if Some(candidate) != own && also.len() < EXAMPLES {
             also.push(candidate);
         }
     }
     TupleGap {
-        refused: false,
+        refused: decided.is_none(),
         admissible,
         classes: classes.len(),
         reasons: reject_reasons.len(),

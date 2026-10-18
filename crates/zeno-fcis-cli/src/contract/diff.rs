@@ -1990,6 +1990,7 @@ fn scope_text(scope: LawScope, genesis: bool) -> String {
         LawScope::Reject => "on reject",
         LawScope::CommittedFailure => "on failure",
         LawScope::Committing => "on commit",
+        LawScope::RejectReason(reason) => return format!("on reject:{reason}"),
     };
     if genesis {
         format!("{scope}, genesis")

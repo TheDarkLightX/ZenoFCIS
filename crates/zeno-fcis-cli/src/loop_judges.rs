@@ -16,9 +16,8 @@
 //!   over exactly those inputs; the laws are checked by the gaps judge for
 //!   false alarms on the core, and must leave every input some admissible
 //!   decision. An answer that differs from the core is a disagreement and is
-//!   never adopted into the contract. The law language cannot name a reject
-//!   reason, so an answer's reason is recorded as a requirement that only
-//!   this door applies, and is reported as such;
+//!   never adopted into the contract. Reason requirements become native
+//!   reason-scoped laws, with their answer provenance retained;
 //! - **teach-back**: a restated rule is exact, holds with inputs missing,
 //!   wrong with exceptions, or vacuous, on the whole declared domain and on
 //!   the reachable states.
@@ -67,6 +66,8 @@ const ADDED_KIND: LawKind = LawKind::AuthoritySubjectRecipient;
 pub(super) enum Stop {
     /// The contract or a request has no contract form.
     Invalid(String),
+    /// The scalar decision universe cannot cover the contract's profile.
+    OutOfScope(String),
     /// A budget was exceeded; nothing is claimed.
     Inconclusive(String),
 }
@@ -146,6 +147,8 @@ pub(super) struct Core {
     pub(super) columns: Vec<Vec<i128>>,
     /// The decision on each tuple; `None` where the Authority refuses.
     pub(super) decisions: Vec<Option<Dec>>,
+    /// Owned native diagnostics, independently of the lawful-outcome relation.
+    refusals: BTreeMap<usize, library::Refusal>,
     /// The case that fires on each tuple.
     pub(super) case_of: Vec<usize>,
     /// Whether each state is reachable from genesis.
@@ -187,18 +190,25 @@ fn names_for_paths(text: &str, paths: &[String], names: &[String]) -> String {
 
 impl Core {
     /// Reads `project.zeno` and `v2/policy.json` from `dir` and observes the
-    /// whole declared domain.
+    /// whole declared domain. Question preparation first applies the gaps profile.
     ///
     /// # Errors
     /// No contract form, or a domain over [`MAX_TUPLES`] (inconclusive).
-    pub(super) fn load(dir: &Path) -> Result<Self> {
+    pub(super) fn load(dir: &Path, question_profile: bool) -> Result<Self> {
         let read = |name: &str| -> Result<String> {
             let path = dir.join(name);
             let bytes = crate::transform_command::read_bounded(&path, 1 << 20)
                 .map_err(|error| Stop::Invalid(format!("{}: {error}", path.display())))?;
             String::from_utf8(bytes).map_err(|_| Stop::Invalid(format!("{name} is not UTF-8")))
         };
-        Self::from_sources(read("project.zeno")?, read("v2/policy.json")?)
+        let project = read("project.zeno")?;
+        let rules = read("v2/policy.json")?;
+        if question_profile
+            && let Some(reason) = crate::contract::review::gaps::profile_scope(&project, &rules)?
+        {
+            return Err(Stop::OutOfScope(reason));
+        }
+        Self::from_sources(project, rules)
     }
 
     fn from_sources(project: String, rules_text: String) -> Result<Self> {
@@ -282,10 +292,14 @@ impl Core {
         })?;
         let state_values = &values[..state_width];
         let mut decisions = Vec::with_capacity(tuples);
-        for (ordinal, outcome) in decided.iter().enumerate() {
+        let mut refusals = BTreeMap::new();
+        for (ordinal, outcome) in decided.into_iter().enumerate() {
             let state = ordinal / inputs;
             decisions.push(match outcome {
-                Outcome::Refused(_) => None,
+                Outcome::Refused(refusal) => {
+                    refusals.insert(ordinal, refusal);
+                    None
+                }
                 Outcome::Decision(decision) => {
                     let next = if decision.class == Class::Reject {
                         state
@@ -382,6 +396,7 @@ impl Core {
             inputs,
             columns,
             decisions,
+            refusals,
             case_of,
             reachable,
             reasons,
@@ -927,16 +942,13 @@ impl Core {
     }
 
     /// Which decisions the declared laws, and `added` (scope, formula)
-    /// laws, admit on every tuple the Authority decides: rejects with each
-    /// reason, accepts with each successor and, when a case commits a
-    /// failure, committed failures with each reason and successor.
+    /// laws, admit on every input tuple, independently of native refusals:
+    /// rejects with each reason, accepts with each successor, and committed
+    /// failures with each reason and successor.
     ///
     /// # Errors
     /// An added law with no contract form; inconclusive over the budget.
-    pub(super) fn admissible(
-        &self,
-        added: &[(String, String)],
-    ) -> Result<Vec<Option<Vec<Candidate>>>> {
+    pub(super) fn admissible(&self, added: &[(String, String)]) -> Result<Vec<Vec<Candidate>>> {
         self.admissible_from(added, None, None)
     }
 
@@ -946,11 +958,11 @@ impl Core {
     fn admissible_from(
         &self,
         added: &[(String, String)],
-        previous: Option<&[Option<Vec<Candidate>>]>,
+        previous: Option<&[Vec<Candidate>]>,
         mask: Option<&[i128]>,
-    ) -> Result<Vec<Option<Vec<Candidate>>>> {
-        let per_tuple = self.reasons.len() as u64
-            + self.states as u64 * (1 + u64::from(self.failure) * self.reasons.len() as u64);
+    ) -> Result<Vec<Vec<Candidate>>> {
+        let per_tuple =
+            self.reasons.len() as u64 + self.states as u64 * (1 + self.reasons.len() as u64);
         let checks = per_tuple.saturating_mul(self.tuples() as u64);
         if checks > MAX_CHECKS {
             return Err(Stop::Inconclusive(format!(
@@ -969,13 +981,23 @@ impl Core {
         } else {
             self.declared_laws.clone()
         };
+        // As in the gaps judge, the closed no-failure profile is independent
+        // of the cases. Its mandatory false law excludes failure candidates.
+        if previous.is_none()
+            && !self
+                .rules
+                .law_kinds
+                .values()
+                .any(|kind| *kind == LawKind::CommittedFailureEffects)
+        {
+            all.push(self.rules.failure_law);
+        }
         all.extend(ids);
         let states: Vec<Vec<i128>> = (0..self.states).map(|s| self.state(s)).collect();
         let result = policy::with_authority(&contract, &schema, |authority| {
             let laws = LawSet::new(authority.descriptor(), &all);
             (0..self.tuples())
                 .map(|ordinal| {
-                    self.decisions[ordinal]?;
                     let tuple = self.tuple(ordinal);
                     let pre = &states[ordinal / self.inputs];
                     let admits = |class: Class, reason: Option<u32>, post: &[i128]| {
@@ -991,17 +1013,15 @@ impl Core {
                         .0
                     };
                     if let Some(previous) = previous {
-                        let candidates = previous[ordinal].as_ref()?;
+                        let candidates = &previous[ordinal];
                         if mask.is_some_and(|mask| mask[ordinal] != 1) {
-                            return Some(candidates.clone());
+                            return candidates.clone();
                         }
-                        return Some(
-                            candidates
-                                .iter()
-                                .copied()
-                                .filter(|c| admits(c.class, c.reason, &states[c.next]))
-                                .collect(),
-                        );
+                        return candidates
+                            .iter()
+                            .copied()
+                            .filter(|c| admits(c.class, c.reason, &states[c.next]))
+                            .collect();
                     }
                     let mut out = Vec::new();
                     for (reason, _) in &self.reasons {
@@ -1022,20 +1042,18 @@ impl Core {
                             });
                         }
                     }
-                    if self.failure {
-                        for (reason, _) in &self.reasons {
-                            for (next, post) in states.iter().enumerate() {
-                                if admits(Class::CommittedFailure, Some(*reason), post) {
-                                    out.push(Candidate {
-                                        class: Class::CommittedFailure,
-                                        reason: Some(*reason),
-                                        next,
-                                    });
-                                }
+                    for (reason, _) in &self.reasons {
+                        for (next, post) in states.iter().enumerate() {
+                            if admits(Class::CommittedFailure, Some(*reason), post) {
+                                out.push(Candidate {
+                                    class: Class::CommittedFailure,
+                                    reason: Some(*reason),
+                                    next,
+                                });
                             }
                         }
                     }
-                    Some(out)
+                    out
                 })
                 .collect::<Vec<_>>()
         })?;
@@ -1283,13 +1301,23 @@ impl Core {
     }
 
     /// The laws an answer pins over exactly its inputs. A reject or failure
-    /// reason has no law form; it is kept as a requirement apart.
+    /// reason is pinned by excluding every other declared rejection reason.
     pub(super) fn pin(&self, answer: &Answer) -> Result<Vec<(String, String)>> {
         let w = self.law_text(&answer.where_)?;
         let not_here = format!("!({w})");
         let mut laws = Vec::new();
         match answer.class {
             Class::Reject => {
+                for (reason, _) in &self.reasons {
+                    if Some(*reason) != answer.reason
+                        && self
+                            .cases
+                            .iter()
+                            .any(|case| case.class == Class::Reject && case.reason == Some(*reason))
+                    {
+                        laws.push((format!("reject:{reason}"), not_here.clone()));
+                    }
+                }
                 laws.push(("accept".to_owned(), not_here.clone()));
                 if self.failure {
                     laws.push(("failure".to_owned(), not_here));
@@ -1328,7 +1356,8 @@ pub(super) struct Freedom {
     pub(super) regions: Vec<Region>,
     /// Per tuple: every decision the laws and the recorded reasons admit
     /// (`None` where the Authority refuses), determined tuples included.
-    pub(super) admitted: Vec<Option<Vec<Candidate>>>,
+    pub(super) admitted: Vec<Vec<Candidate>>,
+    pub(super) residual_witnesses: Vec<Value>,
 }
 
 /// Open inputs of one case that admit the same decisions, or the inputs of
@@ -1363,33 +1392,49 @@ impl Core {
 
     fn freedom_from(
         &self,
-        mut admissible: Vec<Option<Vec<Candidate>>>,
+        mut admissible: Vec<Vec<Candidate>>,
         reasons: &[(Vec<i128>, u32)],
     ) -> Freedom {
-        let determined_by_laws = admissible.iter().flatten().filter(|c| c.len() == 1).count();
+        let determined_by_laws = admissible
+            .iter()
+            .enumerate()
+            .filter(|(ordinal, c)| c.len() == 1 && self.decisions[*ordinal].is_some())
+            .count();
         // A recorded reason requirement removes rejects with other reasons
         // where it applies.
         for (ordinal, candidates) in admissible.iter_mut().enumerate() {
-            if let Some(candidates) = candidates {
-                candidates.retain(|c| {
-                    c.class != Class::Reject
-                        || reasons
-                            .iter()
-                            .all(|(mask, reason)| mask[ordinal] != 1 || c.reason == Some(*reason))
-                });
-            }
+            candidates.retain(|c| {
+                c.class != Class::Reject
+                    || reasons
+                        .iter()
+                        .all(|(mask, reason)| mask[ordinal] != 1 || c.reason == Some(*reason))
+            });
         }
         let mut refused = 0usize;
         let mut determined = 0usize;
         let mut inconsistent = 0usize;
+        let mut residual_witnesses = Vec::new();
         let mut groups: Vec<Region> = Vec::new();
         for (ordinal, candidates) in admissible.iter().enumerate() {
-            let Some(candidates) = candidates else {
+            let refusal = self.refusals.get(&ordinal);
+            if refusal.is_some() {
                 refused += 1;
+            }
+            if candidates.is_empty() {
+                inconsistent += 1;
+            }
+            if candidates.is_empty() || refusal.is_some() {
+                residual_witnesses.push(json!({
+                    "input_ordinal": ordinal,
+                    "row": self.shown(ordinal),
+                    "laws": self.declared_laws,
+                    "lawful_outcomes": candidates.len(),
+                    "reason": if candidates.is_empty() { "zero-lawful-outcomes" } else { "execution-refusal" },
+                    "execution_refusal": refusal.map(|r| json!({"law": r.law, "reason": r.text})),
+                }));
                 continue;
-            };
+            }
             match candidates.len() {
-                0 => inconsistent += 1,
                 1 => determined += 1,
                 _ => {
                     let set: BTreeSet<Label> = candidates
@@ -1451,22 +1496,23 @@ impl Core {
         }
         regions.sort_by_key(|r| (std::cmp::Reverse(r.ordinals.len()), r.case));
         let tuples = self.tuples();
-        let decided = tuples - refused;
         let stats = json!({
             "tuples": tuples,
             "reference_refused": refused,
             "determined": determined,
             "determined_by_laws": determined_by_laws,
             "determined_with_reasons": determined,
-            "determined_rate": if decided == 0 { 1.0 } else { (determined as f64 / decided as f64 * 10_000.0).round() / 10_000.0 },
+            "determined_rate": if tuples == 0 { 0.0 } else { determined as f64 / tuples as f64 },
             "inconsistent": inconsistent,
-            "open": decided - determined - inconsistent,
+            "residual": residual_witnesses.len(),
+            "open": tuples - determined - residual_witnesses.len(),
             "regions": regions.len(),
         });
         Freedom {
             stats,
             regions,
             admitted: admissible,
+            residual_witnesses,
         }
     }
 
@@ -1523,11 +1569,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         }
         let freedom = core.freedom_from(admitted.clone(), &reasons);
         if freedom.stats["inconsistent"].as_u64().unwrap_or(0) > 0 {
-            let Some(ordinal) = freedom
-                .admitted
-                .iter()
-                .position(|c| c.as_ref().is_some_and(Vec::is_empty))
-            else {
+            let Some(ordinal) = freedom.admitted.iter().position(Vec::is_empty) else {
                 return invalid("question-inconsistent-statistics-without-an-input");
             };
             return Ok(json!({
@@ -1535,6 +1577,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
                 "answer": index,
                 "reason": "answer-conflicts-with-earlier-answers",
                 "stats": freedom.stats,
+                "residual_witnesses": freedom.residual_witnesses,
                 "input_ordinal": ordinal,
                 "example": core.shown(ordinal),
                 "requirement": {"answer": index, "where": core.show(&answer.where_),
@@ -1607,10 +1650,12 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
     }
     let freedom = core.freedom_from(admitted, &reasons);
     let mut out = json!({
-        "status": if freedom.regions.is_empty() {
-            if freedom.stats["inconsistent"].as_u64().unwrap_or(0) > 0 { "inconsistent" } else { "determined" }
-        } else { "open" },
+        "status": if freedom.stats["inconsistent"].as_u64().unwrap_or(0) > 0 { "inconsistent" }
+            else if freedom.stats["reference_refused"].as_u64().unwrap_or(0) > 0 { "incomplete" }
+            else if freedom.stats["determined"].as_u64() == Some(core.tuples() as u64) && core.tuples() > 0 { "determined" }
+            else { "open" },
         "stats": freedom.stats,
+        "residual_witnesses": freedom.residual_witnesses,
         "answers": records,
     });
     if let Some(region) = freedom.regions.first() {
@@ -1976,7 +2021,7 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
         let mut open = Vec::new();
         let mut forbidden = Vec::new();
         for o in &region {
-            let admitted = freedom.admitted[*o].as_deref().unwrap_or_default();
+            let admitted = &freedom.admitted[*o];
             let good = admitted
                 .iter()
                 .filter(|c| core.satisfies(rule, claimed.as_ref(), *o, c))
@@ -1991,8 +2036,6 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
         for o in open.iter().take(512) {
             alternatives.extend(
                 freedom.admitted[*o]
-                    .as_deref()
-                    .unwrap_or_default()
                     .iter()
                     .map(|c| label(c.class, c.reason)),
             );
@@ -2008,7 +2051,7 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
         if let Some(first) = forbidden.first() {
             out["required"]["forbidden_example"] = json!({
                 "input": core.shown(*first),
-                "admitted": freedom.admitted[*first].as_deref().unwrap_or_default().iter().take(4)
+                "admitted": freedom.admitted[*first].iter().take(4)
                     .map(|c| core.decision_json(c.class, c.reason, Some(c.next))).collect::<Vec<_>>(),
             });
         }
@@ -2081,7 +2124,7 @@ mod tests {
             std::fs::write(root.join(to), text)
                 .unwrap_or_else(|error| panic!("contract: {error:?}"));
         }
-        let core = Core::load(&root).unwrap_or_else(|error| panic!("core: {error:?}"));
+        let core = Core::load(&root, false).unwrap_or_else(|error| panic!("core: {error:?}"));
         let document: Value =
             serde_json::from_str(answers).unwrap_or_else(|error| panic!("answers: {error:?}"));
         let answers = core
@@ -2122,7 +2165,15 @@ mod tests {
             assert_eq!(narrowed.stats, reference.stats, "{family} prefix {prefix}");
             let report = question(&core, &answers[..prefix])
                 .unwrap_or_else(|error| panic!("question: {error:?}"));
-            assert_eq!(report["stats"], reference.stats, "{family} prefix {prefix}");
+            // Complete base laws can expose a contradiction before the last
+            // submitted answer. The question flow returns that first prefix.
+            let expected = if report["status"] == "conflict" {
+                let first = report["answer"].as_u64().unwrap() as usize + 1;
+                core.freedom(&answers[..first]).unwrap().stats
+            } else {
+                reference.stats
+            };
+            assert_eq!(report["stats"], expected, "{family} prefix {prefix}");
         }
         std::fs::remove_dir_all(root).unwrap_or_else(|error| panic!("remove scratch: {error:?}"));
     }
@@ -2150,5 +2201,31 @@ mod tests {
             {"where":"value == 0","class":"Reject","reason":"at_capacity"}
         ]}"#,
         );
+    }
+    #[test]
+    fn rejection_answers_do_not_bind_failure_only_reasons() {
+        let base =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core-components/bounded-counter");
+        let mut project = std::fs::read_to_string(base.join("project.zeno.in"))
+            .unwrap()
+            .replace("${C}", "1");
+        project.push_str(
+            "reason 203 failure_only precedence 3;\nlaw 503 failure_shape on failure = true;\n",
+        );
+        let mut policy: Value = serde_json::from_str(
+            &std::fs::read_to_string(base.join("policy.json.in"))
+                .unwrap()
+                .replace("${C}", "1")
+                .replace("${INSTANCE}", "c1"),
+        )
+        .unwrap();
+        policy["law_kinds"]["503"] = json!("CommittedFailureEffects");
+        policy["cases"].as_array_mut().unwrap().insert(0, json!({"when":"false","class":"CommittedFailure","reason":203,"post":{"110":"value"},"outbox":[]}));
+        let core = Core::from_sources(project, policy.to_string()).unwrap();
+        let answers=core.answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{"where":"!authorized","class":"Reject","reason":"not_authorized"}]})).unwrap();
+        let laws = core.pin(&answers[0]).unwrap();
+        assert!(laws.iter().any(|(scope, _)| scope == "reject:201"));
+        assert!(!laws.iter().any(|(scope, _)| scope == "reject:203"));
+        core.admissible(&laws).unwrap();
     }
 }

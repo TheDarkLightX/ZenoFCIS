@@ -122,6 +122,9 @@ def static_check():
 
 
 def run(command, cwd, log, environment, expected_exit=0):
+    if command and str(command[0]) == "cargo":
+        require(shutil.disk_usage('/').free >= 6 * 1024**3, "below 6 GiB build reserve")
+        print(subprocess.check_output(['df', '-B1G', '/'], text=True), flush=True)
     with log.open("wb") as stream:
         result = subprocess.run(list(map(str, command)), cwd=cwd, env=environment,
                                 stdout=stream, stderr=subprocess.STDOUT, check=False)

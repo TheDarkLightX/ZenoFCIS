@@ -205,6 +205,7 @@ laws::Scope::Accept=>seq![Part::Word(1)],
 laws::Scope::Reject=>seq![Part::Word(2)],
 laws::Scope::CommittedFailure=>seq![Part::Word(3)],
 laws::Scope::Committing=>seq![Part::Word(4)],
+laws::Scope::RejectReason(reason)=>seq![Part::Word(5),Part::Word(reason as u128)],
 } }
 
 pub open spec fn law_list_prefix<'a>(values:Seq<laws::Law<'a>>,n:nat)->Seq<Part<'a>>

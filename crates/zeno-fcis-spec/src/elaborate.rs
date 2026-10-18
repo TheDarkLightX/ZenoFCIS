@@ -1024,6 +1024,7 @@ const fn scope_keyword(scope: LawScope) -> &'static str {
         LawScope::Reject => "reject",
         LawScope::CommittedFailure => "failure",
         LawScope::Committing => "commit",
+        LawScope::RejectReason(_) => "reject:ID",
     }
 }
 

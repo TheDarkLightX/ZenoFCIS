@@ -9,9 +9,14 @@ import contract_judges_reference as reference
 import instantiate_core as core
 
 
-def instance(family, parameters):
+def instance(family, parameters, complete=False):
     files = core.source(family, parameters, include_proof=False)
-    return reference.Contract(files["project.zeno"].decode(), json.loads(files["v2/policy.json"]))
+    project=files["project.zeno"].decode()
+    policy=json.loads(files["v2/policy.json"])
+    if not complete:
+        project=project.split("// Independent complete relation")[0]
+        policy["law_kinds"]={k:v for k,v in policy["law_kinds"].items() if int(k)<520}
+    return reference.Contract(project, policy)
 
 
 def value(text, grammar=reference.rule_expression, frame=()):
@@ -95,7 +100,8 @@ class Judges(unittest.TestCase):
         dec = next(case for case in policy["cases"] if case["when"] == "action == 151 && value == 0")
         dec["class"] = "CommittedFailure"
         policy["law_kinds"].update({"503": "CommittedFailureEffects", "504": "DebitCreditEffectEquality"})
-        project = files["project.zeno"].decode() + (
+        policy["law_kinds"]={k:v for k,v in policy["law_kinds"].items() if int(k)<520}
+        project = files["project.zeno"].decode().split("// Independent complete relation")[0] + (
             "law 503 keeps on failure = post.100.110 == pre.100.110;\n"
             "law 504 short on accept = post.100.110 <= 1;\n")
         contract = reference.Contract(project, policy)
@@ -108,6 +114,12 @@ class Judges(unittest.TestCase):
         probes = reference.probes(contract, machine)
         self.assertEqual(probes["decisions"]["Refused law 504"], 1)
         self.assertEqual(probes["decisions"]["CommittedFailure 202"], 1)
+
+    def test_complete_counter_and_budget_relations(self):
+        for family in ("bounded-counter", "consumable-budget"):
+            contract=instance(family, {"C":2}, complete=True)
+            measured=reference.gaps(contract, reference.Machine(contract))
+            self.assertEqual(measured["admissible"]["full"]["determined"], measured["admissible"]["full"]["tuples"])
 
     def test_deliveries_are_outside_the_reference(self):
         app = core.ROOT / "examples/dual-approval"

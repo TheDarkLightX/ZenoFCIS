@@ -2279,8 +2279,12 @@ fn json_document(path: &Path) -> Result<Value, (u8, Value)> {
 }
 
 /// The core table of `dir`, in a contained search stage.
-fn contract_core(dir: &Path, stages: &mut Stages) -> Result<judges::Core, (u8, Value)> {
-    match stages.run(true, || judges::Core::load(dir)) {
+fn contract_core(
+    dir: &Path,
+    stages: &mut Stages,
+    question_profile: bool,
+) -> Result<judges::Core, (u8, Value)> {
+    match stages.run(true, || judges::Core::load(dir, question_profile)) {
         Err(reason) => Err(doors_result(
             crate::BLOCKED,
             "contract",
@@ -2295,6 +2299,9 @@ fn contract_core(dir: &Path, stages: &mut Stages) -> Result<judges::Core, (u8, V
 fn stop_result(stop: judges::Stop) -> (u8, Value) {
     match stop {
         judges::Stop::Invalid(reason) => refused(&reason),
+        judges::Stop::OutOfScope(reason) => {
+            super::result(crate::BLOCKED, "out-of-scope", json!({"reason": reason}))
+        }
         judges::Stop::Inconclusive(reason) => {
             super::result(crate::BLOCKED, "inconclusive", json!({"reason": reason}))
         }
@@ -2309,7 +2316,7 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, true) {
         Ok(core) => core,
         Err(failure) => return failure,
     };
@@ -2409,6 +2416,8 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
     (
         if status == "inconsistent" {
             crate::INVALID
+        } else if status == "incomplete" {
+            crate::BLOCKED
         } else {
             crate::OK
         },
@@ -2428,7 +2437,7 @@ fn teach_back_command(dir: &Path, rules: &Path, answers: Option<&Path>) -> (u8, 
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, false) {
         Ok(core) => core,
         Err(failure) => return failure,
     };
@@ -2471,7 +2480,7 @@ fn decompose_command(
         Err(failure) => return failure,
     };
     let mut stages = Stages::new(started, STATELESS_DEADLINE, 0);
-    let core = match contract_core(dir, &mut stages) {
+    let core = match contract_core(dir, &mut stages, false) {
         Ok(core) => core,
         Err(failure) => return failure,
     };

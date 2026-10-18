@@ -239,6 +239,8 @@ pub enum Scope {
     CommittedFailure,
     /// Accept and CommittedFailure.
     Committing,
+    /// Noncommitting rejection carrying exactly this reason.
+    RejectReason(u32),
 }
 /// One declared law. InitialCondition is genesis-only regardless of scope.
 #[cfg_attr(verus_keep_ghost, verus_verify)]

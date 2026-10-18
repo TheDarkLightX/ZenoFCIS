@@ -26,7 +26,25 @@ struct Core {
 }
 
 impl Core {
+    // Historical incomplete-law specimens remain intentional gap controls.
     fn new(family: &str, parameters: &[(&str, i128)]) -> Self {
+        let mut core = Self::complete(family, parameters);
+        core.project = core
+            .project
+            .split("// Independent complete relation")
+            .next()
+            .unwrap()
+            .to_owned();
+        let mut rules: Value = serde_json::from_str(&core.rules).unwrap();
+        rules["law_kinds"]
+            .as_object_mut()
+            .unwrap()
+            .retain(|id, _| id.parse::<u32>().unwrap() < 520);
+        core.rules = rules.to_string();
+        core
+    }
+
+    fn complete(family: &str, parameters: &[(&str, i128)]) -> Self {
         let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../core-components")
             .join(family);
@@ -656,4 +674,56 @@ fn probes_answer_exactly_over_the_declared_domain() {
     )
     .unwrap_or_else(|error| panic!("{error}"));
     assert!(matches!(over, Answer::Inconclusive(_)));
+}
+
+#[test]
+fn complete_relations_and_contradictions_are_separate_from_execution() {
+    for family in ["bounded-counter", "consumable-budget"] {
+        let core = Core::complete(family, &[("C", 2)]);
+        let positive = core.gaps(None);
+        assert_eq!(
+            measured(&positive)["completeness"]["status"],
+            "complete-finite"
+        );
+        let mut contradiction = core;
+        contradiction
+            .project
+            .push_str("law 550 contradiction on accept = false;\n");
+        let mut rules: Value = serde_json::from_str(&contradiction.rules).unwrap();
+        rules["law_kinds"]["550"] = json!("AuthoritySubjectRecipient");
+        contradiction.rules = rules.to_string();
+        let negative = contradiction.gaps(None);
+        let c = &measured(&negative)["completeness"];
+        assert_eq!(c["status"], "incomplete");
+        assert!(count(&c["zero_outcome"]) > 0);
+        assert!(count(&c["execution_refusals"]) > 0);
+        assert!(!c["residual_witnesses"].as_array().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn rejecting_all_wrong_reasons_and_unconstrained_frames_cannot_complete() {
+    let core = Core::complete("bounded-counter", &[("C", 1)]);
+    for changed in [
+        core.with_rules(|r| r["cases"][0]["when"] = json!("true")),
+        core.with_rules(|r| {
+            r["cases"][0]["reason"] = json!(201);
+            r["cases"][1]["reason"] = json!(200);
+        }),
+    ] {
+        let g = changed.gaps(None);
+        assert_eq!(measured(&g)["completeness"]["status"], "incomplete");
+        assert!(count(&measured(&g)["completeness"]["execution_refusals"]) > 0);
+    }
+    let mut extra = core;
+    extra.project = extra.project.replace(
+        "field 110 100 value 105;",
+        "field 110 100 value 105;\nfield 111 100 extra 108;",
+    );
+    let mut r: Value = serde_json::from_str(&extra.rules).unwrap();
+    r["genesis"]["111"] = json!(false);
+    extra.rules = r.to_string();
+    let g = extra.gaps(None);
+    assert_eq!(measured(&g)["completeness"]["status"], "incomplete");
+    assert!(count(&measured(&g)["admissible"]["full"]["freedom"]["successor"]) > 0);
 }

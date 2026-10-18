@@ -616,6 +616,22 @@ impl Parser {
                 return None;
             }
         };
+        let scope = if self.take_symbol(&TokenKind::Colon) {
+            let reason = self.take_id("law.reason")?.get();
+            if scope != LawScope::Reject {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "law.scope",
+                    "reject:ID",
+                    scope_name.as_str(),
+                    "reason scopes require reject",
+                );
+                return None;
+            }
+            LawScope::RejectReason(reason)
+        } else {
+            scope
+        };
         let genesis = self.take_symbol(&TokenKind::Comma);
         if genesis && !self.take_keyword("genesis") {
             self.error(

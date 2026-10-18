@@ -103,19 +103,20 @@ def classification(family):
     return {
         'stored_artifact': 'Identified', 'after_successful_replay': 'Proved',
         'method': 'exhaustive mandatory-library Authority execution over the entire closed finite domain',
-        'scope': 'Every declared parameter and raw state/command/context tuple; every applicable transition law passes; exact independent decisions and positive witnesses. Includes invalid prestates as business Rejects.',
+        'scope': 'Every declared parameter and raw state/command/context tuple; exactly one lawful complete scalar decision independent of law 991, exact independent decisions, positive witnesses and no technical refusal. Includes invalid prestates as business Rejects.',
         'conservation': CONSERVATION[family],
-        'genesis': 'Not re-proved by this transition certificate. Separate retained generated-native evidence checks each exact genesis; no general reachability theorem is inferred.',
+        'genesis': 'No genesis or generated-application qualification claim. This certificate covers actual Authority transition decisions and finite law completeness only.',
         'assumptions': ['supplied authorization, principal and time have only their declared data meanings',
                         'the frozen compiler/runtime and native toolchain execute their source faithfully',
                         'the independent reference specifies the intended finite observations'],
         'trusted_base': ['F1 declaration compiler and canonical codecs',
-                         'mandatory V2 Authority and eager-i64 evaluator and library law evaluator',
+                         'mandatory V2 Authority and checked-i128 evaluator and library law evaluator',
                          'F2 complete-domain enumeration, framing and decision reporting',
                          'this certificate replayer and its full-product/identity comparisons',
                          'Python, Rust compiler/runtime, OS, SHA256 and execution hardware'],
         'not_claimed': ['Lean KernelChecked', 'solver UNSAT proof', 'unbounded parameters or timestamps',
-                        'authentication', 'physical conservation', 'owner adoption', 'release authority'],
+                        'authentication', 'physical conservation', 'owner adoption', 'release authority',
+                        'generated-application/genesis qualification', 'whole-source proof-profile qualification'],
     }
 
 
@@ -154,7 +155,7 @@ def validate_reference(family):
 def run(cli, directory, label, args, expected_exit=0):
     try:
         result = subprocess.run([str(cli), *map(str, args)], cwd=core.ROOT, capture_output=True,
-                                timeout=60, check=False)
+                                timeout=600, check=False)
     except subprocess.TimeoutExpired as error:
         (directory / f'{label}.timeout').write_text(str(error) + '\n')
         raise ValueError(f'{label} timed out; no certificate') from error
@@ -211,21 +212,25 @@ def collect(family, cli, work, snapshot):
         manifest = core.instantiate(family, parameters, directory / 'contract', include_proof=False)
         generated = core.read_json(run(cli, directory, 'generate', ['generate', 'contract', directory / 'contract', '--format', 'json']).decode())
         run(cli, directory, 'regenerate', ['generate', 'contract', directory / 'contract', '--check'])
-        run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json', '--format', 'json'])
+        run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json', '--format', 'json', '--gaps', '--max-work', '500000000'])
         packet = core.read_json((directory / 'review.json').read_text())
         expected = [row for row in reference if row['family'] == family.replace('-', '_') and row['parameters'] == parameters]
         observations = observed_rows(packet, expected, manifest, family)
-        application_laws = [500, 501] if family == 'rate-limiter' else [500, 501, 502]
-        if family == 'retry-budget':
-            application_laws.append(503)
-        laws = application_laws + [908, 909, 990, 991]
+        policy = core.read_json((directory / 'contract/v2/policy.json').read_text())
+        laws = sorted(map(int, policy['law_kinds'])) + [908, 909, 990, 991]
+        complete = packet['gaps']['completeness']
+        require(complete['status'] == 'complete-finite' and complete['law_991_used'] is False
+                and complete['exactly_one'] == manifest['input_tuples']
+                and complete['zero_outcome'] == 0 and complete['execution_refusals'] == 0
+                and complete['accepted_rows'] > 0,
+                'independent declared relation is incomplete or execution refused')
         require(generated['summary']['law_ids'] == laws, 'applicable law inventory differs')
         artifact_hashes = {name: core.digest((directory / 'contract' / name).read_bytes())
                            for name in ('v2/schema.zcve', 'v2/policy.zcve', 'src/v2_contract.rs')}
         instance = {'parameters': parameters, 'domains': manifest['input_domains'], 'tuples': manifest['input_tuples'],
                     'artifacts': artifact_hashes, 'law_ids': laws,
                     'authority_identity_sha256': packet['tool']['library_identity_sha256'],
-                    'source_set_sha256': manifest['source_set_sha256'], **observations}
+                    'source_set_sha256': manifest['source_set_sha256'], 'completeness': complete, **observations}
         instances.append(instance)
         print(f'{family} {parameters}: {manifest["input_tuples"]} complete actual-library decisions', flush=True)
     certificate = {'schema': SCHEMA, 'family': family, 'classification': classification(family),
@@ -329,11 +334,11 @@ def qualify(cli, work):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('issue', 'replay', 'qualify'))
+    parser.add_argument('mode', choices=('issue', 'refresh', 'replay', 'qualify'))
     parser.add_argument('--cli', type=Path, required=True)
     parser.add_argument('--work-dir', type=Path, required=True)
     parser.add_argument('--native-report', type=Path, help='required for issue: retained all77 native qualification report')
-    parser.add_argument('--certificates', type=Path, help='replay-only alternate certificate data directory')
+    parser.add_argument('--certificates', type=Path, help='certificate data directory; issue requires a new directory')
     args = parser.parse_args()
     cli, work = args.cli.resolve(), args.work_dir.resolve()
     require(cli.is_file(), 'CLI binary missing')
@@ -345,9 +350,11 @@ def main():
     snapshot = snapshot_inputs(cli)
     runtime = snapshot['runtime']
     certificates_dir = args.certificates.resolve() if args.certificates else PROOFS
-    require(args.mode == 'replay' or args.certificates is None, 'alternate certificates are replay-only')
     native = None
-    if args.mode == 'issue':
+    if args.mode == 'refresh':
+        require(args.certificates is not None and args.native_report is None, 'refresh requires a new certificate directory and makes no native genesis claim')
+        require(not certificates_dir.exists(), 'refusing to overwrite an existing certificate set')
+    elif args.mode == 'issue':
         require(args.native_report is not None, 'issue requires the retained native report')
         require(core.digest(args.native_report.read_bytes()) == NATIVE_REPORT_SHA256, 'native report identity differs')
         native = core.read_json(args.native_report.read_text())
@@ -357,7 +364,7 @@ def main():
                 'native report does not cover the complete catalogue')
         require(native['runtime_source_sha256'] == core.digest(encoded(runtime)),
                 'native report checked a different compiler/evaluator source')
-        require(not PROOFS.exists(), 'refusing to overwrite an existing certificate set')
+        require(not certificates_dir.exists(), 'refusing to overwrite an existing certificate set')
     else:
         require(load(certificates_dir / 'runtime-source.json') == runtime, 'runtime source changed')
         for family in core.FAMILIES:
@@ -371,12 +378,12 @@ def main():
                 require(len(matching) == 1 and matching[0]['generated_sha256'] == instance['artifacts'],
                         'inherited native evidence has different canonical artifacts')
     require_unchanged_inputs(cli, snapshot)
-    if args.mode == 'issue':
+    if args.mode in ('issue', 'refresh'):
         # No partially checked family is published as a successful certificate.
-        PROOFS.mkdir()
-        (PROOFS / 'runtime-source.json').write_bytes(encoded(runtime))
+        certificates_dir.mkdir()
+        (certificates_dir / 'runtime-source.json').write_bytes(encoded(runtime))
         for family, certificate in certificates.items():
-            (PROOFS / f'{family}.json').write_bytes(encoded(certificate))
+            (certificates_dir / f'{family}.json').write_bytes(encoded(certificate))
     else:
         for family, certificate in certificates.items():
             compare_certificate(load(certificates_dir / f'{family}.json'), certificate)

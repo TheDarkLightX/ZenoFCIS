@@ -936,6 +936,7 @@ fn scope(value: zeno_fcis_spec::LawScope) -> l::Scope {
         LawScope::Always => l::Scope::Always,
         LawScope::Accept => l::Scope::Accept,
         LawScope::Reject => l::Scope::Reject,
+        LawScope::RejectReason(reason) => l::Scope::RejectReason(reason),
         LawScope::CommittedFailure => l::Scope::CommittedFailure,
         LawScope::Committing => l::Scope::Committing,
     }

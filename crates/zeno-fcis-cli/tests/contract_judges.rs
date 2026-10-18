@@ -176,10 +176,10 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
         serde_json::from_slice(&first.stdout).unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(packet["schema"], "zeno-fcis/contract-review/4");
     assert_eq!(packet["authority"], "none");
-    assert_eq!(packet["gaps"]["admissible"]["full"]["determined"], 0);
+    assert_eq!(packet["gaps"]["admissible"]["full"]["determined"], 12);
     let stderr = String::from_utf8_lossy(&first.stderr);
     assert!(
-        stderr.contains("gaps: 0 of 12 tuples determined"),
+        stderr.contains("gaps: 12 of 12 tuples determined"),
         "{stderr}"
     );
     assert!(

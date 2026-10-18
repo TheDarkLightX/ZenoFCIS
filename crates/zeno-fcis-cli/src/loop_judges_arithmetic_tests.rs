@@ -56,10 +56,7 @@ fn actual_admission(core: &Core, formula: &str, amount: i128) -> bool {
         .find(|o| core.columns[k][*o] == amount)
         .unwrap_or_else(|| panic!("expected a value"));
     let d = core.decisions[ordinal].unwrap_or_else(|| panic!("expected a value"));
-    admitted[ordinal]
-        .as_ref()
-        .unwrap_or_else(|| panic!("expected a value"))
-        .contains(&Candidate {
+    admitted[ordinal].contains(&Candidate {
             class: d.class,
             reason: d.reason,
             next: d.next,

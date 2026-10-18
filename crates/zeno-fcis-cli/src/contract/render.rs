@@ -1066,7 +1066,7 @@ fn law(law: &Law) -> Syntax {
     )
 }
 
-pub(super) fn scope_name(scope: zeno_fcis_spec::LawScope) -> &'static str {
+pub(super) fn scope_name(scope: zeno_fcis_spec::LawScope) -> String {
     use zeno_fcis_spec::LawScope;
     match scope {
         LawScope::Always => "Always",
@@ -1074,7 +1074,9 @@ pub(super) fn scope_name(scope: zeno_fcis_spec::LawScope) -> &'static str {
         LawScope::Reject => "Reject",
         LawScope::CommittedFailure => "CommittedFailure",
         LawScope::Committing => "Committing",
+        LawScope::RejectReason(reason) => return format!("RejectReason({reason})"),
     }
+    .to_owned()
 }
 
 fn input_leaf(leaf: &InputLeaf) -> Syntax {

@@ -806,7 +806,7 @@ mod tests {
     fn a_delivery_source_is_refused_before_composition() {
         let witness =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/loop-compose-deliveries");
-        let core = Core::load(&witness).unwrap_or_else(|error| panic!("core: {error:?}"));
+        let core = Core::load(&witness, false).unwrap_or_else(|error| panic!("core: {error:?}"));
         assert_eq!(core.decisions.len(), 8);
         assert!(core.decisions.iter().all(Option::is_some));
         assert_eq!(

@@ -1078,6 +1078,8 @@ pub enum LawScope {
     CommittedFailure,
     /// Accepts and committed failures: `on commit`.
     Committing,
+    /// Rejections carrying this reason only: `on reject:ID`.
+    RejectReason(u32),
 }
 impl LawScope {
     pub(crate) const fn tag(self) -> u8 {
@@ -1087,6 +1089,7 @@ impl LawScope {
             Self::Reject => 2,
             Self::CommittedFailure => 3,
             Self::Committing => 4,
+            Self::RejectReason(_) => 5,
         }
     }
     /// Returns true when the scope includes every accept.
@@ -1845,6 +1848,9 @@ fn encode_law(value: &LawDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     if let Some(applicability) = value.applicability {
         out.push(SCOPED_LAW_TAG);
         out.push(applicability.scope.tag());
+        if let LawScope::RejectReason(reason) = applicability.scope {
+            out.extend_from_slice(&reason.to_be_bytes());
+        }
         out.push(u8::from(applicability.genesis));
     }
     encode_rel(&value.formula, out)
