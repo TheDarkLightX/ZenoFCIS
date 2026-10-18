@@ -292,7 +292,7 @@ impl PreparedBatch {
         };
         let expected = checked(project.admit_root::<RustCryptoSha256>(
             &CounterState {
-                count: CounterValue(i128::from(*count)),
+                count: CounterValue(*count),
             },
             ValidationLimits::default(),
         ))?;
@@ -306,7 +306,7 @@ impl PreparedBatch {
         let destination = checked(NotificationDestination("local-observer".into()).to_value())?;
         let payload = checked(
             Notification {
-                notified_count: CounterValue(i128::from(*count)),
+                notified_count: CounterValue(*count),
             }
             .to_value(),
         )?;

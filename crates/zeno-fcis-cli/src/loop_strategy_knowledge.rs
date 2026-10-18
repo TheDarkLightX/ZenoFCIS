@@ -25,13 +25,17 @@ fn implementation() -> String {
     sha256_hex(
         concat!(
             include_str!("loop_strategy_knowledge.rs"),
-            include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge.rs"),
-            include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs"),
+            include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt"),
+            include_str!(
+                "../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt"
+            ),
             include_str!("knowledge_command.rs"),
             include_str!("knowledge_evidence.rs"),
             include_str!("loop_knowledge.rs"),
-            include_str!("../../zeno-fcis-loop-doors/src/strategy_algebra.rs"),
-            include_str!("../../zeno-fcis-loop-doors/examples/strategy-example.kb"),
+            include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"),
+            include_str!(
+                "../source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt"
+            ),
         )
         .as_bytes(),
     )

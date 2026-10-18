@@ -1,12 +1,12 @@
 {
   "authority": "none",
-  "cli_sha256": "15e58e5a16f1e65b022565f86835e3b9407401100d0a82f4dbf69705aa10aefe",
+  "cli_sha256": "8503fe2e3550bfae21cd077a09ba85253f9d64155603a88a3bb264c029db301a",
   "evidence": "complete-finite-execution",
   "family_theorem": null,
   "independent_reference_sha256": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868",
   "instances": [
     {
-      "app_tests_sha256": "e5110a91c351e3bf2e58cdaa601b2f25632c541ad376bfb4e8bdc0f517da96fd",
+      "app_tests_sha256": "46eba251da376617afe479e8c5c062f8b4eafaf9dbef33fbc8e505aa069ff362",
       "binding": {
         "lock_sha256": "7b12cb7677319b3502a415f38f3438240eb051f7f553327baebb5abbc233bcce",
         "packages": [
@@ -112,7 +112,7 @@
       "review_sha256": "14df0b5e5d4b11591b7681e1d77b2949454a5e34efd90cd7ede339d0338b0ca2"
     },
     {
-      "app_tests_sha256": "85624c779d880c61c5af64ba9ec48038d1f7266460f9701d157c30fd51cdc192",
+      "app_tests_sha256": "e752364b6b4c802b81a29ef0ae2946463efd7e789d0105910d09d62ca136d0d4",
       "binding": {
         "lock_sha256": "e413855fd943869c1099b79b3cca7919cf9455f3231807180bda33d7380aefe1",
         "packages": [
@@ -220,7 +220,7 @@
       "review_sha256": "acdabe91105dacd4aa9ebca2813588a9a3f436ff1223c2c7b5f7769242553f20"
     },
     {
-      "app_tests_sha256": "920aa98e75eb41da2ce0d41ace707301717c588cedebe20dca63d36cefd75729",
+      "app_tests_sha256": "62368f7c4dcaf3825db1d819ff0bb20b579f0e0d9c778193642fd2b5c68ec95c",
       "binding": {
         "lock_sha256": "9c8a9d0a27d40b5b3d5be7b3106b021abfd265ab6dabf1c561dbc580c987f263",
         "packages": [
@@ -329,7 +329,7 @@
       "review_sha256": "28c47345fa912b4b82544ee5ce53b3bddc0f0c345b2a4dc522003897e239be2d"
     },
     {
-      "app_tests_sha256": "52e30825f4b7656bac4006b544e3d35b4d813902cc3941aae124585bba188d87",
+      "app_tests_sha256": "0920ef6009702bd5780fd7f12c3aacfab8d8a3a368622016aa4f7ca8d1dbd060",
       "binding": {
         "lock_sha256": "aa2226ac12b9bdf0a59c33f072abf0a6b1c711498525350b7f7cfa2125654708",
         "packages": [
@@ -439,7 +439,7 @@
       "review_sha256": "78752f9958ffb3bd7514ee4bd3816f36de1b7a2d49a5fe4cfe7135ad5c8c1406"
     },
     {
-      "app_tests_sha256": "d393858d7b8455062755f8b02d555201b958cec6e4da14b7ba147394fe9d253a",
+      "app_tests_sha256": "29e452740e43dd7a5ac773da5e0b55a23780419698ad628fb6d6b66a08bbd74d",
       "binding": {
         "lock_sha256": "2064658a9427be965c14ec2fcafbef789d07e6c0f43c2431d14b1d4894343275",
         "packages": [
@@ -550,7 +550,7 @@
       "review_sha256": "5e000acf7574ca88a61890b9a0e8f095e42c68240a89e60d50739d0bb385a69f"
     },
     {
-      "app_tests_sha256": "a69a10caedb0da52ce56e443172f148f6079f9c9069dd26fe50e9184c643489b",
+      "app_tests_sha256": "d87005ca0fb62b91abdf252004f85e5a52ff5a061947af73de9025ff32271b9c",
       "binding": {
         "lock_sha256": "40ea48fb75a6b8ee95847c4f374ba8a38300bb660d9f332d8f8a457428959b7a",
         "packages": [
@@ -662,7 +662,7 @@
       "review_sha256": "6f0dbaace8245871623a901e1def140d7c4ded6e3ba18b8bd7e9dba07b6701a4"
     },
     {
-      "app_tests_sha256": "31dd3ec3eddcc824278529bee99bbb014bf6998e1c069343021aeebfbe1d2fde",
+      "app_tests_sha256": "0cf706bbe43afef4b77a984c1f508598edfefbaf5a8bff781e7c0e208275ea06",
       "binding": {
         "lock_sha256": "f6889a8a3e40b18682c83db095880f6bf32ff4913c80834d7e05b57d8d188cdb",
         "packages": [
@@ -774,7 +774,7 @@
       "review_sha256": "c53c581863d8119eb3bf6c5c6bd43551b563ae665e20391db4331b5db3697812"
     },
     {
-      "app_tests_sha256": "8d98d3ad7d416fa9d489dff23e489c6560ffeec8c8e35bcbc468028ae198f910",
+      "app_tests_sha256": "f2339188b577e41c9619ffedad48966e414eeeaf18caee3b44d620a252a69336",
       "binding": {
         "lock_sha256": "99328e1f468e77bac4be187c5d99690eb197296fbe162e4f9f51b69b6189dff1",
         "packages": [
@@ -887,7 +887,7 @@
       "review_sha256": "1b57eb446d6c893dbeabaa0d3ace834f278335d39616803e36debf86f041d55c"
     },
     {
-      "app_tests_sha256": "1f17d7779d7fe4ba94277d349fed03bc6cf8a88d7c81c5194cde01a0d7bd5562",
+      "app_tests_sha256": "8f78abf4c14105025a514b3f5eede93ef842fed8400d20785787160cb11c65b3",
       "binding": {
         "lock_sha256": "0f96db6b8929fd85ed3ae3d01d32125f8a23cfb36ad9d7ff785469a57944ee7d",
         "packages": [
@@ -1001,7 +1001,7 @@
       "review_sha256": "4ecc13e958eab773c907b4f6efd48778d84531c1ec234e410d3ac825a42f0dee"
     },
     {
-      "app_tests_sha256": "eda7fab81730be7c8e2702625b7bd925eea599a7209dcb8f9a54e4014f80f81f",
+      "app_tests_sha256": "ec410743b67e2fef0dc68803927167e1057c627a5d8c68e6fbf2cca14de23f96",
       "binding": {
         "lock_sha256": "71e82da2a652845668ac6faf20bc27191e357fa99ae9df605050753e2a9d46c8",
         "packages": [
@@ -1114,7 +1114,7 @@
       "review_sha256": "dfa69d5623415e1a203c20ba3bce212e22a6ee206e69f30483d61d052d2bd7fc"
     },
     {
-      "app_tests_sha256": "5ae92ce02e384b0784e0e62311008abe490453a9d53c6ac60586ce30dfcf1b6f",
+      "app_tests_sha256": "ca5ef6021e2ad37e1458bbdb82e3f4c538cc4606a3689bcabd62c0cee81b344f",
       "binding": {
         "lock_sha256": "be24e00f445defcdff28430db181318a11c937fe54fcca1e784a1089661eb60b",
         "packages": [
@@ -1228,7 +1228,7 @@
       "review_sha256": "78175e9b760d1a9180461f7b53ce5d328077d8017aabf97b92fd2a4858bd8a61"
     },
     {
-      "app_tests_sha256": "1bcfab7cdb783b9a12b3c2c4a94896fcb442d81c79f48cb6696f6923d4c370ea",
+      "app_tests_sha256": "3ad7d9988fd62868e802521df128d6373e382abb2f0c1f87a279ba1d496345f8",
       "binding": {
         "lock_sha256": "952157c25eb96745ac6e61bec91259d822ce41616b602b4a741f053a05599177",
         "packages": [
@@ -1343,7 +1343,7 @@
       "review_sha256": "ef1e1add6ab352bf3022a2b5e6e5985d31e973158e3bb688e6ef4c5db5533172"
     },
     {
-      "app_tests_sha256": "84cda031636b14ac88d5c7aebe54736a7520744d50f4a476f6619fc0697845b7",
+      "app_tests_sha256": "40c3e57fffe8b7a1690cbae0347f2a1cb80312785d482f484a26cb5821042d19",
       "binding": {
         "lock_sha256": "bee4f801cd4087fa76a3ff62b55f69d1135ca1aef4398b4bce861b172b1aa5a4",
         "packages": [
@@ -1456,7 +1456,7 @@
       "review_sha256": "c6a327c358071dae919dcee5e3292cd89b3bf578c99a80d0bf793ebcc4812192"
     },
     {
-      "app_tests_sha256": "e53124b62775ebc1a11e372235598d34d6528647e0358db28f71b64e30583820",
+      "app_tests_sha256": "c79a10741f54e1be85b1a34406847a19e3d19c1960b4a4d20d2f04ab2b61c398",
       "binding": {
         "lock_sha256": "593a74445e4a03098252710e890aace2b66cf8c14ce5ab4004db6d34e48f2175",
         "packages": [
@@ -1570,7 +1570,7 @@
       "review_sha256": "98522b479209ae346be46d8eafd7904a7314c73f16612a71f4139829d768ca41"
     },
     {
-      "app_tests_sha256": "77f183b1b851ddcaca72ddfd120d10c7d15203bb753cc67394d1be4d19cc7d12",
+      "app_tests_sha256": "d391ea6d561f8b72b12c958da3ef0c42b19caecebab165f5d942ee0e4e0e5ac5",
       "binding": {
         "lock_sha256": "b444e06552cc56e3ead86ea69a1dfdf1c8e5534064c968c3c2fea67ae8008d53",
         "packages": [
@@ -1685,7 +1685,7 @@
       "review_sha256": "75403aef288262bfb94578c75242cf5936af8b1cf6bf2c57ca2357858e622146"
     },
     {
-      "app_tests_sha256": "07805f83541fb75ea40a9aa855172210e1670024bf25d8aa1fa610d445a3fdff",
+      "app_tests_sha256": "9347a069ee242fe81519a77c0feadcaa8e2fc22183f612945f81f0d32dd3b1d1",
       "binding": {
         "lock_sha256": "39d7ad3b313e5fc1e44c0db0b64d08bd096f3db8d61886930318d39fcd715c7b",
         "packages": [
@@ -1798,7 +1798,7 @@
       "review_sha256": "8c13b3cbf298f00b131065adf75105711ce305648d9a02892007744cb72e320c"
     },
     {
-      "app_tests_sha256": "5050210e8179c91aee89276db93ac7552eb012c98426d7b62dd6271e06760b08",
+      "app_tests_sha256": "6d121595ba5cbe8438f3a8e0b2812d7e894afe75c7445b9c6cef43eeb0a56577",
       "binding": {
         "lock_sha256": "d41bf8cf459b09faeada08077f4addd9933a6a39754c7c7e681ad28dd7cd6cca",
         "packages": [
@@ -1912,7 +1912,7 @@
       "review_sha256": "6deb7b6b46c7011b43f0eb7ebf76d1d6f536bc7b513f5196eb14eb62b789fdac"
     },
     {
-      "app_tests_sha256": "a33c7dae49002bf71cea0c613fdb9ca8759b58b12c383c3dd21dcbccc06de9bb",
+      "app_tests_sha256": "a6587c06b25c4acbb146f18db7ca38a3e0cfbd76f725e40978f6b9d2949f66fc",
       "binding": {
         "lock_sha256": "6500c9f624bdb30ad30b6cd6f600ee4f91751adad014b70913a8d1278e26bbdb",
         "packages": [
@@ -2027,7 +2027,7 @@
       "review_sha256": "e497cc7b022a6d38d1323a5cffb4a9a40bb322363ac117a7e87fc900ae04de01"
     },
     {
-      "app_tests_sha256": "7bdbf176c5351138e795303212011c2b16bb3b85bca55281c8c61ad00f96e3f4",
+      "app_tests_sha256": "9c62e25986517d38fbb3dfd52c306dd28078e32b0015289128b072e0abf3f4dc",
       "binding": {
         "lock_sha256": "0ff62ff4ef0e9788b34b655b49da6ca5afbee419384f9d7830e97244d3a506c0",
         "packages": [
@@ -2142,7 +2142,7 @@
       "review_sha256": "e93f0d3226c96594b4def9a20ff6b22781a026400b29053edf180547076fe65e"
     },
     {
-      "app_tests_sha256": "4536a3de6b0f4d5765c102434978c6763adcb0e7af415436a370c716383694d3",
+      "app_tests_sha256": "545010e9cdf1a733ae33b497b6814c82951c80311a449a887dd330b513f033fe",
       "binding": {
         "lock_sha256": "f1d8e8cdef40c541f9b1c929c1c73df0fb8aea9b4ab35c568d09c18f78cc1cf6",
         "packages": [
@@ -2257,7 +2257,7 @@
       "review_sha256": "b3b7549bd290ac8cc308952aef8f2d77125074563e223320a551a3c10ab82c07"
     },
     {
-      "app_tests_sha256": "3e1a963d4ac7a16c81b35a4699bf5be228c7870c1bcb0bada0b346db6cd29374",
+      "app_tests_sha256": "854e1bf09e94a98169360cb0b5d0a50a42e536b8d8c548d2da9ca61ea72eb9fc",
       "binding": {
         "lock_sha256": "98713b736a1deaa4d0f52e73fac5d7182dfe00dc40a074987ae32eec674cbaf2",
         "packages": [
@@ -2372,7 +2372,7 @@
       "review_sha256": "39d0a4c9c4520e906570e03ef4b93ec9edf6ce37c0d9ee68caae0a00ad1e3c94"
     },
     {
-      "app_tests_sha256": "e06ca0640f471ddd1c3eb050a9f77638273a4f6669e75dbf5990ca4723bde839",
+      "app_tests_sha256": "259274c3a4c9f8fa95171bd85cc21eace953806be3fea8a59ce468700a23a715",
       "binding": {
         "lock_sha256": "9ad206e5edd8ec54df8a19d9c0b3f250e9b25a77c3841e501b3065f83ec89002",
         "packages": [
@@ -2468,7 +2468,7 @@
       "review_sha256": "a83dab3207e3ced015c227dcc450a44042ac8e43da4657fa56d282e46452734f"
     },
     {
-      "app_tests_sha256": "861392acd051055f6a33091732da2067b1fccfbd4fef3524a0484c6195ff500d",
+      "app_tests_sha256": "5c4ccc57695861a86f94cb8c0b82b6aa4098ae63614c49f29f879575ada0790d",
       "binding": {
         "lock_sha256": "a207a148a3d337cf57df1662d744fefec66021cbd1d86669fcb124fb1282637f",
         "packages": [
@@ -2565,7 +2565,7 @@
       "review_sha256": "04cc0f4fc6731b393d8ade58b5697e3af6247a7c95774b26d7e1d40600af0de4"
     },
     {
-      "app_tests_sha256": "56363b7347683a4f960182131396cfa1d16636604508c3ddfffe80995a2c4364",
+      "app_tests_sha256": "e5e0d892593589994628c32b1e3ad7f27ab644adab80533b5647fb4337f141ad",
       "binding": {
         "lock_sha256": "7920e492e8cdacc90482fd3932a4d8a7610832c1bdaafb86a419c94236616c2c",
         "packages": [
@@ -2663,7 +2663,7 @@
       "review_sha256": "01e202123ddb2826783f61a641e7beae49f276e93d9f3b878cebd2b0457808d7"
     },
     {
-      "app_tests_sha256": "5b546311281db9fcc562d7d5795d7572ff915e3fe977d0f7c0716b9e546c1625",
+      "app_tests_sha256": "0461f1acf6e47e4c670310f5dcf1e76529252d65244bb20402b65e0ad78459bd",
       "binding": {
         "lock_sha256": "f1c5176b4654b229625ee256b7dbd01c6d29a966d38cd0fec33c35447db9e231",
         "packages": [
@@ -2762,7 +2762,7 @@
       "review_sha256": "16aa03476c2d9c04775597062e8597f2723705c93354b29ceb411226f0130770"
     },
     {
-      "app_tests_sha256": "9e40e1b0c856ffc23d1986837cc904e56c1f7d1ae90db3275b8309ba8fb56d03",
+      "app_tests_sha256": "a4d14b40d32a64c99a31ee56e4b730fd686af059267c2d2708dfc2aa99db0023",
       "binding": {
         "lock_sha256": "83141cb5e73f0cab0b06f95d169d821d5d532aacf2ac7c86789288f5cfed9085",
         "packages": [
@@ -2862,7 +2862,7 @@
       "review_sha256": "ca343265c8325dd2dbba1b9baaf07eba4a7adf4ea47d8befdd77c04658c6bf83"
     },
     {
-      "app_tests_sha256": "192aea04125b9f62f445e4f3a15a8514d985b55e0e14af5a61a7a9764b9df968",
+      "app_tests_sha256": "30e64d29b78d9a30fb23b484e701c0a22230f1c54332f357561422055ce0dca0",
       "binding": {
         "lock_sha256": "39236a1d9a1589d062de84b6a6c3b690e55c021f332a51e5327cffa2fd8d0754",
         "packages": [
@@ -2963,7 +2963,7 @@
       "review_sha256": "aba0eb40ebe09221e8b91013b999d030fd832011d742b44479ad7a01842d9b29"
     },
     {
-      "app_tests_sha256": "c3d76e73258a646698ec5eb8627ac0c9d688916a986dc083d8fb6a3ac4461c2d",
+      "app_tests_sha256": "44996cbfddf428d0960a3328522ba495a8871e0e24ceb42009529bcc617f2a8c",
       "binding": {
         "lock_sha256": "f9fa7432e646b3bb0f81db59edd9f15ce53eb17225e5149213a1b05e0603eab2",
         "packages": [
@@ -3065,7 +3065,7 @@
       "review_sha256": "05ee2ca9a3e18ad98191177e819e7ae2049dae8497f0bfabd8f3bbd938b193c2"
     },
     {
-      "app_tests_sha256": "5e5a163d068cc3aadbda8100dd7f89d5f230da9cefc322295b5a0414a9485702",
+      "app_tests_sha256": "af2079a88245241274f11c00a156edca6ec3208b140c8050a52cc820bffbcaf9",
       "binding": {
         "lock_sha256": "3cfb55abbf77bac28fef7d589013ca351dfe0ef4c2453a4af95e46766779f3e3",
         "packages": [
@@ -3168,7 +3168,7 @@
       "review_sha256": "16fc5ba41c3f177d2ce6541a8d9b8549ed56c313bef8fc420fa65039055066b3"
     },
     {
-      "app_tests_sha256": "a7799bc1aeaa38648bebb7e87905c55ab924f54af6d99c94c9a3647f8ec2b3f7",
+      "app_tests_sha256": "f175590d1abe62b3ddf430f238022398f69f321fb48df80532e4339f385b60d2",
       "binding": {
         "lock_sha256": "de581b6611f3e838793dbad838c1b3450ff6ab11c36953667d2befc04081a169",
         "packages": [
@@ -3264,7 +3264,7 @@
       "review_sha256": "0475252366b28478948b95b9eb986e54935f2b56678acd6f450db02dec13d0f4"
     },
     {
-      "app_tests_sha256": "f3cdd9f8730a5b035ecc3e07324830824171a302316eba9ad26eeb9bd16c1486",
+      "app_tests_sha256": "033db6c4603e07a37e600e4f808b74d12db44260d62896c8ca030cb62b153bc8",
       "binding": {
         "lock_sha256": "0e3145d71f72d9bc96b1b22da500f35798639156d56c3f977ed61fcefc00c632",
         "packages": [
@@ -3362,7 +3362,7 @@
       "review_sha256": "fe0fa7b37af59227184449f0d5e2c5f9a428d746df7ea1103c58c8a211f58b66"
     },
     {
-      "app_tests_sha256": "b431547f1ddaca0bc36ebe921ef4ebd269d51e8e413c181d71eb371774aab66a",
+      "app_tests_sha256": "849be9960aefa572057e512f259421b33aed133dae31bef3a1208829fed5c082",
       "binding": {
         "lock_sha256": "02090f5475a2773b95288e375a75c8f119dd0304e5f31b9bc8c1925fb05a1d0a",
         "packages": [
@@ -3462,7 +3462,7 @@
       "review_sha256": "9778a72a787ee59eed019da3e065470641508db5a889e76da34bc703f13d74d2"
     },
     {
-      "app_tests_sha256": "5f878158ce4979a163c0858c58deddbdeadb28fdaee47ae8c4cf335a7c3d4c72",
+      "app_tests_sha256": "e55bad03972ba0bb8b89325e00cbdecc8dd750d9af708ded8dfbb4c44e4e2f13",
       "binding": {
         "lock_sha256": "5db7b5f981fa222a327114e0cdcfeea8ff061ec1c9981c6a157ec08a76bc563f",
         "packages": [
@@ -3564,7 +3564,7 @@
       "review_sha256": "6f7363af0ed6a9eb8ae0677fb42449cdb1dac4b64405c34176902e0f1ce3ae82"
     },
     {
-      "app_tests_sha256": "c418a30fb522b47c683cc4040509de558db66906d96642a1afd99ca987fccf2a",
+      "app_tests_sha256": "c24667bcb9512480b18ce794bd9ffcb3c2f5ffb98d5ea3e2fb311fc58a3a61ee",
       "binding": {
         "lock_sha256": "3af234a5441531038f589affb9b2394075c670a3adfafdff9f151ce97fdfea72",
         "packages": [
@@ -3668,7 +3668,7 @@
       "review_sha256": "a5688007ed789cb0cd1f9ef91d225334eccdf1d2e342846c0a2756ca31664b21"
     },
     {
-      "app_tests_sha256": "8592041b65cdded14c59abbee4528e6b7c8e75fb22a5a4b970df23744a421878",
+      "app_tests_sha256": "76e75e82eebc4461601cceb5eb9dab143f1c0c6caf42c6307bee1df0e4143853",
       "binding": {
         "lock_sha256": "863e65f1acd72a7016f294dfefa6c033d1d3534599e8a8bd6b97ae2592aa6c52",
         "packages": [
@@ -3774,7 +3774,7 @@
       "review_sha256": "96e220d24df963160630595be0d26de8294851e1c829b66b5120564c6f49adc5"
     },
     {
-      "app_tests_sha256": "781ede07790f9a7ec3d90da0be908561798fb3f9e89b9ef051f5c540e7555262",
+      "app_tests_sha256": "9a90b76f3023e77b051058876ee963e9441adaa023ea9c49e5613cf8a9bb3c03",
       "binding": {
         "lock_sha256": "eff0684382063db881c00746ef180096d6029a105fb7c3167e5882684b711cf3",
         "packages": [
@@ -3882,7 +3882,7 @@
       "review_sha256": "2b14d638bad30674a52cadff9dae5dab9e40b33d194438f8853fda9d3641ff67"
     },
     {
-      "app_tests_sha256": "c915a0ba50d436b816b286f92975bdcd8fdfc43290770fbb7d8efdc88d978b0b",
+      "app_tests_sha256": "e621aff13b20a38049fc691e43e1ae9bf755ab075e83be7923d453bd4a28c193",
       "binding": {
         "lock_sha256": "7699c57945c63fb4b5f2394df6fde98c4fd5301cc36f9abd6784a635cc252eda",
         "packages": [
@@ -3992,7 +3992,7 @@
       "review_sha256": "814ebcb8399e33c5e815eb0869a04b7a59eb68e1aefb9efb99c4bfb2ec163edd"
     },
     {
-      "app_tests_sha256": "3e3d078c556f342dbca5461c69cc92598ff402d2cbe3261e9ef1fe4a55755922",
+      "app_tests_sha256": "7334c4700d6b55324b69bdd4d1cfde92ddab5d8bb14dff2d92d44d2f04610e13",
       "binding": {
         "lock_sha256": "5cb102322968e3ab830cf7b5d73ae3794021a3efb12fbb2e4a86e54dddb0f31e",
         "packages": [
@@ -4096,7 +4096,7 @@
       "review_sha256": "1b6a0d0a04b105343873acd52794ad7d028ada55b50c892e99e3231f293faa72"
     },
     {
-      "app_tests_sha256": "ebe669e6eeea4d44f0ea8aaffb2f1432bf4b35f60a8793f0cb4e4062acb88b03",
+      "app_tests_sha256": "9979f644b57aef32d25911e5b966ca5fdbc78a2c0e36e6856064e8d0c89280dc",
       "binding": {
         "lock_sha256": "ea73be296af449d0b0df69de4701b658ce01242c7b0c00a2b3511567b9c14562",
         "packages": [
@@ -4204,7 +4204,7 @@
       "review_sha256": "885d019708ce056c5d708a4d0052989ca9fdbe0e384ea65b77194b5a5557ba72"
     },
     {
-      "app_tests_sha256": "bd189317f272c60688575ca49d361c38629d9e58739e7a3fd5c2ed6c43437a27",
+      "app_tests_sha256": "8e9d76152a2d493c9222d920397b61904374e0faf64c5fb1b30b04eb9c170e7f",
       "binding": {
         "lock_sha256": "058f7f440ed4b01a5284c7ac26336e244738d30dd336f20efa9f29ae6ce678f5",
         "packages": [
@@ -4316,7 +4316,7 @@
       "review_sha256": "08f09d65c80ce5a39a1f3ab3de88622509eeb7e534590d33bd51b18d83091b57"
     },
     {
-      "app_tests_sha256": "56136404a160d50084063e01ee4f195b49b8c4b01a5196be09dede228e30afbc",
+      "app_tests_sha256": "2aa19b0e3a8b8a332cc8d6075ca714ff61b62606d86f3bbdf2aad8975f2d94fc",
       "binding": {
         "lock_sha256": "f8b7d50df0007f4b05b00c3f805870cf0156cb54ebb55b5a2d906a93a4d2bf71",
         "packages": [
@@ -4432,7 +4432,7 @@
       "review_sha256": "9e845f585335dd9aa07bc267b3c8a4bfdf8947ed7054caa9a1b0ed14319a1a18"
     },
     {
-      "app_tests_sha256": "97cfaab012c62edfa37b2b00444d186f35491fd154c19d0ef708e86bf7c4fd15",
+      "app_tests_sha256": "0048cb125ff332ca545836026154fd43935203386b8163b26e799a705aeb2a1b",
       "binding": {
         "lock_sha256": "06519db8f3d8ea9e72dc8e373a5cdb5c830ce6d3751381845bf914792b8728d0",
         "packages": [
@@ -4552,7 +4552,7 @@
       "review_sha256": "8460f20e7cc6ee209885d57d3762063861c807ceae32419142e43db4c983adb8"
     },
     {
-      "app_tests_sha256": "ac3b6ee71a48ceef3a7a013b6b431052022d2aa3a63dd2a0ad8e72df66d90cd9",
+      "app_tests_sha256": "42b702f440c5a7700213e0be76218e97ee03df0456e6dc9fc93fc4f8ecb0e21c",
       "binding": {
         "lock_sha256": "fc7fb96abadbee3b4aaa58963722fb75a5a1dd21a8f15e33fd3760a1b98c8f04",
         "packages": [
@@ -4676,7 +4676,7 @@
       "review_sha256": "4a68211b162e5a5998793e83ac1f017db7b53bbb3ee2e546b0fbbcb7d5b37634"
     },
     {
-      "app_tests_sha256": "9e1a9c83bda4d5f08a45074c6d2a3b3a5ec3a7530c70a9a6dcffd8e74d8d99d9",
+      "app_tests_sha256": "a1c0afa7466debcf6b207b404715fce36e387880d384b2cee17af1cf4858f64e",
       "binding": {
         "lock_sha256": "9f16363102ed0c162ed5bda92c8e43b7134461e805aaebe8b122d2ab35e4526b",
         "packages": [
@@ -4804,7 +4804,7 @@
       "review_sha256": "de758a2a7bdcfd65a3f1a3ee01af8ffa7ce30356c141e5145f32a4bfbcfab266"
     },
     {
-      "app_tests_sha256": "2f79d05b849d7f45c431ee0be96bec27e42da0574d742aa7bf0d4b5186bb8661",
+      "app_tests_sha256": "40a42d4ea123e6321235b616e4ff35184325ac1cb0d3838d2c604bc734c46db9",
       "binding": {
         "lock_sha256": "8c299854bf30cf50905ef9d92c80e007d30fdf4cd44d3ee7acff5f9f4ab73408",
         "packages": [
@@ -4936,7 +4936,7 @@
       "review_sha256": "17ed245cd19a6507b3c1234b05a9841ba2a904b96faa8fce438de57d01548fdf"
     },
     {
-      "app_tests_sha256": "a85e220ea48d128c0ac3ea21d19c6d8cdf939d653a50f6124f3d50271d866c9d",
+      "app_tests_sha256": "6ccd62148536773df5a77cacb1db39cb142f3059f519be883488098611f85f4b",
       "binding": {
         "lock_sha256": "ac906139553e7d1ce04e90f54216f9a6619e1d7388847ff27e0fd0592c8944d6",
         "packages": [
@@ -5044,7 +5044,7 @@
       "review_sha256": "5514af0e0145615f392ba3f8393125b6023cecd296c0c1cd442e27f2c2b5c3b4"
     },
     {
-      "app_tests_sha256": "19bb28cf01fef208402fda623a02071c1cbfb71ff69b83d347f28367d74222c3",
+      "app_tests_sha256": "e26fdc5eeb839e795075e4bf57e4f072aae3554001a2821a7f1f1004d2d2e211",
       "binding": {
         "lock_sha256": "bf6d684e9fee307caaa938f1ca6186623ae9638ad2de16667f2f3b770f870a44",
         "packages": [
@@ -5156,7 +5156,7 @@
       "review_sha256": "af94f576df7fa4e83bb252f8c80a05a1173173b643602451e592db767c31c116"
     },
     {
-      "app_tests_sha256": "7c17c29967cb7205f2c526ec89d7ed41378455a3bb56ade5c791034cd67a2a87",
+      "app_tests_sha256": "6094b1589732a2a7d3e61e62619d240e152e692af78efcd60154e559219a4156",
       "binding": {
         "lock_sha256": "e03c7c654cc1904607336d220e4b1fca98fb73d95a65388ecafed315bf3e421e",
         "packages": [
@@ -5272,7 +5272,7 @@
       "review_sha256": "ef537689cd0a0e8498d52093dde9ed402c3b82b9f17553140d59d82e5a0307ac"
     },
     {
-      "app_tests_sha256": "05d920707367640c6e4556c59c6d98e8b4dd5cebb99e84154291dbaa11d50056",
+      "app_tests_sha256": "59eefcc7a399ce10a17fa32348f8c230d45a8cd2f7e1041bb3f5fb3a3fb32be1",
       "binding": {
         "lock_sha256": "d662451160ee04e53de9de3a1862b9a8095687aed1f046321a860f1149488c1d",
         "packages": [
@@ -5392,7 +5392,7 @@
       "review_sha256": "bd54e53a20ccb73484520b34a36e5e74e139aaec25930c90e23fe2dbd62e354b"
     },
     {
-      "app_tests_sha256": "0a5d2b3fd913d9a576fa417a3b45ebcfad8b87e873f837351a11aed5d6905fbf",
+      "app_tests_sha256": "bf54bed9feb9f1f069b033771784eb91acdb0d82785abba1e123304eb34afe27",
       "binding": {
         "lock_sha256": "46a25ee54d822a2e405132002ee0b0ca0837b0db0bc96bf50a489e38b6c942e1",
         "packages": [
@@ -5516,7 +5516,7 @@
       "review_sha256": "67e9983e188c5a2e7bb2d34c581eedf1d0ce7667e00eca9053c6ed963af11333"
     },
     {
-      "app_tests_sha256": "b50b00beba0521f36ebd196ef41ef154b0bf8b4eed3dae57fd3377c48e7e0780",
+      "app_tests_sha256": "eb4b8fd881b7cf0dd85c873d49414f7b327d705417de3f8b7209c69cf8a03b75",
       "binding": {
         "lock_sha256": "13f21001ad18d1e643908d1fa7bd4d171f7e2184f4f2b1a5d7658cbbd1f561bd",
         "packages": [
@@ -5644,7 +5644,7 @@
       "review_sha256": "79a554037b852bfe6fa0be5a017bc6c513091710a9d2c1a2a820b7a44dada376"
     },
     {
-      "app_tests_sha256": "a3bb97a1178931a1ab869c4783c00d681030a402911afe831de634a532b42ac0",
+      "app_tests_sha256": "dfbaecd8db42c85daea2673f2514fd82ca0166ce44d33be2610aecab47eb193f",
       "binding": {
         "lock_sha256": "ce2af99df8331befb50ef641a1af9016f39e1bbff78b8b35dc17d4bd98a316dc",
         "packages": [
@@ -5776,7 +5776,7 @@
       "review_sha256": "c37e3c922cb7e6a0b0b9a9369d0f911a02025346442f8beaa642d19e15e19ac7"
     },
     {
-      "app_tests_sha256": "e68a31bca7bfe4d97411d1465de79940655f2d0648d29e960bd1209f2ceb7ea8",
+      "app_tests_sha256": "79fcf3406f391ea797a0ba563cbc1e76876efa0ee2a7dac215e63dbd61aa5fc5",
       "binding": {
         "lock_sha256": "09fa7f779351fcb58c82cd9fc61c796cd13e9476f08d83ff9d9b913c03a9d893",
         "packages": [
@@ -5912,7 +5912,7 @@
       "review_sha256": "f4619f9ef41aaddb05513cd502a445e9831cf83ba58e14b89eebdb26f38c4cf2"
     },
     {
-      "app_tests_sha256": "b254338a17be9db438599703899466fcc6719f99d0795dd19447755949958811",
+      "app_tests_sha256": "7384f17369a98518a585b3507fc11da2169f6eb0f801c1f9bfd99138659279c6",
       "binding": {
         "lock_sha256": "3eb2e0d9549d390f4c1b0c31dd2ceb61829138484eb6807009bf9baa8d73dd26",
         "packages": [
@@ -6013,7 +6013,7 @@
       "review_sha256": "cdb48dadfa2778d996b0761fc16d9e93fbd6775deccbb93a1957f4c42637f47d"
     },
     {
-      "app_tests_sha256": "2cffc9f483f53e1937b017169047d63f0f2ddda2935c43b79abb5693f5f47900",
+      "app_tests_sha256": "461b571ec7304dae2554a0a34758665026035fda49adff75ac82aa2e654409f5",
       "binding": {
         "lock_sha256": "37442acbe4327a68f5f91461e70cf30c9e8efcf849acebcd8efd131815d2298d",
         "packages": [
@@ -6115,7 +6115,7 @@
       "review_sha256": "90cb921aae601e0aaef1a820e7a4931d38ef6794eecff5772d17af0f40485a9c"
     },
     {
-      "app_tests_sha256": "d9465e78fabab9de4b25a694369a0773325adcb329dc12d0a97a3746d827643e",
+      "app_tests_sha256": "547cda47802e4c50e2afcffb9a624d727f2d9f055e5991a1d773c4becd7bd684",
       "binding": {
         "lock_sha256": "a7acef4b7ccc8d20900168936ff531085adc4da7de616aa456d20af2c806efbf",
         "packages": [
@@ -6218,7 +6218,7 @@
       "review_sha256": "848d21fabae049774c47a97abf65d186543b2c69d2f4a4118c2ee0ff5f31bc8b"
     },
     {
-      "app_tests_sha256": "95e0446a31c0b84cffb77179f66a94b6a4c830653cc47c486b33a67626c2df09",
+      "app_tests_sha256": "93d3d3d7ffff23e56c93e9d3c8e13b668a1efa8049be4bfa49d6d175af50565c",
       "binding": {
         "lock_sha256": "1a0572f60358b31375b05af21aaa0641d462cbd4fdeb25419d4155c48a0ae102",
         "packages": [
@@ -6322,7 +6322,7 @@
       "review_sha256": "12e62857f8ffcf48ae4e200fdf799291047b62aef022c189d583a64dd7973d1b"
     },
     {
-      "app_tests_sha256": "5d26bd3622b9bd8bc43470478b5817c978fd7e33a10ce2731998568f7cfe490c",
+      "app_tests_sha256": "c153baff639353b72575ec5b19df95be7c50419a2267b134b01a6e32fc4bd737",
       "binding": {
         "lock_sha256": "b38020d2a35325445893657b871a01f29b32c987783f22b68b532b75da5e1ae1",
         "packages": [
@@ -6427,7 +6427,7 @@
       "review_sha256": "3d2d594c3ae27bf80d52104536e5c966bcfa236937da25039d2575010dbb1c0d"
     },
     {
-      "app_tests_sha256": "81695d933211d6fa3dbc614d064d51408a3a0b5215a352b312b162412719c3bd",
+      "app_tests_sha256": "66cc081bea483e236dec702edfaf7a6761620ad272f0aec56570ca485e524c4a",
       "binding": {
         "lock_sha256": "c1d6bb97bdbc2d02423289d766936b585db4b0c3f025d559a681ce8f29faeaef",
         "packages": [
@@ -6533,7 +6533,7 @@
       "review_sha256": "5da1fa21e260f8a363cb31ac3189e2437c0152cf0b1ac976c01283951a342af1"
     },
     {
-      "app_tests_sha256": "1d6ffa441e0b2da875ac63bbc293c2452aaba216af37926d0f9eef2f6ed604f1",
+      "app_tests_sha256": "032e1671fa86f31f2d9be23d02e4315a960a473d5d6d4be729c279e705f7633d",
       "binding": {
         "lock_sha256": "76fab5ad00f40529611a32bc24b03d07ea1ab8ca23af2a509820be7cb66d28bb",
         "packages": [
@@ -6640,7 +6640,7 @@
       "review_sha256": "df1bedec6d90dd5f284efe5e3ff55bdcfc21945dfec2b9b9b1f938c47d222c6b"
     },
     {
-      "app_tests_sha256": "0f91497a3e7d1b56a981e6d0cbee92b64fb1a913623e114279a575d415260a81",
+      "app_tests_sha256": "d0c9d7e0c14a27635973e2762464a4391fb98564f7af5e7d2fc89c52ce2861fe",
       "binding": {
         "lock_sha256": "1cfadaaf3a250b160a2db70b50f5d9387dc8f1524411404a0c45dea207f380a7",
         "packages": [
@@ -6748,7 +6748,7 @@
       "review_sha256": "6913c2747d64b8d601486a692ce35a38a523bfcf9ad1582e416adbd76b9aed79"
     },
     {
-      "app_tests_sha256": "4a53d5974bc0f2a361543996c3ee69b41830a30e111cf5458ca929cf74b91a35",
+      "app_tests_sha256": "0f9f54c30793aacba49700c87ae010277a9294094285dc4f0290eb774ae94f26",
       "binding": {
         "lock_sha256": "946cf79d81efd70d07723c65e748e2a74a33a31f0272a179ebd4aa9fcc992ace",
         "packages": [
@@ -6844,7 +6844,7 @@
       "review_sha256": "594b83e0ced6d6fe13642595a345138002eeceba6a10baa31963c437fadd4194"
     },
     {
-      "app_tests_sha256": "a11a0e2a803aa1f1d8a5cfb632b0a10e032029651847df4b0fc330586393ecb6",
+      "app_tests_sha256": "ba3d38656115af4bfca4713e50135311d8f39852ff840fd960d54c3602b1f925",
       "binding": {
         "lock_sha256": "50b84eb407f1fcbd91851cf98ad807ab40250eabab94d7cdd690e43e2574c6e1",
         "packages": [
@@ -6941,7 +6941,7 @@
       "review_sha256": "c9489be5c66930378806b03dab3f6b85f5c9afdaddcba8a68121d54c5c6f7d05"
     },
     {
-      "app_tests_sha256": "655a646d1ea29568ad2137f8a074c35f4d1dec25cfd574862135f7791a7e13ce",
+      "app_tests_sha256": "1408b648ac0405d5cc730ccea7bc4a96b24f81198ebe06d21ecc779fb1281e27",
       "binding": {
         "lock_sha256": "fc81c40dfe37f9d5b05fc08c7bf634d8d4be8b560fecfd2b3245adf9ebfedfff",
         "packages": [
@@ -7039,7 +7039,7 @@
       "review_sha256": "e4e22dc6dbe908fe7ea4ec28dc222e0150feee0979d3475ef2007b33b836e8fc"
     },
     {
-      "app_tests_sha256": "0b8451b9097b9aae4e069d733b23a82494873345fe39b226b988ee90a207486a",
+      "app_tests_sha256": "3dd494615375f91309f703e5a9af7d69585b533490b51b973e5d20f010891296",
       "binding": {
         "lock_sha256": "efbb1857269b89ec7ceefda15251f03d952f699f35d969714531e5f3c9052e8f",
         "packages": [
@@ -7138,7 +7138,7 @@
       "review_sha256": "b7494e9b610e18342f8ff96728b1bf51546b56fb48393755a5959a56ebf353a2"
     },
     {
-      "app_tests_sha256": "4b365614c9355dbb02b6ea6958804efbe23bfbf0cf0c9c427871e668c32bd48a",
+      "app_tests_sha256": "d720cf2cbd012ff3bc43ae88274b3c97a4d0c123f25bead7a1d5321f08debf28",
       "binding": {
         "lock_sha256": "1bd3fce301fdcaeac6f95c41ad09d180896941defb6ace286558f40bf3681df4",
         "packages": [
@@ -7238,7 +7238,7 @@
       "review_sha256": "dfaf3ede904f7f7798554faa12e85fb52440d015f9c4b5b41957d03aa7dc191c"
     },
     {
-      "app_tests_sha256": "9dc3cb24d89f8bccd8d9b283cfcb835e7027aa40a37afb4ad54074d587b6ff2e",
+      "app_tests_sha256": "edfee44b416685a2796c5d878c7aea245891b85bd3c8e4260e4884dc0a77bc2a",
       "binding": {
         "lock_sha256": "2bcae6e10953b34d8fcb017cd287276967b932e8afd2bac98c7b0870a20abfe0",
         "packages": [
@@ -7339,7 +7339,7 @@
       "review_sha256": "3e0133f1e462ff137a751c9ca577a161b793a2e81c4722274328d06ad337e5f5"
     },
     {
-      "app_tests_sha256": "c5f75d77d636d742a3493bff56c19471a9b74b0863eb0cf1697f9aaf6a880785",
+      "app_tests_sha256": "40fdd68484e1c037d0cc9e24da9aa0333bfae93b71dc7c82e948818a85d62b62",
       "binding": {
         "lock_sha256": "db043679c98548954ec52c2550f6828d4b34ba78c2727cbb02211dc8d63c2099",
         "packages": [
@@ -7441,7 +7441,7 @@
       "review_sha256": "cc9620c131147ae07b8e41d246de32ba660df70407e104b24f221635c51c7b1e"
     },
     {
-      "app_tests_sha256": "8b6e4f01a641243ac5b6dac12f59a06a9666c7cf25fd800ef9c5318bef448ef7",
+      "app_tests_sha256": "1a67600b13a0a7242e0522c14ce5e516b1902fd2b5f7b27f8510bf15212f64a5",
       "binding": {
         "lock_sha256": "27e804a69740a90d95cec0b6e0e3f2007b20a5f58b9318afaadbed1e1486b236",
         "packages": [
@@ -7544,7 +7544,7 @@
       "review_sha256": "e7d1f8439a142d713951d30c8316569df582f85d827d2885ef97cb839314c309"
     },
     {
-      "app_tests_sha256": "d5246cbdf2fc819c742e2cb22ffbf05f903d14f282227d1b983b97b19b8ace88",
+      "app_tests_sha256": "365e729c2bd441e43f9617fc43c3fe77a93b35471899d581927f6e002f05d0e7",
       "binding": {
         "lock_sha256": "03e3baf9e802b9f149ad9b8b59d0669aa52c1bd11b3ccc01c52b6d2746d46ef6",
         "packages": [
@@ -7648,7 +7648,7 @@
       "review_sha256": "b750e01f804787997fcedd67a48460110176e3ce41a8e7c2602ecf18247088ce"
     },
     {
-      "app_tests_sha256": "2dd0ee569231ccb08fec610b3d4cf89eff008d8d150a693df987cd74be1439a9",
+      "app_tests_sha256": "ad6641ebee9493c899fbf0c4ba19886a4d23295a141380692a04955034610843",
       "binding": {
         "lock_sha256": "a4731f62a1a9c28d7de45b98ef09e6cccfde42e493f26d85ba1e320b4171ce66",
         "packages": [
@@ -7755,7 +7755,7 @@
       "review_sha256": "5e884a1c1fb3145537190a943763429a85087b6869fec0020820d5e140769ae7"
     },
     {
-      "app_tests_sha256": "538d62945cf619e5e484dfffd211cef4efdbc42b1c5ce0f356d7696ffbc644a8",
+      "app_tests_sha256": "2d0a3cd81414056ddb09d1e77c0998a23ccef704d7aa5f6b740e20a82d4caa30",
       "binding": {
         "lock_sha256": "9103790c978ab5f205a1f355ff3406a4bd747a877f4822a6779a01616f5ca089",
         "packages": [
@@ -7865,7 +7865,7 @@
       "review_sha256": "59c13e298c36442423848a8340a4b2ca8f1d706a6a2b2bed9fb3e962cb89f6ae"
     },
     {
-      "app_tests_sha256": "3fb3dcecbcc804c88b136cfc67a477820583e78239e5c418f396de1904229b27",
+      "app_tests_sha256": "72366eb75634ca239e8fbd8eba42bbc71c52bb1e07f28242f18075b0bab34718",
       "binding": {
         "lock_sha256": "9850a967e18c59749954d41093a86b3568d67e9195bac0bdccd9ae4e9621d716",
         "packages": [
@@ -7978,7 +7978,7 @@
       "review_sha256": "5f73f4bfe16e5abc97c0163bea4d2a483c2b32751460bbafeb2804caeed69292"
     },
     {
-      "app_tests_sha256": "11526c574ceba9ac0c2a4c1823b6d288b71dc777ddb9468004892f566abaa563",
+      "app_tests_sha256": "3581485c3ffe2793fe4b7705cbb3401d1e184fbe6f0ff727b47d47bf289568be",
       "binding": {
         "lock_sha256": "315e9bdb191593e5c4c3d28aee4aafe8afab8efd1b0f4f862d42e57ef26c330c",
         "packages": [
@@ -8094,7 +8094,7 @@
       "review_sha256": "236504f5af425d615567b20262d956acfe06ce3ee8b7f6f61486d0a003703526"
     },
     {
-      "app_tests_sha256": "0eb644a3b80b444d0f67fc0821f6aa31e348bea5edc30ee4cd6ab45fda6aa701",
+      "app_tests_sha256": "12c28622fdb1b25836c258e379caf30073a27cedc93458ce87f819891b5d4431",
       "binding": {
         "lock_sha256": "3dd498b519b3a4f4537364c54f31f0e2ee804abc0a63ebefc6cd9861ce66fcc2",
         "packages": [
@@ -8213,7 +8213,7 @@
       "review_sha256": "9a33c9f53bacaf6f55723f4278812b09515f62ed8303901fafb3fd6c8400a6de"
     },
     {
-      "app_tests_sha256": "69053505c86d81d93c09c4e32f3576fbdec09415fd6c6cb8be64919953caeb3c",
+      "app_tests_sha256": "ec08421ef0d3efd1a7a66f63be5b6bdbff8a271bf21f9f142b2462b4cdd1b6b8",
       "binding": {
         "lock_sha256": "08ff9b6dca56ddf91f8dfeee8b4f023b7c3daf5d25c2ae3e40d2e45035c04719",
         "packages": [
@@ -8335,7 +8335,7 @@
       "review_sha256": "54cea6cda7559cb185f160a4093377deb3f4bcbc42cc81a067c095f328116c1e"
     },
     {
-      "app_tests_sha256": "f7713101940e359f7b7a224567da3f10f34e509f1a5804a3c89e6a620a3760ea",
+      "app_tests_sha256": "ef113873753f648f39ba721255669dd9a4eb9d3608f301cd24e28d559924efa6",
       "binding": {
         "lock_sha256": "4e41665926a3f47b222d92defb1e64804f0a85bf650f0ea363936a1089182ab3",
         "packages": [
@@ -8566,10 +8566,10 @@
   ],
   "owner_adoption": false,
   "raw_tuples": 107518,
-  "runtime_source_sha256": "8eed41c47716b13f049786a7685f429177f19b99d68d490a832788458b3f0558",
+  "runtime_source_sha256": "52d90f73ec0f17cce67670743d6acc8308743714307081944c4e31095853bfa8",
   "schema": "zeno-fcis/core-seed-check/1",
   "source_binding": {
-    "cli_sha256": "15e58e5a16f1e65b022565f86835e3b9407401100d0a82f4dbf69705aa10aefe",
+    "cli_sha256": "8503fe2e3550bfae21cd077a09ba85253f9d64155603a88a3bb264c029db301a",
     "families": {
       "approval-queue": {
         "core-components/approval-queue/examples/k1.txt": "a597b3b6dff08d8a8bf36b2aad7310fa77361fced3ade89c13c8306dfcd73a9f",
@@ -8580,7 +8580,7 @@
         "core-components/approval-queue/project.zeno.in": "17f776c9aaa2fb8c3c2c4dd514822fa12e6a04ce51636679568333bfc5e2c32e",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "bounded-counter": {
@@ -8598,7 +8598,7 @@
         "core-components/bounded-counter/project.zeno.in": "78b267f2dc73c85d456dab06a61ad0452826c5297a8e1fd55b97bfd06077c518",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "consumable-budget": {
@@ -8616,7 +8616,7 @@
         "core-components/consumable-budget/project.zeno.in": "cac0d4516067d5b392075572b18124ef00052f648015483c9bb7f55174fba587",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "finite-phase-machine": {
@@ -8634,7 +8634,7 @@
         "core-components/finite-phase-machine/project.zeno.in": "b03637ae0e549a07ce7c81ef229b0c93ee033bf1ddb879c197b6295a0cf3cdd5",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "idempotency-slot": {
@@ -8652,7 +8652,7 @@
         "core-components/idempotency-slot/project.zeno.in": "1a99f7ff9a44f4a6f143263c7d8a1f056ccaaa526db296bfa0d83b714aaeab8b",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "logical-deadline": {
@@ -8670,7 +8670,7 @@
         "core-components/logical-deadline/project.zeno.in": "62d7a8952f3d57fe40c7e16d77c36446db9525213a9e79d0672a4d2a12bf0b51",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "rate-limiter": {
@@ -8688,7 +8688,7 @@
         "core-components/rate-limiter/project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "reservation-pool": {
@@ -8706,7 +8706,7 @@
         "core-components/reservation-pool/project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "retry-budget": {
@@ -8724,7 +8724,7 @@
         "core-components/retry-budget/project.zeno.in": "f8670cc9d2ce67f62dcf1dae82254b5dc99292501a93abe0ab235c52e30c904b",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "versioned-register": {
@@ -8742,7 +8742,7 @@
         "core-components/versioned-register/project.zeno.in": "606eed09c7cd8d6eb34775bf53b25e012c03e075ca39c342e6b9af7fe6a497ef",
         "tools/check_core_components.py": "db6bd4360d7fb5f8d1b0c8845289caac806bfb2bc3db57f9ca8ddc679d571991",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "09afeb8e51902de7b68a61245fe14e7edf3d7b52042ea6285ba3f2859a3ca438",
+        "tools/prove_core_families.py": "57ddbff9baffc160ea83f2a5c5eb1fdbf0400ca6ba1b6508360c08877448f4a3",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       }
     },
@@ -8778,13 +8778,49 @@
         "crates/zeno-fcis-cli/contract-app/README.md.in": "dbb1ca5fda799a51e3d0bb7fc6efcda29cff01870accbe9a0d2590f596df7fe9",
         "crates/zeno-fcis-cli/contract-app/decision-examples.txt": "932d2d0a78e21c4037912fd53303ac794ddeb951e762e0f9d88fbed3f27ef5d5",
         "crates/zeno-fcis-cli/contract-app/src/cli.rs": "26b34d9112f965a8b8765ad0b469bf06fe0be7365d46277fd42685aa2a28d813",
-        "crates/zeno-fcis-cli/contract-app/src/examples.rs": "7023384341bfcacc3ea9df56ff86d1671f3e7c81fbc4cba361c5c8f80aa34e49",
+        "crates/zeno-fcis-cli/contract-app/src/examples.rs": "c3b30e831a3e160710765a9b27b0a8dbdf873f8a7e3b64d5915670db72e15ee6",
         "crates/zeno-fcis-cli/contract-app/src/lib.rs": "817693f12bee13aef12ca8b35be840ce357a5c6aeb90d54d94d68e0694269985",
         "crates/zeno-fcis-cli/contract-app/src/main.rs": "bcbf22e792c353befdddc66dcbff894135daf24b068434747ae4a0c184b5d6e1",
         "crates/zeno-fcis-cli/contract-app/src/relay.rs": "f7bf783a1afa518c097239457e99f73cfb68bf5c04fccf527ade18418341cbc4",
-        "crates/zeno-fcis-cli/contract-app/src/session.rs": "4957e99d5d19bd75c0d772a8368af2fc300868d114d54b36b112da14ac51fec5",
-        "crates/zeno-fcis-cli/contract-app/tests/decisions.rs": "6f0227729de8943bf814702ddf2ae5417b8572eef640b768345cc949d84cef38",
+        "crates/zeno-fcis-cli/contract-app/src/session.rs": "b7eb60381b01cedd9c2b2d88e69ac23561abd48981a4a72e6c480c8c6f7a441c",
+        "crates/zeno-fcis-cli/contract-app/tests/decisions.rs": "b0a6ed1217c42e90ce16a08f15ea7289693505885583625287ffa3891e5092a7",
         "crates/zeno-fcis-cli/contract-app/tools/relay.py": "405dcc402749aeaf9224029224300e506d8c4e0e6f3d4819c13c227f8bb7fca4",
+        "crates/zeno-fcis-cli/source-snapshots.json": "0e035e5145e59b8c6ee38479169f51cbfe313c8fd813a30becefd572a77fd362",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-contract/src/internals/expr.rs.txt": "54386307bb88edc8249492c414bdf389e8ab51dfc2dab333433adb5a99d6355e",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt": "010ccbc712c1fcb08a9fb5b2b200c7ce263350173b4fa561afd494d0db5480e1",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/capture.rs.txt": "3e995256067f6139bbb53d5d0ce79b18c2aba01add0765c9919645d6b8fd6766",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/expr.rs.txt": "35febc79f2e27df8d73d8bbc313917601bb09669213c28d7401395458861fa77",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/inverse.rs.txt": "eaa005f9220ac452dead67033ba93112fbf2c14c622fb2b45f08ca912a56b893",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/learn.rs.txt": "c7bb190d9213abd0004d5242ce70fb9776b01f1c743342f17b1d4eb84a88fb6c",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/lower.rs.txt": "531b08f556fc256ca2b68e34a1771c5b1abac2dabf0b3d26df5ed7b10f2e2df0",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/repair.rs.txt": "af24de071742e1e6e4c3b3b68a6baa60ec436eaa10772892093cd19f021d0a6c",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/sketch.rs.txt": "4429ffdda77c4f5f9294296887235bab68acb1ab15ba7fd2af04c3c6496da548",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt": "14658158273632eebf98aacafedd82128b2679114fdb0797199cf30c4d242b83",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt": "4802297af1d33a8ca28a2161232e594336895d03b2abf5eff04637d18ba5a1bd",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt": "cb924b3c9d3124e8a7d7f5920be752f1762bf4603602e399b5a35efba213b729",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_questions.rs.txt": "24787ef7434f635841fe4ebe3a408060c39dafef0affdfbf930bbcec9819e206",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/strategy_split.rs.txt": "c24fdc4ee351e9e6ac3777d2a7f87c436d89e7fd8d3d8b90b947616565a92d2d",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/subject.rs.txt": "e7244787754d5b406f5d06698f0e8e5ef23dbb5ecc1f6abb90fc4ae6a8247498",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-loop-doors/src/version_space.rs.txt": "def783fb3c2e7bfa94eb7e934e1de068bbd119e1ab57371034e0f4236d2ae8e9",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/arithmetic.rs.txt": "f104af65897e88a25fc0149021c102e6dfe6a1d1e3f1c3502792fd03e9ac36b6",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/concrete.rs.txt": "66898f2a5924fd4cbbe38dd50aab69608075a555f6d337067ebd0b2eac9ea17f",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/diagram.rs.txt": "4676a5b6fc36927966c3d6cc6de29e0bf4bb72882d6a3cea4e99e508a9148d3e",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/fold.rs.txt": "61cfbea34f403f7d73641d8a0f8f8131ad375e9761762cd9dbff0c6de700d878",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/ir.rs.txt": "fe33dddc1f36c22eda44df8c0de23181fd1179491f03fda2261e962a618b131f",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/lib.rs.txt": "d1d3ce6354f2c2114b765fe9318d22513a8d6454733172b7dc6c084458fc7660",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/pool.rs.txt": "47f06dd2b122f7c1ac302cdd74b440e1e18d90e8383fe5e03c6bfef647617023",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/resub.rs.txt": "425b2c6e557b64e91f30cf72633fb9c682bd62f08a38215edb971da0130db9bd",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/space.rs.txt": "928058f0c1357884bab0f5bb61e7c3fb59d62be152ec67685e79124ddff7feae",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/target.rs.txt": "43dc7159a13a35c41a3f5afc15dc37e3d9818e6671fa87c0a3bf7853e8d22b73",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/topdown.rs.txt": "deb76481266f87be70982c88fca0b08d5bb29d4fbfd158af8de4776d32e050d2",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-program-search/src/util.rs.txt": "22b515c276501e05b9570d3aba97b80a7e5cafe54997155244db7778e458c05a",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker.rs.txt": "466a617c9a9349c1660732640cb793bcace5032eabbb250983a187f9f78b34a2",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_api.rs.txt": "e4b0695253a4be2f71e626eabff942a76fb718ea19a7a5ebad1bb85758b6a619",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_equality.rs.txt": "3680aacc82d79f5cce1aea288c2a229cba30a8832d858982ab07c479e01e67ec",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_ranges.rs.txt": "0b5f5b58633a45e3dd716de665c9ee08e09f03e67868584e69634b59f0779700",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_spec.rs.txt": "484a6883cc746bc100ad5173e7617522fa53db766767d964245110406901f0c9",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-spec/src/ast.rs.txt": "3adc5bee8b6bf0e3a0867a2371a74ee4224c13429d2c181bf9c0c30877cffdbf",
+        "crates/zeno-fcis-cli/source-snapshots/zeno-fcis-spec/src/parser.rs.txt": "78ec7554e9046dfda298998a98c3d3b3a5d1bcaf75b4209331e58e2c44026c0f",
         "crates/zeno-fcis-cli/src/account_lockout.rs": "4afe1d056b760f835a9c15125d366d9492a1627bd1fa2328aa03330c47eea26e",
         "crates/zeno-fcis-cli/src/agent_treasury_guard.rs": "324a12f1f337650ac156064cb8ebefe522941500a8bfb862dc37d0912fa5201e",
         "crates/zeno-fcis-cli/src/binding.rs": "455a4d7045e578898991615b9ad73c9c98c3ae9aa4cd05b43338de69445df2d8",
@@ -8840,7 +8876,7 @@
         "crates/zeno-fcis-cli/src/effects.rs": "0d84637c3c9e346f59673a68abf200ff3c529a6720c4c689df2172730c4f06be",
         "crates/zeno-fcis-cli/src/inventory_reservation.rs": "71f86125e9bcc636dbab74b6e52378fc231a09173278bf14e443fe3256af345e",
         "crates/zeno-fcis-cli/src/judge_command.rs": "45721ab7433dc66a156be59655de1e54369e41da5eb51147b7a0becad7f8b85a",
-        "crates/zeno-fcis-cli/src/knowledge_command.rs": "720fc57b63d9bd444b1eef7a5e61797d673c830eadde15dea881269cb26f56a6",
+        "crates/zeno-fcis-cli/src/knowledge_command.rs": "5eaeb1e07ff2927e76a5c87b6421c6b5077019f96eac62401aa8b9f68bf039a5",
         "crates/zeno-fcis-cli/src/knowledge_evidence.rs": "e4f71113ef5344614c93cd4245863d942af213accc4870569fa459bb80459fba",
         "crates/zeno-fcis-cli/src/knowledge_evidence/snapshot.rs": "8f3ceaa087500f54ec0e6a218572153f37e2474d7557d53771ad29d91857a62b",
         "crates/zeno-fcis-cli/src/knowledge_evidence/tests.rs": "0cb8dcd158b5a2068d86c62427c9e4117f32603944d6634c78b428fc6baf35e1",
@@ -8859,12 +8895,12 @@
         "crates/zeno-fcis-cli/src/loop_judges_arithmetic_tests.rs": "3e77679a88362cd58542ef422482c5ed0beb5020173cdbd999f4c4f5de72711d",
         "crates/zeno-fcis-cli/src/loop_knowledge.rs": "04c4b5c93b1920fd4df7d0dc539e68d115efb8104087ff730beadef37cb5ebce",
         "crates/zeno-fcis-cli/src/loop_learn.rs": "009a7c969c67809ebec7ed05325e6e41afa3c3916c869cfeddd89ebee8d4e99e",
-        "crates/zeno-fcis-cli/src/loop_pipeline.rs": "07b70ae4a00e04e512e7fe36cb4c05117ad1c61154f8f9e5022ebfae7ad03e0c",
+        "crates/zeno-fcis-cli/src/loop_pipeline.rs": "4c2fb8a69dd3aeddd50a1a79f7516b088e0c0f2972242bd404c921da4c7a87a3",
         "crates/zeno-fcis-cli/src/loop_proposers.rs": "a813ec947db44b713ef0399f8f775dbf87e75bcd23d275a495140508642abb06",
         "crates/zeno-fcis-cli/src/loop_rules.rs": "a55e973b18565255e96c9cb77929b38f24188db7dc92a21694bfd3603d4ea923",
         "crates/zeno-fcis-cli/src/loop_search_limits.rs": "7e3ace4db72ff4e528e882ec8a516b2dd5a92ffe79dfd9b84899e782697e9e0f",
         "crates/zeno-fcis-cli/src/loop_strategy.rs": "6cb7005d8e876e2e0be46c8aa956b686802c38a1c38d2ec88171acdb08d18edf",
-        "crates/zeno-fcis-cli/src/loop_strategy_knowledge.rs": "18a3622b7aa068186e9adc15daf84173a4014df05027788a33dc23555ab7e194",
+        "crates/zeno-fcis-cli/src/loop_strategy_knowledge.rs": "cde6e065bfbcf7ea35507ae778bb25a576712687726157286f169ddde4fa5c04",
         "crates/zeno-fcis-cli/src/loop_strategy_profiles.rs": "cb774a2da85f6fb16afb666c137774b28b979f8fe040f828c4e975ed4d503f0f",
         "crates/zeno-fcis-cli/src/loop_version_space.rs": "b3b4691254f6dc1cc1e685e27118a08869b49afd74ee6164a1baee4528449cf5",
         "crates/zeno-fcis-cli/src/main.rs": "959bdd2537107e1f86c70ec929a997d4637f985b3331b080b0857f901228624b",
@@ -9130,18 +9166,18 @@
         "crates/zeno-fcis-cli/templates/prepared-counter/Cargo.toml.in": "173cd277cf93fb3e7fa8d7fe00ba2f716fef7299f51b36dd669d8e6a0fb3b346",
         "crates/zeno-fcis-cli/templates/prepared-counter/README.md": "61da2d73af8168104699f373b122726c51dc12772cbcddb5d36bfc97cb858c2a",
         "crates/zeno-fcis-cli/templates/prepared-counter/build.rs": "e39cd696ec08bdeabe9c5790358f12b4f2ed82d916783b7758b8306d24fee617",
-        "crates/zeno-fcis-cli/templates/prepared-counter/completion.json": "6b0bfe702007d500f1aa339303baeda22eb82c3cc133814dd112834a8fc2d9b2",
+        "crates/zeno-fcis-cli/templates/prepared-counter/completion.json": "b2acb661e4a72f46024e98901e3808787dc7e52c0fdd85ae2bb764e5d48b6bca",
         "crates/zeno-fcis-cli/templates/prepared-counter/profile.rs": "678bbd99b6416f9ddbc995378d177b6200a50580d47833c1fab5e0003b4fdc3f",
         "crates/zeno-fcis-cli/templates/prepared-counter/project.zeno": "d0a1833444899cfbc14bf93afaf77f05540fc2a7cf775c297a72933df8031e04",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/delivery.rs": "3db4da28bc8a3b9281cbce4638f418fcb4e53373c9b1276295f9dbcbbf82d23c",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/laws.rs": "9146e80ba06d25c6f246d694cf0f1fcddcca9b21d5e1114694c5066a3aeed152",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/lib.rs": "e215af2436970d051b2932cadb22726d8ea1f78d6eb06e7fa356b4ec1703f547",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/main.rs": "a10c235c3a3d4a13e45c69301af79665dd70f3688d3a1464653dbf65566ee0fd",
-        "crates/zeno-fcis-cli/templates/prepared-counter/src/prepare.rs": "be200702207fe7321a1f04a4563b331ac0e32810ff3bb496eda11ee9146e83f3",
+        "crates/zeno-fcis-cli/templates/prepared-counter/src/prepare.rs": "91b914035bf40090acea7cb4776d1a66a2304b1dfe2524c0d2e583413e32dbe4",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/program.rs": "37d51b57eace4cbe188278b97311ac8cff26cdca7a997207b4d662322df80b72",
         "crates/zeno-fcis-cli/templates/prepared-counter/src/v2_contract.rs": "a8df76e8a60bb4097e20dad4c680279f52065bb73e39e3f45c41b101caadb64e",
         "crates/zeno-fcis-cli/templates/prepared-counter/tests/conformance.rs": "fc65379578b949327ec01659e4e4b08940040a36d5fbf728159ef323a987c737",
-        "crates/zeno-fcis-cli/templates/prepared-counter/tests/lifecycle.rs": "1a975b29018754aa1c97b8cd7bb58b3ef498717eeaae4661fcb8e664fa2ff18e",
+        "crates/zeno-fcis-cli/templates/prepared-counter/tests/lifecycle.rs": "85a0659112a4966ffa0e5ea1ec35dd0265f4ffb3c02007edcc4e1a398c2c5a93",
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/policy.json": "20c51fd1eecc90bc6d4c6a3a818f2944e25aa1f3934358ee84927fcd42112654",
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/policy.zcve": "027dbe22fe52481fb96678d7edd28590e7be108956787869bde7c859a1ec2d7f",
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/schema-origin.json": "8e7e69c5145df23771845971e35f02e32baf9afc692f862addb8fef087d3eee9",
@@ -9387,16 +9423,16 @@
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/3/program-8.json": "9b648824fb7c0839a49b6ef1e0559937b6dc4ed1e0fddaf4b9abf6920fef3482",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/3/program-8.zcve": "7dbcc67f70d004250a3d634e3d187a9373d8d891097e33f8a1403b973a0df646",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/3/vectors.json": "40103c295415340ab53aa0fba8038bb8aaa4063b85fbcc7aaa0130c18aadc9c3",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/budget-boundary.expected.json": "bdd943e3778c3bac9a5562ad8d430e1e80b2d24816f9d1baf59a8c474b0d8ff9",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/counterexample.expected.json": "665db83fdf5670553ba9db370cdf61abd49d7ec1edc941454e5661e4153afe59",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/domain-too-large.expected.json": "75d97cc17e107f6b0a23898c052346304c575ca71d58b1ee929079705a92c932",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-identical-failures.expected.json": "e901933b4774dba4bcea4855d1dcaa7ffa0dc901446c083913506378d74ebb1c",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-identical-failures.receipt.json": "488092c8e81bd713cba69ebaa7f508fb61c92c6eca25735c0ea33d41339f7e5f",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-differs.expected.json": "650c3433a4375ea62ebc1d9d3d995b0fbe55df45dca45a87e30c3a1a51e154d2",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-differs.receipt.json": "6c25dbe5f62afe5e3e691834cbf56d0d99573db17fb4016f1393966129c00050",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-preserved.expected.json": "3d270a12e689e465071e4c33411a740b0d97750a0216814bdffc931ff362aa68",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-preserved.receipt.json": "c75a8b9da2784f6939eeae4afb3636bae446c838231c2b4deeccdb2dcaa61e4e",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/output-abi-refused.expected.json": "aba392e8767dcfe29c8f998f55f64c780bc598c7ebbe745c51a4bb03f01985b4",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/budget-boundary.expected.json": "aa9d569160b6e5c45d3f46f2553d9231d54ade109b58bdc40f2a7b06873402b2",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/counterexample.expected.json": "153ae0f23f25d6159de4c74a87b4328f5e42a064afa0b4609c92da97c1f9500e",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/domain-too-large.expected.json": "52510e2612428f60358bc4bdf54f690a0b67e50fa38fee95f05953e71ca3a4b3",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-identical-failures.expected.json": "8cddcbc6b702de3d6a91894d6f98232ce8e5632db26bb7e1510c46f3832f3117",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-identical-failures.receipt.json": "03162fe95eae72b12e8539987ad375479d4a1df3d34b66a2dc0c70b925240478",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-differs.expected.json": "f4ce9b95bd4539fbac259ae3a4d09928009b2b582ca9bd8e8d1f824107bb6885",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-differs.receipt.json": "4a3c3527c0f6a1d16c341e1ef3c8c3b83907c7ff17131533331a7d5a8e044571",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-preserved.expected.json": "f2a5603b8e921838cdc05b9085e56e1c3234aa8ea7641eca1ccede50633483b7",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/equivalent-usage-preserved.receipt.json": "c9cc6a9568b463c79f1c418c821398b768b884a2e7cc0ea1bb478953b8d3d98e",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/output-abi-refused.expected.json": "159e5cadba0ecdcc611e19cfba5d5b21dfaa066140838cc4055ef47c5f135d22",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/program-1.json": "8e72684be5dc3d1deae3d55db845951dbea4fc3f290329ff62f51bc7f71e7116",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/program-1.zcve": "9b8c7455c8ffb8b9ec7bd52d3a109142b3605a50a16321767a3f68368c3777c6",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/program-2.json": "1695e23ea7759a57b7fea5095830af9216a3b1c53ed2d854d8e18427c15f8859",
@@ -9414,7 +9450,7 @@
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/program-8.json": "9b648824fb7c0839a49b6ef1e0559937b6dc4ed1e0fddaf4b9abf6920fef3482",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/program-8.zcve": "bacc43510f874ae3e77c82066b9d1062e8e125ea06a8eb43331b59265d91350a",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/4/vectors.json": "50415a74ace4c5bbdee47ba9d023e90e93fec70299448e3ec1f59114f24d5d74",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/README.md": "8534148f54094d62a0112269b168b48356aba1d7314a1e7d00f7d589649ef87d",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/README.md": "9a73552799f98607e74222332d744bf9bec49d882f48a05df685844ebe05f16c",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/project.zeno": "ac326379295929abe19ebaffef0002acacdbb2184e1de3af44de1e52dbfddf79",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs": "90b9d98c2a555949807cd871460bdeecb181ca0d48021366433058b7ad5a83eb",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract_v1.rs": "b74ca1ee3259bc175d1a39c31d739a989dc5f9d9403c8fa894092af85ab87062",
@@ -9440,12 +9476,13 @@
         "crates/zeno-fcis-cli/tests/loop_version_space.rs": "f2f0a8ee9522deb14db5a38c321d5143283f9322d6e49c4c58a7acf479257877",
         "crates/zeno-fcis-cli/tests/operator_diagnostics.rs": "9217af39b350e8e57d73267de12f4863b4673cc19a68546370a9444d02da22a7",
         "crates/zeno-fcis-cli/tests/optimize_cli.rs": "75cb072d8258dd0c288264e6f370974a9f0fb08d18db03e98a269a4b7d9d194e",
+        "crates/zeno-fcis-cli/tests/source_snapshots.rs": "de4ae03cecf02d21da6ff944f4fc53ac4f3530dae006d089e8178a9b7c6be14a",
         "crates/zeno-fcis-cli/tests/startup_contention.rs": "e0e50388995bb5a188341b4010b5c16a8b06930d1a77d4a0c619646ce7172cb4",
         "crates/zeno-fcis-cli/tests/support/arithmetic_judges.rs": "8aed0388e8538fe920301e100d092cb73560574d2d763f7d714ec2d7bcedc932",
         "crates/zeno-fcis-cli/tests/support/cpmm.rs": "1e934d3f5e843916e35c2a700368448b4ac07634e5ddf0f4e5caf05545291d6d",
         "crates/zeno-fcis-cli/tests/symbolic_certificates.rs": "529dfd6d35192aa58c872e537ad10c4e6084bc1adc77d13824f40f2e28b0cd86",
         "crates/zeno-fcis-cli/tests/symbolic_cli.rs": "827c6e3b2d647bf320b05f13d86885f38afc0e1bb1ca36d9b7ea6da1cbf52f31",
-        "crates/zeno-fcis-cli/tests/synthesis_completion.rs": "f12f4f7a73111b17cc041965724324a6f3db3798d300ab59cba8650b3d520876",
+        "crates/zeno-fcis-cli/tests/synthesis_completion.rs": "d16d74c4a1dbccad491e3375078437618a6fba82a7a4f6cbf94e1cc27663a0e2",
         "crates/zeno-fcis-cli/tests/synthesis_javascript.rs": "2ccec925414035fb502d8002cd687b65c8ba9be906d15344b0324c7e4d55e302",
         "crates/zeno-fcis-cli/tests/tau_kit.rs": "40292516eb19bddaaf739a6f8a4a06168c0b84a16110d8cd5696c1bf4e8c63e2",
         "crates/zeno-fcis-cli/tests/test-data/capture_limits.py": "5d5772803f9e8f76d5a97497517b801181ca33f807282d955be3b89ec2271903",

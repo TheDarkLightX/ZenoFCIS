@@ -80,15 +80,28 @@ two compilations with all features and `--locked --offline`:
    non-test target that reads a file outside its own package fails here.
 2. **Packaged tests, repository layout.** The same unpacked archives are
    placed at `crates/<crate>/`, and the repository files named in
-   `release/packaged-test-inputs.json` are copied from the exact commit: nine
-   from `verification/`, and the benchmark artifacts under `docs/benchmarks/`
-   that the CLI's checker, optimizer and loop tests include. Every target,
+   `release/packaged-test-inputs.json` are copied from the exact commit:
+   verification inputs, any listed benchmark data, and the nine arithmetic
+   example/vector files explicitly named in the packager. Every target,
    tests included, is compiled with `--no-run`. Rustc's dep-info then lists
    every file that each target read outside its own package. Those reads must
    equal the committed manifest exactly, by test target, path and SHA-256, for
    sibling-archive files and repository files alike. Any non-test target with
-   such a read fails. Only `verification/` and `docs/benchmarks/` may hold a
-   pinned repository file.
+   such a read fails. Repository inputs are restricted to `verification/`,
+   `docs/benchmarks/`, and those nine individually named arithmetic files;
+   other files under `examples/` or `tools/` remain refused.
+
+The CLI embeds dependency source text from its own `source-snapshots/` folder.
+`python3 tools/check_cli_source_snapshots.py --write` refreshes those copies;
+the workspace test and packaging preflight require exact equality with their
+originals. This keeps dependency source identities unchanged while allowing
+the CLI to build from its own archive.
+
+After a reviewed source change, derive a test-input candidate with
+`python3 tools/rc_package.py propose-test-inputs --output <new JSON file>
+--target-dir <isolated target directory>`. Review every changed entry before
+installing it as `release/packaged-test-inputs.json`. The normal archive build
+must independently reproduce the complete set; proposing it does not approve it.
 
 Packaged tests are not standalone. They compile only from the published
 archives laid out as in the repository, plus those pinned repository files. A

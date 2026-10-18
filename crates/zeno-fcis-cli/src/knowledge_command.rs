@@ -253,9 +253,11 @@ fn implementation() -> String {
         include_str!("loop_pipeline.rs"),
         include_str!("main.rs"),
         include_str!("checker_process.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs"),
-        include_str!("../../zeno-fcis-loop-doors/src/strategy_algebra.rs"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt"),
+        include_str!(
+            "../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt"
+        ),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"),
         K::EXAMPLE,
     ];
     let mut bytes = Vec::new();
@@ -458,7 +460,7 @@ mod tests {
 fn public_validation(limits: K::Limits) -> Result<(Vec<K::Validation>, u64), Value> {
     let max_work = limits.work;
     let dependency = sha256_hex(include_bytes!(
-        "../../zeno-fcis-loop-doors/src/strategy_algebra.rs"
+        "../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"
     ));
     let context = "task(tool,zeno-fcis).task(version,v241).";
     let fixtures = [

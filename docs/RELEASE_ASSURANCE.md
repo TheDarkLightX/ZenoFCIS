@@ -205,8 +205,9 @@ the published crates from their archives alone, each crate unpacked at
 `sources/<crate>-<version>/`. Packaged tests are not standalone. They compile
 only from the published archives laid out as in the repository
 (`crates/<crate>/`), plus the repository files the manifest pins, copied from
-the commit: nine from `verification/` and the benchmark artifacts under
-`docs/benchmarks/` that the CLI's tests include.
+the commit: verification inputs, any listed benchmark data, and nine arithmetic
+example/vector files individually named by the packager. Other files under
+`examples/` and `tools/` are not admitted by that allowance.
 `release/packaged-test-inputs.json` lists every file a packaged test target
 reads outside its own package, with its SHA-256. The packager derives that set
 from rustc dep-info and requires exact equality, and refuses any such read by a

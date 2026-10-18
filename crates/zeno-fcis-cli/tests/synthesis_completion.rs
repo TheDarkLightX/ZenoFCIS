@@ -82,6 +82,53 @@ fn names(path: &Path) -> Vec<String> {
 }
 
 #[test]
+fn emitted_prepared_counter_uses_the_supported_profile_and_replays() {
+    let directory = Directory::new();
+    let app = directory.path("app");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let emitted = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .arg("new")
+        .arg(&app)
+        .args(["--template", "prepared-counter", "--source"])
+        .arg(root)
+        .output()
+        .unwrap();
+    assert!(emitted.status.success(), "{emitted:?}");
+    let problem = app.join("completion.json");
+    let mut model: Value = serde_json::from_slice(&fs::read(&problem).unwrap()).unwrap();
+    let (exit, discovery) = run(cli().arg("discover"));
+    assert_eq!(exit, 0);
+    assert_eq!(model["profile"], discovery["profile"]);
+    let case = directory.path("case");
+    let (exit, found) = run(cli().arg("find").arg(&problem).arg("--out").arg(&case));
+    assert_eq!(exit, 0, "{found}");
+    assert_eq!(found["status"], "verified");
+    assert_eq!(found["states_checked"], 4);
+    assert_eq!(found["commands_per_state"], 27);
+    assert_eq!(found["maximum_exit_steps"], 1);
+    let (exit, verified) = run(cli()
+        .arg("verify")
+        .arg(&problem)
+        .arg("--plan")
+        .arg(case.join("plan.zcve")));
+    assert_eq!(exit, 0, "{verified}");
+    assert_eq!(verified["problem"], found["problem"]);
+    assert_eq!(verified["plan_sha256"], found["plan_sha256"]);
+    let (exit, replayed) = run(cli().arg("replay").arg(&problem).arg("--case").arg(&case));
+    assert_eq!(exit, 0, "{replayed}");
+    assert_eq!(replayed["replay"], "matched");
+    model["profile"] = json!("zeno-fcis/finite-i64/1");
+    let legacy = directory.write("legacy.json", &model);
+    let (exit, refused) = run(cli()
+        .arg("find")
+        .arg(legacy)
+        .arg("--out")
+        .arg(directory.path("legacy-case")));
+    assert_eq!(exit, 1);
+    assert_eq!(refused["status"], "invalid-problem");
+}
+
+#[test]
 fn discovery_find_verify_and_replay_preserve_independent_problem_binding() {
     let (exit, discovery) = run(cli().arg("discover"));
     assert_eq!(exit, 0);
