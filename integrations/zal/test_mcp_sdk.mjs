@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -18,8 +18,18 @@ const client = new Client({ name: 'zal-harness-test', version: '1.0.0' });
 let transport;
 const timer = setTimeout(() => { console.error('ZAL SDK test timed out'); process.exit(1); }, 30000);
 function run(script, args, input) {
-  return execFileSync(python, [join(here, script), ...args],
-    { encoding: 'utf8', env: environment, input, timeout: 15000 });
+  // One synchronous invocation owns this regular input file and descriptor.
+  // It supplies exactly the same bytes and EOF without a synchronous stdin pipe.
+  const source = join(project, 'process-input.txt');
+  writeFileSync(source, input ?? '', { mode: 0o600 });
+  const descriptor = openSync(source, 'r');
+  try {
+    return execFileSync(python, [join(here, script), ...args],
+      { encoding: 'utf8', env: environment, stdio: [descriptor, 'pipe', 'pipe'], timeout: 15000 });
+  } finally {
+    closeSync(descriptor);
+    unlinkSync(source);
+  }
 }
 async function call(name, args, expectError = false) {
   const result = await client.callTool({ name, arguments: args });

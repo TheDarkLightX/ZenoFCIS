@@ -47,6 +47,10 @@ jobs:
           python3 tools/test_miri_exclusions.py
           python3 tools/test_authority_source_bundle.py
           python3 tools/test_proof_challenge.py
+          python3 tools/test_signed_arithmetic.py
+
+      - name: Spot reference and source tests
+        run: python3 -B -m unittest discover -s core-apps/zenodex-spot/tests -p "test_*.py"
       # BEGIN neutral knowledge source and packaging guards.
       - name: Knowledge file include policy and engine reference
         run: |

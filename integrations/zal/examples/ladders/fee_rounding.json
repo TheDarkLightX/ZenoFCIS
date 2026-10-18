@@ -1,0 +1,96 @@
+{
+  "theory": "steps-over-integers",
+  "id": "fee_rounding",
+  "kind": "law",
+  "authority": {
+    "status": "DECIDED",
+    "source": "LADDERS.md §6; Spot owner policy fixed fee constants. Presentation remains proposed."
+  },
+  "scope": "Accepted Spot SwapExactIn or SwapExactOut steps. Integer input-asset atoms; B=10000, fee rate=30, protocol rate=2000. Fixture membership and native arithmetic refinement are separate.",
+  "domains": {
+    "T": {
+      "member": "step",
+      "plural": "steps",
+      "noun": "steps"
+    }
+  },
+  "symbols": {
+    "S": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "clause": "{0} is an accepted swap",
+      "noun": "accepted swap"
+    },
+    "a": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "gross input",
+      "state": false
+    },
+    "fee": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "total fee",
+      "state": false
+    },
+    "protocol": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "protocol share",
+      "state": false
+    },
+    "net": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "pricing input",
+      "state": false
+    },
+    "lp": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "T"
+      ],
+      "noun": "LP fee",
+      "state": false
+    }
+  },
+  "definitions": [
+    {
+      "name": "SpotFeeSplit",
+      "params": [
+        {
+          "name": "t",
+          "domain": "T"
+        }
+      ],
+      "body": "fee(t) = ceil(a(t)*30 / 10000) and protocol(t) = floor(fee(t)*2000 / 10000) and net(t) = a(t)-fee(t) and lp(t) = fee(t)-protocol(t)",
+      "clause": "{0} uses the Spot fee split"
+    }
+  ],
+  "formula": "forall t in T: S(t) => (fee(t) = ceil(a(t)*30 / 10000) and protocol(t) = floor(fee(t)*2000 / 10000) and net(t) = a(t)-fee(t) and lp(t) = fee(t)-protocol(t))",
+  "fixtures": [
+    {"id":"F1","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],1000]]},"fee":{"rows":[[["t0"],3]]},"protocol":{"rows":[[["t0"],0]]},"net":{"rows":[[["t0"],997]]},"lp":{"rows":[[["t0"],3]]}},"expected":true,"note":"Computed Spot fee tuple; acceptance premises outside fee equations are assumed."},
+    {"id":"F2","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],1333]]},"fee":{"rows":[[["t0"],4]]},"protocol":{"rows":[[["t0"],0]]},"net":{"rows":[[["t0"],1329]]},"lp":{"rows":[[["t0"],4]]}},"expected":true,"note":"Computed Spot fee tuple; acceptance premises outside fee equations are assumed."},
+    {"id":"F3","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],1334]]},"fee":{"rows":[[["t0"],5]]},"protocol":{"rows":[[["t0"],1]]},"net":{"rows":[[["t0"],1329]]},"lp":{"rows":[[["t0"],4]]}},"expected":true,"note":"Computed Spot fee tuple; acceptance premises outside fee equations are assumed."},
+    {"id":"F4","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],10000]]},"fee":{"rows":[[["t0"],30]]},"protocol":{"rows":[[["t0"],6]]},"net":{"rows":[[["t0"],9970]]},"lp":{"rows":[[["t0"],24]]}},"expected":true,"note":"Computed Spot fee tuple; acceptance premises outside fee equations are assumed."},
+    {"id":"F5","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],false]]},"a":{"rows":[[["t0"],1]]},"fee":{"rows":[[["t0"],1]]},"protocol":{"rows":[[["t0"],0]]},"net":{"rows":[[["t0"],0]]},"lp":{"rows":[[["t0"],1]]}},"expected":true,"note":"Computed Spot fee tuple; ZERO_NET is rejected, so S is false."},
+    {"id":"F3_bad_fee","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],1334]]},"fee":{"rows":[[["t0"],4]]},"protocol":{"rows":[[["t0"],1]]},"net":{"rows":[[["t0"],1330]]},"lp":{"rows":[[["t0"],3]]}},"expected":false,"note":"Wrong rounding with adjusted remainders still violates the fee split."},
+    {"id":"F2_bad_protocol","domains":{"T":["t0"]},"symbols":{"S":{"rows":[[["t0"],true]]},"a":{"rows":[[["t0"],1333]]},"fee":{"rows":[[["t0"],4]]},"protocol":{"rows":[[["t0"],1]]},"net":{"rows":[[["t0"],1329]]},"lp":{"rows":[[["t0"],3]]}},"expected":false,"note":"Wrong rounding with adjusted remainders still violates the fee split."}
+  ]
+}

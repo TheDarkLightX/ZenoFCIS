@@ -1,0 +1,156 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "ui_discovery",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Proposed formalization; placeholder definitions await owner review."
+  },
+  "scope": "Declared ordered event observations; example definitions are placeholders.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "finite",
+    "horizon": 4,
+    "source_revision": "example-observations/1",
+    "event_schema": "pre-input-outcome-post/1",
+    "order": "authoritative recorded event order, including rejections and retries",
+    "projection": "retain each recorded event without sorting, merging or deduplication",
+    "model": "placeholder composed model; execution membership is unproved",
+    "environment": "placeholder capabilities; no omitted actor is implicitly excluded",
+    "initialization": "separate initial-state check, including zero-operation executions",
+    "transitions": "requires exact source-model membership",
+    "continuity": "requires post/pre correspondence at every retained boundary",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "true",
+    "definition": "Unconditional finite-word requirement; provided true.",
+    "version": "1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    },
+    "Actions": {
+      "member": "action",
+      "plural": "actions",
+      "noun": "required UI actions",
+      "values": [
+        "exit"
+      ]
+    }
+  },
+  "symbols": {
+    "Required": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Actions"
+      ],
+      "clause": "{0} is required",
+      "definition": "PLACEHOLDER task-state requirement independent of what the UI displays; Actions={exit}.",
+      "version": "placeholder/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "exit"
+          ],
+          "before": "pre.100.110"
+        }
+      ]
+    },
+    "Discoverable": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Actions"
+      ],
+      "clause": "{0} is discoverable",
+      "definition": "PLACEHOLDER a named affordance is visually and assistively exposed and reachable from current focus within h=2 legal keyboard navigation actions, including modal restrictions. Rendering and assistive correspondence are unproved.",
+      "version": "placeholder/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "exit"
+          ],
+          "before": "pre.100.111"
+        }
+      ]
+    }
+  },
+  "definitions": [],
+  "readings": [
+    {
+      "version": "placeholder/1",
+      "body": "forall sigma in Traces: forall a in Actions: always(Required(a) => Discoverable(a))",
+      "intuitive": "every required action remains discoverable at every recorded UI event",
+      "plain": "a required action remains discoverable",
+      "mode": "finite"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "modal_hides_exit",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111"
+      ],
+      "events": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "expected": false,
+      "note": "Recorded modal/focus event hides a required affordance at event 1."
+    },
+    {
+      "id": "not_required",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111"
+      ],
+      "events": [
+        [
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Vacuous implication; no actual browser rendering or accessibility evidence."
+    }
+  ],
+  "formula": "forall sigma in Traces: forall a in Actions: always(Required(a) => Discoverable(a))",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      }
+    ]
+  }
+}

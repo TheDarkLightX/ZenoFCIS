@@ -466,3 +466,75 @@ fn operator_corpus_checks_with_existing_lean() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+// Temporal ladder macros are expanded before reaching this unchanged grammar.
+// These are translation fixtures, never evidence of an unbounded theorem.
+#[test]
+fn ladder_temporal_operator_and_window_translation_fixtures() {
+    let p = atom();
+    let window0 = p.clone();
+    let window1 = TemporalFormula::Or(
+        Box::new(p.clone()),
+        Box::new(TemporalFormula::Next(Box::new(window0.clone()))),
+    );
+    let window2 = TemporalFormula::Or(
+        Box::new(p.clone()),
+        Box::new(TemporalFormula::Next(Box::new(window1.clone()))),
+    );
+    let formulas = [
+        TemporalFormula::Always(Box::new(p.clone())),
+        TemporalFormula::Eventually(Box::new(p.clone())),
+        TemporalFormula::Next(Box::new(p.clone())),
+        TemporalFormula::Until(
+            Box::new(p.clone()),
+            Box::new(TemporalFormula::Not(Box::new(p.clone()))),
+        ),
+        TemporalFormula::Always(Box::new(TemporalFormula::Not(Box::new(p)))),
+        window0,
+        window1,
+        window2,
+    ];
+    for formula in &formulas {
+        let proposition = rendered(formula);
+        assert!(proposition.term.contains("observe"));
+        assert!(!proposition.defined.is_empty());
+        let claim = ClaimDecl::new(
+            StableId::new(2).unwrap_or_else(|| unreachable!()),
+            Identifier::try_new("ladder_window").unwrap_or_else(|| unreachable!()),
+            vec![BackendId::Cvc5],
+            ClaimMode::Finite { horizon: 4 },
+            ClaimFormula::Temporal(formula.clone()),
+        );
+        let export = export_smt(&claim, ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("finite translation: {error:?}"));
+        let text = std::str::from_utf8(export.source())
+            .unwrap_or_else(|error| panic!("SMT UTF-8: {error}"));
+        assert!(text.contains("(<= 1 zeno_trace_len)"));
+        assert!(text.contains("(<= zeno_trace_len 4)"));
+    }
+    let source = rendered(&formulas[7]).term;
+    assert!(source.contains("(0 + 1)"));
+    assert!(source.contains("((0 + 1) + 1)"));
+    // Keep explicit negation of strong next: the finite endpoint is different.
+    let not_next = TemporalFormula::Not(Box::new(TemporalFormula::Next(Box::new(atom()))));
+    let next_not = TemporalFormula::Next(Box::new(TemporalFormula::Not(Box::new(atom()))));
+    let steps = [ModelStep::try_new(vec![]).unwrap_or_else(|| unreachable!())];
+    assert_eq!(
+        check_trace(
+            &not_next,
+            ClaimMode::Finite { horizon: 1 },
+            &steps,
+            DiagnosticLimits::default()
+        ),
+        TemporalDiagnosis::Satisfied,
+    );
+    assert_eq!(
+        check_trace(
+            &next_not,
+            ClaimMode::Finite { horizon: 1 },
+            &steps,
+            DiagnosticLimits::default()
+        ),
+        TemporalDiagnosis::Counterexample { step: 0 },
+    );
+}

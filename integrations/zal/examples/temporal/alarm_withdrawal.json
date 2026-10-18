@@ -1,0 +1,249 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "alarm_withdrawal",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Proposed formalization; placeholder definitions await owner review."
+  },
+  "scope": "Declared ordered event observations; example definitions are placeholders.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "unbounded",
+    "horizon": null,
+    "source_revision": "example-observations/1",
+    "event_schema": "pre-input-outcome-post/1",
+    "order": "authoritative recorded event order, including rejections and retries",
+    "projection": "retain each recorded event without sorting, merging or deduplication",
+    "model": "placeholder composed model; execution membership is unproved",
+    "environment": "placeholder capabilities; no omitted actor is implicitly excluded",
+    "initialization": "separate initial-state check, including zero-operation executions",
+    "transitions": "requires exact source-model membership",
+    "continuity": "requires post/pre correspondence at every retained boundary",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "A(sigma)",
+    "definition": "PLACEHOLDER A: recording/execution continues, asset service remains available, and exit processing is weakly fair. A assumes neither completion nor alarm clearance. A finite non-resettable delay budget must independently establish persistent exit enablement.",
+    "version": "placeholder/1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    },
+    "Requests": {
+      "member": "request",
+      "plural": "requests",
+      "noun": "unique request identities",
+      "values": [
+        "r1",
+        "r2"
+      ]
+    }
+  },
+  "symbols": {
+    "A": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Traces"
+      ],
+      "clause": "{0} meets the response assumptions",
+      "definition": "PLACEHOLDER A: recording/execution continues, asset service remains available, and exit processing is weakly fair. A assumes neither completion nor alarm clearance. A finite non-resettable delay budget must independently establish persistent exit enablement.",
+      "version": "placeholder/1",
+      "observation": "trace",
+      "native": []
+    },
+    "R": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} is a legitimate submitted withdrawal",
+      "definition": "PLACEHOLDER legitimacy is fixed at submission before acceptance; request identity is never reused and policy changes cannot erase it.",
+      "version": "placeholder/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "r1"
+          ],
+          "before": "pre.100.110"
+        },
+        {
+          "args": [
+            "r2"
+          ],
+          "before": "pre.100.112"
+        }
+      ]
+    },
+    "C": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Requests"
+      ],
+      "clause": "{0} has its matching assets returned",
+      "definition": "PLACEHOLDER matching assets returned to the same frozen request identity; another request cannot witness completion.",
+      "version": "placeholder/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [
+            "r1"
+          ],
+          "before": "pre.100.111"
+        },
+        {
+          "args": [
+            "r2"
+          ],
+          "before": "pre.100.113"
+        }
+      ]
+    }
+  },
+  "definitions": [],
+  "readings": [
+    {
+      "version": "placeholder/1",
+      "body": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+      "intuitive": "provided A, every legitimate submitted withdrawal eventually returns its matching assets, even when alarms occur",
+      "plain": "provided A, an alarm may delay a withdrawal but never freeze it",
+      "mode": "unbounded"
+    },
+    {
+      "version": "finite-demonstration/1",
+      "body": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+      "mode": "finite",
+      "horizon": 4,
+      "plain": "an alarm may delay a withdrawal, but the withdrawal still completes before this trace ends",
+      "question": "Does every delayed withdrawal still complete before this trace ends?"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "finite_pending",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": false,
+      "note": "Finite fixture, horizon 4: complete before this recorded word ends. A pending request fails that finite target; the unbounded run obligation remains unresolved."
+    },
+    {
+      "id": "alarm_exit",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Finite fixture, horizon 4: legitimate request r1 completes despite active alarms. A is stipulated, not certified fairness; the unbounded run obligation remains unresolved."
+    },
+    {
+      "id": "wrong_request",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "Finite fixture, horizon 4: completion of r2 does not complete submitted r1 before this word ends. The unbounded run obligation remains unresolved."
+    },
+    {
+      "id": "no_request",
+      "paths": [
+        "pre.100.110",
+        "pre.100.111",
+        "pre.100.112",
+        "pre.100.113"
+      ],
+      "events": [
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "Finite fixture, horizon 4: vacuous response without a request; legitimate journeys and reject-everything controls remain required. The unbounded run obligation remains unresolved."
+    }
+  ],
+  "formula": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      }
+    ]
+  }
+}

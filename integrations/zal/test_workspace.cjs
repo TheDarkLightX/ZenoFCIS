@@ -40,7 +40,7 @@ labeled.session.proposal['evidence']['checker'] = 'simulated-older-checker'
 labeled.session.proposal['examples_digest'] = 'simulated-stale-corpus'
 print(json.dumps({'seed': seed, 'accepted': work.view(), 'seed_data': seed_fixtures, 'accepted_data': fixtures(work.session.model),
                  'labeled': labeled_seed, 'labeled_candidate': labeled_candidate, 'labeled_stale': labeled.view()}))
-`], {cwd: __dirname, encoding: 'utf8', env: {...process.env, PYTHONDONTWRITEBYTECODE: '1'}}));
+`], {cwd: __dirname, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: {...process.env, PYTHONDONTWRITEBYTECODE: '1'}}));
 // A small DOM double executes the actual script/event handlers, not browser defaults.
 class Element {
   constructor(tag = 'div', owner = null) { this.ownerDocument = owner; this.tagName = tag.toUpperCase(); this.textContent = ''; this.value = ''; this.checked = false; this.children = []; this.dataset = {}; this.style = {}; this.open = false; this.hidden = false; this.disabled = false; this.attributes = {}; this.listeners = {}; this.classList = { toggle() {} }; this.isConnected = true; }

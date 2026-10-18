@@ -1,0 +1,88 @@
+{
+  "theory": "steps-over-integers",
+  "id": "no_free_value",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "LADDERS.md §2; narrow proposed per-asset Pareto-gain target remains OPEN."
+  },
+  "scope": "Finite isolated single-pool swap sequences of a fixed ordinary-account coalition; no transfers, other traders, liquidity changes, debt or issuance. Endpoint checks do not establish execution membership.",
+  "domains": {
+    "Sigma": {
+      "member": "sequence",
+      "plural": "sequences",
+      "noun": "sequences"
+    },
+    "Assets": {
+      "member": "asset",
+      "plural": "assets",
+      "noun": "assets"
+    }
+  },
+  "symbols": {
+    "I": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "Sigma"
+      ],
+      "clause": "{0} is an isolated swap sequence",
+      "noun": "isolated swap sequence"
+    },
+    "H_start": {
+      "kind": "function",
+      "arity": 2,
+      "args": [
+        "Sigma",
+        "Assets"
+      ],
+      "noun": "coalition holdings at start",
+      "state": false
+    },
+    "H_end": {
+      "kind": "function",
+      "arity": 2,
+      "args": [
+        "Sigma",
+        "Assets"
+      ],
+      "noun": "coalition holdings at end",
+      "state": false
+    }
+  },
+  "definitions": [
+    {
+      "name": "gain",
+      "params": [
+        {
+          "name": "sigma",
+          "domain": "Sigma"
+        },
+        {
+          "name": "a",
+          "domain": "Assets"
+        }
+      ],
+      "body": "H_end(sigma, a)-H_start(sigma, a)",
+      "noun": "asset gain"
+    },
+    {
+      "name": "FreeGain",
+      "params": [
+        {
+          "name": "sigma",
+          "domain": "Sigma"
+        }
+      ],
+      "body": "(forall a in Assets: gain(sigma, a) >= 0) and (exists a in Assets: gain(sigma, a) > 0)",
+      "clause": "{0} gives a free gain"
+    }
+  ],
+  "formula": "forall sigma in Sigma: I(sigma) => not ((forall a in Assets: gain(sigma, a) >= 0) and (exists a in Assets: gain(sigma, a) > 0))",
+  "fixtures": [
+    {"id":"N1","domains":{"Sigma":["s0"],"Assets":["X","Y"]},"symbols":{"I":{"rows":[[["s0"],true]]},"H_start":{"rows":[[["s0","X"],1000],[["s0","Y"],0]]},"H_end":{"rows":[[["s0","X"],993],[["s0","Y"],0]]}},"expected":true,"note":"Two-swap endpoint arithmetic; execution membership is not checked."},
+    {"id":"N2","domains":{"Sigma":["s0"],"Assets":["X","Y"]},"symbols":{"I":{"rows":[[["s0"],true]]},"H_start":{"rows":[[["s0","X"],1000],[["s0","Y"],0]]},"H_end":{"rows":[[["s0","X"],1001],[["s0","Y"],0]]}},"expected":false,"note":"Alleged isolated endpoint gain; not an admitted-execution witness."},
+    {"id":"N3","domains":{"Sigma":["s0"],"Assets":["X","Y"]},"symbols":{"I":{"rows":[[["s0"],true]]},"H_start":{"rows":[[["s0","X"],1000],[["s0","Y"],0]]},"H_end":{"rows":[[["s0","X"],0],[["s0","Y"],906]]}},"expected":true,"note":"One swap trades one asset for the other; no Pareto gain."},
+    {"id":"N4","domains":{"Sigma":["s0"],"Assets":["X","Y"]},"symbols":{"I":{"rows":[[["s0"],true]]},"H_start":{"rows":[[["s0","X"],1000],[["s0","Y"],0]]},"H_end":{"rows":[[["s0","X"],1000],[["s0","Y"],0]]}},"expected":true,"note":"Empty sequence; the strict-gain existential is false."}
+  ]
+}

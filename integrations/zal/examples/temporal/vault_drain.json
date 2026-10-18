@@ -1,0 +1,130 @@
+{
+  "profile": "zal/ladder-temporal/1",
+  "theory": "ordered-events-over-integers/1",
+  "id": "vault_drain",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "Proposed formalization; placeholder definitions await owner review."
+  },
+  "scope": "Declared ordered event observations; example definitions are placeholders.",
+  "trace": {
+    "domain": "Traces",
+    "mode": "finite",
+    "horizon": 4,
+    "source_revision": "example-observations/1",
+    "event_schema": "pre-input-outcome-post/1",
+    "order": "authoritative recorded event order, including rejections and retries",
+    "projection": "retain each recorded event without sorting, merging or deduplication",
+    "model": "placeholder composed model; execution membership is unproved",
+    "environment": "placeholder capabilities; no omitted actor is implicitly excluded",
+    "initialization": "separate initial-state check, including zero-operation executions",
+    "transitions": "requires exact source-model membership",
+    "continuity": "requires post/pre correspondence at every retained boundary",
+    "arithmetic": "checked-i128",
+    "evidence": "obligation"
+  },
+  "assumptions": {
+    "formula": "true",
+    "definition": "Unconditional finite-word requirement; provided true.",
+    "version": "1"
+  },
+  "domains": {
+    "Traces": {
+      "member": "trace",
+      "plural": "traces",
+      "noun": "admitted traces",
+      "trace": true
+    }
+  },
+  "symbols": {
+    "Loss": {
+      "kind": "predicate",
+      "arity": 0,
+      "args": [],
+      "clause": "uncompensated vault loss is present before or after the event",
+      "definition": "PLACEHOLDER one-asset policy: D(q) := v(q)+p(q)<v0+c(q); Loss := D(pre) or D(post). p counts independently justified entitlement discharges, never approval alone. v0=10, integer asset units. Other assets, valuation and allowed losses await review.",
+      "version": "placeholder/1",
+      "observation": "event",
+      "native": [
+        {
+          "args": [],
+          "before": "pre.100.110"
+        }
+      ]
+    }
+  },
+  "definitions": [],
+  "readings": [
+    {
+      "version": "placeholder/1",
+      "body": "forall sigma in Traces: always(not Loss())",
+      "intuitive": "no admitted operation sequence reaches uncompensated vault loss",
+      "plain": "no admitted operation sequence drains the vault",
+      "mode": "finite"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "legitimate_withdrawal",
+      "paths": [
+        "pre.100.110"
+      ],
+      "events": [
+        [
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "v0=10,c=0; v=7,p=3 offsets the withdrawal; initial D checked separately."
+    },
+    {
+      "id": "partial_drain",
+      "paths": [
+        "pre.100.110"
+      ],
+      "events": [
+        [
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "v0=10,c=0; v=7,p=0 is a loss, including a partial drain."
+    },
+    {
+      "id": "initial_disaster",
+      "paths": [
+        "pre.100.110"
+      ],
+      "events": [
+        [
+          1
+        ]
+      ],
+      "expected": false,
+      "note": "D(pre) is already true; no-operation initialization remains a separate obligation."
+    }
+  ],
+  "formula": "forall sigma in Traces: always(not Loss())",
+  "native_schema": {
+    "state": 100,
+    "fields": [
+      {
+        "id": 110,
+        "kind": "bool"
+      },
+      {
+        "id": 111,
+        "kind": "bool"
+      },
+      {
+        "id": 112,
+        "kind": "bool"
+      },
+      {
+        "id": 113,
+        "kind": "bool"
+      }
+    ]
+  }
+}

@@ -414,3 +414,11 @@ http://127.0.0.1:8765/ /tmp/zal-browser`. `CHROMIUM` can select an existing brow
 `NODE_PATH` can locate an existing Playwright installation. This command neither
 installs them nor establishes a complete accessibility audit. Final repository
 checks are those in [CONTRIBUTING.md](../../CONTRIBUTING.md), not just these suites.
+
+## Experimental progression ladders
+
+The [ladder prototype](ladder/README.md) presents a statement through seven
+deterministic readings. Its separate temporal profile uses explicit event
+order, finite or unbounded scope, and versioned assumptions. Rendering and
+native-source previews have authority none; the worked temporal definitions
+are placeholders awaiting interpretation review.

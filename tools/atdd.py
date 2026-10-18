@@ -184,13 +184,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "zal-dialogue": AcceptanceScenario(
         "Review finite behavior through deterministic language help and exact revisions",
-        (("python3", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
+        (("python3", "-B", "integrations/zal/check_ladder_temporal.py", "native-build"),
+         ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
+         ("python3", "-B", "integrations/zal/check_ladder_temporal.py", "planted"),
          ("node", "integrations/zal/test_workspace.cjs"),
          ("node", "integrations/zal/test_mcp_sdk.mjs"),
          ("python3", "integrations/zal/oracles/independent_oracle.py"),
          ("python3", "integrations/zal/oracles/formula_oracle.py"),
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),
-         ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
     ),
     "core-component-families": AcceptanceScenario(

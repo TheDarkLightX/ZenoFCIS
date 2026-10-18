@@ -11,3 +11,6 @@ Feature: Finite behavior dialogue with deterministic meaning help
     And separate truth-table and bit-mask oracles replay their stated finite families
     And the actual generated factory Authority matches every sample-domain tuple
     And realization, human agreement, inference access and publication remain distinct
+    And the experimental ladder preserves M0 and checks every temporal rung
+    And independent finite-word truth tables and planted temporal defects run
+    And unbounded targets and execution membership remain explicit obligations

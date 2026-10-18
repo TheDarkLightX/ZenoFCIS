@@ -1,0 +1,48 @@
+{
+  "theory": "steps-over-integers",
+  "id": "active_vote",
+  "kind": "invariant",
+  "authority": {
+    "status": "OPEN",
+    "source": "LADDERS.md §3; proposed active-record bound; identity and replacement remain OPEN."
+  },
+  "scope": "Every reachable state, every declared person and ballot. Active counted records, not casts or weight. Person mapping is stipulated, not authenticated.",
+  "domains": {
+    "P": {
+      "member": "person",
+      "plural": "persons",
+      "noun": "persons"
+    },
+    "B": {
+      "member": "ballot",
+      "plural": "ballots",
+      "noun": "ballots"
+    },
+    "R": {
+      "member": "record",
+      "plural": "records",
+      "noun": "records"
+    }
+  },
+  "symbols": {
+    "Active": {
+      "kind": "predicate",
+      "arity": 3,
+      "args": [
+        "R",
+        "P",
+        "B"
+      ],
+      "clause": "{0} is an active counted record for {1} on {2}"
+    }
+  },
+  "definitions": [],
+  "formula": "forall p in P: forall b in B: #{r in R: Active(r, p, b)} <= 1",
+  "fixtures": [
+    {"id":"V1","domains":{"P":["A","B"],"B":["e"],"R":["r1","r2"]},"symbols":{"Active":{"rows":[],"default":false}},"expected":true,"note":"No active records; at most one includes zero."},
+    {"id":"V2","domains":{"P":["A","B"],"B":["e"],"R":["r1","r2"]},"symbols":{"Active":{"rows":[[["r1","A","e"],true],[["r2","B","e"],true]],"default":false}},"expected":true,"note":"Different persons may each have a record."},
+    {"id":"V3","domains":{"P":["A","B"],"B":["e"],"R":["r1","r2"]},"symbols":{"Active":{"rows":[[["r1","A","e"],true],[["r2","A","e"],true]],"default":false}},"expected":false,"note":"Two personas map to the same stipulated person."},
+    {"id":"V4_before","domains":{"P":["A","B"],"B":["e"],"R":["r1","r2"]},"symbols":{"Active":{"rows":[[["r1","A","e"],true]],"default":false}},"expected":true,"note":"Replacement pre-state; no claim about transition authorization."},
+    {"id":"V4_after","domains":{"P":["A","B"],"B":["e"],"R":["r1","r2"]},"symbols":{"Active":{"rows":[[["r2","A","e"],true]],"default":false}},"expected":true,"note":"Replacement post-state; endpoints alone do not establish atomicity."}
+  ]
+}

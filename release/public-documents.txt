@@ -353,3 +353,9 @@ verification/verus/README.md
 crates/zeno-fcis-cli/tests/fixtures/order-fulfillment-split/README.md
 docs/KNOWLEDGE.md
 core-apps/zenodex-spot/README.md
+docs/zal/ladder/BUILD_SPEC_M0.md
+docs/zal/ladder/README.md
+docs/zal/ladder/REVIEW.md
+docs/zal/ladder/TEMPORAL.md
+docs/zal/ladder/VALIDATION.md
+docs/zal/ladder/EXAMPLES.md

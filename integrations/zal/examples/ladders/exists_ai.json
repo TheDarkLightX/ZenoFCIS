@@ -1,0 +1,33 @@
+{
+  "theory": "steps-over-integers",
+  "id": "exists_ai",
+  "kind": "law",
+  "authority": {
+    "status": "OPEN",
+    "source": "OWNER_DIALOGUE.md round 3; owner example, not a claim that a witness exists."
+  },
+  "scope": "Finite declared candidate search space; required property is stipulated by each fixture.",
+  "domains": {
+    "X": {
+      "member": "candidate",
+      "plural": "candidates",
+      "noun": "the search space"
+    }
+  },
+  "symbols": {
+    "P": {
+      "kind": "predicate",
+      "arity": 1,
+      "args": [
+        "X"
+      ],
+      "clause": "{0} satisfies the required property"
+    }
+  },
+  "definitions": [],
+  "formula": "exists x in X: P(x)",
+  "fixtures": [
+    {"id":"A1","domains":{"X":["c0","c1"]},"symbols":{"P":{"rows":[[["c0"],false],[["c1"],true]]}},"expected":true,"note":"A candidate witness exists."},
+    {"id":"A2","domains":{"X":["c0","c1"]},"symbols":{"P":{"rows":[[["c0"],false],[["c1"],false]]}},"expected":false,"note":"No candidate in this finite fixture satisfies P."}
+  ]
+}
