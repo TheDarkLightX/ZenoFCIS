@@ -472,7 +472,28 @@ pub(in super::super) proof fn scalar_division_projection(up:bool,a:i128,b:i128)
         assert(0 <= x/y <= x) by(nonlinear_arith)
             requires 0<=x,y>0,x==x/y*y+x%y,0<=x%y<y;
         assert(x <= i128::MAX as int + 1);
-        // MIN and rounding at the positive endpoint require the final-fit cases.
+        assert(x == super::super::super::value::scalar::magnitude(a as int));
+        assert(y == super::super::super::value::scalar::magnitude(b as int));
+        let negative = (a < 0) != (b < 0);
+        let rounded = x/y + if x%y != 0 && (up != negative) { 1int } else { 0int };
+        assert(0 <= rounded <= x + 1);
+        assert(rounded <= u128::MAX);
+        if a == i128::MIN && b == -1 {
+            // The law refuses this quotient before narrowing; the scalar
+            // specification reaches the same refusal through its final fit.
+            assert(y == 1);
+            vstd::arithmetic::div_mod::lemma_div_basics(x);
+            vstd::arithmetic::div_mod::lemma_mod_bound(x, 1);
+            assert(x/y == x && x%y == 0);
+            assert(super::super::super::value::scalar::division_value(up,a,b) == None::<i128>);
+        } else {
+            let value = if negative { -rounded } else { rounded };
+            assert(division(if up{Division::Ceil}else{Division::Floor},
+                Value::I128(a),Value::I128(b)) == integer(value,true));
+            if i128::MIN <= value <= i128::MAX {
+                assert((value as i128) as int == value);
+            }
+        }
     }
 }
 }

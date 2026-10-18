@@ -11,6 +11,7 @@ extern crate alloc;
 
 /// Library-interpreted finite decisions from a closed canonical plan.
 mod finite_bounds;
+mod finite_bounds_128;
 pub mod finite_decision;
 
 use alloc::boxed::Box;

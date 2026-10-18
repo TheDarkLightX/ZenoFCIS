@@ -33,6 +33,7 @@ pub(crate) enum Term {
     DivCeil(Box<Term>, Box<Term>),
     MulDivFloor(Box<Term>, Box<Term>, Box<Term>),
     MulDivCeil(Box<Term>, Box<Term>, Box<Term>),
+    SignedMulDivFloor(Box<Term>, Box<Term>, Box<Term>),
     ProductsGe(Box<(Term, Term, Term)>, Box<(Term, Term, Term)>),
     Eq(Box<Term>, Box<Term>),
     Lt(Box<Term>, Box<Term>),
@@ -88,6 +89,8 @@ pub(crate) open spec fn denote(term: Term, env: Seq<i128>) -> Result<i128, Failu
             denote(*a, env), denote(*b, env), denote(*d, env)),
         Term::MulDivCeil(a, b, d) => ternary(Op::MulDivCeil(0, 1, 2),
             denote(*a, env), denote(*b, env), denote(*d, env)),
+        Term::SignedMulDivFloor(a, b, d) => ternary(Op::SignedMulDivFloor(0, 1, 2),
+            denote(*a, env), denote(*b, env), denote(*d, env)),
         Term::ProductsGe(a, b) => match denote((*a).0, env) {
             Err(error) => Err(error),
             Ok(va) => match denote((*a).1, env) {
@@ -140,7 +143,8 @@ pub(crate) open spec fn boolean(term: Term, bools: spec_fn(u16) -> bool) -> bool
         Term::Add(_, _) => false,
         Term::Sub(_, _) => false,
         Term::Mul(_, _) | Term::DivFloor(_, _) | Term::DivCeil(_, _)
-            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _) => false,
+            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _)
+            | Term::SignedMulDivFloor(_, _, _) => false,
         Term::Select(_, a, b) => boolean(*a, bools) && boolean(*b, bools),
         _ => true,
     }
@@ -193,6 +197,10 @@ pub(crate) open spec fn mul_div_floor(a: Term, b: Term, d: Term) -> Term {
 
 pub(crate) open spec fn mul_div_ceil(a: Term, b: Term, d: Term) -> Term {
     Term::MulDivCeil(Box::new(a), Box::new(b), Box::new(d))
+}
+
+pub(crate) open spec fn signed_mul_div_floor(a: Term, b: Term, d: Term) -> Term {
+    Term::SignedMulDivFloor(Box::new(a), Box::new(b), Box::new(d))
 }
 
 pub(crate) open spec fn products_ge(a: Term, b: Term, c: Term, d: Term, e: Term, f: Term) -> Term {
@@ -274,6 +282,7 @@ pub(crate) open spec fn canonical_node(op: Op, input: spec_fn(u16) -> Term,
         Op::DivCeil(a, b) => div_ceil(operand(terms, a), operand(terms, b)),
         Op::MulDivFloor(a, b, d) => mul_div_floor(operand(terms, a), operand(terms, b), operand(terms, d)),
         Op::MulDivCeil(a, b, d) => mul_div_ceil(operand(terms, a), operand(terms, b), operand(terms, d)),
+        Op::SignedMulDivFloor(a, b, d) => signed_mul_div_floor(operand(terms, a), operand(terms, b), operand(terms, d)),
         Op::ProductsGe(a, b) => products_ge(operand(terms, a[0]), operand(terms, a[1]),
             operand(terms, a[2]), operand(terms, b[0]), operand(terms, b[1]), operand(terms, b[2])),
         Op::Eq(a, b) => eq(operand(terms, a), operand(terms, b)),
@@ -366,7 +375,8 @@ pub(crate) proof fn boolean_values(term: Term, env: Seq<i128>, bools: spec_fn(u1
         Term::Add(_, _) => {},
         Term::Sub(_, _) => {},
         Term::Mul(_, _) | Term::DivFloor(_, _) | Term::DivCeil(_, _)
-            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _) => {},
+            | Term::MulDivFloor(_, _, _) | Term::MulDivCeil(_, _, _)
+            | Term::SignedMulDivFloor(_, _, _) => {},
         Term::ProductsGe(a, b) => {
             match (denote((*a).0, env), denote((*a).1, env), denote((*a).2, env),
                 denote((*b).0, env), denote((*b).1, env), denote((*b).2, env)) {
@@ -451,7 +461,7 @@ pub(crate) proof fn folded_constructors_preserve_values(a: Term, b: Term, c: Ter
     assert(seq![z, x, y][0] == z && seq![z, x, y][1] == x && seq![z, x, y][2] == y);
 }
 
-/// D1 constructors retain their operands and delegate to the exact D1 node.
+/// Arithmetic constructors retain their operands and delegate to the exact node.
 pub(crate) proof fn arithmetic_constructors_preserve_values(a: Term, b: Term, c: Term,
     env: Seq<i128>, x: i128, y: i128, z: i128)
     requires
@@ -464,6 +474,7 @@ pub(crate) proof fn arithmetic_constructors_preserve_values(a: Term, b: Term, c:
         denote(div_ceil(a, b), env) == node(Op::DivCeil(0, 1), Seq::empty(), seq![x, y]),
         denote(mul_div_floor(a, b, c), env) == node(Op::MulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
         denote(mul_div_ceil(a, b, c), env) == node(Op::MulDivCeil(0, 1, 2), Seq::empty(), seq![x, y, z]),
+        denote(signed_mul_div_floor(a, b, c), env) == node(Op::SignedMulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
 {
     // Operand success is already known; no arithmetic expansion is needed.
     hide(node);
@@ -516,6 +527,7 @@ pub(crate) proof fn constructors_preserve_values(a: Term, b: Term, c: Term, env:
         denote(div_ceil(a, b), env) == node(Op::DivCeil(0, 1), Seq::empty(), seq![x, y]),
         denote(mul_div_floor(a, b, c), env) == node(Op::MulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
         denote(mul_div_ceil(a, b, c), env) == node(Op::MulDivCeil(0, 1, 2), Seq::empty(), seq![x, y, z]),
+        denote(signed_mul_div_floor(a, b, c), env) == node(Op::SignedMulDivFloor(0, 1, 2), Seq::empty(), seq![x, y, z]),
         denote(eq(a, b), env) == node(Op::Eq(0, 1), Seq::empty(), seq![x, y]),
         denote(lt(a, b), env) == node(Op::Lt(0, 1), Seq::empty(), seq![x, y]),
         denote(and(a, b, bools), env) == node(Op::And(0, 1), Seq::empty(), seq![x, y]),
@@ -597,10 +609,12 @@ pub(crate) proof fn node_on_operands(op: Op, input: Seq<i128>, values: Seq<i128>
                 (c as int) < values.len() && (a as int) < values.len() && (b as int) < values.len() ==>
                 node(op, input, values) == node(Op::Select(0, 1, 2), Seq::empty(),
                     seq![values[c as int], values[a as int], values[b as int]]),
-            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) =>
+            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) | Op::SignedMulDivFloor(a, b, d) =>
                 (a as int) < values.len() && (b as int) < values.len() && (d as int) < values.len() ==>
                 node(op, input, values) == node(
-                    if op is MulDivCeil { Op::MulDivCeil(0, 1, 2) } else { Op::MulDivFloor(0, 1, 2) },
+                    if op is MulDivCeil { Op::MulDivCeil(0, 1, 2) }
+                    else if op is SignedMulDivFloor { Op::SignedMulDivFloor(0, 1, 2) }
+                    else { Op::MulDivFloor(0, 1, 2) },
                     Seq::empty(), seq![values[a as int], values[b as int], values[d as int]]),
             Op::ProductsGe(a, b) =>
                 (a[0] as int) < values.len() && (a[1] as int) < values.len()
@@ -627,7 +641,7 @@ pub(crate) proof fn node_on_operands(op: Op, input: Seq<i128>, values: Seq<i128>
             assert(operands[0] == values[c as int] && operands[1] == values[a as int]
                 && operands[2] == values[b as int]);
         },
-        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) | Op::SignedMulDivFloor(a, b, d) => {
             let operands = seq![values[a as int], values[b as int], values[d as int]];
             assert(operands[0] == values[a as int] && operands[1] == values[b as int]
                 && operands[2] == values[d as int]);
@@ -704,7 +718,7 @@ pub(crate) proof fn canonical_terms_have_node_values(nodes: Seq<Op>, input: Seq<
                                 constructors_preserve_values(terms[a as int], terms[b as int], terms[c as int],
                                     env, bools, previous[a as int], previous[b as int], previous[c as int]);
                             },
-                            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+                            Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) | Op::SignedMulDivFloor(a, b, d) => {
                                 assert(node_value(terms, env, previous, a as int));
                                 assert(node_value(terms, env, previous, b as int));
                                 assert(node_value(terms, env, previous, d as int));

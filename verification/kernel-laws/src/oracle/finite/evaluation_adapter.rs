@@ -11,18 +11,18 @@ use zeno_fcis_synthesis::finite::{Error, Program};
 pub(super) trait PreparationEvaluation {
     fn evaluate_into(
         &self,
-        input: &[i64],
-        nodes: &mut Vec<i64>,
-        output: &mut Vec<i64>,
+        input: &[i128],
+        nodes: &mut Vec<i128>,
+        output: &mut Vec<i128>,
     ) -> Result<(), Error>;
 }
 
 impl PreparationEvaluation for Program {
     fn evaluate_into(
         &self,
-        input: &[i64],
-        nodes: &mut Vec<i64>,
-        output: &mut Vec<i64>,
+        input: &[i128],
+        nodes: &mut Vec<i128>,
+        output: &mut Vec<i128>,
     ) -> Result<(), Error> {
         nodes.clear();
         output.clear();
@@ -46,15 +46,15 @@ fn relocation_adapter_preserves_results_refusals_and_recovery() {
     let overflow = Program::try_new(
         vec![Domain::Bool],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
         vec![
             Op::Input(0),
             Op::Int(1),
             Op::Int(0),
             Op::Select(0, 1, 2),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(4, 3),
         ],
         vec![5],
@@ -67,9 +67,9 @@ fn relocation_adapter_preserves_results_refusals_and_recovery() {
         (&identity, vec![], Err(Error::Invalid("input-domain"))),
         (&identity, vec![0], Ok(vec![0])),
         (&identity, vec![-1], Err(Error::Invalid("output-domain"))),
-        (&overflow, vec![0], Ok(vec![i64::MAX])),
+        (&overflow, vec![0], Ok(vec![i128::MAX])),
         (&overflow, vec![1], Err(Error::Arithmetic)),
-        (&overflow, vec![0], Ok(vec![i64::MAX])),
+        (&overflow, vec![0], Ok(vec![i128::MAX])),
     ] {
         assert_eq!(program.evaluate(&input), expected);
         let result = PreparationEvaluation::evaluate_into(program, &input, &mut nodes, &mut output);

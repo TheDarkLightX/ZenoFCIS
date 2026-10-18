@@ -121,15 +121,15 @@ impl From<EncodeError> for PreparationError {
 ///
 /// ```compile_fail
 /// use crate::oracle::finite::preparation::PreparedFold;
-/// fn read_partial(prepared: &PreparedFold) -> &[i64] {
+/// fn read_partial(prepared: &PreparedFold) -> &[i128] {
 ///     &prepared.accumulator
 /// }
 /// ```
 #[must_use]
 pub struct PreparedFold {
     program: Program,
-    items: Vec<Vec<i64>>,
-    accumulator: Vec<i64>,
+    items: Vec<Vec<i128>>,
+    accumulator: Vec<i128>,
     context: PreparationContext,
     limits: PreparationLimits,
     processed: u32,
@@ -156,8 +156,8 @@ impl PreparedFold {
     /// overhead and any later application candidate, witness, receipt or outbox.
     pub fn start(
         program: Program,
-        initial: Vec<i64>,
-        items: Vec<Vec<i64>>,
+        initial: Vec<i128>,
+        items: Vec<Vec<i128>>,
         context: PreparationContext,
         limits: PreparationLimits,
         budget: BudgetLimits,
@@ -330,7 +330,7 @@ impl PreparedFold {
     }
 
     /// Returns a complete, still-untrusted tuple only for the exact current context.
-    pub fn finish(&self, current: PreparationContext) -> Result<Vec<i64>, PreparationError> {
+    pub fn finish(&self, current: PreparationContext) -> Result<Vec<i128>, PreparationError> {
         if self.remaining_items() != 0 {
             return Err(PreparationError::Incomplete);
         }
@@ -361,7 +361,7 @@ impl PreparedFold {
     }
 }
 
-fn encoded_size(values: &[i64]) -> Result<u64, PreparationError> {
+fn encoded_size(values: &[i128]) -> Result<u64, PreparationError> {
     let bytes = finite_tuple(values)?
         .canonical_bytes()
         .map_err(SynthesisError::Encode)?;

@@ -3,7 +3,7 @@ use zeno_fcis_codec::EncodeError;
 use zeno_fcis_synthesis::finite::Domain;
 use zeno_fcis_value::Value;
 
-pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
+pub(super) fn admitted(domains: &[Domain], values: &[i128]) -> bool {
     if domains.len() != values.len() {
         return false;
     }

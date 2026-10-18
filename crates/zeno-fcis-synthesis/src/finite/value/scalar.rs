@@ -37,7 +37,7 @@ pub(crate) open spec fn signed_floor_relation(a:i128,b:i128,d:i128,result:Option
     result == signed_mul_div_floor_value(a,b,d)
     && match result {
         Some(q) => d>0 && q as int*d as int <= a as int*b as int
-            && a as int*b as int < (q as int+1)*d as int,
+            && (a as int*b as int) < (q as int+1)*(d as int),
         None => if d<=0 {true}else{!((i128::MIN as int) <= (a as int*b as int)/d as int <= (i128::MAX as int))},
     }
 }
@@ -120,6 +120,53 @@ pub(crate) fn signed_mul_div_floor(a: i128, b: i128, den: i128) -> Option<i128> 
     let negative = (a < 0) != (b < 0);
     let x = unsigned_magnitude(a);
     let y = unsigned_magnitude(b);
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        let p = a as int * b as int;
+        let m = x as int * y as int;
+        let d = den as int;
+        assert(m == if negative { -p } else { p }) by(nonlinear_arith)
+            requires
+                p == a as int * b as int,
+                m == x as int * y as int,
+                negative == ((a < 0) != (b < 0)),
+                x as int == if a < 0 { -(a as int) } else { a as int },
+                y as int == if b < 0 { -(b as int) } else { b as int };
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod(m, d);
+        vstd::arithmetic::div_mod::lemma_mod_bound(m, d);
+        let q = m / d;
+        let r = m % d;
+        let rounded = q + if negative && r != 0 { 1int } else { 0int };
+        let signed = if negative { -rounded } else { rounded };
+        let remainder = if negative && r != 0 { d - r } else { r };
+        assert(m >= 0) by(nonlinear_arith)
+            requires m == x as int * y as int, x >= 0, y >= 0;
+        assert(q >= 0) by(nonlinear_arith)
+            requires m >= 0, d > 0, m == d * q + r, 0 <= r < d;
+        assert(p == signed * d + remainder) by(nonlinear_arith)
+            requires
+                m == if negative { -p } else { p },
+                m == d * q + r,
+                rounded == q + if negative && r != 0 { 1int } else { 0int },
+                signed == if negative { -rounded } else { rounded },
+                remainder == if negative && r != 0 { d - r } else { r };
+        assert(0 <= remainder < d);
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse_div(
+            p, d, signed, remainder);
+        assert(signed * d <= p < (signed + 1) * d) by(nonlinear_arith)
+            requires p == signed * d + remainder, 0 <= remainder < d, d > 0;
+        // An unsigned helper overflow cannot hide a fitting signed quotient.
+        if rounded > u128::MAX {
+            assert(narrow(signed) == None::<i128>);
+        }
+        assert(signed_mul_div_floor_value(a, b, den) ==
+            match if negative { wide::ceiling_value(x, y, den as u128) }
+                else { wide::floor_value(x, y, den as u128) } {
+                Some(v) => narrow(if negative { -(v as int) } else { v as int }),
+                None => None::<i128>,
+            });
+        assert(signed_floor_relation(a, b, den, signed_mul_div_floor_value(a, b, den)));
+    }
     let q = if negative {
         // D7_NEGATIVE_ROUNDING: floor(-P/d) = -ceil(P/d).
         wide::mul_div_ceil(x, y, den as u128)
