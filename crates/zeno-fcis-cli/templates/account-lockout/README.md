@@ -273,8 +273,8 @@ is shared.
    ```
 
    Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
-   recorded as blocked evidence, with exit code 2. There is no Lean export
-   for inductive claims, so `--backend lean` selects nothing.
+   recorded as blocked evidence, with exit code 2. This historical run predates
+   the restricted Lean inductive exporter, so its Lean command selected nothing.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
@@ -286,6 +286,13 @@ is shared.
    no compatible claim/backend pair was selected
    (exit 2)
    ```
+
+   The development candidate routes claim 600 through `--backend lean`.
+   Its finite-history theorem is conditional on the invariant holding at the
+   application's exact initial state. The ignored CLI test
+   `pinned_lean_kernel_checks_both_inductive_pilots_through_prove` must pass
+   with the pinned runtime before replacing the historical Lean output above.
+   That pinned run is not yet complete for this candidate.
 
    In the historical 1.1.0 run, the same control command on a copy whose three integer types
    declare no range printed, for CVC5:
@@ -332,7 +339,8 @@ It does not say:
   agree, on every input of its grid;
 - that the step is proved: CVC5's `unsat` is attested; `prove` exits 2, and
   the proof text is not checked. Z3's `unsat` is recorded as unsupported
-  evidence, and there is no Lean export for inductive claims;
+  evidence. The new restricted Lean route still requires its pinned kernel
+  check; the solver observations above do not establish that result;
 - anything outside the declared ranges: the step assumes them. That no
   committed account leaves them is the schema's doing, which the authority
   checks at admission, at genesis, and on every transition.

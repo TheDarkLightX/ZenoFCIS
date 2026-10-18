@@ -27,7 +27,9 @@ use spec_authoring::{
 };
 /// Pinned independent certificate checking with immutable input custody.
 pub mod certificate;
+mod lean_inductive;
 mod model_diagnostics;
+pub use lean_inductive::{export_inductive_lean, export_inductive_lean_with_limits};
 use model_diagnostics::{
     DiagnosticLimits, DiagnosticOutcome, ModelContext, ModelObservation, ModelReason, ModelStep,
     TemporalDiagnosis, check_relation, check_trace,
@@ -1251,6 +1253,8 @@ impl ExportedObligation {
 /// by the committing decisions they are enforced on.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct StepHypotheses {
+    /// Paths whose integer range is asserted by the exporter.
+    paths: BTreeSet<ProjectionPath>,
     every_commit: Box<[LawDecl]>,
     accepts: Box<[LawDecl]>,
     committed_failures: Box<[LawDecl]>,
@@ -1259,6 +1263,11 @@ pub struct StepHypotheses {
     domains: BTreeMap<ProjectionPath, DeclaredDomain>,
 }
 impl StepHypotheses {
+    /// Every observed path whose i128 range the inductive exporter asserts.
+    #[must_use]
+    pub const fn paths(&self) -> &BTreeSet<ProjectionPath> {
+        &self.paths
+    }
     /// Laws assumed for every committing decision.
     #[must_use]
     pub const fn every_commit(&self) -> &[LawDecl] {
@@ -1814,6 +1823,7 @@ pub fn export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+        hypotheses.paths.insert(path.clone());
         if let Some(domain) = declared_domain(spec, path) {
             let member = match &domain {
                 DeclaredDomain::Values(values) => smt_or(
@@ -1901,6 +1911,7 @@ fn step_hypotheses(claim: &ClaimDecl, laws: &[LawDecl]) -> Result<StepHypotheses
         Ok(resolved.into_boxed_slice())
     };
     Ok(StepHypotheses {
+        paths: BTreeSet::new(),
         every_commit: resolve(assumptions.every_commit())?,
         accepts: resolve(assumptions.accepts())?,
         committed_failures: resolve(assumptions.committed_failures())?,
@@ -2224,6 +2235,12 @@ pub fn execute_tool(
     obligation: ExportedObligation,
 ) -> Result<ToolRun, ToolFailure> {
     if config.backend != obligation.backend {
+        return Err(ToolFailure::UnsupportedEvidence);
+    }
+    if config.backend == ToolBackend::Lean
+        && matches!(obligation.claim.mode(), ClaimMode::Inductive)
+        && !lean_inductive::source_is_bound(&obligation)
+    {
         return Err(ToolFailure::UnsupportedEvidence);
     }
     let checked = check_tool(config)?;
@@ -2711,6 +2728,13 @@ fn classify(
                 .runtime
                 .as_ref()
                 .is_none_or(|runtime| runtime.tree_sha256 != LEAN_LINUX_X86_64_TREE_SHA256) =>
+        {
+            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+        }
+        ToolBackend::Lean
+            if matches!(obligation.claim.mode(), ClaimMode::Inductive)
+                && (!lean_inductive::source_is_bound(obligation)
+                    || !lean_inductive::theorem_report_is_bound(&text)) =>
         {
             ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
         }
