@@ -1,4 +1,4 @@
-//! Closed I128 redemption traversal and accounting plan. This pure subcomponent
+//! Closed U128 redemption traversal and accounting plan. This pure subcomponent
 //! consumes an already authenticated command/context and committed oracle view;
 //! it cannot authenticate a host, commit money or publish a custody receipt.
 //! Source: pinned TroveManager.sol 0b0ba14dc297938b98aa7f130924b3525706fa6b3736fa663c72c40f483f1895.
@@ -8,46 +8,46 @@ use super::super::meter::{self, Meter};
 use super::{Failure, Limits, Resource, Usage};
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-const Q: i128 = 1_000_000_000_000_000_000;
-const NICR_Q: i128 = 100_000_000_000_000_000_000;
-const MCR: i128 = 1_100_000_000_000_000_000;
-const DECAY: i128 = 999_037_758_833_783_000;
+const Q: u128 = 1_000_000_000_000_000_000;
+const NICR_Q: u128 = 100_000_000_000_000_000_000;
+const MCR: u128 = 1_100_000_000_000_000_000;
+const DECAY: u128 = 999_037_758_833_783_000;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Vault {
     pub id: u32,
     pub owner: u32,
     pub active: bool,
-    pub collateral: i128,
-    pub debt: i128,
-    pub stake: i128,
-    pub snapshot_c: i128,
-    pub snapshot_d: i128,
+    pub collateral: u128,
+    pub debt: u128,
+    pub stake: u128,
+    pub snapshot_c: u128,
+    pub snapshot_d: u128,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
     pub vaults: Vec<Vault>,
     pub order: Vec<u32>,
-    pub priorities: Vec<(u32, i128)>,
-    pub reward_c: i128,
-    pub reward_d: i128,
-    pub stakes_snapshot: i128,
-    pub collateral_snapshot: i128,
-    pub active_collateral: i128,
-    pub default_collateral: i128,
-    pub active_debt: i128,
-    pub default_debt: i128,
+    pub priorities: Vec<(u32, u128)>,
+    pub reward_c: u128,
+    pub reward_d: u128,
+    pub stakes_snapshot: u128,
+    pub collateral_snapshot: u128,
+    pub active_collateral: u128,
+    pub default_collateral: u128,
+    pub active_debt: u128,
+    pub default_debt: u128,
     pub holder: u32,
-    pub holder_balance: i128,
-    pub reserve_balance: i128,
-    pub supply: i128,
-    pub holder_collateral: i128,
-    pub staking_collateral: i128,
-    pub surplus: Vec<(u32, i128)>,
+    pub holder_balance: u128,
+    pub reserve_balance: u128,
+    pub supply: u128,
+    pub holder_collateral: u128,
+    pub staking_collateral: u128,
+    pub surplus: Vec<(u32, u128)>,
     pub nonce: u64,
-    pub price_e8: i128,
+    pub price_e8: u128,
     pub price_epoch: u64,
     pub oracle_profile: [u8; 32],
-    pub base_rate: i128,
+    pub base_rate: u128,
     pub last_fee_epoch: u64,
 }
 #[derive(Clone, Debug)]
@@ -55,24 +55,24 @@ pub struct Policy {
     pub capacity: u32,
     pub inventory_capacity: u32,
     pub retained_bytes: u64,
-    pub minimum_net_debt: i128,
-    pub reserve: i128,
+    pub minimum_net_debt: u128,
+    pub reserve: u128,
     pub bootstrap_epoch: u64,
     pub epoch_seconds: u64,
     pub max_price_age: u64,
     pub oracle_profile: [u8; 32],
-    pub redemption_capacity: i128,
+    pub redemption_capacity: u128,
     pub limits: Limits,
 }
 #[derive(Clone, Debug)]
 pub struct Command {
     pub actor: u32,
     pub nonce: u64,
-    pub maximum: i128,
+    pub maximum: u128,
     pub max_visits: u32,
-    pub max_fee: i128,
+    pub max_fee: u128,
     pub first: Option<u32>,
-    pub partial_nicr: i128,
+    pub partial_nicr: u128,
     pub upper: Option<u32>,
     pub lower: Option<u32>,
 }
@@ -112,12 +112,12 @@ pub struct Trace {
     pub first: Option<u32>,
     pub first_hint_used: bool,
     pub stop: Stop,
-    pub executed: i128,
-    pub unfilled: i128,
-    pub gross_collateral: i128,
-    pub reserve_burn: i128,
-    pub surplus: i128,
-    pub fee: i128,
+    pub executed: u128,
+    pub unfilled: u128,
+    pub gross_collateral: u128,
+    pub reserve_burn: u128,
+    pub surplus: u128,
+    pub fee: u128,
     pub settled: Vec<u32>,
 }
 #[derive(Debug)]
@@ -162,39 +162,54 @@ fn visit(m: &mut Meter) -> Result<(), Failure> {
     m.charge(Resource::Read, 1)?;
     Ok(())
 }
-pub(super) fn add(a: i128, b: i128, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn add(a: u128, b: u128, m: &mut Meter) -> Result<u128, Failure> {
     step(m)?;
     a.checked_add(b).ok_or(Failure::Arithmetic)
 }
-pub(super) fn sub(a: i128, b: i128, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn sub(a: u128, b: u128, m: &mut Meter) -> Result<u128, Failure> {
     step(m)?;
-    a.checked_sub(b)
-        .filter(|x| *x >= 0)
-        .ok_or(Failure::Arithmetic)
+    a.checked_sub(b).ok_or(Failure::Arithmetic)
 }
-pub(super) fn muldiv(a: i128, b: i128, d: i128, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn muldiv(a: u128, b: u128, d: u128, m: &mut Meter) -> Result<u128, Failure> {
     m.charge(Resource::Step, 1024)?;
     m.charge(Resource::Byte, 51)?;
-    if a < 0 || b < 0 || d <= 0 {
+    if d == 0 {
         return Err(Failure::Arithmetic);
     }
-    i128::try_from(wide::mul_div_floor(a as u128, b as u128, d as u128).ok_or(Failure::Arithmetic)?)
-        .map_err(|_| Failure::Arithmetic)
+    wide::mul_div_floor(a, b, d).ok_or(Failure::Arithmetic)
 }
 /// Exact floor of a 384-bit product divided by a positive denominator. Binary
 /// search compares qualified three-limb products; no intermediate narrowing.
-pub(super) fn mul3div(a: i128, b: i128, c: i128, d: i128, m: &mut Meter) -> Result<i128, Failure> {
-    if a < 0 || b < 0 || c < 0 || d <= 0 {
+pub(super) fn mul3div(a: u128, b: u128, c: u128, d: u128, m: &mut Meter) -> Result<u128, Failure> {
+    if d == 0 {
         return Err(Failure::Arithmetic);
     }
 
-    let (a, b, c, d) = (a as u128, b as u128, c as u128, d as u128);
     let mut lo = 0u128;
     let mut hi = 1u128 << 127;
     m.charge(Resource::Step, 128)?;
     m.charge(Resource::Byte, 68)?;
     if wide::products_ge(a, b, c, d, hi, 1) {
-        return Err(Failure::Arithmetic);
+        // Only the newly admitted upper half takes this branch. The historical
+        // lower-half search and its measured work remain unchanged.
+        m.charge(Resource::Step, 128)?;
+        let product = wide::multiply_three(a, b, c);
+        if product[2] != 0 || product[1] >= d {
+            return Err(Failure::Arithmetic);
+        }
+        lo = hi;
+        hi = u128::MAX;
+        while lo < hi {
+            m.charge(Resource::Step, 128)?;
+            let delta = hi - lo;
+            let mid = lo + delta / 2 + delta % 2;
+            if wide::products_ge(a, b, c, d, mid, 1) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return Ok(lo);
     }
     while hi - lo > 1 {
         m.charge(Resource::Step, 128)?;
@@ -205,27 +220,20 @@ pub(super) fn mul3div(a: i128, b: i128, c: i128, d: i128, m: &mut Meter) -> Resu
             hi = mid
         }
     }
-    Ok(lo as i128)
+    Ok(lo)
 }
-pub(super) fn nicr(c: i128, d: i128, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn nicr(c: u128, d: u128, m: &mut Meter) -> Result<u128, Failure> {
     muldiv(c, NICR_Q, d, m)
 }
-pub(super) fn eligible(c: i128, d: i128, price: i128, m: &mut Meter) -> Result<bool, Failure> {
+pub(super) fn eligible(c: u128, d: u128, price: u128, m: &mut Meter) -> Result<bool, Failure> {
     m.charge(Resource::Step, 128)?;
     m.charge(Resource::Byte, 102)?;
-    if c < 0 || d <= 0 || price <= 0 {
+    if d == 0 || price == 0 {
         return Err(Failure::Arithmetic);
     }
-    Ok(wide::products_ge(
-        c as u128,
-        price as u128,
-        10_000_000_000,
-        d as u128,
-        MCR as u128,
-        1,
-    ))
+    Ok(wide::products_ge(c, price, 10_000_000_000, d, MCR, 1))
 }
-pub(super) fn effective(s: &State, v: &Vault, m: &mut Meter) -> Result<(i128, i128), Failure> {
+pub(super) fn effective(s: &State, v: &Vault, m: &mut Meter) -> Result<(u128, u128), Failure> {
     if !v.active {
         return Ok((v.collateral, v.debt));
     }
@@ -278,10 +286,14 @@ pub(super) fn index(s: &State, id: u32, m: &mut Meter) -> Result<usize, Failure>
     }
     out.ok_or(Failure::Undefined)
 }
-pub(super) fn pcmp(a: i128, b: i128, m: &mut Meter) -> Result<Ordering, Failure> {
-    super::ordered::number_cmp(a, b, m)
+pub(super) fn pcmp(a: u128, b: u128, m: &mut Meter) -> Result<Ordering, Failure> {
+    super::ordered::number_cmp(
+        super::ordered::Priority::Unsigned(a),
+        super::ordered::Priority::Unsigned(b),
+        m,
+    )
 }
-pub(super) fn priority(s: &State, id: u32, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn priority(s: &State, id: u32, m: &mut Meter) -> Result<u128, Failure> {
     let mut out = None;
     for (key, p) in &s.priorities {
         visit(m)?;
@@ -339,9 +351,7 @@ fn validate(p: &Policy, s: &State, m: &mut Meter) -> Result<(), Failure> {
         s.base_rate,
     ] {
         step(m)?;
-        if x < 0 {
-            return Err(Failure::Wire);
-        }
+        let _ = x; // Nonnegativity is now guaranteed by U128; retain the tariff.
     }
     if s.base_rate > Q
         || s.supply != add(s.active_debt, s.default_debt, m)?
@@ -358,9 +368,7 @@ fn validate(p: &Policy, s: &State, m: &mut Meter) -> Result<(), Failure> {
         visit(m)?;
         for x in [v.collateral, v.debt, v.stake, v.snapshot_c, v.snapshot_d] {
             step(m)?;
-            if x < 0 {
-                return Err(Failure::Wire);
-            }
+            let _ = x;
         }
         if !v.active {
             if v.collateral != 0
@@ -423,9 +431,7 @@ fn validate(p: &Policy, s: &State, m: &mut Meter) -> Result<(), Failure> {
     }
     for (id, amount) in &s.surplus {
         visit(m)?;
-        if *amount < 0 {
-            return Err(Failure::Law(984));
-        }
+        let _ = amount;
         let mut owner_present = false;
         for vault in &s.vaults {
             visit(m)?;
@@ -459,7 +465,7 @@ fn settle(s: &mut State, i: usize, m: &mut Meter) -> Result<bool, Failure> {
 fn reinsert(
     s: &mut State,
     id: u32,
-    p: i128,
+    p: u128,
     upper: Option<u32>,
     lower: Option<u32>,
     m: &mut Meter,
@@ -568,27 +574,19 @@ fn reinsert(
     }
     Ok(())
 }
-fn decmul(a: i128, b: i128, m: &mut Meter) -> Result<i128, Failure> {
+fn decmul(a: u128, b: u128, m: &mut Meter) -> Result<u128, Failure> {
     // V1 _decMul rounds to nearest, half up; do not substitute floor.
     let floor = muldiv(a, b, Q, m)?;
     m.charge(Resource::Step, 128)?;
     m.charge(Resource::Byte, 34)?;
-    let product = wide::multiply(a as u128, b as u128);
+    let product = wide::multiply(a, b);
     // a,b<=Q, so this product is <=10^36 and fits a single u128 limb.
     if product[1] != 0 {
         return Err(Failure::Arithmetic);
     }
-    add(
-        floor,
-        if product[0] % (Q as u128) >= (Q / 2) as u128 {
-            1
-        } else {
-            0
-        },
-        m,
-    )
+    add(floor, if product[0] % (Q) >= (Q / 2) { 1 } else { 0 }, m)
 }
-pub(super) fn decay(base: i128, minutes: u64, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn decay(base: u128, minutes: u64, m: &mut Meter) -> Result<u128, Failure> {
     let mut n = minutes.min(525_600_000);
     if n == 0 {
         return Ok(base);
@@ -613,10 +611,10 @@ impl Traversal {
     pub fn bind(policy: Policy) -> Result<Self, Failure> {
         if policy.inventory_capacity < policy.capacity
             || policy.retained_bytes < 1024
-            || policy.minimum_net_debt <= 0
-            || policy.reserve <= 0
+            || policy.minimum_net_debt == 0
+            || policy.reserve == 0
             || policy.epoch_seconds == 0
-            || policy.redemption_capacity <= 0
+            || policy.redemption_capacity == 0
         {
             return Err(Failure::Descriptor);
         }
@@ -664,7 +662,7 @@ impl Traversal {
         if pre.nonce == u64::MAX {
             return Ok(Err(Reason::NonceExhausted));
         }
-        if pre.price_e8 <= 0
+        if pre.price_e8 == 0
             || pre.oracle_profile != p.oracle_profile
             || pre.price_epoch > x.epoch
             || x.epoch - pre.price_epoch > p.max_price_age
@@ -685,7 +683,7 @@ impl Traversal {
         if !eligible(total_c, total_d, pre.price_e8, m)? {
             return Ok(Err(Reason::Tcr));
         }
-        if c.maximum <= 0 {
+        if c.maximum == 0 {
             return Ok(Err(Reason::Amount));
         }
         if pre.holder_balance < c.maximum {
@@ -819,7 +817,7 @@ impl Traversal {
                     s.vaults[i].stake = if s.collateral_snapshot == 0 {
                         new_c
                     } else {
-                        if s.stakes_snapshot <= 0 {
+                        if s.stakes_snapshot == 0 {
                             return Err(Failure::Law(986));
                         }
                         muldiv(new_c, s.stakes_snapshot, s.collateral_snapshot, m)?
@@ -950,7 +948,7 @@ impl Traversal {
     /// Advance already funded reward accumulators and repair their own rounding
     /// inversions atomically. This restricted candidate changes no monetary field
     /// and carries no publication authority. External malformed order still fails.
-    pub fn redistribute(&self, pre: &State, reward_c: i128, reward_d: i128) -> OrderRepair {
+    pub fn redistribute(&self, pre: &State, reward_c: u128, reward_d: u128) -> OrderRepair {
         let mut m = meter::new(self.policy.limits);
         let result = (|| {
             validate(&self.policy, pre, &mut m)?;

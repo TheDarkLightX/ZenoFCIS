@@ -2,7 +2,7 @@
 use serde_json::{Value as J, json};
 use std::{path::PathBuf, sync::OnceLock};
 use zeno_fcis_synthesis::finite::v2_authority::tables::{self as t, redemption as r};
-fn num(j: &J) -> i128 {
+fn num(j: &J) -> u128 {
     j.as_str().unwrap().parse().unwrap()
 }
 fn u32_(j: &J) -> u32 {
@@ -14,7 +14,7 @@ fn u64_(j: &J) -> u64 {
 fn opt(j: &J) -> Option<u32> {
     if j.is_null() { None } else { Some(u32_(j)) }
 }
-fn pairs(j: &J) -> Vec<(u32, i128)> {
+fn pairs(j: &J) -> Vec<(u32, u128)> {
     j.as_array()
         .unwrap()
         .iter()
@@ -203,10 +203,10 @@ fn redemption_debt_only_rewards_explicitly_depart_from_pinned_v1() {
         let evaluation = a.evaluate(&pre, &cmd, context(&row["context"]));
         let plan = evaluation.result().unwrap().unwrap();
         assert_eq!(plan.trace().settled, vec![1]);
-        assert_eq!(plan.trace().executed, 100 * 10i128.pow(18));
-        assert_eq!(plan.state().vaults[1].debt, 2010 * 10i128.pow(18));
+        assert_eq!(plan.trace().executed, 100 * 10u128.pow(18));
+        assert_eq!(plan.state().vaults[1].debt, 2010 * 10u128.pow(18));
         assert_eq!(plan.state(), &state(&row["v1_corrected_expected"]["state"]));
-        assert_ne!(3500 * 10i128.pow(20) / 2000, cmd.partial_nicr);
+        assert_ne!(3500 * 10u128.pow(20) / 2000, cmd.partial_nicr);
         assert_eq!(pre, state(&row["pre"]));
     }
 }
@@ -258,25 +258,25 @@ fn redemption_refuses_stale_nicr_and_unsorted_redistribution() {
     // redistribution reverses their effective order; updating cached keys is not enough.
     let mut s = state(&row["pre"]);
     s.vaults.truncate(2);
-    s.vaults[0].collateral = 2000 * 10i128.pow(18);
-    s.vaults[0].debt = 1000 * 10i128.pow(18);
-    s.vaults[0].stake = 1000 * 10i128.pow(18);
+    s.vaults[0].collateral = 2000 * 10u128.pow(18);
+    s.vaults[0].debt = 1000 * 10u128.pow(18);
+    s.vaults[0].stake = 1000 * 10u128.pow(18);
     s.vaults[1].collateral = s.vaults[0].collateral;
     s.vaults[1].debt = s.vaults[0].debt;
-    s.vaults[1].stake = 10i128.pow(18);
+    s.vaults[1].stake = 10u128.pow(18);
     s.order = vec![0, 1];
-    s.priorities = vec![(0, 2 * 10i128.pow(20)), (1, 2 * 10i128.pow(20))];
-    s.active_collateral = 4000 * 10i128.pow(18);
-    s.active_debt = 2000 * 10i128.pow(18);
+    s.priorities = vec![(0, 2 * 10u128.pow(20)), (1, 2 * 10u128.pow(20))];
+    s.active_collateral = 4000 * 10u128.pow(18);
+    s.active_debt = 2000 * 10u128.pow(18);
     s.supply = s.active_debt;
-    s.holder_balance = 1000 * 10i128.pow(18);
-    s.reserve_balance = 100 * 10i128.pow(18);
-    s.default_debt = 1001 * 10i128.pow(18);
+    s.holder_balance = 1000 * 10u128.pow(18);
+    s.reserve_balance = 100 * 10u128.pow(18);
+    s.default_debt = 1001 * 10u128.pow(18);
     s.supply = s.active_debt + s.default_debt;
     let frozen = s.clone();
     let mut candidate = s.clone();
-    candidate.reward_d = 10i128.pow(18);
-    candidate.priorities = vec![(0, 10i128.pow(20)), (1, 2000 * 10i128.pow(20) / 1001)];
+    candidate.reward_d = 10u128.pow(18);
+    candidate.priorities = vec![(0, 10u128.pow(20)), (1, 2000 * 10u128.pow(20) / 1001)];
     let outcome = a.check_redistribution(&s, &candidate);
     assert!(
         matches!(outcome.result(), Err(t::Failure::Law(985))),
@@ -388,13 +388,14 @@ fn redemption_owned_policy_and_oversized_input_admission() {
     let mut p = policy(&row["policy"]);
     let a = r::Traversal::bind(p.clone()).unwrap();
     p.reserve = 1;
+    assert_eq!(p.reserve, 1);
     let mut pre = state(&row["pre"]);
     let snapshot = pre.clone();
     let c = command(&row["command"]);
     let x = context(&row["context"]);
     let e = a.evaluate(&pre, &c, x);
     let plan = e.result().unwrap().unwrap();
-    assert_eq!(plan.trace().reserve_burn, 50 * 10i128.pow(18));
+    assert_eq!(plan.trace().reserve_burn, 50 * 10u128.pow(18));
     assert_eq!(pre, snapshot);
     let mut q = policy(&row["policy"]);
     q.limits = t::zero_limits();
@@ -465,11 +466,12 @@ fn redistribution_repairs_pinned_swaps_and_preserves_committed_ties() {
         minted.supply += 1;
         minted.default_debt += 1;
         assert!(a.check_redistribution(&pre, &minted).result().is_err());
-        assert!(
-            a.redistribute(&pre, -1, expected.reward_d)
-                .result()
-                .is_err()
-        );
+        let (lower_c, lower_d) = if post.reward_c > 0 {
+            (post.reward_c - 1, post.reward_d)
+        } else {
+            (post.reward_c, post.reward_d.checked_sub(1).unwrap())
+        };
+        assert!(a.redistribute(post, lower_c, lower_d).result().is_err());
     }
     println!("REDISTRIBUTION_REFERENCE {} exact vectors", rows.len());
 }

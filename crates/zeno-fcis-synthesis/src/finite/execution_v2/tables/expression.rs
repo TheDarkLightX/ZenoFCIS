@@ -3,10 +3,41 @@ use super::collection::{self, step};
 use super::schema::{record_field, record_replace};
 use super::*;
 
+/// Checked carry addition, scoped to the law accumulator rather than Value arithmetic.
+fn add_unsigned_sum(sum: [u128; 2], value: u128) -> Result<[u128; 2], Failure> {
+    let (low, carry) = sum[0].overflowing_add(value);
+    let high = sum[1]
+        .checked_add(u128::from(carry))
+        .ok_or(Failure::Arithmetic)?;
+    Ok([low, high])
+}
+fn numeric_compare(a: Data, b: Data) -> Result<core::cmp::Ordering, Failure> {
+    fn unsigned(data: Data) -> Result<[u128; 2], Failure> {
+        match data {
+            Data::WideSum(sum) => Ok(sum),
+            Data::Value(v) => match v.view() {
+                ValueRef::U128(n) => Ok([n, 0]),
+                _ => Err(Failure::Kind),
+            },
+            _ => Err(Failure::Kind),
+        }
+    }
+    if let (Data::Value(a), Data::Value(b)) = (&a, &b) {
+        if let (ValueRef::I128(a), ValueRef::I128(b)) = (a.view(), b.view()) {
+            return Ok(a.cmp(&b));
+        }
+    }
+    let a = unsigned(a)?;
+    let b = unsigned(b)?;
+    Ok((a[1], a[0]).cmp(&(b[1], b[0])))
+}
+
 #[derive(Clone, Debug)]
 enum Ty {
     Bool,
     Int(i128, i128),
+    Unsigned(Option<u128>),
+    WideSum,
     Bytes,
     Unit,
     Canonical(u32),
@@ -17,6 +48,7 @@ fn ty(d: &Descriptor, id: u32) -> Result<Ty, Failure> {
     Ok(match d.ty(id)?.shape {
         Shape::Bool => Ty::Bool,
         Shape::I128 { min, max } => Ty::Int(min, max),
+        Shape::U128 { max, .. } => Ty::Unsigned(Some(max)),
         Shape::Bytes { .. } => Ty::Bytes,
         Shape::Unit => Ty::Unit,
         _ => Ty::Canonical(id),
@@ -27,6 +59,8 @@ fn same(a: &Ty, b: &Ty) -> bool {
         (a, b),
         (Ty::Bool, Ty::Bool)
             | (Ty::Int(..), Ty::Int(..))
+            | (Ty::Unsigned(_), Ty::Unsigned(_))
+            | (Ty::WideSum, Ty::WideSum)
             | (Ty::Bytes, Ty::Bytes)
             | (Ty::Unit, Ty::Unit)
     ) || matches!((a,b),(Ty::Canonical(x),Ty::Canonical(y)) if x==y)
@@ -37,6 +71,7 @@ fn join(a: Ty, b: Ty) -> Result<Ty, Failure> {
     }
     Ok(match (a, b) {
         (Ty::Int(a, b), Ty::Int(c, d)) => Ty::Int(a.min(c), b.max(d)),
+        (Ty::Unsigned(a), Ty::Unsigned(b)) => Ty::Unsigned(a.zip(b).map(|(a, b)| a.max(b))),
         (a, _) => a,
     })
 }
@@ -69,6 +104,7 @@ struct Check<'a> {
     nodes: usize,
     sources: u8,
     candidate: bool,
+    law: bool,
 }
 impl Check<'_> {
     fn expr(&mut self, e: &Expr, depth: usize) -> Result<Ty, Failure> {
@@ -192,19 +228,45 @@ impl Check<'_> {
                 Ty::Canonical(*id)
             }
             Expr::Eq(a, b) => {
-                if !same(&self.expr(a, depth + 1)?, &self.expr(b, depth + 1)?) {
+                let a = self.expr(a, depth + 1)?;
+                let b = self.expr(b, depth + 1)?;
+                if !same(&a, &b)
+                    && !matches!(
+                        (&a, &b),
+                        (Ty::WideSum, Ty::Unsigned(_)) | (Ty::Unsigned(_), Ty::WideSum)
+                    )
+                {
                     return Err(Failure::Kind);
                 }
                 Ty::Bool
             }
             Expr::Lt(a, b) => {
-                integer(self.expr(a, depth + 1)?)?;
-                integer(self.expr(b, depth + 1)?)?;
+                let a = self.expr(a, depth + 1)?;
+                let b = self.expr(b, depth + 1)?;
+                if !matches!(
+                    (a, b),
+                    (Ty::Int(..), Ty::Int(..))
+                        | (Ty::Unsigned(_), Ty::Unsigned(_))
+                        | (Ty::WideSum, Ty::WideSum)
+                        | (Ty::WideSum, Ty::Unsigned(_))
+                        | (Ty::Unsigned(_), Ty::WideSum)
+                ) {
+                    return Err(Failure::Kind);
+                }
                 Ty::Bool
             }
             Expr::Add(a, b) | Expr::Sub(a, b) => {
-                let (a0, a1) = integer(self.expr(a, depth + 1)?)?;
-                let (b0, b1) = integer(self.expr(b, depth + 1)?)?;
+                let a = self.expr(a, depth + 1)?;
+                let b = self.expr(b, depth + 1)?;
+                if let (Ty::Unsigned(a), Ty::Unsigned(b)) = (&a, &b) {
+                    return Ok(Ty::Unsigned(if matches!(e, Expr::Add(..)) {
+                        a.zip(*b).and_then(|(a, b)| a.checked_add(b))
+                    } else {
+                        *a
+                    }));
+                }
+                let (a0, a1) = integer(a)?;
+                let (b0, b1) = integer(b)?;
                 let bounds = if matches!(e, Expr::Add(..)) {
                     a0.checked_add(b0).zip(a1.checked_add(b1))
                 } else {
@@ -323,7 +385,8 @@ impl Check<'_> {
             Expr::All(a, body)
             | Expr::Any(a, body)
             | Expr::Count(a, body)
-            | Expr::SumI128(a, body) => {
+            | Expr::SumI128(a, body)
+            | Expr::SumU128(a, body) => {
                 if self.entry.is_some() {
                     return Err(Failure::Descriptor);
                 }
@@ -334,7 +397,22 @@ impl Check<'_> {
                 self.entry = Some((kt, vt));
                 let body_ty = self.expr(body, depth + 1)?;
                 self.entry = None;
-                if matches!(e, Expr::SumI128(..)) {
+                if matches!(e, Expr::SumU128(..)) {
+                    if !self.law {
+                        return Err(Failure::Kind);
+                    }
+                    let Ty::Unsigned(maximum) = body_ty else {
+                        return Err(Failure::Kind);
+                    };
+                    // C is u32, hence C*B < 2^160. Exact multiplication supplies
+                    // the U256 bound; lack of a static B refuses even for C=0.
+                    let maximum = maximum.ok_or(Failure::Arithmetic)?;
+                    let _bound = super::super::super::value::wide::multiply(
+                        limits.max_entries.into(),
+                        maximum,
+                    );
+                    Ty::WideSum
+                } else if matches!(e, Expr::SumI128(..)) {
                     let (lo, hi) = integer(body_ty)?;
                     if lo == i128::MIN || hi == i128::MIN {
                         return Err(Failure::Arithmetic);
@@ -430,6 +508,7 @@ pub(crate) fn admit(d: &Descriptor) -> Result<(), Failure> {
         nodes: 0,
         sources: 7,
         candidate: false,
+        law: false,
     };
     for case in &d.cases {
         boolean(c.expr(&case.when, 0)?)?;
@@ -440,6 +519,7 @@ pub(crate) fn admit(d: &Descriptor) -> Result<(), Failure> {
             Law::Predicate {
                 expression, scope, ..
             } => {
+                c.law = true;
                 c.sources = match scope {
                     Scope::State | Scope::Genesis => 9,
                     Scope::Reject => 7,
@@ -449,6 +529,7 @@ pub(crate) fn admit(d: &Descriptor) -> Result<(), Failure> {
                 boolean(c.expr(expression, 0)?)?;
             }
             Law::Frame { field, keys, .. } => {
+                c.law = false;
                 c.sources = 7;
                 c.candidate = false;
                 let f = d
@@ -561,20 +642,53 @@ impl Env<'_> {
                 Data::Value(v)
             }
             Expr::Eq(a, b) => {
-                let a = self.eval(d, a, m)?.value()?;
-                let b = self.eval(d, b, m)?.value()?;
-                collection::reserve(&a, m)?;
-                collection::reserve(&b, m)?;
-                Data::Value(Value::boolean(a == b))
+                let a = self.eval(d, a, m)?;
+                if !matches!(a, Data::Value(_) | Data::WideSum(_)) {
+                    return Err(Failure::Kind);
+                }
+                let b = self.eval(d, b, m)?;
+                let equal = if matches!(a, Data::WideSum(_)) || matches!(b, Data::WideSum(_)) {
+                    m.charge(Resource::Byte, 64)?;
+                    numeric_compare(a, b)? == core::cmp::Ordering::Equal
+                } else {
+                    let a = a.value()?;
+                    let b = b.value()?;
+                    collection::reserve(&a, m)?;
+                    collection::reserve(&b, m)?;
+                    a == b
+                };
+                Data::Value(Value::boolean(equal))
             }
             Expr::Lt(a, b) => {
-                let a = self.eval(d, a, m)?.integer()?;
-                let b = self.eval(d, b, m)?.integer()?;
-                Data::Value(Value::boolean(a < b))
+                let a = self.eval(d, a, m)?;
+                match &a {
+                    Data::WideSum(_) => {}
+                    Data::Value(v) if matches!(v.view(), ValueRef::I128(_) | ValueRef::U128(_)) => {
+                    }
+                    _ => return Err(Failure::Kind),
+                }
+                let b = self.eval(d, b, m)?;
+                Data::Value(Value::boolean(
+                    numeric_compare(a, b)? == core::cmp::Ordering::Less,
+                ))
             }
             Expr::Add(a, b) | Expr::Sub(a, b) => {
-                let a = self.eval(d, a, m)?.integer()?;
-                let b = self.eval(d, b, m)?.integer()?;
+                let a = self.eval(d, a, m)?.value()?;
+                if !matches!(a.view(), ValueRef::I128(_) | ValueRef::U128(_)) {
+                    return Err(Failure::Kind);
+                }
+                let b = self.eval(d, b, m)?.value()?;
+                if let (ValueRef::U128(a), ValueRef::U128(b)) = (a.view(), b.view()) {
+                    let n = if matches!(e, Expr::Add(..)) {
+                        a.checked_add(b)
+                    } else {
+                        a.checked_sub(b)
+                    }
+                    .ok_or(Failure::Arithmetic)?;
+                    return Ok(Data::Value(Value::unsigned(n)));
+                }
+                let a = Data::Value(a).integer()?;
+                let b = Data::Value(b).integer()?;
                 let v = if matches!(e, Expr::Add(..)) {
                     a.checked_add(b)
                 } else {
@@ -690,7 +804,8 @@ impl Env<'_> {
             Expr::All(table, body)
             | Expr::Any(table, body)
             | Expr::Count(table, body)
-            | Expr::SumI128(table, body) => {
+            | Expr::SumI128(table, body)
+            | Expr::SumU128(table, body) => {
                 let table = self.eval(d, table, m)?.value()?;
                 let ValueRef::Map(entries) = table.view() else {
                     return Err(Failure::Kind);
@@ -698,6 +813,10 @@ impl Env<'_> {
                 let mut all = true;
                 let mut any = false;
                 let mut n = 0i128;
+                let mut wide = [0u128; 2];
+                if matches!(e, Expr::SumU128(..)) {
+                    m.charge(Resource::Byte, 32)?;
+                }
                 for entry in entries {
                     collection::visit(m)?;
                     let old = self.entry.replace((
@@ -706,7 +825,14 @@ impl Env<'_> {
                     ));
                     let value = self.eval(d, body, m);
                     self.entry = old;
-                    if matches!(e, Expr::SumI128(..)) {
+                    if matches!(e, Expr::SumU128(..)) {
+                        step(m)?;
+                        let value = value?.value()?;
+                        let ValueRef::U128(value) = value.view() else {
+                            return Err(Failure::Kind);
+                        };
+                        wide = add_unsigned_sum(wide, value)?;
+                    } else if matches!(e, Expr::SumI128(..)) {
                         step(m)?;
                         n = n
                             .checked_add(value?.integer()?)
@@ -720,6 +846,9 @@ impl Env<'_> {
                             n = n.checked_add(1).ok_or(Failure::Arithmetic)?;
                         }
                     }
+                }
+                if matches!(e, Expr::SumU128(..)) {
+                    return Ok(Data::WideSum(wide));
                 }
                 Data::Value(match e {
                     Expr::All(..) => Value::boolean(all),

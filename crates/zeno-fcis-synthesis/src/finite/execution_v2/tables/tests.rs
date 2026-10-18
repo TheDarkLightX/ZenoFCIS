@@ -146,3 +146,164 @@ fn lookup_full_scan_has_exact_reference_tariff() {
         );
     }
 }
+
+fn unsigned_comparison(enabled: bool, holds: bool, witness: &str) {
+    if enabled {
+        assert!(holds, "U128_TABLE_MISMATCH {witness}");
+    }
+}
+#[test]
+fn u128_table_wide_sum_oracle() {
+    let enabled = std::env::var_os("U128_TABLE_DISABLE_COMPARISON").is_none();
+    std::println!("U128_TABLE_WITNESS wide sum including MAX+MAX");
+    let d = Descriptor {
+        order: None,
+        profile: b"sum-oracle".to_vec(),
+        types: vec![],
+        roots: [100, 101, 102],
+        frame_bytes: [4096; 3],
+        genesis: Value::unit(),
+        reasons: vec![303],
+        cases: vec![],
+        laws: vec![],
+        limits: schema::all_limits(),
+    };
+    for row in include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/test-data/u128-tables/sums.tsv"
+    ))
+    .lines()
+    {
+        let columns: Vec<_> = row.split('\t').collect();
+        let xs: Vec<u128> = if columns[0] == "-" {
+            vec![]
+        } else {
+            columns[0].split(',').map(|n| n.parse().unwrap()).collect()
+        };
+        let expected = [
+            columns[1].parse::<u128>().unwrap(),
+            columns[2].parse::<u128>().unwrap(),
+        ];
+        let table = Value::map_canonical(
+            xs.iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    MapEntry::try_new(Value::unsigned(i as u128), Value::unsigned(*n)).unwrap()
+                })
+                .collect(),
+        )
+        .unwrap();
+        let expression = Expr::SumU128(
+            Box::new(Expr::Literal(0, table)),
+            Box::new(Expr::EntryValue),
+        );
+        let unit = Value::unit();
+        let mut env = expression::Env {
+            pre: &unit,
+            command: None,
+            context: None,
+            post: None,
+            payload: None,
+            entry: None,
+            error: None,
+            candidate_reason: None,
+        };
+        let mut m = meter::new(schema::all_limits());
+        let result = env.eval(&d, &expression, &mut m);
+        unsigned_comparison(
+            enabled,
+            matches!(result,Ok(Data::WideSum(sum)) if sum==expected),
+            row,
+        );
+        let used = m.used;
+        let mut retry = meter::new(schema::all_limits());
+        let again = env.eval(&d, &expression, &mut retry);
+        unsigned_comparison(
+            enabled,
+            matches!(again,Ok(Data::WideSum(sum)) if sum==expected),
+            row,
+        );
+        assert_eq!(used, retry.used);
+        assert!(env.entry.is_none());
+        if used.used(Resource::Step) > 0 {
+            let limit =
+                schema::all_limits().with_limit(Resource::Step, used.used(Resource::Step) - 1);
+            let mut denied = meter::new(limit);
+            assert!(matches!(
+                env.eval(&d, &expression, &mut denied),
+                Err(Failure::Budget(_))
+            ));
+            assert!(env.entry.is_none());
+        }
+    }
+}
+#[test]
+fn u128_table_nicr_wide_oracle() {
+    let enabled = std::env::var_os("U128_TABLE_DISABLE_COMPARISON").is_none();
+    std::println!("U128_TABLE_WITNESS unsigned NICR with full-width product");
+    for row in include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/test-data/u128-tables/nicr.tsv"
+    ))
+    .lines()
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        let expected = c[2].parse::<u128>().ok();
+        let actual = redemption::nicr(
+            c[0].parse().unwrap(),
+            c[1].parse().unwrap(),
+            &mut meter::new(schema::all_limits()),
+        );
+        unsigned_comparison(enabled, actual.ok() == expected, row);
+    }
+    // Three-factor quotient crosses the old signed boundary and checks its final U128 range.
+    assert_eq!(
+        redemption::mul3div(u128::MAX, 1, 1, 1, &mut meter::new(schema::all_limits())).unwrap(),
+        u128::MAX
+    );
+    assert!(
+        redemption::mul3div(u128::MAX, 2, 1, 1, &mut meter::new(schema::all_limits())).is_err()
+    );
+}
+
+#[test]
+fn u128_table_kind_checks_keep_left_before_right() {
+    let d = Descriptor {
+        order: None,
+        profile: vec![],
+        types: vec![],
+        roots: [0; 3],
+        frame_bytes: [1024; 3],
+        genesis: Value::unit(),
+        reasons: vec![],
+        cases: vec![],
+        laws: vec![],
+        limits: schema::all_limits(),
+    };
+    let unit = Value::unit();
+    let mut env = expression::Env {
+        pre: &unit,
+        command: None,
+        context: None,
+        post: None,
+        payload: None,
+        entry: None,
+        error: None,
+        candidate_reason: None,
+    };
+    for expression in [
+        Expr::Lt(
+            Box::new(Expr::Literal(0, Value::boolean(false))),
+            Box::new(Expr::Payload),
+        ),
+        Expr::Add(
+            Box::new(Expr::Literal(0, Value::boolean(false))),
+            Box::new(Expr::Payload),
+        ),
+    ] {
+        assert!(matches!(
+            env.eval(&d, &expression, &mut meter::new(schema::all_limits())),
+            Err(Failure::Kind)
+        ));
+    }
+}

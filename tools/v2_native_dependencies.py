@@ -78,8 +78,21 @@ def prepare_native_dependencies(root: Path, directory: Path, environment: dict) 
     for line in run.stdout.splitlines():
         row = json.loads(line)
         if row.get("reason") == "compiler-artifact":
-            for filename in row.get("filenames", []):
-                artifact = Path(filename)
+            artifacts = [Path(name) for name in row.get("filenames", [])]
+            reported_libraries = [path for path in artifacts if path.suffix == ".rlib"]
+            for metadata in [path for path in artifacts if path.suffix == ".rmeta"]:
+                # For a selected package Cargo reports its top-level .rlib and
+                # hashed .rmeta. Rustc also needs the matching hashed .rlib for
+                # transitive linking. Bind that sibling to the emitted bytes;
+                # never search a shared target for a plausible stale artifact.
+                library = metadata.with_suffix(".rlib")
+                if library not in artifacts and reported_libraries:
+                    if (library.is_symlink() or not library.is_file()
+                            or not any(verifier.digest(library) == verifier.digest(path)
+                                       for path in reported_libraries)):
+                        raise ValueError("hashed native library differs from Cargo output")
+                    artifacts.append(library)
+            for artifact in artifacts:
                 if artifact.suffix not in (".rlib", ".rmeta", ".so"):
                     continue
                 destination = private / artifact.name

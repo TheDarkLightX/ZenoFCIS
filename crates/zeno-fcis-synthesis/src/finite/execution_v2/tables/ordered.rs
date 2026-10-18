@@ -8,6 +8,12 @@ use super::*;
 use alloc::vec;
 use core::cmp::Ordering;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum Priority {
+    Signed(i128),
+    Unsigned(u128),
+}
+
 pub(super) fn fields(d: &Descriptor, s: &OrderSpec) -> Result<(u32, Option<u32>), Failure> {
     let fs = d.record(d.roots[0])?;
     let map = fs
@@ -36,10 +42,21 @@ pub(super) fn admit(d: &Descriptor, s: &OrderSpec) -> Result<(), Failure> {
         return Err(Failure::Descriptor);
     }
     let fs = d.record(item)?;
-    if fs.len() != 3 || !matches!(d.ty(fs[0].type_id)?.shape, Shape::I128 { .. }) {
+    if fs.len() != 3
+        || !matches!(
+            d.ty(fs[0].type_id)?.shape,
+            Shape::I128 { .. } | Shape::U128 { .. }
+        )
+    {
         return Err(Failure::Descriptor);
     }
-    if s.mode == 2 && !matches!(d.ty(fs[0].type_id)?.shape,Shape::I128{min,max:_} if min>0) {
+    if s.mode == 2
+        && !match d.ty(fs[0].type_id)?.shape {
+            Shape::I128 { min, .. } => min > 0,
+            Shape::U128 { min, .. } => min > 0,
+            _ => false,
+        }
+    {
         return Err(Failure::Descriptor);
     }
     for t in &d.types {
@@ -107,12 +124,16 @@ pub(super) fn integer(v: &Value) -> Result<i128, Failure> {
         _ => Err(Failure::Kind),
     }
 }
-pub(super) fn priority(item: &Value, m: &mut Meter) -> Result<i128, Failure> {
+pub(super) fn priority(item: &Value, m: &mut Meter) -> Result<Priority, Failure> {
     step(m)?;
     let ValueRef::Record(fs) = item.view() else {
         return Err(Failure::Kind);
     };
-    integer(fs.first().ok_or(Failure::Kind)?.value())
+    match fs.first().ok_or(Failure::Kind)?.value().view() {
+        ValueRef::I128(n) => Ok(Priority::Signed(n)),
+        ValueRef::U128(n) => Ok(Priority::Unsigned(n)),
+        _ => Err(Failure::Kind),
+    }
 }
 pub(super) fn compare(a: &Value, b: &Value, m: &mut Meter) -> Result<Ordering, Failure> {
     step(m)?;
@@ -341,24 +362,28 @@ fn at_priority(
     xs: &[Value],
     i: usize,
     m: &mut Meter,
-) -> Result<i128, Failure> {
+) -> Result<Priority, Failure> {
     visit(m)?;
     priority(
         &collection::lookup(d, mt, map, &xs[i], m)?.ok_or(Failure::Undefined)?,
         m,
     )
 }
-pub(super) fn number_cmp(a: i128, b: i128, m: &mut Meter) -> Result<Ordering, Failure> {
+pub(super) fn number_cmp(a: Priority, b: Priority, m: &mut Meter) -> Result<Ordering, Failure> {
     step(m)?;
     m.charge(Resource::Byte, 34)?;
-    Ok(a.cmp(&b))
+    match (a, b) {
+        (Priority::Signed(a), Priority::Signed(b)) => Ok(a.cmp(&b)),
+        (Priority::Unsigned(a), Priority::Unsigned(b)) => Ok(a.cmp(&b)),
+        _ => Err(Failure::Kind),
+    }
 }
 fn gap(
     d: &Descriptor,
     mt: u32,
     map: &Value,
     xs: &[Value],
-    p: i128,
+    p: Priority,
     upper: Option<usize>,
     lower: Option<usize>,
     m: &mut Meter,
@@ -386,7 +411,7 @@ pub(super) fn cut(
     mt: u32,
     map: &Value,
     xs: &[Value],
-    p: i128,
+    p: Priority,
     upper: Option<&Value>,
     lower: Option<&Value>,
     mode: u8,

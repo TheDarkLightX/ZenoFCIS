@@ -93,6 +93,15 @@ fn value(types: &[t::Type], tid: u32, j: &Json) -> Result<Value, ContractError> 
             }
             Value::signed(n)
         }
+        Shape::U128 { min, max } => {
+            // Unsigned atoms use canonical decimal text, never JSON numbers or signed casts.
+            let token = text(j)?;
+            let n = token.parse::<u128>().map_err(err)?;
+            if n.to_string() != token || n < *min || n > *max {
+                return Err(err("noncanonical U128 or value outside declared range"));
+            }
+            Value::unsigned(n)
+        }
         Shape::Bytes { min, max } => {
             let bytes = array(j)?.iter().map(num).collect::<Result<Vec<u8>, _>>()?;
             if bytes.len() < *min as usize || bytes.len() > *max as usize {
@@ -196,6 +205,7 @@ fn expression(types: &[t::Type], j: &Json) -> Result<Expr, ContractError> {
         "any" => 24,
         "count" => 25,
         "sum_i128" => 26,
+        "sum_u128" => 31,
         "reason" => 27,
         "project" => 28,
         "match_bool" => 29,
@@ -375,6 +385,11 @@ pub fn compile(project: &str, rules: &str) -> Result<Compiled, ContractError> {
                 return Err(err("binding overrides record"));
             }
             Shape::Record(fields)
+        } else if let Some((min, max)) = t.unsigned_range() {
+            if binding.is_some() {
+                return Err(err("binding overrides unsigned range"));
+            }
+            Shape::U128 { min, max }
         } else if let Some(range) = t.range() {
             if binding.is_some() {
                 return Err(err("binding overrides integer range"));

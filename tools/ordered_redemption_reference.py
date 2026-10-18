@@ -149,6 +149,14 @@ def cases():
     s.update(active_collateral=sum(v['collateral'] for v in s['vaults']),active_debt=sum(v['debt'] for v in s['vaults']),holder_balance=maximum//5,price_e8=4*10**8,order=[0,1,2]);s['supply']=s['active_debt'];s['priorities']=[(v['id'],priority(s,v)) for v in s['vaults']]
     c['maximum']=maximum//100;c['partial_nicr']=nicr(s['vaults'][2]['collateral']-c['maximum']//4,s['vaults'][2]['debt']-c['maximum']);add('i128-wide-boundary',s,c,p,x)
     s,c,p,x=base()
+    v=s['vaults'][0];v.update(collateral=2**127+102,debt=2**127+101)
+    s.update(active_collateral=sum(v['collateral'] for v in s['vaults']),active_debt=sum(v['debt'] for v in s['vaults']),price_e8=4*10**8,base_rate=Q//1000)
+    s['supply']=s['active_debt'];s['priorities']=[(v['id'],priority(s,v)) for v in s['vaults']]
+    s['order']=sorted(s['order'],key=lambda k:-dict(s['priorities'])[k])
+    c.update(maximum=100*Q,partial_nicr=nicr(v['collateral']-25*Q,v['debt']-100*Q))
+    add('u128-high-bit-vault',s,c,p,x)
+    assert 'reason' not in rows[-1]['expected']
+    s,c,p,x=base()
     for v in s['vaults']:v['collateral']*=2;v['debt']*=2
     s['active_collateral']*=2;s['active_debt']*=2;s['supply']*=2
     s.update(reward_d=Q//10,default_debt=30*Q,supply=s['supply']+30*Q);s['priorities']=[(v['id'],priority(s,v)) for v in s['vaults']]

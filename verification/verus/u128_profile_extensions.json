@@ -8,14 +8,14 @@
     {
       "id": "finite-execution",
       "retained_inventory": "verification/verus/finite-execution.json",
-      "retained_inventory_sha256": "92f7efd4e50f104a03a510b429f2a6dfee6d0b2721a5a574ef974f3db6d5714f",
+      "retained_inventory_sha256": "7fcba155cd1af92db630816c317e1bf2d2225ffd7ab7525ba8abdbd251f1591a",
       "extension": "U128 typed graph, casts, sum projection, metadata and full shared-source closure; retranslate and reprove at freeze",
       "old_counts_qualify_extension": false
     },
     {
       "id": "metered-execution",
       "retained_inventory": "verification/verus/metered-execution.json",
-      "retained_inventory_sha256": "bdaf42bb6c80577ab4599007263cfc7f68311805954b0ae2a69cf76aa5d0e2d5",
+      "retained_inventory_sha256": "f69127d9cda6f27e7b19b5713047d988b3db4e3cba0f133422fb885bd29c421c",
       "extension": "U128 typed graph, casts, sum projection, metadata and full shared-source closure; retranslate and reprove at freeze",
       "old_counts_qualify_extension": false
     },
@@ -78,7 +78,7 @@
     {
       "id": "authority_v2",
       "retained_inventory": "verification/verus/authority_v2.json",
-      "retained_inventory_sha256": "ad5c45c022793447bd830bae7ffd3390a8c2e9f5850729d797a9e76f3eeba975",
+      "retained_inventory_sha256": "716c8f7875e37ef960e878ee353216f4955e264a697d1a05064723f78a2467b1",
       "extension": "U128 typed graph, casts, sum projection, metadata and full shared-source closure; retranslate and reprove at freeze",
       "old_counts_qualify_extension": false
     },
@@ -138,7 +138,7 @@
       "Exact sum-code projection separately from original domain equality; unsigned values never use that projection.",
       "One metered eager driver, actual refusal/retry usage, exclusive invocation scratch and immutable retained inputs/results.",
       "Original law/delivery/output/publication bytes, exact replay, catalog/source binding and independent admission.",
-      "U128 tables and unsupported consumers refuse at binding; no table qualification or publication authority from research checks."
+      "U128 tables reconstruct exact unsigned kinds; law-local U256 sums require established static capacity bounds; ordered U128 NICR uses wide intermediates. Restricted scalar consumers refuse table subjects. Native finite/oracle/defect checks do not qualify shared Verus profiles or grant publication authority."
     ],
     "qualification": "pending; native compilation is not Verus acceptance"
   },
@@ -153,8 +153,10 @@
     "crates/zeno-fcis-contract/src/internals/policy.rs": "56d90cbb40fb26e42c968f399a17eda0d825594e9ac25d3217007263115d7efd",
     "crates/zeno-fcis-contract/src/internals/quantity.rs": "0597f9769d2485817214ef610b18445ba5533ce8ba41c3661c687d884213739f",
     "crates/zeno-fcis-contract/src/internals/review/evaluate.rs": "b40aeb7be4bbbb85a73d22a22e40bf1380fe387342d8a2f8151275986eacebcb",
-    "crates/zeno-fcis-contract/src/internals/rules.rs": "4c8765929c93964345ccc40cd2b03e9f095f665e470166c2c3ac21148038fad0",
+    "crates/zeno-fcis-contract/src/internals/rules.rs": "e80f82bc982291e2318d6bb0deb329ad460f5dc3146a7b4027a693643505b74d",
     "crates/zeno-fcis-contract/src/internals/schema.rs": "1bb61003e16ce3723b54c2a10d9c1e59368f221f08a0f0bdf74ccaabeb45bfeb",
+    "crates/zeno-fcis-contract/src/internals/tables.rs": "f2ff79db5eb29098f83043418e9dac2e2339948b375c688a6fe603cb2f32d5e0",
+    "crates/zeno-fcis-contract/src/internals/tables_review.rs": "2f7822d7d4f172572dd14b9bd374baeb25f883565784727a55c7b87c55ae153d",
     "crates/zeno-fcis-spec/src/ast.rs": "9bbedb41f90572eda327287b30d858241ae989805a5dadbecedf3eb5f5e5cc17",
     "crates/zeno-fcis-spec/src/elaborate.rs": "0217c3e84c92979cebb78ebedbca4ba2b1fd172bbda38d10cf1184eb6797ca44",
     "crates/zeno-fcis-spec/src/parser.rs": "0624722a3915a3956e48409af8ffeacece6442f23fe1da4f8813eb7a5c0edc7b",
@@ -170,6 +172,16 @@
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/shared_spec.rs": "4cc84814e35e75f2f133ff6e5f4a04f8ce6a35d97645c8bb610ba6913281eb5a",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed.rs": "0df4cf937e12462ea2071aca50430533fb620a8720ac69689b624a6f72cabee9",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed/spec.rs": "64c7dc3e7d1733693f9cc2508d9117601ec569e24fa9e8f887cb61a6220af1ba",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/authority.rs": "1243a9fdf2009859e03edb6997d29bc446747295fab59a5af4eec3cbd025feb8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/collection.rs": "d04dd308d2dcba2d37eaa01585cf504502bd19926066cd1761bb17c8768b4555",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/expression.rs": "11cc1bdcffbbc27a0929a69a107f82b28777044418f75b438b7a4dcfbbd8409c",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/mod.rs": "2f21b90be4314e2618ce7fce03d93d48c46515192281d79f9f8cc12f98a012dc",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/order_laws.rs": "7c55efa05497b5243ba0889a08e52b347b0e33625e3ea2209792d7239274186b",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/ordered.rs": "d5fc706c1446705b8860cd50be671971c827aa93feb7a1ffcbe2f4254cd8c50c",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/policy.rs": "9be0bed3db572f81ec705bed1981606c810b6a074f9b616591ddc617af13af3f",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption.rs": "b2a31d78f266cde0b0c210f8ac476496809b3c75614af39a5a0d5e3226ba93f7",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption_laws.rs": "4b1a74f40cf11f9d7d440a55820c2d4ca6fe4df3c27ff91a72f8d84182c733b8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/schema.rs": "b3629891c5756e8f369342e9b4d1e4a0141b4ba0318d562dbfd75275461fb23b",
     "crates/zeno-fcis-synthesis/src/finite/value/mod.rs": "fcee14489846c0067bd9e9ec73b4a7f3f658289b6b0e7bc0e89e5d5531f075fa",
     "crates/zeno-fcis-synthesis/src/finite/value/wide.rs": "7ba3833708ab33c9267283799277c534af21ac1edec90722a6c0852cc0e2beff",
     "verification/arithmetic/unsigned_lowering.rs": "e1eb947de8b1e6324e2b5f8ca6f3dd91f707d0d1c51700405c79ead0055b17fb",
@@ -178,7 +190,11 @@
   "required_native_controls": [
     "u128_checked_arithmetic_oracle",
     "u128_conversion_boundaries",
-    "u128_fused_wide_oracle"
+    "u128_fused_wide_oracle",
+    "u128_table_wide_sum_oracle",
+    "u128_table_keys_preserve_kind",
+    "u128_table_nicr_wide_oracle",
+    "u128_sum_requires_static_bound"
   ],
   "next_gate": "At the 2.5.1 freeze, translate the complete final subjects, inspect every inventory delta, prove and run pinned semantic controls together with tables. Do not copy previous checked counts."
 }

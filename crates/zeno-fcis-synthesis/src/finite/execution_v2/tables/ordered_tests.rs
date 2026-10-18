@@ -118,18 +118,27 @@ fn ordered_scan_and_iteration_reference_reads() {
 fn ordered_redemption_fused_wide_integer_boundaries() {
     let mut denied = meter::new(schema::all_limits().with_limit(Resource::Byte, 33));
     assert!(matches!(
-        ordered::number_cmp(1, 0, &mut denied),
+        ordered::number_cmp(
+            ordered::Priority::Signed(1),
+            ordered::Priority::Signed(0),
+            &mut denied
+        ),
         Err(Failure::Budget(_))
     ));
     assert_eq!(denied.used.used(Resource::Step), 1);
     assert_eq!(denied.used.used(Resource::Byte), 0);
     let mut exact = meter::new(schema::all_limits().with_limit(Resource::Byte, 34));
     assert_eq!(
-        ordered::number_cmp(1, 0, &mut exact).unwrap(),
+        ordered::number_cmp(
+            ordered::Priority::Signed(1),
+            ordered::Priority::Signed(0),
+            &mut exact
+        )
+        .unwrap(),
         core::cmp::Ordering::Greater
     );
     assert_eq!(exact.used.used(Resource::Byte), 34);
-    let max = i128::MAX;
+    let max = u128::MAX;
     for (a, b, c, d, want) in [
         (7, 11, 13, 17, Some(58)),
         (max, max, 1, max, Some(max)),

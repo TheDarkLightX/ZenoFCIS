@@ -24,7 +24,7 @@ class DependencyBinding(unittest.TestCase):
         self.rows = []
         self.target = self.root/'target'
         self.target.mkdir()
-        for package in ('value', 'codec'):
+        for package in ('value', 'codec', 'collections'):
             base = self.root/'crates'/('zeno-fcis-'+package)
             (base/'src').mkdir(parents=True)
             (base/'Cargo.toml').write_text('fixture manifest')
@@ -64,14 +64,14 @@ class DependencyBinding(unittest.TestCase):
             self.assertEqual(rows[0]['args'], rows[1]['args'])
             self.assertEqual(rows[0]['args'], list(prepared.arguments))
         self.assertEqual(mtimes, {p:p.stat().st_mtime_ns for p in mtimes})
-        self.assertEqual(len(prepared.artifacts), 3)
+        self.assertEqual(len(prepared.artifacts), 4)
         self.assertTrue(all(path.stat().st_mode & 0o222 == 0 for path, _ in prepared.artifacts))
         receipt = json.loads(prepared.receipt.read_text())
         self.assertTrue(all(row['fresh'] is False for row in receipt['libraries'].values()))
-        self.assertEqual(len(receipt['artifacts']), 3)
+        self.assertEqual(len(receipt['artifacts']), 4)
 
     def test_fresh_true_oracle_witness_remains_refused(self):
-        for i in (0, 1):
+        for i in (0, 1, 2):
             with self.subTest(package=i):
                 self.rows[i]['fresh'] = True
                 result = subprocess.CompletedProcess([], 0, '\n'.join(map(json.dumps, self.rows)), '')
@@ -79,6 +79,37 @@ class DependencyBinding(unittest.TestCase):
                         self.assertRaisesRegex(ValueError, 'fresh current-source provenance'):
                     deps.prepare_native_dependencies(self.root, self.root/f'bad-{i}', self.env)
                 self.rows[i]['fresh'] = False
+
+    def test_cargo_top_level_library_retains_hash_matched_link_sibling(self):
+        library = Path(self.rows[1]['filenames'][0])
+        hashed = self.target/'deps/libzeno_fcis_codec-cargo_hash.rlib'
+        hashed.parent.mkdir()
+        hashed.write_bytes(library.read_bytes())
+        metadata = hashed.with_suffix('.rmeta')
+        metadata.write_bytes(b'synthetic metadata')
+        self.rows[1]['filenames'].append(str(metadata))
+        prepared = self.prepare()
+        private = dict(prepared.artifacts)
+        retained = prepared.receipt.parent/'libraries'/hashed.name
+        self.assertIn(retained, private)
+        self.assertEqual(retained.read_bytes(), library.read_bytes())
+        hashed.write_bytes(b'later shared target mutation')
+        self.assertEqual(retained.read_bytes(), b'codec')
+        deps.native_dependency_args(self.root,self.root/'worker',self.env,prepared=prepared)
+
+    def test_missing_or_wrong_hashed_link_sibling_refuses_preparation(self):
+        hashed = self.target/'deps/libzeno_fcis_codec-cargo_hash.rlib'
+        hashed.parent.mkdir()
+        metadata = hashed.with_suffix('.rmeta')
+        metadata.write_bytes(b'synthetic metadata')
+        self.rows[1]['filenames'].append(str(metadata))
+        for index, content in enumerate((None,b'wrong library')):
+            if content is not None:
+                hashed.write_bytes(content)
+            result = subprocess.CompletedProcess([],0,'\n'.join(map(json.dumps,self.rows)),'')
+            with patch.object(deps.verifier,'run',return_value=result), \
+                    self.assertRaisesRegex(ValueError,'differs from Cargo output'):
+                deps.prepare_native_dependencies(self.root,self.root/f'bad-link-{index}',self.env)
 
     def test_authority_creates_absent_target_before_unchanged_preparation_checks(self):
         import ast

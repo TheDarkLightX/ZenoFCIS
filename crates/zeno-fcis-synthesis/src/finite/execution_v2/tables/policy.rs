@@ -104,6 +104,7 @@ impl Expr {
             Self::Any(a, b) => binary(24, a, b),
             Self::Count(a, b) => binary(25, a, b),
             Self::SumI128(a, b) => binary(26, a, b),
+            Self::SumU128(a, b) => binary(31, a, b),
             Self::Ordered(op, mode, view, extra, args) => v(vec![
                 n(30),
                 n(*op),
@@ -118,7 +119,7 @@ impl Expr {
         let xs = seq(value)?;
         let tag = int(at(xs, 0)?)?;
         let len = match tag {
-            0 | 1 | 5 | 6..=10 | 15 | 16 | 23..=26 | 28 => 3,
+            0 | 1 | 5 | 6..=10 | 15 | 16 | 23..=26 | 28 | 31 => 3,
             2..=4 | 22 | 27 => 1,
             11 | 12 => 2,
             13 | 14 | 19..=21 | 29 => 4,
@@ -166,6 +167,7 @@ impl Expr {
             24 => Self::Any(expr(1)?, expr(2)?),
             25 => Self::Count(expr(1)?, expr(2)?),
             26 => Self::SumI128(expr(1)?, expr(2)?),
+            31 => Self::SumU128(expr(1)?, expr(2)?),
             27 => Self::Reason,
             28 => Self::Project(expr(1)?, num(&xs[2])?),
             29 => Self::MatchBool(expr(1)?, expr(2)?, expr(3)?),
@@ -251,6 +253,9 @@ impl Descriptor {
                 let shape = match &t.shape {
                     Shape::Unit => v(vec![n(0)])?,
                     Shape::Bool => v(vec![n(1)])?,
+                    Shape::U128 { min, max } => {
+                        v(vec![n(2), Value::unsigned(*min), Value::unsigned(*max)])?
+                    }
                     Shape::I128 { min, max } => v(vec![n(3), n(*min), n(*max)])?,
                     Shape::Bytes { min, max } => v(vec![n(4), n(*min), n(*max)])?,
                     Shape::Vector {
@@ -383,6 +388,17 @@ impl Descriptor {
                     0 | 1 => {
                         exact(&x[2], 1)?;
                         if tag == 0 { Shape::Unit } else { Shape::Bool }
+                    }
+                    2 => {
+                        exact(&x[2], 3)?;
+                        let unsigned = |v: &Value| match v.view() {
+                            ValueRef::U128(n) => Ok(n),
+                            _ => Err(Failure::Policy),
+                        };
+                        Shape::U128 {
+                            min: unsigned(&form[1])?,
+                            max: unsigned(&form[2])?,
+                        }
                     }
                     3 => {
                         exact(&x[2], 3)?;

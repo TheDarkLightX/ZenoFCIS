@@ -39,9 +39,9 @@ fn workspace_digest_equals_compiled_authority() {
     let manifest = include_str!("../../../verification/verus/authority_v2_sources.json");
     // Independently pinned membership: omission must refuse even if regenerated.
     let approved_manifest = [
-        130_u8, 169_u8, 110_u8, 17_u8, 60_u8, 63_u8, 93_u8, 105_u8, 160_u8, 237_u8, 94_u8, 205_u8,
-        112_u8, 218_u8, 93_u8, 78_u8, 230_u8, 243_u8, 9_u8, 85_u8, 77_u8, 221_u8, 190_u8, 238_u8,
-        25_u8, 124_u8, 33_u8, 67_u8, 65_u8, 63_u8, 128_u8, 87_u8,
+        191_u8, 13_u8, 220_u8, 96_u8, 12_u8, 20_u8, 25_u8, 181_u8, 123_u8, 138_u8, 82_u8, 110_u8,
+        35_u8, 127_u8, 172_u8, 199_u8, 107_u8, 39_u8, 58_u8, 175_u8, 148_u8, 206_u8, 126_u8,
+        220_u8, 89_u8, 164_u8, 131_u8, 213_u8, 51_u8, 141_u8, 102_u8, 161_u8,
     ];
     assert_eq!(
         RustCryptoSha256::hash(manifest.as_bytes()).as_bytes(),
@@ -65,7 +65,7 @@ fn workspace_digest_equals_compiled_authority() {
             (name.to_owned(), payload)
         })
         .collect();
-    rows.push(("@pin/core-profile".into(), b"ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\nOwned native tables/1 policy v3: bounded maps/sets, I128 sums and full-scan work tariff. Finite checked at C=0..3 plus tested journeys; no table Verus proof. Scalar-only consumers refuse table subjects.\nOwned native tables-ordered/1 policy v4: closed I128 priority/ID and committed V1 NICR cuts, bounded ID vectors, full-view admission, independent ordered and redemption relations, stable metered V1-cut redistribution repair. Typed redemption plans require authenticated consensus/oracle inputs and cannot publish custody or authenticate a host. Finite evidence and tested journeys, no ordered-table Verus or full-zUSD proof.\n".to_vec()));
+    rows.push(("@pin/core-profile".into(), b"ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\nOwned native tables/1 policy v3: bounded maps/sets, I128 sums and full-scan work tariff. Finite checked at C=0..3 plus tested journeys; no table Verus proof. Scalar-only consumers refuse table subjects.\nOwned native tables-ordered/1 policy v4: closed I128 priority/ID and committed V1 NICR cuts, bounded ID vectors, full-view admission, independent ordered and redemption relations, stable metered V1-cut redistribution repair. Typed redemption plans require authenticated consensus/oracle inputs and cannot publish custody or authenticate a host. Finite evidence and tested journeys, no ordered-table Verus or full-zUSD proof.\nU128 tables extension: exact unsigned schema/key/value reconstruction, kind-preserving point/update/frame laws, law-local checked U256 sums with established static capacity bounds, unsigned ordered priorities and U128 redemption quantities using exact wide NICR. Existing I128 table schema/policy/value formats and tariffs retained. Finite alphabets, independent integer oracles and compiled defect controls only; final shared-source Verus qualification remains pending.\n".to_vec()));
     rows.push(("@pin/runtime-toolchain".into(), b"Rust 1.97.1; Cargo --locked. Verus-shared execution source under ordinary Rust. Supported assurance target Linux x86_64.\n".to_vec()));
     rows.push((
         "@pin/verifier-toolchain".into(),

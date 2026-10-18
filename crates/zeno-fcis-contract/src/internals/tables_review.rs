@@ -36,6 +36,15 @@ pub fn values(d: &t::Descriptor, id: u32, cap: usize) -> Result<Vec<Value>, Cont
     Ok(match &ty.shape {
         Shape::Unit => vec![Value::unit()],
         Shape::Bool => vec![Value::boolean(false), Value::boolean(true)],
+        Shape::U128 { min, max } => {
+            let _count = max
+                .checked_sub(*min)
+                .and_then(|n| n.checked_add(1))
+                .and_then(|n| usize::try_from(n).ok())
+                .filter(|n| *n <= cap)
+                .ok_or_else(|| error("domain-over-limit"))?;
+            (*min..=*max).map(Value::unsigned).collect()
+        }
         Shape::I128 { min, max } => {
             let count = max
                 .checked_sub(*min)

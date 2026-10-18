@@ -63,6 +63,10 @@ pub struct FieldType {
 pub enum Shape {
     Unit,
     Bool,
+    U128 {
+        min: u128,
+        max: u128,
+    },
     I128 {
         min: i128,
         max: i128,
@@ -120,6 +124,8 @@ pub enum Expr {
     Any(Box<Expr>, Box<Expr>),
     Count(Box<Expr>, Box<Expr>),
     SumI128(Box<Expr>, Box<Expr>),
+    /// Law-local U256 sum; cannot become a persisted Value or general arithmetic operand.
+    SumU128(Box<Expr>, Box<Expr>),
     /// Closed ordered operator: operation, comparator, view type, auxiliary type, arguments.
     Ordered(u8, u8, u32, u32, Vec<Expr>),
 }
@@ -209,6 +215,7 @@ impl EditError {
 #[derive(Clone, Debug)]
 pub(crate) enum Data {
     Value(Value),
+    WideSum([u128; 2]),
     Lookup(Option<Value>),
     Edit(Result<Value, EditError>),
 }

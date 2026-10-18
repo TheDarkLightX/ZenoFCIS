@@ -31,7 +31,7 @@ fn cut(
     mt: u32,
     map: &Value,
     ids: &[Value],
-    p: i128,
+    p: ordered::Priority,
     upper: Option<&Value>,
     lower: Option<&Value>,
     mode: u8,

@@ -81,6 +81,10 @@ impl Descriptor {
                 kind: match &t.shape {
                     Shape::Unit => s::Kind::Unit,
                     Shape::Bool => s::Kind::Bool,
+                    Shape::U128 { min, max } => s::Kind::U128 {
+                        min: *min,
+                        max: *max,
+                    },
                     Shape::I128 { min, max } => s::Kind::I128 {
                         min: *min,
                         max: *max,
@@ -140,6 +144,11 @@ impl Descriptor {
             match &t.shape {
                 Shape::Unit => b.push(0),
                 Shape::Bool => b.push(1),
+                Shape::U128 { min, max } => {
+                    b.push(2);
+                    b.extend_from_slice(&min.to_be_bytes());
+                    b.extend_from_slice(&max.to_be_bytes());
+                }
                 Shape::I128 { min, max } => {
                     b.push(3);
                     b.extend_from_slice(&min.to_be_bytes());
@@ -258,7 +267,9 @@ impl Descriptor {
             }
             match &d.ty(id)?.shape {
                 Shape::Unit if !key => Ok(()),
-                Shape::Bool | Shape::I128 { .. } | Shape::Bytes { .. } => Ok(()),
+                Shape::Bool | Shape::I128 { .. } | Shape::U128 { .. } | Shape::Bytes { .. } => {
+                    Ok(())
+                }
                 Shape::Tuple(ids) => {
                     for id in ids {
                         plain(d, *id, depth + 1, key)?;

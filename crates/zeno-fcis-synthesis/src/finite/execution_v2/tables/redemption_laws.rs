@@ -6,7 +6,7 @@ use super::redemption::{self as r, *};
 use super::{Failure, Resource};
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-const Q: i128 = 1_000_000_000_000_000_000;
+const Q: u128 = 1_000_000_000_000_000_000;
 /// Extensional redistribution relation. Admission checks fresh keys/bijection;
 /// this independent pair law determines the unique stable order without calling
 /// the producer's prefix repair, gap enumeration or V1 reinsertion.
@@ -61,11 +61,11 @@ struct Change {
     settled: bool,
     close: bool,
     partial: bool,
-    c: i128,
-    d: i128,
-    lot: i128,
-    draw: i128,
-    surplus: i128,
+    c: u128,
+    d: u128,
+    lot: u128,
+    draw: u128,
+    surplus: u128,
 }
 fn visit(m: &mut Meter) -> Result<(), Failure> {
     m.charge(Resource::Step, 1)?;
@@ -77,7 +77,7 @@ fn cut(
     s: &State,
     ids: &[u32],
     id: u32,
-    newp: i128,
+    newp: u128,
     upper: Option<u32>,
     lower: Option<u32>,
     m: &mut Meter,
@@ -218,7 +218,7 @@ fn expected(
     refuse!(c.nonce != pre.nonce, Replay);
     refuse!(pre.nonce == u64::MAX, NonceExhausted);
     refuse!(
-        pre.price_e8 <= 0
+        pre.price_e8 == 0
             || pre.oracle_profile != p.oracle_profile
             || x.epoch < pre.price_epoch
             || x.epoch - pre.price_epoch > p.max_price_age,
@@ -230,7 +230,7 @@ fn expected(
     let backing = r::add(pre.active_collateral, pre.default_collateral, m)?;
     let debt = r::add(pre.active_debt, pre.default_debt, m)?;
     refuse!(!r::eligible(backing, debt, pre.price_e8, m)?, Tcr);
-    refuse!(c.maximum <= 0, Amount);
+    refuse!(c.maximum == 0, Amount);
     refuse!(pre.holder_balance < c.maximum, Balance);
     m.charge(Resource::Byte, (pre.order.len() as u64 + 1) * 128)?;
     let mut first = None;
@@ -344,7 +344,7 @@ fn expected(
         }
     }
     refuse!(
-        tr.executed <= 0 || tr.gross_collateral <= 0,
+        tr.executed == 0 || tr.gross_collateral == 0,
         NoPositiveExecution
     );
     // Fee arithmetic is a source-bound primitive; traversal and state equations
@@ -410,7 +410,7 @@ fn expected(
             post.vaults[i].stake = if pre.collateral_snapshot == 0 {
                 ch.c
             } else {
-                if pre.stakes_snapshot <= 0 {
+                if pre.stakes_snapshot == 0 {
                     return Err(Failure::Law(986));
                 }
                 r::muldiv(ch.c, pre.stakes_snapshot, pre.collateral_snapshot, m)?
