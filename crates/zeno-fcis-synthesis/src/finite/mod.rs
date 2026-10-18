@@ -983,8 +983,9 @@ mod semantic_source_tests {
     use std::fs;
     use std::path::Path;
 
-    /// The Authority publication route. No program admission or evaluation
-    /// path reaches these files; both identities bind them only through the
+    /// The Authority publication route, including the owned native tables family.
+    /// Legacy scalar program admission/evaluation does not reach these modules.
+    /// Both identities bind them through the
     /// generated `EVALUATOR` digest of the approved source closure.
     const AUTHORITY_ROUTE: &[&str] = &[
         "canonical_v2/envelope.rs",
@@ -1048,6 +1049,16 @@ mod semantic_source_tests {
         "execution_v2/laws/predicate.rs",
         "execution_v2/laws/spec.rs",
         "execution_v2/laws/types.rs",
+        "execution_v2/tables/authority.rs",
+        "execution_v2/tables/collection.rs",
+        "execution_v2/tables/expression.rs",
+        "execution_v2/tables/mod.rs",
+        "execution_v2/tables/policy.rs",
+        "execution_v2/tables/schema.rs",
+        "execution_v2/tables/ordered.rs",
+        "execution_v2/tables/order_laws.rs",
+        "execution_v2/tables/redemption.rs",
+        "execution_v2/tables/redemption_laws.rs",
     ];
     /// Modules rooted in `AUTHORITY_ROUTE`, which hashed files must not use.
     const AUTHORITY_MODULES: &[&str] = &[
@@ -1058,6 +1069,7 @@ mod semantic_source_tests {
         "envelope",
         "laws",
         "output",
+        "tables",
     ];
     /// The generated digest, which both identities include by value.
     const GENERATED: &[&str] = &["execution_v2/authority/evaluator.rs"];
@@ -1080,6 +1092,8 @@ mod semantic_source_tests {
         "execution_v2/input_view/tests.rs",
         "execution_v2/laws/tests.rs",
         "execution_v2/numeric/tests.rs",
+        "execution_v2/tables/tests.rs",
+        "execution_v2/tables/ordered_tests.rs",
         "execution_v2/tests.rs",
         "value/tests.rs",
     ];

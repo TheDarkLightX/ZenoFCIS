@@ -412,6 +412,12 @@ pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
     let result = (|| {
         let inputs = Inputs::read(contract)?;
+        if zeno_fcis_contract::internals::tables::recognizes(&inputs.rules)? {
+            return Err(invalid(
+                "tables/1",
+                "the SQLite application scaffold is scalar-only; use generate contract and the owned table Authority binding",
+            ));
+        }
         let examples = match read_input(&contract.join(EXAMPLES)) {
             Ok(bytes) => text(EXAMPLES, bytes)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => NO_EXAMPLES.to_owned(),

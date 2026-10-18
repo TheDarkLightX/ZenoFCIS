@@ -408,6 +408,48 @@ fn with_current<R>(
 pub(crate) fn generate_contract(
     sources: ContractSources<'_>,
 ) -> Result<GeneratedContract, ContractError> {
+    if zeno_fcis_contract::internals::tables::recognizes(sources.rules)? {
+        if !sources.adoptions.is_empty()
+            || !sources.evolutions.is_empty()
+            || sources.schema_origin.is_some()
+        {
+            return Err(ContractError::new(
+                "tables/1",
+                "adoption, evolution and schema-origin bridges are not qualified",
+            ));
+        }
+        let c = zeno_fcis_contract::internals::tables::compile(sources.project, sources.rules)?;
+        let d = &c.descriptor;
+        return Ok(GeneratedContract {
+            schema: c.schema,
+            source: c.source,
+            program: Some(c.policy.clone()),
+            policy: c.policy,
+            previous: Vec::new(),
+            replayed: Vec::new(),
+            claims: Vec::new(),
+            summary: ContractSummary {
+                application: String::from_utf8_lossy(&d.profile).into_owned(),
+                version: 1,
+                program_nodes: d.cases.len(),
+                outputs: 0,
+                law_nodes: d.laws.len(),
+                law_ids: d.laws.iter().map(|l| l.id()).collect(),
+                schema_types: d.types.len(),
+                read_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Read),
+                step_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Step),
+                byte_budget: d
+                    .limits
+                    .limit(zeno_fcis_synthesis::finite::V2Resource::Byte),
+                adoptions: Vec::new(),
+                evolutions: Vec::new(),
+            },
+        });
+    }
     generate(sources, Receipts::Replay)
 }
 

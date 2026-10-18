@@ -39,9 +39,9 @@ fn workspace_digest_equals_compiled_authority() {
     let manifest = include_str!("../../../verification/verus/authority_v2_sources.json");
     // Independently pinned membership: omission must refuse even if regenerated.
     let approved_manifest = [
-        238_u8, 185_u8, 144_u8, 218_u8, 237_u8, 115_u8, 52_u8, 192_u8, 14_u8, 183_u8, 24_u8,
-        105_u8, 79_u8, 110_u8, 55_u8, 217_u8, 176_u8, 63_u8, 186_u8, 173_u8, 113_u8, 70_u8, 224_u8,
-        66_u8, 109_u8, 177_u8, 102_u8, 41_u8, 184_u8, 136_u8, 104_u8, 126_u8,
+        130_u8, 169_u8, 110_u8, 17_u8, 60_u8, 63_u8, 93_u8, 105_u8, 160_u8, 237_u8, 94_u8, 205_u8,
+        112_u8, 218_u8, 93_u8, 78_u8, 230_u8, 243_u8, 9_u8, 85_u8, 77_u8, 221_u8, 190_u8, 238_u8,
+        25_u8, 124_u8, 33_u8, 67_u8, 65_u8, 63_u8, 128_u8, 87_u8,
     ];
     assert_eq!(
         RustCryptoSha256::hash(manifest.as_bytes()).as_bytes(),
@@ -65,7 +65,7 @@ fn workspace_digest_equals_compiled_authority() {
             (name.to_owned(), payload)
         })
         .collect();
-    rows.push(("@pin/core-profile".into(), b"ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\n".to_vec()));
+    rows.push(("@pin/core-profile".into(), b"ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\nOwned native tables/1 policy v3: bounded maps/sets, I128 sums and full-scan work tariff. Finite checked at C=0..3 plus tested journeys; no table Verus proof. Scalar-only consumers refuse table subjects.\nOwned native tables-ordered/1 policy v4: closed I128 priority/ID and committed V1 NICR cuts, bounded ID vectors, full-view admission, independent ordered and redemption relations, stable metered V1-cut redistribution repair. Typed redemption plans require authenticated consensus/oracle inputs and cannot publish custody or authenticate a host. Finite evidence and tested journeys, no ordered-table Verus or full-zUSD proof.\n".to_vec()));
     rows.push(("@pin/runtime-toolchain".into(), b"Rust 1.97.1; Cargo --locked. Verus-shared execution source under ordinary Rust. Supported assurance target Linux x86_64.\n".to_vec()));
     rows.push((
         "@pin/verifier-toolchain".into(),

@@ -116,6 +116,57 @@ fn review_directory(
         let message = format!("{} exists; seeds go to a new directory", path.display());
         return report_failure(dir, Failure::Read(message), format);
     }
+    if let Ok(rules) = read_text(dir, RULES)
+        && zeno_fcis_contract::internals::tables::recognizes(&rules).unwrap_or(false)
+    {
+        if mutant_programs.is_some()
+            || gap_settings.is_some_and(|g| g.laws.is_some())
+            || dir.join(EXAMPLES).exists()
+        {
+            return report_failure(dir, Failure::Invalid {place: "tables/1".into(), reason: "scalar examples, mutant programs and scalar proposed laws do not support table subjects".into()}, format);
+        }
+        let result = (|| {
+            let project = read_text(dir, PROJECT)?;
+            let compiled = zeno_fcis_contract::internals::tables::compile(&project, &rules)
+                .map_err(|e| Failure::Invalid {
+                    place: e.place().into(),
+                    reason: e.reason().into(),
+                })?;
+            let report = zeno_fcis_contract::internals::tables_review::review(
+                &compiled,
+                max_tuples,
+                gap_settings.map_or(0, |g| g.max_work),
+                gap_settings.is_some(),
+            )
+            .map_err(|e| Failure::Invalid {
+                place: e.place().into(),
+                reason: e.reason().into(),
+            })?;
+            if let Some(path) = out {
+                if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                    fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;
+                }
+                atomic_replace(
+                    path,
+                    serde_json::to_string_pretty(&report).unwrap().as_bytes(),
+                )
+                .map_err(|e| Failure::Read(e.to_string()))?;
+            }
+            Ok(report)
+        })();
+        return match result {
+            Ok(report) => {
+                let code = match report["status"].as_str() {
+                    Some("finite-checked") => OK,
+                    Some("inconclusive") => BLOCKED,
+                    _ => INVALID,
+                };
+                print_json(&report);
+                code
+            }
+            Err(failure) => report_failure(dir, failure, format),
+        };
+    }
     let result = (|| {
         let project = read_text(dir, PROJECT)?;
         let rules = read_text(dir, RULES)?;

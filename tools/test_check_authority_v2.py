@@ -112,7 +112,7 @@ class GateTests(unittest.TestCase):
 
     def test_evaluator_matches_complete_approved_generation(self):
         result = gate.check_generated_sources()
-        self.assertEqual(result['paths'], 120)
+        self.assertEqual(result['paths'], 135)
         self.assertIn('crates/zeno-fcis-synthesis/src/finite/value/scalar.rs', gate.source_manifest(gate.ROOT / gate.SOURCE_MANIFEST)['paths'])
         self.assertEqual(result['pins'], 3)
         self.assertEqual(result['approved_manifest_sha256'], gate.APPROVED_SOURCE_CLOSURE_SHA256)

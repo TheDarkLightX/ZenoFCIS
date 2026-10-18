@@ -1613,6 +1613,7 @@ name = "zeno-fcis-synthesis"
 version = "2.5.0"
 dependencies = [
  "zeno-fcis-codec",
+ "zeno-fcis-collections",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-value",

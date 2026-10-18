@@ -16,6 +16,8 @@ pub mod quantity;
 pub mod review;
 pub mod rules;
 pub mod schema;
+pub mod tables;
+pub mod tables_review;
 
 pub use crate::ContractError;
 

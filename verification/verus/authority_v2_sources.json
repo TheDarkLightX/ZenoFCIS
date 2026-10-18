@@ -8,6 +8,11 @@
     "crates/zeno-fcis-codec/src/domains.rs",
     "crates/zeno-fcis-codec/src/lib.rs",
     "crates/zeno-fcis-codec/src/providers.rs",
+    "crates/zeno-fcis-collections/Cargo.toml",
+    "crates/zeno-fcis-collections/src/bounded.rs",
+    "crates/zeno-fcis-collections/src/lib.rs",
+    "crates/zeno-fcis-collections/src/pipe.rs",
+    "crates/zeno-fcis-collections/src/reference.rs",
     "crates/zeno-fcis-core/Cargo.toml",
     "crates/zeno-fcis-core/src/lib.rs",
     "crates/zeno-fcis-core/src/resource.rs",
@@ -105,6 +110,16 @@
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/numeric.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/numeric/spec.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/spec.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/authority.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/collection.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/expression.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/mod.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/order_laws.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/ordered.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/policy.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption_laws.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/schema.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/util.rs",
     "crates/zeno-fcis-synthesis/src/finite/ir.rs",
     "crates/zeno-fcis-synthesis/src/finite/ir/program.rs",
@@ -123,7 +138,7 @@
   ],
   "pins": [
     {
-      "bytes": "ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\n",
+      "bytes": "ZenoFCIS V2 closed generic scalar producer, flat records and scalar roots. No application callbacks or supplied meter. Exact original schema and full reviewed policy binding.\nOwned native tables/1 policy v3: bounded maps/sets, I128 sums and full-scan work tariff. Finite checked at C=0..3 plus tested journeys; no table Verus proof. Scalar-only consumers refuse table subjects.\nOwned native tables-ordered/1 policy v4: closed I128 priority/ID and committed V1 NICR cuts, bounded ID vectors, full-view admission, independent ordered and redemption relations, stable metered V1-cut redistribution repair. Typed redemption plans require authenticated consensus/oracle inputs and cannot publish custody or authenticate a host. Finite evidence and tested journeys, no ordered-table Verus or full-zUSD proof.\n",
       "path": "@pin/core-profile"
     },
     {

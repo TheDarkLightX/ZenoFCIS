@@ -1254,13 +1254,13 @@ fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, Contra
 }
 
 /// One JSON object of the rules file, with the place it was read from.
-struct Object<'j> {
+pub(super) struct Object<'j> {
     place: String,
     entries: &'j [(String, Json)],
 }
 
 impl<'j> Object<'j> {
-    fn new(json: &'j Json, place: &str) -> Result<Self, ContractError> {
+    pub(super) fn new(json: &'j Json, place: &str) -> Result<Self, ContractError> {
         match json {
             Json::Object(entries) => Ok(Self {
                 place: place.to_owned(),
@@ -1271,17 +1271,17 @@ impl<'j> Object<'j> {
     }
 
     /// `v2/policy.json cases`, then `v2/policy.json cases[0].post`.
-    fn place_of(&self, key: &str) -> String {
+    pub(super) fn place_of(&self, key: &str) -> String {
         let separator = if self.place == FILE { ' ' } else { '.' };
         format!("{}{separator}{key}", self.place)
     }
 
-    fn error(&self, key: &str, reason: impl Into<String>) -> ContractError {
+    pub(super) fn error(&self, key: &str, reason: impl Into<String>) -> ContractError {
         ContractError::new(self.place_of(key), reason)
     }
 
     /// Refuses keys outside `allowed`.
-    fn only(&self, allowed: &[&str]) -> Result<(), ContractError> {
+    pub(super) fn only(&self, allowed: &[&str]) -> Result<(), ContractError> {
         match self
             .entries
             .iter()
@@ -1295,40 +1295,40 @@ impl<'j> Object<'j> {
         }
     }
 
-    fn entries(&self) -> impl Iterator<Item = (&'j str, &'j Json)> {
+    pub(super) fn entries(&self) -> impl Iterator<Item = (&'j str, &'j Json)> {
         self.entries
             .iter()
             .map(|(key, value)| (key.as_str(), value))
     }
 
-    fn optional(&self, key: &str) -> Option<&'j Json> {
+    pub(super) fn optional(&self, key: &str) -> Option<&'j Json> {
         self.entries
             .iter()
             .find(|(name, _)| name == key)
             .map(|(_, value)| value)
     }
 
-    fn field(&self, key: &str) -> Result<&'j Json, ContractError> {
+    pub(super) fn field(&self, key: &str) -> Result<&'j Json, ContractError> {
         self.optional(key)
             .ok_or_else(|| ContractError::new(&self.place, format!("missing key `{key}`")))
     }
 
-    fn text(&self, key: &str) -> Result<&'j str, ContractError> {
+    pub(super) fn text(&self, key: &str) -> Result<&'j str, ContractError> {
         text(self.field(key)?, &self.place_of(key))
     }
 
-    fn object(&self, key: &str) -> Result<Object<'j>, ContractError> {
+    pub(super) fn object(&self, key: &str) -> Result<Object<'j>, ContractError> {
         Object::new(self.field(key)?, &self.place_of(key))
     }
 
-    fn array(&self, key: &str) -> Result<&'j [Json], ContractError> {
+    pub(super) fn array(&self, key: &str) -> Result<&'j [Json], ContractError> {
         match self.field(key)? {
             Json::Array(items) => Ok(items),
             _ => Err(self.error(key, "must be an array")),
         }
     }
 
-    fn number<T: TryFrom<i128> + fmt::Display + Bounded>(
+    pub(super) fn number<T: TryFrom<i128> + fmt::Display + Bounded>(
         &self,
         key: &str,
     ) -> Result<T, ContractError> {
@@ -1346,9 +1346,18 @@ impl<'j> Object<'j> {
 }
 
 /// Integer field types, for range messages.
-trait Bounded: Sized {
+pub(super) trait Bounded: Sized {
     const MIN: Self;
     const MAX: Self;
+}
+
+impl Bounded for i128 {
+    const MIN: Self = i128::MIN;
+    const MAX: Self = i128::MAX;
+}
+impl Bounded for u64 {
+    const MIN: Self = u64::MIN;
+    const MAX: Self = u64::MAX;
 }
 
 impl Bounded for u16 {
@@ -1368,7 +1377,7 @@ impl Bounded for u128 {
 
 /// A parsed JSON document. Object keys keep file order, and a repeated key
 /// is refused while parsing rather than overriding the first.
-enum Json {
+pub(super) enum Json {
     Null,
     Bool(bool),
     Int(i128),

@@ -21,6 +21,8 @@ pub(crate) mod nonbinding_step;
 pub(crate) mod numeric;
 #[cfg(verus_keep_ghost)]
 mod spec;
+#[cfg(not(verus_keep_ghost))]
+pub mod tables;
 pub(crate) mod util;
 
 pub use input_view::{

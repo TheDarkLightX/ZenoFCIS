@@ -1,4 +1,4 @@
-"""Link direct-source native harnesses to freshly built codec/value oracles.
+"""Link direct-source native harnesses to freshly built codec/value/collections oracles.
 
 Callers serialize preparation with the fleet lock, before starting controls.
 Workers only read private, hash-bound copies of that preparation. These are
@@ -32,7 +32,7 @@ class NativeDependencies:
 
 def source_hashes(root: Path) -> dict[str, str]:
     files = [root / "Cargo.toml", root / "Cargo.lock", root / "rust-toolchain.toml", root / ".cargo/config.toml"]
-    for package in ("zeno-fcis-codec", "zeno-fcis-value"):
+    for package in ("zeno-fcis-codec", "zeno-fcis-value", "zeno-fcis-collections"):
         base = root / "crates" / package
         files.append(base / "Cargo.toml")
         files.extend(sorted((base / "src").rglob("*.rs")))
@@ -57,7 +57,13 @@ def prepare_native_dependencies(root: Path, directory: Path, environment: dict) 
     env.update(CARGO_TARGET_DIR=str(target), CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
                CARGO_NET_OFFLINE="true", RUST_TEST_THREADS="1")
     command = ["cargo", "+1.97.1", "build", "--locked", "--offline", "-vv", "-p",
-               "zeno-fcis-codec", "--message-format=json"]
+               "zeno-fcis-codec", "-p", "zeno-fcis-collections", "--message-format=json"]
+    import subprocess
+    disk = subprocess.run(["df", "-B1G", "/"], capture_output=True, text=True, check=True)
+    (retained / "disk.log").write_text(disk.stdout)
+    if os.statvfs("/").f_bavail * os.statvfs("/").f_frsize < 6 * 1024**3:
+        raise ValueError("disk below 6 GiB; native dependency build stopped")
+    env.update(CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
     run = verifier.run(command, root, env)
     (retained / "cargo.stdout").write_text(run.stdout)
     (retained / "cargo.stderr").write_text(run.stderr)
@@ -68,7 +74,7 @@ def prepare_native_dependencies(root: Path, directory: Path, environment: dict) 
     private = retained / "libraries"
     private.mkdir()
     copied = {}
-    expected = {"zeno_fcis_codec": "zeno-fcis-codec", "zeno_fcis_value": "zeno-fcis-value"}
+    expected = {"zeno_fcis_codec": "zeno-fcis-codec", "zeno_fcis_value": "zeno-fcis-value", "zeno_fcis_collections": "zeno-fcis-collections"}
     for line in run.stdout.splitlines():
         row = json.loads(line)
         if row.get("reason") == "compiler-artifact":
@@ -97,7 +103,7 @@ def prepare_native_dependencies(root: Path, directory: Path, environment: dict) 
         libraries[name] = {"path": str(bound), "sha256": copied[bound], "build_path": str(artifact),
                            "manifest_path": str(manifest), "fresh": False}
     if set(libraries) != set(expected):
-        raise ValueError("actual codec and value native oracle artifacts are missing")
+        raise ValueError("actual codec, value and collections native oracle artifacts are missing")
     after = source_hashes(root)
     if before != after:
         raise ValueError("native comparison dependency source changed during compilation")

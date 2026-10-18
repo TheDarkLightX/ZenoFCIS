@@ -77,7 +77,7 @@ class NativeMeteredExecution(unittest.TestCase):
             # The full gate already owns this name for its positive VIR logs.
             (Path(temporary) / "positive").mkdir()
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn("test result: ok. 161 passed; 0 failed", evidence["test_output"])
+        self.assertIn("test result: ok. 170 passed; 0 failed", evidence["test_output"])
         # Exact 2.5 corpus: retain the three additional independent checks.
         for test in ('independent_wide_oracle_matches_fraction_corpora',
                      'variant_oracle_rejects_unrepresentable_cardinalities_without_overflow',
