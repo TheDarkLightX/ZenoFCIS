@@ -79,6 +79,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [0004: V2 ledger of deferred breaking changes](adr/0004-v2-ledger.md)
 - [0005: Library-owned decision gate](adr/0005-decision-gate.md)
 - [Finite interpreter assurance notes](FINITE_INTERPRETER_ASSURANCE.md)
+- [2.6 task packets for coding agents (planned work)](agent-tasks/2.6/README.md)
 
 ## Assurance and verification
 
