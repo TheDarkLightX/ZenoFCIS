@@ -52,7 +52,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Contract rules reference: `v2/policy.json`](CONTRACT_RULES.md)
 - [Contract judges: specification gaps, state profile, lemmas, scenarios and probes](CONTRACT_JUDGES.md)
 - [Composed-domain composition](COMPOSED_DOMAIN_COMPOSITION.md)
-- [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
+- [RC3 specification contract](RC3_AUTHORING_CONTRACT.md)
 - [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
 - [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
 - [Formal tools](FORMAL_TOOLS_RC3.md)

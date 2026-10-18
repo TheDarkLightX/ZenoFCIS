@@ -172,7 +172,7 @@ profiles. Legacy search, optimizer, migration and linear certificate consumers
 refuse the arithmetic extension. See
 [Contract program export](CLI_REFERENCE.md#contract-program-export).
 
-Units and scales are development authoring features, with source-proof
+Units and scales are development specification features, with source-proof
 qualification pending. For example, `type 105 int Price in 0..=1000000 unit
 USD/COLL scale e8;` declares raw atoms n with value n/10^8 USD/COLL. Products
 and quotients of nominal identifiers are canonical; `unit 1 scale e4` is

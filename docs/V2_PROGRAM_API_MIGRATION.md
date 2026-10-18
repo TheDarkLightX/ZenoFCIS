@@ -86,7 +86,7 @@ umbrella crate makes these changes:
 | `TransitionDecision` | `PublicationOutcome` from the checked route |
 
 `legacy` contains inert compatibility data and standalone evidence utilities
-only. It does not contain native authoring, meter construction, candidate
+only. It does not contain native program construction, meter construction, candidate
 sealing or reference-shell commit functions. Those are retired, and their
 original algorithms and assertions run only in the private kernel-law oracle.
 A consumer that implemented native transitions, budgets or sealers moves to
@@ -107,19 +107,19 @@ pinned file differs. V2 intentionally changes the V1.0 foundational sources
 the documented migration compiles; it does not establish universal downstream
 source compatibility.
 
-## Normal authoring and compatibility
+## Normal specification and compatibility
 
 `Limits` configure the eight resources, including `Resource::Step`. Only library execution constructs `Usage` and the private meter. Applications do not supply usage, seal a candidate, provide a native transition callback or return a law verdict. Raw caller values cannot substitute for original envelopes. Declaration bytes cannot be mutated through the immutable catalog/program borrow.
 
 | Previous normal operation | Current normal route | Remaining compatibility obligation |
 |---|---|---|
-| `Transition`, `DomainMachine`, `CatalogTransitionProgram` application implementation | Complete `ProgramDefinition`, `bind_catalog`, `bind_program` | Native authoring is retired; complete historical algorithms remain executable in the private kernel-law oracle. |
+| `Transition`, `DomainMachine`, `CatalogTransitionProgram` application implementation | Complete `ProgramDefinition`, `bind_catalog`, `bind_program` | Native callback implementations are retired; complete historical algorithms remain executable in the private kernel-law oracle. |
 | `Budget::new`, `finish`, claimed `BudgetUsed` | `zero_limits`, policy limits, actual `Evaluation::usage` | Caller meter constructors/reports are retired from normal packages; original budget assertions remain private oracle tests. |
 | `CandidateBuilder::seal`, `CataloguedTransitionBuilder` | `Program::publish` | Normal application sealers are retired. Publication construction is library-private and checked across crate boundaries. |
 | `GeneratedTransition`, `begin_*transition`, raw `pre_state` | Closed declarative graph over original frames | Bootstrap emits complete untrusted proposals and calls the actual checked catalog/authority constructors. Template retirement has separate source-bound qualification. |
 | Application `ProjectLawEngine` | Closed laws, required IDs, guarded observations, actual genesis | Historical native law algorithms remain in the private verification oracle; declarations cannot supply application verdicts. |
 | Unchecked `BoundDeliveryInterpreter` | Ordered wire deliveries in a private Publication | Persistence and physical delivery remain shell responsibilities. |
-| `zeno_fcis::core`, `receipt`, `authority`, `transition`, `domain`, `synthesis` | No normal whole-module aliases | Explicit `legacy` contains inert compatibility data and standalone evidence utilities, not native authoring constructors. |
+| `zeno_fcis::core`, `receipt`, `authority`, `transition`, `domain`, `synthesis` | No normal whole-module aliases | Explicit `legacy` contains inert compatibility data and standalone evidence utilities, not native runtime constructors. |
 
 The `minimal_core` example directly binds and invokes a checked program; its support file contains only example declarations and manually authored original schema/input bytes. The original native minimal-core and bounded-preparation algorithms/assertions remain executable in the private kernel-law oracle. `checked_backend` and `completion_scaling` expose standalone evidence computations, not publication authority. No normal package depends on that private oracle for production execution.
 
@@ -131,4 +131,4 @@ This umbrella adds no protocol enums. Handle existing `#[non_exhaustive]` enums,
 
 Bootstrap generates `GeneratedProgramProposal` and pure `GeneratedDeclarations` helpers. Supply the complete original schema description/bytes, reviewed policy, execution descriptor and original frame/channel roots. `GeneratedProject::bind_program` checks exact generated catalog correspondence, then calls the same actual `v2_catalog::bind_original`/`v2_authority::bind` implementation selected by the root `Program` API. It cannot infer policy adequacy from catalog metadata. Typed adapters retain complete original envelopes; declaration and inert effect/channel helpers grant no publication capability.
 
-Use `zeno-fcis describe` to discover the normal workflow and `new --template` to copy a supported declaration example without overwriting a nonempty directory. `check --format json` reports authoring diagnostics with runtime admission not run; `generate` renders authoring artifacts and has the same nonclaim. MCP invokes these exact CLI commands. Standalone `synth` tools still provide bounded finite/target evidence and cannot turn generated native code into runtime authority. See [agent installation and usage](LLM_SYNTHESIS.md) and the [synthesis-first skill](../skills/zenofcis-synthesis-first/SKILL.md).
+Use `zeno-fcis describe` to discover the normal workflow and `new --template` to copy a supported declaration example without overwriting a nonempty directory. `check --format json` reports specification diagnostics with runtime admission not run; `generate` renders generated artifacts and has the same nonclaim. MCP invokes these exact CLI commands. Standalone `synth` tools still provide bounded finite/target evidence and cannot turn generated native code into runtime authority. See [agent installation and usage](LLM_SYNTHESIS.md) and the [synthesis-first skill](../skills/zenofcis-synthesis-first/SKILL.md).

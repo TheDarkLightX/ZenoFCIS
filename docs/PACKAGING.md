@@ -10,7 +10,7 @@ pending.
 
 - 39 public crates in dependency-first publication order;
 - one private crate for compiled generated-code tests, for 40 workspace packages;
-- the `zeno-fcis` authoring CLI;
+- the `zeno-fcis` specification CLI;
 - the exact Cargo version and Rust toolchain.
 
 `tools/rc_package.py check` compares that manifest with Cargo metadata. It

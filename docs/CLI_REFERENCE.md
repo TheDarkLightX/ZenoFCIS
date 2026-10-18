@@ -2308,7 +2308,7 @@ nominal authorization and atomic state/outbox publication.
 
 ## Examples-first contract drafting
 
-`contract draft` is a local authoring conversation with explicit operations.
+`contract draft` is a local specification conversation with explicit operations.
 `start` captures a plain-language intent file, fixed `project.zeno`, optional
 initial [decision examples](CONTRACT_RULES.md), and supplied provenance. An
 agent or owner then supplies a **complete rules file** with `propose`. There

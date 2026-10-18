@@ -335,7 +335,7 @@ compatibility and assurance boundaries.
 ## Historical host binary
 
 The core library does not require a daemon. You can install the earlier
-`1.1.0` authoring CLI for its historical workflows:
+`1.1.0` specification CLI for its historical workflows:
 
 ```bash
 cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked

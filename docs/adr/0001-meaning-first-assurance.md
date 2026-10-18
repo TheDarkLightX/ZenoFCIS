@@ -14,7 +14,7 @@ protect is mostly supplied by project code the library cannot inspect.
 
 | Assurance link | V1.1 state |
 | --- | --- |
-| Meaning | Split across `.zeno`, the finite IR, hand-written Rust, and `build.rs` |
+| Meaning | Split across `.zeno`, the finite IR, LLM-generated Rust, and `build.rs` |
 | Decision | Strong: pure step, three-way algebra, re-execution |
 | Conformance | Weak: law verdicts are self-reported, and proofs checked validity only |
 | Integrity | Excellent: ZCVE/1, sealed candidates, strict decoders |

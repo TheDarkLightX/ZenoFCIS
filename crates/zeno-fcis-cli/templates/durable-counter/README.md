@@ -32,7 +32,7 @@ constructs the complete decision, and checks the original law programs with
 one meter. The SQLite shell consumes genuine `Publication` and
 `Publication` capabilities; exact replay recomputes the same original inputs.
 
-The hand-written adapters, legacy law engines and earlier synthesis/model
+The LLM-generated adapters, legacy law engines and earlier synthesis/model
 checks described below are retained only in the repository’s nonpublished
 `verification/kernel-laws/src/oracle/templates/durable-counter` package for independent oracle
 and historical evidence tests. They do not execute the normal V2 decision.

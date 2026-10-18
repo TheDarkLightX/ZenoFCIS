@@ -2,7 +2,7 @@
 
 ## Design preflight
 
-This is an additive authoring feature. The existing canonical search, nominal
+This is an additive specification feature. The existing canonical search, nominal
 commit authority, catalog checker, and durable outbox remain its acceptance
 boundaries. A separate language-model design review informed this design; its
 suggestions confer no verification or release authority.

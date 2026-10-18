@@ -13,7 +13,7 @@ The normal application API is `zeno_fcis::program`, which needs no optional
 features. It binds complete declarations to the library-owned evaluator and to
 private publication capabilities. Historical reference surfaces live under
 `zeno_fcis::legacy`. Enabling a dependency feature does not restore a retired
-native authoring API.
+native callback API.
 
 ## Host platforms
 
@@ -66,14 +66,14 @@ cryptographic provider features also serve the historical reference APIs.
 
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
-| `authoring` | `no_std + alloc` | Authoring | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
+| `authoring` | `no_std + alloc` | Specification | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
 | `schema` | `no_std + alloc` | Core | Closed schemas and schema-admitted values |
 | `catalog` | `no_std + alloc` | Core | Schema plus project reasons, effects, channels, authority rules, and limits |
-| `transition` | `no_std + alloc` | Historical | Native transition authoring is retired; normal transitions use `program` |
+| `transition` | `no_std + alloc` | Historical | Native transition implementations are retired; normal transitions use `program` |
 | `laws` | `no_std + alloc` | Metadata | Law declarations and evidence subjects; the checked evaluator is reached through `program::law` |
 | `authority` | `no_std + alloc` | Core authority | Library-owned V2 authority and publication re-exports |
-| `domain-machines` | `no_std + alloc` | Historical | Native domain-machine authoring is retired |
-| `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
+| `domain-machines` | `no_std + alloc` | Historical | Native domain-machine implementations are retired |
+| `composed-program` | `no_std + alloc` | Historical | Native composed-program implementations are retired |
 
 Start both single-domain and multi-domain applications with complete
 declarations through `zeno_fcis::program`. V2.2 has three finite component
@@ -177,7 +177,7 @@ zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", features = ["authenticated-
 # Tool-neutral checked backend protocol
 zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["backend"] }
 
-# Pure authoring compiler and Mini Determinator
+# Pure specification compiler and Mini Determinator
 zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["authoring"] }
 ```
 

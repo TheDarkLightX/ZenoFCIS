@@ -233,7 +233,7 @@ indeterminate result and blocks promotion.
 - Secrets implement `Debug`, ordinary serialization, unredacted errors, or
   accidental cloning without an explicit exposure boundary.
 - Security randomness comes from a deterministic seed or a non-CSPRNG source.
-- Cryptography is hand-written, uses an unapproved algorithm, or lacks key
+- Cryptography uses a custom implementation or an unapproved algorithm, or lacks key
   rotation, domain separation, context binding, and failure handling.
 - Constant-time behavior is claimed from source inspection alone.
 

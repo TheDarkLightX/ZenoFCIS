@@ -1,4 +1,4 @@
-# Checked program authoring with agents
+# Checked program generation with agents
 
 The [skill](../skills/zenofcis-synthesis-first/SKILL.md) and local
 [MCP server](../integrations/mcp/zeno_fcis_synthesis.py) use the actual `zeno-fcis`
@@ -33,7 +33,7 @@ inventory-reservation, withdrawal-queue, agent-treasury-guard, prepared-counter
 or compliance-gateway. The destination's
 parent must exist; a nonempty destination is refused without overwriting files.
 `check_project_spec` runs `check --format json`, optionally with
-`--require-substantive`. These are authoring results with runtime admission
+`--require-substantive`. These are proposal results with runtime admission
 explicitly not run.
 
 Follow [the normal API migration](V2_PROGRAM_API_MIGRATION.md): independently
@@ -52,7 +52,7 @@ producer. Account-lockout uses that library-owned producer over its original
 timestamp domains; it does not fall back to an application-supplied authority callback.
 Unsupported profiles return named refusals and grant no publication capability.
 Independent acceptance models and source-bound proof qualification remain
-separate from these authoring tools.
+separate from these generation tools.
 
 The original three finite tools remain: `assess_finite_problem`,
 `synthesize_finite_core` and `verify_finite_core`. Order-fulfillment's standalone
@@ -118,13 +118,13 @@ cp skills/zenofcis-synthesis-first/SKILL.md \
 ```
 
 Other agents can load the same `SKILL.md` as project guidance. Keep server, CLI,
-library and skill revisions consistent. Report authoring diagnostics, finite
+library and skill revisions consistent. Report specification diagnostics, finite
 exhaustive evidence, qualified source-bound proofs, runtime Publications and
 shell effects separately. A passing sample, timeout or unchecked solver answer
 is not proof acceptance; tool use does not replace independent intent review.
 
 Exercise the real MCP protocol, all original finite cases and the normal
-authoring/refusal tools with:
+generation/refusal tools with:
 
 ```sh
 ZENO_FCIS_CLI=/absolute/path/to/zeno-fcis uv run --no-project --with 'mcp==2.2.0' \

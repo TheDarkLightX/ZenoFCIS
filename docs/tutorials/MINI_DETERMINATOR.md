@@ -212,7 +212,7 @@ The [API reference](../API_REFERENCE.md) names each type in the chain. The
 [product contract](../V1_PRODUCT_CONTRACT.md) records the exact support and
 assurance boundary.
 
-## See three authoring mistakes at once
+## See three specification mistakes at once
 
 The small file
 [`examples/diagnostics-tour/project.zeno`](../../examples/diagnostics-tour/project.zeno)
@@ -232,7 +232,7 @@ ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a d
 ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type
 ```
 
-![Three authoring problems from one bounded check](../assets/marketing/terminal-accumulated-diagnostics.png)
+![Three specification problems from one bounded check](../assets/marketing/terminal-accumulated-diagnostics.png)
 
 Each message includes a stable code, a location, the expected value, the
 observed value, and a suggested repair. The order stays stable for the same
@@ -265,7 +265,7 @@ single-threaded emulation.
 | Rust example | The public decision API computes the shown accepted result. |
 | Completion-order tests | The full bounded result is equal for the tested orders. |
 | Conflict tests | Both input orders produce the same conflict and no next state. |
-| Authoring example | Three independent problems appear in stable order. |
+| Specification example | Three independent problems appear in stable order. |
 | QEMU capture and serial record | The same crate runs after UEFI startup in the documented guest setup. |
 
 The QEMU guest contains a kernel entry point, screen output, serial output, and

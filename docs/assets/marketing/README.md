@@ -22,13 +22,13 @@ only that terminal window, and closes it. Window decoration and font rasterizing
 can differ by desktop. The command output remains deterministic.
 
 The styled renderer also runs the real commands with color disabled.
-Successful runs must exit cleanly and keep stderr empty. The authoring-error
+Successful runs must exit cleanly and keep stderr empty. The specification-error
 run must return the stable invalid-project exit code and place every message on
 stderr.
 
-## Authoring problems in one pass
+## Specification problems in one pass
 
-![Three authoring problems from one bounded check](terminal-accumulated-diagnostics.png)
+![Three specification problems from one bounded check](terminal-accumulated-diagnostics.png)
 
 The source example contains three independent mistakes. One command reports
 all three with stable codes, locations, observed values, expected values, and
@@ -60,18 +60,18 @@ hash, toolchain, emulator version, and framebuffer size. See the
 [QEMU demo contract](../../QEMU_MINI_DETERMINATOR.md) for reproduction steps
 and exact nonclaims.
 
-Together, the images demonstrate authoring, bounded checking, deterministic
+Together, the images demonstrate specification, bounded checking, deterministic
 derived views, the executable Mini Determinator semantic model, and a real
 freestanding guest integration.
 
 | Image | What it shows |
 |---|---|
 | `terminal-cli-overview.png` | The real public help output in a virtual terminal |
-| `terminal-accumulated-diagnostics.png` | The real CLI reporting three authoring problems |
+| `terminal-accumulated-diagnostics.png` | The real CLI reporting three specification problems |
 | `terminal-mini-determinator-check.png` | The real CLI reporting project identity and remaining checks |
 | `terminal-composition-graph.png` | The real CLI printing a Mermaid connection view |
 | `zeno-fcis-cli-overview.png` | The public command surface |
-| `accumulated-diagnostics.png` | Three authoring problems from one check |
+| `accumulated-diagnostics.png` | Three specification problems from one check |
 | `mini-determinator-check.png` | Project identity and remaining checks |
 | `composition-graph.png` | A deterministic connection view |
 | `mini-determinator-replay.png` | Equal results from opposite completion orders |

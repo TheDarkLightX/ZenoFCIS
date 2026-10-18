@@ -88,10 +88,10 @@ channels and laws as data. The library admits the inputs, computes the
 decision and resource use, checks every applicable declared law, and issues
 a private publication capability only for a committing outcome. Applications
 cannot replace this route with decision or law callbacks, caller-reported
-usage or caller-built publications. Authoring, search and evidence tools
+usage or caller-built publications. Specification, search and evidence tools
 grant no publication authority.
 
-### Library and contract authoring
+### Library and contract specification
 
 - The crate root and prelude use the checked program API. `bind_catalog` and
   `bind_program` admit declarations; `Program::publish` evaluates original
@@ -113,7 +113,7 @@ grant no publication authority.
   escaped key spellings, including compact and CRLF rule files.
 - Library numeric descriptors support checked signed and unsigned 128-bit
   arithmetic and whole declared compound values. Nested field selection and
-  a numeric CLI authoring or lineage-upgrade route are unsupported. CLI
+  a numeric CLI specification or lineage-upgrade route are unsupported. CLI
   contracts support up to 4,096 nodes, 64 inputs and 64 outputs with checked
   signed 64-bit expressions. See [wide values](WIDE_VALUE_EXECUTION.md).
 
@@ -234,7 +234,7 @@ run reported disagreement, `UNKNOWN` or failure. These query results grant
 no authority and do not authenticate supplied authorization or context.
 
 The OCaml consumer is a client of the generated Rust application; Rust retains
-decisions, laws and storage. ZAL remains an optional finite-model authoring
+decisions, laws and storage. ZAL remains an optional finite-model specification
 prototype, outside the released API; supplied labels and scripted review
 are not human approval or authenticated authorization.
 

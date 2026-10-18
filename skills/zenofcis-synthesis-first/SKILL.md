@@ -16,7 +16,7 @@ Use `create_program_project` or `zeno-fcis new --template durable-counter` for a
 complete checked declaration example. The other supported normal examples are
 account-lockout, order-fulfillment, inventory-reservation, withdrawal-queue and
 agent-treasury-guard. `check_project_spec` or `zeno-fcis check --format json`
-checks `.zeno` authoring diagnostics; it does not admit a runtime program.
+checks `.zeno` specification diagnostics; it does not admit a runtime program.
 
 The normal Rust API is `zeno_fcis::prelude` and `zeno_fcis::program`. Propose the
 complete original schema description/bytes, `ProgramDefinition`, original policy
@@ -49,7 +49,7 @@ Retain independent full-decision/state/reason/delivery comparisons over every
 admitted input. Finite target evidence does not authorize arbitrary generated Rust
 or replace checked Program binding, laws or complete raw-input correspondence.
 
-Report authoring proposals, finite exhaustive results, source-bound proof
+Report specification proposals, finite exhaustive results, source-bound proof
 qualification, genuine runtime Publications and trusted shell effects separately.
 Timeouts, incomplete searches, unchecked solver answers and passing samples are
 not proof acceptance. Preserve artifact drift refusals and exact source/tool

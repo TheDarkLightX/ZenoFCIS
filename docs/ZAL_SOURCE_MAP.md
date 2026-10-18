@@ -28,7 +28,7 @@ there, `contract/rules.rs`, `contract/model.rs` and `contract/expr.rs` are in
 | Authority | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs:79`, `:186`, `:222` | Exact catalog binding, original-envelope evaluation, required laws/genesis, and private publication custody. No application callback supplies the decision. |
 | Publication | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication.rs:49` | Private non-Clone capability carrying the actual committing evaluation, original poststate and ordered deliveries. Reports or serialized subjects cannot construct it. |
 | Persistence and upgrade | `crates/zeno-fcis-shell-sqlite/src/v2.rs:452`, `v2/upgrade.rs:93`, `:364` | Mandatory capability-based SQLite route, exact identity/replay, and same-schema upgrade premises. Data migration and changed-business-rule evolution were added later as `contract evolve` (see [rule changes](CLI_REFERENCE.md#rule-changes-for-live-stores) and [data migrations](CLI_REFERENCE.md#data-migrations-and-renames)). |
-| Existing agent bridge | `integrations/mcp/zeno_fcis_synthesis.py`, `zeno_fcis_transform.py` | Fixed authoring/check/synthesis/loop commands with no publication claim. Existing MCP registration is optional; the ZAL MVP need not modify accounts or MCP configuration. |
+| Existing agent bridge | `integrations/mcp/zeno_fcis_synthesis.py`, `zeno_fcis_transform.py` | Fixed specification/check/synthesis/loop commands with no publication claim. Existing MCP registration is optional; the ZAL MVP need not modify accounts or MCP configuration. |
 
 `docs/CONTRACT_RULES.md` describes ordered cases: the first matching case wins
 and the final case must be literal `true`. ZAL can choose stricter source
@@ -89,7 +89,7 @@ describe this implemented scope.
 map and generated Authority comparison test. Qualification runs actual contract
 generation, drift checking, advisory review, scaffolding and app tests against
 the pinned source. Interpreter checks remain distinct from actual Authority
-correspondence. No authoring result is an agreement, Authority, Publication,
+correspondence. No specification result is an agreement, Authority, Publication,
 replacement receipt or deployment approval. The generated test obtains its
 Authority through the existing library route. See [usage](zal/README.md).
 

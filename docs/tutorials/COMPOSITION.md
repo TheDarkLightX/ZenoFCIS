@@ -85,7 +85,7 @@ The generated Rust still needs concrete machines and reviewed evidence.
 source cannot create evidence, certificates, receipts, commits, or production
 permission.
 
-The [composition section of the authoring contract](../RC3_AUTHORING_CONTRACT.md)
+The [composition section of the specification contract](../RC3_AUTHORING_CONTRACT.md)
 defines the derived tables and unresolved checks. The
 [API reference](../API_REFERENCE.md) covers `ComposedDomainProgram` and
 `ProjectionPlan`.

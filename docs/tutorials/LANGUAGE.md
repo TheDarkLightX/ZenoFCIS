@@ -64,7 +64,7 @@ ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a d
 ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type
 ```
 
-![One bounded check reports three authoring problems](../assets/marketing/terminal-accumulated-diagnostics.png)
+![One bounded check reports three specification problems](../assets/marketing/terminal-accumulated-diagnostics.png)
 
 The compiler keeps checking after the first independent problem. Each message
 contains a stable code, a source location, the observed value, the expected
@@ -82,7 +82,7 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 
 `new` refuses a target that already contains files. A `.zeno` file cannot
 import files, read environment variables, select executable paths, or run
-commands. These limits keep the authoring input small and reviewable.
+commands. These limits keep the specification input small and reviewable.
 
 The [language reference](../ZENO_LANGUAGE_V1.md) defines every declaration,
 limit, and error rule. The [CLI reference](../CLI_REFERENCE.md) defines JSON

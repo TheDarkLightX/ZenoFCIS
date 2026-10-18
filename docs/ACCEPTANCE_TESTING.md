@@ -66,7 +66,7 @@ there with a reviewed reason.
 | `minimal-core` | Immutable transition and logical budget example. |
 | `checked-backend` | Bounded tool-neutral backend request example. |
 | `zal-dialogue` | Deterministic finite-FSM help and explanation, paired language views, exact-revision human review, terminal/MCP shared state, UI-state doubles, and actual sample-domain factory replay. Native browser and model-provider access remain separate. |
-| `external-consumer` | Isolated downstream compile against the public authoring API. |
+| `external-consumer` | Isolated downstream compile against the public specification API. |
 | `project-bootstrap` | Deterministic generated starter and negative vectors. |
 | `generated-application` | Authored schema lowering, complete invocation binding, runtime laws, dependency admission, and isolated durable lifecycle, for the durable counter and the six example applications. |
 | `example-templates` | The account-lockout, order-fulfillment, inventory-reservation, compliance-gateway, withdrawal-queue, and agent-treasury-guard templates emit exactly their files, refuse to overwrite, and carry only substantive law formulas with resolved paths. |

@@ -14,7 +14,7 @@ The 2.4.0 source uses the checked program family by default. `zeno_fcis::Program
 | Actual usage and immutable audit | `Evaluation`, `Resource`, `Usage` |
 | Capability-consuming SQLite boundary | `zeno_fcis::sqlite` with feature `sqlite-shell` |
 
-The `spec` frontend remains authoring input and still requires checked program
+The `spec` frontend remains specification input and still requires checked program
 admission. `zeno_fcis::legacy` retains inert data and standalone evidence
 utilities; the retired native transition and authorization constructors are
 not available through that namespace.

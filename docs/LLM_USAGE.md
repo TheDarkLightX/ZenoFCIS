@@ -9,7 +9,7 @@ declare its own output verified.
 Read in this order:
 
 1. [Quickstart](QUICKSTART.md)
-2. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md) when working with `.zeno`
+2. [RC3 specification contract](RC3_AUTHORING_CONTRACT.md) when working with `.zeno`
 3. [Canonical bytes and admission](CANONICAL_BYTES.md)
 4. [Crate map](CRATE_MAP.md)
 5. [Feature matrix](FEATURE_MATRIX.md)

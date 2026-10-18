@@ -75,7 +75,7 @@ rules cover what `core` still offers, such as atomics and raw pointers. Its
 only other route is its dependencies, which are named as the library's
 semantic crates that `tools/check_assurance.py` checks for ambient effects.
 Putting decision code in its own confined library crate is the strongest
-check available for hand-written Rust.
+check available for LLM-generated Rust.
 
 The manifest reader accepts the common forms of `[dependencies]`,
 `[dependencies.NAME]`, and their `target` variants, and ignores development
@@ -191,7 +191,7 @@ Agreement from a probe or from changed-environment runs is Checked evidence
 about the runs observed. It does not prove determinism for other runs,
 environments, inputs, or machines. Reopening a SQLite store gives one more
 check of the same kind: it re-executes every persisted transition and fails
-closed if any bytes differ. The strongest position for hand-written code
+closed if any bytes differ. The strongest position for LLM-generated code
 combines three things:
 - a confined decision crate;
 - a probe of every admitted input, or of a representative corpus when the

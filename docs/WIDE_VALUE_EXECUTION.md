@@ -19,7 +19,7 @@ Application callbacks cannot replace the decision or law evaluator on this route
 | Wide numeric decisions | Library descriptors and the checked numeric evaluator | Signed and unsigned 128-bit values, with width-explicit checked arithmetic and resource limits. |
 | Original compound values | Library schema admission and immutable decoded witnesses | Whole declared compound values can be carried through decisions; nested field selection is unsupported. |
 
-The numeric family has no general CLI authoring or lineage-upgrade workflow.
+The numeric family has no general CLI specification or lineage-upgrade workflow.
 Its library fixtures exercise the actual publication, replay and store route.
 They do not supply a business decision callback. The legacy `transform`,
 `optimize` and `loop` checker path retains its 256-node/16-output bound;

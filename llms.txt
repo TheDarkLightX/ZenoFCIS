@@ -25,7 +25,7 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/SECURITY_HOTSPOT_MODEL.md: deterministic EPI ranking and chain proof obligations
 - docs/SECURITY_STANDARDS_SNAPSHOT.md: dated primary-source practices and tool cautions
 - docs/V1_PRODUCT_CONTRACT.md: historical stable V1 features and supported adopter journeys
-- docs/RC3_AUTHORING_CONTRACT.md: authoring pipeline, capability boundary, and nonclaims
+- docs/RC3_AUTHORING_CONTRACT.md: specification pipeline, capability boundary, and nonclaims
 - docs/ZENO_LANGUAGE_V1.md: exact grammar, canonicalization, and diagnostics
 - docs/TEMPORAL_LOGIC_V1.md: finite and unbounded temporal semantics
 - docs/FORMAL_TOOLS_RC3.md: exact tool identity and fail-closed process adapters
@@ -86,10 +86,10 @@ invocation values, not prebuilt decisions or bundles.
   CatalogAuthorizedTransition
 - formal tools: BackendEngine, BackendVerifier, EvidenceChecker,
   LawEvidenceVerifier
-- authoring: parse_project, elaborate_project, ProjectSpecBuilder,
+- specification: parse_project, elaborate_project, ProjectSpecBuilder,
   evaluate_temporal, MiniDeterminator
 - formal process shell: package zeno-fcis-formal-tools
-- authoring CLI: package zeno-fcis-cli, binary zeno-fcis
+- specification CLI: package zeno-fcis-cli, binary zeno-fcis
 - shells: AuthorizedShellState; zeno-fcis-shell-sqlite when enabled
 
 ## Production integration rules

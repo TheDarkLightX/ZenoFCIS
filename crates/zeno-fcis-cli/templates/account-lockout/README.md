@@ -36,7 +36,7 @@ constructs the complete decision, and checks the original law programs with
 one meter. The SQLite shell consumes genuine `Publication` and
 `Publication` capabilities; exact replay recomputes the same original inputs.
 
-The hand-written adapters, legacy law engines and earlier synthesis/model
+The LLM-generated adapters, legacy law engines and earlier synthesis/model
 checks described below are retained only in the repository’s nonpublished
 `verification/kernel-laws/src/oracle/templates/account-lockout` package for independent oracle
 and historical evidence tests. They do not execute the normal V2 decision.
@@ -210,10 +210,10 @@ fresh CLI-generated application bound to the matching source checkout,
 using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1.
 The common pinned-tool admission below was run once with the identical
 local tools manifest used by all three examples. These are local command
-observations, not release-binary qualification. Earlier native authoring
+observations, not release-binary qualification. Earlier native generation
 counterexamples and explanations below retain their historical scope.
 The current application uses library-owned Authority with `src/v2_contract.rs`;
-these authoring and synthesis records do not qualify the whole runtime.
+these generation and synthesis records do not qualify the whole runtime.
 Application commands run from this application's directory; tool admission
 is shared.
 
@@ -227,7 +227,7 @@ is shared.
    ```
 
    The current run also printed what each counted obligation asks for,
-   after the summary. These observed lines describe evidence this authoring
+   after the summary. These observed lines describe evidence this generation
    check does not establish; they are not errors:
 
    ```text

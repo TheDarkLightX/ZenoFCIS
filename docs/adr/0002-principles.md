@@ -21,7 +21,7 @@ Each implementation step is checked by its own mechanism:
 | --- | --- |
 | Contract to finite or semantic program | SMT with the transition relation, or exhaustive enumeration |
 | Program to emitted code | Exhaustive or finite target conformance |
-| Contract to hand-written Rust | Bounded model checking over the real `execute`, plus differential testing through the real gate |
+| Contract to LLM-generated Rust | Bounded model checking over the real `execute`, plus differential testing through the real gate |
 | Source to binary | Reproducible build or module hash |
 | Execution to contract | A library-owned monitor at the authority gate |
 

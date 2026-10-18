@@ -18,7 +18,7 @@ commands. It shows six patterns:
   of that invariant: law 507 checks the slippage bound on each accepted
   proposal, and under law 503 a proposal is accepted only when no swap is
   outstanding;
-- a synthesized decision: a small hand-written adapter computes the guard's
+- a synthesized decision: a small LLM-generated adapter computes the guard's
   facts with checked arithmetic, and a core that `zeno-fcis synth` selected
   and checked on every fact tuple decides which rule applies first;
 - the model's identity as an input: the context names the model the agent
@@ -48,7 +48,7 @@ constructs the complete decision, and checks the original law programs with
 one meter. The SQLite shell consumes genuine `GenesisPublication` and
 `Publication` capabilities; exact replay recomputes the same original inputs.
 
-The hand-written adapters, legacy law engines and earlier synthesis/model
+The LLM-generated adapters, legacy law engines and earlier synthesis/model
 checks described below remain available under `legacy` for independent oracle
 and historical evidence tests. They do not execute the normal V2 decision.
 The declared policy still requires independent review of the intended rules.
