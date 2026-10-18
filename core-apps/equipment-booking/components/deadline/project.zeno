@@ -29,5 +29,5 @@ law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.
 law 502 exact_deadline on accept = command.101.120 >= pre.100.111 && command.101.120 >= pre.100.110 && post.100.110 == pre.100.110 && post.100.111 == command.101.120 && post.100.112 == 1;
 // Core seed logical-deadline/1; parameters {"C": 4}.
 // Instance source-set SHA256 2ac884840b84984bb672007de032a8558698e7dae511c029763fae18900a22ca.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 f0438e6391c2d55866d4fcde0e9eb4b91c4fd491f0da1d5f9990012bd9570b78; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/logical-deadline.json SHA256 e45d7d6e383064379b548795d8a63e63e9b540455e92ab6a00280e7656ba919d; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

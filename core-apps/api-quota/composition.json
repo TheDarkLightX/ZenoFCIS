@@ -12,7 +12,7 @@
     {
       "family": "rate-limiter",
       "instance": "components/quota/core-instance.json",
-      "instance_sha256": "f93e96f8560a5e131ea38e43b9a556b4f3bf188c77299f4be14ae1d9579d1f7e",
+      "instance_sha256": "40259f8b2379199e9263e91f2888a7ffa2b219555d290fd856835b3fef8239c6",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "quota",
       "owns_fields": [
@@ -41,7 +41,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "1dae2b85697fa75816ed0bdfbf53e9fcc77484bbdfc3b00c08e0c92e36837813",
+      "instance_sha256": "f5d7c3290a7cc019eb2c04892cce1f86ea0c347fd1eb7085cda505f2340f3def",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "memo",
       "owns_fields": [
