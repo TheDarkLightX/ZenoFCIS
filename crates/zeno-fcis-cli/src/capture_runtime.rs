@@ -1,7 +1,7 @@
 //! Bounded interpreter adapter inside checker_process's contained unit.
 //! LLM-generated. Kernel confinement precedes owner code; no candidate judge.
 
-use serde_json::{Value, json};
+use serde_json::Value;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use std::{
     io::{Read, Write},
@@ -36,7 +36,16 @@ impl Scratch {
         #[cfg(not(unix))]
         std::fs::create_dir(&dir).map_err(|_| "capture-scratch-unavailable")?;
         let scratch = Self(dir);
-        crate::atomic_create(&scratch.0.join("scratch.txt"), b"")
+        // Invocation-local scratch is disposable, never a receipt or journal.
+        // Do not fsync an empty file: that waits on filesystem/journal peers
+        // outside the CPU-accounted cgroup without making reference progress.
+        use std::os::unix::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(nix::libc::O_NOFOLLOW)
+            .open(scratch.0.join("scratch.txt"))
             .map_err(|_| "capture-scratch-unavailable")?;
         Ok(scratch)
     }
@@ -60,6 +69,48 @@ impl Drop for Scratch {
     }
 }
 
+// This is protocol preparation, not a decision or resource authority. The
+// worker already reads JSON integers; preserve that grammar and every digit.
+#[derive(serde::Serialize)]
+struct Request<'a> {
+    source: &'a str,
+    points: &'a [Vec<i128>],
+}
+
+fn encode_request(source: &str, points: &[Vec<i128>]) -> Result<Vec<u8>, String> {
+    serde_json::to_vec(&Request { source, points }).map_err(|_| "capture-request-json".into())
+}
+
+#[cfg(test)]
+mod request_tests {
+    #[test]
+    fn worker_input_keeps_exact_raw_integer_tokens_without_value_overflow() {
+        #[derive(serde::Deserialize)]
+        struct Received {
+            source: String,
+            points: Vec<Vec<i128>>,
+        }
+        let points = vec![vec![
+            i128::MIN,
+            i128::MAX,
+            -(1 << 100),
+            1 << 100,
+            1 << 64,
+            0,
+            5,
+        ]];
+        let bytes = super::encode_request("source", &points).unwrap();
+        let received: Received = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(received.source, "source");
+        assert_eq!(received.points, points);
+        let small = super::encode_request("source", &[vec![0, 5]]).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&small).unwrap(),
+            serde_json::json!({"source":"source", "points":[[0,5]]})
+        );
+    }
+}
+
 /// Fresh process per observation schedule; its only input is source and points.
 pub(super) fn invoke(source: &str, points: &[Vec<i128>]) -> Result<Value, String> {
     if !crate::checker_process::contained() {
@@ -68,8 +119,7 @@ pub(super) fn invoke(source: &str, points: &[Vec<i128>]) -> Result<Value, String
     if source.len() > 65536 {
         return Err("capture-source-bound".into());
     }
-    let request = serde_json::to_vec(&json!({"source":source,"points":points}))
-        .map_err(|_| "capture-request-json")?;
+    let request = encode_request(source, points)?;
     if request.len() > PROTOCOL_LIMIT {
         return Err("capture-request-bound".into());
     }

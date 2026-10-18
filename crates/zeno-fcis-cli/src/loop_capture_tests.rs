@@ -286,3 +286,66 @@ fn capture_arithmetic_refusals_cannot_be_checked_as_wrapped_values() {
         assert!(receipt.is_none());
     }
 }
+
+#[test]
+fn capture_packet_coordinates_and_rows_keep_full_width_values() {
+    for value in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1i128 << 100,
+        1i128 << 64,
+        5,
+    ] {
+        let domain = Domain::Int {
+            min: value,
+            max: value,
+        };
+        let table = ok(proposal::ReferenceTable::new(
+            vec![domain],
+            vec![domain],
+            vec![vec![value]],
+        ));
+        // Formatter-only fixture: these unused placeholders are not checked
+        // session bindings or evidence of a qualified reference worker.
+        let state = Session {
+            schema: SESSION_SCHEMA.into(),
+            spec: Value::Null,
+            source_sha256: String::new(),
+            table_sha256: String::new(),
+            program_sha256: String::new(),
+            checker: Value::Null,
+            rows: vec![vec![value]],
+            reference_observations: 0,
+            budget: Budget {
+                max_tuples: 1,
+                rounds: 1,
+                max_examples: 1,
+                node_visits: 100,
+            },
+            attempts: 0,
+            invocations: 0,
+            reserved_visits: 0,
+            examples: vec![0],
+            status: "fixture".into(),
+            events: vec![],
+            candidate: None,
+            receipt: None,
+        };
+        let session = session_report(&state);
+        assert_eq!(session["rows"][0][0], crate::report_numbers::integer(value));
+        assert_eq!(state.rows[0][0], value);
+        if value == 5 {
+            assert_eq!(session, serde_json::to_value(&state).unwrap());
+        }
+        let packet = packet(&state, &table);
+        let wire: Value = ok(serde_json::from_slice(&ok(serde_json::to_vec(&packet))));
+        for side in ["input", "output"] {
+            assert_eq!(
+                crate::report_numbers::read(&wire["examples"][0][side][0]),
+                Some(value)
+            );
+        }
+        assert_eq!(table.rows(), &[vec![value]]);
+    }
+}

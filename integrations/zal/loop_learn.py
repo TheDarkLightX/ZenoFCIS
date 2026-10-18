@@ -16,6 +16,7 @@ import re
 import tempfile
 
 from behavior import Refusal
+import report_numbers as N
 import loop_doors as doors
 import loop_language as Z
 
@@ -55,7 +56,7 @@ def tuple_text(values):
 
 def tuple_values(text):
     values = strict_json(text)
-    if type(values) is not list or len(values) > 8 or any(type(v) is not int or not Z.I64[0] <= v <= Z.I64[1] for v in values):
+    if type(values) is not list or len(values) > 8 or any(type(v) is not int or not Z.I128[0] <= v <= Z.I128[1] for v in values):
         raise Refusal("learn-tuple")
     return tuple(values)
 
@@ -243,12 +244,13 @@ def post(workspace, state, ctx, id_, seq, report):
         workspace._reply(state, ctx, "learn-inconclusive", id_, seq, report)
     elif status == "question":
         q = detail["question"]
+        point = N.integers(q["input"])
         qid = workspace._fresh_question_id(state)
         state["questions"][qid] = {"kind": "learn", "status": "open", "asked_by": "judge",
-                                    "input": list(q["input"]), "binding": Z.digest(specification(state)),
+                                    "input": list(point), "binding": Z.digest(specification(state)),
                                     "proposal": q, "counts": list(detail["counts"])}
         workspace._reply(state, ctx, "learn-question", qid, seq, report,
-                         input=tuple(q["input"]), counts=tuple(detail["counts"]))
+                         input=point, counts=tuple(detail["counts"]))
     elif status == "determined":
         candidate = detail.get("candidate") or {}
         checked = candidate.get("examples_check") or {}
@@ -317,7 +319,7 @@ def view(workspace, state):
                           "english": Z.render_act(a, ctx, True), "symbolic": Z.render_act(a, ctx, False),
                           "input": list(q["input"]), "buckets": json.loads(json.dumps(q["proposal"]["buckets"])),
                           "workflow": "owner: loop answer " + id_ + " '[output,tuple]'; model suggestions are advisory"})
-    return {"schema": "zeno-fcis/zal-loop-view/1", "workspace": str(workspace.path), "zal_profile": Z.PROFILE,
+    return {"schema": "zeno-fcis/zal-loop-view/2", "workspace": str(workspace.path), "zal_profile": Z.PROFILE,
             "mode": "learn", "subject": list(Z.Context(state["subject"]).subject_ref), "incumbent": None,
             "original_nodes": None, "events": [{k: e[k] for k in ("seq", "author", "english", "symbolic")}
                                                   for e in state["events"][-40:]],

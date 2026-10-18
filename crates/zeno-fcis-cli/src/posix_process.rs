@@ -55,6 +55,16 @@ mod runtime {
     const ROLE: &str = "ZENO_FCIS_POSIX_ROLE";
     const INVOCATION: &str = "ZENO_FCIS_POSIX_INVOCATION";
     const EVIDENCE_CAP: usize = 32768;
+    // ACK follows limit/environment/FD readback and durable startup custody.
+    // Same-core CPU contention measured that journal sync up to 5.378 s (idle
+    // ACK max 31 ms); 10 s gives almost twice that observed tail, unlike 1 s.
+    // Host5 independently measured systemd:30 idle+30 loaded startups passed;
+    // loaded ACK p95=89ms,max=100ms (supervisor custody observations up to240ms).
+    // Keep10s for the separately observed durable-I/O tail; samples do not
+    // guarantee worst-case scheduling or storage latency.
+    // The supervisor's existing 25 s whole-run cap still includes startup;
+    // this wait neither extends it nor retries an invocation or admission.
+    pub(in super::super) const STARTUP_ACK_BUDGET: Duration = Duration::from_secs(10);
     const ENVIRONMENT: &[&str] = &[
         "LC_ALL",
         "MALLOC_ARENA_MAX",
@@ -147,6 +157,7 @@ mod runtime {
         before_receipts: std::collections::BTreeMap<String, String>,
         finished: bool,
         guardian: bool,
+        timing: super::super::diagnostics::Record,
     }
 
     fn bounded_read(path: &Path) -> Result<Vec<u8>, String> {
@@ -256,11 +267,13 @@ mod runtime {
             actual: Vec<Guarantee>,
             source: super::super::SelectionSource,
         ) -> Result<Self, String> {
+            let mut timing = super::super::diagnostics::Record::new("caller", "posix");
             let mut nonce = [0; 32];
             fs::File::open("/dev/urandom")
                 .and_then(|mut f| f.read_exact(&mut nonce))
                 .map_err(|e| e.to_string())?;
             let invocation = crate::transform::sha256_hex(&nonce);
+            timing.set("invocation_sha256", serde_json::json!(invocation));
             let build = build_identity()?;
             let root = evidence_root();
             match fs::DirBuilder::new().mode(0o700).create(&root) {
@@ -290,6 +303,7 @@ mod runtime {
                 before_receipts: Default::default(),
                 finished: false,
                 guardian: false,
+                timing,
             };
             let mut admission = empty_evidence(&this.invocation, &this.build);
             admission.guarantees = actual;
@@ -346,6 +360,7 @@ mod runtime {
                 before_receipts,
                 finished: false,
                 guardian: true,
+                timing: super::super::diagnostics::Record::new("guardian-journal", "posix"),
             }))
         }
 
@@ -621,20 +636,90 @@ mod runtime {
     }
 
     pub(in super::super) fn await_startup_ack(stream: &mut UnixStream) -> Result<(), String> {
-        let deadline = Instant::now() + Duration::from_secs(1);
+        let started = Instant::now();
+        let backend = if is_worker() { "posix" } else { "systemd" };
+        // Construction performs no I/O during the guardian's FD snapshot.
+        // Identity/record I/O is deferred to Drop, after ACK acceptance/refusal.
+        let mut timing = super::super::diagnostics::Record::new("worker-startup", backend);
+        timing.set(
+            "ack_budget_ms",
+            serde_json::json!(STARTUP_ACK_BUDGET.as_millis() as u64),
+        );
+        if let Ok(unit) = std::env::var("ZENO_FCIS_CHECKER_UNIT") {
+            timing.set("unit", serde_json::json!(unit));
+        }
+        let result = await_startup_ack_before(stream, started + STARTUP_ACK_BUDGET);
+        timing.duration("ack_wait_ms", started);
+        timing.set("ack_accepted", serde_json::json!(result.is_ok()));
+        timing.set("startup_reason", serde_json::json!(result.as_ref().err()));
+        result
+    }
+
+    fn await_startup_ack_before(stream: &mut UnixStream, deadline: Instant) -> Result<(), String> {
         loop {
             let mut byte = [0];
-            match stream.read(&mut byte) {
+            let read = stream.read(&mut byte);
+            // Check after the nonblocking read, before accepting any reply:
+            // descheduling or a queued late ACK cannot bypass the deadline.
+            if Instant::now() >= deadline {
+                return Err("startup-ack-unavailable:deadline".into());
+            }
+            match read {
                 Ok(1) if byte[0] == 0xA1 => return Ok(()),
                 Ok(0) => return Err("startup-ack-unavailable:eof".into()),
                 Ok(_) => return Err("wrong-startup-ack".into()),
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                 Err(e) => return Err(format!("startup-ack-unavailable:{e}")),
             }
-            if Instant::now() >= deadline {
-                return Err("startup-ack-unavailable:deadline".into());
-            }
             std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    #[cfg(test)]
+    mod startup_tests {
+        use super::*;
+
+        #[test]
+        fn delayed_custody_ack_preserves_the_budget_and_exact_protocol_byte() {
+            let (mut child, parent) = UnixStream::pair().unwrap();
+            child.set_nonblocking(true).unwrap();
+            let writer = std::thread::spawn(move || {
+                // A durable custody write can exceed the former one-second wait.
+                std::thread::sleep(Duration::from_millis(1200));
+                write_protocol(&parent, &[0xA1]).unwrap();
+            });
+            let started = Instant::now();
+            assert_eq!(await_startup_ack(&mut child), Ok(()));
+            assert!(started.elapsed() >= Duration::from_millis(1200));
+            assert!(STARTUP_ACK_BUDGET < Duration::from_secs(25));
+            writer.join().unwrap();
+        }
+
+        #[test]
+        fn wrong_closed_missing_and_late_startup_ack_all_refuse() {
+            let (mut child, parent) = UnixStream::pair().unwrap();
+            child.set_nonblocking(true).unwrap();
+            write_protocol(&parent, &[1]).unwrap();
+            assert_eq!(
+                await_startup_ack(&mut child),
+                Err("wrong-startup-ack".into())
+            );
+            drop(parent);
+            assert_eq!(
+                await_startup_ack(&mut child),
+                Err("startup-ack-unavailable:eof".into())
+            );
+            let (mut child, parent) = UnixStream::pair().unwrap();
+            child.set_nonblocking(true).unwrap();
+            assert_eq!(
+                await_startup_ack_before(&mut child, Instant::now() + Duration::from_millis(20)),
+                Err("startup-ack-unavailable:deadline".into())
+            );
+            write_protocol(&parent, &[0xA1]).unwrap();
+            assert_eq!(
+                await_startup_ack_before(&mut child, Instant::now()),
+                Err("startup-ack-unavailable:deadline".into())
+            );
         }
     }
 
@@ -1151,6 +1236,9 @@ mod runtime {
                     Ok(Some(crate::BLOCKED))
                 }
                 "guardian" => {
+                    let prepared = Instant::now();
+                    let mut preparation =
+                        super::super::diagnostics::Record::new("guardian-preparation", "posix");
                     use clap::Parser;
                     let cli = crate::Cli::try_parse().map_err(|e| e.to_string())?;
                     finite_command(&cli.command)?;
@@ -1177,6 +1265,8 @@ mod runtime {
                         .map_err(|e| e.to_string())?;
                     guardian.journal =
                         Invocation::recover(&cli.command, &invocation, &guardian.build)?;
+                    preparation.duration("preparation_ms", prepared);
+                    preparation.set("invocation_sha256", serde_json::json!(invocation));
                     let (staging_parent, receipt) = super::super::receipt_paths(&cli.command);
                     let mut result = linux::supervise_posix(
                         &std::env::args_os().skip(1).collect::<Vec<_>>(),
@@ -1252,11 +1342,26 @@ mod runtime {
             .stdin(Stdio::from(std::os::fd::OwnedFd::from(channel)))
             .stdout(output)
             .stderr(errors);
+        invocation
+            .timing
+            .duration("preparation_ms", invocation.timing.started());
+        let guardian_started = Instant::now();
         let mut child = launcher
             .spawn()
             .map_err(|e| unavailable(format!("guardian-launch:{e}")).to_string())?;
         drop(launcher); // Only the caller owns this watchdog endpoint.
-        let deadline = Instant::now() + Duration::from_secs(30);
+        let guardian_clock = Instant::now();
+        let deadline = guardian_clock + Duration::from_secs(30);
+        invocation
+            .timing
+            .set("guardian_pid", serde_json::json!(child.id()));
+        invocation.timing.set(
+            "guardian_start_ticks",
+            serde_json::json!(super::super::diagnostics::process_start_ticks(child.id())),
+        );
+        invocation
+            .timing
+            .set("guardian_budget_ms", serde_json::json!(30000));
         let mut evidence = Vec::new();
         let captured = (|| -> Result<ExitStatus, String> {
             let mut status = None;
@@ -1292,6 +1397,16 @@ mod runtime {
                 std::thread::sleep(Duration::from_millis(2));
             }
         })();
+        invocation
+            .timing
+            .duration("guardian_observed_ms", guardian_clock);
+        invocation
+            .timing
+            .duration("guardian_launch_and_wait_ms", guardian_started);
+        invocation.timing.set(
+            "guardian_transport_reason",
+            serde_json::json!(captured.as_ref().err()),
+        );
         let mut final_evidence = empty_evidence(&identity, &build);
         final_evidence.termination = Termination::Stopped;
         final_evidence.cleanup = Cleanup::Unknown;
@@ -1377,6 +1492,14 @@ mod runtime {
             final_evidence.exit_code = None;
             final_evidence.termination_reason = Some(failure.reason.clone());
         }
+        invocation.timing.set(
+            "supervisor_reason",
+            serde_json::json!(outcome.as_ref().err().map(|f| &f.reason)),
+        );
+        invocation.timing.set(
+            "cleanup_verified",
+            serde_json::json!(final_evidence.absence_verified),
+        );
         invocation
             .finish(&mut final_evidence)
             .map_err(|e| format!("containment-evidence:{e}"))?;
@@ -1397,5 +1520,334 @@ mod runtime {
             );
         }
         Ok(code)
+    }
+    #[cfg(test)]
+    mod stage_tests {
+        use super::*;
+        // Actual re-executed workers: no production flag or alternate decision API.
+        fn worker(spin: bool) {
+            if !is_worker() {
+                return;
+            }
+            close_inherited_descriptors().unwrap();
+            install_limits().unwrap();
+            assert_eq!(linux::child(), Ok(true));
+            super::super::super::start(Duration::from_millis(if spin { 1000 } else { 100 }), false)
+                .unwrap();
+            if spin {
+                loop {
+                    std::hint::black_box(1u64.wrapping_mul(7));
+                }
+            }
+            std::thread::sleep(Duration::from_millis(600));
+            super::super::super::finish().unwrap();
+            println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
+            super::super::super::shutdown(crate::BLOCKED);
+            std::process::exit(crate::BLOCKED.into());
+        }
+        #[test]
+        fn probe_stage_spin() {
+            worker(true);
+        }
+        #[test]
+        fn probe_stage_wait() {
+            worker(false);
+        }
+
+        #[test]
+        fn actual_posix_stage_cpu_spin_is_stopped_but_waiting_does_not_spend_cpu() {
+            let root = evidence_root();
+            fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&root)
+                .unwrap();
+            for name in ["probe_stage_wait", "probe_stage_spin"] {
+                let invocation = crate::transform::sha256_hex(
+                    format!(
+                        "stage-cpu-{}-{}",
+                        std::process::id(),
+                        crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    )
+                    .as_bytes(),
+                );
+                let directory = evidence_directory(&invocation).unwrap();
+                fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&directory)
+                    .unwrap();
+                let (caller, _held) = UnixStream::pair().unwrap();
+                caller.set_nonblocking(true).unwrap();
+                let mut guardian = Guardian {
+                    caller,
+                    invocation,
+                    build: "stage-control".into(),
+                    evidence: None,
+                    journal: None,
+                };
+                let probe = format!("checker_process::posix::runtime::stage_tests::{name}");
+                let args =
+                    ["--exact", &probe, "--nocapture", "--test-threads=1"].map(OsString::from);
+                let result = linux::supervise_posix(
+                    &args,
+                    linux::Receipts {
+                        staging_parent: None,
+                        receipt: None,
+                    },
+                    &mut guardian,
+                );
+                let evidence = guardian.evidence.as_ref().unwrap();
+                assert!(evidence.absence_verified);
+                assert_eq!(evidence.cleanup, Cleanup::OwnedWorkersReaped);
+                let records = Path::new("/tmp")
+                    .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
+                let observation = fs::read_dir(records)
+                    .unwrap()
+                    .filter_map(|p| {
+                        serde_json::from_slice::<serde_json::Value>(&fs::read(p.ok()?.path()).ok()?)
+                            .ok()
+                    })
+                    .find(|v| {
+                        v["observer"] == "worker-supervisor"
+                            && v["pid"] == std::process::id()
+                            && v["process_start_ticks"]
+                                == super::super::super::diagnostics::process_start_ticks(
+                                    std::process::id(),
+                                )
+                                .unwrap()
+                            && v["worker_pid"] == evidence.worker_pid
+                    })
+                    .unwrap();
+                println!("stage-control {name}: {observation}");
+                assert_eq!(observation["cleanup_verified"], true);
+                if name.ends_with("spin") {
+                    let failure = result.unwrap_err();
+                    assert!(
+                        failure.reason.starts_with("contained-deadline"),
+                        "{failure:?}"
+                    );
+                    assert!(failure.cleanup.is_none());
+                    assert_eq!(observation["stages"][0]["stopped_by"], "cpu");
+                    assert!(
+                        observation["stages"][0]["cpu_observed_us"]
+                            .as_u64()
+                            .unwrap()
+                            >= 1_000_000
+                    );
+                } else {
+                    assert_eq!(result, Ok(crate::BLOCKED));
+                    assert_eq!(observation["stages"][0]["finished"], true);
+                    assert!(
+                        observation["stages"][0]["wall_elapsed_ms"]
+                            .as_u64()
+                            .unwrap()
+                            >= 600
+                    );
+                    assert!(
+                        observation["stages"][0]["cpu_observed_us"]
+                            .as_u64()
+                            .unwrap()
+                            < 100_000
+                    );
+                }
+                fs::remove_dir_all(directory).unwrap();
+            }
+        }
+        // Isolated re-exec: an external controller stops the supervisor for7s
+        // after the worker got its permit. FINISH queues while that peer is
+        // starved; the worker must wait for the actual permit, then complete.
+        #[test]
+        fn actual_starved_supervisor_accepts_queued_finish_and_hung_stage_refuses() {
+            const PROBE: &str = "ZENO_FCIS_STARVED_SUPERVISOR_TEST";
+            if std::env::var_os(PROBE).is_none() {
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "checker_process::posix::runtime::stage_tests::actual_starved_supervisor_accepts_queued_finish_and_hung_stage_refuses", "--nocapture", "--test-threads=1"])
+                    .env(PROBE, "1").output().unwrap();
+                assert!(output.status.success(), "{output:?}");
+                println!("{}", String::from_utf8_lossy(&output.stdout));
+                return;
+            }
+            let root = evidence_root();
+            fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&root)
+                .unwrap();
+            for starved in [true, false] {
+                let invocation = crate::transform::sha256_hex(
+                    format!(
+                        "peer-control-{}-{}-{}",
+                        std::process::id(),
+                        super::super::super::diagnostics::process_start_ticks(std::process::id())
+                            .unwrap(),
+                        crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    )
+                    .as_bytes(),
+                );
+                let directory = evidence_directory(&invocation).unwrap();
+                fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&directory)
+                    .unwrap();
+                let marker = root.join(format!(
+                    ".peer-{}-{}",
+                    std::process::id(),
+                    super::super::super::diagnostics::process_start_ticks(std::process::id())
+                        .unwrap()
+                ));
+                assert!(!marker.exists());
+                let controller = if starved {
+                    Some(std::process::Command::new("python3")
+                    .args(["-I", "-S", "-B", "-c", r#"
+import os,signal,sys,time
+from pathlib import Path
+marker=Path(sys.argv[1]); pid=int(sys.argv[2]); ticks=Path(f'/proc/{pid}/stat').read_text().rsplit(') ',1)[1].split()[19]
+end=time.monotonic()+20
+while not marker.exists():
+ if time.monotonic()>=end: raise RuntimeError('stage marker missing')
+ time.sleep(.002)
+assert Path(f'/proc/{pid}/stat').read_text().rsplit(') ',1)[1].split()[19]==ticks
+os.kill(pid,signal.SIGSTOP)
+try: time.sleep(7)
+finally: os.kill(pid,signal.SIGCONT)
+"#]).arg(&marker).arg(std::process::id().to_string()).spawn().unwrap())
+                } else {
+                    None
+                };
+                let (caller, _held) = UnixStream::pair().unwrap();
+                caller.set_nonblocking(true).unwrap();
+                let mut guardian = Guardian {
+                    caller,
+                    invocation,
+                    build: "stage-control".into(),
+                    evidence: None,
+                    journal: None,
+                };
+                let probe = if starved {
+                    "probe_stage_starved_peer"
+                } else {
+                    "probe_stage_hung"
+                };
+                // Marker binds the live supervisor PID and kernel start ticks.
+                // The controller is our owned direct child; never signal after reap.
+                let args = [
+                    "--exact",
+                    &format!("checker_process::posix::runtime::stage_tests::{probe}"),
+                    "--nocapture",
+                    "--test-threads=1",
+                ]
+                .map(OsString::from);
+                let result = linux::supervise_posix(
+                    &args,
+                    linux::Receipts {
+                        staging_parent: None,
+                        receipt: None,
+                    },
+                    &mut guardian,
+                );
+                if let Some(mut controller) = controller {
+                    assert!(controller.wait().unwrap().success());
+                }
+                let evidence = guardian.evidence.unwrap();
+                assert!(evidence.absence_verified);
+                assert_eq!(evidence.cleanup, Cleanup::OwnedWorkersReaped);
+                let records = Path::new("/tmp")
+                    .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
+                let observation = fs::read_dir(records)
+                    .unwrap()
+                    .filter_map(|p| {
+                        serde_json::from_slice::<serde_json::Value>(&fs::read(p.ok()?.path()).ok()?)
+                            .ok()
+                    })
+                    .find(|v| {
+                        v["observer"] == "worker-supervisor"
+                            && v["pid"] == std::process::id()
+                            && v["process_start_ticks"]
+                                == super::super::super::diagnostics::process_start_ticks(
+                                    std::process::id(),
+                                )
+                                .unwrap()
+                            && v["worker_pid"] == evidence.worker_pid
+                    })
+                    .unwrap();
+                assert_eq!(observation["cleanup_verified"], true);
+                assert!(observation["worker_observed_ms"].as_u64().unwrap() < 25000);
+                let stage = &observation["stages"][0];
+                assert!(stage["cpu_observed_us"].as_u64().unwrap() < 1_000_000);
+                if starved {
+                    assert_eq!(result, Ok(crate::BLOCKED));
+                    assert_eq!(stage["finished"], true);
+                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() >= 7000);
+                } else {
+                    assert!(result.unwrap_err().reason.starts_with("contained-deadline"));
+                    assert_eq!(stage["stopped_by"], "no-cpu-or-protocol-progress");
+                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() >= 2000);
+                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() < 4000);
+                    assert!(
+                        !observation["idle_waiters"]["threads"]
+                            .as_array()
+                            .unwrap()
+                            .is_empty()
+                    );
+                }
+                println!("physical peer control starved={starved}: {observation}");
+                if starved {
+                    fs::remove_file(marker).unwrap();
+                }
+                fs::remove_dir_all(directory).unwrap();
+            }
+        }
+        fn peer_worker(starved: bool) {
+            if !is_worker() {
+                return;
+            }
+            close_inherited_descriptors().unwrap();
+            install_limits().unwrap();
+            assert_eq!(linux::child(), Ok(true));
+            super::super::super::start(Duration::from_millis(1000), true).unwrap();
+            if starved {
+                let parent = nix::unistd::getppid().as_raw() as u32;
+                let ticks = super::super::super::diagnostics::process_start_ticks(parent).unwrap();
+                fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .open(evidence_root().join(format!(".peer-{parent}-{ticks}")))
+                    .unwrap();
+                // Wait for the real fault, not a scheduling guess. Under
+                // eight burners the controller can run after a100ms sleep.
+                let stop_end = Instant::now() + Duration::from_secs(2);
+                loop {
+                    assert_eq!(
+                        super::super::super::diagnostics::process_start_ticks(parent),
+                        Some(ticks)
+                    );
+                    let stat = fs::read_to_string(format!("/proc/{parent}/stat")).unwrap();
+                    if stat.rsplit_once(") ").unwrap().1.split_whitespace().next() == Some("T") {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < stop_end,
+                        "controller did not stop the actual supervisor"
+                    );
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                super::super::super::finish().unwrap();
+                println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
+                super::super::super::shutdown(crate::BLOCKED);
+                std::process::exit(crate::BLOCKED.into());
+            }
+            loop {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+        #[test]
+        fn probe_stage_starved_peer() {
+            peer_worker(true);
+        }
+        #[test]
+        fn probe_stage_hung() {
+            peer_worker(false);
+        }
     }
 }

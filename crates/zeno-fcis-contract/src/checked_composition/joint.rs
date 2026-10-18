@@ -182,7 +182,7 @@ impl JointOutcome {
                 json!({"kind": "CommittedFailure", "component": component, "reason": reason})
             }
         };
-        json!({"outcome": kind, "successor": self.successor})
+        json!({"schema":"zeno-fcis/composed-joint-outcome/2", "integer_encoding":super::INTEGER_ENCODING, "outcome": kind, "successor": super::json_integers(&self.successor)})
     }
 }
 

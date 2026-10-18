@@ -455,11 +455,12 @@ impl Core {
                 let value = match text {
                     Value::String(text) => expand(self.read_names(text)?)?,
                     Value::Bool(b) => Expr::Int(i128::from(*b)),
-                    Value::Number(n) => Expr::Int(
-                        n.as_i64()
-                            .map(i128::from)
-                            .ok_or_else(|| Stop::Invalid(format!("case {index} post")))?,
-                    ),
+                    Value::Number(_) => match case.post.get(&field) {
+                        Some(zeno_fcis_contract::internals::expr::Ast::Int(value)) => {
+                            Expr::Int(*value)
+                        }
+                        _ => return invalid(format!("case {index} post")),
+                    },
                     _ => return invalid(format!("case {index} post")),
                 };
                 post.insert(k, value);
@@ -533,7 +534,7 @@ impl Core {
         }
         match self.vocab.variant_name(&self.names[k], value) {
             Some(variant) => json!(variant),
-            None => json!(value),
+            None => crate::report_numbers::integer(value),
         }
     }
 

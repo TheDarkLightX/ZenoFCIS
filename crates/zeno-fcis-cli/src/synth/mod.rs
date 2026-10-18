@@ -109,7 +109,7 @@ type Result<T> = std::result::Result<T, Failure>;
 fn fail(exit: u8, code: &str, detail: Value) -> Failure {
     Failure {
         exit,
-        report: json!({"schema":"zeno-fcis/synthesis-result/1","status":code,"authority":"none","detail":detail}),
+        report: json!({"schema":"zeno-fcis/synthesis-result/2","integer_encoding":crate::report_numbers::ENCODING,"status":code,"authority":"none","detail":detail}),
     }
 }
 fn io(error: std::io::Error) -> Failure {
@@ -138,7 +138,7 @@ fn semantic(error: Error) -> Failure {
         Error::ContractTrap { input, output } => fail(
             crate::INVALID,
             "contract-trap",
-            json!({"input":input,"output":output}),
+            json!({"input":crate::report_numbers::integers(&input),"output":crate::report_numbers::integers(&output)}),
         ),
         Error::Search(
             zeno_fcis_synthesis::SynthesisError::CheckerIndeterminate
@@ -212,7 +212,11 @@ fn prepare(selection: &Selection) -> Result<Prepared> {
             first_counterexample,
         } => (program, certificate, cases, first_counterexample),
         Outcome::Unrealizable { input } => {
-            return Err(fail(crate::INVALID, "unrealizable", json!({"input":input})));
+            return Err(fail(
+                crate::INVALID,
+                "unrealizable",
+                json!({"input":crate::report_numbers::integers(&input)}),
+            ));
         }
         Outcome::NoSolution {
             certificate,
@@ -252,8 +256,8 @@ fn prepare(selection: &Selection) -> Result<Prepared> {
         format!("transition.{}", target.emitter.target().extension),
         source.as_bytes().to_vec(),
     );
-    files.insert("vectors.json".into(),json_bytes(&json!({"schema":"zeno-fcis/synthesis-vectors/1","cases":cases.iter().map(|c|json!({"input":c.input,"output":c.output})).collect::<Vec<_>>()}))?);
-    let manifest = json!({"schema":"zeno-fcis/synthesis-artifact/1","status":"selected","authority":"none","profile":PROFILE,"target":{"language":target.emitter.target().language,"revision":target.emitter.target().revision},"emitter_sha256":hex(target.emitter.identity()),"abi":problem.names,"contract":hex(problem.contract.commitment().map_err(semantic)?),"certificate":hex(certificate.commitment().map_err(|e|semantic(Error::Search(e)))?),"assignments_evaluated":certificate.evaluated(),"input_coverage":cases.len(),"trace":hex(certificate.trace_hash()),"first_counterexample":witness_json(witness),"runtime_conformance":"not-run","files":files.iter().map(|(name,bytes)|json!({"path":name,"bytes":bytes.len(),"sha256":sha(bytes)})).collect::<Vec<_>>()});
+    files.insert("vectors.json".into(),json_bytes(&json!({"schema":"zeno-fcis/synthesis-vectors/2","integer_encoding":crate::report_numbers::ENCODING,"cases":cases.iter().map(|c|json!({"input":crate::report_numbers::integers(&c.input),"output":crate::report_numbers::integers(&c.output)})).collect::<Vec<_>>()}))?);
+    let manifest = json!({"schema":"zeno-fcis/synthesis-artifact/2","integer_encoding":crate::report_numbers::ENCODING,"status":"selected","authority":"none","profile":PROFILE,"target":{"language":target.emitter.target().language,"revision":target.emitter.target().revision},"emitter_sha256":hex(target.emitter.identity()),"abi":problem.names,"contract":hex(problem.contract.commitment().map_err(semantic)?),"certificate":hex(certificate.commitment().map_err(|e|semantic(Error::Search(e)))?),"assignments_evaluated":certificate.evaluated(),"input_coverage":cases.len(),"trace":hex(certificate.trace_hash()),"first_counterexample":witness_json(witness),"runtime_conformance":"not-run","files":files.iter().map(|(name,bytes)|json!({"path":name,"bytes":bytes.len(),"sha256":sha(bytes)})).collect::<Vec<_>>()});
     files.insert("manifest.json".into(), json_bytes(&manifest)?);
     Ok(Prepared {
         files,
@@ -286,7 +290,7 @@ fn author(selection: &Selection, check: bool) -> Result<Value> {
         }
     }
     Ok(
-        json!({"schema":"zeno-fcis/synthesis-result/1","status":if check {"current"}else{"selected"},"authority":"none","semantic":"complete-finite","runtime_conformance":"not-run","manifest":prepared.manifest}),
+        json!({"schema":"zeno-fcis/synthesis-result/2","integer_encoding":crate::report_numbers::ENCODING,"status":if check {"current"}else{"selected"},"authority":"none","semantic":"complete-finite","runtime_conformance":"not-run","manifest":prepared.manifest}),
     )
 }
 fn verify(selection: &Selection, tool: Option<&Path>, receipt: Option<&Path>) -> Result<Value> {
@@ -378,7 +382,7 @@ fn check_files(out: &Path, expected: &BTreeMap<String, Vec<u8>>) -> Result<()> {
     Ok(())
 }
 fn witness_json(witness: Option<Witness>) -> Value {
-    witness.map_or(Value::Null, |w| json!({"input":w.input,"output":w.output}))
+    witness.map_or(Value::Null, |w| json!({"input":crate::report_numbers::integers(&w.input),"output":w.output.as_deref().map(crate::report_numbers::integers)}))
 }
 fn json_bytes(value: &Value) -> Result<Vec<u8>> {
     let mut bytes = serde_json::to_vec_pretty(value).map_err(|e| {

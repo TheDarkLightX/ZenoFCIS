@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from behavior import Refusal
+import report_numbers as N
 import loop_doors as doors
 import loop_language as Z
 
@@ -216,8 +217,8 @@ def _post(workspace, state, ctx, id_, seq, report):
         if old is not None and (old.get("status") != "open" or old.get("version_question") != q):
             raise Refusal("version-space-question-id-collision")
         state["questions"][q["id"]] = {"status": "open", "asked_by": "judge", "kind": "version-space", "version_question": q}
-        workspace._reply(state, ctx, "version-question", q["id"], seq, report, input=tuple(q["input"]),
-                         answers=tuple((tuple(a["output"]), a["remaining"]) for a in q["answers"]))
+        workspace._reply(state, ctx, "version-question", q["id"], seq, report, input=N.integers(q["input"]),
+                         answers=tuple((N.integers(a["output"]), a["remaining"]) for a in q["answers"]))
     elif status == "determined":
         candidate = detail["candidate"]
         if candidate.get("status") != "checked" or not candidate.get("checks") or any(
@@ -303,7 +304,7 @@ def handle(workspace, state, ctx, a, seq):
         # Own a fresh next specification. Retain an in-domain answer even if
         # it excludes this grammar; a later budget stop never erases the answer.
         proposal = json.loads(json.dumps(version["specification"]))
-        proposal["requirements"].append({"id": "answer_" + a.id, "input": list(q["input"]), "output": list(values)})
+        proposal["requirements"].append({"id": "answer_" + a.id, "input": list(N.integers(q["input"])), "output": list(values)})
         version["specification"] = proposal
         state["subject"] = _subject(proposal)
         state["questions"][a.id]["status"] = "answered"
@@ -324,7 +325,7 @@ def answer(workspace, state, ctx, question, option):
         index = int(option) - 1
         if not 0 <= index < len(answers):
             raise Refusal("version-space-answer-option")
-        output = tuple(answers[index]["output"])
+        output = N.integers(answers[index]["output"])
     else:
         raise Refusal("answer with an option number or a complete [output,tuple]; use loop stop to end")
     _tuple_kind(output, ctx, True)
@@ -343,7 +344,7 @@ def view(workspace, state):
                           "options": [{"n": k + 1, "output": a["output"], "remaining": a["remaining"],
                                        "english": f"answer {tuple_text(a['output'])} leaves {a['remaining']} meanings (proposal)",
                                        "symbolic": tuple_text(a["output"])} for k, a in enumerate(q["answers"])]})
-    return {"schema": "zeno-fcis/zal-loop-view/1", "workspace": str(workspace.path), "zal_profile": Z.PROFILE,
+    return {"schema": "zeno-fcis/zal-loop-view/2", "workspace": str(workspace.path), "zal_profile": Z.PROFILE,
             "subject": list(Z.Context(state["subject"]).subject_ref), "mode": "version-space", "incumbent": None,
             "event_count": len(state["events"]), "open_questions": questions, "authority": "none",
             "events": [{k: e[k] for k in ("seq", "author", "english", "symbolic")} for e in state["events"][-40:]]}

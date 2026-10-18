@@ -53,7 +53,7 @@ use super::refusal::Refusal;
 use super::{DOMAIN_CLAIM, DOMAIN_NONCLAIMS, DOMAIN_TRUSTED_BASE, DomainSources, hex};
 
 /// The schema of a composed-domain result.
-pub const DOMAIN_RESULT_SCHEMA: &str = "zeno-fcis/composed-domain-result/1";
+pub const DOMAIN_RESULT_SCHEMA: &str = "zeno-fcis/composed-domain-result/2";
 
 /// A composed-domain verdict.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -373,6 +373,7 @@ impl DomainResult {
             });
         json!({
             "schema": DOMAIN_RESULT_SCHEMA,
+            "integer_encoding": super::INTEGER_ENCODING,
             "profile": "composed-domain",
             "verdict": self.verdict.name(),
             "manifest": {
@@ -626,7 +627,7 @@ fn named<'a>(names: impl Iterator<Item = &'a str>, values: &[i128]) -> Value {
     Value::Object(
         names
             .zip(values)
-            .map(|(name, value)| (name.to_owned(), json!(value)))
+            .map(|(name, value)| (name.to_owned(), super::json_integer(*value)))
             .collect::<Map<_, _>>(),
     )
 }
@@ -637,7 +638,10 @@ fn states_json(composition: &Composition, components: &[usize], states: &[Vec<i1
     for at in components {
         let component = &composition.components[*at];
         for (field, value) in component.state_fields().iter().zip(&states[*at]) {
-            out.insert(format!("{}.{}", component.name, field.name), json!(value));
+            out.insert(
+                format!("{}.{}", component.name, field.name),
+                super::json_integer(*value),
+            );
         }
     }
     Value::Object(out)

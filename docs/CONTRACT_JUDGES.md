@@ -20,6 +20,36 @@ advisory packet with `authority: none` and changes no application file. The
 [CLI reference](CLI_REFERENCE.md#contract-judges) gives every option, field and
 exit code.
 
+## Integer values in JSON reports
+
+Scalar integer fields in current door and judge reports use
+`safe-number-or-decimal-string/1`, named by `integer_encoding`:
+
+- Values from `-9007199254740991` to `9007199254740991` are JSON numbers.
+- Other signed 128-bit values are canonical decimal strings, with a minus sign
+  only for negative values and no leading zeros. New numeric fields encode zero as `0`.
+- Boolean fields remain booleans; variant names remain names. Expression text,
+  program/domain documents and existing string-valued arrays (including
+  scenario posts, ordinary review packets, evaluate results and receipts)
+  retain their own formats, even for small values.
+
+The current schemas are `zeno-fcis/loop-doors/2`,
+`zeno-fcis/black-box-capture/2`, `zeno-fcis/loop-version-space/2`,
+`zeno-fcis/contract-profile/2`, `zeno-fcis/contract-lemma/2`,
+`zeno-fcis/contract-transition-lemma/2`, `zeno-fcis/contract-probe/2`,
+`zeno-fcis/contract-scenario/2`, and the gap-judge packet
+`zeno-fcis/contract-review/4`. The ordinary string-valued review packet remains
+`zeno-fcis/contract-review/2`. Public loop workspace views use
+`zeno-fcis/zal-loop-view/2`. Synthesis result, artifact and vector reports use
+`/2`; draft assessments name `zeno-fcis/contract-draft-assessment/2`.
+
+For example, `5` is still a JSON number, while `2^100` is the string
+`"1267650600228229401496703205376"`. Python readers decode numeric coordinates
+with exact `int` arithmetic. JavaScript readers can display the string directly
+or use `BigInt(value)` for an integer field. This preserves existing small-value
+meaning and every signed 128-bit endpoint without floating-point rounding.
+These reports remain advisory; the encoding supplies no decision authority.
+
 ## A contract to judge
 
 The judges enumerate the whole declared domain, so they suit contracts with

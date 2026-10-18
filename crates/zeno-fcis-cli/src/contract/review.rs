@@ -55,7 +55,7 @@ use table::{Row, Table};
 
 pub(crate) const PACKET_SCHEMA: &str = "zeno-fcis/contract-review/2";
 /// The packet with the specification-gap judge and the extended catalog.
-pub(crate) const PACKET_SCHEMA_GAPS: &str = "zeno-fcis/contract-review/3";
+pub(crate) const PACKET_SCHEMA_GAPS: &str = "zeno-fcis/contract-review/4";
 pub(crate) use machine::Inconclusive;
 /// The largest input set a review enumerates or probes by default.
 pub(crate) const DEFAULT_MAX_TUPLES: u64 = 1 << 20;
@@ -504,6 +504,7 @@ fn review_with(
     let mut packet = packet::build(&report);
     if let Some(result) = &gap_result {
         packet["schema"] = json!(PACKET_SCHEMA_GAPS);
+        packet["integer_encoding"] = json!(crate::report_numbers::ENCODING);
         packet["advisory"] = json!(format!("{ADVISORY} {ADVISORY_GAPS}"));
         packet["tool"]["mutant_catalog"] = json!(mutants::CATALOG_V2);
         packet["mutants"]["catalog"] = json!(mutants::CATALOG_V2);
@@ -565,7 +566,7 @@ pub(crate) fn draft_examples(
     Ok((shape, checked))
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug)]
 pub(crate) struct DraftExample {
     pub(crate) input: Vec<i128>,
     pub(crate) text: String,

@@ -439,3 +439,51 @@ fn symlink_inputs_outputs_and_case_members_cannot_redirect_the_file_boundary() {
     );
     assert_eq!(fs::read(&outside).unwrap(), original);
 }
+
+#[test]
+fn wide_no_exit_reports_replay_exactly_without_authorizing_a_plan() {
+    let directory = Directory::new();
+    for (i, value) in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1 << 100,
+        (1 << 53) + 1,
+        5,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // Source grammar retains exact raw integer tokens; the report uses its
+        // declared encoding. An inert failure case must replay as a failure.
+        let text = format!(
+            r#"{{"schema":"zeno-fcis/completion-problem/1","profile":"zeno-fcis/finite-i128/1",
+          "state":[{{"name":"value","type":{{"kind":"int","min":{value},"max":{value}}}}}],
+          "commands":[{{"name":"request","type":{{"kind":"bool"}}}}],
+          "step":{{"nodes":[["bool",true],["input",0]],"roots":[0,1]}},
+          "terminal":{{"nodes":[["bool",false]],"roots":[0]}}}}"#
+        );
+        let problem = directory.path(&format!("wide-{i}.json"));
+        fs::write(&problem, text).unwrap();
+        let out = directory.path(&format!("wide-case-{i}"));
+        let (exit, report) = run(cli().arg("find").arg(&problem).arg("--out").arg(&out));
+        assert_eq!(exit, 1);
+        assert_eq!(report["status"], "no-exit");
+        assert_eq!(report["schema"], "zeno-fcis/completion-result/2");
+        assert_eq!(
+            report["integer_encoding"],
+            "safe-number-or-decimal-string/1"
+        );
+        let scalar = if value == 5 {
+            json!(5)
+        } else {
+            json!(value.to_string())
+        };
+        assert_eq!(report["detail"]["state"], json!([scalar]));
+        assert!(!out.join("plan.zcve").exists());
+        let (exit, replay) = run(cli().arg("replay").arg(&problem).arg("--case").arg(&out));
+        let mut expected = report;
+        expected["replay"] = json!("matched");
+        assert_eq!((exit, replay), (1, expected));
+    }
+}

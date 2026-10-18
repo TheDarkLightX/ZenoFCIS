@@ -25,7 +25,7 @@ mod runtime;
 #[path = "loop_capture_whole.rs"]
 mod whole;
 
-const SCHEMA: &str = "zeno-fcis/black-box-capture/1";
+const SCHEMA: &str = "zeno-fcis/black-box-capture/2";
 const SESSION_SCHEMA: &str = "zeno-fcis/capture-session/1";
 const FILE_LIMIT: usize = 65536;
 
@@ -156,7 +156,7 @@ fn report(status: &str, mut detail: Value) -> (u8, Value) {
     };
     (
         code,
-        json!({"schema":SCHEMA,"door":"capture","authority":"none","status":status,"detail":detail}),
+        json!({"schema":SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"capture","authority":"none","status":status,"detail":detail}),
     )
 }
 fn refused(reason: &str) -> (u8, Value) {
@@ -354,12 +354,28 @@ fn load(dir: &Path) -> Result<(Session, proposal::ReferenceTable, Vec<u8>), Stri
     Ok((state, table, bytes))
 }
 
+// The persisted Session keeps its existing raw-integer format and hash.
+// Its public report is a fresh owned tree using the versioned scalar encoding.
+fn session_report(state: &Session) -> Value {
+    json!({
+        "schema": state.schema, "spec": state.spec,
+        "source_sha256": state.source_sha256, "table_sha256": state.table_sha256,
+        "program_sha256": state.program_sha256, "checker": state.checker,
+        "rows": state.rows.iter().map(|row| crate::report_numbers::integers(row)).collect::<Vec<_>>(),
+        "reference_observations": state.reference_observations, "budget": state.budget,
+        "attempts": state.attempts, "invocations": state.invocations,
+        "reserved_visits": state.reserved_visits, "examples": state.examples,
+        "status": state.status, "events": state.events,
+        "candidate": state.candidate, "receipt": state.receipt,
+    })
+}
+
 fn packet(state: &Session, table: &proposal::ReferenceTable) -> Value {
     let mut examples = state.examples.clone();
     examples.sort_unstable();
     json!({"profile":"zal/fcis-loop/1","abi":{"inputs":domains_json(table.inputs()),
         "outputs":domains_json(table.outputs()),"tuples":table.points().len(),"order":transform::ENUMERATION},
-        "round":state.attempts,"examples":examples.iter().map(|i|json!({"input":table.points()[*i],"output":table.rows()[*i]})).collect::<Vec<_>>()})
+        "round":state.attempts,"examples":examples.iter().map(|i|json!({"input":crate::report_numbers::integers(&table.points()[*i]),"output":crate::report_numbers::integers(&table.rows()[*i])})).collect::<Vec<_>>()})
 }
 
 fn reference_rows(
@@ -866,7 +882,7 @@ fn candidate(
             &mut state,
             "precheck-refuted",
             json!({"precheck":"precheck-refuted","decided_by":"proposal-example-filter",
-        "example":{"input":table.points()[i],"output":table.rows()[i]},"precheck_reserved_visits":pre,"exact":"not-run"}),
+        "example":{"input":crate::report_numbers::integers(&table.points()[i]),"output":crate::report_numbers::integers(&table.rows()[i])},"precheck_reserved_visits":pre,"exact":"not-run"}),
             Attempt::Spend,
         );
     }
@@ -987,7 +1003,7 @@ fn candidate(
         }
         state.examples.push(ordinal);
     }
-    detail["example"] = json!({"input":table.points()[ordinal],"output":table.rows()[ordinal]});
+    detail["example"] = json!({"input":crate::report_numbers::integers(&table.points()[ordinal]),"output":crate::report_numbers::integers(&table.rows()[ordinal])});
     // The full checker witness is kept private; its ordinal must not expose an
     // additional hidden input through the public counterexample-selection path.
     detail["check"] = json!({"verdict":"counterexample"});
@@ -1050,7 +1066,7 @@ fn status_loaded(
         }
     }
     let detail = if full {
-        json!({"session":state,
+        json!({"session":session_report(&state),
             "table_program":program_to_json(&match table.program(){Ok(p)=>p,Err(_)=>return refused("capture-reference-encoding")})})
     } else {
         json!({"source_sha256":state.source_sha256,"table_sha256":state.table_sha256,

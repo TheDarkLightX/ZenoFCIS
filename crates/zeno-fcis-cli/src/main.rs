@@ -29,6 +29,7 @@ mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
+mod report_numbers;
 mod review_command;
 mod shell_v2;
 mod symbolic;

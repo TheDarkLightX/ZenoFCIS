@@ -363,7 +363,7 @@ pub(super) fn validate(contract: &Contract, cases: &[Case], stdout: &[u8]) -> Re
         {
             return Err(error(
                 "counterexample",
-                json!({"ordinal":ordinal,"input":case.input,"expected":case.output,"actual":output}),
+                json!({"ordinal":ordinal,"input":crate::report_numbers::integers(&case.input),"expected":crate::report_numbers::integers(&case.output),"actual":crate::report_numbers::integers(&output)}),
             ));
         }
     }

@@ -59,7 +59,7 @@ def controls(cli, directory):
                 if report["status"] != "question" or rounds >= len(hidden):
                     failures.append({"case": name, "failure": "owner-not-recovered"})
                     break
-                q = detail["question"]
+                q = O.report_question(detail["question"])
                 s["requirements"].append({"id": f"answer_{rounds}", "input": q["input"], "output": list(hidden[q["ordinal"]])})
                 rounds += 1
     # Minimum conflicts, empty grammar, eager traps and intent outside the

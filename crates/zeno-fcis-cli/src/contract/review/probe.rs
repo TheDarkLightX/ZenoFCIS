@@ -131,10 +131,10 @@ pub(crate) fn probe(
                 }),
                 Some(found) => json!({
                     "answer": "yes",
-                    "state": space.state(found),
+                    "state": crate::report_numbers::integers(&space.state(found)),
                     "trace_from_genesis": Machine::trace(&parent, found)
                         .into_iter()
-                        .map(|input| json!(space.input(input)))
+                        .map(|input| crate::report_numbers::integers(&space.input(input)))
                         .collect::<Vec<_>>(),
                 }),
             }
@@ -179,7 +179,7 @@ pub(crate) fn probe(
                 Some(ordinal) => json!({
                     "answer": "no",
                     "count": broken.len(),
-                    "input": space.at(*ordinal),
+                    "input": crate::report_numbers::integers(&space.at(*ordinal)),
                     "contract": machine.observed[*ordinal].json(space),
                     "conclusion": truth_name(conclusions[*ordinal]),
                 }),
@@ -354,7 +354,7 @@ fn depends(
                 .iter()
                 .map(|ordinal| {
                     json!({
-                        "input": space.at(*ordinal),
+                        "input": crate::report_numbers::integers(&space.at(*ordinal)),
                         "contract": machine.observed[*ordinal].json(space),
                     })
                 })
@@ -449,7 +449,7 @@ fn explain(loaded: &Loaded, input: &[i128]) -> Result<Value, ContractError> {
             .positions
             .iter()
             .zip(input)
-            .map(|(position, value)| (position.name.clone(), json!(value)))
+            .map(|(position, value)| (position.name.clone(), crate::report_numbers::integer(*value)))
             .collect::<serde_json::Map<_, _>>(),
         "case": selected,
         "cases_tried": cases,

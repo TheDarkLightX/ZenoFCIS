@@ -47,7 +47,9 @@ fn run(args: &[&str]) -> (i32, Value) {
     } else {
         "auto"
     };
-    let done = Command::new(CLI)
+    // Explicit test-only executable selection for source-pinned before/after replay.
+    let cli = std::env::var_os("ZENO_CAPTURE_TEST_CLI").unwrap_or_else(|| CLI.into());
+    let done = Command::new(cli)
         .env("ZENO_FCIS_CONTAINMENT_BACKEND", backend)
         .args(args)
         .output()

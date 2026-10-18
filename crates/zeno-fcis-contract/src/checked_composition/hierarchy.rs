@@ -948,7 +948,7 @@ fn implication(
                 ordered
                     .iter()
                     .zip(tuple)
-                    .map(|(var, value)| (domains.name(*var), json!(value)))
+                    .map(|(var, value)| (domains.name(*var), super::json_integer(*value)))
                     .collect::<Map<String, Value>>(),
             ));
         }

@@ -288,7 +288,7 @@ impl Observed {
             } => json!({
                 "class": class.name(),
                 "reason": reason,
-                "post": space.state(next),
+                "post": crate::report_numbers::integers(&space.state(next)),
             }),
             Self::Refused { class, law } => json!({
                 "class": "Refused",

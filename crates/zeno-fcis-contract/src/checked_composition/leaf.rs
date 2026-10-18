@@ -949,7 +949,12 @@ impl Check<'_, '_> {
                 state
                     .iter()
                     .zip(tuple)
-                    .map(|(field, value)| (format!("post.100.{}", field.field), json!(value)))
+                    .map(|(field, value)| {
+                        (
+                            format!("post.100.{}", field.field),
+                            super::json_integer(*value),
+                        )
+                    })
                     .collect::<Map<_, _>>(),
             ));
             let holds = self.defined(
@@ -1018,7 +1023,7 @@ impl Check<'_, '_> {
             .positions
             .iter()
             .zip(tuple)
-            .map(|(position, value)| (position.name.clone(), json!(value)))
+            .map(|(position, value)| (position.name.clone(), super::json_integer(*value)))
             .collect();
         if let Some(note) = note {
             row.insert("input".to_owned(), json!(note));

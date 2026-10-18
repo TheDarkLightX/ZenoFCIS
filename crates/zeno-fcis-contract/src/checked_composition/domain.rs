@@ -138,8 +138,12 @@ impl FieldDomain {
     pub(crate) fn json(&self) -> Value {
         match self {
             Self::Bool => json!({"kind": "bool"}),
-            Self::Int { min, max } => json!({"kind": "int", "min": min, "max": max}),
-            Self::Variants(variants) => json!({"kind": "variants", "values": variants}),
+            Self::Int { min, max } => {
+                json!({"kind": "int", "min": super::json_integer(*min), "max": super::json_integer(*max)})
+            }
+            Self::Variants(variants) => {
+                json!({"kind": "variants", "values": super::json_integers(variants)})
+            }
         }
     }
 

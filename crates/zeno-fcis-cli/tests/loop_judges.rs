@@ -182,7 +182,7 @@ fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let c8 = directory.contract("bounded-counter", &[("C", 8)]);
     let (exit, report) = run(&["loop", "question", "--contract", &c8]);
     assert_eq!(exit, Some(0), "{report}");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     assert_eq!(report["authority"], "none");
     let detail = &report["detail"];
     // the declared laws determine no decision of the counter: five regions

@@ -588,7 +588,7 @@ fn a_family_program_is_checked_on_every_instance_and_its_fit_on_unfitted_ones() 
         "--fit",
     ]);
     assert_eq!(exit, Some(0), "{report}");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     assert_eq!(report["authority"], "none");
     let detail = &report["detail"];
     assert_eq!(detail["accepted"], 8);
@@ -719,7 +719,7 @@ fn malformed_doors_are_refused_before_any_work() {
     ]);
     assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["status"], "refused");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     let unknown = directory.json(
         "u.json",
         &json!({"schema": "zeno-fcis/loop-expressions/1", "outputs": ["$K", "keep", "keep"]}),

@@ -171,8 +171,8 @@ pub(crate) fn judge_transitions(
         {
             result["counterexample"] = json!({
                 "ordinal": ordinal,
-                "state": space.state(ordinal / space.inputs),
-                "input": space.input(ordinal % space.inputs),
+                "state": crate::report_numbers::integers(&space.state(ordinal / space.inputs)),
+                "input": crate::report_numbers::integers(&space.input(ordinal % space.inputs)),
                 "outcome": machine.observed[ordinal].json(space),
                 "relation": if truths[ordinal] == Truth::Fails { "fails" } else { "undefined" },
             });
@@ -254,22 +254,22 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
         .min_by_key(|(trace, state)| (trace.len(), *state));
     let verdict = if !holds[machine.genesis] {
         out["reason"] = json!("genesis does not satisfy the lemma");
-        out["genesis"] = json!(space.state(machine.genesis));
+        out["genesis"] = crate::report_numbers::integers(&space.state(machine.genesis));
         Verdict::False
     } else if let Some((trace, state)) = violation {
         let last = *trace.last().unwrap_or(&0);
         let before = parent[state].map_or(machine.genesis, |(before, _)| before);
         out["reason"] = json!("a reachable state lies outside the lemma");
         out["counterexample_to_induction"] = json!({
-            "state": space.state(before),
-            "input": space.input(last),
-            "successor": space.state(state),
+            "state": crate::report_numbers::integers(&space.state(before)),
+            "input": crate::report_numbers::integers(&space.input(last)),
+            "successor": crate::report_numbers::integers(&space.state(state)),
             "count": count,
         });
         out["trace_from_genesis"] = json!(
             trace
                 .into_iter()
-                .map(|input| json!(space.input(input)))
+                .map(|input| crate::report_numbers::integers(&space.input(input)))
                 .collect::<Vec<_>>()
         );
         Verdict::False
@@ -278,9 +278,9 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
             "every reachable state satisfies the lemma, but an unreachable state it admits steps outside it: strengthen the lemma to exclude that state"
         );
         out["counterexample_to_induction"] = json!({
-            "state": space.state(state),
-            "input": space.input(input),
-            "successor": space.state(machine.of(state, input).after(state)),
+            "state": crate::report_numbers::integers(&space.state(state)),
+            "input": crate::report_numbers::integers(&space.input(input)),
+            "successor": crate::report_numbers::integers(&space.state(machine.of(state, input).after(state))),
             "count": count,
         });
         Verdict::NotInductive

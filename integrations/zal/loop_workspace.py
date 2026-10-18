@@ -40,6 +40,7 @@ import sys
 import tempfile
 
 from behavior import Refusal
+import report_numbers as N
 import loop_doors as doors
 
 # Composable program loops: shell routing only; no new MCP or owner path.
@@ -54,7 +55,7 @@ import loop_learn as L
 from shared import SharedWorkspace
 
 SCHEMA = "zeno-fcis/zal-loop-workspace/1"
-VIEW_SCHEMA = "zeno-fcis/zal-loop-view/1"
+VIEW_SCHEMA = "zeno-fcis/zal-loop-view/2"
 MAX_BYTES = 32 << 20
 MAX_EVENTS = 4096
 VIEW_EVENTS = 40
@@ -114,6 +115,11 @@ def fields_of(contract: Path) -> dict:
             return "Bool", (0, 1)
         if "range" in entry:
             return "Int", entry["range"]
+        binding = policy.get("leaf_bindings", {}).get(str(tid))
+        if binding == ["Bool"]:
+            return "Bool", (0, 1)
+        if type(binding) is list and len(binding) == 3 and binding[0] == "I128":
+            return "Int", (N.integer(binding[1]), N.integer(binding[2]))
         table = variants.get(tid)
         if table:
             field_variants[name] = dict(table)
@@ -234,14 +240,14 @@ def _clip(text: str) -> str:
 def _int_value(subject: dict, name: str, value) -> int:
     if isinstance(value, bool):
         return int(value)
-    if isinstance(value, int):
-        return value
+    if type(value) is int:
+        return N.integer(value)
     if isinstance(value, str):
         table = subject["variants"].get(name, {})
         if value in table:
             return table[value]
         if re.fullmatch(r"-?\d+", value):
-            return int(value)
+            return N.integer(value)
     raise Refusal(f"Unreadable input value for {name}")
 
 
@@ -1339,7 +1345,7 @@ class LoopWorkspace:
             self._contract(state)
             ctx = Z.Context(state["subject"])
             start = len(state["events"])
-            act = Z.Act("probe", "next", (("query", "freedom"), ("args", ()), ("where", None)))
+            act = Z.Act("probe", "next", (("query", "freedom"), ("args", ())))
             seq = self._record(state, ctx, "owner", act)["seq"]
             try:
                 self._freedom(state, ctx, "next", seq)
@@ -1362,6 +1368,11 @@ class LoopWorkspace:
 
     # -- displays ---------------------------------------------------------------------------------------------
     def view(self, state: dict | None = None) -> dict:
+        result = N.encode(self._view(state))
+        result["integer_encoding"] = N.ENCODING
+        return result
+
+    def _view(self, state: dict | None = None) -> dict:
         state = state or self.load()
         if state.get("version_space"):
             return versions.view(self, state)

@@ -202,8 +202,8 @@ impl<'a> WholeCheck<'a> {
             let (check, receipt) = compare_exact(&original, &encoded);
             if check["verdict"] == "counterexample" {
                 self.stopped = true;
-                let ordinal = check["ordinal"]
-                    .as_u64()
+                let ordinal = crate::report_numbers::read(&check["ordinal"])
+                    .and_then(|value| u64::try_from(value).ok())
                     .ok_or("capture-whole-checker-witness")?;
                 let at = usize::try_from(ordinal).map_err(|_| "capture-whole-checker-witness")?;
                 let input = table
@@ -211,11 +211,15 @@ impl<'a> WholeCheck<'a> {
                     .get(at)
                     .ok_or("capture-whole-checker-witness")?;
                 let actual = match candidate.evaluate(input) {
-                    Ok(output) => json!({"status":"returned","output":output}),
+                    Ok(output) => {
+                        json!({"status":"returned","output":crate::report_numbers::integers(&output)})
+                    }
                     Err(error) => json!({"status":"refused","reason":format!("{error:?}")}),
                 };
-                return Ok(Some(json!({"ordinal":self.next + ordinal,"input":input,
-                    "expected":table.rows()[at],"actual":actual,"check":check})));
+                return Ok(Some(
+                    json!({"ordinal":self.next + ordinal,"input":crate::report_numbers::integers(&input),
+                    "expected":crate::report_numbers::integers(&table.rows()[at]),"actual":actual,"check":check}),
+                ));
             }
             if check["verdict"] != "equivalent" || check["replay"] != "matched" || receipt.is_none()
             {

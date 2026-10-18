@@ -58,7 +58,7 @@ const MEANING_PROFILE: &str = "zeno-fcis/loop-meaning/1";
 /// Bytes of observations hashed per block of a meaning key.
 const MEANING_BLOCK: usize = 1 << 16;
 /// Schema of the stateless doors' results.
-const DOORS_SCHEMA: &str = "zeno-fcis/loop-doors/1";
+const DOORS_SCHEMA: &str = "zeno-fcis/loop-doors/2";
 /// Largest expressions, sketch or manifest file.
 const DOCUMENT_LIMIT: u64 = 65_536;
 /// Largest program file named by a manifest.
@@ -519,6 +519,7 @@ fn refused(reason: &str) -> (u8, Value) {
 /// The stateless doors report under their own schema, refusals included.
 fn as_door(door: &str, (exit, mut report): (u8, Value)) -> (u8, Value) {
     report["schema"] = json!(DOORS_SCHEMA);
+    report["integer_encoding"] = json!(crate::report_numbers::ENCODING);
     report["door"] = json!(door);
     (exit, report)
 }
@@ -527,7 +528,7 @@ fn doors_result(exit: u8, door: &str, status: &str, mut detail: Value) -> (u8, V
     search_limits::annotate(door, status, &mut detail);
     (
         exit,
-        json!({"schema": DOORS_SCHEMA, "door": door, "status": status, "authority": "none", "detail": detail}),
+        json!({"schema": DOORS_SCHEMA, "integer_encoding": crate::report_numbers::ENCODING, "door": door, "status": status, "authority": "none", "detail": detail}),
     )
 }
 
@@ -703,7 +704,7 @@ fn point_json(subject: &Subject, ordinal: usize) -> Value {
         } else {
             match subject.vocab.variant_name(name, value) {
                 Some(variant) => json!(variant),
-                None => json!(value),
+                None => crate::report_numbers::integer(value),
             }
         };
         out.insert(name.clone(), shown);
@@ -729,7 +730,7 @@ fn fill_json(subject: &Subject, sketch: &[Expr], k: usize, fill: &Fill) -> Value
     match fill {
         Fill::Const(value) => {
             let text = show(&Expr::Int(*value), &subject.vocab, Some(kind));
-            json!({"fill": text, "value": value})
+            json!({"fill": text, "value": crate::report_numbers::integer(*value)})
         }
         Fill::Choice(index) => {
             let alternative = sketch
@@ -802,8 +803,9 @@ impl Stages {
         }
     }
 
-    /// Runs `work` in one contained stage (search: up to five seconds;
-    /// check: up to two), bounded by the invocation's remaining time.
+    /// The contained supervisor charges search/check CPU (5s/2s), including
+    /// its children on systemd. The invocation still has its original wall
+    /// deadline; deterministic tuple/node/work reservations are unchanged.
     fn run<T>(&mut self, search: bool, work: impl FnOnce() -> T) -> Result<T, String> {
         if self.frames + 2 > FRAME_BUDGET {
             return Err("stage-budget".into());
@@ -822,7 +824,13 @@ impl Stages {
         let begun = Instant::now();
         let value = work();
         crate::checker_process::finish()?;
-        if begun.elapsed() >= duration {
+        // FINISH independently checks the supervisor's kernel CPU counter
+        // before permitting a result. Local unit execution has no supervisor,
+        // so retain its cooperative wall fallback rather than inventing usage.
+        if self.started.elapsed() >= self.deadline {
+            return Err("invocation-deadline".into());
+        }
+        if !crate::checker_process::contained() && begun.elapsed() >= duration {
             return Err("stage-deadline".into());
         }
         Ok(value)
@@ -1138,8 +1146,8 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                                 })
                                 .map(|node| sketch::constant_bound(subject, node));
                             json!({"kind": "constant", "derived": "exact over all integers",
-                                   "range": range.map(|(lo, hi)| json!([lo, hi])),
-                                   "enumeration_bound": bound})
+                                   "range": range.map(|(lo, hi)| crate::report_numbers::integers(&[lo, hi])),
+                                   "enumeration_bound": bound.map(crate::report_numbers::integer)})
                         }
                         _ => Value::Null,
                     };
@@ -1155,9 +1163,9 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                         "hole": s.hole,
                         "kind": if s.choice { "choice" } else { "constant" },
                         "values": s.values.len(),
-                        "min": s.values.iter().min(),
-                        "max": s.values.iter().max(),
-                        "listed": if s.values.len() <= 64 { json!(s.values) } else { Value::Null },
+                        "min": s.values.iter().min().copied().map(crate::report_numbers::integer),
+                        "max": s.values.iter().max().copied().map(crate::report_numbers::integer),
+                        "listed": if s.values.len() <= 64 { crate::report_numbers::integers(&s.values) } else { Value::Null },
                         "complete": s.complete,
                     })).collect::<Vec<_>>(),
                     "assignments": info.assignments.to_string(),
@@ -1173,7 +1181,7 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                     })),
                     "conflicting_inputs": info.conflicting_inputs.iter().map(|ordinal| json!({
                         "ordinal": ordinal, "input": point_json(subject, *ordinal),
-                        "required_output": subject.targets[info.output][*ordinal],
+                        "required_output": crate::report_numbers::integer(subject.targets[info.output][*ordinal]),
                     })).collect::<Vec<_>>(),
                 })
             })
@@ -1213,7 +1221,7 @@ fn sketch_json(subject: &Subject, result: &SketchResult) -> Value {
                 "output": result.outputs.last().map(|info| format!("out{}", info.output)),
                 "conflicting_inputs": result.outputs.iter().flat_map(|info| info.conflicting_inputs.iter().map(move |ordinal| json!({
                     "output": format!("out{}", info.output), "ordinal": ordinal, "input": point_json(subject, *ordinal),
-                    "required_output": subject.targets[info.output][*ordinal],
+                    "required_output": crate::report_numbers::integer(subject.targets[info.output][*ordinal]),
                 }))).collect::<Vec<_>>()}),
         };
     }
@@ -1506,10 +1514,10 @@ fn failure_region_json(subject: &Subject, region: &repair::Region) -> Value {
                     let shown = if subject.vocab.input_kinds()[*k] == Kind::Bool {
                         json!(*v == 1)
                     } else {
-                        subject
-                            .vocab
-                            .variant_name(name, *v)
-                            .map_or_else(|| json!(v), |variant| json!(variant))
+                        subject.vocab.variant_name(name, *v).map_or_else(
+                            || crate::report_numbers::integer(*v),
+                            |variant| json!(variant),
+                        )
                     };
                     (name.clone(), shown)
                 })
@@ -1805,7 +1813,7 @@ fn judge_instances(
     let holes = outputs.iter().any(has_holes);
     let mut rows = Vec::new();
     for instance in order {
-        let mut row = json!({"instance": instance.name, "parameters": instance.parameters});
+        let mut row = json!({"instance": instance.name, "parameters": instance.parameters.iter().map(|(name, value)| (name.clone(), crate::report_numbers::integer(*value))).collect::<Map<_, _>>()});
         if let Some(fitted) = fitted {
             row["fitted"] = json!(fitted.get(&instance.name).copied().unwrap_or(false));
         }
@@ -2043,9 +2051,11 @@ fn family_command(instances: &Path, program: &Path, fit: bool) -> (u8, Value) {
 fn form_json(form: Option<&Form>) -> Value {
     match form {
         None => Value::Null,
-        Some(Form::Constant(value)) => json!({"constant": value, "text": value.to_string()}),
+        Some(Form::Constant(value)) => {
+            json!({"constant": crate::report_numbers::integer(*value), "text": value.to_string()})
+        }
         Some(form @ Form::Linear { parameter, a, b }) => {
-            json!({"parameter": parameter, "a": a, "b": b, "text": form.text()})
+            json!({"parameter": parameter, "a": crate::report_numbers::integer(*a), "b": crate::report_numbers::integer(*b), "text": form.text()})
         }
     }
 }
@@ -2559,7 +2569,7 @@ fn transfer_command(from: &Path, to_instances: &Path) -> (u8, Value) {
     let mut by: BTreeMap<&str, usize> = BTreeMap::new();
     let mut transferred = 0;
     for instance in &manifest.instances {
-        let mut row = json!({"instance": instance.name, "parameters": instance.parameters});
+        let mut row = json!({"instance": instance.name, "parameters": instance.parameters.iter().map(|(name, value)| (name.clone(), crate::report_numbers::integer(*value))).collect::<Map<_, _>>()});
         let moved = stages.run(true, || {
             instance_subject(&manifest, instance).map(|subject| {
                 let result = family::transfer(
@@ -2698,6 +2708,49 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fitted_family_reports_keep_full_width_offsets_and_constants() {
+        for value in [
+            i128::MIN,
+            i128::MAX,
+            -(1i128 << 100),
+            1i128 << 100,
+            1i128 << 64,
+            5,
+        ] {
+            let constant = form_json(Some(&Form::Constant(value)));
+            assert_eq!(
+                crate::report_numbers::read(&constant["constant"]),
+                Some(value)
+            );
+            let linear = form_json(Some(&Form::Linear {
+                parameter: "C".into(),
+                a: 1,
+                b: value,
+            }));
+            assert_eq!(crate::report_numbers::read(&linear["a"]), Some(1));
+            assert_eq!(crate::report_numbers::read(&linear["b"]), Some(value));
+            assert!(
+                Form::Linear {
+                    parameter: "C".into(),
+                    a: 1,
+                    b: value
+                }
+                .expr()
+                .is_ok()
+            );
+            assert_eq!(
+                linear["text"],
+                Form::Linear {
+                    parameter: "C".into(),
+                    a: 1,
+                    b: value
+                }
+                .text()
+            );
+        }
+    }
 
     #[test]
     fn evaluate_uses_i128_inputs_and_full_width_arithmetic_outputs() {

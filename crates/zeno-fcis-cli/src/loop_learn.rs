@@ -242,7 +242,7 @@ fn stopped(e: Stop, budget: &Budget, bytes: usize) -> (u8, Value) {
 }
 fn observation(o: Observation) -> Value {
     match o {
-        Observation::Value(v) => json!({"value": v}),
+        Observation::Value(v) => json!({"value": crate::report_numbers::integer(v)}),
         Observation::Arithmetic => json!({"failure": "arithmetic"}),
         Observation::OutputDomain => json!({"failure": "output-domain"}),
     }
@@ -352,14 +352,14 @@ pub(super) fn run(
                     input_bytes,
                 );
                 result["detail"]["examples_check"] = json!({"decided_by": "library-evaluator", "verdict": "mismatch",
-                    "example": example, "checked": checked, "actual": actual,
-                    "expected": spec.examples[example].output});
+                    "example": example, "checked": checked, "actual": actual.as_deref().map(crate::report_numbers::integers),
+                    "expected": crate::report_numbers::integers(&spec.examples[example].output)});
                 return (exit, result);
             }
         }
     }
     let question = analysis.question.as_ref().map(|q| json!({
-        "input": q.input, "ordinal": q.ordinal, "worst": q.worst.to_string(), "squares": q.squares.to_string(),
+        "input": crate::report_numbers::integers(&q.input), "ordinal": q.ordinal, "worst": q.worst.to_string(), "squares": q.squares.to_string(),
         "buckets": q.buckets.iter().map(|bs| bs.iter().map(|b| json!({"observation": observation(b.observation),
             "remaining": b.remaining})).collect::<Vec<_>>()).collect::<Vec<_>>()
     }));

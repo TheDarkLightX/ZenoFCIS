@@ -345,7 +345,7 @@ impl Draft {
                 .collect::<Result<_, _>>()?;
             if questions.insert(input.clone()) {
                 details.push(
-                    json!({"input": input, "proposed_example": witness["proposed_example"],
+                    json!({"input": crate::report_numbers::integers(&input), "proposed_example": witness["proposed_example"],
                     "alternative_example": witness["mutant_as_example"],
                     "label_supplied": labels.iter().any(|l| l.input == input)}),
                 );
@@ -354,10 +354,10 @@ impl Draft {
         let covered: BTreeSet<Vec<i128>> = labels.iter().map(|l| l.input.clone()).collect();
         let missing: Vec<_> = questions.difference(&covered).cloned().collect();
         let ready = !labels.is_empty() && missing.is_empty() && reviewed.summary().findings == 0;
-        let report = json!({"shape": shape, "proposal": proposal.id, "ready": ready,
+        let report = json!({"schema":"zeno-fcis/contract-draft-assessment/2", "integer_encoding":crate::report_numbers::ENCODING, "shape": shape, "proposal": proposal.id, "ready": ready,
             "status": if ready {"labels-agree"} else {"needs-labels-or-revision"},
-            "labels_compared": labels, "label_provenance": {"initial": self.provenance, "additional": self.labels},
-            "questions": details, "unlabeled_inputs": missing,
+            "labels_compared": labels.iter().map(|label| json!({"input": crate::report_numbers::integers(&label.input), "text": label.text, "difference": label.difference})).collect::<Vec<_>>(), "label_provenance": {"initial": self.provenance, "additional": self.labels},
+            "questions": details, "unlabeled_inputs": missing.iter().map(|input| crate::report_numbers::integers(input)).collect::<Vec<_>>(),
             "review": packet, "authority": "none", "hosted_model": "off",
             "assumptions": "Labels and their provenance are supplied intent assumptions, not authenticated owner approval. F2 remains advisory."});
         Ok(Assessment {

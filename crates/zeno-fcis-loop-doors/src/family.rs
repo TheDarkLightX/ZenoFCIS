@@ -137,6 +137,7 @@ impl Form {
                 match b.cmp(&0) {
                     core::cmp::Ordering::Equal => term,
                     core::cmp::Ordering::Greater => format!("{term} + {b}"),
+                    core::cmp::Ordering::Less if *b == i128::MIN => format!("{term} + ({b})"),
                     core::cmp::Ordering::Less => format!("{term} - {}", b.unsigned_abs()),
                 }
             }

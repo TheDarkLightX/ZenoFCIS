@@ -13,6 +13,14 @@ mod posix;
 #[path = "checker_limits.rs"]
 mod limits;
 
+#[cfg(target_os = "linux")]
+#[path = "containment_diagnostics.rs"]
+mod diagnostics;
+
+#[cfg(target_os = "linux")]
+#[path = "stage_budget.rs"]
+mod stage_budget;
+
 const BACKEND_ENV: &str = "ZENO_FCIS_CONTAINMENT_BACKEND";
 const EXPLICIT_BACKEND_REQUIRED: &str = "containment-unavailable:auto:explicit-backend-required";
 const BACKEND_MESSAGE: &str = "Choose --containment-backend systemd or set ZENO_FCIS_CONTAINMENT_BACKEND=systemd only when the sibling service may run outside the caller's restrictions; auto keeps finite data on POSIX.";
@@ -404,6 +412,11 @@ mod linux {
     const STDIN_CHANNEL: &str = "stdin";
     const OUTPUT_LIMIT: usize = 1024 * 1024;
     const MEMORY: u64 = 64 * 1024 * 1024;
+    // Host5: 30 idle +30 eight-burner same-core startups all passed; standalone
+    // manager loaded p95=98ms, max=128ms. Keep 5s (~39x observed max) for
+    // manager/scheduling/I/O tails; finite samples are no worst-case guarantee.
+    // This ceiling remains inside the unchanged whole-worker deadline.
+    const STARTUP_MANAGER_QUERY_BUDGET: Duration = Duration::from_secs(5);
     const STARTUP_HELLO: u8 = 0xA0;
     const STARTUP_ACK: u8 = 0xA1;
     const CHECK_STAGE: u8 = 1;
@@ -411,10 +424,6 @@ mod linux {
     const FINISH_STAGE: u8 = 3;
     const RECEIPT_HANDOVER: u8 = 4;
     const EXIT_REPORT: u8 = 5;
-    /// The child's own deadline starts before it requests a stage; the
-    /// supervisor kills only this long after the requested stage ends, so a
-    /// cooperative stop is recorded with its progress instead of a kill.
-    const STAGE_GRACE: Duration = Duration::from_secs(1);
     /// Whole-run caps from spawn: each deadline ceiling (60 s offline, the
     /// loop's 20 s session) plus a margin for startup, grace and teardown.
     const OFFLINE_WHOLE: Duration = Duration::from_secs(65);
@@ -435,6 +444,8 @@ mod linux {
         closing: Arc<AtomicBool>,
         monitor: Option<JoinHandle<()>>,
         active: bool,
+        // Poll scheduling hint only; never acceptance or deadline authority.
+        reply_waiting: Arc<AtomicBool>,
     }
 
     fn group() -> Result<PathBuf, String> {
@@ -561,19 +572,22 @@ mod linux {
     }
 
     fn await_startup_ack(stream: &mut UnixStream) -> Result<(), String> {
+        // Use the same monotonic, post-read deadline gate as POSIX. Restoring
+        // blocking mode precedes monitor installation; no admission is retried.
         stream
-            .set_read_timeout(Some(Duration::from_secs(1)))
-            .map_err(|e| format!("startup-ack-timeout: {e}"))?;
-        let mut byte = [0];
+            .set_nonblocking(true)
+            .map_err(|e| format!("startup-ack-mode:{e}"))?;
+        let result = super::posix::await_startup_ack(stream).map_err(|e| {
+            if e == "startup-ack-unavailable:deadline" {
+                "startup-ack-timeout:deadline".into()
+            } else {
+                e
+            }
+        });
         stream
-            .read_exact(&mut byte)
-            .map_err(|e| format!("startup-ack-unavailable: {e}"))?;
-        if byte[0] != STARTUP_ACK {
-            return Err("wrong-startup-ack".into());
-        }
-        stream
-            .set_read_timeout(None)
-            .map_err(|e| format!("startup-ack-timeout-reset: {e}"))
+            .set_nonblocking(false)
+            .map_err(|e| format!("startup-ack-mode-reset:{e}"))?;
+        result
     }
 
     fn write_control(stream: &mut UnixStream, bytes: &[u8], posix: bool) -> Result<(), String> {
@@ -629,6 +643,8 @@ mod linux {
         let mut reader = writer.try_clone().map_err(|e| e.to_string())?;
         let closing = Arc::new(AtomicBool::new(false));
         let watch = Arc::clone(&closing);
+        let reply_waiting = Arc::new(AtomicBool::new(false));
+        let waiting = Arc::clone(&reply_waiting);
         let (tx, replies) = mpsc::sync_channel(1);
         // Parent death closes the control socket. Exit the execution process,
         // causing systemd's KillMode=control-group to terminate descendants.
@@ -647,7 +663,18 @@ mod linux {
                         if watch.load(Ordering::Acquire) {
                             break;
                         }
-                        std::thread::sleep(Duration::from_millis(2));
+                        // Keep idle monitoring from manufacturing CPU progress
+                        // in a hung stage. An exchange unparks this thread and
+                        // marks the pending reply, retaining fast2ms polling
+                        // while that reply is outstanding. No socket options,
+                        // new descriptor or sandbox network capability needed.
+                        std::thread::park_timeout(Duration::from_millis(
+                            if waiting.load(Ordering::Acquire) {
+                                2
+                            } else {
+                                100
+                            },
+                        ));
                         continue;
                     }
                     if read.is_err() {
@@ -656,6 +683,7 @@ mod linux {
                         }
                         break;
                     }
+                    waiting.store(false, Ordering::Release);
                     if tx.try_send(byte[0]).is_err() {
                         if !watch.load(Ordering::Acquire) {
                             std::process::exit(crate::BLOCKED.into());
@@ -672,6 +700,7 @@ mod linux {
                 closing,
                 monitor: Some(monitor),
                 active: false,
+                reply_waiting,
             }))
             .map_err(|_| "duplicate-control-client")?;
         Ok(true)
@@ -693,9 +722,20 @@ mod linux {
         let mut frame = [0; 9];
         frame[0] = kind;
         frame[1..].copy_from_slice(&value.to_be_bytes());
+        client.reply_waiting.store(true, Ordering::Release);
+        if let Some(monitor) = &client.monitor {
+            monitor.thread().unpark();
+        }
         write_control(&mut client.writer, &frame, super::posix::is_worker())?;
-        match client.replies.recv_timeout(Duration::from_secs(1)) {
-            Ok(1) => {
+        // A peer can be descheduled outside the accounted cgroup. Use the
+        // bounded control/ACK wait, not a one-second scheduling assumption.
+        // The independent supervisor still kills at worker25s/offline65s.
+        let reply_end = Instant::now() + super::posix::STARTUP_ACK_BUDGET;
+        match client
+            .replies
+            .recv_timeout(super::posix::STARTUP_ACK_BUDGET)
+        {
+            Ok(1) if Instant::now() < reply_end => {
                 client.active = matches!(kind, CHECK_STAGE | SEARCH_STAGE);
                 Ok(())
             }
@@ -738,6 +778,9 @@ mod linux {
             && let Ok(mut c) = client.lock()
         {
             c.closing.store(true, Ordering::Release);
+            if let Some(monitor) = &c.monitor {
+                monitor.thread().unpark();
+            }
             let _ = c.writer.shutdown(std::net::Shutdown::Both);
             if let Some(monitor) = c.monitor.take() {
                 let deadline = Instant::now() + Duration::from_secs(1);
@@ -1237,6 +1280,11 @@ mod linux {
         result_label: Option<(super::Profile, super::SelectionSource)>,
     ) -> Result<u8, super::SupervisorFailure> {
         let is_posix = guardian.is_some();
+        let mut timing = super::diagnostics::Record::new(
+            "worker-supervisor",
+            if is_posix { "posix" } else { "systemd" },
+        );
+        let preparation = Instant::now();
         let setup_error = |error: String| {
             if is_posix && !error.starts_with("containment-unavailable:") {
                 super::Unavailable {
@@ -1352,6 +1400,19 @@ mod linux {
             .stdin(Stdio::from(std::os::fd::OwnedFd::from(channel)))
             .stdout(output)
             .stderr(errors);
+        timing.duration("preparation_ms", preparation);
+        timing.set(
+            "worker_budget_ms",
+            serde_json::json!(whole.as_millis() as u64),
+        );
+        timing.set(
+            "ack_budget_ms",
+            serde_json::json!(super::posix::STARTUP_ACK_BUDGET.as_millis() as u64),
+        );
+        timing.set(
+            "manager_query_budget_ms",
+            serde_json::json!(STARTUP_MANAGER_QUERY_BUDGET.as_millis() as u64),
+        );
         let started = Instant::now();
         let end = started + whole;
         let mut owned = OwnedUnit {
@@ -1372,6 +1433,12 @@ mod linux {
             members: Vec::new(),
             cleanup_error: None,
         };
+        timing.set("worker_pid", serde_json::json!(owned.child.id()));
+        timing.set(
+            "worker_start_ticks",
+            serde_json::json!(super::diagnostics::process_start_ticks(owned.child.id())),
+        );
+        timing.set("unit", serde_json::json!(owned.unit));
         if let Some(g) = guardian.as_mut() {
             g.spawned(owned.child.id());
         }
@@ -1382,7 +1449,8 @@ mod linux {
         let mut frame = [0; 9];
         let mut used = 0;
         let mut frames = 0;
-        let mut active: Option<Instant> = None;
+        let mut active: Option<super::stage_budget::StageBudget> = None;
+        let mut stage_observations = Vec::new();
         let mut terminal = false;
         let mut handed_over: Option<u64> = None;
         let mut reported: Option<u8> = None;
@@ -1393,19 +1461,25 @@ mod linux {
                 }
                 interrupted()?;
                 let now = Instant::now();
-                if now >= end || active.is_some_and(|deadline| now >= deadline) {
+                if now >= end {
                     return Err("contained-deadline".into());
                 }
-                let output_deadline = active.unwrap_or(end).min(end);
+                if let Some(stage) = active.as_mut() {
+                    stage.check(now)?;
+                }
+                let output_deadline = active.as_ref().map_or(end, |s| s.wall_deadline()).min(end);
                 stdout.read_available(output_deadline)?;
                 stderr.read_available(output_deadline)?;
                 if !connected {
                     let mut hello = [0];
                     match control.read(&mut hello) {
                         Ok(1) if hello[0] == STARTUP_HELLO => {
+                            let custody = Instant::now();
+                            timing.duration("hello_observed_ms", started);
                             if let Some(g) = guardian.as_mut() {
                                 g.accept(&owned.child).map_err(setup_error)?;
                             } else {
+                                let query_started = Instant::now();
                                 let shown = manager(
                                     &[
                                         "--user",
@@ -1414,8 +1488,19 @@ mod linux {
                                         "--value",
                                         &owned.unit,
                                     ],
-                                    end.min(Instant::now() + Duration::from_secs(1)),
-                                )?;
+                                    end.min(query_started + STARTUP_MANAGER_QUERY_BUDGET),
+                                );
+                                timing.duration("manager_query_ms", query_started);
+                                let shown = shown.map_err(|e| {
+                                    if matches!(
+                                        e.as_str(),
+                                        "control-process-deadline" | "contained-output-deadline"
+                                    ) {
+                                        "manager-query-deadline".into()
+                                    } else {
+                                        format!("manager-query:{e}")
+                                    }
+                                })?;
                                 let relative = String::from_utf8(shown.stdout)
                                     .map_err(|_| "invalid-control-group")?;
                                 if !shown.status.success() || !relative.trim().starts_with('/') {
@@ -1433,6 +1518,8 @@ mod linux {
                             // Record custody before ACK, including on a failed write.
                             write_control(&mut control, &[STARTUP_ACK], is_posix)?;
                             connected = true;
+                            timing.duration("startup_custody_ms", custody);
+                            timing.duration("ack_sent_ms", started);
                         }
                         Ok(0) => {}
                         Ok(_) => return Err("wrong-startup-hello".into()),
@@ -1471,19 +1558,29 @@ mod linux {
                                         if value == 0 || value > cap {
                                             return Err("stage-limit".into());
                                         }
-                                        active = Some(
-                                            (Instant::now()
-                                                + Duration::from_millis(value)
-                                                + STAGE_GRACE)
-                                                .min(end),
-                                        );
+                                        active = Some(super::stage_budget::StageBudget::new(
+                                            if frame[0] == SEARCH_STAGE {
+                                                "search"
+                                            } else {
+                                                "check"
+                                            },
+                                            value,
+                                            started,
+                                            end,
+                                            offline,
+                                            if is_posix {
+                                                Some(owned.child.id())
+                                            } else {
+                                                None
+                                            },
+                                            owned.group.as_deref(),
+                                        )?);
                                         terminal = false;
                                     }
                                     FINISH_STAGE if active.is_some() && value == 0 => {
-                                        if active.is_some_and(|deadline| Instant::now() >= deadline)
-                                        {
-                                            return Err("contained-deadline".into());
-                                        }
+                                        let stage = active.as_mut().ok_or("control-stage-order")?;
+                                        stage.finish()?;
+                                        stage_observations.push(stage.observation(true));
                                         active = None;
                                         terminal = true;
                                     }
@@ -1503,10 +1600,24 @@ mod linux {
                                     _ => return Err("control-stage-order".into()),
                                 }
                                 write_control(&mut control, &[1], is_posix)?;
+                                if let Some(stage) = active.as_mut() {
+                                    stage.permitted();
+                                }
                             }
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                         Err(e) => return Err(e.to_string()),
+                    }
+                }
+                // Read protocol progress before deciding that the stage is idle.
+                // A queued FINISH still pays CPU/rounding and absolute wall caps.
+                if let Some(stage) = active.as_mut() {
+                    if let Err(reason) = stage.check_progress() {
+                        timing.set(
+                            "idle_waiters",
+                            super::diagnostics::waiters(owned.group.as_deref(), owned.child.id()),
+                        );
+                        return Err(reason);
                     }
                 }
                 if let Some(status) = owned.poll_exit()? {
@@ -1537,6 +1648,20 @@ mod linux {
                 std::thread::sleep(Duration::from_millis(2));
             }
         })();
+        if let Some(stage) = active.as_ref() {
+            stage_observations.push(stage.observation(false));
+        }
+        timing.set(
+            "stage_clock",
+            serde_json::json!("monotonic-ms-from-worker-spawn; CPU-microseconds"),
+        );
+        timing.set("stages", serde_json::json!(stage_observations));
+        timing.duration("worker_observed_ms", started);
+        timing.set("startup_ack_sent", serde_json::json!(connected));
+        timing.set(
+            "supervisor_reason",
+            serde_json::json!(result.as_ref().err()),
+        );
         if result.is_err() || is_posix {
             owned.terminate();
         } else {
@@ -1662,7 +1787,9 @@ mod linux {
                     .all(|pid| !Path::new("/proc").join(pid.to_string()).exists());
             (physical, terminal_state, reset)
         };
+        timing.set("cleanup_verified", serde_json::json!(dir.writers_gone));
         if !dir.writers_gone {
+            timing.set("cleanup_detail", serde_json::json!(physical));
             return Err(super::SupervisorFailure::cleanup(result.err(), physical));
         }
         let accepted = (|| {
@@ -2016,17 +2143,42 @@ mod linux {
 
         #[test]
         fn startup_ack_accepts_only_the_startup_byte_and_restores_blocking_reads() {
-            let (mut child, mut parent) = test_ok(UnixStream::pair());
-            test_ok(parent.write_all(&[STARTUP_ACK]));
+            let (mut child, parent) = test_ok(UnixStream::pair());
+            test_ok(super::super::posix::write_protocol(&parent, &[STARTUP_ACK]));
             assert_eq!(await_startup_ack(&mut child), Ok(()));
-            assert_eq!(test_ok(child.read_timeout()), None);
+            let sender = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(20));
+                test_ok(super::super::posix::write_protocol(&parent, &[7]));
+            });
+            let mut followup = [0];
+            test_ok(child.read_exact(&mut followup));
+            assert_eq!(
+                followup,
+                [7],
+                "monitor must receive blocking reads after ACK"
+            );
+            test_ok(sender.join());
             assert!(CLIENT.get().is_none(), "handshake must not spawn a monitor");
+        }
+
+        #[test]
+        fn delayed_startup_ack_is_accepted_without_a_retry() {
+            let (mut child, parent) = test_ok(UnixStream::pair());
+            let sender = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(1200));
+                test_ok(super::super::posix::write_protocol(&parent, &[STARTUP_ACK]));
+            });
+            let started = Instant::now();
+            assert_eq!(await_startup_ack(&mut child), Ok(()));
+            assert!(started.elapsed() >= Duration::from_millis(1200));
+            test_ok(sender.join());
+            assert!(CLIENT.get().is_none());
         }
 
         #[test]
         fn wrong_or_closed_startup_ack_refuses_and_releases_the_socket() {
             let (mut child, mut parent) = test_ok(UnixStream::pair());
-            test_ok(parent.write_all(&[1])); // A stage permit is not startup ACK.
+            test_ok(super::super::posix::write_protocol(&parent, &[1])); // A stage permit is not startup ACK.
             assert_eq!(
                 await_startup_ack(&mut child),
                 Err("wrong-startup-ack".into())
@@ -2049,10 +2201,10 @@ mod linux {
             let (mut child, mut parent) = test_ok(UnixStream::pair());
             let started = Instant::now();
             assert!(
-                test_err(await_startup_ack(&mut child)).starts_with("startup-ack-unavailable:")
+                test_err(await_startup_ack(&mut child)).starts_with("startup-ack-timeout:deadline")
             );
-            assert!(started.elapsed() >= Duration::from_millis(900));
-            assert!(started.elapsed() < Duration::from_secs(3));
+            assert!(started.elapsed() >= super::super::posix::STARTUP_ACK_BUDGET);
+            assert!(started.elapsed() < Duration::from_secs(15));
             assert!(CLIENT.get().is_none());
             drop(child);
             assert_eq!(test_ok(parent.read(&mut [0])), 0);
@@ -2476,6 +2628,14 @@ pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8
         _ => None,
     };
 
+    // Exact diagnostics stay in the owner-private operator record. Its stderr
+    // fallback also remains separate from the sanitized proposer-facing JSON.
+    #[cfg(target_os = "linux")]
+    {
+        let mut diagnostic = diagnostics::Record::new("refusal", "unqualified");
+        diagnostic.set("supervisor_reason", serde_json::json!(failure.reason));
+        diagnostic.set("cleanup_detail", serde_json::json!(failure.cleanup));
+    }
     let reason = &failure.reason;
     let mut exit_code = crate::BLOCKED;
     let mut report = failure.report(profile.0);
@@ -3165,5 +3325,75 @@ mod tests {
             physical.lines().any(|line| line == "ExecMainStatus=2"),
             "{physical}"
         );
+    }
+    #[test]
+    fn probe_loop_cpu_spin() {
+        if std::env::var_os("ZENO_FCIS_CHECKER_CONTROL").is_none() {
+            return;
+        }
+        assert_eq!(linux::child(), Ok(true));
+        test_ok(start(Duration::from_secs(1), false));
+        loop {
+            std::hint::black_box(1u64.wrapping_mul(7));
+        }
+    }
+    #[test]
+    fn actual_systemd_stage_cpu_spin_is_stopped() {
+        let _guard = PHYSICAL_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let args = [
+            "--exact",
+            "checker_process::tests::probe_loop_cpu_spin",
+            "--nocapture",
+            "--test-threads=1",
+        ]
+        .map(std::ffi::OsString::from);
+        let result = linux::supervise(
+            &args,
+            false,
+            1,
+            linux::Receipts {
+                staging_parent: None,
+                receipt: None,
+            },
+            None,
+        );
+        let (unit, physical, gone, _, members_gone) = test_some(
+            test_ok(linux::LAST_PHYSICAL.lock()).take(),
+            "physical systemd CPU control",
+        );
+        assert!(gone && members_gone, "{physical}");
+        let failure = test_err(result);
+        assert!(
+            failure.reason.starts_with("contained-deadline"),
+            "{failure:?}"
+        );
+        assert!(failure.cleanup.is_none());
+        let root = std::path::Path::new("/tmp")
+            .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
+        let observation = test_ok(std::fs::read_dir(root))
+            .filter_map(|p| {
+                serde_json::from_slice::<serde_json::Value>(&std::fs::read(p.ok()?.path()).ok()?)
+                    .ok()
+            })
+            .find(|r| {
+                r["observer"] == "worker-supervisor"
+                    && r["unit"] == unit
+                    && r["process_start_ticks"]
+                        == diagnostics::process_start_ticks(std::process::id()).unwrap()
+            })
+            .unwrap();
+        assert_eq!(observation["cleanup_verified"], true);
+        assert_eq!(observation["stages"][0]["stopped_by"], "cpu");
+        assert_eq!(
+            observation["stages"][0]["cpu_source"],
+            "contained-cgroup-cpu.stat"
+        );
+        assert!(
+            observation["stages"][0]["cpu_observed_us"]
+                .as_u64()
+                .unwrap()
+                >= 1_000_000
+        );
+        println!("systemd-stage-control {observation}");
     }
 }

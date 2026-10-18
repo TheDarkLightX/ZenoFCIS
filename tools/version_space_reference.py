@@ -206,13 +206,34 @@ def program_table(program):
     return tuple(result)
 
 
+def report_question(question):
+    """Decode report coordinates within this reference's original i64 scope."""
+    def scalar(value):
+        if type(value) is int:
+            number = value
+        elif type(value) is str and len(value) <= 40:
+            number = int(value)
+            if str(number) != value:
+                raise ValueError("noncanonical report integer")
+        else:
+            raise ValueError("report integer")
+        if not I64[0] <= number <= I64[1]:
+            raise ValueError("report outside reference i64 scope")
+        return number
+    return {**question, "input": [scalar(v) for v in question["input"]],
+            "answers": [{**a, "output": [scalar(v) for v in a["output"]]} for a in question["answers"]]}
+
+
 def compare(spec, report, stub=False):
     """Exact comparisons, separate from the oracle to support mutation controls."""
     wanted = expected(spec)
     detail = report.get("detail", report)
     comparisons = [detail.get("count") == wanted["count"]]
     if "question" in wanted:
-        q = detail.get("question") or {}
+        try:
+            q = report_question(detail.get("question") or {})
+        except (ValueError, KeyError, TypeError):
+            return False
         comparisons.extend(q.get(k) == v for k, v in wanted["question"].items())
     elif "conflict" in wanted:
         comparisons.append((detail.get("conflict") or {}).get("requirements") == wanted["conflict"])

@@ -693,7 +693,7 @@ The application-level safety statement is therefore machine-checked over the
 evaluator specification, with the validator implementation tested, not
 proved.
 
-The result, schema `zeno-fcis/checked-composition-result/1`, records the
+The result, schema `zeno-fcis/checked-composition-result/2`, records the
 manifest's schema, SHA-256 and commitment, the checker's source-bound
 identity, the commitment of the composition specification, each leaf's
 bindings and counts, the SHA-256 of each table the checker ran, the edges and
@@ -703,7 +703,7 @@ validation established.
 The identity combines the SHA-256 of the checker's own source files, the
 source digests of `zeno-fcis-spec` and `zeno-fcis-compose`, and the library
 evaluator's digest. `--receipt FILE` writes the result as a receipt, schema
-`zeno-fcis/checked-composition-receipt/1`: compact JSON with object keys in
+`zeno-fcis/checked-composition-receipt/2`: compact JSON with object keys in
 byte order and a final newline. `--replay FILE` runs every check again and
 requires that receipt byte for byte; a difference is reported with the path
 of the first value that differs.
@@ -748,11 +748,11 @@ limit the manifest gives, the verdict is `refused` and nothing is evaluated
 (`evaluated: 0`, no Authority decision, no formula value). Within budget
 every obligation is checked exhaustively. The JSON report has status
 `proved`, `violated` or `refused` and a result of schema
-`zeno-fcis/composed-domain-result/1`: each obligation's size, status and
+`zeno-fcis/composed-domain-result/2`: each obligation's size, status and
 evaluated rows, the first witness of a violation, the planner's refusal, the
 monolithic product the check did not enumerate, each component's pins and
 decision-table SHA-256, the checker's identity, the claim, the trusted base
-and the non-claims. `--receipt` writes `zeno-fcis/composed-domain-receipt/1`
+and the non-claims. `--receipt` writes `zeno-fcis/composed-domain-receipt/2`
 for any verdict and `--replay` requires it byte for byte.
 
 `--joint-table MAX_PAIRS` prints the joint step on every global state
@@ -1013,10 +1013,54 @@ documented host-integrity assumption. The `--deadline-ms` limit bounds one
 `run` or `candidate` invocation's loop work; an agent's thinking time between
 `candidate` calls is not loop work, while attempts, checks and work caps are
 session-wide and persisted. The invocation runs in a contained process with a
-64 MiB memory cap and no swap. Check stages have a two-second cooperative
-deadline; the supervisor allows one second of grace to record a timeout before
-killing an unresponsive stage. The whole loop has a 25-second cap from spawn,
-including startup and teardown. A zero-remaining stage records a timeout
+64 MiB memory cap and no swap. Contained loop stages request at most two
+seconds of CPU for a check and five seconds for a search, clipped by the
+invocation's remaining wall allowance. The supervisor samples kernel CPU:
+the verified cgroup's `cpu.stat usage_usec` on systemd, or the owned trusted
+finite worker's user and system ticks on POSIX. POSIX refuses unexpected
+waited-child CPU; interpreter and native profiles still require systemd.
+Missing, malformed or regressed counters refuse. FINISH independently resamples
+and charges the counter's rounding uncertainty before permitting a result.
+CPU use at or above the requested budget refuses; a conservative strict upper
+bound above that budget also refuses at FINISH.
+
+Each loop stage also has a wall backstop of nine times its requested CPU
+milliseconds plus two seconds, clipped to the whole worker's remaining time.
+Thus a full check has at most 20 seconds; a full search's nominal 47 seconds
+is clipped by the 25-second worker cap. No CPU increase and no valid completion
+frame for the requested milliseconds plus one second refuses (3 seconds for a
+full check; 6 for a full search). The supervisor services queued protocol
+completion before declaring inactivity; partial or invalid frames do not
+extend this bound. Waiting for a control reply has a separate 10-second
+monotonic limit; wrong, closed, missing and late replies refuse. These are
+checked deadlines, not real-time scheduling guarantees.
+
+The whole loop worker has a 25-second cap from spawn, including startup.
+Cleanup and absence verification fence output and receipts after execution;
+they do not grant more execution time. Caller preparation precedes that clock;
+on POSIX, the separate 30-second guardian clock also includes guardian
+preparation. Startup ACK waiting has a 10-second monotonic deadline inside the
+worker cap; no application work starts before ACK. There is no invocation retry.
+The systemd startup manager query has its own 5-second ceiling, also bounded by
+the worker deadline. Offline check stages keep their explicit requested wall
+limit plus one second of grace and their separate 65-second worker cap.
+Independent deterministic work reservations and invocation deadlines still
+apply; CPU accounting does not replace them.
+
+Operator observations are written separately under the owner-private
+`/tmp/zeno-fcis-operator-UID/` directory (0700; records 0600). The versioned
+`zeno-fcis/operator-containment/1` records identify the observer process and
+record preparation, ACK, worker and guardian durations in milliseconds where
+observed, plus the exact supervisor refusal and cleanup observation. Missing
+phases remain unknown. These records supply no decision, resource accounting,
+admission, receipt or publication authority. They do not enter capture JSON;
+its proposer-facing refusal stays sanitized. A record-write failure sends the
+operator diagnostic to stderr instead. Each complete record is flushed to an
+owner-only temporary file in that same directory and renamed atomically into
+its final name. Readers select the invocation before decoding; malformed
+matching records still fail their checks.
+
+A zero-remaining stage records a timeout
 without starting work. Durable session records can retain earlier completed
 checks even if a later stage fails; resume independently rechecks them.
 
@@ -1109,7 +1153,7 @@ guide is
 
 Results carry `authority: none`. Session doors use schema
 `zeno-fcis/transform-loop/1` with a `door` section; `family` and `transfer`
-use `zeno-fcis/loop-doors/1`. Every door runs in the loop's contained
+use `zeno-fcis/loop-doors/2`. Every door runs in the loop's contained
 process: its search runs in five-second search stages and each confirming
 check in a two-second check stage, within the invocation's deadline; a stage
 that cannot run in time is reported as inconclusive. Input documents and
@@ -1171,7 +1215,17 @@ Raw meaning vectors retain arithmetic failures and integer values; only an
 output root turns values outside its domain into output-domain failures.
 Failures use tags, including at the lowest i64 output bound.
 
-Results use `zeno-fcis/loop-doors/1`, `door: learn`, `authority: none`:
+Results use `zeno-fcis/loop-doors/2`, `door: learn`, `authority: none`.
+Scalar report fields use `safe-number-or-decimal-string/1`: integers from
+`-9007199254740991` through `9007199254740991` are JSON numbers; larger
+magnitudes are canonical decimal strings. Decode both forms as exact integers.
+This covers question coordinates, learned observations, witness values, search
+bounds, fills and fitted coefficients. Booleans and variant names retain their
+own types. Existing decimal-string program, domain, evaluate and receipt
+fields retain their formats. The [judge reference](CONTRACT_JUDGES.md#integer-values-in-json-reports)
+lists the corresponding judge and display schemas.
+
+Statuses:
 
 | Status | Exit | Scope |
 |---|---|---|
@@ -2614,3 +2668,14 @@ Read-only operations exit 0 for complete answers, 1 for integrity/refusal
 failures, 2 for an inconclusive bound or no plan, and 3 for a file read failure.
 No partial candidate plan is returned after a resource stop.
 <!-- END bounded knowledge operations of the existing loop strategy -->
+
+Scalar coordinates in current composition JSON results and joint tables use
+`safe-number-or-decimal-string/1`; see the [integer report encoding](CONTRACT_JUDGES.md#integer-values-in-json-reports).
+Fresh composition receipts use `/2` envelopes for the versioned result. Existing
+receipt files are unchanged; replay requires the current exact schema and result.
+Draft assessment `/2` applies the same scalar encoding to `labels_compared[].input`,
+`questions[].input` and every tuple in `unlabeled_inputs`; label text and provenance
+remain text. Completion result `/2` declares the same encoding for failure `input`
+and `state` tuples, including optional invalid-plan states. Small coordinates keep
+their numeric form. Completion source documents and canonical plan bytes retain
+their existing formats; a replayed failure case still fails and supplies no plan.

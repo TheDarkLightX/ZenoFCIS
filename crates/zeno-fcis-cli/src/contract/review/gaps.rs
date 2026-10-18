@@ -396,13 +396,13 @@ struct Example {
 impl Example {
     fn json(&self, space: &Space) -> Value {
         json!({
-            "input": space.at(self.ordinal),
+            "input": crate::report_numbers::integers(&space.at(self.ordinal)),
             "contract": self.reference.json(space),
             "admissible": self.admissible,
             "also_admitted": self.also.iter().map(|(class, reason, next)| json!({
                 "class": class.name(),
                 "reason": reason,
-                "post": next.map(|next| space.state(next)),
+                "post": next.map(|next| crate::report_numbers::integers(&space.state(next))),
             })).collect::<Vec<_>>(),
         })
     }
@@ -665,7 +665,7 @@ fn reject_everything(
         "refused_where_the_contract_decides": where_decided,
         "admitted_where_the_contract_decides": where_decided == 0,
         "first_refusal": first.map(|ordinal| json!({
-            "input": machine.space.at(ordinal),
+            "input": crate::report_numbers::integers(&machine.space.at(ordinal)),
             "refusal": observed[ordinal].json(&machine.space),
         })),
     }))
@@ -805,7 +805,7 @@ fn mutation(loaded: &Loaded, machine: &Machine, valid: &[bool]) -> Result<Mutati
         value["valid_domain"] = json!(classify(1));
         let witness = |ordinal: usize| {
             json!({
-                "input": space.at(ordinal),
+                "input": crate::report_numbers::integers(&space.at(ordinal)),
                 "contract": machine.observed[ordinal].json(space),
                 "mutant": observed[ordinal].json(space),
             })
@@ -1012,7 +1012,7 @@ fn check_proposals(
                         false_alarm.get_or_insert_with(|| {
                             json!({
                                 "law": ids[index],
-                                "input": space.at(ordinal),
+                                "input": crate::report_numbers::integers(&space.at(ordinal)),
                                 "contract": machine.observed[ordinal].json(space),
                             })
                         });

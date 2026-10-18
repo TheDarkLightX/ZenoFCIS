@@ -110,6 +110,23 @@ class ReproducibleApplicationReceiptTests(unittest.TestCase):
                         self.assertRaisesRegex(RuntimeError, "CLI completion model differs"):
                     application.exercise_prepared_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
 
+    def test_completion_report_versions_keep_independent_acceptance_checks(self):
+        report = {"status": "verified", "authority": "none", "assurance": "complete-finite",
+                  "states_checked": 4, "commands_per_state": 27, "maximum_exit_steps": 1,
+                  "problem": "a" * 64, "plan_sha256": "b" * 64}
+        for schema, encoding, accepted in (("zeno-fcis/completion-result/1", None, True),
+                ("zeno-fcis/completion-result/2", "safe-number-or-decimal-string/1", True),
+                ("zeno-fcis/completion-result/2", None, False),
+                ("zeno-fcis/completion-result/2", "unknown", False),
+                ("zeno-fcis/completion-result/3", "safe-number-or-decimal-string/1", False)):
+            current = {**report, "schema": schema, "integer_encoding": encoding}
+            with self.subTest(schema=schema, encoding=encoding), \
+                    mock.patch.object(application, "run", side_effect=[json.dumps(current), json.dumps(current),
+                                     json.dumps({**current, "replay": "matched"})]), \
+                    mock.patch.object(application, "exercise_rust_application", side_effect=RuntimeError("independent runtime gate")), \
+                    self.assertRaisesRegex(RuntimeError, "independent runtime gate" if accepted else "completion claim did not pass"):
+                application.exercise_prepared_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+
     def test_variable_test_logs_are_checked_but_never_exported(self):
         report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
                   "authority": "none", "assurance": "complete-finite", "states_checked": 4,

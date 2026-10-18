@@ -142,7 +142,7 @@ pub(super) fn run(command: Command) -> u8 {
     match command {
         Command::Profile { common } => judge(
             &common,
-            "zeno-fcis/contract-profile/1",
+            "zeno-fcis/contract-profile/2",
             None,
             true,
             |sources| {
@@ -163,9 +163,9 @@ pub(super) fn run(command: Command) -> u8 {
         } => judge(
             &common,
             if transition {
-                "zeno-fcis/contract-transition-lemma/1"
+                "zeno-fcis/contract-transition-lemma/2"
             } else {
-                "zeno-fcis/contract-lemma/1"
+                "zeno-fcis/contract-lemma/2"
             },
             None,
             true,
@@ -210,7 +210,7 @@ pub(super) fn run(command: Command) -> u8 {
             let label = path.display().to_string();
             judge(
                 &common,
-                "zeno-fcis/contract-scenario/1",
+                "zeno-fcis/contract-scenario/2",
                 Some(&path),
                 false,
                 |sources| {
@@ -235,7 +235,7 @@ pub(super) fn run(command: Command) -> u8 {
             let enumerates = !matches!(question, probe::Question::Explain { .. });
             judge(
                 &common,
-                "zeno-fcis/contract-probe/1",
+                "zeno-fcis/contract-probe/2",
                 None,
                 enumerates,
                 |sources| {
@@ -381,6 +381,7 @@ fn judge(
     };
     let mut packet = json!({
         "schema": schema,
+        "integer_encoding": crate::report_numbers::ENCODING,
         "authority": "none",
         "advisory": ADVISORY,
         "application": application,

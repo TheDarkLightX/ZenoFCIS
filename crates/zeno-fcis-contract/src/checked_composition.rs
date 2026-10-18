@@ -183,7 +183,22 @@ pub use structure::SPEC_VERSION;
 use table::{Table, TableKind};
 
 /// The schema of a checked composition's result.
-pub const RESULT_SCHEMA: &str = "zeno-fcis/checked-composition-result/1";
+pub const RESULT_SCHEMA: &str = "zeno-fcis/checked-composition-result/2";
+
+// Report preparation only: the same safe-number-or-decimal-string/1 rule
+// as CLI door/judge reports, without changing canonical scalar input formats.
+const INTEGER_ENCODING: &str = "safe-number-or-decimal-string/1";
+fn json_integer(value: i128) -> Value {
+    const SAFE: i128 = (1i128 << 53) - 1;
+    if (-SAFE..=SAFE).contains(&value) {
+        Value::from(value as i64)
+    } else {
+        Value::from(value.to_string())
+    }
+}
+fn json_integers(values: &[i128]) -> Value {
+    Value::Array(values.iter().copied().map(json_integer).collect())
+}
 
 /// What an application-level claim rests on that is tested, not proved.
 /// The repository's Verus harness `verification/verus/checked_assembly.rs`
@@ -329,6 +344,7 @@ impl CheckedComposition {
         }
         json!({
             "schema": RESULT_SCHEMA,
+            "integer_encoding": INTEGER_ENCODING,
             "evidence": "checked",
             "profile": "one selected leaf per command; immutable peer views from the same pre-state; disjoint writes; no effects or outbox",
             "manifest": {
@@ -733,7 +749,7 @@ fn interface(
                         } else {
                             "command.101"
                         };
-                        (format!("{root}.{}", field.field), json!(value))
+                        (format!("{root}.{}", field.field), json_integer(*value))
                     })
                     .collect(),
             )

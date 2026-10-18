@@ -525,15 +525,38 @@ def cli_json(cli, *args):
         return result.returncode, {"status": "unreadable", "stdout": result.stdout, "stderr": result.stderr}
 
 
+def report_integer(value):
+    """Exact report syntax only; independent transition semantics stay below."""
+    if type(value) is int:
+        number = value
+    elif type(value) is str and len(value) <= 40:
+        number = int(value)
+        if str(number) != value:
+            raise ValueError("noncanonical report integer")
+    else:
+        raise ValueError("report integer")
+    if not -(1 << 127) <= number < (1 << 127):
+        raise ValueError("report i128 bound")
+    return number
+
+
+def report_witness(witness):
+    """Decode only typed named coordinate maps, retaining descriptive text."""
+    names = ('genesis', 'states', 'after', 'providers', 'request', 'state', 'inputs', 'post')
+    return {key: ({name: report_integer(value) for name, value in values.items()}
+                  if key in names and isinstance(values, dict) else values)
+            for key, values in witness.items()}
+
+
 def canonical_rows_rust(table: dict) -> dict:
     names = table["state_layout"]
     rows = {}
     for row in table["rows"]:
-        state = tuple(sorted(zip(names, row["state"])))
-        after = tuple(sorted(zip(names, row["successor"])))
+        state = tuple(sorted(zip(names, [report_integer(v) for v in row["state"]])))
+        after = tuple(sorted(zip(names, [report_integer(v) for v in row["successor"]])))
         outcome = row["outcome"]
         detail = outcome.get("reason") if outcome["kind"] in ("Reject", "CommittedFailure") else outcome.get("class")
-        rows[(state, tuple(row["request"]))] = (outcome["kind"], outcome.get("component"), detail, after)
+        rows[(state, tuple([report_integer(v) for v in row["request"]]))] = (outcome["kind"], outcome.get("component"), detail, after)
     return rows
 
 
@@ -802,7 +825,7 @@ def faults(args) -> int:
             row["obligation"] = kind
             agree = (ours["first"]["kind"], ours["first"]["subject"]) == (kind["kind"], kind["subject"])
             expected = _named_witness(composition, ours["first"]["witness"])
-            got = theirs["witness"]["witness"]
+            got = report_witness(theirs["witness"]["witness"])
             if kind["kind"] == "local":
                 fields = composition.by_name[kind["subject"]]
                 expected = {"state": dict(zip(fields.state_names, ours["first"]["witness"]["state"])),

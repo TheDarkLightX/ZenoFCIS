@@ -186,12 +186,13 @@ RESERVED = frozenset({"true", "false", "keep", "not", "and", "or", "is", "if", "
                       "plus", "minus", "times", "less", "greater", "than", "at", "most", "least", "some",
                       "constant", "expression", "one", "of", "from", "to", "parameter", "before", "after",
                       "the", "original", "output", "where"})
-I64 = (-(1 << 63), (1 << 63) - 1)
+I64 = (-(1 << 63), (1 << 63) - 1)  # The separately bounded version-space input grammar.
+I128 = (-(1 << 127), (1 << 127) - 1)
 
 
 def _integer(text: str, negative: bool = False) -> int:
     value = -int(text) if negative else int(text)
-    if not I64[0] <= value <= I64[1]:
+    if not I128[0] <= value <= I128[1]:
         raise Refusal("expression-integer-range")
     return value
 
@@ -711,7 +712,7 @@ class Context:
             return int(text == "true")
         if text in self.variants:
             return self.variants[text]
-        if re.fullmatch(r"-?\d{1,19}", text):
+        if re.fullmatch(r"-?\d{1,39}", text):
             return _integer(text.lstrip("-"), text.startswith("-"))
         raise Refusal(f"zal-value:{name}={text[:20]}")
 

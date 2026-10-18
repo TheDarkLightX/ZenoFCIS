@@ -27,6 +27,7 @@ import subprocess
 import sys
 
 from behavior import Refusal
+import report_numbers as N
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPRESSIONS_SCHEMA = "zeno-fcis/loop-expressions/1"
@@ -107,7 +108,7 @@ def document(vocabulary: dict | None, outputs: list, parameters: dict | None = N
 
 def open_session(cli: Path, original: Path, session: Path) -> dict:
     code, report = run(cli, ["loop", "open", "--original", original, "--session", session,
-                             "--profile", "checked-i64-v1"])
+                             "--profile", "checked-i128-v1"])
     if code != 0 or report.get("status") != "opened":
         raise Refusal(f"loop open refused the program: {report.get('status')}")
     return report
@@ -156,13 +157,7 @@ def evaluate_expression(cli: Path, original: Path, expressions: Path, values: li
     result = (report.get("detail") or {}).get("values")
     if code != 0 or report.get("status") != "evaluated" or not isinstance(result, list) or len(result) != 1:
         raise Refusal("scenario-expression-refused-by-library")
-    value = result[0]
-    if not isinstance(value, str) or not re.fullmatch(r"-?(?:0|[1-9][0-9]{0,18})", value):
-        raise Refusal("scenario-expression-result-shape")
-    number = int(value)
-    if not -(1 << 63) <= number < (1 << 63):
-        raise Refusal("scenario-expression-result-range")
-    return number
+    return N.integer(result[0])
 
 
 def lemma(cli: Path, contract: Path, formula: str) -> tuple[int, dict]:
@@ -236,7 +231,7 @@ def generate_family(cli: Path, family_name: str, directory: Path, vocabulary,
         entry = {"name": name, "parameters": params, "program": f"{name}/original.zcve"}
         if optimize:
             code, report = run(cli, ["optimize", "--program", folder / "original.zcve", "--profile",
-                                     "checked-i64-v1", "--candidate-out", folder / "optimized.zcve"])
+                                     "checked-i128-v1", "--candidate-out", folder / "optimized.zcve"])
             if code == 0 and (folder / "optimized.zcve").is_file():
                 entry["optimize"] = f"{name}/optimized.zcve"
         if fit is not None:

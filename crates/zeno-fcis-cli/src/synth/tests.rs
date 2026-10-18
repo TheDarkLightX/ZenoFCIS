@@ -423,3 +423,46 @@ fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
         assert_eq!(verdict.code(), exhaustive.code());
     }
 }
+
+#[test]
+fn wide_synthesis_failure_and_witness_reports_keep_values_and_absence() {
+    for value in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1i128 << 100,
+        1i128 << 64,
+        5,
+    ] {
+        let failure = semantic(Error::ContractTrap {
+            input: vec![value],
+            output: vec![value],
+        });
+        assert_eq!(failure.report["schema"], "zeno-fcis/synthesis-result/2");
+        assert_eq!(
+            crate::report_numbers::read(&failure.report["detail"]["input"][0]),
+            Some(value)
+        );
+        assert_eq!(
+            crate::report_numbers::read(&failure.report["detail"]["output"][0]),
+            Some(value)
+        );
+        for output in [None, Some(vec![value])] {
+            let encoded = witness_json(Some(Witness {
+                input: vec![value],
+                output: output.clone(),
+            }));
+            assert_eq!(
+                crate::report_numbers::read(&encoded["input"][0]),
+                Some(value)
+            );
+            assert_eq!(encoded["output"].is_null(), output.is_none());
+            if output.is_some() {
+                assert_eq!(
+                    crate::report_numbers::read(&encoded["output"][0]),
+                    Some(value)
+                );
+            }
+        }
+    }
+}

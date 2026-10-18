@@ -381,7 +381,7 @@ pub(super) fn command(
             } else {
                 "proposed-ambiguous"
             };
-            let q=r.question.map(|q|json!({"statement":q.statement,"id":groups[q.statement].id,"text":input["readings"][q.statement]["text"],"ordinal":q.ordinal,"world":q.world,"holds":q.holds,"does_not_hold":q.does_not_hold}));
+            let q=r.question.map(|q|json!({"statement":q.statement,"id":groups[q.statement].id,"text":input["readings"][q.statement]["text"],"ordinal":q.ordinal,"world":crate::report_numbers::integers(&q.world),"holds":q.holds,"does_not_hold":q.does_not_hold}));
             Ok((
                 json!({"status":status,"query":input["query"],"distinct":r.distinct,"answers":r.answers,"answer":if answer.len()==1{answer.first().copied()}else{None},"question":q,"proposer_work":r.work,"claim":"answer stability over listed finite readings only; no owner intent or missing-reading completeness"}),
                 r.trace,

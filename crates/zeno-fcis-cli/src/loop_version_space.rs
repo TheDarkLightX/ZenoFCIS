@@ -22,6 +22,7 @@ use zeno_fcis_synthesis::finite::{
 };
 
 const SCHEMA: &str = "zeno-fcis/loop-version-space/1";
+const RESULT_SCHEMA: &str = "zeno-fcis/loop-version-space/2";
 
 #[derive(Args, Clone, Copy, Default)]
 pub(crate) struct Arguments {
@@ -581,7 +582,7 @@ fn stopped(stop: Stop, budget: Option<&Budget>, revision: Option<&str>) -> (u8, 
         Stop::Refused(s) => (crate::INVALID, "refused", s),
         Stop::Inconclusive(s) => (crate::BLOCKED, "inconclusive", s),
     };
-    let mut report = json!({"schema":SCHEMA,"door":"version-space","authority":"none","status":status,
+    let mut report = json!({"schema":RESULT_SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"version-space","authority":"none","status":status,
         "detail":{"revision":revision,"count":null,"question":null,"candidate":null,"reason":reason,"attempts_spent":0,
             "budget":budget.map(usage)}});
     super::search_limits::annotate("version-space", status, &mut report["detail"]);
@@ -617,8 +618,8 @@ pub(super) fn run(path: &Path, arguments: Arguments) -> (u8, Value) {
         "claims":"proposal","decided_by":"door-enumeration","attempts_spent":0});
     let status = match proposal {
         Proposal::Question { count, question: q } => {
-            let mut question = json!({"input":q.input,"ordinal":q.ordinal,
-                "answers":q.answers.iter().map(|a| json!({"output":a.output,"remaining":a.remaining})).collect::<Vec<_>>(),
+            let mut question = json!({"input":crate::report_numbers::integers(&q.input),"ordinal":q.ordinal,
+                "answers":q.answers.iter().map(|a| json!({"output":crate::report_numbers::integers(&a.output),"remaining":a.remaining})).collect::<Vec<_>>(),
                 "worst_remaining":q.worst_remaining,"sum_squared_buckets":q.sum_squared_buckets,
                 "picker":"min largest bucket, then sum of squares, then input ordinal",
                 "revision":revision,"requires_owner_confirmation":true});
@@ -661,7 +662,7 @@ pub(super) fn run(path: &Path, arguments: Arguments) -> (u8, Value) {
     super::search_limits::annotate("version-space", status, &mut detail);
     (
         0,
-        json!({"schema":SCHEMA,"door":"version-space","status":status,"authority":"none","detail":detail}),
+        json!({"schema":RESULT_SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"version-space","status":status,"authority":"none","detail":detail}),
     )
 }
 

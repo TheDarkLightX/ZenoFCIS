@@ -189,7 +189,7 @@ fn a_receipt_that_is_not_canonical_is_refused_before_the_check() {
     let mut extra = value.clone();
     extra["note"] = json!("x");
     let mut schema = value.clone();
-    schema["schema"] = json!("zeno-fcis/checked-composition-receipt/2");
+    schema["schema"] = json!("zeno-fcis/checked-composition-receipt/3");
     for (text, form) in [
         ("not json".to_owned(), ReceiptForm::NotJson),
         (pretty, ReceiptForm::NotCanonical),

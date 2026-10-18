@@ -1112,7 +1112,7 @@ fn implied_by_invariant(leaf: &Compiled, formula: &str, place: &str) -> Result<u
                 fields
                     .iter()
                     .zip(tuple)
-                    .map(|(field, value)| (format!("post.100.{}", field.field), json!(value)))
+                    .map(|(field, value)| (format!("post.100.{}", field.field), super::json_integer(*value)))
                     .collect(),
             ))),
             other => Err(refuse(

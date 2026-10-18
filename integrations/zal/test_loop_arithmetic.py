@@ -220,7 +220,7 @@ class ArithmeticLanguage(unittest.TestCase):
             self.assertIn("--input=7", run.call_args.args[1])
         for code, report in [(1, {"status": "refused"}), (0, {"status": "equivalent"}),
                              (0, {"status": "evaluated", "detail": {"values": [True]}}),
-                             (0, {"status": "evaluated", "detail": {"values": [str(1 << 63)]}})]:
+                             (0, {"status": "evaluated", "detail": {"values": [str(1 << 127)]}})]:
             with patch.object(loop_doors, "run", return_value=(code, report)), self.assertRaises(Refusal):
                 loop_doors.evaluate_expression(*args)
 
