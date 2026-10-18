@@ -138,6 +138,7 @@ mod receipt;
 #[cfg(test)]
 mod receipt_tests;
 mod refusal;
+mod resolve;
 mod structure;
 #[cfg(test)]
 mod structure_tests;
