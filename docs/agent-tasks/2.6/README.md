@@ -26,3 +26,35 @@ Linux x86-64.
 
 Results come back as draft pull requests and are reviewed before any merge. These packets are task instructions,
 not release documentation; they describe planned work, not shipped capability.
+
+## Revision 2
+
+Revision 1 (commit `a38a8ee`) had acceptance requirements that were impossible or tested the wrong condition. Revision
+2 corrects them. An agent that started from revision 1 must apply these changes:
+
+- **P1, shell simulation.**
+  - The crash points return an error and roll back, so a child process cannot die inside the transaction. P1 now
+    permits a test-only abort mode for the crash points, and an interleaving hook between `synchronize()` and
+    `BEGIN`, both behind the `crash-injection` feature.
+  - Freshness and acknowledgement checks are layered. Each mutation now needs a behavioural witness: mutate every
+    layer together, or build a schedule that reaches only the mutated layer.
+  - The stale-writer control now removes the whole compare-and-swap predicate, and uses the interleaving window.
+  - Two vague mutations are replaced.
+- **P2, Lean induction.**
+  - The project definition has no genesis value, so `history_holds` now takes the base case as a hypothesis. A
+    concrete genesis theorem is optional, and only with a bound genesis value.
+  - The controls are now a table, each with a normal result and the result under its mutation. The
+    domain-dependent fixture must be **checked** normally, and must fail after the domains are dropped.
+  - The definedness control now uses a claim whose own arithmetic can overflow.
+- **P3, composed-domain proof.**
+  - The obligations now match the checker (`obligations.rs:1-42`): Reject, Refused and Skip are legitimate, and the
+    delivered read-only state must satisfy its invariant. The theorem now includes that invariant.
+  - State application is a second shared proved function, `apply`. The "commits only its own successor" control is
+    a mutation of `apply`, not of the resolver.
+- **P4, structure-search gate.**
+  - `m.cmp` and `m.eq` accept only fixed-size scalar types.
+  - Derived `Clone` and equality are refused, because they bypass the meter.
+  - Exhaustion now has exact refinement semantics: `Exhausted` if and only if the spec cost exceeds the limit,
+    with no new version.
+  - Every gate now runs standalone on every plant, with an overlap matrix, so each gate's control is shown
+    independently of the pipeline order.

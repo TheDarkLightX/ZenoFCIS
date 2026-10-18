@@ -1,5 +1,8 @@
 # Task packet P1: deterministic fault simulation for the SQLite shell (single store)
 
+**Revision 2 (2026-10-18).** Corrects acceptance requirements in revision 1 (commit `a38a8ee`). If you started from
+revision 1, apply the changes listed for this packet in [README.md](README.md#revision-2) before continuing.
+
 **Branch:** `agent/2.6-shell-simulation` **Size:** large **Evidence level of the result:** tested
 
 ## Why (the user's story)
@@ -66,9 +69,17 @@ It is test evidence, not a proof, and the report must say so.
 ## What to build
 Everything goes under `crates/zeno-fcis-shell-sqlite/tests/` as new files: a `simulation.rs` integration test, a
 `sim/` support module and `sim/fixtures/`. You may add one test-only `[[test]]` entry with
-`required-features = ["crash-injection"]` to the crate's Cargo.toml. Change no production code, except one optional
-addition: a busy-timeout setter behind the existing `crash-injection` feature, if the busy fault needs it. Justify it
-in the report.
+`required-features = ["crash-injection"]` to the crate's Cargo.toml. Change no production code, except these
+permitted additions. Each one sits behind the existing `crash-injection` feature, leaves default builds byte-identical
+in behaviour, and is justified in the report:
+- **An abort mode for the crash points.** Today `inject` (v2.rs:2379-2386) returns `Error::InjectedCrash`, and the
+  dropped transaction rolls back. A child process therefore cannot die inside the transaction. Add a test-only
+  selector that makes a chosen crash point call `std::process::abort()` instead of returning, for example
+  `CrashMode::{Error, Abort}` carried with the `CrashPoint`. Error mode stays the default and keeps its tests.
+- **An interleaving hook** at `CrashPoint::BeforeTransaction`: a test-only callback that runs between `synchronize()`
+  and `BEGIN IMMEDIATE`. It lets a schedule commit from a second handle inside that window, which is the only window
+  where the compare-and-swap is the sole freshness guard.
+- **A busy-timeout setter,** if the busy fault needs one.
 
 1. **A deterministic world.**
    - A seeded PRNG written in the test code (SplitMix64 or xoshiro256**, about 20 lines, with a published test
@@ -136,33 +147,47 @@ in the report.
      regression cases, replayed by a normal test. Seeds and schedules are plain JSON.
 10. **Kill and reopen.**
     - The test binary re-executes itself (`std::env::current_exe()` with an environment variable naming the role).
-    - The child commits on a file database and stops itself at a chosen point with `std::process::abort()`. The
-      points are: before BEGIN, after each statement inside the transaction (use the crash points), right after
-      COMMIT returns, and between delivery and acknowledgement.
+    - The child commits on a file database and stops itself at a chosen point. Inside the transaction, use the
+      abort mode of the crash points above; outside it, call `std::process::abort()` in the child's own code. The
+      points are: before BEGIN, after each statement inside the transaction, right after COMMIT returns, and between
+      delivery and acknowledgement.
     - The parent waits, reopens with `open`, audits, compares against the model, and checks recovery by the
       original key.
     - Keep these separate from injected-error rollback, and name them separately in the report. Neither is
       power-failure qualification.
-11. **The freshness note.** Disabling `synchronize()` alone may still be caught by the in-transaction anchor check.
-    A double-apply control must reach the CAS or the binding predicate. Otherwise, classify it as an availability
-    control and say so.
+11. **Freshness is layered. Test each layer where it is the only guard.**
+    - The guards are: `synchronize()` (a data_version re-audit); the cached-anchor expected-version check
+      (:952-954); and the CAS `WHERE sequence=?5 AND root=?6 AND chain=?7` (:1007). The sequence, root and chain
+      terms are redundant with each other, because every commit changes all three.
+    - Use the interleaving hook to commit from a second handle after the first handle's `synchronize()` and before
+      its BEGIN. In that window, the cached anchor still matches, so only the CAS can refuse.
+    - Disabling `synchronize()` alone may still be caught by a later guard. Classify such a mutation by what it
+      actually changes, for example as an availability control, never as a killed double-apply.
 
 ## Controls (planted defects)
 Write `tools/check_shell_simulation_mutations.py`, following `tools/check_bounded_mutations.py`. That tool copies the
 tree, applies one textual mutation, builds, and runs the named test; a build failure is not a kill.
 
+**A mutation counts only if it changes behaviour.** Before relying on a mutation, show a concrete input or schedule
+on which the mutated code behaves differently from the original. Where a guard is layered, there are two options:
+- mutate every layer on that path together, and name the control as a layered-guard control;
+- or construct a schedule that reaches only the mutated layer.
+
+A mutation with no behavioural witness is an equivalent mutant. Record it as such, and replace it.
+
 | Mutation | Must fail |
 |---|---|
 | Skip the outbox INSERT for the second entry | I3 or I5 |
 | Insert one extra outbox row | I3 |
-| Remove the `sequence=?5` term from the CAS WHERE clause | the stale-writer test |
-| Ignore the payload hash in `acknowledge` | I4 |
+| Remove the whole CAS freshness predicate (`sequence`, `root` and `chain` terms) | The interleaving-hook stale-writer schedule, where the cached anchor still matches |
+| Remove the payload-hash comparison on every acknowledgement layer: `Pending::relayed` (delivery.rs:357) and the in-transaction recheck (delivery.rs:568) | I4. Also add a schedule that changes nothing between the two checks, to show the recheck alone is redundant there |
 | Treat changed bytes under the same replay key as an idempotent replay | I2 |
-| Mark acknowledged before the transaction commits | I4 or I5 |
-| A comparator that always returns equal (patch the test code) | the comparator self-test |
+| Drop the already-acknowledged refusal on every layer of the acknowledgement path | I4 (acknowledged is monotone, and a duplicate ack is refused) |
+| Split the transaction: commit the state UPDATE in its own transaction, before the commit-row INSERT | I5, when the kill-and-reopen test aborts between the two |
+| A comparator that always returns equal (patch the test code) | The comparator self-test |
 | A receiver that records its dedup ID outside the effect's transaction | I6 under the lost-reply schedule |
 
-The baseline must pass first. Record each mutation's result in the report.
+The baseline must pass first. Record each mutation's behavioural witness and result in the report.
 
 ## Done when
 - The simulation, the kill-and-reopen tests and the controls all pass. The unmodified tree passes:

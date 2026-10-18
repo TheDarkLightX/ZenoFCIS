@@ -1,5 +1,8 @@
 # Task packet P4: data-structure search, first feasibility gate
 
+**Revision 2 (2026-10-18).** Corrects acceptance requirements in revision 1 (commit `a38a8ee`). If you started from
+revision 1, apply the changes listed for this packet in [README.md](README.md#revision-2) before continuing.
+
 **Branch:** `agent/2.6-structure-search-gate` **Size:** extra large (the required part is large; the stretch part is
 marked) **Evidence level of the result:**
 - the profile checker and the gates: tested;
@@ -77,19 +80,32 @@ crates. Adding this workspace member to `Cargo.lock` is allowed; adding any exte
    - **The API candidates must use:**
      - `m.enter()?` (a call, and depth plus one) and `m.exit()` (depth minus one);
      - `m.scrut(x)?`, which charges a match and returns `x`;
-     - `m.cmp(&a, &b)?`, which returns `Ordering`;
-     - `m.eq(&a, &b)?`;
+     - `m.cmp(&a, &b)?`, which returns `Ordering`, and `m.eq(&a, &b)?`. Both accept **only scalar types**, through
+       a sealed `Scalar` trait in the prelude. It is implemented for `i64`, `u64`, `u32`, `bool`, and tuples of up
+       to three scalars, which compare lexicographically.
+       - A tuple comparison charges one `compares` step per component compared, so its cost stays fixed and
+         visible.
+       - A recursive or user-declared type can never be compared in one charged step: a deep traversal must be an
+         explicit, metered recursive function.
      - `m.add(a, b)?` and `m.sub(a, b)?`, which are checked and refuse on overflow;
      - `m.alloc(v)?`, which returns `Arc<T>`;
      - `m.share(&arc)?`, which returns a clone of the `Arc`.
    - After `Exhausted`, the operation is refused and the meter state is reported as is.
+   - **Exhaustion has exact refinement semantics.** Each candidate declares a spec cost function `cost_op(r, args)`
+     per resource. On meter limits `L`:
+     - the operation returns `Err(Exhausted)` if and only if some resource's cost exceeds its limit;
+     - it then returns no new version, and the input version is unchanged (it is immutable);
+     - otherwise it returns `Ok` with the result and successor that O2 requires, and the final counters equal
+       `cost_op`.
+
+     So a budget refusal is a defined outcome, never an unconstrained one. The gates run O1-O2 with ample limits,
+     and also check the boundary per resource: limit = cost gives `Ok`, and limit = cost - 1 gives `Exhausted`.
 2. **The profile checker** (`src/profile.rs`, profile ID `zeno-fcis/structure-profile/1`).
    - **Input and output:** it takes one candidate source file, parses it with syn, and returns accepted or a list of
      violations. Each violation has a rule ID, a line and a column.
    - **Allowed:**
      - the items `use zeno_fcis_structure_search::prelude::*;`, `struct`, `enum`, `fn` and inherent `impl`;
-     - `#[derive(Clone, Debug, PartialEq, Eq)]`, `#[cfg_attr(verus_keep_ghost, verus_spec(...))]` and `proof!{...}`
-       blocks.
+     - `#[derive(Debug)]` only, `#[cfg_attr(verus_keep_ghost, verus_spec(...))]` and `proof!{...}` blocks.
    - **Refused, each with its own rule ID:**
      - `unsafe`, `static`, `extern`, trait impls (including `Drop`) and macros other than `proof!`;
      - loops (`loop`, `while`, `for`) and closures;
@@ -97,7 +113,10 @@ crates. Adding this workspace member to `Cargo.lock` is allowed; adding any exte
      - `panic!`, `unwrap`, `expect` and `unreachable!`;
      - indexing, `as` casts and division or remainder;
      - the operators `+ - * < <= > >= == !=` on values (use the meter);
-     - `Arc::new` and `.clone()` on `Arc` (use `alloc` and `share`);
+     - `Arc::new` and any `.clone()` call (use `alloc` and `share`; scalars are `Copy`);
+     - derives other than `Debug`, so no derived `Clone`, `PartialEq`, `Eq`, `PartialOrd`, `Ord` or `Hash`, and no
+       trait impls. A derived equality or clone would traverse or copy a structure without charging the meter.
+       Copying a value means constructing it explicitly, through metered calls;
      - field types other than the allowed ones: `i64`, `u64`, `u32`, `bool`, `Option<_>`, tuples, `Arc<T>` of
        types declared in the file, and types declared in the file;
      - any of `Cell`, `RefCell`, `UnsafeCell`, `Mutex`, `RwLock`, `OnceCell`, `OnceLock`, `LazyCell`, `LazyLock`,
@@ -127,8 +146,9 @@ crates. Adding this workspace member to `Cargo.lock` is allowed; adding any exte
    crate. It writes every model state reachable from empty, with up to k = 4 entries over IDs {0,1,2,3,4}, prices
    {-1,0,1} and `next_seq` below 12, crossed with every operation and argument in those domains. The output is a
    JSON table with its SHA-256. Rust tests load it.
-5. **The gates** (`src/gates.rs`, with a test binary per gate). A candidate stops at its first failing gate, and
-   every failure is a structured counterexample (JSON).
+5. **The gates** (`src/gates.rs`, with a test binary per gate). Each gate can run **standalone** on any candidate
+   that builds. The search pipeline runs them in order, and a candidate stops at its first failing gate. Every
+   failure is a structured counterexample (JSON).
    - **G0:** the profile check, then the build. A build failure counts as a G0 failure, not as a caught defect of a
      later gate.
    - **G1:** a random differential against the model over 10,000 deterministic seeded traces of length up to 64.
@@ -162,13 +182,20 @@ crates. Adding this workspace member to `Cargo.lock` is allowed; adding any exte
      4. ties popped by the larger sequence number (G2);
      5. cancel of a missing ID that silently succeeds (G2, a refusal mismatch);
      6. an insertion without rebalancing, so the cost is linear (G3).
-   - **The comparison-disabled controls:** for each gate, a test run with that gate's comparison disabled must let
-     its planted candidate through. This shows that the gate, and not something else, is what catches it.
+   - **Gate-independent controls.** The pipeline stops at the first failure, so a later gate's control is not shown
+     by the pipeline: if G1 already rejects a plant aimed at G2, disabling G2 proves nothing. So:
+     - run **each gate standalone** on **each plant** that builds, and record the full overlap matrix (gate ×
+       plant: fails or passes, with the coordinate);
+     - each plant must fail its target gate when that gate runs alone;
+     - each target gate, run alone with its comparison disabled, must let its plant through;
+     - choose or adjust each plant so that its target gate catches it standalone. Overlap with other gates is
+       fine; record it.
 7. **The proof lane for C1** (required).
    - The Verus harness is `verification/verus/structure_queue_sorted_list.rs`. It `#[path]`-includes the C1 file
      unchanged.
    - Prove these with nothing assumed:
-     - O1 and O2 against a `spec fn` model over `Map<u64, (i64, u64)>`;
+     - O1 and O2 against a `spec fn` model over `Map<u64, (i64, u64)>`, including the exhaustion semantics above:
+       `Err(Exhausted)` exactly when the spec cost exceeds the limit, with no new version;
      - O3, termination, by `decreases` on the list length;
      - the meter totality: each operation's meter counts equal a stated spec cost function of the position and
        the length.

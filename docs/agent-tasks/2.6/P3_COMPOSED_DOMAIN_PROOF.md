@@ -1,5 +1,8 @@
 # Task packet P3: machine-check the composed-domain theorem, plus a shared proved outcome resolver
 
+**Revision 2 (2026-10-18).** Corrects acceptance requirements in revision 1 (commit `a38a8ee`). If you started from
+revision 1, apply the changes listed for this packet in [README.md](README.md#revision-2) before continuing.
+
 **Branch:** `agent/2.6-composed-domain-proof` **Size:** large **Evidence level of the result:** proved (Verus) for
 the abstract theorem and the resolver; every other bridge is named as tested or as a premise
 
@@ -11,8 +14,9 @@ obligations exhaustively over finite tables. From those checks, the guide derive
 satisfies every component and coupling invariant. That last step, the induction, is argued in prose and is not
 machine-checked. Both the code and the guide say so.
 
-This task proves that induction in Verus over an abstract model of the joint step. It also extracts the small pure
-function that decides a joint step's outcome and committed prefix, so the runtime and the proof share one source.
+This task proves that induction in Verus over an abstract model of the joint step. It also extracts the two small
+pure functions that decide a joint step's outcome and committed prefix and apply it to the state, so the runtime and
+the proof share one source.
 
 ## Facts about the current code (verified on the base commit)
 - **Location.** The code is in `crates/zeno-fcis-contract/src/checked_composition.rs` and
@@ -88,7 +92,17 @@ function that decides a joint step's outcome and committed prefix, so the runtim
    pub(crate) fn resolve(n: usize, decide: impl FnMut(usize) -> Local) -> Resolution
    ```
    - It scans in component order and calls `decide` only until the step ends, so later components do not run.
-   - Then `joint::step` builds its result from `Resolution`. Keep reasons and classes on the caller side.
+   - **State application is a second shared function in the same file,** generic over the state type:
+     ```rust
+     pub(crate) fn apply<S: Clone>(pre: &[S], posts: &[Option<S>], owns: &[bool], resolution: &Resolution) -> Vec<S>
+     ```
+     It returns `pre` unchanged for Reject and Refused. Otherwise it returns, for each component index `i`:
+     - `posts[i]` when `i < committed`, the component owns its state and decided Commit or CommitFailure;
+     - `pre[i]` in every other case (later components, read-only components, skipped components).
+
+     A resolver that returns only a prefix length cannot express "a CommittedFailure commits only its own
+     successor". That defect lives in state application, so `apply` is where it is proved against and mutated.
+   - Then `joint::step` builds its result from `resolve` and `apply`. Keep reasons and classes on the caller side.
    - Use `resolve` in `check_couple` too, if its member loop has the same semantics. If the cut-point
      over-approximation cannot use it directly, keep that loop, explain why in a comment and in the report, and
      prove instead that the abstract `couple` obligation is implied by what `check_couple` checks (item 3).
@@ -102,6 +116,11 @@ function that decides a joint step's outcome and committed prefix, so the runtim
      exactly the prefix the rules in the guide (:32-45) define.
    - Prove termination and the "later components do not run" property: `decide` is never called past the
      terminating index.
+   - Prove that `apply` equals a `spec fn apply_spec`:
+     - every index at or after `committed` keeps its pre-state;
+     - every read-only index keeps its pre-state;
+     - every committed owning index takes its post;
+     - Reject and Refused return the whole pre-state.
 3. **The abstract theorem** (in a new file `verification/verus/composed_domain_theorem.rs`).
    - **The model:** n components and couplings.
      - Each component has a participation predicate, an ownership flag, a domain predicate, `assume_i`, `inv_i`,
@@ -111,20 +130,33 @@ function that decides a joint step's outcome and committed prefix, so the runtim
        earlier provider.
      - All components decide from the same pre-state.
    - **The obligations, as spec predicates:**
-     - **local:** in-domain inputs satisfying `assume_i` and `inv_i` give a Commit or CommitFailure post that
-       satisfies `inv_i` and its domain;
-     - **assume:** every delivered input is in domain and satisfies `assume_i`, given the global invariants;
-     - **couple:** each coupling invariant holds after any committed prefix, including the cut points where an
-       outside component can end the step with a CommittedFailure between members.
+     These must match what the checker actually checks. Its definitions are in `obligations.rs:1-42`; restate them
+     there, not from memory.
+     - **local**, per component:
+       - an owning component's genesis lies in its field domains, is committed by its genesis laws and satisfies
+         `inv_i`;
+       - from every state satisfying `inv_i`, on every input satisfying `assume_i`, every **committing** decision
+         (Commit or CommitFailure) gives a post that satisfies `inv_i` and lies in its domains;
+       - Reject, Refused and Skip are legitimate outcomes, not violations. They commit nothing.
+       - For a read-only component, every committing decision leaves its state unchanged.
+     - **assume**, per component: where it participates, given the invariants of the components its participation
+       and bindings read:
+       - every binding has a value in its field's domain;
+       - the delivered command and context satisfy `assume_i`;
+       - for a read-only component, the delivered state also lies in its domains and **satisfies its invariant**.
+     - **couple**, per coupling over members K: the coupling holds at the members' genesis, and is kept by every
+       joint step simulated over the members in merge order. This includes each cut point where a component
+       outside K with a CommittedFailure case sits between two members and may end the step.
    - **The theorem:** genesis satisfies all invariants. If the obligations hold, every finite history of joint steps
-     keeps every component invariant and every coupling invariant. Every delivered input, including a read-only
-     component's delivered state, is in its domain and satisfies its assumption. The theorem text must match the
-     guide's claim at :239-242. Reuse the `history` / `joint_induction` idiom.
+     keeps every component invariant and every coupling invariant. Every input delivered to a component, with a
+     read-only component's delivered state, is inside its domains and satisfies its assumption **and its
+     invariant**. The theorem must state the guide's claim at :239-242 with nothing dropped. Reuse the
+     `history` / `joint_induction` idiom.
    - **The smallest pilot first:** three components, coupled on members 0 and 2, with a possible committed failure
      outside the coupling at member 1, one read-only guard and one non-participant. Then the general n-component
      theorem. Report both, labelled with their scope.
-   - Connect the abstract step to `resolve_spec`: the abstract joint step must be defined through `resolve_spec`,
-     so that the proved resolver and the theorem share the same outcome rules.
+   - Connect the abstract step to `resolve_spec` and `apply_spec`. The abstract joint step must be defined through
+     them, so that the proved runtime functions and the theorem share the same outcome and state rules.
 4. **The gate.**
    - Add `tools/check_composed_domain.py` and `tools/test_check_composed_domain.py`, following
      `tools/check_checked_assembly.py` and its test.
@@ -136,7 +168,7 @@ function that decides a joint step's outcome and committed prefix, so the runtim
 
    | Bridge | Status |
    |---|---|
-   | Joint-step resolver | Proved, shared source |
+   | Joint-step resolver (`resolve`) and state application (`apply`) | Proved, shared source |
    | Local decision tables (Authority) | Tested premise |
    | Manifest parsing | Tested premise |
    | Formula lowering | Tested premise |
@@ -150,10 +182,16 @@ function that decides a joint step's outcome and committed prefix, so the runtim
 - **A missing outside-failure cut.** In the abstract model, remove the cut-point condition from the couple
   obligation. The theorem proof must fail. Also show a realizable witness from
   `tools/composition_domain_soundness.py`, or from a small new fixture, where the coupling breaks.
-- **A CommittedFailure that commits only its own successor,** in `resolve_spec` or in `resolve`. The resolver proof
-  must fail, and the existing native test (`joint_tests.rs:179`) and the Python reference must disagree with it.
-- **A read-only component written by the step.** The theorem or resolver proof must fail. `joint_tests.rs:210` must
-  catch it natively.
+- **A CommittedFailure that commits only its own successor,** as a mutation of `apply`: for the failing index, take
+  its post, but keep the pre-state for the earlier committed components. The `apply_spec` proof must fail. The
+  existing native test (`joint_tests.rs:179`) and the Python reference's planted control
+  (`tools/composition_domain_soundness.py:23-25`) must disagree with the mutated runtime.
+- **A committed prefix one too short,** as a mutation of `resolve` (`committed = i` instead of `i + 1` at a
+  CommittedFailure). The resolver proof must fail.
+- **A read-only component written by the step,** as a mutation of `apply` that ignores `owns`. The `apply_spec`
+  proof must fail, and `joint_tests.rs:210` must catch it natively.
+- **An `assume` obligation that drops the read-only invariant.** The theorem proof must fail. Show the
+  failing obligation, and a model witness where the read-only guard delivers a state outside its invariant.
 - **A resolver that calls `decide` past a Reject.** The "later components do not run" proof must fail.
 - **A non-participant treated as Commit.** A proof or a native test must fail.
 - **An actual native case that reaches CommittedFailure:** the `documented/lockstep-failure.json` fixture through

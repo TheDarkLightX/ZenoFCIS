@@ -1,5 +1,8 @@
 # Task packet P2: a Lean-kernel-checked inductive claim (restricted linear fragment)
 
+**Revision 2 (2026-10-18).** Corrects acceptance requirements in revision 1 (commit `a38a8ee`). If you started from
+revision 1, apply the changes listed for this packet in [README.md](README.md#revision-2) before continuing.
+
 **Branch:** `agent/2.6-lean-induction` **Size:** large **Evidence level of the result:** kernel checked, for the
 supported fragment only
 
@@ -107,12 +110,24 @@ core tactics (`omega`, `decide`, `simp`, `intro`, `cases`, `induction`).
      `kind = 1 ∨ kind = 2`.
    - `theorem step_preserves : Inv pre → Admitted pre post ... kind → Inv post`, proved by `omega`, after `intro` and
      `cases` on the kind if needed.
-   - `theorem genesis_holds : Inv genesis`, where `genesis` is the project's declared genesis state; proved by
-     `decide` or `omega`.
    - `def Step (s s' : State) : Prop := (∃ cmd ctx kind, Admitted s s' cmd ctx kind) ∨ s' = s`. The `s' = s`
      disjunct covers rejects and technical refusals; this is a stated runtime premise (see below).
-   - `theorem history_holds : ∀ (h : List State), Chain Step genesis h → ∀ s ∈ h, Inv s`, proved by induction on
-     `h` from the two theorems. Define `Chain` in the file; do not depend on library lemmas that may move.
+   - **The base case is conditional.** The project definition (`ProjectSpec`) carries no genesis value. Each
+     application defines its own initial state (for example `genesis_state()` in
+     `crates/zeno-fcis-cli/templates/durable-counter/src/lib.rs:53`), and the library checks it at genesis. So the
+     required theorem takes the base case as a hypothesis:
+     `theorem history_holds (g : State) (hg : Inv g) : ∀ (h : List State), Chain Step g h → ∀ s ∈ h, Inv s`.
+     Prove it by induction on `h` from `step_preserves`. Define `Chain` in the file; do not depend on library
+     lemmas that may move.
+   - **Optional, only if you also bind the value: a concrete genesis.** The exporter may accept an explicit genesis
+     state supplied by the caller, for example the template's reviewed initial state passed as canonical values. It
+     then also emits `theorem genesis_holds : Inv genesis` (by `decide` or `omega`) and a corollary
+     `history_from_genesis`. The genesis value's canonical bytes and their SHA-256 go in the file header and the run
+     record. Without that binding, never emit a concrete genesis theorem.
+   - **The claim this evidence supports.** With the conditional form: "if the initial state satisfies the invariant,
+     every finite history of admitted steps keeps it". The base case is discharged by the application's existing
+     genesis check, for example `the_invariant_holds_on_the_exact_genesis_state` in the template tests
+     (docs/INDUCTIVE_CLAIMS.md:284). Name that test as a premise.
    - `#print axioms history_holds` as the only axioms line.
 5. **CLI.** The minimal change in `main.rs:1339-1345` and :1371: an `Inductive` claim with the Lean backend calls
    `export_inductive_lean`. A claim outside the fragment still exits 2 with a clear refusal. The temporal shallow
@@ -131,22 +146,25 @@ core tactics (`omega`, `decide`, `simp`, `intro`, `cases`, `induction`).
 - **Positive:** durable-counter claim 600 and account-lockout claim 600. Both must give `KernelChecked` (exit 0)
   through `zeno-fcis prove --backend lean` in an ignored test that uses the pinned Lean, and through a direct
   `execute_tool` test.
-- **Negative fixtures** go in `crates/zeno-fcis-formal-tools/tests/fixtures/lean-inductive/`. Each one is a
-  minimal project that must **not** be kernel checked:
-  1. A non-inductive invariant (law 501 decrements). This catches an exporter that assumes the invariant on the
-     post-state, the pre-to-post substitution.
-  2. A failure-kind law that breaks the invariant. With the kind split removed, the contradictory accept and
-     failure hypotheses would prove anything. This catches a dropped split.
-  3. An invariant that holds only inside a declared domain. With the domain dropped, it must fail. Also include a
-     fixture that would wrongly pass if a domain were attached to the wrong path.
-  4. A law whose arithmetic overflows at the i128 boundary. It is caught if definedness is dropped.
-  5. A claim that holds only if an out-of-group law (for example the reject law) were assumed. It is caught by a
-     wrong law scope.
-  6. A genesis that violates the invariant.
-  7. A claim whose observation path is mapped to the wrong field.
+- **Control fixtures** go in `crates/zeno-fcis-formal-tools/tests/fixtures/lean-inductive/`. Each is a minimal
+  project with a stated **normal result** on the correct exporter, plus one exporter mutation that must **flip**
+  that result. A control is valid only if the normal result holds on the unmutated exporter and the mutated
+  exporter changes it.
+
+  | # | Fixture | Normal result | Exporter mutation | Result under the mutation |
+  |---|---|---|---|---|
+  | 1 | A non-inductive invariant: the accept law decrements the counter | Not checked | Assume the invariant on the post-state (pre-to-post substitution) | Wrongly checked |
+  | 2 | A failure-kind law that breaks the invariant, with accept and failure laws on different command values | Not checked | Drop the decision-kind split, so all laws are assumed at once and contradict each other | Wrongly checked |
+  | 3a | An invariant that holds only because the runtime refuses a post-state outside a declared range (for example `x in 0..=3`, accept `post.x == pre.x + 1`, claim `pre.x <= 3`) | **Checked** | Drop the declared-domain hypotheses | Not checked |
+  | 3b | The same law, with the range declared on a different field than the claim reads | Not checked | Attach the domain to the wrong path | Wrongly checked |
+  | 4 | A claim whose **own** arithmetic can overflow at a reachable state (for example claim `pre.x * 2 >= 0`, accept `post.x == pre.x + 1`) | Not checked: strict definedness makes the post-state goal undefined near the i128 bound | Drop the definedness conjuncts | Wrongly checked |
+  | 5 | A claim that holds only if an out-of-group law (for example the reject law) were assumed | Not checked | Assume every declared law regardless of group | Wrongly checked |
+  | 6 | Only if the optional concrete genesis is built: a supplied genesis that violates the invariant | `genesis_holds` fails | Substitute a different genesis value | Wrongly checked |
+  | 7 | A claim that reads field 110, where only field 111 is constrained | Not checked | Map path 110 to field 111 in the projection | Wrongly checked |
+
 - **Exporter mutations:** `tools/check_lean_inductive_mutations.py`, following `tools/check_bounded_mutations.py`.
-  Apply one textual mutation to `lean_inductive.rs` for each of the seven items above, and show that the matching
-  fixture test fails. This needs the pinned Lean; mark it as the ignored lane and run it in your container.
+  Apply each mutation in the table to `lean_inductive.rs`, and show that the fixture's result flips. Also show the
+  unmutated result first. This needs the pinned Lean; mark it as the ignored lane and run it in your container.
 - **Evidence tampering** must give no `KernelChecked`:
   - a changed theorem name;
   - a changed source byte after export;
@@ -164,8 +182,8 @@ core tactics (`omega`, `decide`, `simp`, `intro`, `cases`, `induction`).
   - the ignored Lean lane, with the pinned runtime
 
   Copy the exact commands and outputs into the PR.
-- Both positive claims are `KernelChecked`. All seven negative fixtures and all tampering cases are refused, and
-  each exporter mutation is killed.
+- Both positive claims, and control 3a, are `KernelChecked`. Every other control fixture and every tampering case
+  is refused, and each exporter mutation flips its fixture's result.
 - `docs/INDUCTIVE_CLAIMS.md` gets a short new section (at most 60 lines). It covers:
   - the fragment;
   - the theorem chain;
