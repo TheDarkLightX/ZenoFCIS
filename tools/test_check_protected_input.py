@@ -16,8 +16,8 @@ class ProtectedInputCoverage(unittest.TestCase):
     def test_complete_shared_closure_and_real_mutation_anchors(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile['functions'].items() if record['mode'] == 'Exec'}
-        self.assertEqual(len(profile['functions']), 1586)
-        self.assertEqual(len(runtime), 641)
+        self.assertEqual(len(profile['functions']), 1599)
+        self.assertEqual(len(runtime), 647)
         self.assertEqual(set(profile['body_covered_functions']), runtime)
         self.assertTrue(all(record['requires'] == 0 and record['ensures'] > 0
                             for record in profile['functions'].values() if record['mode'] == 'Exec'))

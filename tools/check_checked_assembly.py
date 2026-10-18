@@ -227,8 +227,10 @@ def candidate_profile(process, report, pin, profile, functions):
         raise ValueError('cannot inventory a failed or differently pinned whole proof')
     return {**profile, 'reviewed': False,
         'expected_verified': report['verification-results']['verified'],
+        # Report-only enum getter aliases have different VIR function names.
+        # Pin their complete records in functions; target actual report names.
         'target_functions': sorted(name for name in report['func-details']
-            if name.startswith(NAMESPACES)),
+            if name in functions),
         'functions': functions, 'inventory': counts(functions)}
 
 

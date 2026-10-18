@@ -13,8 +13,8 @@ class LawCoverage(unittest.TestCase):
     def test_every_runtime_body_and_total_contract_is_covered(self):
         profile=json.loads((gate.ROOT/gate.PROFILE).read_text())
         runtime={name for name,data in profile['functions'].items() if data['mode']=='Exec'}
-        self.assertEqual(len(profile['functions']),1586)
-        self.assertEqual(len(runtime),641)
+        self.assertEqual(len(profile['functions']),1599)
+        self.assertEqual(len(runtime),647)
         self.assertEqual(set(profile['body_covered_functions']),runtime)
         self.assertTrue(all(v['requires']==0 and v['ensures']>0 for v in profile['functions'].values() if v['mode']=='Exec'))
         for suffix in ('laws::evaluate','laws::evaluate_into','laws::frame::observe','laws::predicate::node','laws::atoms::divide'):
