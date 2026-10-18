@@ -1,8 +1,6 @@
-# ZenoFCIS 2.5.0 — draft release notes
+# ZenoFCIS 2.5.0 release notes
 
-2.5.0 is the integration source for the next release. These notes are a draft
-for review. Final source qualification, hosted platform checks, packaging,
-signing and publication remain pending. Code is LLM-generated or synthesized;
+Code is LLM-generated or synthesized;
 acceptance depends on the stated check, domain and assumptions. The
 [installation guide](INSTALLATION.md) describes how to verify published assets
 once they are available.
@@ -52,8 +50,8 @@ signed-floor quotient/remainder argument and division projection, extends the
 assembly term proof with the signed-floor operation, and brings the retained
 verification workspace into line with 128-bit scalars. These are Verus proofs
 under their reviewed specifications, pinned verifier, solver, translation and
-erasure assumptions. Supplied proof results describe those source-bound
-profiles; a fresh proof run on the frozen release source remains required.
+erasure assumptions. The pinned Verus profiles are run on the release source
+as part of release qualification.
 They are distinct from Lean kernel-checked results and from solver-attested
 queries, and do not prove the whole compiler, runtime or application shell.
 
@@ -72,7 +70,7 @@ establish owner intent or authorize a decision.
 
 ## Qualification tools
 
-**Tested tooling; release qualification pending.** Qualification tools add
+**Tested tooling.** Qualification tools add
 bounded worker scheduling, deterministic source identities and separate
 source policies for approved test-only changes. Offline replay and planted
 controls check those tools within their stated scope. These changes are
