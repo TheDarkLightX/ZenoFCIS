@@ -1,6 +1,95 @@
-# ZenoFCIS 2.4.0
+# ZenoFCIS 2.5.0 — draft release notes
 
-2.4.0 is the current release source. These notes describe the changes recorded
+2.5.0 is the integration source for the next release. These notes are a draft
+for review. Final source qualification, hosted platform checks, packaging,
+signing and publication remain pending. Code is LLM-generated or synthesized;
+acceptance depends on the stated check, domain and assumptions. The
+[installation guide](INSTALLATION.md) describes how to verify published assets
+once they are available.
+
+## Arithmetic loops
+
+**Tested and finite checked.** Arithmetic expressions now reach the normal
+loop doors, exact full-domain transform checks, receipt replay and point
+evaluation through the signed 128-bit route. Proposers still supply no
+acceptance or publication authority. A finite check establishes agreement
+only over its complete declared domain; a stopped check is inconclusive.
+
+## Containment and CPU budgets
+
+**Tested.** The portable POSIX containment route has explicit backend
+selection alongside the systemd route. Supported profiles and prerequisites
+are described in the [CLI reference](CLI_REFERENCE.md). Backend selection does
+not silently substitute a weaker backend when the selected one is unavailable.
+Linux runtime checks establish the observed containment behavior; the backend
+name alone does not qualify another operating system or arbitrary executable.
+
+Stage limits measure CPU time, with conservative FINISH uncertainty and a
+separate wall backstop. POSIX requests below the counter's FINISH uncertainty
+are refused before START: at HZ=100, 18 and 19 ms refuse, while 20 ms is
+admissible subject to the unchanged FINISH checks. An unreplayed session has
+no trusted incumbent; its inconclusive report preserves durable charges and
+has an empty current-invocation attempts list. Systemd's counter policy and
+hard resource caps are unchanged.
+
+**Known limits.** Under extreme concurrent filesystem I/O a contained capture
+may stop inconclusive; it fails closed. Host-dependent systemd paths need a
+host with a user manager. A refusal is no verdict and grants no authority.
+
+## Arithmetic and specifications
+
+**Tested and finite checked.** The main scalar route uses checked signed
+128-bit arithmetic, including the signed minimum. Explicit signed fused floor
+division preserves the exact product until the final fit check. Units and
+scales are checked before erasure; explicit target scales and bounded rounded
+chains retain prefix rounding and refusal semantics. The quantity-enabled
+route caps dependent chains at 16 steps; historical policy/2 compatibility
+remains separately checked. Native regression, independent arithmetic and
+semantic mutation controls cover their declared cases, not every program.
+
+**Proved in the reviewed proof profiles.** The arithmetic repair restores the
+signed-floor quotient/remainder argument and division projection, extends the
+assembly term proof with the signed-floor operation, and brings the retained
+verification workspace into line with 128-bit scalars. These are Verus proofs
+under their reviewed specifications, pinned verifier, solver, translation and
+erasure assumptions. Supplied proof results describe those source-bound
+profiles; a fresh proof run on the frozen release source remains required.
+They are distinct from Lean kernel-checked results and from solver-attested
+queries, and do not prove the whole compiler, runtime or application shell.
+
+## Spot pool
+
+ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, are planned for 2.5.1.
+
+## Knowledge snapshots
+
+**Tested.** A knowledge invocation freezes the selected external files into a
+bounded snapshot, binds their bytes to its identity and refuses inconsistent
+or incomplete acquisition. Configuration precedence remains explicit, and
+retries cannot silently change the invocation's knowledge. Retrieved facts
+and proposed plans remain advisory; a snapshot does not authenticate facts,
+establish owner intent or authorize a decision.
+
+## Qualification tools
+
+**Tested tooling; release qualification pending.** Qualification tools add
+bounded worker scheduling, deterministic source identities and separate
+source policies for approved test-only changes. Offline replay and planted
+controls check those tools within their stated scope. These changes are
+intended to shorten qualification; no end-to-end speedup has been measured
+for this release. A missing, timed-out or stale check never counts as a pass.
+
+The checked program API and private publication boundary remain in force.
+Canonical formats keep their own versioned identifiers. Tests, finite checks,
+solver-attested results, kernel-checked theorems and proofs under a tool's
+trusted base describe different evidence; none alone establishes release,
+deployment or external-effect authority.
+
+---
+
+## Historical 2.4.0 source and qualification
+
+The 2.4.0 notes below describe the changes recorded
 in the [changelog](../CHANGELOG.md#240---2026-10-15). Final source qualification,
 hosted checks, packaging, signing and publication remain separate gates; these
 notes do not claim those gates have passed. Published downloads must be checked

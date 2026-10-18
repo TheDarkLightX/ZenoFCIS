@@ -1,6 +1,6 @@
 # Release packaging
 
-This document describes the release packaging tooling and the `2.4.0`
+This document describes the release packaging tooling and the `2.5.0`
 artifact set it prepares. Final release qualification and publication remain
 pending.
 

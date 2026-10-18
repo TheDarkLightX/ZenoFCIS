@@ -1,6 +1,6 @@
 # `zeno-fcis` CLI reference
 
-This guide documents the `2.4.0` source. Its retained V1
+This guide documents the `2.5.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
@@ -149,8 +149,8 @@ release binary, extract the release's `source/zeno-fcis-<version>-source.tar.gz`
 and pass `--source <extracted source tree>`:
 
 ```sh
-tar -xzf zeno-fcis-2.4.0-source.tar.gz
-zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.4.0
+tar -xzf zeno-fcis-2.5.0-source.tar.gz
+zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.5.0
 ```
  The generated README lists the build commands, which
 `tools/check_app_journey.py` runs exactly as written, in a new directory, on
@@ -1141,7 +1141,7 @@ any candidate, and only the loop's check can replace the incumbent. The MCP tool
 runs the local and fake arms of the preregistered protocol over a cases file
 and reports every result, including failures.
 
-### Loop doors (2.4.0)
+### Loop doors (2.5.0)
 
 The doors let a proposer submit expressions, sketches with holes and family
 programs instead of whole canonical programs. They are untrusted proposers
@@ -2383,7 +2383,7 @@ proposal. Fixture replay and generated-app tests do not establish a live owner
 interaction or correct automatic translation of prose.
 
 
-### Requirements-only version-space questions (2.4.0)
+### Requirements-only version-space questions (2.5.0)
 
 ```sh
 zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
@@ -2433,7 +2433,7 @@ budgets, both surfaces and explicit nonclaims.
 
 <!-- BEGIN black-box capture reference: additive block -->
 
-### Black-box capture (2.4.0)
+### Black-box capture (2.5.0)
 
 ```text
 zeno-fcis loop capture open --spec FILE --reference FILE --session NEW_DIR

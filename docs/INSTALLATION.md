@@ -1,13 +1,13 @@
 # Installation
 
-ZenoFCIS `2.4.0` is the current release source. Final qualification and
+ZenoFCIS `2.5.0` is the current release source. Final qualification and
 publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
-The intended 2.4.0 release set includes CLI archives for **Linux x86_64 GNU**
+The intended 2.5.0 release set includes CLI archives for **Linux x86_64 GNU**
 and **macOS on Apple silicon**, with offline Rustdoc. After qualification and
 publication, the signed `DOWNLOADS.sha256` on the release page will list the
 assets available to install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
-qualification boundary. The [2.4.0 release notes](RELEASE_NOTES.md) describe
+qualification boundary. The [2.5.0 release notes](RELEASE_NOTES.md) describe
 the release's scope.
 
 Applications use the V2 API from the matching source tag, as
@@ -27,7 +27,7 @@ exact source pins, signed checksum assets and qualification limits.
   need). Ubuntu 24.04, where they were built, ships glibc 2.39. On an older
   glibc, such as Ubuntu 22.04's 2.35, the dynamic loader refuses to start the
   executable and names the missing `GLIBC_2.39` version.
-- **macOS on Apple silicon** (`aarch64-apple-darwin`): the 2.4.0 release
+- **macOS on Apple silicon** (`aarch64-apple-darwin`): the 2.5.0 release
   workflow builds this required archive on GitHub's macOS 15 arm64 image
   (`macos-15`), with a minimum-version field of macOS 11.0. The archive joins
   the release set only if an installed-binary journey passes on that image.
@@ -37,11 +37,11 @@ exact source pins, signed checksum assets and qualification limits.
   Building from the matching source tag on those hosts may work, but it is not
   qualified.
 
-## Install the 2.4.0 CLI
+## Install the 2.5.0 CLI
 
-Once the qualified 2.4.0 release is published and its signed `DOWNLOADS.sha256`
+Once the qualified 2.5.0 release is published and its signed `DOWNLOADS.sha256`
 lists the Linux archive, use the commands below. In the directory where you
-want to keep the archive and the executable, set `export VERSION=2.4.0`, then
+want to keep the archive and the executable, set `export VERSION=2.5.0`, then
 run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
@@ -64,9 +64,9 @@ CLI in later sessions.
 
 `--ignore-missing` checks the downloaded assets listed in the flat
 `DOWNLOADS.sha256`; it does not check assets you have not downloaded. Verify
-the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.4.0/DOWNLOADS.sha256.sig)
+the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/DOWNLOADS.sha256.sig)
 separately, under your trusted signing-key policy. That published release must
-also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.4.0/RELEASE-SIGNING-KEY.pub).
+also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/RELEASE-SIGNING-KEY.pub).
 Downloading it beside the artifacts does not independently establish trust, so
 confirm its fingerprint through a trusted channel. See
 [Verify downloads](#verify-downloads).
@@ -76,9 +76,9 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-After the qualified 2.4.0 release is published, check that its signed
-`DOWNLOADS.sha256` lists `zeno-fcis-2.4.0-aarch64-apple-darwin.tar.gz`. Then set
-`export VERSION=2.4.0` in your shell and run:
+After the qualified 2.5.0 release is published, check that its signed
+`DOWNLOADS.sha256` lists `zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz`. Then set
+`export VERSION=2.5.0` in your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash
@@ -172,13 +172,13 @@ matches your CLI. The historical `1.1.0` package keeps its own V1 API. Follow
 the release's source pin when you build generated applications.
 
 Before publication, use an explicitly pinned, reviewed source checkout. Once
-the matching 2.4.0 release and its source tag are published, clone into a fresh
+the matching 2.5.0 release and its source tag are published, clone into a fresh
 directory:
 
 ```bash
-git clone --branch v2.4.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
+git clone --branch v2.5.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
 git -C ZenoFCIS rev-parse HEAD
-# Expected: the source commit named on the v2.4.0 release page
+# Expected: the source commit named on the v2.5.0 release page
 zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
 ```
 
@@ -188,7 +188,7 @@ lockfile to that tree; keep the source and follow the generated README. The
 historical prerelease source and binary-build revisions stay in the
 [release-candidate record](RELEASE_CANDIDATES.md).
 
-An application beside that 2.4.0 source checkout can use:
+An application beside that 2.5.0 source checkout can use:
 
 ```toml
 [dependencies]
@@ -256,9 +256,9 @@ ceiling, and enclosing I/O limits are not inherited. The result records these
 residuals. These integration-source rules establish no release qualification
 or general preservation of the caller's security context.
 
-### Released-source requirements
+### Historical 2.4.0 containment requirements
 
-In the 2.4.0 source, `loop` commands and `transform check --offline-parallel`
+In the historical 2.4.0 source, `loop` commands and `transform check --offline-parallel`
 require Linux, cgroup v2 with the memory and pids controllers, and a running
 systemd user manager. `systemd-run --user` and `systemctl --user` must work
 for the invoking user. On a headless host, `sudo loginctl enable-linger

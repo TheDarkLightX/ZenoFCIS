@@ -1,7 +1,7 @@
 # V2 normal program API migration
 
 This guide describes the V2 API cutover introduced in 2.3.0 and retained in
-the current 2.4.0 release source. The historical
+the current 2.5.0 release source. The historical
 [2.3.0 release notes](RELEASE_NOTES.md#historical-230-source-and-qualification)
 define that source line's supported scope and limits.
 

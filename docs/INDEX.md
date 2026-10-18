@@ -7,7 +7,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [Installation](INSTALLATION.md)
 - [Quickstart](QUICKSTART.md)
-- [ZenoFCIS 2.4.0 release notes](RELEASE_NOTES.md)
+- [ZenoFCIS 2.5.0 release notes](RELEASE_NOTES.md)
 - [Earlier public release candidates](RELEASE_CANDIDATES.md)
 - [V2 normal program API migration](V2_PROGRAM_API_MIGRATION.md)
 
@@ -203,11 +203,11 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.4.0`, the current release source, following the
+The workspace is version `2.5.0`, the current release source, following the
 first stable V2 line, 2.3.0. Final qualification and publication remain pending.
-Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.4.0` source tag; see
+Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.5.0` source tag; see
 [installation](INSTALLATION.md) and the
-[2.4.0 release notes](RELEASE_NOTES.md). The earlier public candidates
+[2.5.0 release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
 [candidate record](RELEASE_CANDIDATES.md) keeps their sources and limits.
 
