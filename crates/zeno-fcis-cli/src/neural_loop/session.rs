@@ -1216,6 +1216,25 @@ pub(crate) struct ReservedReplay {
 }
 
 impl ReservedReplay {
+    /// Consumes an unused durable replay reservation without trusting the
+    /// retained incumbent or witnesses. No new attempt ran. Historical spend
+    /// stays in the ledger totals; no replay charge is refunded. This owned
+    /// report cannot resume the session or supply a checker result.
+    pub(crate) fn into_unreplayed_report(self) -> Value {
+        let plan = self.plan;
+        json!({
+            "schema": REPORT_SCHEMA, "authority": "none",
+            "request_id": plan.request.id(), "profile": plan.request.profile().name(),
+            "status": "no-checked-improvement", "resume": "not-replayed",
+            "incumbent": Value::Null, "trusted_incumbent": Value::Null,
+            "session": match &plan.closed {
+                Some(reason) => json!({"state":"closed", "stop_reason":StopReason::parse(reason).name()}),
+                None => json!({"state":"open"}),
+            },
+            "attempts": [], "accounting": plan.ledger.accounting().json(),
+            "ledger_head": plan.ledger.head().json(),
+        })
+    }
     pub(crate) fn remaining_ms(&self, elapsed_ms: u64) -> u64 {
         self.plan
             .request

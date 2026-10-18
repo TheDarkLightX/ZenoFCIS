@@ -2182,6 +2182,67 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
 }
 
 #[test]
+fn an_unreplayed_report_preserves_spend_and_never_trusts_the_retained_incumbent() {
+    for retained in [false, true] {
+        let original = artifact("boolean-kernel-original");
+        let candidate = artifact("boolean-kernel-candidate");
+        let mut session = Session::open(request(original, Profile::FunctionalBoolV1));
+        if retained {
+            attempt(&mut session, Proposal::Candidate(candidate.to_vec()));
+            assert!(session.incumbent().replacement().is_some());
+        }
+        let persisted = Persisted::of(&session);
+        let before = session.ledger().accounting();
+        let replayed = std::rc::Rc::new(std::cell::Cell::new(false));
+        let probe = std::rc::Rc::clone(&replayed);
+        replay_probe::arm(move || probe.set(true));
+        let ResumePlan::Replay(pending) = prepare_resume(persisted.stored(), 0) else {
+            panic!("expected replay plan");
+        };
+        let mut written = None;
+        let reserved = pending
+            .reserve(|ledger| {
+                written = Some(ledger.clone());
+                Ok::<(), Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {});
+        let report = reserved.into_unreplayed_report();
+        let written = written.unwrap();
+        assert!(!replayed.get(), "the refusal must not run replay work");
+        assert_eq!(report["authority"], "none");
+        assert_eq!(report["status"], "no-checked-improvement");
+        assert_eq!(report["resume"], "not-replayed");
+        assert_eq!(report["incumbent"], Value::Null);
+        assert_eq!(report["trusted_incumbent"], Value::Null);
+        assert_eq!(report["attempts"], json!([]));
+        assert_eq!(report["session"]["state"], "open");
+        assert_eq!(report["accounting"], written.accounting().json());
+        assert_eq!(report["ledger_head"], written.head().json());
+        assert_eq!(report["accounting"]["complete"], true);
+        assert_eq!(written.accounting().attempts, before.attempts);
+        assert_eq!(written.accounting().checks, before.checks);
+        assert_eq!(
+            written.accounting().replays,
+            before.replays + u8::from(retained)
+        );
+        if retained {
+            assert!(written.accounting().work_reserved > before.work_reserved);
+            // A later resume still has to pay and replay; no trust or refund
+            // can be obtained by serializing the refused reservation.
+            let mut interrupted = Persisted::of(&session);
+            interrupted.ledger = written.entries().iter().flat_map(Entry::line).collect();
+            interrupted.head = Some(written.head());
+            let resumed = resumed_session(&interrupted);
+            assert!(replayed.get());
+            assert!(
+                resumed.ledger().accounting().work_reserved > written.accounting().work_reserved
+            );
+            assert_eq!(resumed.incumbent(), session.incumbent());
+        }
+    }
+}
+
+#[test]
 fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() {
     let original = artifact("boolean-kernel-original");
     let candidate = artifact("boolean-kernel-candidate");

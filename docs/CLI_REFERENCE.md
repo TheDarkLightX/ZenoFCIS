@@ -1022,7 +1022,17 @@ waited-child CPU; interpreter and native profiles still require systemd.
 Missing, malformed or regressed counters refuse. FINISH independently resamples
 and charges the counter's rounding uncertainty before permitting a result.
 CPU use at or above the requested budget refuses; a conservative strict upper
-bound above that budget also refuses at FINISH.
+bound above that budget also refuses at FINISH. POSIX rejects a stage before
+starting it with `stage-cpu-resolution` when the requested CPU milliseconds
+cannot cover FINISH uncertainty (20 ms for two counters at HZ=100). A 20 ms
+request is admissible there, but still needs a bounded FINISH; no extra tick is
+added to the minimum because the strict upper bound may equal the budget.
+Systemd's one-microsecond counter policy is unchanged. A replay refused for
+this reason returns `inconclusive`, an empty current-invocation `attempts`
+list and the persisted accounting, including any replay reservation already
+charged. Intake observations remain complete. Its report marks
+`resume: "not-replayed"` and leaves `incumbent` and `trusted_incumbent` null:
+no retained result is trusted without replay, and no attempt is spent.
 
 Each loop stage also has a wall backstop of nine times its requested CPU
 milliseconds plus two seconds, clipped to the whole worker's remaining time.

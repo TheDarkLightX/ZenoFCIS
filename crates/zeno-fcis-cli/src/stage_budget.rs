@@ -92,6 +92,24 @@ fn cgroup_usage(text: &str) -> Result<u64, String> {
     Ok(value)
 }
 
+fn process_finish_uncertainty_us(hz: u64) -> u64 {
+    2 * 1_000_000u64.div_ceil(hz) + u64::from(1_000_000 % hz != 0)
+}
+
+fn check_resolution(requested_ms: u64, uncertainty_us: u64) -> Result<(), String> {
+    if u128::from(requested_ms) * 1000 < u128::from(uncertainty_us) {
+        Err(super::STAGE_CPU_RESOLUTION.into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Worker-side refusal only; the supervisor repeats this from its own counter.
+pub(super) fn check_posix_resolution(requested_ms: u64) -> Result<(), String> {
+    let hz = clock_ticks(&fs::read("/proc/self/auxv").map_err(|_| "stage-cpu-auxv")?)?;
+    check_resolution(requested_ms, process_finish_uncertainty_us(hz))
+}
+
 impl CpuCounter {
     fn new(pid: Option<u32>, group: Option<&Path>) -> Result<Self, String> {
         if let Some(pid) = pid {
@@ -112,9 +130,7 @@ impl CpuCounter {
     // cpu.stat usage_usec is one counter rounded to microseconds.
     fn finish_uncertainty_us(&self) -> u64 {
         match self {
-            Self::Process { hz, .. } => {
-                2 * 1_000_000u64.div_ceil(*hz) + u64::from(1_000_000 % hz != 0)
-            }
+            Self::Process { hz, .. } => process_finish_uncertainty_us(*hz),
             Self::Cgroup(_) => 1,
         }
     }
@@ -169,6 +185,9 @@ impl StageBudget {
         } else {
             Some(CpuCounter::new(pid, group)?)
         };
+        if let Some(counter @ CpuCounter::Process { .. }) = &counter {
+            check_resolution(requested, counter.finish_uncertainty_us())?;
+        }
         let baseline = counter.as_ref().map_or(Ok(0), CpuCounter::sample)?;
         let active = Instant::now();
         let span = if offline {
@@ -280,6 +299,61 @@ impl StageBudget {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn posix_small_cpu_requests_refuse_below_the_exact_finish_boundary() {
+        let uncertainty = process_finish_uncertainty_us(100);
+        assert_eq!(uncertainty, 20_000);
+        for requested in [18, 19] {
+            assert_eq!(
+                check_resolution(requested, uncertainty),
+                Err(super::super::STAGE_CPU_RESOLUTION.into())
+            );
+        }
+        // The strict upper bound may equal the budget. Admission is not a
+        // FINISH permit: any observed tick still makes this request refuse.
+        assert_eq!(check_resolution(20, uncertainty), Ok(()));
+        assert_eq!(check_resolution(21, uncertainty), Ok(()));
+        assert_eq!(check_resolution(u64::MAX, uncertainty), Ok(()));
+        assert!(10_000 + uncertainty > 20_000);
+        assert_eq!(process_finish_uncertainty_us(1000), 2000);
+        assert_eq!(check_resolution(2, 2000), Ok(()));
+    }
+    #[test]
+    fn supervisor_independently_refuses_small_posix_stages_at_admission() {
+        use std::os::unix::process::CommandExt;
+        let mut child = std::process::Command::new("sleep")
+            .arg("10")
+            .process_group(0)
+            .spawn()
+            .unwrap();
+        let now = Instant::now();
+        let results: Vec<_> = [18, 19, 20]
+            .into_iter()
+            .map(|requested| {
+                StageBudget::new(
+                    "check",
+                    requested,
+                    now,
+                    now + Duration::from_secs(25),
+                    false,
+                    Some(child.id()),
+                    None,
+                )
+                .map(|s| s.observation(false))
+            })
+            .collect();
+        child.kill().unwrap();
+        child.wait().unwrap();
+        assert_eq!(results[0], Err(super::super::STAGE_CPU_RESOLUTION.into()));
+        assert_eq!(results[1], Err(super::super::STAGE_CPU_RESOLUTION.into()));
+        let boundary = results[2].as_ref().unwrap();
+        assert_eq!(boundary["cpu_finish_uncertainty_us"], 20_000);
+        assert_eq!(boundary["cpu_budget_us"], 20_000);
+        assert_eq!(
+            boundary["finished"], false,
+            "admission cannot credit a verdict"
+        );
+    }
     #[test]
     fn cpu_stat_is_exact_and_missing_duplicate_or_overflowed_usage_refuses() {
         assert_eq!(

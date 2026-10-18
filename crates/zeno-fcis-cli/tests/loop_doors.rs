@@ -839,6 +839,12 @@ fn a_door_that_cannot_confirm_in_time_is_inconclusive_and_spends_nothing() {
         let detail = &report["detail"];
         assert_ne!(detail["door"]["check"]["verdict"], "equivalent", "{report}");
         // no attempt spent, the incumbent unchanged and the session still open
+        assert_ne!(report["accounting_complete"], false, "{report}");
+        assert!(
+            report["acquisition"]["observed_intake"].is_object(),
+            "{report}"
+        );
+        assert_eq!(detail["report"]["accounting"]["complete"], true, "{report}");
         assert_eq!(detail["report"]["attempts"], json!([]), "{report}");
         assert_eq!(
             detail["report"]["status"], "no-checked-improvement",

@@ -1546,6 +1546,33 @@ mod runtime {
             std::process::exit(crate::BLOCKED.into());
         }
         #[test]
+        fn probe_small_stage_admission() {
+            if !is_worker() {
+                return;
+            }
+            close_inherited_descriptors().unwrap();
+            install_limits().unwrap();
+            assert_eq!(linux::child(), Ok(true));
+            for requested in [18, 19] {
+                assert_eq!(
+                    super::super::super::start(Duration::from_millis(requested), false),
+                    Err(super::super::super::STAGE_CPU_RESOLUTION.into())
+                );
+            }
+            // Both denials occurred before START; a subsequent ordinary
+            // stage must still work, rather than inheriting an active stage.
+            super::super::super::start(Duration::from_millis(100), false).unwrap();
+            assert_eq!(
+                super::super::super::start(Duration::from_millis(18), false),
+                Err("control-stage-order".into()),
+                "protocol order must precede the small-budget prescreen"
+            );
+            super::super::super::finish().unwrap();
+            println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
+            super::super::super::shutdown(crate::BLOCKED);
+            std::process::exit(crate::BLOCKED.into());
+        }
+        #[test]
         fn probe_stage_spin() {
             worker(true);
         }
@@ -1562,7 +1589,11 @@ mod runtime {
                 .mode(0o700)
                 .create(&root)
                 .unwrap();
-            for name in ["probe_stage_wait", "probe_stage_spin"] {
+            for name in [
+                "probe_stage_wait",
+                "probe_stage_spin",
+                "probe_small_stage_admission",
+            ] {
                 let invocation = crate::transform::sha256_hex(
                     format!(
                         "stage-cpu-{}-{}",
@@ -1634,6 +1665,11 @@ mod runtime {
                             .unwrap()
                             >= 1_000_000
                     );
+                } else if name == "probe_small_stage_admission" {
+                    assert_eq!(result, Ok(crate::BLOCKED));
+                    assert_eq!(observation["stages"].as_array().unwrap().len(), 1);
+                    assert_eq!(observation["stages"][0]["requested_ms"], 100);
+                    assert_eq!(observation["stages"][0]["finished"], true);
                 } else {
                     assert_eq!(result, Ok(crate::BLOCKED));
                     assert_eq!(observation["stages"][0]["finished"], true);

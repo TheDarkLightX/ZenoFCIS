@@ -197,6 +197,7 @@ fn label_systemd_output(
     Ok(bytes)
 }
 
+pub(crate) const STAGE_CPU_RESOLUTION: &str = "stage-cpu-resolution";
 const STAGING: &str = "ZENO_FCIS_CHECKER_STAGING";
 #[cfg(target_os = "linux")]
 const MAX_STAGED_RECEIPTS: usize = 16;
@@ -718,6 +719,12 @@ mod linux {
             .map_err(|_| "control-poisoned")?;
         if (kind == FINISH_STAGE) != client.active {
             return Err("control-stage-order".into());
+        }
+        if matches!(kind, CHECK_STAGE | SEARCH_STAGE) && value != 0 && super::posix::is_worker() {
+            // Refusal only, after protocol-order validation and before any
+            // START frame or client-state change. The supervisor checks
+            // admission independently. Zero keeps its stage-limit refusal.
+            super::stage_budget::check_posix_resolution(value)?;
         }
         let mut frame = [0; 9];
         frame[0] = kind;

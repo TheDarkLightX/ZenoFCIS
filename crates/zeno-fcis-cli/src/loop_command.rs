@@ -649,6 +649,17 @@ fn load_session(
     }
     let replay_started = Instant::now();
     if let Err(reason) = crate::checker_process::start(duration, false) {
+        if reason == crate::checker_process::STAGE_CPU_RESOLUTION {
+            let report = reserved.into_unreplayed_report();
+            let complete = report["accounting"]["complete"].clone();
+            let mut outcome = result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({"reason":reason,"trusted_incumbent":Value::Null,"report":report}),
+            );
+            outcome.1["accounting_complete"] = complete;
+            return Err(outcome);
+        }
         return Err(result(
             crate::BLOCKED,
             "resume-inconclusive",
