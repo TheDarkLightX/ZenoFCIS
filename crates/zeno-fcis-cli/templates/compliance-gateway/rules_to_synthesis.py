@@ -24,8 +24,9 @@ that matter run afterwards. `tests/rule_base.rs` compares the selected program
 with a separate evaluation of rules.txt on every input, and the library's
 `tools/check_synthesis.py` does so again in Python.
 """
+import argparse
 import json
-import sys
+from pathlib import Path
 
 VERDICT = {"allow": 0, "hold": 1, "block": 2}
 
@@ -195,11 +196,16 @@ def integer(low, high):
     return {"kind": "int", "min": low, "max": high}
 
 
-features, rules = parse(open(sys.argv[1]).read())
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("rules", type=Path)
+parser.add_argument("output", type=Path)
+parser.add_argument("--check", action="store_true")
+args = parser.parse_args()
+features, rules = parse(args.rules.read_text())
 assert [f[0] for f in features] == ["strikes", "identity_tier", "region", "amount_band", "counterparty_risk"]
 problem = {
     "schema": "zeno-fcis/synthesis-problem/1",
-    "profile": "zeno-fcis/finite-i64/1",
+    "profile": "zeno-fcis/finite-i128/1",
     "inputs": [{"name": f"pre.{name}" if name == "strikes" else f"feature.{name}",
                 "type": integer(low, high)} for name, low, high, _ in features] + [
                     {"name": "command.action.screen_reinstate", "type": integer(0, 1)},
@@ -214,8 +220,11 @@ problem = {
     "contract": contract(features, rules),
     "sketch": sketch(features, rules),
 }
-with open(sys.argv[2], "w") as output:
-    json.dump(problem, output, indent=2)
-    output.write("\n")
+content = json.dumps(problem, indent=2) + "\n"
+if args.check:
+    if args.output.read_text() != content:
+        raise SystemExit("synthesis.json differs from the reviewed rules builder")
+else:
+    args.output.write_text(content)
 print(f"{len(rules)} rules; contract {len(problem['contract']['nodes'])} nodes, "
       f"sketch {len(problem['sketch']['nodes'])} nodes")
