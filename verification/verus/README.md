@@ -458,3 +458,36 @@ leaf providing its own interface, an aggregate allowed to write unselected
 slots, and the identity `true && x = x` applied to a non-Boolean `x`. The proof
 makes no claim about liveness, fairness, traces, continuous dynamics, or
 asynchronous or shared-write coupling.
+
+## Spot refinement
+
+[spot_refinement.rs](spot_refinement.rs) proves the compiled ZenoDEX Spot
+decision program against the Spot core specification and the integer Step
+contracts that `core-apps/zenodex-spot/proofs/NativeBridge.lean` states. It is
+an application gate, not one of the workflow's qualification gates, and runs
+through `core-apps/zenodex-spot/tools/check_refinement.py`.
+
+- [spot_native_program.rs](spot_native_program.rs) is generated from
+  `core-apps/zenodex-spot/src/v2_contract.rs`: the 1,377 instructions, roots
+  and declared domains, each node's value as a function of the input, and
+  `program_terms`, which proves from the evaluator specification's `prefix`
+  and `projection` that a successful `execution` computes exactly those
+  values. Per accepting branch it also proves the guard and successor terms
+  the branch selection implies.
+- [spot_refinement_proof.rs](spot_refinement_proof.rs) states the
+  specification's successor, rounding included, and proves `spot_refinement`:
+  on every input `execution` accepts, an accepting branch assigns exactly that
+  successor, which meets the Step contract for every coalition containing the
+  actor.
+
+The closure is `evaluation/spec.rs`, `value/scalar.rs` and `value/wide.rs` by
+path. The evaluator's `Domain`, `Op` and `Failure` declarations come from a
+generated verbatim copy ([spot_evaluator_types.rs](spot_evaluator_types.rs))
+because their module also owns executable bodies this unit does not need. The
+generator's `--check` mode keeps both generated files fresh. That the
+executable evaluator, decision construction and publication meet the
+specification is the subject of the gates above, not of this unit.
+
+The check runs the whole crate under `--no-cheating`, requires the reviewed
+obligation count and theorem names, and runs five planted program defects
+that must each fail the proof.
