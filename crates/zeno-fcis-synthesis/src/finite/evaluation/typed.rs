@@ -304,10 +304,10 @@ pub(crate) fn node<'a>(
             };
             match (signed, v) {
                 (true, Atom::U128(v)) => i128::try_from(v)
-                    .map(Atom::I128)
+                    .map(|v| Atom::I128(v))
                     .map_err(|_| Failure::Arithmetic),
                 (false, Atom::I128(v)) => u128::try_from(v)
-                    .map(Atom::U128)
+                    .map(|v| Atom::U128(v))
                     .map_err(|_| Failure::Arithmetic),
                 _ => Err(Failure::Kind),
             }
@@ -335,7 +335,7 @@ pub(crate) fn node<'a>(
                             }
                             _ => None,
                         };
-                        result.map(Atom::U128).ok_or(Failure::Arithmetic)
+                        result.map(|v| Atom::U128(v)).ok_or(Failure::Arithmetic)
                     }
                     _ => Err(Failure::Kind),
                 };
