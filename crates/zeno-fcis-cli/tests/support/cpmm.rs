@@ -1,7 +1,7 @@
 //! Shared source fixtures, never prewritten checker evidence.
 use serde_json::{Value, json};
 
-pub(super) fn project(limit: i64) -> String {
+pub(crate) fn project(limit: i64) -> String {
     format!(
         r#"zeno 1;
 project 1 scaled_cpmm;
@@ -30,7 +30,7 @@ law 500 nonnegative on commit, genesis = post.100.110 >= 0 && post.100.111 >= 0;
     )
 }
 
-pub(super) fn policy(limit: i64, bps: i64, ceiling_output: bool) -> Value {
+pub(crate) fn policy(limit: i64, bps: i64, ceiling_output: bool) -> Value {
     let rounding = if ceiling_output {
         "mul_div_ceil"
     } else {
@@ -55,5 +55,5 @@ pub(super) fn policy(limit: i64, bps: i64, ceiling_output: bool) -> Value {
     })
 }
 
-pub(super) const RELATION: &str =
+pub(crate) const RELATION: &str =
     "products_ge(post.100.110, post.100.111, pre.100.110, pre.100.111)";

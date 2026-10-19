@@ -253,11 +253,7 @@ fn decode_variant(
 pub(super) fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i128, usize)> {
     let (value, end) = typed::decode_value(bytes, offset, typed::LeafView::Legacy(leaf))?;
     match value {
-        super::super::value::Atom::I128(value)
-            if value >= i128::MIN as i128 && value <= i128::MAX as i128 =>
-        {
-            Some((value as i128, end))
-        }
+        super::super::value::Atom::I128(value) => Some((value, end)),
         _ => None,
     }
 }

@@ -62,8 +62,9 @@ mod tests {
             SAFE + 1,
         ] {
             let encoded = integer(value);
-            let bytes = serde_json::to_vec(&encoded).unwrap();
-            let received: Value = serde_json::from_slice(&bytes).unwrap();
+            let bytes = serde_json::to_vec(&encoded).unwrap_or_else(|e| panic!("{e:?}"));
+            let received: Value =
+                serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(read(&received), Some(value));
             assert_eq!(encoded.is_number(), (-SAFE..=SAFE).contains(&value));
             if encoded.is_string() {

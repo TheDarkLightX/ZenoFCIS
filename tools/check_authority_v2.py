@@ -122,7 +122,7 @@ def mutations():
         ('law_observation',OBSERVATIONS,'laws::Observation::OutboxPayload(a,b)=>{parts.push(Part::Word(28));','laws::Observation::OutboxPayload(a,b)=>{parts.push(Part::Word(27));',True),
         ('invocation_state',FRAMING,'Part::Bytes(identity),Part::Bytes(state),','Part::Bytes(identity),Part::Bytes(command),',True),
         ('genesis_tag',FRAMING,'Kind::Genesis=>0,Kind::Transition=>1','Kind::Genesis=>1,Kind::Transition=>1',True),
-        ('metadata_variant_code',METADATA,'parts.push(Part::Word(values[i].code as i128 as u128));','parts.push(Part::Word(0));',True),
+        ('metadata_variant_code',METADATA,'parts.push(Part::Word(values[i].id as u128));parts.push(Part::Word(values[i].code as u128));','parts.push(Part::Word(values[i].id as u128));parts.push(Part::Word(0));',True),
         ('metadata_branch_reason',METADATA,'reason(parts,&values[i].reason);','reason(parts,&None);',True),
         ('metadata_delivery_idempotency',METADATA,'expr(parts,&values[i].idempotency);','expr(parts,&values[i].destination);',True),
         ('metadata_law_scope',METADATA,'law_scope(parts,&values[i].scope);','law_scope(parts,&laws::Scope::Always);',True),

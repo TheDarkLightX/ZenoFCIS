@@ -142,7 +142,7 @@ impl<'s, 'a> Values<'s, 'a> {
         match self {
             Self::Legacy(v) => {
                 if index < v.len() {
-                    Some(Atom::I128(v[index] as i128))
+                    Some(Atom::I128(v[index]))
                 } else {
                     None
                 }
@@ -164,7 +164,7 @@ pub(crate) fn legacy_instruction(op: &Op) -> Instruction {
     use BooleanEncoding::LegacyInteger01 as L;
     match *op {
         Op::Input(i) => Instruction::Input(i),
-        Op::Int(v) => Instruction::Literal(Atom::I128(v as i128), Kind::Signed),
+        Op::Int(v) => Instruction::Literal(Atom::I128(v), Kind::Signed),
         Op::Bool(v) => Instruction::Literal(Atom::I128(if v { 1 } else { 0 }), Kind::Bool),
         Op::Add(a, b) => Instruction::Arithmetic(IntegerWidth::Signed128, ArithmeticOp::Add, a, b),
         Op::Sub(a, b) => Instruction::Arithmetic(IntegerWidth::Signed128, ArithmeticOp::Sub, a, b),
@@ -238,7 +238,7 @@ fn boolean(encoding: BooleanEncoding, value: bool) -> Atom<'static> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::project(value),))]
 pub(crate) fn project(value: Atom<'_>) -> Option<i128> {
     match value {
-        Atom::I128(v) if v >= i128::MIN as i128 && v <= i128::MAX as i128 => Some(v as i128),
+        Atom::I128(v) => Some(v),
         _ => None,
     }
 }

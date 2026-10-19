@@ -426,33 +426,6 @@ fn invoke_with_identity(
     report(&loaded, result)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn kb_slow_checker_identity_does_not_consume_check_window() {
-        let started = std::time::Instant::now();
-        let (exit, report) = invoke_with_identity(&[], Operation::Check, || {
-            std::thread::sleep(CHECK_WINDOW + std::time::Duration::from_millis(100));
-            Ok("a".repeat(64))
-        });
-        assert!(started.elapsed() >= CHECK_WINDOW);
-        assert_eq!(exit, 0, "{report}");
-        assert_eq!(report["status"], "consistent");
-        assert_eq!(report["authority"], "none");
-    }
-
-    #[test]
-    fn kb_checker_identity_failure_refuses() {
-        let (exit, report) =
-            invoke_with_identity(&[], Operation::Check, || Err(fail("kb-evidence-checker")));
-        assert_eq!(exit, 1);
-        assert_eq!(report["reason"], "kb-evidence-checker");
-        assert_eq!(report["status"], "refused");
-    }
-}
-
 /// Finite encoding replay for the compiled public declarations only. The
 /// expected results are frozen in code, independent of the Datalog derivation.
 /// This establishes these declared policies on the two fixtures, not host
@@ -571,4 +544,31 @@ fn public_validation(limits: K::Limits) -> Result<(Vec<K::Validation>, u64), Val
         admitted.push(input);
     }
     Ok((admitted, used))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kb_slow_checker_identity_does_not_consume_check_window() {
+        let started = std::time::Instant::now();
+        let (exit, report) = invoke_with_identity(&[], Operation::Check, || {
+            std::thread::sleep(CHECK_WINDOW + std::time::Duration::from_millis(100));
+            Ok("a".repeat(64))
+        });
+        assert!(started.elapsed() >= CHECK_WINDOW);
+        assert_eq!(exit, 0, "{report}");
+        assert_eq!(report["status"], "consistent");
+        assert_eq!(report["authority"], "none");
+    }
+
+    #[test]
+    fn kb_checker_identity_failure_refuses() {
+        let (exit, report) =
+            invoke_with_identity(&[], Operation::Check, || Err(fail("kb-evidence-checker")));
+        assert_eq!(exit, 1);
+        assert_eq!(report["reason"], "kb-evidence-checker");
+        assert_eq!(report["status"], "refused");
+    }
 }

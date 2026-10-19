@@ -243,7 +243,7 @@ fn legacy_d1_all_1165_original_oracle_rows_keep_i64_meaning() {
         let f: Vec<_> = line.split('\t').collect();
         let input: Vec<i64> = f[1..f.len() - 1]
             .iter()
-            .map(|n| n.parse().unwrap())
+            .map(|n| n.parse().unwrap_or_else(|e| panic!("{e:?}")))
             .collect();
         let mut nodes: Vec<_> = (0..input.len()).map(|i| Op::Input(i as u16)).collect();
         let op = match f[0] {
@@ -278,7 +278,11 @@ fn legacy_d1_all_1165_original_oracle_rows_keep_i64_meaning() {
         let expected = if f[f.len() - 1] == "arithmetic" {
             Err(Failure::Arithmetic)
         } else {
-            Ok(vec![f[f.len() - 1].parse::<i64>().unwrap()])
+            Ok(vec![
+                f[f.len() - 1]
+                    .parse::<i64>()
+                    .unwrap_or_else(|e| panic!("{e:?}")),
+            ])
         };
         for _ in 0..2 {
             let (r, u) = old

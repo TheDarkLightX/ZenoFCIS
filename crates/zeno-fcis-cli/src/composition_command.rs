@@ -512,7 +512,7 @@ fn joint_table(
             "authority": "none", "evidence": "composed-domain-joint-table",
             "state_layout": joint.state_layout().iter().map(|slot| format!("{}.{}", slot.component, slot.field)).collect::<Vec<_>>(),
             "request_layout": joint.request_layout().iter().map(|slot| slot.name.clone()).collect::<Vec<_>>(),
-            "genesis": crate::report_numbers::integers(&joint.genesis()),
+            "genesis": crate::report_numbers::integers(joint.genesis()),
             "rows": rows.iter().map(|row| {
                 let mut out = row.outcome.json();
                 out["state"] = crate::report_numbers::integers(&row.state);

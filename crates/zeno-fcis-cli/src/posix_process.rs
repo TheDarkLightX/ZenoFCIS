@@ -681,25 +681,29 @@ mod runtime {
 
         #[test]
         fn delayed_custody_ack_preserves_the_budget_and_exact_protocol_byte() {
-            let (mut child, parent) = UnixStream::pair().unwrap();
-            child.set_nonblocking(true).unwrap();
+            let (mut child, parent) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+            child
+                .set_nonblocking(true)
+                .unwrap_or_else(|e| panic!("{e:?}"));
             let writer = std::thread::spawn(move || {
                 // A durable custody write can exceed the former one-second wait.
                 std::thread::sleep(Duration::from_millis(1200));
-                write_protocol(&parent, &[0xA1]).unwrap();
+                write_protocol(&parent, &[0xA1]).unwrap_or_else(|e| panic!("{e:?}"));
             });
             let started = Instant::now();
             assert_eq!(await_startup_ack(&mut child), Ok(()));
             assert!(started.elapsed() >= Duration::from_millis(1200));
             assert!(STARTUP_ACK_BUDGET < Duration::from_secs(25));
-            writer.join().unwrap();
+            writer.join().unwrap_or_else(|e| panic!("{e:?}"));
         }
 
         #[test]
         fn wrong_closed_missing_and_late_startup_ack_all_refuse() {
-            let (mut child, parent) = UnixStream::pair().unwrap();
-            child.set_nonblocking(true).unwrap();
-            write_protocol(&parent, &[1]).unwrap();
+            let (mut child, parent) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+            child
+                .set_nonblocking(true)
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            write_protocol(&parent, &[1]).unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(
                 await_startup_ack(&mut child),
                 Err("wrong-startup-ack".into())
@@ -709,13 +713,15 @@ mod runtime {
                 await_startup_ack(&mut child),
                 Err("startup-ack-unavailable:eof".into())
             );
-            let (mut child, parent) = UnixStream::pair().unwrap();
-            child.set_nonblocking(true).unwrap();
+            let (mut child, parent) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+            child
+                .set_nonblocking(true)
+                .unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(
                 await_startup_ack_before(&mut child, Instant::now() + Duration::from_millis(20)),
                 Err("startup-ack-unavailable:deadline".into())
             );
-            write_protocol(&parent, &[0xA1]).unwrap();
+            write_protocol(&parent, &[0xA1]).unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(
                 await_startup_ack_before(&mut child, Instant::now()),
                 Err("startup-ack-unavailable:deadline".into())
@@ -1529,18 +1535,18 @@ mod runtime {
             if !is_worker() {
                 return;
             }
-            close_inherited_descriptors().unwrap();
-            install_limits().unwrap();
+            close_inherited_descriptors().unwrap_or_else(|e| panic!("{e:?}"));
+            install_limits().unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(linux::child(), Ok(true));
             super::super::super::start(Duration::from_millis(if spin { 1000 } else { 100 }), false)
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
             if spin {
                 loop {
                     std::hint::black_box(1u64.wrapping_mul(7));
                 }
             }
             std::thread::sleep(Duration::from_millis(600));
-            super::super::super::finish().unwrap();
+            super::super::super::finish().unwrap_or_else(|e| panic!("{e:?}"));
             println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
             super::super::super::shutdown(crate::BLOCKED);
             std::process::exit(crate::BLOCKED.into());
@@ -1550,8 +1556,8 @@ mod runtime {
             if !is_worker() {
                 return;
             }
-            close_inherited_descriptors().unwrap();
-            install_limits().unwrap();
+            close_inherited_descriptors().unwrap_or_else(|e| panic!("{e:?}"));
+            install_limits().unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(linux::child(), Ok(true));
             for requested in [18, 19] {
                 assert_eq!(
@@ -1561,13 +1567,14 @@ mod runtime {
             }
             // Both denials occurred before START; a subsequent ordinary
             // stage must still work, rather than inheriting an active stage.
-            super::super::super::start(Duration::from_millis(100), false).unwrap();
+            super::super::super::start(Duration::from_millis(100), false)
+                .unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(
                 super::super::super::start(Duration::from_millis(18), false),
                 Err("control-stage-order".into()),
                 "protocol order must precede the small-budget prescreen"
             );
-            super::super::super::finish().unwrap();
+            super::super::super::finish().unwrap_or_else(|e| panic!("{e:?}"));
             println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
             super::super::super::shutdown(crate::BLOCKED);
             std::process::exit(crate::BLOCKED.into());
@@ -1588,7 +1595,7 @@ mod runtime {
                 .recursive(true)
                 .mode(0o700)
                 .create(&root)
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
             for name in [
                 "probe_stage_wait",
                 "probe_stage_spin",
@@ -1602,13 +1609,15 @@ mod runtime {
                     )
                     .as_bytes(),
                 );
-                let directory = evidence_directory(&invocation).unwrap();
+                let directory = evidence_directory(&invocation).unwrap_or_else(|e| panic!("{e:?}"));
                 fs::DirBuilder::new()
                     .mode(0o700)
                     .create(&directory)
-                    .unwrap();
-                let (caller, _held) = UnixStream::pair().unwrap();
-                caller.set_nonblocking(true).unwrap();
+                    .unwrap_or_else(|e| panic!("{e:?}"));
+                let (caller, _held) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+                caller
+                    .set_nonblocking(true)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
                 let mut guardian = Guardian {
                     caller,
                     invocation,
@@ -1627,13 +1636,16 @@ mod runtime {
                     },
                     &mut guardian,
                 );
-                let evidence = guardian.evidence.as_ref().unwrap();
+                let evidence = guardian
+                    .evidence
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("expected a value"));
                 assert!(evidence.absence_verified);
                 assert_eq!(evidence.cleanup, Cleanup::OwnedWorkersReaped);
                 let records = Path::new("/tmp")
                     .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
                 let observation = fs::read_dir(records)
-                    .unwrap()
+                    .unwrap_or_else(|e| panic!("{e:?}"))
                     .filter_map(|p| {
                         serde_json::from_slice::<serde_json::Value>(&fs::read(p.ok()?.path()).ok()?)
                             .ok()
@@ -1645,14 +1657,14 @@ mod runtime {
                                 == super::super::super::diagnostics::process_start_ticks(
                                     std::process::id(),
                                 )
-                                .unwrap()
+                                .unwrap_or_else(|| panic!("expected a value"))
                             && v["worker_pid"] == evidence.worker_pid
                     })
-                    .unwrap();
+                    .unwrap_or_else(|| panic!("expected a value"));
                 println!("stage-control {name}: {observation}");
                 assert_eq!(observation["cleanup_verified"], true);
                 if name.ends_with("spin") {
-                    let failure = result.unwrap_err();
+                    let failure = result.err().unwrap_or_else(|| panic!("expected a refusal"));
                     assert!(
                         failure.reason.starts_with("contained-deadline"),
                         "{failure:?}"
@@ -1662,12 +1674,18 @@ mod runtime {
                     assert!(
                         observation["stages"][0]["cpu_observed_us"]
                             .as_u64()
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("expected a value"))
                             >= 1_000_000
                     );
                 } else if name == "probe_small_stage_admission" {
                     assert_eq!(result, Ok(crate::BLOCKED));
-                    assert_eq!(observation["stages"].as_array().unwrap().len(), 1);
+                    assert_eq!(
+                        observation["stages"]
+                            .as_array()
+                            .unwrap_or_else(|| panic!("expected a value"))
+                            .len(),
+                        1
+                    );
                     assert_eq!(observation["stages"][0]["requested_ms"], 100);
                     assert_eq!(observation["stages"][0]["finished"], true);
                 } else {
@@ -1676,17 +1694,17 @@ mod runtime {
                     assert!(
                         observation["stages"][0]["wall_elapsed_ms"]
                             .as_u64()
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("expected a value"))
                             >= 600
                     );
                     assert!(
                         observation["stages"][0]["cpu_observed_us"]
                             .as_u64()
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("expected a value"))
                             < 100_000
                     );
                 }
-                fs::remove_dir_all(directory).unwrap();
+                fs::remove_dir_all(directory).unwrap_or_else(|e| panic!("{e:?}"));
             }
         }
         // Isolated re-exec: an external controller stops the supervisor for7s
@@ -1696,9 +1714,9 @@ mod runtime {
         fn actual_starved_supervisor_accepts_queued_finish_and_hung_stage_refuses() {
             const PROBE: &str = "ZENO_FCIS_STARVED_SUPERVISOR_TEST";
             if std::env::var_os(PROBE).is_none() {
-                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                let output = std::process::Command::new(std::env::current_exe().unwrap_or_else(|e| panic!("{e:?}")))
                     .args(["--exact", "checker_process::posix::runtime::stage_tests::actual_starved_supervisor_accepts_queued_finish_and_hung_stage_refuses", "--nocapture", "--test-threads=1"])
-                    .env(PROBE, "1").output().unwrap();
+                    .env(PROBE, "1").output().unwrap_or_else(|e| panic!("{e:?}"));
                 assert!(output.status.success(), "{output:?}");
                 println!("{}", String::from_utf8_lossy(&output.stdout));
                 return;
@@ -1708,28 +1726,28 @@ mod runtime {
                 .recursive(true)
                 .mode(0o700)
                 .create(&root)
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
             for starved in [true, false] {
                 let invocation = crate::transform::sha256_hex(
                     format!(
                         "peer-control-{}-{}-{}",
                         std::process::id(),
                         super::super::super::diagnostics::process_start_ticks(std::process::id())
-                            .unwrap(),
+                            .unwrap_or_else(|| panic!("expected a value")),
                         crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                     )
                     .as_bytes(),
                 );
-                let directory = evidence_directory(&invocation).unwrap();
+                let directory = evidence_directory(&invocation).unwrap_or_else(|e| panic!("{e:?}"));
                 fs::DirBuilder::new()
                     .mode(0o700)
                     .create(&directory)
-                    .unwrap();
+                    .unwrap_or_else(|e| panic!("{e:?}"));
                 let marker = root.join(format!(
                     ".peer-{}-{}",
                     std::process::id(),
                     super::super::super::diagnostics::process_start_ticks(std::process::id())
-                        .unwrap()
+                        .unwrap_or_else(|| panic!("expected a value"))
                 ));
                 assert!(!marker.exists());
                 let controller = if starved {
@@ -1746,12 +1764,14 @@ assert Path(f'/proc/{pid}/stat').read_text().rsplit(') ',1)[1].split()[19]==tick
 os.kill(pid,signal.SIGSTOP)
 try: time.sleep(7)
 finally: os.kill(pid,signal.SIGCONT)
-"#]).arg(&marker).arg(std::process::id().to_string()).spawn().unwrap())
+"#]).arg(&marker).arg(std::process::id().to_string()).spawn().unwrap_or_else(|e| panic!("{e:?}")))
                 } else {
                     None
                 };
-                let (caller, _held) = UnixStream::pair().unwrap();
-                caller.set_nonblocking(true).unwrap();
+                let (caller, _held) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+                caller
+                    .set_nonblocking(true)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
                 let mut guardian = Guardian {
                     caller,
                     invocation,
@@ -1782,15 +1802,22 @@ finally: os.kill(pid,signal.SIGCONT)
                     &mut guardian,
                 );
                 if let Some(mut controller) = controller {
-                    assert!(controller.wait().unwrap().success());
+                    assert!(
+                        controller
+                            .wait()
+                            .unwrap_or_else(|e| panic!("{e:?}"))
+                            .success()
+                    );
                 }
-                let evidence = guardian.evidence.unwrap();
+                let evidence = guardian
+                    .evidence
+                    .unwrap_or_else(|| panic!("expected a value"));
                 assert!(evidence.absence_verified);
                 assert_eq!(evidence.cleanup, Cleanup::OwnedWorkersReaped);
                 let records = Path::new("/tmp")
                     .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
                 let observation = fs::read_dir(records)
-                    .unwrap()
+                    .unwrap_or_else(|e| panic!("{e:?}"))
                     .filter_map(|p| {
                         serde_json::from_slice::<serde_json::Value>(&fs::read(p.ok()?.path()).ok()?)
                             .ok()
@@ -1802,54 +1829,87 @@ finally: os.kill(pid,signal.SIGCONT)
                                 == super::super::super::diagnostics::process_start_ticks(
                                     std::process::id(),
                                 )
-                                .unwrap()
+                                .unwrap_or_else(|| panic!("expected a value"))
                             && v["worker_pid"] == evidence.worker_pid
                     })
-                    .unwrap();
+                    .unwrap_or_else(|| panic!("expected a value"));
                 assert_eq!(observation["cleanup_verified"], true);
-                assert!(observation["worker_observed_ms"].as_u64().unwrap() < 25000);
+                assert!(
+                    observation["worker_observed_ms"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("expected a value"))
+                        < 25000
+                );
                 let stage = &observation["stages"][0];
-                assert!(stage["cpu_observed_us"].as_u64().unwrap() < 1_000_000);
+                assert!(
+                    stage["cpu_observed_us"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("expected a value"))
+                        < 1_000_000
+                );
                 if starved {
                     assert_eq!(result, Ok(crate::BLOCKED));
                     assert_eq!(stage["finished"], true);
-                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() >= 7000);
+                    assert!(
+                        stage["wall_elapsed_ms"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("expected a value"))
+                            >= 7000
+                    );
                 } else {
-                    assert!(result.unwrap_err().reason.starts_with("contained-deadline"));
+                    assert!(
+                        result
+                            .err()
+                            .unwrap_or_else(|| panic!("expected a refusal"))
+                            .reason
+                            .starts_with("contained-deadline")
+                    );
                     assert_eq!(stage["stopped_by"], "no-cpu-or-protocol-progress");
-                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() >= 2000);
-                    assert!(stage["wall_elapsed_ms"].as_u64().unwrap() < 4000);
+                    assert!(
+                        stage["wall_elapsed_ms"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("expected a value"))
+                            >= 2000
+                    );
+                    assert!(
+                        stage["wall_elapsed_ms"]
+                            .as_u64()
+                            .unwrap_or_else(|| panic!("expected a value"))
+                            < 4000
+                    );
                     assert!(
                         !observation["idle_waiters"]["threads"]
                             .as_array()
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("expected a value"))
                             .is_empty()
                     );
                 }
                 println!("physical peer control starved={starved}: {observation}");
                 if starved {
-                    fs::remove_file(marker).unwrap();
+                    fs::remove_file(marker).unwrap_or_else(|e| panic!("{e:?}"));
                 }
-                fs::remove_dir_all(directory).unwrap();
+                fs::remove_dir_all(directory).unwrap_or_else(|e| panic!("{e:?}"));
             }
         }
         fn peer_worker(starved: bool) {
             if !is_worker() {
                 return;
             }
-            close_inherited_descriptors().unwrap();
-            install_limits().unwrap();
+            close_inherited_descriptors().unwrap_or_else(|e| panic!("{e:?}"));
+            install_limits().unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(linux::child(), Ok(true));
-            super::super::super::start(Duration::from_millis(1000), true).unwrap();
+            super::super::super::start(Duration::from_millis(1000), true)
+                .unwrap_or_else(|e| panic!("{e:?}"));
             if starved {
                 let parent = nix::unistd::getppid().as_raw() as u32;
-                let ticks = super::super::super::diagnostics::process_start_ticks(parent).unwrap();
+                let ticks = super::super::super::diagnostics::process_start_ticks(parent)
+                    .unwrap_or_else(|| panic!("expected a value"));
                 fs::OpenOptions::new()
                     .write(true)
                     .create_new(true)
                     .mode(0o600)
                     .open(evidence_root().join(format!(".peer-{parent}-{ticks}")))
-                    .unwrap();
+                    .unwrap_or_else(|e| panic!("{e:?}"));
                 // Wait for the real fault, not a scheduling guess. Under
                 // eight burners the controller can run after a100ms sleep.
                 let stop_end = Instant::now() + Duration::from_secs(2);
@@ -1858,8 +1918,16 @@ finally: os.kill(pid,signal.SIGCONT)
                         super::super::super::diagnostics::process_start_ticks(parent),
                         Some(ticks)
                     );
-                    let stat = fs::read_to_string(format!("/proc/{parent}/stat")).unwrap();
-                    if stat.rsplit_once(") ").unwrap().1.split_whitespace().next() == Some("T") {
+                    let stat = fs::read_to_string(format!("/proc/{parent}/stat"))
+                        .unwrap_or_else(|e| panic!("{e:?}"));
+                    if stat
+                        .rsplit_once(") ")
+                        .unwrap_or_else(|| panic!("expected a value"))
+                        .1
+                        .split_whitespace()
+                        .next()
+                        == Some("T")
+                    {
                         break;
                     }
                     assert!(
@@ -1868,7 +1936,7 @@ finally: os.kill(pid,signal.SIGCONT)
                     );
                     std::thread::sleep(Duration::from_millis(2));
                 }
-                super::super::super::finish().unwrap();
+                super::super::super::finish().unwrap_or_else(|e| panic!("{e:?}"));
                 println!("{{\"status\":\"inconclusive\",\"authority\":\"none\"}}");
                 super::super::super::shutdown(crate::BLOCKED);
                 std::process::exit(crate::BLOCKED.into());

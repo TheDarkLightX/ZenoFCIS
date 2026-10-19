@@ -380,9 +380,7 @@ pub fn verify_completion_bytes(
         let command = command
             .iter()
             .map(|value| match value.view() {
-                ValueRef::I128(value) => {
-                    i128::try_from(value).map_err(|_| invalid_plan("command-range", None))
-                }
+                ValueRef::I128(value) => Ok(value),
                 _ => Err(invalid_plan("command-scalar", None)),
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -533,10 +531,15 @@ fn tuple_index(domains: &[Domain], values: &[i128]) -> Result<usize, CompletionE
     let mut index = 0usize;
     for (domain, value) in domains.iter().zip(values) {
         let (min, max) = domain.bounds();
-        let width = usize::try_from(i128::from(max) - i128::from(min) + 1)
-            .map_err(|_| CompletionError::Invalid("state-index"))?;
-        let offset = usize::try_from(i128::from(*value) - i128::from(min))
-            .map_err(|_| CompletionError::Invalid("state-index"))?;
+        let width = max
+            .checked_sub(min)
+            .and_then(|span| span.checked_add(1))
+            .and_then(|width| usize::try_from(width).ok())
+            .ok_or(CompletionError::Invalid("state-index"))?;
+        let offset = value
+            .checked_sub(min)
+            .and_then(|offset| usize::try_from(offset).ok())
+            .ok_or(CompletionError::Invalid("state-index"))?;
         index = index
             .checked_mul(width)
             .and_then(|v| v.checked_add(offset))

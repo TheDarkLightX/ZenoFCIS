@@ -74,7 +74,7 @@ def mutations() -> list[tuple[str, Path, str, str, str]]:
     return [
         ("omit_policy_equality", SUBJECT, "if !super::util::bytes_equal(&actual, original_contract)", "if false", "proof"),
         ("omit_original_state_root", MATCHING, "description.root == f.state.root\n        && matches!", "matches!", "proof"),
-        ("narrow_original_i128_bound", MATCHING, "a == *c as i128 && b == *d as i128", "a <= *c as i128 && b >= *d as i128", "proof"),
+        ("narrow_original_i128_bound", MATCHING, "InputLeaf::I128 { min: c, max: d }) => a == *c && b == *d", "InputLeaf::I128 { min: c, max: d }) => a <= *c && b >= *d", "proof"),
         ("omit_unused_outbox", MATCHING, " || !deliveries(defs, bs[i].outbox, ls)", "", "proof"),
         ("discard_text_upper_bound", MATCHING, "\n                    && b.len() as u64 <= max as u64\n                    && super::super::util::ascii(b)", "\n                    && super::super::util::ascii(b)", "proof"),
         # G3 checks the closed descriptor projection's channels, for both families.

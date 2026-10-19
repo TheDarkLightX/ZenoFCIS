@@ -399,9 +399,7 @@ fn genesis(space: &Space, positions: &[Position], rules: &Rules) -> Result<usize
             })?;
             match rules.genesis.get(&field) {
                 Some(Constant::Bool(value)) => Ok(i128::from(*value)),
-                Some(Constant::Int(value)) => i128::try_from(*value).map_err(|_| {
-                    ContractError::new(format!("v2/policy.json genesis.{field}"), "is out of range")
-                }),
+                Some(Constant::Int(value)) => Ok(*value),
                 None => Err(ContractError::new(
                     "v2/policy.json genesis",
                     format!("has no field {field}"),
@@ -446,7 +444,7 @@ fn observe(
                     .iter()
                     .map(|position| {
                         let number = (*by_field.get(&position.field.unwrap_or(0))?)?;
-                        i128::try_from(number).ok()
+                        Some(number)
                     })
                     .collect();
                 values

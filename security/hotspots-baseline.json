@@ -1220,7 +1220,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3761,
+      "production_lines": 3763,
       "rank": 9,
       "score": 95,
       "signals": [
@@ -1304,8 +1304,8 @@
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            4083,
-            4084
+            4084,
+            4086
           ]
         },
         {
@@ -1387,7 +1387,7 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 1020,
+      "production_lines": 1019,
       "rank": 10,
       "score": 94,
       "signals": [
@@ -1401,17 +1401,17 @@
           "id": "potential-amplification",
           "lines": [
             497,
-            1099,
-            1101,
-            1211,
-            1213
+            1098,
+            1100,
+            1210,
+            1212
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            962,
-            973
+            961,
+            972
           ]
         },
         {
@@ -1420,8 +1420,8 @@
             592,
             603,
             607,
-            928,
-            1048
+            927,
+            1047
           ]
         }
       ],
@@ -1474,7 +1474,7 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 463,
+      "production_lines": 458,
       "rank": 11,
       "score": 94,
       "signals": [
@@ -1487,13 +1487,13 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            406
+            401
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            387
+            382
           ]
         }
       ],
@@ -1836,7 +1836,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1759,
+      "production_lines": 1827,
       "rank": 14,
       "score": 93,
       "signals": [
@@ -1856,7 +1856,7 @@
         {
           "id": "concurrency-primitive",
           "lines": [
-            686
+            688
           ]
         },
         {
@@ -1877,20 +1877,20 @@
           "lines": [
             284,
             447,
-            960,
-            999,
-            1638,
-            1740,
-            1745,
-            1795
+            966,
+            1005,
+            1650,
+            1758,
+            1763,
+            1822
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            743,
-            1699,
-            1736
+            749,
+            1717,
+            1754
           ]
         },
         {
@@ -1910,13 +1910,13 @@
           "id": "panic-or-unchecked-result",
           "lines": [
             684,
-            685,
-            689,
-            695,
-            700,
-            701,
+            687,
+            691,
+            697,
             702,
-            712
+            705,
+            706,
+            716
           ]
         },
         {
@@ -1927,9 +1927,9 @@
             489,
             621,
             659,
-            838,
-            1272,
-            1369
+            844,
+            1278,
+            1375
           ]
         },
         {
@@ -1938,9 +1938,9 @@
             184,
             352,
             395,
-            842,
-            1427,
-            1509
+            848,
+            1433,
+            1515
           ]
         }
       ],
@@ -2734,21 +2734,21 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 339,
+      "production_lines": 335,
       "rank": 22,
       "score": 89,
       "signals": [
         {
           "id": "json-or-line-protocol",
           "lines": [
-            393
+            389
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
             213,
-            314
+            310
           ]
         },
         {
@@ -2819,7 +2819,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 413,
+      "production_lines": 528,
       "rank": 23,
       "score": 89,
       "signals": [
@@ -2828,7 +2828,8 @@
           "lines": [
             67,
             68,
-            366
+            366,
+            489
           ]
         },
         {
@@ -2836,7 +2837,10 @@
           "lines": [
             101,
             138,
-            268
+            268,
+            435,
+            540,
+            541
           ]
         },
         {
@@ -2852,7 +2856,8 @@
           "lines": [
             148,
             242,
-            292
+            292,
+            542
           ]
         },
         {
@@ -3645,89 +3650,89 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1393,
+      "production_lines": 1400,
       "rank": 30,
       "score": 89,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            112
+            119
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            214,
-            439,
-            445,
-            504,
-            530,
-            625,
-            865,
-            940
+            221,
+            446,
+            452,
+            511,
+            537,
+            632,
+            872,
+            947
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            1399
+            1406
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            205,
-            211,
-            575,
-            685,
-            730,
-            777,
-            855
+            212,
+            218,
+            582,
+            692,
+            737,
+            784,
+            862
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            52,
             53,
-            87,
-            106,
+            56,
+            58,
+            94,
             113,
-            117,
-            148,
+            120,
+            124,
             155
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            264,
-            479
+            271,
+            486
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            464,
             471,
-            488,
-            513,
-            533,
-            544,
-            550,
-            560
+            478,
+            495,
+            520,
+            540,
+            551,
+            557,
+            567
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            190,
-            211,
-            271,
-            777,
-            855,
-            1140
+            197,
+            218,
+            278,
+            784,
+            862,
+            1147
           ]
         }
       ],
@@ -4639,7 +4644,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 341,
+      "production_lines": 344,
       "rank": 41,
       "score": 87,
       "signals": [
@@ -4651,8 +4656,8 @@
             193,
             209,
             268,
-            339,
-            342
+            341,
+            345
           ]
         },
         {
@@ -4661,7 +4666,7 @@
             5,
             177,
             178,
-            339
+            341
           ]
         },
         {
@@ -4676,7 +4681,7 @@
         {
           "id": "strict-decoder",
           "lines": [
-            342
+            345
           ]
         }
       ],
@@ -6085,9 +6090,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 12854460,
+    "admitted_bytes": 12864163,
     "admitted_files": 794,
-    "inventory_sha256": "279baaa1f86ac5604a40ff896e9048ea75b3c16317e97848f31ac7ca22ff9689",
+    "inventory_sha256": "109f389ea3e0b01e8c412f1da7e4262c68f0ec66aca9ba47f370eb77ef68f6de",
     "ranked_above_minimum": 691,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

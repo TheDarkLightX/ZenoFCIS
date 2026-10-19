@@ -434,7 +434,7 @@ pub(crate) fn decide_all(
 fn number(atom: c::Atom<'_>) -> Option<i128> {
     match atom {
         c::Atom::Bool(value) => Some(i128::from(value)),
-        c::Atom::I128(value) => i128::try_from(value).ok(),
+        c::Atom::I128(value) => Some(value),
         c::Atom::U128(value) => i128::try_from(value).ok(),
         c::Atom::Sum { variant, .. } | c::Atom::Enum { variant, .. } => Some(i128::from(variant)),
         _ => None,

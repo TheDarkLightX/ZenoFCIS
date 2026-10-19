@@ -129,11 +129,11 @@ fn number(atom: c::Atom<'_>) -> Option<i128> {
 /// An output's number by its output type, as reification decodes it.
 fn reify(leaf: &Leaf, code: i128) -> Option<i128> {
     match leaf {
-        Leaf::Bool => (code == 0 || code == 1).then_some(i128::from(code)),
-        Leaf::I128 { min, max } => (*min..=*max).contains(&code).then_some(i128::from(code)),
+        Leaf::Bool => (code == 0 || code == 1).then_some(code),
+        Leaf::I128 { min, max } => (*min..=*max).contains(&code).then_some(code),
         Leaf::U128 { min, max } => u128::try_from(code)
             .is_ok_and(|unsigned| (*min..=*max).contains(&unsigned))
-            .then_some(i128::from(code)),
+            .then_some(code),
         Leaf::Sum { variants, .. } | Leaf::Enum { variants, .. } => variants
             .iter()
             .find(|variant| variant.code == code)
@@ -191,7 +191,7 @@ pub(super) fn successor(
             .iter()
             .position(|position| (position.source, position.field) == (source, field))
             .and_then(|at| tuple.get(at))
-            .map(|value| i128::from(*value))
+            .copied()
     };
     let mut post = Vec::new();
     for plan in branch.assignments {
@@ -235,7 +235,7 @@ pub(super) fn with_state(
                 (Source::State, Some(field)) => state
                     .iter()
                     .find(|(id, _)| *id == field)
-                    .and_then(|(_, value)| i128::try_from(*value).ok()),
+                    .map(|(_, value)| *value),
                 _ => None,
             }
             .unwrap_or(*value)

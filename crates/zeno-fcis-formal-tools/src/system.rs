@@ -328,7 +328,7 @@ fn model_value(text: &str, name: &str) -> Option<i128> {
         .map_or((false, rest), |rest| (true, rest));
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
     let magnitude: i128 = digits.parse().ok()?;
-    i128::try_from(if negative { -magnitude } else { magnitude }).ok()
+    Some(if negative { -magnitude } else { magnitude })
 }
 
 /// Exports the obligations for `property`, asks `solve` for each in order, and

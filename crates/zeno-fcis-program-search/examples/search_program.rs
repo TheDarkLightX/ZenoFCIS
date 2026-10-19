@@ -356,7 +356,7 @@ fn run_plant(arguments: &[String]) -> Result<(u8, String), String> {
         .iter()
         .map(|domain| {
             let (min, max) = domain.bounds();
-            u128::try_from(i128::from(max) - i128::from(min) + 1).unwrap_or(u128::MAX)
+            u128::try_from(max - min + 1).unwrap_or(u128::MAX)
         })
         .product();
     if size > 1 << 22 {

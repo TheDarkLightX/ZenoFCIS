@@ -88,6 +88,7 @@ impl<'a> TopDown<'a> {
     /// Inputs, then point and threshold predicates on small integer inputs,
     /// then comparisons between integer inputs.
     fn atoms(&mut self, meter: &mut Meter) -> Result<(), Stop> {
+        self.atoms_within_cells(meter)?;
         let inputs = self.original.inputs.clone();
         let mut ints = Vec::new();
         for (k, domain) in inputs.iter().enumerate() {
@@ -109,17 +110,7 @@ impl<'a> TopDown<'a> {
         // Keep the source's arithmetic vocabulary available as exact atoms.
         // This is bounded by the source graph and the existing cells/work
         // budgets, rather than a Cartesian product of six-factor candidates.
-        if self.original.nodes.iter().any(|node| {
-            matches!(
-                node,
-                Node::Mul(..)
-                    | Node::DivFloor(..)
-                    | Node::DivCeil(..)
-                    | Node::MulDivFloor(..)
-                    | Node::MulDivCeil(..)
-                    | Node::ProductsGe(..)
-            )
-        }) {
+        if has_arithmetic(self.original) {
             let kinds = self.original.kinds();
             let mut ids: Vec<Option<usize>> = Vec::with_capacity(self.original.nodes.len());
             let original_nodes = self.original.nodes.clone();
@@ -143,13 +134,12 @@ impl<'a> TopDown<'a> {
                         | Node::MulDivFloor(..)
                         | Node::MulDivCeil(..)
                         | Node::ProductsGe(..)
-                ) {
-                    if let Some(id) = id {
-                        if kinds[k] == Kind::Bool {
-                            self.atoms_bool.push(id);
-                        } else {
-                            self.atoms_int.push(id);
-                        }
+                ) && let Some(id) = id
+                {
+                    if kinds[k] == Kind::Bool {
+                        self.atoms_bool.push(id);
+                    } else {
+                        self.atoms_int.push(id);
                     }
                 }
             }
@@ -201,6 +191,62 @@ impl<'a> TopDown<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Stops exactly as `atoms` would when its atoms alone exceed the cells
+    /// budget, with the same charges, but before holding their values (each
+    /// is one value per considered tuple).
+    fn atoms_within_cells(&mut self, meter: &mut Meter) -> Result<(), Stop> {
+        let size = self.size as u128;
+        let Some(atoms) = self.atom_count() else {
+            return Ok(());
+        };
+        let stopping = u128::from(self.max_cells).saturating_sub(self.cells) / size + 1;
+        if atoms < stopping {
+            return Ok(());
+        }
+        for _ in 0..stopping {
+            // As `make` charges each new atom: no operator work, then its cells.
+            meter.charge(0)?;
+            meter.charge(self.size.max(1))?;
+        }
+        self.cells = self.cells.saturating_add(stopping * size);
+        Err(Stop::CellsOverBudget {
+            cells: self.cells,
+            limit: self.max_cells,
+        })
+    }
+
+    /// How many entries `atoms` interns, when every atom is new: on an empty
+    /// arena over some tuples and without the source's arithmetic vocabulary.
+    fn atom_count(&self) -> Option<u128> {
+        if self.size == 0 || !self.arena.is_empty() || has_arithmetic(self.original) {
+            return None;
+        }
+        let mut atoms = 0u128;
+        let mut ints = 0u128;
+        let mut constants = BTreeSet::new();
+        for (k, domain) in self.original.inputs.iter().enumerate() {
+            if u16::try_from(k).is_err() {
+                continue;
+            }
+            atoms += 1;
+            if domain_kind(*domain) != Some(Kind::Int) {
+                continue;
+            }
+            ints += 1;
+            let (min, max) = domain.bounds();
+            let Some(span) = max.checked_sub(min).and_then(|span| span.checked_add(1)) else {
+                continue;
+            };
+            if span < 1 || span > i128::from(PREDICATE_DOMAIN) {
+                continue;
+            }
+            // Point predicates, then threshold predicates, on shared constants.
+            atoms += span.unsigned_abs() * 2 - 1;
+            constants.extend(min..=max);
+        }
+        Some(atoms + constants.len() as u128 + 3 * (ints * ints.saturating_sub(1) / 2))
     }
 
     /// Interns `node` (operands are arena ids). `None` when an addition or
@@ -776,6 +822,21 @@ fn counterexample_guided(
     Ok(None)
 }
 
+/// Whether `graph` has arithmetic the atoms keep as vocabulary.
+fn has_arithmetic(graph: &Graph) -> bool {
+    graph.nodes.iter().any(|node| {
+        matches!(
+            node,
+            Node::Mul(..)
+                | Node::DivFloor(..)
+                | Node::DivCeil(..)
+                | Node::MulDivFloor(..)
+                | Node::MulDivCeil(..)
+                | Node::ProductsGe(..)
+        )
+    })
+}
+
 /// One care-masked solve of an arbitrary target, for the public facade in
 /// `target.rs`. `columns` hold each input's value on every considered tuple
 /// (`size` of them); `pos` lists the cared-for positions and `want` the
@@ -833,4 +894,113 @@ pub(crate) fn solve_target(
     let mut pool = Pool::new(inputs);
     let root = search.put(&mut pool, plan);
     Ok(Some(pool.emit(&[output], &[root])))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeno_fcis_synthesis::finite::Domain;
+
+    /// Seven tuples; the atoms' values do not depend on the columns' content.
+    const SIZE: usize = 7;
+
+    fn shell(inputs: Vec<Domain>) -> Graph {
+        Graph {
+            inputs,
+            outputs: Vec::new(),
+            nodes: Vec::new(),
+            roots: Vec::new(),
+        }
+    }
+
+    fn search(graph: &Graph, max_cells: u64) -> TopDown<'_> {
+        TopDown {
+            original: graph,
+            columns: vec![vec![0; SIZE]; graph.inputs.len()],
+            size: SIZE,
+            depth: 2,
+            width: 4,
+            solve_limit: 100,
+            two_valued: true,
+            max_cells,
+            cells: 0,
+            arena: Vec::new(),
+            index: BTreeMap::new(),
+            memo: BTreeMap::new(),
+            atoms_int: Vec::new(),
+            atoms_bool: Vec::new(),
+            work: 0,
+        }
+    }
+
+    fn shells() -> Vec<Graph> {
+        let int = |min, max| Domain::Int { min, max };
+        [
+            vec![Domain::Bool],
+            vec![int(5, 5)],
+            vec![int(0, 3), Domain::Bool, int(2, 6)],
+            vec![int(-2, 2), int(0, 63), int(0, 64), int(-1, 1)],
+            vec![
+                int(0, 1),
+                int(0, 1),
+                int(0, 1),
+                Domain::Bool,
+                int(i128::MIN, i128::MAX),
+            ],
+        ]
+        .into_iter()
+        .map(shell)
+        .collect()
+    }
+
+    #[test]
+    fn atoms_are_counted_exactly_and_each_charges_and_holds_one_value_per_tuple() {
+        for graph in shells() {
+            let mut full = search(&graph, u64::MAX);
+            let counted = full.atom_count().unwrap_or_else(|| panic!("{graph:?}"));
+            let mut meter = Meter::new(u64::MAX);
+            assert_eq!(full.atoms(&mut meter), Ok(()));
+            assert_eq!(full.arena.len() as u128, counted, "{graph:?}");
+            let per_tuple = counted * SIZE as u128;
+            assert_eq!(u128::from(meter.used()), per_tuple, "{graph:?}");
+            assert_eq!(full.cells, per_tuple, "{graph:?}");
+        }
+    }
+
+    #[test]
+    fn atoms_over_the_cells_budget_stop_where_and_as_interning_them_would() {
+        for graph in shells() {
+            let counted = search(&graph, u64::MAX).atom_count().unwrap_or(0);
+            let total = counted * SIZE as u128;
+            for max_cells in 0..=u64::try_from(total).unwrap_or(0) + SIZE as u64 {
+                // Interning stops at the first atom past the budget, having
+                // charged every atom up to it.
+                let stopping = u128::from(max_cells) / SIZE as u128 + 1;
+                let charged = u64::try_from(stopping * SIZE as u128).unwrap_or(u64::MAX);
+                for work in [u64::MAX, charged, charged - 1] {
+                    let mut tight = search(&graph, max_cells);
+                    let mut meter = Meter::new(work);
+                    let result = tight.atoms(&mut meter);
+                    if total <= u128::from(max_cells) {
+                        assert_eq!(result, Ok(()), "{graph:?} {max_cells}");
+                        assert_eq!(tight.arena.len() as u128, counted);
+                    } else if work < charged {
+                        assert_eq!(result, Err(Stop::WorkBudget { limit: work }));
+                        assert!(tight.arena.is_empty());
+                    } else {
+                        let cells = stopping * SIZE as u128;
+                        assert_eq!(
+                            result,
+                            Err(Stop::CellsOverBudget {
+                                cells,
+                                limit: max_cells
+                            })
+                        );
+                        assert_eq!(meter.used(), charged);
+                        assert!(tight.arena.is_empty(), "no atom value is held");
+                    }
+                }
+            }
+        }
+    }
 }

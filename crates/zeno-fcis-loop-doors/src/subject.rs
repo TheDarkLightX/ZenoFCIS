@@ -48,7 +48,7 @@ pub fn domain_size(domain: Domain) -> u128 {
     }
     let lower = (lo as u128) ^ (1u128 << 127);
     let upper = (hi as u128) ^ (1u128 << 127);
-    (upper - lower).checked_add(1).unwrap_or(u128::MAX)
+    (upper - lower).saturating_add(1)
 }
 
 /// Tuples in the product of the domains (saturating).

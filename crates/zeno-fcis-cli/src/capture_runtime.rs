@@ -99,13 +99,14 @@ mod request_tests {
             0,
             5,
         ]];
-        let bytes = super::encode_request("source", &points).unwrap();
-        let received: Received = serde_json::from_slice(&bytes).unwrap();
+        let bytes = super::encode_request("source", &points).unwrap_or_else(|e| panic!("{e:?}"));
+        let received: Received = serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(received.source, "source");
         assert_eq!(received.points, points);
-        let small = super::encode_request("source", &[vec![0, 5]]).unwrap();
+        let small =
+            super::encode_request("source", &[vec![0, 5]]).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&small).unwrap(),
+            serde_json::from_slice::<serde_json::Value>(&small).unwrap_or_else(|e| panic!("{e:?}")),
             serde_json::json!({"source":"source", "points":[[0,5]]})
         );
     }

@@ -265,7 +265,7 @@ fn law_nodes(program: &Program) -> Result<LawPredicate, Stop> {
                 k.checked_add(1).ok_or_else(|| bad("law-field"))?,
             )),
             Instruction::Bool(v) => laws::Op::Literal(laws::Atom::Bool(v)),
-            Instruction::Int(v) => laws::Op::Literal(laws::Atom::I128(i128::from(v))),
+            Instruction::Int(v) => laws::Op::Literal(laws::Atom::I128(v)),
             Instruction::Add(a, b) => laws::Op::Add(id(a)?, id(b)?),
             Instruction::Sub(a, b) => laws::Op::Sub(id(a)?, id(b)?),
             Instruction::Mul(a, b) => laws::Op::Mul(id(a)?, id(b)?),
@@ -353,7 +353,7 @@ fn library_law(
                 value: if *d == Domain::Bool {
                     laws::Atom::Bool(*v == 1)
                 } else {
-                    laws::Atom::I128(i128::from(*v))
+                    laws::Atom::I128(*v)
                 },
             })
         })
@@ -799,7 +799,7 @@ mod arithmetic_tests {
                 ));
                 let checked = ok(final_check(
                     &spec,
-                    &[expression.clone()],
+                    std::slice::from_ref(&expression),
                     &mut ok(Budget::new(Limits::default())),
                     &mut LawUsage::default(),
                 ));

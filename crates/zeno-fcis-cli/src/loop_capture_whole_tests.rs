@@ -95,7 +95,9 @@ fn whole_capture_reports_a_fault_at_the_last_declared_point() {
         &fee,
         &format!("x0 == 40 && x1 == 40 && x2 == 40 ? ({output} + 1) : {output}"),
     );
-    let difference = complete(&reference, &candidate).expect_err("last-point defect accepted");
+    let difference = complete(&reference, &candidate)
+        .err()
+        .unwrap_or_else(|| panic!("last-point defect accepted"));
     assert_eq!(difference["ordinal"], 68_920);
     assert_eq!(difference["input"], json!([40, 40, 40]));
     assert_eq!(difference["expected"], json!([1, 19]));
@@ -195,7 +197,9 @@ fn whole_capture_keeps_canonical_product_order_and_arithmetic_refusal() {
         true,
         &skeleton,
     ));
-    let difference = complete(&reference, &bad).expect_err("undefined arithmetic captured");
+    let difference = complete(&reference, &bad)
+        .err()
+        .unwrap_or_else(|| panic!("undefined arithmetic captured"));
     assert_eq!(difference["ordinal"], 0);
     assert_eq!(difference["actual"]["status"], "refused");
 }

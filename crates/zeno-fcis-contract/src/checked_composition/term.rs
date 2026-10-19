@@ -313,14 +313,13 @@ pub(crate) fn same_selection(
 pub(crate) fn intervals(nodes: &[Node], domains: &[(i128, i128)]) -> Vec<Option<(i128, i128)>> {
     let mut out: Vec<Option<(i128, i128)>> = Vec::with_capacity(nodes.len());
     let fits = |(low, high): (i128, i128)| {
-        (i128::from(i128::MIN)..=i128::from(i128::MAX)).contains(&low)
-            && (i128::from(i128::MIN)..=i128::from(i128::MAX)).contains(&high)
+        (i128::MIN..=i128::MAX).contains(&low) && (i128::MIN..=i128::MAX).contains(&high)
     };
     for node in nodes {
         let get = |index: usize| out.get(index).copied().flatten();
         let interval = match *node {
             Node::Input(index) => domains.get(index).copied(),
-            Node::Int(value) => Some((i128::from(value), i128::from(value))),
+            Node::Int(value) => Some((value, value)),
             Node::Bool(value) => Some((i128::from(value), i128::from(value))),
             Node::Add(a, b) => get(a)
                 .zip(get(b))

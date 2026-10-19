@@ -71,8 +71,6 @@ impl Interval {
     }
 }
 
-/// Clamps an `i128` bound into `i128`, reporting whether it was out of range.
-
 /// The declared input domain: per-input bounds and the fixed sample tuples.
 #[derive(Clone, Debug)]
 pub(crate) struct DomainInfo {

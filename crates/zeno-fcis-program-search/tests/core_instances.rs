@@ -15,8 +15,15 @@ fn fixture(name: &str, kind: &str) -> Vec<u8> {
         env!("CARGO_MANIFEST_DIR")
     );
     let historical = std::fs::read(&path).unwrap_or_else(|error| panic!("{path}: {error}"));
-    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(&historical).unwrap();
-    assert_eq!(old.value().unwrap().zcve_bytes().unwrap(), historical);
+    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(&historical)
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(
+        old.value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .zcve_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}")),
+        historical
+    );
     let profile = old.profile().as_bytes();
     assert_eq!(
         &historical[..10],

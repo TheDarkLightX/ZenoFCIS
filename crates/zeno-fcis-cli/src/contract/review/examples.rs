@@ -52,14 +52,7 @@ pub(super) fn parse(
             let inputs = line
                 .inputs
                 .iter()
-                .map(|value| {
-                    i128::try_from(*value).map_err(|_| {
-                        ContractError::new(
-                            format!("{FILE} line {}", line.number),
-                            format!("`{value}` is too large"),
-                        )
-                    })
-                })
+                .map(|value| Ok(*value))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Example {
                 line: line.number,
@@ -114,7 +107,7 @@ pub(super) fn agrees(
     if example.class == Class::Reject {
         let pre = example.inputs[..state_width.min(example.inputs.len())]
             .iter()
-            .map(|value| i128::from(*value));
+            .copied();
         if !example.post.iter().copied().eq(pre) {
             return Err("the rejected post-state differs from the pre-state".to_owned());
         }

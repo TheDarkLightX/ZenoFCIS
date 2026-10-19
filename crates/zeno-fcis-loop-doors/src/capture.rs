@@ -201,11 +201,9 @@ impl TableBuilder {
         }
         let half = width / 2;
         let stride = values.len() / width;
-        let pivot = i128::try_from(
-            i128::from(lo)
-                + i128::try_from(half).map_err(|_| Refusal::new("reference-domain-budget"))?,
-        )
-        .map_err(|_| Refusal::new("reference-domain-budget"))?;
+        let pivot = lo
+            .checked_add(i128::try_from(half).map_err(|_| Refusal::new("reference-domain-budget"))?)
+            .ok_or_else(|| Refusal::new("reference-domain-budget"))?;
         let (left, right) = values.split_at(half * stride);
         let a = self.branch(inputs, dim, left, output, Some((lo, half)))?;
         let b = self.branch(inputs, dim, right, output, Some((pivot, width - half)))?;
@@ -280,7 +278,7 @@ pub fn choose_counterexample(
             let distance = p.map_or(0u128, |p| {
                 p.iter()
                     .zip(&table.points[*i])
-                    .map(|(a, b)| (i128::from(*a) - i128::from(*b)).unsigned_abs())
+                    .map(|(a, b)| a.abs_diff(*b))
                     .sum()
             });
             (distance, core::cmp::Reverse(*i))

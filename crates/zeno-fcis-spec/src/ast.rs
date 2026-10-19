@@ -1889,7 +1889,7 @@ fn fused_variants_keep_distinct_tags_and_count_every_operand() {
     );
     for (value, tag) in [(&nonnegative, 8), (&signed, 9)] {
         let mut encoded = Vec::new();
-        encode_value(value, &mut encoded).unwrap();
+        encode_value(value, &mut encoded).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(encoded[0], tag);
         assert_eq!(formula_shape_value(value), (4, 2));
     }

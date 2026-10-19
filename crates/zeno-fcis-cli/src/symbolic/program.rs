@@ -103,7 +103,7 @@ mod tests {
             let assignment: BTreeMap<String, i128> = input
                 .iter()
                 .enumerate()
-                .map(|(index, value)| (format!("x{index}"), i128::from(*value)))
+                .map(|(index, value)| (format!("x{index}"), *value))
                 .collect();
             let evaluation = script
                 .evaluate(&assignment)
@@ -124,10 +124,8 @@ mod tests {
                     let encoded: Vec<Option<i128>> = (0..outputs)
                         .map(|index| evaluation.int(&format!("out{index}")))
                         .collect();
-                    let expected: Vec<Option<i128>> = values
-                        .iter()
-                        .map(|value| Some(i128::from(*value)))
-                        .collect();
+                    let expected: Vec<Option<i128>> =
+                        values.iter().map(|value| Some(*value)).collect();
                     assert_eq!(encoded, expected, "{input:?}");
                 }
                 Err(V2ExecutionFailure::Arithmetic) => assert_eq!(trap, Some(true), "{input:?}"),

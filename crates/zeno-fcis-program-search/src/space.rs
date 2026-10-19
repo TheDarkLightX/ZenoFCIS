@@ -132,8 +132,7 @@ impl Space {
         for ((min, size), stride) in self.mins.iter().zip(&self.sizes).zip(&self.strides) {
             let offset = (ordinal / stride) % size;
             // The offset is below the domain size, so the sum stays in range.
-            let value = i128::from(*min) + i128::from(offset);
-            out.push(i128::try_from(value).unwrap_or(*min));
+            out.push(*min + i128::from(offset));
         }
     }
 
@@ -150,7 +149,7 @@ impl Space {
             .iter()
             .map(|ordinal| {
                 let offset = (u64::from(*ordinal) / stride) % size;
-                i128::try_from(i128::from(*min) + i128::from(offset)).unwrap_or(*min)
+                *min + i128::from(offset)
             })
             .collect()
     }

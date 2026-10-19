@@ -24,26 +24,45 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/transform-check");
     for version in [1, 2, 3] {
         let directory = root.join(version.to_string());
-        let read = |name: &str| std::fs::read(directory.join(name)).unwrap();
-        let manifest: Value = serde_json::from_slice(&read("vectors.json")).unwrap();
+        let read =
+            |name: &str| std::fs::read(directory.join(name)).unwrap_or_else(|e| panic!("{e:?}"));
+        let manifest: Value =
+            serde_json::from_slice(&read("vectors.json")).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             manifest["semantics"],
             format!("zeno-fcis/transform-check/{version}")
         );
-        for vector in manifest["vectors"].as_array().unwrap() {
-            let name = |key: &str| vector[key].as_str().unwrap();
+        for vector in manifest["vectors"]
+            .as_array()
+            .unwrap_or_else(|| panic!("expected a value"))
+        {
+            let name = |key: &str| {
+                vector[key]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("expected a value"))
+            };
             let bytes = [read(name("original")), read(name("candidate"))];
             let programs = bytes.each_ref().map(|data| {
-                let program = import_i64_program(data).unwrap();
-                assert_eq!(program.value().unwrap().zcve_bytes().unwrap(), *data);
+                let program = import_i64_program(data).unwrap_or_else(|e| panic!("{e:?}"));
+                assert_eq!(
+                    program
+                        .value()
+                        .unwrap_or_else(|e| panic!("{e:?}"))
+                        .zcve_bytes()
+                        .unwrap_or_else(|e| panic!("{e:?}")),
+                    *data
+                );
                 program
             });
             let sources = ["original", "candidate"].map(|key| {
                 let path = Path::new(name(key)).with_extension("json");
-                serde_json::from_slice::<Value>(&std::fs::read(directory.join(path)).unwrap())
-                    .unwrap()
+                serde_json::from_slice::<Value>(
+                    &std::fs::read(directory.join(path)).unwrap_or_else(|e| panic!("{e:?}")),
+                )
+                .unwrap_or_else(|e| panic!("{e:?}"))
             });
-            let expected: Value = serde_json::from_slice(&read(name("expected"))).unwrap();
+            let expected: Value =
+                serde_json::from_slice(&read(name("expected"))).unwrap_or_else(|e| panic!("{e:?}"));
             for (side, data) in ["original", "candidate"].into_iter().zip(&bytes) {
                 assert_eq!(expected[format!("{side}_sha256")], sha256(data));
             }
@@ -54,15 +73,23 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
             }
             let bounds: Vec<(i64, i64)> = sources[0]["inputs"]
                 .as_array()
-                .unwrap()
+                .unwrap_or_else(|| panic!("expected a value"))
                 .iter()
                 .map(|d| {
                     if d["kind"] == "Bool" {
                         (0, 1)
                     } else {
                         (
-                            d["min"].as_str().unwrap().parse().unwrap(),
-                            d["max"].as_str().unwrap().parse().unwrap(),
+                            d["min"]
+                                .as_str()
+                                .unwrap_or_else(|| panic!("expected a value"))
+                                .parse()
+                                .unwrap_or_else(|e| panic!("{e:?}")),
+                            d["max"]
+                                .as_str()
+                                .unwrap_or_else(|| panic!("expected a value"))
+                                .parse()
+                                .unwrap_or_else(|e| panic!("{e:?}")),
                         )
                     }
                 })
@@ -70,7 +97,13 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
             let size = bounds.iter().fold(1u128, |n, (min, max)| {
                 n * (i128::from(*max) - i128::from(*min) + 1) as u128
             });
-            if size > u128::from(vector["max_input_tuples"].as_u64().unwrap()) {
+            if size
+                > u128::from(
+                    vector["max_input_tuples"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("expected a value")),
+                )
+            {
                 assert_eq!(expected["status"], "inconclusive");
                 assert_eq!(expected["detail"]["cause"], "domain-too-large");
                 assert_eq!(expected["detail"]["domain_size"], size.to_string());
@@ -98,7 +131,10 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
                 for side in 0..2 {
                     max_steps[side] = max_steps[side].max(observations[side].steps);
                     over[side] += u64::from(
-                        observations[side].steps > vector["step_limit"].as_u64().unwrap(),
+                        observations[side].steps
+                            > vector["step_limit"]
+                                .as_u64()
+                                .unwrap_or_else(|| panic!("expected a value")),
                     );
                 }
                 more += u64::from(observations[1].steps > observations[0].steps);
@@ -122,7 +158,7 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
                 for (side, o) in ["original", "candidate"].into_iter().zip(observations) {
                     assert_eq!(
                         expected["detail"][side],
-                        json!({"ok":o.result.unwrap().iter().map(ToString::to_string).collect::<Vec<_>>(),"steps":o.steps})
+                        json!({"ok":o.result.unwrap_or_else(|e| panic!("{e:?}")).iter().map(ToString::to_string).collect::<Vec<_>>(),"steps":o.steps})
                     );
                 }
             } else {
@@ -136,13 +172,17 @@ fn historical_transform_vectors_and_receipts_keep_i64_observations_and_usage() {
                     );
                     assert_eq!(
                         expected["detail"]["minimum_step_limit"],
-                        max_steps.into_iter().max().unwrap()
+                        max_steps
+                            .into_iter()
+                            .max()
+                            .unwrap_or_else(|| panic!("expected a value"))
                     );
                     assert_eq!(expected["detail"]["usage"], usage);
                 } else {
                     assert_eq!(expected["status"], "equivalent");
                     let receipt = read(name("receipt"));
-                    let archived: Value = serde_json::from_slice(&receipt).unwrap();
+                    let archived: Value =
+                        serde_json::from_slice(&receipt).unwrap_or_else(|e| panic!("{e:?}"));
                     assert_eq!(archived, expected["detail"]["receipt"]);
                     assert_eq!(sha256(&receipt), expected["detail"]["receipt_sha256"]);
                     assert_eq!(archived["checker"]["semantics"], manifest["semantics"]);

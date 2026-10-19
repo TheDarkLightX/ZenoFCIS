@@ -184,17 +184,14 @@ fn spot_228_declared_laws_determine_every_reject_reason() {
                 for (index, position) in positions.iter().enumerate() {
                     if position.source == Source::State && actual.class != Class::Reject {
                         let field = position.field.unwrap();
-                        successor[index] = i128::try_from(
-                            actual
-                                .post
-                                .iter()
-                                .find(|(id, _)| *id == field)
-                                .unwrap()
-                                .1
-                                .number()
-                                .unwrap(),
-                        )
-                        .unwrap();
+                        successor[index] = actual
+                            .post
+                            .iter()
+                            .find(|(id, _)| *id == field)
+                            .unwrap()
+                            .1
+                            .number()
+                            .unwrap();
                     }
                 }
                 let correct = Proposed {

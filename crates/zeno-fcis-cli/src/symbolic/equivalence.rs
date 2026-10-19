@@ -326,8 +326,6 @@ fn model_input(
             let value = *model
                 .get(&name)
                 .ok_or_else(|| format!("the model has no value for {name}"))?;
-            let value = i128::try_from(value)
-                .map_err(|_| format!("{name} = {value} is outside the 64-bit range"))?;
             if domain.contains(value) {
                 Ok(value)
             } else {
@@ -378,13 +376,13 @@ fn planted_difference(
         return Err("the programs have no outputs".to_owned());
     };
     for (name, value) in [("original_first", a), ("candidate_first", b)] {
-        if model.get(name) != Some(&i128::from(*value)) {
+        if model.get(name) != Some(value) {
             return Err(format!(
                 "the model's {name} differs from the evaluator's {value} on {input:?}"
             ));
         }
     }
-    if i128::from(*b) + 1 == i128::from(*a) {
+    if (*b) + 1 == (*a) {
         return Err(format!(
             "the shifted first output equals the original's on {input:?}"
         ));

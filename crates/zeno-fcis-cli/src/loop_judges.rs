@@ -298,7 +298,7 @@ impl Core {
                             .iter()
                             .map(|p| {
                                 let number = (*by_field.get(&p.field.unwrap_or(0))?)?;
-                                i128::try_from(number).ok()
+                                Some(number)
                             })
                             .collect();
                         post.and_then(|post| index_of(state_values, &post))
@@ -330,9 +330,7 @@ impl Core {
             .iter()
             .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
                 Some(Constant::Bool(b)) => Ok(i128::from(*b)),
-                Some(Constant::Int(v)) => {
-                    i128::try_from(*v).map_err(|_| Stop::Invalid("genesis out of range".into()))
-                }
+                Some(Constant::Int(v)) => Ok(*v),
                 None => invalid("v2/policy.json genesis misses a state field"),
             })
             .collect::<Result<_>>()?;
@@ -2018,7 +2016,7 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
 
 #[cfg(test)]
 #[path = "../tests/support/cpmm.rs"]
-mod cpmm;
+pub(crate) mod cpmm;
 
 #[cfg(test)]
 #[path = "loop_judges_arithmetic_tests.rs"]
@@ -2034,23 +2032,25 @@ mod tests {
     fn arithmetic_law_writers_compile_and_check_with_the_native_laws() {
         let core = Core::from_sources(cpmm::project(2), cpmm::policy(2, 30, false).to_string())
             .unwrap_or_else(|error| panic!("core: {error:?}"));
-        let baseline = core.admissible(&[]).unwrap();
+        let baseline = core.admissible(&[]).unwrap_or_else(|e| panic!("{e:?}"));
         for text in [
             "(x + 1) * (y + 2) >= x * y",
             "mul_div_floor(amount, 30, 10000) <= mul_div_ceil(amount, 30, 10000)",
             "products_ge(x, 2, x, 2)",
             "products_ge(x, 2, 3, x, 2, 3)",
         ] {
-            let expression = parse(text, 0, Allow::PLAIN).unwrap();
-            let law = core.law_text(&expression).unwrap();
+            let expression = parse(text, 0, Allow::PLAIN).unwrap_or_else(|e| panic!("{e:?}"));
+            let law = core
+                .law_text(&expression)
+                .unwrap_or_else(|e| panic!("{e:?}"));
             let admitted = core
                 .admissible(&[("commit".to_owned(), law.clone())])
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
             assert_eq!(admitted, baseline, "{text}: {law}");
         }
         let constrained = core
             .admissible(&[("commit".to_owned(), cpmm::RELATION.to_owned())])
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{e:?}"));
         assert_ne!(
             constrained, baseline,
             "product comparison admitted every successor"

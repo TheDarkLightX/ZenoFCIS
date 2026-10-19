@@ -307,13 +307,13 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize) -> Result<Value, String>
                 false,
             )
         }
-        Ast::MulDiv(r, a, b, h) => fused(d, *r, false, a, b, h, None, fuel),
-        Ast::SignedMulDivFloor(a, b, h) => fused(d, Rounding::Floor, true, a, b, h, None, fuel),
+        Ast::MulDiv(r, a, b, h) => fused(d, *r, false, (a, b, h), None, fuel),
+        Ast::SignedMulDivFloor(a, b, h) => fused(d, Rounding::Floor, true, (a, b, h), None, fuel),
         Ast::ScaledMulDiv(r, signed, a, b, h, q) => {
             if !strict {
                 return Err("scaled call requires declared units and scales".into());
             }
-            fused(d, *r, *signed, a, b, h, Some(*q), fuel)
+            fused(d, *r, *signed, (a, b, h), Some(*q), fuel)
         }
         Ast::RepeatMulDiv(signed, x, a, h, p) => {
             if *p > 16 {
@@ -410,9 +410,7 @@ fn fused(
     d: &Declarations,
     r: Rounding,
     signed: bool,
-    a: &Ast,
-    b: &Ast,
-    h: &Ast,
+    (a, b, h): (&Ast, &Ast, &Ast),
     target: Option<u8>,
     fuel: &mut usize,
 ) -> Result<Value, String> {

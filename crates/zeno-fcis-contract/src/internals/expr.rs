@@ -346,26 +346,6 @@ pub fn render(ast: &Ast) -> String {
     text
 }
 
-#[cfg(test)]
-mod signed_literal_tests {
-    use super::*;
-
-    #[test]
-    fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {
-        assert_eq!(parse(&i128::MIN.to_string()), Ok(Ast::Int(i128::MIN)));
-        assert_eq!(parse(&i128::MAX.to_string()), Ok(Ast::Int(i128::MAX)));
-        assert_eq!(parse("-1"), Ok(Ast::Neg(Box::new(Ast::Int(1)))));
-        for text in [
-            "170141183460469231731687303715884105728",
-            "-170141183460469231731687303715884105729",
-        ] {
-            assert!(parse(text).is_err(), "{text}");
-        }
-        let tree = Ast::Int(i128::MIN);
-        assert_eq!(parse(&render(&tree)), Ok(tree));
-    }
-}
-
 /// Writes `ast` where only operators binding at least as tightly as `level`
 /// may stand without parentheses.
 fn write(ast: &Ast, level: u8, out: &mut String) {
@@ -718,5 +698,25 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ValueExpr::Var(name) if name.as_str() == "decision_reason" => Ok(Ast::DecisionReason),
         ValueExpr::Var(name) => Err(format!("free variable `{}`", name.as_str())),
         ValueExpr::Sum { .. } => Err("sum".to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod signed_literal_tests {
+    use super::*;
+
+    #[test]
+    fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {
+        assert_eq!(parse(&i128::MIN.to_string()), Ok(Ast::Int(i128::MIN)));
+        assert_eq!(parse(&i128::MAX.to_string()), Ok(Ast::Int(i128::MAX)));
+        assert_eq!(parse("-1"), Ok(Ast::Neg(Box::new(Ast::Int(1)))));
+        for text in [
+            "170141183460469231731687303715884105728",
+            "-170141183460469231731687303715884105729",
+        ] {
+            assert!(parse(text).is_err(), "{text}");
+        }
+        let tree = Ast::Int(i128::MIN);
+        assert_eq!(parse(&render(&tree)), Ok(tree));
     }
 }

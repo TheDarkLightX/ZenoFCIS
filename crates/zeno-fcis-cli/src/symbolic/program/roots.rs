@@ -222,8 +222,8 @@ mod tests {
             ([1i128, 0i128], [0i128, 0, 1, 0, 7, 0]),
         ] {
             let assignment = BTreeMap::from([
-                ("x0".to_owned(), i128::from(raw_input[0])),
-                ("x1".to_owned(), i128::from(raw_input[1])),
+                ("x0".to_owned(), raw_input[0]),
+                ("x1".to_owned(), raw_input[1]),
             ]);
             let evaluation = script
                 .evaluate(&assignment)
@@ -231,10 +231,7 @@ mod tests {
             let observed: Vec<Option<i128>> = (0..roots.len())
                 .map(|position| evaluation.int(&format!("root_out{position}")))
                 .collect();
-            assert_eq!(
-                observed,
-                expected.map(|wire| Some(i128::from(wire))).to_vec()
-            );
+            assert_eq!(observed, expected.map(Some).to_vec());
             assert_eq!(evaluation.boolean("root_admitted"), Some(true));
             let (actual, _) = finite::execute_v2(
                 &input_domains,

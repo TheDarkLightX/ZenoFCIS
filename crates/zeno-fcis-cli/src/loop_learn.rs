@@ -443,7 +443,7 @@ mod tests {
             "vocabulary":{{"arithmetic":["mul_div_floor"],"compare":["products_ge"]}},
             "examples":[{{"input":[{wide}],"output":[{wide}]}}]}}"#
         );
-        let spec = specification(bytes.as_bytes()).unwrap();
+        let spec = specification(bytes.as_bytes()).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             spec.inputs,
             vec![Domain::Int {

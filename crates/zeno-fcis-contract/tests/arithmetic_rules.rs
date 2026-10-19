@@ -86,11 +86,8 @@ fn generic_fee_is_computed_by_the_authority_on_every_reduced_tuple() {
                                     panic!("Authority refused {input:?}: {result:?}")
                                 };
                                 let expected = (amount * rate + 9) / 10;
-                                assert_eq!(decision.post[0].1.number(), Some(expected as i128));
-                                assert_eq!(
-                                    decision.post[1].1.number(),
-                                    Some((amount - expected) as i128)
-                                );
+                                assert_eq!(decision.post[0].1.number(), Some(expected));
+                                assert_eq!(decision.post[1].1.number(), Some(amount - expected));
                                 assert!(decision.outbox.is_empty());
                                 count += 1;
                             }
@@ -166,7 +163,7 @@ fn ceiling_quote_and_fitting_fused_quotient_use_authored_rules() {
                 let Outcome::Decision(decision) = actual else {
                     panic!("refused {actual:?}")
                 };
-                assert_eq!(decision.post[0].1.number(), Some(answer as i128));
+                assert_eq!(decision.post[0].1.number(), Some(answer));
             })
             .unwrap();
         });
@@ -256,9 +253,8 @@ fn successful_authority_path_controls_reject_fee_stubs_and_disabled_comparison()
         }
         match actual {
             Outcome::Decision(decision) => {
-                decision.post[0].1.number() == Some(((amount * rate + 9) / 10) as i128)
-                    && decision.post[1].1.number()
-                        == Some((amount - (amount * rate + 9) / 10) as i128)
+                decision.post[0].1.number() == Some((amount * rate + 9) / 10)
+                    && decision.post[1].1.number() == Some(amount - (amount * rate + 9) / 10)
             }
             Outcome::Refused(_) => false,
         }
@@ -367,8 +363,8 @@ law 500 exact_root on accept = products_ge(command.101.120, command.101.121, pos
         let framer = Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
         policy::with_authority(contract, schema, |authority| {
             let check = |a0: i128, a1: i128, proposed: i128| {
-                let product = i128::from(a0) * i128::from(a1);
-                let s = i128::from(proposed);
+                let product = a0 * a1;
+                let s = proposed;
                 let expected = s * s <= product && product < (s + 1) * (s + 1);
                 let actual = evaluate::evaluate(authority, &framer, &[0, a0, a1, proposed, 0]);
                 let Outcome::Decision(decision) = actual else {

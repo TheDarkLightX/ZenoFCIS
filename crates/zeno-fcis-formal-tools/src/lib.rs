@@ -4080,8 +4080,10 @@ fn fused_value_calls_refuse_in_unextended_backends() {
         ));
     }
     let formula = RelExpr::Compare(CompareOp::Eq, value, ValueExpr::Int(0));
-    let step = model_diagnostics::ModelStep::try_new(Vec::new()).unwrap();
-    let limits = model_diagnostics::DiagnosticLimits::try_new(1000, 1000, 1000).unwrap();
+    let step = model_diagnostics::ModelStep::try_new(Vec::new())
+        .unwrap_or_else(|| panic!("expected a value"));
+    let limits = model_diagnostics::DiagnosticLimits::try_new(1000, 1000, 1000)
+        .unwrap_or_else(|| panic!("expected a value"));
     let result = model_diagnostics::check_relation(
         &formula,
         model_diagnostics::ModelContext::new(&step, limits),

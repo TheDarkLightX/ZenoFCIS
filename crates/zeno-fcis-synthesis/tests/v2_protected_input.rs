@@ -9,7 +9,7 @@ use zeno_fcis_value::{Field, Value};
 #[test]
 fn actual_canonical_records_preserve_closed_mapping_and_opaque_usage() {
     let record = Value::record_canonical(vec![
-        Field::new(0, Value::signed(i128::MIN as i128)),
+        Field::new(0, Value::signed(i128::MIN)),
         Field::new(7, Value::boolean(true)),
         Field::new(32, Value::enumeration(u32::MAX, u16::MAX)),
         Field::new(u16::MAX, Value::sum(0, 7, None)),

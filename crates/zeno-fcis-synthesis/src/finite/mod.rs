@@ -221,12 +221,7 @@ fn digest_value(hash: Hash32) -> Result<Value, Error> {
 /// Canonical scalar tuple shared by the optional finite operation profiles.
 /// Boolean positions retain the finite ABI's exact integer values 0 and 1.
 fn finite_tuple(values: &[i128]) -> Result<Value, zeno_fcis_codec::EncodeError> {
-    tuple(
-        values
-            .iter()
-            .map(|value| Value::signed(i128::from(*value)))
-            .collect(),
-    )
+    tuple(values.iter().map(|value| Value::signed(*value)).collect())
 }
 
 /// Hard input-space ceiling, checked before any enumeration.
@@ -925,14 +920,9 @@ impl CandidateChecker for Checker<'_> {
                 let output = evaluated.then(|| self.program_output.clone());
                 let counterexample = (|| {
                     tuple(vec![
-                        tuple(
-                            self.input
-                                .iter()
-                                .map(|v| Value::signed((*v).into()))
-                                .collect(),
-                        )?,
+                        tuple(self.input.iter().map(|v| Value::signed(*v)).collect())?,
                         output.as_ref().map_or(Ok(Value::unit()), |out| {
-                            tuple(out.iter().map(|v| Value::signed((*v).into())).collect())
+                            tuple(out.iter().map(|v| Value::signed(*v)).collect())
                         })?,
                     ])
                 })();

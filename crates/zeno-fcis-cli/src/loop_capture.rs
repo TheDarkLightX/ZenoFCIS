@@ -1066,7 +1066,7 @@ fn status_loaded(
         }
     }
     let detail = if full {
-        json!({"session":session_report(&state),
+        json!({"session":session_report(state),
             "table_program":program_to_json(&match table.program(){Ok(p)=>p,Err(_)=>return refused("capture-reference-encoding")})})
     } else {
         json!({"source_sha256":state.source_sha256,"table_sha256":state.table_sha256,

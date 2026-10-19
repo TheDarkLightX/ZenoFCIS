@@ -597,15 +597,12 @@ fn lowered_graphs_replay_in_generated_rust_python_javascript() {
                 .replace(
                     &format!("== {values:?}"),
                     &format!(
-                        "== {}",
-                        format!(
-                            "({})",
-                            values
-                                .iter()
-                                .map(ToString::to_string)
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
+                        "== ({})",
+                        values
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     ),
                 ),
             )

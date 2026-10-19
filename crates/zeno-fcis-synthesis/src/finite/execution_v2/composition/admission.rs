@@ -188,9 +188,7 @@ fn matches_leaf(domain: Domain<'_>, leaf: &InputLeaf) -> bool {
     match (domain, leaf) {
         (Domain::Bool, InputLeaf::Bool) => true,
         (Domain::U128 { min: a, max: b }, InputLeaf::U128 { min: c, max: d }) => a == *c && b == *d,
-        (Domain::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => {
-            a == *c as i128 && b == *d as i128
-        }
+        (Domain::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => a == *c && b == *d,
         (
             Domain::Enum {
                 type_id: a,
@@ -477,8 +475,8 @@ fn branches(d: &Descriptor<'_>, fields: &[InputField]) -> bool {
     #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.branches.len(),d.decision_output<d.output_types.len(),d.output_types@[d.decision_output as int]==(InputLeaf::I128{min,max}),min<=max,max as int-min as int+1==d.branches@.len(),forall|j:int|0<=j<i==>spec::branch_valid(d,fields@,min,max,j),decreases d.branches.len()-i,))]
     while i < d.branches.len() {
         let b = d.branches[i];
-        if b.code < min as i128
-            || b.code > max as i128
+        if b.code < min
+            || b.code > max
             || (i > 0 && d.branches[i - 1].code >= b.code)
             || !reason(d, b.class, b.reason)
         {

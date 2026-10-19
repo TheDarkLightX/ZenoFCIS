@@ -146,7 +146,7 @@ pub(super) fn reify(leaf: &InputLeaf, code: i128) -> Option<Atom<'static>> {
         }
         InputLeaf::I128 { min, max } => {
             if *min <= code && code <= *max {
-                Some(Atom::I128(code as i128))
+                Some(Atom::I128(code))
             } else {
                 None
             }

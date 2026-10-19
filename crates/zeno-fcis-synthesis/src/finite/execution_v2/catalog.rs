@@ -137,6 +137,7 @@ impl<'a, D: DescriptorData<'a> + 'a> BoundCatalog<'a, D> {
         family_spec::bind(checked.view(), original_contract@, descriptor, framing,
             channel_roots@, max_contract_bytes),
 ))]
+#[cfg_attr(verus_keep_ghost, verifier::rlimit(80))]
 fn bind_checked<'a, D: DescriptorData<'a> + 'a>(
     checked: schema::Checked<'a>,
     original_contract: &'a [u8],

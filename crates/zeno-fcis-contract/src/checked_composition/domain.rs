@@ -105,7 +105,7 @@ impl FieldDomain {
                 } else {
                     let lower = (*min as u128) ^ (1u128 << 127);
                     let upper = (*max as u128) ^ (1u128 << 127);
-                    (upper - lower).checked_add(1).unwrap_or(u128::MAX)
+                    (upper - lower).saturating_add(1)
                 }
             }
             Self::Variants(variants) => variants.len() as u128,
@@ -117,10 +117,9 @@ impl FieldDomain {
     pub(crate) fn nth(&self, offset: u128) -> i128 {
         match self {
             Self::Bool => i128::from(offset != 0),
-            Self::Int { min, .. } => {
-                i128::try_from(i128::from(*min) + i128::try_from(offset).unwrap_or(i128::MAX))
-                    .unwrap_or(i128::MAX)
-            }
+            Self::Int { min, .. } => min
+                .checked_add(i128::try_from(offset).unwrap_or(i128::MAX))
+                .unwrap_or(i128::MAX),
             Self::Variants(variants) => usize::try_from(offset)
                 .ok()
                 .and_then(|at| variants.get(at).copied())

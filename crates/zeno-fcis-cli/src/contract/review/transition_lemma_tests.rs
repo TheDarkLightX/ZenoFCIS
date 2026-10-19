@@ -1,6 +1,5 @@
 use super::*;
-#[path = "../../../tests/support/cpmm.rs"]
-mod cpmm;
+use crate::loop_command::doors::judges::cpmm;
 
 fn judged(project: &str, policy: &str, formula: &str) -> Value {
     match judge_transitions(

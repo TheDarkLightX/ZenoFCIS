@@ -170,8 +170,11 @@ pub fn check_system_property(
 fn cardinality(domains: &[Domain]) -> Result<u64, Error> {
     domains.iter().try_fold(1u64, |count, domain| {
         let (min, max) = domain.bounds();
-        let width = u64::try_from(i128::from(max) - i128::from(min) + 1)
-            .map_err(|_| Error::Limit("system-space"))?;
+        let width = max
+            .checked_sub(min)
+            .and_then(|span| span.checked_add(1))
+            .and_then(|width| u64::try_from(width).ok())
+            .ok_or(Error::Limit("system-space"))?;
         count.checked_mul(width).ok_or(Error::Limit("system-space"))
     })
 }

@@ -10,7 +10,7 @@ fn posix_startup_completes_under_same_cpu_contention() {
         .arg(root.join("templates/durable-counter"))
         .arg("posix")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
     assert!(
         done.status.success(),
         "{}\n{}",
@@ -31,7 +31,7 @@ fn systemd_startup_completes_under_same_cpu_contention() {
         .arg(root.join("templates/durable-counter"))
         .arg("systemd")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
     assert!(
         done.status.success(),
         "{}\n{}",

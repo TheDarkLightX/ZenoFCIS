@@ -62,7 +62,7 @@ fn process_stat(text: &str, pid: u32) -> Result<(u64, u64), String> {
 
 fn clock_ticks(bytes: &[u8]) -> Result<u64, String> {
     const N: usize = size_of::<usize>();
-    if bytes.len() % (2 * N) != 0 {
+    if !bytes.len().is_multiple_of(2 * N) {
         return Err("stage-cpu-auxv".into());
     }
     for pair in bytes.chunks_exact(2 * N) {
@@ -325,7 +325,7 @@ mod tests {
             .arg("10")
             .process_group(0)
             .spawn()
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{e:?}"));
         let now = Instant::now();
         let results: Vec<_> = [18, 19, 20]
             .into_iter()
@@ -342,11 +342,11 @@ mod tests {
                 .map(|s| s.observation(false))
             })
             .collect();
-        child.kill().unwrap();
-        child.wait().unwrap();
+        child.kill().unwrap_or_else(|e| panic!("{e:?}"));
+        child.wait().unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(results[0], Err(super::super::STAGE_CPU_RESOLUTION.into()));
         assert_eq!(results[1], Err(super::super::STAGE_CPU_RESOLUTION.into()));
-        let boundary = results[2].as_ref().unwrap();
+        let boundary = results[2].as_ref().unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(boundary["cpu_finish_uncertainty_us"], 20_000);
         assert_eq!(boundary["cpu_budget_us"], 20_000);
         assert_eq!(
@@ -401,7 +401,11 @@ mod tests {
         );
         assert!(clock_ticks(&[]).is_err());
         assert!(clock_ticks(&[0]).is_err());
-        assert!(clock_ticks(&fs::read("/proc/self/auxv").unwrap()).unwrap() > 0);
+        assert!(
+            clock_ticks(&fs::read("/proc/self/auxv").unwrap_or_else(|e| panic!("{e:?}")))
+                .unwrap_or_else(|e| panic!("{e:?}"))
+                > 0
+        );
     }
     #[test]
     fn queued_finish_is_progress_but_idle_without_a_frame_refuses() {
@@ -410,8 +414,8 @@ mod tests {
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
-        fs::create_dir(&path).unwrap();
-        fs::write(path.join("cpu.stat"), "usage_usec 1000\n").unwrap();
+        fs::create_dir(&path).unwrap_or_else(|e| panic!("{e:?}"));
+        fs::write(path.join("cpu.stat"), "usage_usec 1000\n").unwrap_or_else(|e| panic!("{e:?}"));
         let now = Instant::now();
         let mut stage = StageBudget::new(
             "search",
@@ -422,7 +426,7 @@ mod tests {
             None,
             Some(&path),
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
         stage.progress = now - Duration::from_secs(3);
         assert_eq!(stage.check_progress(), Err("contained-deadline".into()));
         assert_eq!(
@@ -433,10 +437,11 @@ mod tests {
             stage.finish().is_ok(),
             "a queued valid FINISH can end idle, but must still pay independent CPU and wall checks"
         );
-        fs::write(path.join("cpu.stat"), "usage_usec 1001000\n").unwrap();
+        fs::write(path.join("cpu.stat"), "usage_usec 1001000\n")
+            .unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(stage.finish(), Err("contained-deadline".into()));
         assert_eq!(stage.observation(false)["stopped_by"], "cpu");
-        fs::remove_dir_all(path).unwrap();
+        fs::remove_dir_all(path).unwrap_or_else(|e| panic!("{e:?}"));
     }
     #[test]
     fn cpu_budget_finish_regression_missing_counter_and_wall_deadline_refuse() {
@@ -445,9 +450,9 @@ mod tests {
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
-        fs::create_dir(&path).unwrap();
+        fs::create_dir(&path).unwrap_or_else(|e| panic!("{e:?}"));
         let file = path.join("cpu.stat");
-        fs::write(&file, "usage_usec 1000\n").unwrap();
+        fs::write(&file, "usage_usec 1000\n").unwrap_or_else(|e| panic!("{e:?}"));
         let now = Instant::now();
         let mut stage = StageBudget::new(
             "check",
@@ -458,26 +463,26 @@ mod tests {
             None,
             Some(&path),
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             stage.wall_deadline().duration_since(stage.active),
             Duration::from_millis(2900)
         );
-        fs::write(&file, "usage_usec 100999\n").unwrap();
+        fs::write(&file, "usage_usec 100999\n").unwrap_or_else(|e| panic!("{e:?}"));
         assert!(stage.check(Instant::now()).is_ok());
         assert_eq!(stage.finish(), Ok(())); // Strict upper bound equals budget; actual CPU remains below it.
-        fs::write(&file, "usage_usec 101000\n").unwrap();
+        fs::write(&file, "usage_usec 101000\n").unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             stage.check(Instant::now()),
             Err("contained-deadline".into())
         );
         assert_eq!(stage.observation(false)["stopped_by"], "cpu");
-        fs::write(&file, "usage_usec 1000\n").unwrap();
+        fs::write(&file, "usage_usec 1000\n").unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             stage.check(Instant::now()),
             Err("stage-cpu-regressed".into())
         );
-        fs::remove_file(&file).unwrap();
+        fs::remove_file(&file).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             stage.check(Instant::now()),
             Err("stage-cpu-cgroup-unavailable".into())
@@ -487,6 +492,6 @@ mod tests {
             Err("contained-deadline".into())
         );
         assert_eq!(stage.observation(false)["stopped_by"], "wall");
-        fs::remove_dir(&path).unwrap();
+        fs::remove_dir(&path).unwrap_or_else(|e| panic!("{e:?}"));
     }
 }

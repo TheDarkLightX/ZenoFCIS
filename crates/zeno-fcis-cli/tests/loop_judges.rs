@@ -88,13 +88,14 @@ fn answers(items: &[Value]) -> Value {
 
 fn arithmetic_contract(directory: &Directory, successor: &str, condition: &str) -> String {
     let app = directory.0.join("arithmetic");
-    fs::create_dir_all(app.join("v2")).unwrap();
-    fs::write(app.join("project.zeno"), arithmetic_fixture::project()).unwrap();
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|e| panic!("{e:?}"));
+    fs::write(app.join("project.zeno"), arithmetic_fixture::project())
+        .unwrap_or_else(|e| panic!("{e:?}"));
     fs::write(
         app.join("v2/policy.json"),
         arithmetic_fixture::policy(successor, condition).to_string(),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("{e:?}"));
     app.to_string_lossy().into_owned()
 }
 

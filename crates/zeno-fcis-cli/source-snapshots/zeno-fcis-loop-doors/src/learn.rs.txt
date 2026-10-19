@@ -729,9 +729,7 @@ fn ordinal(point: &[i128], domains: &[Domain]) -> Result<usize, Stop> {
     for (v, d) in point.iter().zip(domains) {
         n = n
             .checked_mul(domain_size(*d))
-            .and_then(|n| {
-                n.checked_add(u128::try_from(i128::from(*v) - i128::from(d.bounds().0)).ok()?)
-            })
+            .and_then(|n| n.checked_add(u128::try_from(v.checked_sub(d.bounds().0)?).ok()?))
             .ok_or_else(|| Stop::Refused("learn-example-ordinal".into()))?;
     }
     usize::try_from(n).map_err(|_| Stop::Inconclusive("learn-domain-budget".into()))

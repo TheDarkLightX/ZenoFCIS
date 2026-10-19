@@ -191,41 +191,49 @@ mod tests {
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root)
+            .unwrap_or_else(|e| panic!("{e:?}"));
         let (ready, waiting) = mpsc::channel();
         let (resume, resumed) = mpsc::channel();
         let path = root.clone();
         let writer = std::thread::spawn(move || {
             publish_record(&path, "record.json", |f| {
                 f.write_all(b"{\"complete\":")?;
-                ready.send(()).unwrap();
-                resumed.recv().unwrap();
+                ready.send(()).unwrap_or_else(|e| panic!("{e:?}"));
+                resumed.recv().unwrap_or_else(|e| panic!("{e:?}"));
                 f.write_all(b"true}")?;
                 f.flush()
             })
         });
         waiting
             .recv_timeout(std::time::Duration::from_secs(5))
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{e:?}"));
         assert!(
             !root.join("record.json").exists(),
             "partial JSON must never be visible under final name"
         );
         assert_eq!(
             fs::symlink_metadata(root.join(".record.json.tmp"))
-                .unwrap()
+                .unwrap_or_else(|e| panic!("{e:?}"))
                 .mode()
                 & 0o777,
             0o600
         );
-        resume.send(()).unwrap();
-        writer.join().unwrap().unwrap();
-        let value: serde_json::Value =
-            serde_json::from_slice(&fs::read(root.join("record.json")).unwrap()).unwrap();
+        resume.send(()).unwrap_or_else(|e| panic!("{e:?}"));
+        writer
+            .join()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        let value: serde_json::Value = serde_json::from_slice(
+            &fs::read(root.join("record.json")).unwrap_or_else(|e| panic!("{e:?}")),
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(value, serde_json::json!({"complete":true}));
         assert_eq!(
             fs::symlink_metadata(root.join("record.json"))
-                .unwrap()
+                .unwrap_or_else(|e| panic!("{e:?}"))
                 .mode()
                 & 0o777,
             0o600
@@ -239,7 +247,7 @@ mod tests {
         );
         assert!(!root.join("failed.json").exists());
         assert!(!root.join(".failed.json.tmp").exists());
-        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(root).unwrap_or_else(|e| panic!("{e:?}"));
     }
 
     #[test]
@@ -254,14 +262,14 @@ mod tests {
         }
         use std::os::{fd::OwnedFd, unix::net::UnixStream};
         use std::process::{Command, Stdio};
-        let (writer, reader) = UnixStream::pair().unwrap();
+        let (writer, reader) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
         drop(reader);
-        let out = Command::new(std::env::current_exe().unwrap())
+        let out = Command::new(std::env::current_exe().unwrap_or_else(|e| panic!("{e:?}")))
             .args(["--exact", "checker_process::diagnostics::tests::failed_record_and_closed_stderr_do_not_change_exit", "--nocapture"])
             .env(PROBE, "1")
             .stdout(Stdio::piped())
             .stderr(Stdio::from(OwnedFd::from(writer)))
-            .output().unwrap();
+            .output().unwrap_or_else(|e| panic!("{e:?}"));
         assert!(out.status.success(), "{out:?}");
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("1 passed; 0 failed"),

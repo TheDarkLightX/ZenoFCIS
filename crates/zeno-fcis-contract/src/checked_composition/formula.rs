@@ -299,8 +299,8 @@ fn integer_declarations() -> Declarations {
         name: "Integer".to_owned(),
         quantity: None,
         form: TypeForm::Leaf(Leaf::I128 {
-            min: i128::from(i128::MIN),
-            max: i128::from(i128::MAX),
+            min: i128::MIN,
+            max: i128::MAX,
         }),
     };
     Declarations {
@@ -324,7 +324,7 @@ fn record(tuple: &[i128]) -> Vec<c::Field<'static>> {
         .enumerate()
         .map(|(index, value)| c::Field {
             id: u16::try_from(index + 1).unwrap_or(u16::MAX),
-            value: c::Atom::I128(i128::from(*value)),
+            value: c::Atom::I128(*value),
         })
         .collect()
 }

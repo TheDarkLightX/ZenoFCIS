@@ -1334,10 +1334,7 @@ pub fn input_leaf(
             min: i128::MIN,
             max: i128::MAX,
         },
-        TypeKind::I128 { min, max } => {
-            let (min, max) = program_bounds(type_id, min, max)?;
-            InputLeaf::I128 { min, max }
-        }
+        TypeKind::I128 { min, max } => InputLeaf::I128 { min, max },
         TypeKind::Text => {
             return Err(ContractError::new(
                 "project.zeno",
@@ -1360,18 +1357,6 @@ fn scalar_domain(
             max: variants.last().copied().map_or(0, i128::from),
         },
     })
-}
-
-fn program_bounds(type_id: u32, min: i128, max: i128) -> Result<(i128, i128), ContractError> {
-    i128::try_from(min)
-        .ok()
-        .zip(i128::try_from(max).ok())
-        .ok_or_else(|| {
-            ContractError::new(
-                "project.zeno",
-                format!("type {type_id} range exceeds the 128-bit program range"),
-            )
-        })
 }
 
 fn root_schema(declarations: &Declarations, root: u32) -> Result<RootSchema, ContractError> {

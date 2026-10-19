@@ -27,12 +27,7 @@ fn plan_value(plan: &CompletionPlan) -> Value {
                 .map(|row| {
                     tuple(vec![
                         Value::unsigned(row.remaining.into()),
-                        tuple(
-                            row.command
-                                .iter()
-                                .map(|v| Value::signed((*v).into()))
-                                .collect(),
-                        ),
+                        tuple(row.command.iter().map(|v| Value::signed(*v)).collect()),
                     ])
                 })
                 .collect(),

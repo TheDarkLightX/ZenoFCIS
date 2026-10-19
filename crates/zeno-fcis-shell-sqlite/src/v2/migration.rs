@@ -514,7 +514,7 @@ impl<'d> Root<'d> {
     fn size(&self) -> Option<u128> {
         self.leaves.iter().try_fold(1u128, |size, leaf| {
             let (min, max) = bounds(leaf)?;
-            let width = u128::try_from(i128::from(max) - i128::from(min)).ok()?;
+            let width = u128::try_from(max.checked_sub(min)?).ok()?;
             size.checked_mul(width.checked_add(1)?)
         })
     }
@@ -548,8 +548,8 @@ impl<'d> Root<'d> {
         let mut codes = vec![0; self.leaves.len()];
         for (code, leaf) in codes.iter_mut().zip(&self.leaves).rev() {
             let (min, max) = bounds(leaf)?;
-            let width = u128::try_from(i128::from(max) - i128::from(min)).ok()? + 1;
-            *code = i128::try_from(i128::from(min) + i128::try_from(index % width).ok()?).ok()?;
+            let width = u128::try_from(max.checked_sub(min)?).ok()? + 1;
+            *code = min.checked_add(i128::try_from(index % width).ok()?)?;
             index /= width;
         }
         (index == 0).then_some(codes)
@@ -633,7 +633,7 @@ impl<'d> Root<'d> {
             .iter()
             .zip(&self.leaves)
             .zip(codes)
-            .map(|((id, leaf), code)| (*id, number(leaf, *code).unwrap_or(i128::from(*code))))
+            .map(|((id, leaf), code)| (*id, number(leaf, *code).unwrap_or(*code)))
             .collect()
     }
 }
@@ -654,7 +654,7 @@ fn bounds(leaf: &Leaf) -> Option<(i128, i128)> {
 /// variant's ID.
 fn number(leaf: &Leaf, code: i128) -> Option<i128> {
     match leaf {
-        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => Some(i128::from(code)),
+        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => Some(code),
         Leaf::Enum { variants, .. } | Leaf::Sum { variants, .. } => variants
             .iter()
             .find(|variant| variant.code == code)
@@ -666,7 +666,7 @@ fn number(leaf: &Leaf, code: i128) -> Option<i128> {
 /// The code of a number in a leaf's domain; `None` outside it.
 fn code(leaf: &Leaf, number: i128) -> Option<i128> {
     let code = match leaf {
-        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => i128::try_from(number).ok()?,
+        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => number,
         Leaf::Enum { variants, .. } | Leaf::Sum { variants, .. } => {
             variants
                 .iter()
@@ -687,7 +687,7 @@ fn atom(leaf: &Leaf, code: i128) -> Option<c::Atom<'static>> {
             1 => true,
             _ => return None,
         }),
-        Leaf::I128 { .. } => c::Atom::I128(i128::from(code)),
+        Leaf::I128 { .. } => c::Atom::I128(code),
         Leaf::U128 { .. } => c::Atom::U128(u128::try_from(code).ok()?),
         Leaf::Enum {
             type_id, variants, ..
@@ -853,10 +853,10 @@ fn program_total(fields: &[u16], program: &Program, old: &Root<'_>, target: &Lea
             .leaves
             .iter()
             .zip(&codes)
-            .map(|(leaf, value)| i128::try_from(number(leaf, *value)?).ok())
+            .map(|(leaf, value)| number(leaf, *value))
             .collect::<Option<Vec<_>>>()?;
         let result = program.evaluate(&input).ok()?;
-        code(target, i128::from(*result.first()?))?;
+        code(target, *result.first()?)?;
         root.next(&mut codes);
     }
     Some(())
@@ -890,11 +890,10 @@ fn apply(
                 }),
                 Source::Program { fields, program } => fields
                     .iter()
-                    .map(|field| i128::try_from(value(*field)?).ok())
+                    .map(|field| value(*field))
                     .collect::<Option<Vec<_>>>()
                     .and_then(|input| program.evaluate(&input).ok())
-                    .and_then(|output| output.first().copied())
-                    .map(i128::from),
+                    .and_then(|output| output.first().copied()),
             };
             number
                 .and_then(|number| code(leaf, number))

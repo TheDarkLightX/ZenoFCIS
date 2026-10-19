@@ -134,13 +134,12 @@ impl<'a> TopDown<'a> {
                         | Node::MulDivFloor(..)
                         | Node::MulDivCeil(..)
                         | Node::ProductsGe(..)
-                ) {
-                    if let Some(id) = id {
-                        if kinds[k] == Kind::Bool {
-                            self.atoms_bool.push(id);
-                        } else {
-                            self.atoms_int.push(id);
-                        }
+                ) && let Some(id) = id
+                {
+                    if kinds[k] == Kind::Bool {
+                        self.atoms_bool.push(id);
+                    } else {
+                        self.atoms_int.push(id);
                     }
                 }
             }

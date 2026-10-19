@@ -38,9 +38,9 @@ use crate::subject::{Subject, domain_size};
 use crate::{Refusal, Result};
 
 /// The least value a position can hold: values are signed 128-bit integers.
-pub const MIN: i128 = i128::MIN as i128;
+pub const MIN: i128 = i128::MIN;
 /// The greatest value a position can hold.
-pub const MAX: i128 = i128::MAX as i128;
+pub const MAX: i128 = i128::MAX;
 
 /// The requirement on one position, per tuple.
 ///
@@ -69,7 +69,7 @@ pub struct Need {
 }
 
 fn wide(values: &[i128]) -> Vec<i128> {
-    values.iter().map(|v| i128::from(*v)).collect()
+    values.to_vec()
 }
 
 impl Need {
@@ -105,7 +105,7 @@ impl Need {
     pub fn accepts(&self, values: &[i128]) -> Vec<bool> {
         (0..self.len())
             .map(|t| {
-                let v = i128::from(values[t]);
+                let v = values[t];
                 (!self.has_eq[t] || v == self.eq[t])
                     && v >= self.lo[t]
                     && v <= self.hi[t]
@@ -412,8 +412,8 @@ fn derive_with(
                             neq: Vec::new(),
                             impossible: imp,
                         };
-                        for t in 0..n {
-                            let (exact, _) = inverse(need.eq[t], s[t]);
+                        for (t, &side) in s.iter().enumerate().take(n) {
+                            let (exact, _) = inverse(need.eq[t], side);
                             next.eq[t] = exact.unwrap_or(0);
                             next.impossible[t] |= need.has_eq[t] && exact.is_none();
                             next.impossible[t] |= need.lo[t] > need.hi[t];
@@ -422,8 +422,8 @@ fn derive_with(
                             } else {
                                 (need.lo[t], need.hi[t])
                             };
-                            let (lower_exact, lower_clipped) = inverse(lower, s[t]);
-                            let (upper_exact, upper_clipped) = inverse(upper, s[t]);
+                            let (lower_exact, lower_clipped) = inverse(lower, side);
+                            let (upper_exact, upper_clipped) = inverse(upper, side);
                             next.lo[t] = lower_clipped;
                             next.hi[t] = upper_clipped;
                             next.impossible[t] |= lower_exact.is_none() && lower_clipped == MAX;
@@ -639,8 +639,8 @@ pub fn solve_constant(need: &Need, prefer: &[i128]) -> Option<i128> {
     if first_unsatisfiable(need).is_some() {
         return None;
     }
-    let mut lo = need.lo.iter().copied().max().unwrap_or(MIN).max(MIN);
-    let mut hi = need.hi.iter().copied().min().unwrap_or(MAX).min(MAX);
+    let mut lo = need.lo.iter().copied().max().unwrap_or(MIN);
+    let mut hi = need.hi.iter().copied().min().unwrap_or(MAX);
     if need.kind == Kind::Bool {
         lo = lo.max(0);
         hi = hi.min(1);
@@ -665,16 +665,16 @@ pub fn solve_constant(need: &Need, prefer: &[i128]) -> Option<i128> {
     }
     let feasible = |c: i128| lo <= c && c <= hi && !forbidden.contains(&c);
     if let Some(c) = fixed.first() {
-        return feasible(*c).then(|| i128::try_from(*c).ok()).flatten();
+        return feasible(*c).then_some(*c);
     }
-    if let Some(c) = prefer.iter().find(|c| feasible(i128::from(**c))) {
+    if let Some(c) = prefer.iter().find(|c| feasible(**c)) {
         return Some(*c);
     }
     let start = lo.max(0).min(hi);
     for step in 0..=i128::try_from(forbidden.len()).unwrap_or(MAX) {
         for c in [start.saturating_add(step), start.saturating_sub(step)] {
             if feasible(c) {
-                return i128::try_from(c).ok();
+                return Some(c);
             }
         }
     }
@@ -947,13 +947,7 @@ pub fn solve_expression(
         // Every required value is within the 128-bit range: the need is
         // satisfiable.
         let target: Vec<i128> = (0..need.len())
-            .map(|t| {
-                if need.has_eq[t] {
-                    i128::try_from(need.eq[t]).unwrap_or(0)
-                } else {
-                    0
-                }
-            })
+            .map(|t| if need.has_eq[t] { need.eq[t] } else { 0 })
             .collect();
         if let Some(expr) = synthesizer.solve(&target, &need.has_eq, need.kind, depth, false)? {
             let values = evaluate(&expr, &env, &none)?;

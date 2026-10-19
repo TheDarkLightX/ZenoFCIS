@@ -18,7 +18,7 @@ fn wide_door_judge_and_workspace_reports_round_trip_through_real_readers() {
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .current_dir(root)
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
     assert!(
         done.status.success(),
         "{}\n{}",

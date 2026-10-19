@@ -27,8 +27,8 @@ impl Domain {
         let (min, max) = self.bounds();
         tuple(vec![
             Value::boolean(self.boolean()),
-            Value::signed(min.into()),
-            Value::signed(max.into()),
+            Value::signed(min),
+            Value::signed(max),
         ])
     }
 }
@@ -47,7 +47,7 @@ impl Op {
         };
         match *self {
             Self::Input(a) => ints(0, &[a.into()]),
-            Self::Int(a) => ints(1, &[a.into()]),
+            Self::Int(a) => ints(1, &[a]),
             Self::Bool(a) => ints(2, &[i128::from(a)]),
             Self::Add(a, b) => ints(3, &[a.into(), b.into()]),
             Self::Sub(a, b) => ints(4, &[a.into(), b.into()]),

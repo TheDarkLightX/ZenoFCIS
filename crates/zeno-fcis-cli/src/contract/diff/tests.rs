@@ -84,13 +84,23 @@ impl Files {
             adoptions: Vec::new(),
         };
         if !adoptions.is_empty() {
-            let mut rules: Value = serde_json::from_str(&result.rules).unwrap();
-            rules.as_object_mut().unwrap().remove("adoptions");
-            result.rules = serde_json::to_string(&rules).unwrap();
+            let mut rules: Value =
+                serde_json::from_str(&result.rules).unwrap_or_else(|e| panic!("{e:?}"));
+            rules
+                .as_object_mut()
+                .unwrap_or_else(|| panic!("expected a value"))
+                .remove("adoptions");
+            result.rules = serde_json::to_string(&rules).unwrap_or_else(|e| panic!("{e:?}"));
             for (historical, _) in adoptions {
-                let old =
-                    zeno_fcis_synthesis::finite_runtime::import_i64_program(&historical).unwrap();
-                assert_eq!(old.value().unwrap().zcve_bytes().unwrap(), historical);
+                let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(&historical)
+                    .unwrap_or_else(|e| panic!("{e:?}"));
+                assert_eq!(
+                    old.value()
+                        .unwrap_or_else(|e| panic!("{e:?}"))
+                        .zcve_bytes()
+                        .unwrap_or_else(|e| panic!("{e:?}")),
+                    historical
+                );
                 let profile = old.profile().as_bytes();
                 assert_eq!(
                     &historical[..10],
@@ -101,7 +111,8 @@ impl Files {
                 candidate[9] += 1;
                 candidate.extend_from_slice(old.profile().replace("i64", "i128").as_bytes());
                 candidate.extend_from_slice(&historical[10 + profile.len()..]);
-                let historical_graph = import_program(&candidate).unwrap();
+                let historical_graph =
+                    import_program(&candidate).unwrap_or_else(|e| panic!("{e:?}"));
                 let outputs = historical_graph
                     .outputs()
                     .iter()
@@ -123,11 +134,11 @@ impl Files {
                     historical_graph.nodes().to_vec(),
                     historical_graph.roots().to_vec(),
                 )
-                .unwrap();
-                let candidate = program_bytes(&main).unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
+                let candidate = program_bytes(&main).unwrap_or_else(|e| panic!("{e:?}"));
                 let size = crate::transform::domain_size(main.inputs())
-                    .unwrap()
-                    .unwrap();
+                    .unwrap_or_else(|e| panic!("{e:?}"))
+                    .unwrap_or_else(|| panic!("expected a value"));
                 assert!(size <= u128::from(DEFAULT_MAX_INPUT_TUPLES));
                 // Bounded legacy cross-check; the independent adoption checker
                 // below still checks the complete current-route domain.
@@ -135,12 +146,16 @@ impl Files {
                     let mut tuple = crate::transform::first_tuple(main.inputs());
                     for (value, domain) in tuple.iter_mut().zip(main.inputs()).rev() {
                         let (min, max) = domain.bounds();
-                        let width = u128::try_from(max - min).unwrap() + 1;
-                        *value += i128::try_from(ordinal % width).unwrap();
+                        let width =
+                            u128::try_from(max - min).unwrap_or_else(|e| panic!("{e:?}")) + 1;
+                        *value +=
+                            i128::try_from(ordinal % width).unwrap_or_else(|e| panic!("{e:?}"));
                         ordinal /= width;
                     }
-                    let narrow: Vec<i64> =
-                        tuple.iter().map(|v| i64::try_from(*v).unwrap()).collect();
+                    let narrow: Vec<i64> = tuple
+                        .iter()
+                        .map(|v| i64::try_from(*v).unwrap_or_else(|e| panic!("{e:?}")))
+                        .collect();
                     assert_eq!(
                         old.evaluate(&narrow)
                             .map(|row| row.into_iter().map(i128::from).collect::<Vec<_>>()),
@@ -148,7 +163,8 @@ impl Files {
                     );
                 }
                 let sources = result.adoption_sources();
-                let current = generate_contract(result.sources(&sources)).unwrap();
+                let current =
+                    generate_contract(result.sources(&sources)).unwrap_or_else(|e| panic!("{e:?}"));
                 let receipt = transform::check(
                     current.program(),
                     &candidate,
@@ -157,7 +173,7 @@ impl Files {
                         input_tuples: DEFAULT_MAX_INPUT_TUPLES,
                     },
                 )
-                .unwrap()
+                .unwrap_or_else(|e| panic!("{e:?}"))
                 .receipt();
                 let plan = CheckedCandidate::check(
                     result.sources(&sources),
@@ -165,7 +181,7 @@ impl Files {
                     receipt.clone(),
                 )
                 .and_then(|checked| checked.plan(result.sources(&sources), Usage::NewVersion))
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
                 result.rules = plan.rules().to_owned();
                 result.adoptions.push((candidate, receipt));
             }

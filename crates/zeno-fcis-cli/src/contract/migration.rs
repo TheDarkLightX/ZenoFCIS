@@ -518,12 +518,7 @@ fn scalar_domain(kind: Kind<'_>) -> Result<ScalarDomain, String> {
             return Err("text has no supported finite migration expression domain".to_owned());
         }
     };
-    Ok(ScalarDomain::Int {
-        min: i128::try_from(min)
-            .map_err(|_| "expression domain exceeds checked i128".to_owned())?,
-        max: i128::try_from(max)
-            .map_err(|_| "expression domain exceeds checked i128".to_owned())?,
-    })
+    Ok(ScalarDomain::Int { min, max })
 }
 
 fn fields_syntax(fields: &[(u16, Field)]) -> Syntax {

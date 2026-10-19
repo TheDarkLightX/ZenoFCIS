@@ -1564,16 +1564,17 @@ mod posix_controls {
                 .spawn()
                 .unwrap_or_else(|e| panic!("{e}"));
             let (guardian_pid, worker) = find_worker(child.id(), true);
-            let stat = fs::read_to_string(format!("/proc/{guardian_pid}/stat")).unwrap();
+            let stat = fs::read_to_string(format!("/proc/{guardian_pid}/stat"))
+                .unwrap_or_else(|e| panic!("{e:?}"));
             let guardian_ticks: u64 = stat
                 .rsplit_once(") ")
-                .unwrap()
+                .unwrap_or_else(|| panic!("expected a value"))
                 .1
                 .split_whitespace()
                 .nth(19)
-                .unwrap()
+                .unwrap_or_else(|| panic!("expected a value"))
                 .parse()
-                .unwrap();
+                .unwrap_or_else(|e| panic!("{e:?}"));
             signal(worker, nix::sys::signal::Signal::SIGSTOP);
             let caller = child.id();
             // Independent harness: caller guardian30s plus bounded3s+1s
@@ -1597,11 +1598,11 @@ mod posix_controls {
             let root =
                 Path::new("/tmp").join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
             let records: Vec<_> = fs::read_dir(root)
-                .unwrap()
-                .map(|e| e.unwrap().path())
+                .unwrap_or_else(|e| panic!("{e:?}"))
+                .map(|e| e.unwrap_or_else(|e| panic!("{e:?}")).path())
                 .filter(|p| {
                     p.file_name()
-                        .unwrap()
+                        .unwrap_or_else(|| panic!("expected a value"))
                         .to_string_lossy()
                         .starts_with(&format!("{guardian_pid}-"))
                 })
@@ -1615,7 +1616,9 @@ mod posix_controls {
             let timing = &records[0];
             assert_eq!(timing["worker_pid"], worker);
             assert_eq!(timing["worker_budget_ms"], 25000);
-            let worker_ms = timing["worker_observed_ms"].as_u64().unwrap();
+            let worker_ms = timing["worker_observed_ms"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("expected a value"));
             // One second is scheduling/observation tolerance, not a renewed cap.
             assert!(
                 worker_ms < 26000,

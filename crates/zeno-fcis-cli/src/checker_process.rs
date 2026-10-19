@@ -1618,14 +1618,14 @@ mod linux {
                 }
                 // Read protocol progress before deciding that the stage is idle.
                 // A queued FINISH still pays CPU/rounding and absolute wall caps.
-                if let Some(stage) = active.as_mut() {
-                    if let Err(reason) = stage.check_progress() {
-                        timing.set(
-                            "idle_waiters",
-                            super::diagnostics::waiters(owned.group.as_deref(), owned.child.id()),
-                        );
-                        return Err(reason);
-                    }
+                if let Some(stage) = active.as_mut()
+                    && let Err(reason) = stage.check_progress()
+                {
+                    timing.set(
+                        "idle_waiters",
+                        super::diagnostics::waiters(owned.group.as_deref(), owned.child.id()),
+                    );
+                    return Err(reason);
                 }
                 if let Some(status) = owned.poll_exit()? {
                     if let Some(g) = guardian.as_mut() {
@@ -3389,9 +3389,10 @@ mod tests {
                 r["observer"] == "worker-supervisor"
                     && r["unit"] == unit
                     && r["process_start_ticks"]
-                        == diagnostics::process_start_ticks(std::process::id()).unwrap()
+                        == diagnostics::process_start_ticks(std::process::id())
+                            .unwrap_or_else(|| panic!("expected a value"))
             })
-            .unwrap();
+            .unwrap_or_else(|| panic!("expected a value"));
         assert_eq!(observation["cleanup_verified"], true);
         assert_eq!(observation["stages"][0]["stopped_by"], "cpu");
         assert_eq!(
@@ -3401,7 +3402,7 @@ mod tests {
         assert!(
             observation["stages"][0]["cpu_observed_us"]
                 .as_u64()
-                .unwrap()
+                .unwrap_or_else(|| panic!("expected a value"))
                 >= 1_000_000
         );
         println!("systemd-stage-control {observation}");

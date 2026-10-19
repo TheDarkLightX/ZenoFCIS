@@ -50,7 +50,7 @@ fn field(bytes: &[u8], position: &mut usize, descriptor: &Field) -> Option<i128>
                 return None;
             }
             let value = i128::from_be_bytes(take(bytes, position)?);
-            (*min as i128 <= value && value <= *max as i128).then_some(value as i128)
+            (*min <= value && value <= *max).then_some(value)
         }
         Leaf::Bool => match tag {
             1 => Some(0),
@@ -207,14 +207,11 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
     ];
     let mut bytes = std::vec![9, 0, 0, 0, 6];
     for (id, payload) in [
-        (
-            0u16,
-            [&[4][..], &(i128::MIN as i128).to_be_bytes()].concat(),
-        ),
+        (0u16, [&[4][..], &i128::MIN.to_be_bytes()].concat()),
         (1, std::vec![2]),
         (7, std::vec![7, 0, 0, 0, 0, 0, 0]),
         (256, std::vec![10, 255, 255, 255, 255, 255, 255, 0]),
-        (300, [&[4][..], &(i128::MAX as i128).to_be_bytes()].concat()),
+        (300, [&[4][..], &i128::MAX.to_be_bytes()].concat()),
         (u16::MAX, std::vec![1]),
     ] {
         bytes.extend_from_slice(&id.to_be_bytes());
@@ -607,10 +604,7 @@ fn migrated_account_signed_wire_reader_extremes() {
             let mut b = id.to_be_bytes().to_vec();
             b.push(4);
             b.extend(x.to_be_bytes());
-            assert_eq!(
-                decode_field(&b, 0, &field),
-                i128::try_from(x).ok().map(|n| (n, 19))
-            );
+            assert_eq!(decode_field(&b, 0, &field), Some((x, 19)));
             for end in 0..19 {
                 assert_eq!(decode_field(&b[..end], 0, &field), None);
             }

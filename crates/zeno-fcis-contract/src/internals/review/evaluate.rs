@@ -336,7 +336,7 @@ impl Framer {
 fn atom(kind: AtomKind, value: i128) -> c::Atom<'static> {
     match kind {
         AtomKind::Bool => c::Atom::Bool(value != 0),
-        AtomKind::Int => c::Atom::I128(i128::from(value)),
+        AtomKind::Int => c::Atom::I128(value),
         AtomKind::Sum(type_id) => c::Atom::Sum {
             type_id,
             variant: u16::try_from(value).unwrap_or(u16::MAX),

@@ -49,7 +49,7 @@ pub(crate) fn export(
         .map(|position| {
             let bounds = match &position.domain {
                 LeafDomain::Bool => (0, 1),
-                LeafDomain::Int { min, max } => (i128::from(*min), i128::from(*max)),
+                LeafDomain::Int { min, max } => (*min, *max),
                 LeafDomain::Sum { variants, .. } => (
                     i128::from(*variants.iter().min().unwrap_or(&0)),
                     i128::from(*variants.iter().max().unwrap_or(&0)),
@@ -242,13 +242,13 @@ fn inputs(
         .enumerate()
         .map(|(index, position)| {
             let term = if let Some(tuple) = tuple {
-                Term::Int(i128::from(tuple[index]))
+                Term::Int(tuple[index])
             } else {
                 let values = match &position.domain {
                     LeafDomain::Bool => Values::Range { min: 0, max: 1 },
                     LeafDomain::Int { min, max } => Values::Range {
-                        min: i128::from(*min),
-                        max: i128::from(*max),
+                        min: *min,
+                        max: *max,
                     },
                     LeafDomain::Sum { variants, .. } => {
                         Values::Set(variants.iter().map(|id| i128::from(*id)).collect())
@@ -610,10 +610,7 @@ fn ast(
             ));
         }
         Ast::Bool(value) => (Term::Bool(*value), Sort::Bool),
-        Ast::Int(value) => {
-            i128::try_from(*value).map_err(|_| refused("integer outside i128"))?;
-            (Term::Int(*value), Sort::Int)
-        }
+        Ast::Int(value) => (Term::Int(*value), Sort::Int),
         Ast::Name(name) => names
             .get(name)
             .cloned()
@@ -803,9 +800,9 @@ fn ranges(program: &Program) -> Result<(), ContractError> {
                         "inputs must be nonnegative scalar codes no larger than 65535",
                     ));
                 }
-                (i128::from(lo), i128::from(hi))
+                (lo, hi)
             }
-            Op::Int(value) => (i128::from(value), i128::from(value)),
+            Op::Int(value) => (value, value),
             Op::Bool(_) | Op::Eq(..) | Op::Lt(..) | Op::And(..) | Op::Not(..) => (0, 1),
             Op::Add(a, b) => {
                 let a = values[usize::from(a)];
@@ -834,11 +831,6 @@ fn ranges(program: &Program) -> Result<(), ContractError> {
             }
             _ => return Err(refused("unsupported scalar instruction")),
         };
-        if interval.0 < i128::from(i128::MIN) || interval.1 > i128::from(i128::MAX) {
-            return Err(refused(
-                "cannot establish eager i128 arithmetic safety for this program",
-            ));
-        }
         values.push(interval);
     }
     Ok(())
@@ -913,11 +905,6 @@ fn ast_ranges(
             ));
         }
     };
-    if interval.0 < i128::from(i128::MIN) || interval.1 > i128::from(i128::MAX) {
-        return Err(refused(
-            "cannot establish authored eager i128 arithmetic safety",
-        ));
-    }
     Ok(interval)
 }
 
@@ -966,11 +953,7 @@ impl Tau {
 
     fn int(&mut self, term: &Term) -> Result<String, ContractError> {
         Ok(match term {
-            Term::Int(value) => {
-                let value = i128::try_from(*value)
-                    .map_err(|_| refused("Tau integer outside the signed representation"))?;
-                format!("{{{}}}:bv[128]", value as u128)
-            }
+            Term::Int(value) => format!("{{{}}}:bv[128]", *value as u128),
             Term::Name(name) if self.sorts.get(name) == Some(&Sort::Int) => name.clone(),
             Term::Add(a, b) | Term::Sub(a, b) => {
                 let a = self.int(a)?;
@@ -1168,7 +1151,7 @@ mod tests {
             "{340282366920938463463374607431768211455}:bv[128]"
         );
         assert_eq!(
-            tau.int(&Term::Int(i128::from(i128::MIN)))
+            tau.int(&Term::Int(i128::MIN))
                 .unwrap_or_else(|error| panic!("cannot render the signed boundary query: {error}")),
             "{170141183460469231731687303715884105728}:bv[128]"
         );
@@ -1181,7 +1164,7 @@ mod tests {
             Box::new(Ast::Bool(false)),
             Box::new(Ast::Binary(
                 Binary::Sub,
-                Box::new(Ast::Int(i128::from(i128::MIN))),
+                Box::new(Ast::Int(i128::MIN)),
                 Box::new(Ast::Int(1)),
             )),
             Box::new(Ast::Int(0)),

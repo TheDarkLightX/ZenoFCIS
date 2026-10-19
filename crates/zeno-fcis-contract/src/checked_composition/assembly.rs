@@ -484,7 +484,7 @@ fn eager(contract: &Contract<'_>, nodes: &[Node]) -> Result<(), Refusal> {
         .iter()
         .map(|domain| match domain {
             ScalarDomain::Bool => (0, 1),
-            ScalarDomain::Int { min, max } => (i128::from(*min), i128::from(*max)),
+            ScalarDomain::Int { min, max } => (*min, *max),
         })
         .collect();
     let intervals = term::intervals(nodes, &domains);
@@ -507,9 +507,7 @@ fn value_term(
 ) -> Option<u32> {
     match value {
         Expr::Constant(Atom::Bool(value)) => Some(arena.constant(*value)),
-        Expr::Constant(Atom::I128(value)) => {
-            i128::try_from(*value).ok().map(|value| arena.int(value))
-        }
+        Expr::Constant(Atom::I128(value)) => Some(arena.int(*value)),
         Expr::Constant(Atom::Sum { variant, .. }) => Some(arena.int(i128::from(*variant))),
         Expr::Constant(_) | Expr::Root(_) => None,
         Expr::Input(source, field) => input(arena, *source, *field),
@@ -1159,7 +1157,7 @@ fn observe(
         let value = match (position.source, position.field) {
             (Source::State, Some(field)) => match rules.genesis.get(&field) {
                 Some(Constant::Bool(value)) => i128::from(*value),
-                Some(Constant::Int(value)) => i128::try_from(*value).unwrap_or(i128::MAX),
+                Some(Constant::Int(value)) => *value,
                 None => position.domain.least().unwrap_or(0),
             },
             _ => position.domain.least().unwrap_or(0),

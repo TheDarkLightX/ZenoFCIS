@@ -336,7 +336,10 @@ fn capture_packet_coordinates_and_rows_keep_full_width_values() {
         assert_eq!(session["rows"][0][0], crate::report_numbers::integer(value));
         assert_eq!(state.rows[0][0], value);
         if value == 5 {
-            assert_eq!(session, serde_json::to_value(&state).unwrap());
+            assert_eq!(
+                session,
+                serde_json::to_value(&state).unwrap_or_else(|e| panic!("{e:?}"))
+            );
         }
         let packet = packet(&state, &table);
         let wire: Value = ok(serde_json::from_slice(&ok(serde_json::to_vec(&packet))));

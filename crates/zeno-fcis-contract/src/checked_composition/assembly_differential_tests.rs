@@ -44,8 +44,8 @@ impl Sample {
     }
 
     fn within(&mut self, (min, max): (i128, i128)) -> i128 {
-        let width = u64::try_from(i128::from(max) - i128::from(min) + 1).unwrap_or(u64::MAX);
-        let offset = i128::try_from(self.next() % width).unwrap_or_else(fail);
+        let width = u64::try_from(max - min + 1).unwrap_or(u64::MAX);
+        let offset = i128::from(self.next() % width);
         min + offset
     }
 }
@@ -54,7 +54,7 @@ impl Sample {
 fn value(expr: &Expr, outputs: &[i128], input: &dyn Fn(Source, u16) -> i128) -> i128 {
     match expr {
         Expr::Constant(Atom::Bool(value)) => i128::from(*value),
-        Expr::Constant(Atom::I128(value)) => i128::try_from(*value).unwrap_or_else(fail),
+        Expr::Constant(Atom::I128(value)) => *value,
         Expr::Constant(Atom::Sum { variant, .. }) => i128::from(*variant),
         Expr::Input(source, field) => input(*source, *field),
         Expr::Output(index) => outputs[*index],

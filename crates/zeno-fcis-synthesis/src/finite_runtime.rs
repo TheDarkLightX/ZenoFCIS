@@ -68,10 +68,10 @@ mod legacy {
                 if matches!(op, Op::SignedMulDivFloor(..)) {
                     return Err(Error::Invalid("program-encoding"));
                 }
-                if let Op::Int(value) = op {
-                    if i64::try_from(*value).is_err() {
-                        return Err(Error::Invalid("program-encoding"));
-                    }
+                if let Op::Int(value) = op
+                    && i64::try_from(*value).is_err()
+                {
+                    return Err(Error::Invalid("program-encoding"));
                 }
             }
             Ok(Self { program })

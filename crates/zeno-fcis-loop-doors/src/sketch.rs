@@ -399,12 +399,7 @@ fn path_to_hole(node: &Expr, k: usize) -> Result<Vec<u8>> {
 /// scratch; overflow never creates a supposedly complete search space.
 fn affine_hole(node: &Expr, env: &Env<'_>) -> Option<(usize, Vec<i128>, i128, i128)> {
     if let Expr::Hole(k, Hole::Const(None)) = node {
-        return Some((
-            *k,
-            vec![0; env.len],
-            i128::from(i128::MIN),
-            i128::from(i128::MAX),
-        ));
+        return Some((*k, vec![0; env.len], i128::MIN, i128::MAX));
     }
     let Expr::Bin(op @ (Op::Add | Op::Sub), a, b) = node else {
         return None;
@@ -506,10 +501,7 @@ impl Solver<'_> {
                 continue;
             };
             if hi.checked_sub(lo).is_some_and(|n| n <= 4096) {
-                let range = (i128::try_from(lo).ok(), i128::try_from(hi).ok());
-                if let (Some(lo), Some(hi)) = range {
-                    out.insert(k, (lo, hi));
-                }
+                out.insert(k, (lo, hi));
             }
         }
         Ok(out)
@@ -583,10 +575,10 @@ impl Solver<'_> {
                 let mut need = need.clone();
                 if let Some((lo, hi)) = range {
                     for v in &mut need.lo {
-                        *v = (*v).max(i128::from(*lo));
+                        *v = (*v).max(*lo);
                     }
                     for v in &mut need.hi {
-                        *v = (*v).min(i128::from(*hi));
+                        *v = (*v).min(*hi);
                     }
                 }
                 let mut prefer: BTreeSet<i128> = sketch_constants.clone();

@@ -1136,7 +1136,7 @@ pub(crate) fn for_each_tuple<E>(
 pub(crate) fn atom(domain: &LeafDomain, value: i128) -> c::Atom<'static> {
     match domain {
         LeafDomain::Bool => c::Atom::Bool(value != 0),
-        LeafDomain::Int { .. } => c::Atom::I128(i128::from(value)),
+        LeafDomain::Int { .. } => c::Atom::I128(value),
         LeafDomain::Sum { type_id, .. } => c::Atom::Sum {
             type_id: *type_id,
             variant: u16::try_from(value).unwrap_or(u16::MAX),
@@ -1147,7 +1147,7 @@ pub(crate) fn atom(domain: &LeafDomain, value: i128) -> c::Atom<'static> {
 pub(crate) fn number(atom: &Atom) -> Option<i128> {
     match atom {
         Atom::Bool(value) => Some(i128::from(*value)),
-        Atom::I128(value) => i128::try_from(*value).ok(),
+        Atom::I128(value) => Some(*value),
         Atom::U128(value) => i128::try_from(*value).ok(),
         Atom::Sum { variant, .. } => Some(i128::from(*variant)),
         Atom::Text(_) => None,

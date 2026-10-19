@@ -2510,7 +2510,7 @@ fn fusion_merges_roots_of_a_trapping_original_only_by_exact_tables() {
 
 #[test]
 fn wide_domain_sampling_and_width_caps_remain_total() {
-    let domain = DomainInfo::new(&[FULL]).unwrap();
+    let domain = DomainInfo::new(&[FULL]).unwrap_or_else(|| panic!("expected a value"));
     assert_eq!(domain.widths(), &[u64::MAX]);
     assert_eq!(domain.size(), None);
     let samples = super::signature::sample_tuples(&[

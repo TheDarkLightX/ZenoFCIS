@@ -115,9 +115,7 @@ fn fields(core: &Core) -> Result<Fields> {
         .filter(|p| p.source == Source::State)
         .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
             Some(Constant::Bool(b)) => Ok(i128::from(*b)),
-            Some(Constant::Int(v)) => {
-                i128::try_from(*v).map_err(|_| Stop::Invalid("compose-genesis-range".into()))
-            }
+            Some(Constant::Int(v)) => Ok(*v),
             None => refuse("compose-genesis-missing"),
         })
         .collect::<Result<Vec<_>>>()?;

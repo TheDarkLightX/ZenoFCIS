@@ -217,8 +217,8 @@ fn execute_into(
             input[5] != 0,
         ),
         branch: output[0],
-        deadline: output[1] as i128,
-        increment: output[2] as i128,
+        deadline: output[1],
+        increment: output[2],
     })
 }
 struct Report(Result<Facts, Failure>, Usage, Vec<ReadAttempt>);

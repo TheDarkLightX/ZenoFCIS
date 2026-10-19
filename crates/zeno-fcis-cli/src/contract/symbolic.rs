@@ -447,7 +447,7 @@ impl Context<'_> {
                         .find(|(id, _)| *id == field)
                         .and_then(|(_, atom)| match atom {
                             Atom::Bool(value) => Some(i128::from(*value)),
-                            Atom::I128(value) => i128::try_from(*value).ok(),
+                            Atom::I128(value) => Some(*value),
                             Atom::Sum { variant, .. } => Some(i128::from(*variant)),
                             _ => None,
                         }),
@@ -570,7 +570,7 @@ impl Replays<'_> {
                 let name = format!("x{index}");
                 let value = model
                     .get(&name)
-                    .and_then(|value| i128::try_from(*value).ok())
+                    .copied()
                     .ok_or_else(|| format!("the model has no 64-bit value for {name}"))?;
                 if admits(&position.domain, value) {
                     Ok(value)

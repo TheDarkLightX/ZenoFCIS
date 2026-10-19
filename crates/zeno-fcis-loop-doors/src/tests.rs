@@ -21,8 +21,8 @@ use crate::expr::{
 };
 use crate::family::{self, Form, TransferStatus};
 use crate::inverse::{
-    self, MAX, MIN, Need, Synthesis, Synthesizer, derive, describe_region, positions,
-    solve_constant, unsatisfiable,
+    self, MIN, Need, Synthesis, Synthesizer, derive, describe_region, positions, solve_constant,
+    unsatisfiable,
 };
 use crate::lower::{from_program, lower_outputs};
 use crate::repair::{self, SiteKind, Status as RepairStatus, first_difference};
@@ -141,7 +141,14 @@ fn program(name: &str) -> Program {
     let bytes = data(name);
     let legacy = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes)
         .unwrap_or_else(|error| panic!("{name}: legacy {error:?}"));
-    assert_eq!(legacy.value().unwrap().zcve_bytes().unwrap(), bytes);
+    assert_eq!(
+        legacy
+            .value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .zcve_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}")),
+        bytes
+    );
     let profile = b"zeno-fcis/finite-i64/1";
     assert_eq!(
         &bytes[..10],
@@ -157,7 +164,10 @@ fn program(name: &str) -> Program {
     assert!(points <= 100_000, "fixture differential must stay bounded");
     let mut tuple: Vec<i128> = program.inputs().iter().map(|d| d.bounds().0).collect();
     for _ in 0..points {
-        let narrow: Vec<i64> = tuple.iter().map(|v| i64::try_from(*v).unwrap()).collect();
+        let narrow: Vec<i64> = tuple
+            .iter()
+            .map(|v| i64::try_from(*v).unwrap_or_else(|e| panic!("{e:?}")))
+            .collect();
         assert_eq!(
             legacy
                 .evaluate(&narrow)
@@ -570,7 +580,7 @@ fn inverse_rules_for_each_operator() {
     assert!(d.has_eq.iter().all(|h| *h) && d.eq.iter().all(|e| *e == 2));
     // `k - x`: the requirement on x is k - target
     let minus: Vec<i128> = x.iter().map(|v| 5 - v).collect();
-    let wide: Vec<i128> = x.iter().map(|v| i128::from(*v)).collect();
+    let wide: Vec<i128> = x.to_vec();
     assert_eq!(derived(&s, "5 - x", &[1], Kind::Int, &minus).eq, wide);
     // a select's branch: kept where taken, dropped elsewhere
     let target: Vec<i128> = x
@@ -586,7 +596,7 @@ fn inverse_rules_for_each_operator() {
     let d = derived(&s, "?c ? x + 1 : x", &[0], Kind::Int, &target);
     assert_eq!(d.kind, Kind::Bool);
     for t in 0..n {
-        assert_eq!((d.has_eq[t], d.eq[t]), (true, i128::from(flag[t])));
+        assert_eq!((d.has_eq[t], d.eq[t]), (true, flag[t]));
     }
     // `==` on integers: equality where true, inequality where false
     let two: Vec<i128> = x.iter().map(|v| i128::from(*v == 2)).collect();
@@ -633,16 +643,13 @@ fn inverse_rules_for_each_operator() {
     let implies = derived(&s, "?c -> flag", &[0], Kind::Bool, &both);
     for t in 0..n {
         if flag[t] == 0 {
-            assert_eq!(
-                (implies.has_eq[t], implies.eq[t]),
-                (true, i128::from(1 - both[t]))
-            );
+            assert_eq!((implies.has_eq[t], implies.eq[t]), (true, (1 - both[t])));
         }
     }
     // `!`: negated
     let not = derived(&s, "!?c", &[0], Kind::Bool, &both);
     for t in 0..n {
-        assert_eq!(not.eq[t], i128::from(1 - both[t]));
+        assert_eq!(not.eq[t], (1 - both[t]));
     }
     // a constant's feasible set: an interval minus finitely many values
     let mut need = Need::exact(Kind::Int, &vec![0; n], &vec![false; n]);
@@ -1319,7 +1326,6 @@ fn inverse_comparisons_at_the_128_bit_ends_do_not_wrap() {
             impossible,
             "{text}"
         );
-        assert!(need.lo.iter().all(|lo| *lo >= MIN) && need.hi.iter().all(|hi| *hi <= MAX));
     }
 }
 

@@ -299,7 +299,7 @@ pub(crate) enum DoorCommand {
 mod version_space;
 
 #[path = "loop_judges.rs"]
-mod judges;
+pub(crate) mod judges;
 
 #[path = "loop_decompose.rs"]
 mod decompose;
@@ -2771,16 +2771,20 @@ mod tests {
             vec![Op::Input(0)],
             vec![0],
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e:?}"));
         let scratch = std::env::temp_dir().join(format!(
             "loop-evaluate-wide-{}-{}",
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
-        std::fs::create_dir(&scratch).unwrap();
+        std::fs::create_dir(&scratch).unwrap_or_else(|e| panic!("{e:?}"));
         let original = scratch.join("original.zcve");
         let expressions = scratch.join("expressions.json");
-        std::fs::write(&original, encode(&program).unwrap()).unwrap();
+        std::fs::write(
+            &original,
+            encode(&program).unwrap_or_else(|e| panic!("{e:?}")),
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"));
         for (expression, expected) in [
             ("mul_div_floor(x, 3, 2)", (wide * 3 / 2).to_string()),
             ("products_ge(x, 3, x, 2)", "1".to_owned()),
@@ -2793,12 +2797,12 @@ mod tests {
                 })
                 .to_string(),
             )
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{e:?}"));
             let (status, value) = evaluate_command(&original, &expressions, &[wide]);
             assert_eq!(status, crate::OK, "{value}");
             assert_eq!(value["detail"]["values"], json!([expected]));
         }
-        std::fs::remove_dir_all(scratch).unwrap();
+        std::fs::remove_dir_all(scratch).unwrap_or_else(|e| panic!("{e:?}"));
     }
 
     #[test]

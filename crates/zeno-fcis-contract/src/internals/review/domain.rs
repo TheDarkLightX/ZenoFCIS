@@ -83,18 +83,9 @@ impl LeafDomain {
 
 /// The domain of a scalar type; text has none.
 pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDomain, ContractError> {
-    let wide = || {
-        ContractError::new(
-            "project.zeno",
-            format!("type {type_id} range exceeds the 64-bit program range"),
-        )
-    };
     Ok(match declarations.kind(type_id)? {
         TypeKind::Bool => LeafDomain::Bool,
-        TypeKind::I128 { min, max } => LeafDomain::Int {
-            min: i128::try_from(min).map_err(|_| wide())?,
-            max: i128::try_from(max).map_err(|_| wide())?,
-        },
+        TypeKind::I128 { min, max } => LeafDomain::Int { min, max },
         TypeKind::Sum(variants) => LeafDomain::Sum {
             type_id,
             variants: variants.iter().map(|variant| variant.id).collect(),
@@ -294,9 +285,7 @@ pub fn input_set(
             |(index, position)| match (position.source, position.field) {
                 (Source::State, Some(field)) => match rules.genesis.get(&field) {
                     Some(Constant::Bool(value)) => i128::from(*value),
-                    Some(Constant::Int(value)) => {
-                        i128::try_from(*value).unwrap_or(values[index][0])
-                    }
+                    Some(Constant::Int(value)) => *value,
                     None => values[index][0],
                 },
                 _ => values[index][0],
@@ -500,12 +489,11 @@ fn constants(
         if let (Constant::Int(value), Some(declared)) = (
             value,
             state_fields.iter().find(|declared| declared.id == *field),
-        ) && let Ok(value) = i128::try_from(*value)
-        {
+        ) {
             found
                 .entry(declared.type_id)
                 .or_insert_with(BTreeSet::new)
-                .insert(value);
+                .insert(*value);
         }
     }
     Ok(found)

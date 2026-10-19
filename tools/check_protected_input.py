@@ -132,8 +132,8 @@ def mutation_sources(source: str, specification: str, typed: str) -> dict[str, t
     # with FieldsView::Legacy. These controls change the legacy cases there.
     for name, before, after in (
         ("wrong_enum_tag", "if tag != 0x07 {", "if tag != 0x0a {"),
-        ("wrong_integer_value", "value > *max as i128 { return None; } Some((Atom::I128(value), end))",
-         "value > *max as i128 { return None; } Some((Atom::I128(0), end))"),
+        ("wrong_integer_value", "value > *max { return None; } Some((Atom::I128(value), end))",
+         "value > *max { return None; } Some((Atom::I128(0), end))"),
         ("wrong_unsigned_value", "value > i128::MAX as u128 { return None; } Some((Atom::I128(value as i128), end))",
          "value > i128::MAX as u128 { return None; } Some((Atom::I128(0), end))"),
         ("wrong_boolean_value", "Some((Atom::I128(1), payload_offset))", "Some((Atom::I128(0), payload_offset))"),

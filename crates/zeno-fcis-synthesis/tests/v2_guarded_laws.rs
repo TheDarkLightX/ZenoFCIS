@@ -97,7 +97,7 @@ fn check_original_graph() {
                         ScalarDomain::Int { min, max } => (1, min, max),
                         _ => panic!("unsupported future domain in the original graph oracle"),
                     };
-                    tuple(vec![vec![flag], integer(min.into()), integer(max.into())])
+                    tuple(vec![vec![flag], integer(min), integer(max)])
                 })
                 .collect(),
         )
@@ -107,7 +107,7 @@ fn check_original_graph() {
         .map(|op| {
             let fields: Vec<i128> = match *op {
                 ScalarOp::Input(a) => vec![0, a.into()],
-                ScalarOp::Int(a) => vec![1, a.into()],
+                ScalarOp::Int(a) => vec![1, a],
                 ScalarOp::Bool(a) => vec![2, i128::from(a)],
                 ScalarOp::Add(a, b) => vec![3, a.into(), b.into()],
                 ScalarOp::Sub(a, b) => vec![4, a.into(), b.into()],

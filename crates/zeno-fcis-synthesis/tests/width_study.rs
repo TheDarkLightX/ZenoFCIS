@@ -13,14 +13,18 @@ fn full() -> Domain {
 }
 
 fn graph(nodes: Vec<Op>, roots: Vec<u16>) -> Program {
-    Program::try_new(vec![], roots.iter().map(|_| full()).collect(), nodes, roots).unwrap()
+    Program::try_new(vec![], roots.iter().map(|_| full()).collect(), nodes, roots)
+        .unwrap_or_else(|e| panic!("{e:?}"))
 }
 
 #[test]
 fn scalar_crosses_old_machine_bound_and_roundtrips_full_width_literals() {
     let old_max = i128::from(i64::MAX);
     let program = graph(vec![Op::Int(old_max), Op::Int(1), Op::Add(0, 1)], vec![2]);
-    assert_eq!(program.evaluate(&[]).unwrap(), vec![1i128 << 63]);
+    assert_eq!(
+        program.evaluate(&[]).unwrap_or_else(|e| panic!("{e:?}")),
+        vec![1i128 << 63]
+    );
     for value in [
         i128::MIN,
         i128::MIN + 1,
@@ -30,12 +34,16 @@ fn scalar_crosses_old_machine_bound_and_roundtrips_full_width_literals() {
         i128::MAX,
     ] {
         let literal = graph(vec![Op::Int(value)], vec![0]);
-        let bytes = literal.value().unwrap().canonical_bytes().unwrap();
+        let bytes = literal
+            .value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .canonical_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(
             finite_runtime::import_program(&bytes)
-                .unwrap()
+                .unwrap_or_else(|e| panic!("{e:?}"))
                 .evaluate(&[])
-                .unwrap(),
+                .unwrap_or_else(|e| panic!("{e:?}")),
             vec![value]
         );
     }
@@ -89,7 +97,7 @@ fn input_and_output_domains_remain_distinct_from_machine_width() {
         vec![Op::Input(0)],
         vec![0],
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("{e:?}"));
     let limits = v2_zero_limits().with_limit(V2Resource::Step, 1);
     let (outside, usage) = program.execute_v2(&[0], limits).into_parts();
     assert_eq!(outside, Err(V2ExecutionFailure::InputDomain));

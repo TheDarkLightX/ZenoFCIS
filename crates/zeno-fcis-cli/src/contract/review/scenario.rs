@@ -177,7 +177,7 @@ fn genesis_values(loaded: &Loaded) -> Option<Vec<i128>> {
         .map(
             |position| match loaded.rules.genesis.get(&position.field?)? {
                 Constant::Bool(value) => Some(i128::from(*value)),
-                Constant::Int(value) => i128::try_from(*value).ok(),
+                Constant::Int(value) => Some(*value),
             },
         )
         .collect()
@@ -287,11 +287,7 @@ fn run(
             && decision.class != Class::Reject
         {
             // The examples agree, so the successor is the written one.
-            state = step
-                .post
-                .iter()
-                .map(|value| i128::try_from(*value).unwrap_or(i128::MAX))
-                .collect();
+            state = step.post.to_vec();
         }
     }
     None

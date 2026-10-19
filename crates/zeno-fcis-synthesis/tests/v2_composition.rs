@@ -196,8 +196,7 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
         let ValueRef::I128(x) = v.view() else {
             panic!("artifact integer")
         };
-        i128::try_from(x)
-            .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
+        x
     }
     fn domains(v: &Value) -> Vec<ScalarDomain> {
         tuple(v)
@@ -219,9 +218,17 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
         .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"));
     let v = tuple(&value);
     assert_eq!(v[0].view(), ValueRef::Text(finite::PROFILE));
-    let imported = zeno_fcis_synthesis::finite_runtime::import_program(bytes).unwrap();
+    let imported = zeno_fcis_synthesis::finite_runtime::import_program(bytes)
+        .unwrap_or_else(|e| panic!("{e:?}"));
     {
-        assert_eq!(imported.value().unwrap().zcve_bytes().unwrap(), bytes);
+        assert_eq!(
+            imported
+                .value()
+                .unwrap_or_else(|e| panic!("{e:?}"))
+                .zcve_bytes()
+                .unwrap_or_else(|e| panic!("{e:?}")),
+            bytes
+        );
     }
     let schema = tuple(&v[1]);
     let nodes = tuple(&v[2])
@@ -269,7 +276,7 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
             let (min, max) = d.bounds();
             size.checked_mul(min.abs_diff(max).checked_add(1)?)
         })
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected a value"));
     assert!(size <= 100_000);
     let mut point: Vec<_> = main.inputs().iter().map(|d| d.bounds().0).collect();
     for _ in 0..size {

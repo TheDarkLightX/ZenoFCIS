@@ -377,7 +377,7 @@ fn encode(fields: &[Field], values: &[i128]) -> Vec<u8> {
             }
             Leaf::I128 { .. } => {
                 bytes.push(4);
-                bytes.extend_from_slice(&i128::from(*value).to_be_bytes());
+                bytes.extend_from_slice(&(*value).to_be_bytes());
             }
             Leaf::Bool => bytes.push(if *value == 0 { 1 } else { 2 }),
             Leaf::Enum {

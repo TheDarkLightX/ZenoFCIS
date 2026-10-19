@@ -366,7 +366,7 @@ fn the_complete_joint_domain_agrees_with_the_compositional_result() {
                                         return fail(post);
                                     };
                                     let mut next = state;
-                                    next[target] = i128::try_from(value).unwrap_or_else(fail);
+                                    next[target] = value;
                                     Joint::Accept(next)
                                 }
                                 PublicationOutcome::Reject(_) => Joint::Reject,

@@ -398,11 +398,11 @@ fn quantity_declarations_use_version_two_canonical_metadata() {
     let b = spec(&source.replace("USD*COLL/COLL", "USD"));
     let old = spec(&source.replace(" unit USD*COLL/COLL scale e8", ""));
     assert_eq!(a.canonical_bytes(), b.canonical_bytes());
-    let bytes = a.canonical_bytes().unwrap();
+    let bytes = a.canonical_bytes().unwrap_or_else(|e| panic!("{e:?}"));
     let prefix = b"ZFCIS-PROJECT-SPEC\0".len();
     assert_eq!(&bytes[prefix..prefix + 2], &2u16.to_be_bytes());
     assert_eq!(
-        &old.canonical_bytes().unwrap()[prefix..prefix + 2],
+        &old.canonical_bytes().unwrap_or_else(|e| panic!("{e:?}"))[prefix..prefix + 2],
         &1u16.to_be_bytes()
     );
     assert_ne!(

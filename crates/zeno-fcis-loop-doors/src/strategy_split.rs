@@ -374,7 +374,11 @@ pub fn split(
     let mut count = 1u128;
     for d in original.inputs() {
         let (a, b) = d.bounds();
-        count = count.saturating_mul((i128::from(b) - i128::from(a) + 1) as u128);
+        count = count.saturating_mul(
+            b.checked_sub(a)
+                .and_then(|span| span.checked_add(1))
+                .map_or(u128::MAX, |width| width as u128),
+        );
     }
     let items = corpus.integers.len() + corpus.predicates.len();
     let leaves = 1usize << c.depth;

@@ -205,11 +205,9 @@ fn sampled_tuples(positions: &[Position], count: usize, seed: u64) -> Vec<Vec<i1
                             .collect();
                         let value = match random.below(5) {
                             0 => {
-                                let width = u64::try_from(i128::from(*max) - i128::from(*min))
-                                    .unwrap_or(u64::MAX);
+                                let width = u64::try_from(max.abs_diff(*min)).unwrap_or(u64::MAX);
                                 let offset = random.next() % width.saturating_add(1).max(1);
-                                i128::try_from(i128::from(*min) + i128::from(offset))
-                                    .unwrap_or(*min)
+                                *min + i128::from(offset)
                             }
                             1 if !earlier.is_empty() => earlier[random.below(earlier.len())],
                             _ => pooled[random.below(pooled.len())],
@@ -301,7 +299,7 @@ fn encodings_agree_with_the_library(app: &App, samples: usize) -> BTreeMap<usize
             let assignment: BTreeMap<String, i128> = tuple
                 .iter()
                 .enumerate()
-                .map(|(index, value)| (format!("x{index}"), i128::from(*value)))
+                .map(|(index, value)| (format!("x{index}"), *value))
                 .collect();
             let evaluation = script.evaluate(&assignment).unwrap_or_else(|| {
                 panic!("{}: {tuple:?} is outside the declared domain", app.name)
@@ -451,7 +449,7 @@ fn law_arithmetic_agrees_with_the_library_law_evaluator_on_sampled_states() {
             let assignment: BTreeMap<String, i128> = tuple
                 .iter()
                 .enumerate()
-                .map(|(index, value)| (format!("x{index}"), i128::from(*value)))
+                .map(|(index, value)| (format!("x{index}"), *value))
                 .collect();
             let evaluation = script
                 .evaluate(&assignment)

@@ -25,21 +25,22 @@ fn capture_refusal_keeps_exact_operator_reason_out_of_public_json() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e}"));
     let pid = child.id();
-    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap_or_else(|e| panic!("{e}"));
     let ticks: u64 = stat
         .rsplit_once(") ")
-        .unwrap()
+        .unwrap_or_else(|| panic!("stat command field"))
         .1
         .split_whitespace()
         .nth(19)
-        .unwrap()
+        .unwrap_or_else(|| panic!("stat start-time field"))
         .parse()
-        .unwrap();
-    let out = child.wait_with_output().unwrap();
+        .unwrap_or_else(|e| panic!("{e}"));
+    let out = child.wait_with_output().unwrap_or_else(|e| panic!("{e}"));
     assert!(!out.status.success(), "{out:?}");
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let report: serde_json::Value =
+        serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(report["authority"], "none");
     assert_eq!(
         report["detail"]["reason"],
@@ -48,29 +49,42 @@ fn capture_refusal_keeps_exact_operator_reason_out_of_public_json() {
     let root = Path::new("/tmp").join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
     use std::os::unix::fs::PermissionsExt;
     assert_eq!(
-        fs::metadata(&root).unwrap().permissions().mode() & 0o777,
+        fs::metadata(&root)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .permissions()
+            .mode()
+            & 0o777,
         0o700
     );
     let records: Vec<_> = fs::read_dir(root)
-        .unwrap()
-        .map(|e| e.unwrap().path())
+        .unwrap_or_else(|e| panic!("{e}"))
+        .map(|e| e.unwrap_or_else(|e| panic!("{e}")).path())
         .filter(|p| {
             p.file_name()
-                .unwrap()
+                .unwrap_or_else(|| panic!("record file name"))
                 .to_string_lossy()
                 .starts_with(&format!("{pid}-"))
         })
         .map(|p| {
             assert_eq!(
-                fs::metadata(&p).unwrap().permissions().mode() & 0o777,
+                fs::metadata(&p)
+                    .unwrap_or_else(|e| panic!("{e}"))
+                    .permissions()
+                    .mode()
+                    & 0o777,
                 0o600
             );
-            serde_json::from_slice::<serde_json::Value>(&fs::read(p).unwrap()).unwrap()
+            serde_json::from_slice::<serde_json::Value>(
+                &fs::read(p).unwrap_or_else(|e| panic!("{e}")),
+            )
+            .unwrap_or_else(|e| panic!("{e}"))
         })
         .filter(|r| r["observer"] == "refusal" && r["process_start_ticks"] == ticks)
         .collect();
     assert_eq!(records.len(), 1, "{records:?}; {out:?}");
-    let reason = records[0]["supervisor_reason"].as_str().unwrap();
+    let reason = records[0]["supervisor_reason"]
+        .as_str()
+        .unwrap_or_else(|| panic!("supervisor reason"));
     assert!(
         reason.starts_with("containment-unavailable:posix:"),
         "{reason}"
@@ -92,7 +106,7 @@ fn unrelated_partial_records_do_not_break_startup_but_matching_corruption_refuse
         .args(["-I", "-B"])
         .arg(script)
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{e}"));
     assert!(output.status.success(), "{output:?}");
     assert!(
         String::from_utf8_lossy(&output.stdout).contains("matching-corruption refusals passed")

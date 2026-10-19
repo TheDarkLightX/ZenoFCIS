@@ -105,8 +105,11 @@ impl<'a> WholeCheck<'a> {
         for (slot, domain) in point.iter_mut().zip(self.candidate.inputs()).rev() {
             let width =
                 u64::try_from(domain_size(*domain)).map_err(|_| "capture-whole-domain-budget")?;
-            *slot = i128::try_from(i128::from(domain.bounds().0) + i128::from(ordinal % width))
-                .map_err(|_| "capture-whole-ordinal")?;
+            *slot = domain
+                .bounds()
+                .0
+                .checked_add(i128::from(ordinal % width))
+                .ok_or("capture-whole-ordinal")?;
             ordinal /= width;
         }
         Ok(point)
@@ -217,7 +220,7 @@ impl<'a> WholeCheck<'a> {
                     Err(error) => json!({"status":"refused","reason":format!("{error:?}")}),
                 };
                 return Ok(Some(
-                    json!({"ordinal":self.next + ordinal,"input":crate::report_numbers::integers(&input),
+                    json!({"ordinal":self.next + ordinal,"input":crate::report_numbers::integers(input),
                     "expected":crate::report_numbers::integers(&table.rows()[at]),"actual":actual,"check":check}),
                 ));
             }

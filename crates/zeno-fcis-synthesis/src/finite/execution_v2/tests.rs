@@ -629,7 +629,7 @@ fn independent_wide_oracle_matches_fraction_corpora() {
             let start = usize::from(kind == 0);
             let mut operands: Vec<i128> = fields[start..fields.len() - 1]
                 .iter()
-                .map(|value| value.parse().unwrap())
+                .map(|value| value.parse().unwrap_or_else(|e| panic!("{e:?}")))
                 .collect();
             let op = if kind == 1 {
                 Op::SignedMulDivFloor(0, 1, 2)
@@ -651,7 +651,11 @@ fn independent_wide_oracle_matches_fraction_corpora() {
             let expected = if fields.last() == Some(&"arithmetic") {
                 Err(Failure::Arithmetic)
             } else {
-                Ok(fields.last().unwrap().parse().unwrap())
+                Ok(fields
+                    .last()
+                    .unwrap_or_else(|| panic!("expected a value"))
+                    .parse()
+                    .unwrap_or_else(|e| panic!("{e:?}")))
             };
             assert_eq!(
                 reference_node(&op, &operands, &operands),

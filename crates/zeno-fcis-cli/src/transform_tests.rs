@@ -49,8 +49,15 @@ fn main_fixture(bytes: &[u8]) -> Vec<u8> {
     {
         return bytes.to_vec();
     }
-    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes).unwrap();
-    assert_eq!(old.value().unwrap().zcve_bytes().unwrap(), bytes);
+    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes)
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(
+        old.value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .zcve_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}")),
+        bytes
+    );
     let profile = old.profile();
     let mut fresh = bytes[..10].to_vec();
     fresh[9] += 1;
@@ -191,10 +198,10 @@ fn decode(domains: &[Domain], mut ordinal: u128) -> Vec<i128> {
     let mut tuple = vec![0; domains.len()];
     for (slot, domain) in tuple.iter_mut().zip(domains).rev() {
         let (min, max) = domain.bounds();
-        let width = u128::from(max.abs_diff(min)) + 1;
+        let width = max.abs_diff(min) + 1;
         let offset = i128::try_from(ordinal % width).unwrap_or_else(|_| panic!("offset"));
         ordinal /= width;
-        *slot = i128::try_from(i128::from(min) + offset).unwrap_or_else(|_| panic!("value"));
+        *slot = min.checked_add(offset).unwrap_or_else(|| panic!("value"));
     }
     assert_eq!(ordinal, 0, "ordinal beyond the domain");
     tuple
@@ -255,7 +262,7 @@ fn enumeration_visits_each_tuple_once_in_declared_order() {
             .unwrap_or_else(|| panic!("small domain"));
         let product: u128 = domains
             .iter()
-            .map(|domain| u128::from(domain.bounds().1.abs_diff(domain.bounds().0)) + 1)
+            .map(|domain| domain.bounds().1.abs_diff(domain.bounds().0) + 1)
             .product();
         assert_eq!(size, product);
         let mut tuple = first_tuple(&domains);

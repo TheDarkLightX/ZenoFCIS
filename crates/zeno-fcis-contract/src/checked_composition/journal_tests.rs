@@ -50,7 +50,7 @@ pub(super) struct Journal {
 fn number(atom: &c::Atom<'_>) -> i128 {
     match atom {
         c::Atom::Bool(value) => i128::from(*value),
-        c::Atom::I128(value) => i128::try_from(*value).unwrap_or_else(fail),
+        c::Atom::I128(value) => *value,
         c::Atom::Sum { variant, .. } => i128::from(*variant),
         other => fail(format!("unexpected atom {other:?}")),
     }
@@ -101,7 +101,7 @@ pub(super) fn journal(files: &AggregateSources, steps: &[Step]) -> Journal {
             let field = position.field.unwrap_or_else(|| fail("a root state"));
             let value = match built.rules.genesis.get(&field) {
                 Some(Constant::Bool(value)) => i128::from(*value),
-                Some(Constant::Int(value)) => i128::try_from(*value).unwrap_or_else(fail),
+                Some(Constant::Int(value)) => *value,
                 None => least(position),
             };
             (field, value)

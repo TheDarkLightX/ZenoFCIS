@@ -186,10 +186,10 @@ pub(crate) fn tuple_of_ordinal(domains: &[Domain], ordinal: u64) -> Option<Vec<i
     let mut tuple = vec![0_i128; domains.len()];
     for (slot, domain) in tuple.iter_mut().zip(domains).rev() {
         let (min, max) = domain.bounds();
-        let width = u128::from(max.abs_diff(min)) + 1;
+        let width = max.abs_diff(min) + 1;
         let offset = i128::try_from(remaining % width).ok()?;
         remaining /= width;
-        *slot = i128::try_from(i128::from(min) + offset).ok()?;
+        *slot = min.checked_add(offset)?;
     }
     (remaining == 0).then_some(tuple)
 }

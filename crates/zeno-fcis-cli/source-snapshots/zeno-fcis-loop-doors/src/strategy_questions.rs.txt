@@ -22,7 +22,11 @@ fn points(inputs: &[Domain], l: Limits, w: &mut Work) -> Result<Vec<Vec<i128>>, 
     let mut size = 1u128;
     for d in inputs {
         let (a, b) = d.bounds();
-        size = size.saturating_mul((i128::from(b) - i128::from(a) + 1) as u128);
+        size = size.saturating_mul(
+            b.checked_sub(a)
+                .and_then(|span| span.checked_add(1))
+                .map_or(u128::MAX, |width| width as u128),
+        );
     }
     if size > u128::from(l.worlds)
         || size.saturating_mul(inputs.len() as u128 * 2) > u128::from(l.cells)

@@ -162,7 +162,7 @@ const APPS: [App; 6] = [
 ];
 fn value(kind: Leaf, n: i128) -> Value {
     match kind {
-        Int => Value::signed(i128::from(n)),
+        Int => Value::signed(n),
         Bool => {
             assert!(n == 0 || n == 1);
             Value::boolean(n == 1)
@@ -172,7 +172,7 @@ fn value(kind: Leaf, n: i128) -> Value {
 }
 fn atom(kind: Leaf, n: i128) -> c::Atom<'static> {
     match kind {
-        Int => c::Atom::I128(i128::from(n)),
+        Int => c::Atom::I128(n),
         Bool => c::Atom::Bool(n != 0),
         Sum(type_id) => c::Atom::Sum {
             type_id,

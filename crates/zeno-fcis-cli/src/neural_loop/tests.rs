@@ -2207,7 +2207,7 @@ fn an_unreplayed_report_preserves_spend_and_never_trusts_the_retained_incumbent(
             })
             .unwrap_or_else(|never| match never {});
         let report = reserved.into_unreplayed_report();
-        let written = written.unwrap();
+        let written = written.unwrap_or_else(|| panic!("expected a value"));
         assert!(!replayed.get(), "the refusal must not run replay work");
         assert_eq!(report["authority"], "none");
         assert_eq!(report["status"], "no-checked-improvement");

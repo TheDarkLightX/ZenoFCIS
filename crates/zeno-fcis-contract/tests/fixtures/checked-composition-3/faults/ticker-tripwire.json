@@ -16,7 +16,7 @@
       "participates": "op != 2",
       "path": "tripwire",
       "policy_sha256": "df5de7ef244a36fd1d194429798654e82d27fe071320816d1cc53e1b97cc867d",
-      "program_sha256": "383c3e1cf95e2cd5e027ec4406acf643ee4ba470fb56a1ec9cb2a70cc745705f",
+      "program_sha256": "f1b81b342b133982aebcf483fa66ce7d0eb1035963d8fc4c7caa7dff91180095",
       "project_sha256": "dd599654e5ca1e8828f30b13ce1d96f8bba0af8abbb9514cf6dc9a75f7abab8b"
     },
     {
@@ -33,7 +33,7 @@
       "participates": "true",
       "path": "ticker",
       "policy_sha256": "664b21f6c03dc958a0f05f9fa725cba5b96c5e07e73b2acfb1d2a3645e8adc2f",
-      "program_sha256": "5fe367d20fcf90fdcf576c0beab99ca12d7b78d2751dd48f3b5b2b1efc4ff804",
+      "program_sha256": "9ba6b81ee750e5bbb0f87fd5dfcd803b4c8d76d232fa3db7195885fe2baed6fa",
       "project_sha256": "fd59206fbe111db4287d5fd82a874e999dc1fae8bd534bd41674dc728e1546d5"
     },
     {
@@ -50,7 +50,7 @@
       "participates": "op != 2",
       "path": "budget",
       "policy_sha256": "3b182556d4492c35b0d0ed8cb979c43670ecbef742ebb3d8dfc8c8bc695cff51",
-      "program_sha256": "5a78ebe5d4a574606e447a82436e3f2f208643adaa29b54a9f05e098d17504f5",
+      "program_sha256": "ce6ca4082dfbddd42541d2289424e46f10f0cce9b481f3ae990ec1259a8f93e0",
       "project_sha256": "4002c1198514628122b2aec3d776bf0cd0bcf2057e9fc6ccf5860f80fa07de38"
     }
   ],

@@ -61,7 +61,7 @@ fn wire(values: &[i128]) -> Vec<u8> {
     out.extend_from_slice(&(values.len() as u32).to_be_bytes());
     for v in values {
         out.push(0x04);
-        out.extend_from_slice(&i128::from(*v).to_be_bytes());
+        out.extend_from_slice(&(*v).to_be_bytes());
     }
     out
 }

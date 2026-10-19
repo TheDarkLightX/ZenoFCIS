@@ -48,9 +48,7 @@ pub(in super::super) fn valid(schema: SchemaView<'_>) -> bool {
 pub(in super::super) fn reify(leaf: LeafView<'_>, code: Atom<'static>) -> Option<Atom<'static>> {
     match leaf {
         LeafView::Legacy(l) => match code {
-            Atom::I128(v) if i128::MIN as i128 <= v && v <= i128::MAX as i128 => {
-                super::reify(l, v as i128)
-            }
+            Atom::I128(v) => super::reify(l, v),
             _ => None,
         },
         LeafView::Numeric(d) => {

@@ -672,7 +672,9 @@ pub fn analyze(spec: &Specification, budget: &mut Budget) -> Result<Proposal, St
                     budget.spend(spec.outputs.len() as u64)?;
                     let k = input.iter().zip(&spec.inputs).fold(0u128, |n, (v, d)| {
                         n * domain_size(*d)
-                            + u128::try_from(i128::from(*v) - i128::from(d.bounds().0)).unwrap_or(0)
+                            + v.checked_sub(d.bounds().0)
+                                .and_then(|offset| u128::try_from(offset).ok())
+                                .unwrap_or(0)
                     });
                     meaning.table.get(usize::try_from(k).unwrap_or(usize::MAX)) == Some(output)
                 }

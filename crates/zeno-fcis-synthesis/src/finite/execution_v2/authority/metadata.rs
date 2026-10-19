@@ -64,7 +64,7 @@ pub(super) fn variants<'a>(parts: &mut Vec<Part<'a>>, values: &[InputVariant]) {
 parts@==initial+seq![Part::Word(values.len() as u128)]+model::variants_prefix(values@,i as nat),decreases values.len()-i,))]
     while i < values.len() {
         parts.push(Part::Word(values[i].id as u128));
-        parts.push(Part::Word(values[i].code as i128 as u128));
+        parts.push(Part::Word(values[i].code as u128));
         i += 1;
     }
 }
@@ -74,8 +74,8 @@ pub(super) fn leaf<'a>(parts: &mut Vec<Part<'a>>, value: &InputLeaf) {
     match value {
         InputLeaf::I128 { min, max } => {
             parts.push(Part::Word(0));
-            parts.push(Part::Word(*min as i128 as u128));
-            parts.push(Part::Word(*max as i128 as u128));
+            parts.push(Part::Word(*min as u128));
+            parts.push(Part::Word(*max as u128));
         }
         InputLeaf::Bool => parts.push(Part::Word(1)),
         InputLeaf::U128 { min, max } => {
@@ -91,8 +91,8 @@ pub(super) fn leaf<'a>(parts: &mut Vec<Part<'a>>, value: &InputLeaf) {
         } => {
             parts.push(Part::Word(2));
             parts.push(Part::Word(*type_id as u128));
-            parts.push(Part::Word(*min as i128 as u128));
-            parts.push(Part::Word(*max as i128 as u128));
+            parts.push(Part::Word(*min as u128));
+            parts.push(Part::Word(*max as u128));
             variants(parts, vs);
         }
         InputLeaf::Sum {
@@ -103,8 +103,8 @@ pub(super) fn leaf<'a>(parts: &mut Vec<Part<'a>>, value: &InputLeaf) {
         } => {
             parts.push(Part::Word(3));
             parts.push(Part::Word(*type_id as u128));
-            parts.push(Part::Word(*min as i128 as u128));
-            parts.push(Part::Word(*max as i128 as u128));
+            parts.push(Part::Word(*min as u128));
+            parts.push(Part::Word(*max as u128));
             variants(parts, vs);
         }
     }
@@ -181,8 +181,8 @@ pub(super) fn scalar_domain<'a>(parts: &mut Vec<Part<'a>>, value: &ScalarDomain)
         }
         ScalarDomain::Int { min, max } => {
             parts.push(Part::Word(1));
-            parts.push(Part::Word(*min as i128 as u128));
-            parts.push(Part::Word(*max as i128 as u128));
+            parts.push(Part::Word(*min as u128));
+            parts.push(Part::Word(*max as u128));
         }
     }
 }
@@ -210,7 +210,7 @@ pub(super) fn scalar_op<'a>(parts: &mut Vec<Part<'a>>, value: &ScalarOp) {
         }
         ScalarOp::Int(a) => {
             parts.push(Part::Word(1));
-            parts.push(Part::Word(*a as i128 as u128));
+            parts.push(Part::Word(*a as u128));
         }
         ScalarOp::Bool(a) => {
             parts.push(Part::Word(2));
