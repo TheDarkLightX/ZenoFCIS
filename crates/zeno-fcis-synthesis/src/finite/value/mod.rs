@@ -256,3 +256,23 @@ pub(crate) fn validate_variant_codes(variants: &[u16]) -> bool {
     }
     true
 }
+
+/// Test membership without changing the declared variant-code domain.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == (exists|j:int| 0 <= j < variants@.len() && variants@[j] == variant),
+))]
+pub(crate) fn contains_variant_code(variants: &[u16], variant: u16) -> bool {
+    let mut index = 0usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant index <= variants.len(),
+            forall|j:int| 0 <= j < index ==> variants@[j] != variant,
+        decreases variants.len() - index,
+    ))]
+    while index < variants.len() {
+        if variants[index] == variant {
+            return true;
+        }
+        index += 1;
+    }
+    false
+}

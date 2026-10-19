@@ -54,7 +54,7 @@ pub(in super::super) fn reify(leaf: LeafView<'_>, code: Atom<'static>) -> Option
         LeafView::Numeric(Domain::Sum { type_id, variants }) => match code {
             Atom::I128(v) => {
                 let variant = u16::try_from(v).ok()?;
-                if variants.contains(&variant) {
+                if super::super::super::super::value::contains_variant_code(variants, variant) {
                     Some(Atom::Sum { type_id, variant })
                 } else {
                     None
