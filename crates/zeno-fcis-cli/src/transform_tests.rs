@@ -424,7 +424,7 @@ fn receipt_is_canonical_and_deterministic() {
             "{{\"authority\":\"none\",",
             "\"candidate\":{{\"bytes\":{},\"nodes\":1,\"sha256\":\"{}\"}},",
             "\"checker\":{{\"evaluator_identity\":\"{}\",",
-            "\"semantics\":\"zeno-fcis/transform-check/4\"}},",
+            "\"semantics\":\"zeno-fcis/transform-check/5\"}},",
             "\"claim\":\"Functionally equal on the full declared input domain: every tuple ",
             "gives identical outputs or identical failures. The Step limit never binds: no ",
             "tuple needs more Steps than the limit in either program.\",",
