@@ -69,16 +69,38 @@ class CustodyTest(unittest.TestCase):
         report = self.check(tag=f"v{fixture.VERSION}", remote=self.source.commit)
         self.assertEqual(report["status"], "passed", json.dumps(report["checks"], indent=1)[:4000])
         self.assertEqual(len(report["checks"]), 11)
+        self.assertEqual(report["not_run"], [])
         self.assertEqual(report["checks"]["C7-compiled-inputs"]["counts"]["registry_inputs"], 2)
 
-    def test_assembled_set_without_signing_inputs_checks_c1_through_c9(self):
+    def test_an_unrun_check_is_listed_and_never_counted_as_passed(self):
         report = self.check(bindings=None, downloads=None)
-        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["status"], "incomplete")
         self.assertEqual(len(report["checks"]), 9)
-        self.assertEqual(report["not_requested"], ["C10-cross-job", "C11-download-list"])
+        self.assertTrue(all(item["passed"] for item in report["checks"].values()))
+        self.assertEqual(report["not_run"], ["C10-cross-job", "C11-download-list"])
+        self.assertNotIn("C10-cross-job", report["checks"])
+        for overrides, missing in (({"bindings": None}, ["C10-cross-job"]), ({"downloads": None}, ["C11-download-list"])):
+            partial = self.check(**overrides)
+            self.assertEqual((partial["status"], partial["not_run"], len(partial["checks"])), ("incomplete", missing, 10))
+        # A failure among the checks that ran outranks the unrun ones.
         journey = self.release / "hosts" / fixture.LINUX / "INSTALLED-JOURNEY.json"
         journey.unlink()
-        self.assertIn("C6-binary-archives", self.failed(self.check(bindings=None, downloads=None)))
+        failed = self.check(bindings=None, downloads=None)
+        self.assertEqual(failed["status"], "failed")
+        self.assertIn("C6-binary-archives", self.failed(failed))
+
+    def test_only_a_complete_run_exits_zero(self):
+        bindings = self.root / "JOB-OUTPUTS.json"
+        bindings.write_text(json.dumps(self.source.bindings(self.release)))
+        common = ["--release", str(self.release), "--repo", str(self.source.repo),
+                  "--cargo-home", str(self.source.cargo_home)]
+        for extra, code, status in (([], 2, "incomplete"), (["--bindings", str(bindings)], 2, "incomplete"),
+                                    (["--bindings", str(bindings), "--downloads", str(self.downloads)], 0, "passed")):
+            report = self.root / f"custody-{code}-{len(extra)}.json"
+            self.assertEqual(custody.main([*common, "--report", str(report), *extra]), code)
+            self.assertEqual(json.loads(report.read_text())["status"], status)
+        (self.release / "hosts" / fixture.LINUX / "INSTALLED-JOURNEY.json").unlink()
+        self.assertEqual(custody.main([*common, "--report", str(self.root / "failed.json")]), 1)
 
     def test_signing_key_without_download_list_still_refuses(self):
         key = self.root / "RELEASE-SIGNING-KEY.pub"

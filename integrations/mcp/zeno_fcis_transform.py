@@ -18,7 +18,7 @@ import subprocess
 from typing import Any
 
 LOOP_SCHEMA = "zeno-fcis/transform-loop/1"
-PROFILES = ("functional-bool-v1", "checked-i64-v1")
+PROFILES = ("functional-bool-v1", "checked-i128-v1")
 NOTE = ("Checker-derived feedback over the declared input domain under eager semantics. "
         "No optimality, convergence or application authority is implied; a receipt never publishes.")
 
@@ -75,7 +75,7 @@ def _loop(arguments: list[str]) -> dict[str, Any]:
             "authority": "none", "note": NOTE}
 
 
-def transform_request(original_path: str, session_path: str, profile: str = "checked-i64-v1",
+def transform_request(original_path: str, session_path: str, profile: str = "checked-i128-v1",
                       attempts: int = 8, checks: int = 8, deadline_ms: int = 20_000) -> dict[str, Any]:
     """Admit an original program and open a loop session; hosted providers stay disabled."""
     if profile not in PROFILES:

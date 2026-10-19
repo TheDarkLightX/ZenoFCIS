@@ -301,8 +301,15 @@ set to its source commit by content. Its eleven checks cover:
 10. the producing jobs' hashes;
 11. the download list.
 
-A missing input fails its check, and the bindings must name every host of the
-set with its archive and all four hashes. The tag check confirms that the tag
+Checks 1 to 9 always run, and a missing input fails its check. Checks 10 and
+11 run only when `--bindings` and `--downloads` (or `--signing-key`) are given.
+A check that does not run is listed by name in the report's `not_run` list and
+is never counted as passed. The report's `status` is `passed`, with exit code
+0, only when all eleven checks ran and passed. It is `failed`, exit code 1,
+when any check that ran failed. Otherwise it is `incomplete`, exit code 2: for
+example, a set checked before signing, without the job outputs and download
+list. The bindings must name every host of the set with its archive and all
+four hashes. The tag check confirms that the tag
 names the commit. It does not authenticate the tag: on a tag run, the checkout
 itself creates the tag at the run's commit.
 

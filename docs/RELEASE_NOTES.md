@@ -33,6 +33,12 @@ hard resource caps are unchanged.
 **Known limits.** Under extreme concurrent filesystem I/O a contained capture
 may stop inconclusive; it fails closed. Host-dependent systemd paths need a
 host with a user manager. A refusal is no verdict and grants no authority.
+On a shared host, another local user can create the POSIX backend's fixed
+evidence directory, `/tmp/zeno-fcis-containment-<uid>`, first; contained
+commands are then refused until it is removed, which fails closed. If the
+caller is killed during a contained POSIX run, the guardian can exit with
+code 101 instead of its refusal code after cleanup; only the exit code
+differs. Both are planned for 2.5.1.
 
 ## Arithmetic and specifications
 

@@ -32,7 +32,7 @@ HERE = Path(__file__).resolve().parent
 CONTRACT_SCHEMA = "orbitsynthesis/finite-controller-contract/v1"
 STRATEGY_SCHEMA = "orbitsynthesis/finite-mealy-strategy/v1"
 PROBLEM_SCHEMA = "zeno-fcis/synthesis-problem/1"
-PROBLEM_PROFILE = "zeno-fcis/finite-i64/1"
+PROBLEM_PROFILE = "zeno-fcis/finite-i128/1"
 
 # Ticks that stay paused after an honored alarm's own tick.
 PAUSE_TICKS = 2
@@ -165,7 +165,7 @@ def canonical_bytes(value):
 
 
 class Graph:
-    """A `zeno-fcis/finite-i64/1` expression graph, built node by node."""
+    """A `zeno-fcis/finite-i128/1` expression graph, built node by node."""
 
     def __init__(self):
         self.nodes = []

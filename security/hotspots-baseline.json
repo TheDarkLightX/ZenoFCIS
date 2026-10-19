@@ -317,7 +317,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 2418,
+      "production_lines": 2419,
       "rank": 1,
       "score": 100,
       "signals": [
@@ -329,9 +329,9 @@
             1941,
             2200,
             2306,
-            2418,
-            2465,
-            2544
+            2421,
+            2468,
+            2547
           ]
         },
         {
@@ -2138,11 +2138,11 @@
             1979,
             1985,
             2000,
-            2794,
-            2816,
+            2797,
             2819,
-            2826,
-            2842
+            2822,
+            2829,
+            2845
           ]
         },
         {
@@ -2631,7 +2631,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 582,
+      "production_lines": 609,
       "rank": 21,
       "score": 89,
       "signals": [
@@ -2639,14 +2639,14 @@
           "id": "filesystem-read-path",
           "lines": [
             39,
-            170
+            171
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
             54,
-            356
+            386
           ]
         },
         {
@@ -2654,12 +2654,12 @@
           "lines": [
             40,
             54,
-            72,
-            77,
-            80,
-            87,
-            90,
-            96
+            73,
+            78,
+            81,
+            88,
+            91,
+            97
           ]
         },
         {
@@ -2671,18 +2671,18 @@
         {
           "id": "replay-outbox-commit",
           "lines": [
-            462,
-            477,
-            490,
-            514,
-            539
+            492,
+            507,
+            520,
+            544,
+            569
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
             54,
-            356
+            386
           ]
         }
       ],
@@ -5451,90 +5451,90 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 787,
+      "production_lines": 789,
       "rank": 48,
       "score": 86,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            904
+            906
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            108,
-            109,
-            112,
-            113,
-            169,
-            417,
-            421,
-            631
+            110,
+            111,
+            114,
+            115,
+            171,
+            419,
+            423,
+            633
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            955
+            958
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            121,
-            243,
-            386,
-            392,
+            123,
+            245,
+            388,
             394,
-            425,
-            696,
-            798
+            396,
+            427,
+            698,
+            800
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            137
+            139
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            121,
-            547,
-            781
+            123,
+            549,
+            783
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            115,
-            795
+            117,
+            797
           ]
         },
         {
           "id": "release-or-publish",
           "lines": [
-            825,
-            826,
-            829,
-            830,
-            831
+            827,
+            828,
+            831,
+            832,
+            833
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            141,
-            145,
-            149,
-            158,
-            270,
-            277,
-            322,
-            462
+            143,
+            147,
+            151,
+            160,
+            272,
+            279,
+            324,
+            464
           ]
         }
       ],
@@ -6085,9 +6085,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 12849618,
+    "admitted_bytes": 12854460,
     "admitted_files": 794,
-    "inventory_sha256": "d94a84c85db07c730b4b055121864e4b596997e33894817c212d3d55ba05de6a",
+    "inventory_sha256": "279baaa1f86ac5604a40ff896e9048ea75b3c16317e97848f31ac7ca22ff9689",
     "ranked_above_minimum": 691,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

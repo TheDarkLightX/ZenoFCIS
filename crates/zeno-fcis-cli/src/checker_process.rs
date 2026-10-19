@@ -2744,12 +2744,15 @@ pub(crate) fn scheduling_evidence() -> serde_json::Value {
 }
 
 /// Pool sizing in the imperative shell; this cannot decide semantic results.
-/// Four trusted workers fit the POSIX VM budget. Existing backends retain
-/// their existing pool sizes and ordered-result behavior.
+/// The POSIX worker runs one thread: under its 64 MiB address-space cap its
+/// allocator keeps one arena (`MALLOC_ARENA_MAX=1`), so more threads only
+/// contend for that arena's lock and add CPU, which every stage charges.
+/// Existing backends retain their existing pool sizes and ordered-result
+/// behavior.
 pub(crate) fn worker_thread_limit(requested: usize) -> usize {
     #[cfg(target_os = "linux")]
     if linux::contained() && posix::is_worker() {
-        return requested.min(4);
+        return requested.min(1);
     }
     requested
 }

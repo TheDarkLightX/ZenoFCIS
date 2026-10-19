@@ -21,6 +21,7 @@ fn law_judges(core: &Core, formula: &str, expected: &str) {
             max_tuples: 1000,
             max_work: 1_000_000,
             proposals: Some(&proposal),
+            mutants: true,
         },
     )
     .unwrap();

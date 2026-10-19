@@ -2344,6 +2344,9 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
                     max_tuples: judges::MAX_TUPLES,
                     max_work: crate::contract::review::gaps::DEFAULT_MAX_WORK,
                     proposals: Some(&lines),
+                    // The question reports only determination and the
+                    // proposals' check, so the mutants are not bound.
+                    mutants: false,
                 },
             )
         });

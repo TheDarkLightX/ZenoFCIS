@@ -5,10 +5,10 @@ For each of the 77 core-component instances the decision program is made
 afresh in a work directory outside the source tree (`instantiate_core.py`,
 `zeno-fcis generate contract`, `zeno-fcis contract export-program`), then:
 
-- (a) `zeno-fcis optimize --profile checked-i64-v1`;
+- (a) `zeno-fcis optimize --profile checked-i128-v1`;
 - (b) the search alone (`search_program search`);
 - (b+) the search seeded with (a)'s program;
-- (c) `zeno-fcis optimize --profile checked-i64-v1 --with-candidate` with each
+- (c) `zeno-fcis optimize --profile checked-i128-v1 --with-candidate` with each
   distinct search output (the existing supplied-candidate path).
 
 Every reported program that differs from the original goes through
@@ -258,7 +258,7 @@ def measure_instance(family: str, parameters: dict, cli: Path, search: Path, wor
         raise MeasureError(f"{name}: export-program reported another node count")
 
     a_path = folder / "a.zcve"
-    code, report, seconds = run([cli, "optimize", "--program", original, "--profile", "checked-i64-v1",
+    code, report, seconds = run([cli, "optimize", "--program", original, "--profile", "checked-i128-v1",
                                  "--candidate-out", a_path], log)
     row["seconds"]["a"] = round(seconds, 3)
     row["a_status"] = (report or {}).get("status")
@@ -293,7 +293,7 @@ def measure_instance(family: str, parameters: dict, cli: Path, search: Path, wor
             supplied.append(programs[key])
     if supplied:
         c_path = folder / "c.zcve"
-        command = [cli, "optimize", "--program", original, "--profile", "checked-i64-v1",
+        command = [cli, "optimize", "--program", original, "--profile", "checked-i128-v1",
                    "--candidate-out", c_path]
         for path in supplied:
             command += ["--with-candidate", path]

@@ -64,7 +64,7 @@ code-generation theorem or automatic authority for generated native code.
 
 Three transform-loop tools drive the bounded optimization loop
 (`zeno-fcis loop`, see the [CLI reference](CLI_REFERENCE.md)):
-`transform_request(original_path, session_path, profile="checked-i64-v1",
+`transform_request(original_path, session_path, profile="checked-i128-v1",
 attempts, checks, deadline_ms)` admits an original and opens a session with
 work ceilings scaled to it; `transform_candidate
 (session_path, candidate_path | candidate_json_path)` spends one attempt on a

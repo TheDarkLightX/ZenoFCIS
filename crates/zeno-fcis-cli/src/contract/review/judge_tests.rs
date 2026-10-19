@@ -64,6 +64,7 @@ impl Core {
             max_tuples: DEFAULT_MAX_TUPLES,
             max_work: gaps::DEFAULT_MAX_WORK,
             proposals,
+            mutants: true,
         }
     }
 
@@ -189,6 +190,7 @@ fn over_a_limit_the_gap_judge_is_inconclusive() {
             max_tuples,
             max_work,
             proposals: None,
+            mutants: true,
         };
         match gaps::judge(&counter.project, &counter.rules, options)
             .unwrap_or_else(|error| panic!("{error}"))
@@ -228,6 +230,33 @@ fn a_proposed_law_is_checked_against_the_contract_before_it_is_measured() {
 }
 
 #[test]
+fn without_mutants_the_gap_judge_binds_none_and_measures_the_rest_alike() {
+    let counter = Core::new("bounded-counter", &[("C", 2)]);
+    let proposals = "law 9000 kept on reject = context.102.130 == 0 || context.102.130 == 1;\nlaw 9001 harmless on any = true;\n";
+    let full = counter.gaps(Some(proposals));
+    let options = gaps::Options {
+        mutants: false,
+        ..Core::options(Some(proposals))
+    };
+    let lean = gaps::judge(&counter.project, &counter.rules, options)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let (full, lean) = (measured(&full), measured(&lean));
+    assert!(count(&full["mutation"]["count"]) > 0);
+    assert_eq!(full["reject_everything"]["status"], "bound");
+    // The mutant and core sections are the only ones that differ, before and
+    // after the proposals.
+    let mut expected = full.clone();
+    for section in ["mutation", "reject_everything"] {
+        expected[section] = Value::Null;
+        expected["proposals"]["after"][section] = Value::Null;
+    }
+    for section in ["mutants_admitted", "now_caught"] {
+        expected["proposals"][section] = Value::Null;
+    }
+    assert_eq!(*lean, expected);
+}
+
+#[test]
 fn proposed_laws_count_against_the_work_limit() {
     let counter = Core::new("bounded-counter", &[("C", 2)]);
     let declared = measured(&counter.gaps(None))["work"]
@@ -239,6 +268,7 @@ fn proposed_laws_count_against_the_work_limit() {
         max_tuples: DEFAULT_MAX_TUPLES,
         max_work: declared,
         proposals: Some(proposals),
+        mutants: true,
     };
     match gaps::judge(&counter.project, &counter.rules, options)
         .unwrap_or_else(|error| panic!("{error}"))

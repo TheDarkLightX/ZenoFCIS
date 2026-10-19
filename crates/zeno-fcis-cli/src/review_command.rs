@@ -147,6 +147,7 @@ fn review_directory(
                         max_tuples,
                         max_work: settings.max_work,
                         proposals: laws.as_deref(),
+                        mutants: true,
                     },
                 )
             }

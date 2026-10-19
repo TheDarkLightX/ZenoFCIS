@@ -63,7 +63,7 @@ UNAVAILABLE_ARMS = {
     "hybrid-without-feedback": "hosted provider disabled; no approved provider, disclosure or budget",
     "hybrid-with-feedback": "hosted provider disabled; no approved provider, disclosure or budget",
 }
-PROFILES = {"FunctionalBoolV1": "functional-bool-v1", "CheckedI64V1": "checked-i64-v1"}
+PROFILES = {"FunctionalBoolV1": "functional-bool-v1", "CheckedI64V1": "checked-i128-v1"}
 
 
 def profile_of(case: dict[str, Any]) -> str | None:

@@ -17,7 +17,7 @@ from zeno_fcis_knowledge import TOOLS as KNOWLEDGE_TOOLS, ANNOTATIONS as KNOWLED
 
 
 mcp = MCPServer("ZenoFCIS synthesis")
-PROFILE = "zeno-fcis/finite-i64/1"
+PROFILE = "zeno-fcis/finite-i128/1"
 TARGETS = {"rust", "python", "javascript"}
 PROGRAM_TEMPLATES = {"durable-counter", "account-lockout", "order-fulfillment",
                      "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",

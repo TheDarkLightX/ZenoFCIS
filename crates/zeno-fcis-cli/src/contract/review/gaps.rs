@@ -59,6 +59,10 @@ pub(crate) struct Options<'a> {
     pub(crate) max_work: u64,
     /// Proposed laws: `.zeno` law declarations, one per line.
     pub(crate) proposals: Option<&'a str>,
+    /// Whether to bind the extended catalog's mutants and the
+    /// reject-everything core. Without them those sections are `null`; every
+    /// other measure is unchanged.
+    pub(crate) mutants: bool,
 }
 
 /// The judge's result.
@@ -154,7 +158,7 @@ pub(crate) fn judge(
     if let Some(over) = over_limit(work, options.max_work, "work-over-limit") {
         return Ok(over);
     }
-    let before = match measure(&loaded, space, options.max_tuples) {
+    let before = match measure(&loaded, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
@@ -194,17 +198,27 @@ pub(crate) fn judge(
     ) {
         return Ok(over);
     }
-    let after = match measure(&extended, space, options.max_tuples) {
+    let after = match measure(&extended, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
     };
-    let killed: Vec<&str> = before
-        .mutation
-        .admitted_ids()
-        .difference(&after.mutation.admitted_ids())
-        .copied()
-        .collect();
+    let (admitted, killed) = match (&before.mutation, &after.mutation) {
+        (Some(earlier), Some(later)) => (
+            json!({
+                "full": [earlier.counts[0].admitted, later.counts[0].admitted],
+                "valid": [earlier.counts[1].admitted, later.counts[1].admitted],
+            }),
+            json!(
+                earlier
+                    .admitted_ids()
+                    .difference(&later.admitted_ids())
+                    .copied()
+                    .collect::<Vec<&str>>()
+            ),
+        ),
+        _ => (Value::Null, Value::Null),
+    };
     let proposals = json!({
         "laws": checked.laws_json(),
         "inactive": checked.inactive(),
@@ -212,10 +226,7 @@ pub(crate) fn judge(
             "full": [before.admissible[0].determined, after.admissible[0].determined],
             "valid": [before.admissible[1].determined, after.admissible[1].determined],
         },
-        "mutants_admitted": {
-            "full": [before.mutation.counts[0].admitted, after.mutation.counts[0].admitted],
-            "valid": [before.mutation.counts[1].admitted, after.mutation.counts[1].admitted],
-        },
+        "mutants_admitted": admitted,
         "now_caught": killed,
         "after": after.json(work_after, options.max_work, None),
     });
@@ -302,8 +313,9 @@ struct Measured {
     /// The admissible count of each tuple, `-` where the contract's own
     /// decision is refused, as a table digest.
     admissible_sha256: String,
-    reject_everything: Value,
-    mutation: Mutation,
+    /// The reject-everything core and the mutants, when they were bound.
+    reject_everything: Option<Value>,
+    mutation: Option<Mutation>,
 }
 
 impl Measured {
@@ -363,7 +375,7 @@ impl Measured {
                 "rule": "SHA-256 of one line per tuple in ordinal order, each ending in a newline: the number of admissible decisions, or `-` where the contract's own decision is refused",
                 "admissible_sha256": self.admissible_sha256,
             },
-            "mutation": self.mutation.json(),
+            "mutation": self.mutation.as_ref().map(Mutation::json),
             "proposals": proposals,
         })
     }
@@ -421,7 +433,12 @@ struct TupleGap {
     mismatch: bool,
 }
 
-fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, Stop> {
+fn measure(
+    loaded: &Loaded,
+    space: Space,
+    max_tuples: u64,
+    mutants: bool,
+) -> Result<Measured, Stop> {
     let declared = loaded.declared_laws();
     let reasons = loaded.reasons();
     let failure = has_failure(&loaded.rules);
@@ -498,8 +515,14 @@ fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, S
             gap.admissible.to_string()
         }
     }));
-    let reject_everything = reject_everything(loaded, &machine, max_tuples)?;
-    let mutation = mutation(loaded, &machine, &valid)?;
+    let (reject_everything, mutation) = if mutants {
+        (
+            Some(reject_everything(loaded, &machine, max_tuples)?),
+            Some(mutation(loaded, &machine, &valid)?),
+        )
+    } else {
+        (None, None)
+    };
     Ok(Measured {
         machine,
         declared,
