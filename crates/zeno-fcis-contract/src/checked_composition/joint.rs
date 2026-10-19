@@ -766,28 +766,50 @@ pub(crate) fn step(
     pre: &[Vec<i64>],
     request: &[i64],
 ) -> (Ended, Vec<Vec<i64>>) {
-    let mut after = pre.to_vec();
-    for at in 0..composition.components.len() {
+    use super::resolve::{self, End};
+    let resolution = resolve::resolve(composition.components.len(), |at| {
         match local(composition, tables, at, pre, request) {
-            Local::Skip => {}
-            Local::Reject(reason) => return (Ended::Reject(at, reason), pre.to_vec()),
-            Local::Refused(class) => return (Ended::Refused(at, class), pre.to_vec()),
-            Local::Commit {
-                failure,
-                reason,
-                post,
-            } => {
-                if composition.components[at].owns {
-                    after[at] = post;
-                }
-                if failure {
-                    return (Ended::CommittedFailure(at, reason), after);
-                }
-            }
+            Local::Skip => resolve::Local::Skip,
+            Local::Reject(_) => resolve::Local::Reject,
+            Local::Refused(_) => resolve::Local::Refused,
+            Local::Commit { failure: true, .. } => resolve::Local::CommitFailure,
+            Local::Commit { failure: false, .. } => resolve::Local::Commit,
+        }
+    });
+    // Local is a pure table lookup. Recover only committed payloads, and the
+    // terminal reason/class, without a mutable callback or a retained cache.
+    // No lookup here reaches a component after the resolver's terminal index.
+    let mut posts = vec![None; composition.components.len()];
+    let mut failure_reason = None;
+    for (at, slot) in posts.iter_mut().enumerate().take(resolution.committed) {
+        if let Local::Commit { reason, post, .. } = local(composition, tables, at, pre, request) {
+            *slot = Some(post);
+            failure_reason = reason;
         }
     }
-    (Ended::Accept, after)
+    let ended = match resolution.end {
+        End::Accept => Ended::Accept,
+        End::CommittedFailure(at) => Ended::CommittedFailure(at, failure_reason),
+        End::Reject(at) => match local(composition, tables, at, pre, request) {
+            Local::Reject(reason) => Ended::Reject(at, reason),
+            _ => unreachable!("an immutable local decision keeps its kind"),
+        },
+        End::Refused(at) => match local(composition, tables, at, pre, request) {
+            Local::Refused(class) => Ended::Refused(at, class),
+            _ => unreachable!("an immutable local decision keeps its kind"),
+        },
+    };
+    let owns: Vec<bool> = composition
+        .components
+        .iter()
+        .map(|component| component.owns)
+        .collect();
+    (ended, resolve::apply(pre, &posts, &owns, &resolution))
 }
+
+#[cfg(test)]
+#[path = "joint_differential_tests.rs"]
+mod differential_tests;
 
 /// Every request in enumeration order, the last field fastest, one at a
 /// time: a request domain is never collected.

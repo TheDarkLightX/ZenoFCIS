@@ -352,3 +352,5 @@ verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/README.m
 verification/verus/README.md
 crates/zeno-fcis-cli/tests/fixtures/order-fulfillment-split/README.md
 docs/KNOWLEDGE.md
+
+docs/COMPOSED_DOMAIN_PROOF.md
