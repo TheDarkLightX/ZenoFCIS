@@ -35,26 +35,26 @@ CATALOG = "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs"
 # Contract-only failures leave runtime code unchanged.
 CONTRACT_REJECTIONS = {
     "omit_original_getter_contract": frozenset({
-        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 133),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 180),
         ("postcondition not satisfied", CATALOG, 83),
         ("postcondition not satisfied", CATALOG, 136),
-        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 345),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 343),
         ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 63),
         ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 542),
     }),
     "weaken_original_getter_contract": frozenset({
-        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 133),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 180),
         ("postcondition not satisfied", CATALOG, 83),
         ("postcondition not satisfied", CATALOG, 136),
-        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 345),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 343),
         ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 63),
         ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 542),
     }),
     "narrow_original_getter_domain": frozenset({
-        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 131),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 178),
         ("precondition not satisfied", CATALOG, 87),
-        ("precondition not satisfied", CATALOG, 170),
-        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 358),
+        ("precondition not satisfied", CATALOG, 171),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 356),
         ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 104),
         ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 540),
     }),

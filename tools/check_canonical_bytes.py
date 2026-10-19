@@ -46,13 +46,13 @@ CONTRACT_REJECTIONS = {
     **dict.fromkeys(("omit_signed_contract", "weaken_signed_contract"), frozenset({
         ("postcondition not satisfied", str(SCHEMA), 150),
         ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 107),
-        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 206),
+        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 207),
     })),
     "narrow_signed_input": frozenset({
         ("precondition not satisfied", str(SCHEMA), 153),
         ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 109),
-        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 228),
-        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 266),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 229),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 267),
     }),
 }
 
