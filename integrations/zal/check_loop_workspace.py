@@ -12,7 +12,8 @@ In a scratch directory it:
   is refused, and the existing tools come first unchanged;
 * opens a family workspace and submits a family program with a hole, whose fit is checked on the instances
   it was not fitted on;
-* routes acts to the contract judges on a second counter workspace: an invariant feedback cycle (a too-weak
+* routes acts to the contract judges on a second counter workspace, without the catalogue's complete relation
+  so that owner questions remain: an invariant feedback cycle (a too-weak
   invariant refuted with its counterexample to induction and the core's decision there, a revised one
   inductive, the same invariant in other words answered from memory), a law that holds and one with a false
   alarm, a scenario that kills the reject-everything core, a teach-back rule with its exceptions, a rule the
@@ -147,14 +148,31 @@ def mcp_session(path: Path, head: str, env: dict, report: dict) -> None:
     report["mcp_tools"] = names
 
 
+def historical_incomplete(contract: Path) -> None:
+    """Drop the catalogue's independent complete relation (laws 520 and above), as the CLI's judge tests do.
+
+    The complete relation determines every decision, so no owner question would remain to ask."""
+    project = contract / "project.zeno"
+    source = project.read_text(encoding="ascii")
+    expect(source.count("// Independent complete relation") == 1, "the instance names its complete relation once")
+    project.write_text(source.split("// Independent complete relation")[0], encoding="ascii")
+    policy_path = contract / "v2" / "policy.json"
+    policy = json.loads(policy_path.read_text(encoding="ascii"))
+    kept = {law: kind for law, kind in policy["law_kinds"].items() if int(law) < 520}
+    expect(len(kept) < len(policy["law_kinds"]), "the instance declares complete-relation law kinds")
+    policy["law_kinds"] = kept
+    policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="ascii")
+
+
 def judges_workspace(work: Path, cli: Path, report: dict) -> Path:
-    """Acts routed to the contract judges, on a bounded counter at C = 8."""
+    """Acts routed to the contract judges, on a bounded counter at C = 8 without its complete relation."""
     sys.path.insert(0, str(ROOT / "tools"))
     import instantiate_core
     sys.path.pop(0)
     contract = work / "judged" / "contract"
     contract.parent.mkdir()
     instantiate_core.instantiate("bounded-counter", {"C": 8}, contract, include_proof=False)
+    historical_incomplete(contract)
     path = work / "judged.json"
     workspace = LW.LoopWorkspace(path, cli)
     workspace.init(contract=contract)
