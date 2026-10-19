@@ -78,8 +78,9 @@ mod runtime {
 
     // Owner-private append-only invocation directories. No session is created
     // merely to retain a refusal. Only qualified admission may create a journal.
+    #[cfg(test)]
     fn evidence_root() -> PathBuf {
-        Path::new("/tmp").join(format!("zeno-fcis-containment-{}", nix::unistd::geteuid()))
+        PathBuf::from("/tmp")
     }
 
     fn evidence_directory(invocation: &str) -> Result<PathBuf, String> {
@@ -90,7 +91,11 @@ mod runtime {
         {
             return Err("evidence-invocation-identity".into());
         }
-        Ok(evidence_root().join(invocation))
+        // Invocation::new obtains this identity from 256 bits of OS randomness.
+        // Create its directory atomically, without a shared predictable parent.
+        Ok(Path::new("/tmp").join(format!(
+            "zeno-fcis-containment-{}-{invocation}", nix::unistd::geteuid()
+        )))
     }
 
     fn append_record(
@@ -275,19 +280,6 @@ mod runtime {
             let invocation = crate::transform::sha256_hex(&nonce);
             timing.set("invocation_sha256", serde_json::json!(invocation));
             let build = build_identity()?;
-            let root = evidence_root();
-            match fs::DirBuilder::new().mode(0o700).create(&root) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-                Err(e) => return Err(e.to_string()),
-            }
-            let metadata = fs::symlink_metadata(&root).map_err(|e| e.to_string())?;
-            if !metadata.is_dir()
-                || metadata.uid() != nix::unistd::geteuid().as_raw()
-                || metadata.mode() & 0o777 != 0o700
-            {
-                return Err("evidence-directory-ownership".into());
-            }
             let directory = evidence_directory(&invocation)?;
             fs::DirBuilder::new()
                 .mode(0o700)
@@ -1530,6 +1522,28 @@ mod runtime {
     #[cfg(test)]
     mod stage_tests {
         use super::*;
+        #[test]
+        fn containment_regression_journal_has_no_predictable_shared_directory() {
+            use clap::Parser;
+            let cli = crate::Cli::try_parse_from([
+                "zeno-fcis", "loop", "question", "--contract", "unused",
+            ]).unwrap_or_else(|e| panic!("{e:?}"));
+            let a = Invocation::new(&cli.command, Vec::new(), super::super::super::SelectionSource::Flag)
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            let b = Invocation::new(&cli.command, Vec::new(), super::super::super::SelectionSource::Flag)
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            assert_ne!(a.directory, b.directory);
+            for directory in [&a.directory, &b.directory] {
+                let metadata = fs::symlink_metadata(directory).unwrap_or_else(|e| panic!("{e:?}"));
+                assert!(metadata.is_dir());
+                assert_eq!(metadata.mode() & 0o777, 0o700);
+                assert_eq!(metadata.uid(), nix::unistd::geteuid().as_raw());
+                assert_eq!(directory.parent(), Some(Path::new("/tmp")),
+                    "an invocation must not depend on a predictable application directory another user can occupy");
+            }
+            // These are evidence records, so the test retains both journals.
+        }
+
         // Actual re-executed workers: no production flag or alternate decision API.
         fn worker(spin: bool) {
             if !is_worker() {
