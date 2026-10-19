@@ -122,7 +122,7 @@ Formulas use the contract rules' expression language
 ([contract rules](CONTRACT_RULES.md)). A number used as a boolean is true
 exactly when it is 1. A formula with no value, such as a division by zero,
 counts as false. A binding is a rule expression, as a decision rule is: no
-multiplication or division, and checked 64-bit arithmetic, so a binding
+multiplication or division, and checked 128-bit arithmetic, so a binding
 that overflows has no value. The library's program evaluator computes each
 binding, reading every field it names as the number it is (a boolean as 0 or
 1), so a component whose fields are all boolean needs no integer declaration;

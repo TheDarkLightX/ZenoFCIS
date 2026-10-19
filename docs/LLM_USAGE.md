@@ -340,7 +340,7 @@ through the existing catalog laws and nominal authority before it can commit.
 The JavaScript target emits an ES module with `transition(input)`. Pass a
 primitive string of canonical decimal integers separated by single spaces; the
 result is another primitive string, or `null` for rejection. This preserves
-every signed 64-bit value without JavaScript `Number` rounding or object
+every signed 128-bit value without JavaScript `Number` rounding or object
 conversion hooks. `synth verify --target javascript` uses an existing Node.js
 installation. Consult discovery for the supported runtime and the exact ABI.
 Problem and vector JSON also need lossless integer handling in your client.

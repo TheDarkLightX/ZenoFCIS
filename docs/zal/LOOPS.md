@@ -401,7 +401,7 @@ examples. It reads no existing core. The schema is
 
 A meaning is the complete input-major output table. Duplicate expressions
 and assignments count once. Eligible completions must be total under eager
-signed-i64 evaluation and stay within every output bound. Finite constant
+signed-i128 evaluation and stay within every output bound. Finite constant
 ranges and choice holes are exhaustive; a Boolean `?c` ranges over 0 and 1.
 An unbounded integer `?c` or `?e` is inconclusive. Multiplication, parameters,
 `keep`, implicit core names and mixed kinds are refused.

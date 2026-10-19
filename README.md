@@ -492,7 +492,7 @@ synthesis uses the second.
 | | Correct by construction | Correct by exhaustive verification |
 | --- | --- | --- |
 | How correctness is shown | Every step that builds the program preserves correctness, so the result must be correct | The program is found by any method, then checked on every input the contract admits |
-| What you trust | The construction rules and the tool that applies them | The checker: the `finite-i64/1` interpreter and its enumeration of inputs |
+| What you trust | The construction rules and the tool that applies them | The checker: the `finite-i128/1` interpreter and its enumeration of inputs |
 | If the builder has a bug | A wrong program can come out with no warning, unless the tool is itself verified | A wrong candidate fails the check and is never selected |
 | What it can cover | Unbounded input domains | Finite domains small enough to enumerate |
 

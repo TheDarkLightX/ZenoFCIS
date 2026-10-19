@@ -10,7 +10,7 @@ checks, and what remains a contract for your code.
 
 | Code | How determinism is assured | What it rests on |
 | --- | --- | --- |
-| A synthesized finite core | By construction: the `finite-i64/1` language has no clock, randomness, input or output, or unordered collection | The interpreter and emitters, which are library code checked for ambient effects |
+| A synthesized finite core | By construction: the `finite-i128/1` language has no clock, randomness, input or output, or unordered collection | The interpreter and emitters, which are library code checked for ambient effects |
 | The library's semantic crates | `tools/check_assurance.py` rejects ambient effects, and the crates forbid unsafe code | That script's rules |
 | Your transition, adapter, and law engine | A contract, tested by the purity check and the probe below | The purity rule table, and the runs observed |
 

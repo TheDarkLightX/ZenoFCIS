@@ -28,7 +28,7 @@ zeno-fcis transform check --original FILE --candidate FILE --symbolic --tools FI
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis transform check-certificates --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--step-limit N] [--max-input-tuples N] [--out RECEIPT] [--queries DIR]
 zeno-fcis transform replay-certificates --receipt FILE --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--max-input-tuples N]
-zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
+zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i128-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract draft start --session DIR --intent FILE --project FILE --provenance TEXT [--examples FILE] [--rounds 4] [--max-tuples 4096]
 zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --provenance TEXT
 zeno-fcis contract draft questions|check --session DIR
@@ -392,7 +392,7 @@ zeno-fcis contract adopt . --candidate candidate.zcve --receipt receipt.json --u
 ```
 
 Arithmetic development graphs within 256 nodes, 16 outputs and 32 inputs use
-`zeno-fcis/finite-i64/3`. `contract export-program`, finite `transform check`
+`zeno-fcis/finite-i128/3`. `contract export-program`, finite `transform check`
 and `transform replay` carry that profile and its exact arithmetic. Older
 readers refuse it. Legacy `optimize` and loop/search proposal profiles refuse
 the new opcodes; symbolic and independent-certificate program encoders also
@@ -408,8 +408,8 @@ their packets were byte-identical. Prefer a release build for these
 commands; their results do not depend on the build.
 
 A decision program of at most 256 nodes, 16 outputs and 32 inputs uses the
-profile `zeno-fcis/finite-i64/1`. A larger one, up to 4,096 nodes, 64 outputs
-and 64 inputs, uses the profile `zeno-fcis/finite-i64/2` (or `/4` when
+profile `zeno-fcis/finite-i128/1`. A larger one, up to 4,096 nodes, 64 outputs
+and 64 inputs, uses the profile `zeno-fcis/finite-i128/2` (or `/4` when
 it contains the arithmetic extension); `generate contract`
 and `new --contract` refuse a contract past any of these limits and name the
 counts. `export-program` writes either profile, and an application built
@@ -649,7 +649,7 @@ ordinary contract route and requires: its state fields to be the slots with
 their leaves' domains and its genesis to be every leaf's genesis; the target
 to range over the leaves and every other command or context field to be a
 leaf's, with the same domain; no channel or delivery; that no program node
-can leave the 64-bit range on any input within the declared domains; a Step
+can leave the 128-bit range on any input within the declared domains; a Step
 budget that covers every program and law node, and the Authority's observed
 usage within it; on each route, the aggregate's program with its target
 fixed to that route, reduced to canonical terms, choosing the selected
@@ -836,7 +836,7 @@ user-supplied code runs. Phase names come from a closed set:
 | `phases` | Required; 1 to 16 objects, each `{"phase": NAME, "rounds": 1..=8}` with `NAME` from the table above. A round collects every match against the current graph, applies the rewrites and rebuilds; a phase stops early when a round changes nothing. |
 | `limits` | Optional object; each entry is optional and defaults to the value shown, with range 1 to 100000: `max_enodes` (e-nodes ever created, retired duplicates included), `max_classes` (live classes), `max_rewrites_per_round` (rewrites proposed or completions attempted in one round), `max_extraction_rounds` (improvement rounds of `dag-greedy`), `max_work` (deterministic work in millions of steps: rule matches, completion pairs, cut evaluations and table tuple evaluations; no round starts once it is reached). A phase that reaches a limit stops and names it. `max_work` stands in for a time budget, which a deterministic search cannot read; its default does not bind in practice. |
 | `extractor` | Optional; `dag-greedy` (default) or `tree`. |
-| `profile` | Optional; `functional-bool-v1` or `checked-i64-v1`, the artifact profiles of the [bounded optimization loop](#bounded-optimization-loop). Instructions outside the profile (`Int`, `Add`, `Sub`, `Eq` and `Lt` for `functional-bool-v1`) are never added by any phase and have no finite extraction cost; cut rewriting uses its table without `Eq`, and may replace a stored instruction outside the profile. Every candidate must also pass the profile's gate before it is judged. |
+| `profile` | Optional; `functional-bool-v1` or `checked-i128-v1`, the artifact profiles of the [bounded optimization loop](#bounded-optimization-loop). Instructions outside the profile (`Int`, `Add`, `Sub`, `Eq` and `Lt` for `functional-bool-v1`) are never added by any phase and have no finite extraction cost; cut rewriting uses its table without `Eq`, and may replace a stored instruction outside the profile. Every candidate must also pass the profile's gate before it is judged. |
 
 Without `--strategy` the fixed default portfolio, version 1
 (`zeno-fcis/optimize-portfolio/1`), runs three strategies in turn, each from
@@ -967,7 +967,7 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 
 | Command | Effect |
 | --- | --- |
-| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i64-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i64-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
+| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i128-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i128-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
 | `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
 | `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
@@ -1207,7 +1207,7 @@ domains, and every example supplies all outputs.
 }
 ```
 
-Domains are `{"kind":"Bool"}` or inclusive signed-i64
+Domains are `{"kind":"Bool"}` or inclusive signed-i128
 `{"kind":"Int","min":N,"max":N}`. There are 1 to 8 inputs and outputs,
 at most 32 distinct constants and 64 examples, and `max_size` is 1 to 12
 (default 7). Input names are distinct lower-case identifiers of at most 32
@@ -1223,7 +1223,7 @@ costs one plus its arguments. `min`, `max` and `abs` expand to checked IR
 before final checking. Evaluation is eager, including unselected branches.
 Raw meaning vectors retain arithmetic failures and integer values; only an
 output root turns values outside its domain into output-domain failures.
-Failures use tags, including at the lowest i64 output bound.
+Failures use tags, including at the lowest i128 output bound.
 
 Results use `zeno-fcis/loop-doors/2`, `door: learn`, `authority: none`.
 Scalar report fields use `safe-number-or-decimal-string/1`: integers from
@@ -1948,7 +1948,7 @@ For state expressions and payload representation changes, use schema
 complete new payload records using the same field forms. Each changed payload
 needs an explicit map. `{"expr":"old.145 >= 2"}` reads only its source
 record's field 145: the library's closed finite program computes Boolean or
-checked i64 results with addition, subtraction, comparisons, Boolean operators
+checked i128 results with addition, subtraction, comparisons, Boolean operators
 and `choose`. Multiplication, division, text and external inputs are refused.
 All source valuations must evaluate successfully into the declared target
 domain, including those excluded by state laws.
@@ -2299,7 +2299,7 @@ needs:
 
 `zeno-fcis describe synth completion` lists the exact options and filesystem
 effects of `discover`, `find`, `verify` and `replay`. These commands use the
-closed `zeno-fcis/completion-problem/1` JSON schema and existing finite-i64
+closed `zeno-fcis/completion-problem/1` JSON schema and existing finite-i128
 instructions; they never execute supplied code. See
 [bounded completion](BOUNDED_COMPLETION.md) for commands and evidence limits.
 The `prepared-counter` template connects preparation to independently checked
@@ -2565,7 +2565,7 @@ field is admitted. All problems have schema `zeno-fcis/loop-strategy-problem/1`.
 `learn` uses `zeno-fcis/learn-terms/1`: exact `original_sha256`, `status`
 (`complete` or `inconclusive`), and on completion `integers` and `predicates`
 as finite program JSON. Terms share the exact reference input domains and
-have one full i64 or Boolean output. The consumer recomputes meanings. An
+have one full i128 or Boolean output. The consumer recomputes meanings. An
 incomplete producer stops before decoding lists and cannot certify emptiness.
 
 `circuit` contains `inputs`, `gates` (`kind`, prior `wires`) and `outputs`;

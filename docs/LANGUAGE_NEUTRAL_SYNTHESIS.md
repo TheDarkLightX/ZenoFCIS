@@ -64,8 +64,9 @@ The language-model design review, run with tools disabled, completed on
 precheck, typed expression alternatives, and a separate target-conformance
 result.
 It uses a flat, topologically ordered expression graph to bound traversal and
-avoid recursive parser/evaluator depth. Boolean and checked i64 arithmetic are
-the initial theory; enum and temporal theories need separate profile work.
+avoid recursive parser/evaluator depth. Boolean and checked i64 arithmetic were
+the initial theory; the current profile uses checked i128. Enum and temporal
+theories need separate profile work.
 
 Realizability checks `for each input, some output satisfies the relation` over
 the complete declared Cartesian spaces. It also checks that the relation does
@@ -163,7 +164,7 @@ such platform dependency.
 ## Problem format and semantics
 
 A problem is bounded JSON with schema `zeno-fcis/synthesis-problem/1` and profile
-`zeno-fcis/finite-i64/1`. `inputs` and `outputs` are named positional fields.
+`zeno-fcis/finite-i128/1`. `inputs` and `outputs` are named positional fields.
 Each field has `type: {"kind":"bool"}` or
 `type: {"kind":"int", "min":0, "max":3}`. Names are metadata, never executable
 source. Unknown/duplicate object fields and unsupported instructions fail.
@@ -189,7 +190,7 @@ as useful evidence.
 | --- | --- |
 | `["input", position]` | Read an explicit input |
 | `["int", value]`, `["bool", true]` | Exact scalar constant |
-| `["add", a, b]`, `["sub", a, b]` | Checked signed i64 arithmetic |
+| `["add", a, b]`, `["sub", a, b]` | Checked signed i128 arithmetic |
 | `["eq", a, b]`, `["lt", a, b]` | Same-kind equality or integer less-than |
 | `["and", a, b]`, `["not", a]` | Boolean operations |
 | `["select", condition, a, b]` | Choose an equal-kind result |
@@ -200,7 +201,7 @@ rule is identical in the interpreter and in every emitter. Inputs and outputs
 must satisfy their declared ranges. Boolean wire values are exactly 0 and 1;
 Boolean nodes remain a distinct kind during type checking. Python requires an
 exact tuple of built-in integers, excluding `bool` aliases, subclasses, mutable
-lists, and custom conversion hooks. Rust uses an immutable `&[i64]` and returns
+lists, and custom conversion hooks. Rust uses an immutable `&[i128]` and returns
 a fixed-size stack array through `Option`. JavaScript uses an immutable string
 of canonical tokens and returns a string or `null`.
 
@@ -221,20 +222,20 @@ export function transition(input) { /* ... */ }
 ```
 
 `input` must be a **primitive string** holding exactly the declared number of
-canonical signed decimal i64 tokens separated by single ASCII spaces; zero
+canonical signed decimal i128 tokens separated by single ASCII spaces; zero
 declared fields is the empty string. The result spells the complete output
 tuple the same way, and `null` covers every rejected input, domain, arithmetic,
 and output case. The string ABI is deliberate: it excludes `Number` rounding
 for values beyond 2^53, and it excludes caller objects, arrays, proxies, and
 conversion hooks. The module tests `typeof input === "string"` before any
 method, index, or coercion can run, and bounds the input length by the declared
-arity and the longest i64 spelling before any scan, slice, or `BigInt`.
+arity and the longest i128 spelling before any scan, slice, or `BigInt`.
 
 Admission rejects a leading plus, a leading zero, negative zero, non-ASCII
 digits, whitespace other than a single separating ASCII space, a missing or
 extra token, a repeated or trailing space, exponent and hex spellings,
-out-of-i64 values, and any other malformed token. Every field and node value is
-a `BigInt`, so each `add` and `sub` carries an explicit i64 range trap;
+out-of-i128 values, and any other malformed token. Every field and node value is
+a `BigInt`, so each `add` and `sub` carries an explicit i128 range trap;
 evaluation stays eager, including dead nodes and unselected arms. Boolean wire
 values remain 0 and 1 with the shared typed IR semantics.
 
@@ -327,8 +328,8 @@ missing tools, and it injects `NODE_OPTIONS`, `NODE_PATH`, `NODE_V8_COVERAGE`,
 and `NODE_COMPILE_CACHE` to require that no preload, coverage file, or compile
 cache reaches either version identification or fixture execution. A required
 Node integration test calls the emitted module directly under the installed
-Node 22: exact canonical spellings, i64 extremes and magnitudes above 2^53,
-add/sub overflow including dead nodes and unselected arms, every Boolean
+Node 22: exact canonical spellings, i64 and i128 extremes and magnitudes above
+2^53, add/sub overflow including dead nodes and unselected arms, every Boolean
 operation, zero input fields, maximum arity, rejected output domains, malformed
 tokens, and hostile arguments such as objects with conversion hooks, proxies,
 and revoked proxies. That test is mandatory: a run without a qualified Node is a

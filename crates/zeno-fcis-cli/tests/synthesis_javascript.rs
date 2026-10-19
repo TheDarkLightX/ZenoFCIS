@@ -47,7 +47,8 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
         vec![0],
         r#"
         for (const input of ['0', '-1', '9007199254740993', '-9007199254740993',
-                             '9223372036854775807', '-9223372036854775808']) expect(input, input);
+                             '9223372036854775807', '-9223372036854775808',
+                             '170141183460469231731687303715884105727', '-170141183460469231731687303715884105728']) expect(input, input);
         let touched = 0;
         const hostile = { [Symbol.toPrimitive]() { ++touched; throw new Error('coercion'); } };
         const proxy = new Proxy([], { get() { ++touched; throw new Error('get'); } });
@@ -55,7 +56,8 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
         for (const input of [null, undefined, true, false, 0, 0n, [], {}, new String('0'), hostile, proxy, revoked.proxy,
                              '', '+1', '-0', '00', '-01', '1e0', '0x1', '1.0', 'NaN', 'Infinity',
                              ' 1', '1 ', '1  2', '1\n', '1\r', '1\t', '\u0661',
-                             '9223372036854775808', '-9223372036854775809', '1'.repeat(10000)]) {
+                             '170141183460469231731687303715884105728', '-170141183460469231731687303715884105729',
+                             '1'.repeat(10000)]) {
             expect(input, null);
         }
         if (touched !== 0) throw new Error('input hooks executed');
@@ -70,8 +72,10 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
         expect('9007199254740992 1', '9007199254740993 9007199254740991');
         expect('9223372036854775807 0', '9223372036854775807 9223372036854775807');
         expect('-9223372036854775808 0', '-9223372036854775808 -9223372036854775808');
-        for (const input of ['9223372036854775807 1', '-9223372036854775808 1',
-                             '-9223372036854775808 -1', '9223372036854775807 -1',
+        expect('9223372036854775807 1', '9223372036854775808 9223372036854775806');
+        expect('-9223372036854775808 1', '-9223372036854775807 -9223372036854775809');
+        for (const input of ['170141183460469231731687303715884105727 1', '-170141183460469231731687303715884105728 1',
+                             '-170141183460469231731687303715884105728 -1', '170141183460469231731687303715884105727 -1',
                              '0', '0 0 0', '0  0']) expect(input, null);
     "#,
     );
@@ -102,7 +106,7 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
         vec![Op::Int(i128::MIN)],
         vec![0],
         r#"
-        expect('', '-9223372036854775808'); expect('0', null); expect(' ', null);
+        expect('', '-170141183460469231731687303715884105728'); expect('0', null); expect(' ', null);
     "#,
     );
     execute(
@@ -111,7 +115,7 @@ fn javascript_executes_precision_overflow_and_inert_input_boundaries() {
         vec![Op::Input(15)],
         vec![0],
         r#"
-        expect(Array(16).fill('-9223372036854775808').join(' '), '-9223372036854775808');
+        expect(Array(16).fill('-170141183460469231731687303715884105728').join(' '), '-170141183460469231731687303715884105728');
         expect(Array(15).fill('0').join(' '), null);
         expect(Array(17).fill('0').join(' '), null);
     "#,

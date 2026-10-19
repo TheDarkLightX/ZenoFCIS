@@ -119,7 +119,7 @@ rechecking:
 - the synthesis search's enumeration of candidates, for a "no solution"
   result;
 - a project's law engine, whose verdicts the authority enforces;
-- the `finite-i64/1` interpreter, the Rust compiler, and the target runtimes.
+- the `finite-i128/1` interpreter, the Rust compiler, and the target runtimes.
 
 Judgments carried by types with private constructors:
 
