@@ -72,8 +72,11 @@ def generate(cli, source, output, semantics):
                 raise ValueError('CLI does not implement the selected checker semantics')
             receipt = output / name(vector['receipt'])
             again = run([*command, '--receipt', receipt])
-            if again != raw or json.loads(receipt.read_bytes()) != report['detail']['receipt']:
-                raise ValueError('receipt generation changed the report')
+            written_report = json.loads(again)
+            if (differences(report, written_report) != {('detail', 'receipt_path')}
+                    or written_report['detail']['receipt_path'] != str(receipt)
+                    or json.loads(receipt.read_bytes()) != report['detail']['receipt']):
+                raise ValueError('receipt generation changed more than its requested output path')
             if sha(receipt.read_bytes()) != report['detail']['receipt_sha256']:
                 raise ValueError('receipt digest differs')
         (output / name(vector['expected'])).write_bytes(raw)
