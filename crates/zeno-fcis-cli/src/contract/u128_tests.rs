@@ -48,6 +48,7 @@ fn u128_finite_gaps_proposals_and_limits() {
     let p = project(H, H + 1);
     let r = rules(H);
     let settings = review::gaps::Options {
+        mutants: true,
         max_tuples: 100,
         max_work: 100000,
         proposals: None,
