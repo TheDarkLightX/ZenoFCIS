@@ -75,7 +75,7 @@ def main():
            and "__pycache__" not in p.parts and p.name not in ("SOURCE_PINS.json","REPORT.md","PROGRESS.md")}
     manifest={"schema":"spot-source-pins/1","authority":"none","starting_head":"fda32144231bd5f8adbe201eff3a958caa2caaf6",
               "starting_source_manifest_sha256":"bdca784516973287a59731112d2b70b0215e3884a06f1133c90d232432626b87",
-              "cli":{"path":str(args.cli),"sha256":sha(args.cli),
+              "cli":{"path":args.cli.name,"sha256":sha(args.cli),
                      "observed_version":subprocess.check_output([str(args.cli),"--version"],text=True).strip()},
               "specification":previous["specification"] if previous is not None else {name:sha(args.spec/name) for name in ("SPOT_CORE_SPEC.md","OWNER_ANSWERS.md","PRIOR_OWNER_ANSWERS.md")},
               "files":files,"qualification":"bounded authoring evidence; not full-range proof or release acceptance"}
