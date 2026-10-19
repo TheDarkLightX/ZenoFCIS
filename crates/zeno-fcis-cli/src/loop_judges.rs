@@ -26,8 +26,10 @@
 //!
 //! This module is LLM-generated.
 
+use crate::contract::review::deliveries::{self, DeliveryUniverse};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::Arc;
 
 use serde_json::{Value, json};
 use zeno_fcis_contract::internals::ContractError;
@@ -161,6 +163,8 @@ pub(super) struct Core {
     pub(super) failure: bool,
     declared_laws: Vec<u32>,
     program: zeno_fcis_synthesis::finite::Program,
+    delivery_universe: Option<DeliveryUniverse>,
+    native_deliveries: Vec<Arc<[library::Delivery]>>,
 }
 
 /// `pre.100.110` as written in rules and laws.
@@ -215,6 +219,8 @@ impl Core {
         let rules = Rules::read(&rules_text)?;
         rules.refuse_unsigned("loop binding")?;
         let declarations = Declarations::read(&project, &rules.leaf_bindings)?;
+        let delivery_universe = DeliveryUniverse::new(&declarations, &rules);
+        let has_channels = !declarations.channels.is_empty();
         let positions = domain::positions(&declarations)?;
         match domain::domain_size(&positions) {
             Some(size) if size <= u128::from(MAX_TUPLES) => {}
@@ -292,15 +298,18 @@ impl Core {
         })?;
         let state_values = &values[..state_width];
         let mut decisions = Vec::with_capacity(tuples);
+        let mut native_deliveries = Vec::new();
         let mut refusals = BTreeMap::new();
         for (ordinal, outcome) in decided.into_iter().enumerate() {
             let state = ordinal / inputs;
             decisions.push(match outcome {
                 Outcome::Refused(refusal) => {
+                    if has_channels { native_deliveries.push(Arc::from([])); }
                     refusals.insert(ordinal, refusal);
                     None
                 }
                 Outcome::Decision(decision) => {
+                    if has_channels { native_deliveries.push(Arc::from(decision.outbox)); }
                     let next = if decision.class == Class::Reject {
                         state
                     } else {
@@ -403,6 +412,8 @@ impl Core {
             cases: Vec::new(),
             vocab,
             program,
+            delivery_universe,
+            native_deliveries,
         };
         core.cases = core.case_texts(&policy, &variables, &positions)?;
         Ok(core)
@@ -507,6 +518,26 @@ impl Core {
 
     pub(super) fn tuples(&self) -> usize {
         self.states * self.inputs
+    }
+
+    fn native_outbox(&self, ordinal: usize) -> &[library::Delivery] {
+        self.native_deliveries
+            .get(ordinal)
+            .map(|v| v.as_ref())
+            .unwrap_or(&[])
+    }
+
+    fn outcome_count(&self, candidates: &[Candidate], fixed: bool) -> usize {
+        candidates
+            .iter()
+            .map(|c| {
+                if c.class != Class::Reject && self.delivery_universe.is_some() && !fixed {
+                    2
+                } else {
+                    1
+                }
+            })
+            .sum()
     }
 
     /// The values of the tuple at `ordinal`.
@@ -963,7 +994,12 @@ impl Core {
     ) -> Result<Vec<Vec<Candidate>>> {
         let per_tuple =
             self.reasons.len() as u64 + self.states as u64 * (1 + self.reasons.len() as u64);
-        let checks = per_tuple.saturating_mul(self.tuples() as u64);
+        let checks = if self.delivery_universe.is_some() {
+            per_tuple.saturating_mul(2).saturating_add(1)
+        } else {
+            per_tuple
+        }
+        .saturating_mul(self.tuples() as u64);
         if checks > MAX_CHECKS {
             return Err(Stop::Inconclusive(format!(
                 "admissibility-over-limit: {checks} law checks, limit {MAX_CHECKS}"
@@ -971,6 +1007,16 @@ impl Core {
         }
         let (project, rules, ids) = self.with_laws(added)?;
         let declarations = Declarations::read(&project, &rules.leaf_bindings)?;
+        if !declarations.channels.is_empty()
+            && !self
+                .delivery_universe
+                .as_ref()
+                .is_some_and(|u| u.covers(&declarations, &rules))
+        {
+            return Err(Stop::OutOfScope(
+                "declared channels require a complete delivery decision universe".into(),
+            ));
+        }
         let positions = domain::positions(&declarations)?;
         let schema = schema::encode(&declarations)?;
         let commitment = schema_commitment(&schema)?;
@@ -996,36 +1042,98 @@ impl Core {
         let states: Vec<Vec<i128>> = (0..self.states).map(|s| self.state(s)).collect();
         let result = policy::with_authority(&contract, &schema, |authority| {
             let laws = LawSet::new(authority.descriptor(), &all);
-            (0..self.tuples())
+            if self.delivery_universe.is_some() && !laws.delivery_independent() {
+                return Err(Stop::OutOfScope(
+                    "delivery-observing laws require a complete delivery decision universe".into(),
+                ));
+            }
+            if previous.is_none() && added.is_empty() {
+                if let Some(universe) = &self.delivery_universe {
+                    for (ordinal, decision) in self.decisions.iter().enumerate() {
+                        if let Some(d) = decision {
+                            let outbox = self.native_outbox(ordinal);
+                            if !universe.allows(outbox)
+                                || !laws
+                                    .on_transition_with_outbox(
+                                        &framer,
+                                        &self.tuple(ordinal),
+                                        &Proposed {
+                                            class: d.class,
+                                            reason: d.reason,
+                                            post: &states[d.next],
+                                        },
+                                        outbox,
+                                    )
+                                    .0
+                            {
+                                return invalid(
+                                    "question-delivery-frames-disagree-with-native-decision",
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            let table = (0..self.tuples())
                 .map(|ordinal| {
                     let tuple = self.tuple(ordinal);
                     let pre = &states[ordinal / self.inputs];
-                    let admits = |class: Class, reason: Option<u32>, post: &[i128]| {
-                        laws.on_transition(
-                            &framer,
-                            &tuple,
-                            &Proposed {
-                                class,
-                                reason,
-                                post,
-                            },
-                        )
-                        .0
-                    };
+                    let admits =
+                        |class: Class, reason: Option<u32>, post: &[i128]| -> Result<bool> {
+                            let admitted = laws
+                                .on_transition(
+                                    &framer,
+                                    &tuple,
+                                    &Proposed {
+                                        class,
+                                        reason,
+                                        post,
+                                    },
+                                )
+                                .0;
+                            if admitted && class != Class::Reject {
+                                if let Some(u) = &self.delivery_universe {
+                                    let witness = u.example();
+                                    if witness.is_empty()
+                                        || !u.allows(&witness)
+                                        || !laws
+                                            .on_transition_with_outbox(
+                                                &framer,
+                                                &tuple,
+                                                &Proposed {
+                                                    class,
+                                                    reason,
+                                                    post,
+                                                },
+                                                &witness,
+                                            )
+                                            .0
+                                    {
+                                        return invalid(
+                                            "question-delivery-multiplicity-witness-refused",
+                                        );
+                                    }
+                                }
+                            }
+                            Ok(admitted)
+                        };
                     if let Some(previous) = previous {
                         let candidates = &previous[ordinal];
                         if mask.is_some_and(|mask| mask[ordinal] != 1) {
-                            return candidates.clone();
+                            return Ok(candidates.clone());
                         }
-                        return candidates
-                            .iter()
-                            .copied()
-                            .filter(|c| admits(c.class, c.reason, &states[c.next]))
-                            .collect();
+                        let mut out = Vec::new();
+                        for c in candidates {
+                            if admits(c.class, c.reason, &states[c.next])? {
+                                out.push(*c);
+                            }
+                        }
+                        return Ok(out);
                     }
                     let mut out = Vec::new();
                     for (reason, _) in &self.reasons {
-                        if admits(Class::Reject, Some(*reason), pre) {
+                        if admits(Class::Reject, Some(*reason), pre)? {
                             out.push(Candidate {
                                 class: Class::Reject,
                                 reason: Some(*reason),
@@ -1034,7 +1142,7 @@ impl Core {
                         }
                     }
                     for (next, post) in states.iter().enumerate() {
-                        if admits(Class::Accept, None, post) {
+                        if admits(Class::Accept, None, post)? {
                             out.push(Candidate {
                                 class: Class::Accept,
                                 reason: None,
@@ -1044,7 +1152,7 @@ impl Core {
                     }
                     for (reason, _) in &self.reasons {
                         for (next, post) in states.iter().enumerate() {
-                            if admits(Class::CommittedFailure, Some(*reason), post) {
+                            if admits(Class::CommittedFailure, Some(*reason), post)? {
                                 out.push(Candidate {
                                     class: Class::CommittedFailure,
                                     reason: Some(*reason),
@@ -1053,10 +1161,11 @@ impl Core {
                             }
                         }
                     }
-                    out
+                    Ok(out)
                 })
-                .collect::<Vec<_>>()
-        })?;
+                .collect::<Result<Vec<_>>>()?;
+            Ok(table)
+        })??;
         Ok(result)
     }
 
@@ -1222,9 +1331,16 @@ pub(super) fn meaning_digest(kind: &str, parts: &[Vec<u8>]) -> String {
 
 // --- requirements: answers -----------------------------------------------------
 
+#[derive(Clone, Debug)]
+pub(super) enum DeliveryAnswer {
+    Case,
+    Exact(Arc<[library::Delivery]>),
+}
+
 /// An owner's answer: a decision for exactly the inputs `where` names.
 #[derive(Clone, Debug)]
 pub(super) struct Answer {
+    pub(super) deliveries: Option<DeliveryAnswer>,
     pub(super) where_: Expr,
     pub(super) class: Class,
     pub(super) reason: Option<u32>,
@@ -1290,7 +1406,22 @@ impl Core {
             if class == Class::Reject && sets.as_ref().is_some_and(|s| !s.is_empty()) {
                 return Err(at("a reject keeps the state"));
             }
+            let deliveries = match &item["deliveries"] {
+                Value::Null => None,
+                Value::String(value) if value == "case" => Some(DeliveryAnswer::Case),
+                Value::Array(values) if values.is_empty() => {
+                    Some(DeliveryAnswer::Exact(Arc::from([])))
+                }
+                Value::Array(_) => Some(DeliveryAnswer::Exact(Arc::from(
+                    self.delivery_universe
+                        .as_ref()
+                        .ok_or_else(|| at("delivery universe unavailable"))?
+                        .read(&item["deliveries"])?,
+                ))),
+                _ => return Err(at("deliveries must be a complete array or case")),
+            };
             out.push(Answer {
+                deliveries,
                 where_,
                 class,
                 reason,
@@ -1342,7 +1473,27 @@ impl Core {
                 }
             }
             Class::CommittedFailure => {
-                return invalid("question-choice-unsupported:CommittedFailure");
+                laws.push(("reject".to_owned(), not_here.clone()));
+                laws.push(("accept".to_owned(), not_here));
+                let reason = answer
+                    .reason
+                    .ok_or_else(|| Stop::Invalid("failure-reason-required".into()))?;
+                laws.push((
+                    "failure".to_owned(),
+                    format!("({w}) -> (decision_reason == {reason})"),
+                ));
+                if let Some(sets) = &answer.sets {
+                    for k in 0..self.state_width {
+                        let value = sets
+                            .get(&k)
+                            .cloned()
+                            .unwrap_or_else(|| Expr::Var(self.names[k].clone()));
+                        laws.push((
+                            "failure".to_owned(),
+                            format!("({w}) -> ({})", self.successor_law(k, &value)?),
+                        ));
+                    }
+                }
             }
         }
         Ok(laws)
@@ -1372,33 +1523,89 @@ pub(super) struct Region {
 }
 
 impl Core {
+    fn apply_delivery_answer(
+        &self,
+        answer: &Answer,
+        mask: &[i128],
+        admitted: &mut [Vec<Candidate>],
+        fixed: &mut Vec<Option<Arc<[library::Delivery]>>>,
+    ) -> Result<()> {
+        let Some(requirement) = &answer.deliveries else {
+            return Ok(());
+        };
+        if fixed.is_empty() {
+            fixed.resize(self.tuples(), None);
+        }
+        for ordinal in 0..self.tuples() {
+            if mask[ordinal] != 1 {
+                continue;
+            }
+            let wanted = match requirement {
+                DeliveryAnswer::Exact(values) => values.clone(),
+                DeliveryAnswer::Case => {
+                    if self.decisions[ordinal].is_none() {
+                        return invalid("delivery-case-has-no-native-decision");
+                    }
+                    self.native_deliveries
+                        .get(ordinal)
+                        .cloned()
+                        .unwrap_or_else(|| Arc::from([]))
+                }
+            };
+            if answer.class == Class::Reject && !wanted.is_empty() {
+                return invalid("a-reject-cannot-deliver");
+            }
+            if self
+                .delivery_universe
+                .as_ref()
+                .map_or(!wanted.is_empty(), |u| !u.allows(&wanted))
+            {
+                return invalid("delivery-answer-outside-declared-universe");
+            }
+            if fixed[ordinal].as_ref().is_some_and(|old| old != &wanted) {
+                admitted[ordinal].clear();
+            } else {
+                if !wanted.is_empty() {
+                    admitted[ordinal].retain(|c| c.class != Class::Reject);
+                }
+                fixed[ordinal] = Some(wanted);
+            }
+        }
+        Ok(())
+    }
+
     /// Which inputs the laws and requirements leave open, grouped into
     /// regions by the case that fires there.
     pub(super) fn freedom(&self, answers: &[Answer]) -> Result<Freedom> {
         let mut admissible = self.admissible(&[])?;
+        let mut fixed = Vec::new();
         let mut reasons: Vec<(Vec<i128>, u32)> = Vec::new();
         for answer in answers {
             let mask = self.eval(&answer.where_)?;
             admissible =
                 self.admissible_from(&self.pin(answer)?, Some(&admissible), Some(&mask))?;
+            self.apply_delivery_answer(answer, &mask, &mut admissible, &mut fixed)?;
             if answer.class == Class::Reject
                 && let Some(reason) = answer.reason
             {
                 reasons.push((mask, reason));
             }
         }
-        Ok(self.freedom_from(admissible, &reasons))
+        Ok(self.freedom_from(admissible, &reasons, &fixed))
     }
 
     fn freedom_from(
         &self,
         mut admissible: Vec<Vec<Candidate>>,
         reasons: &[(Vec<i128>, u32)],
+        fixed: &[Option<Arc<[library::Delivery]>>],
     ) -> Freedom {
         let determined_by_laws = admissible
             .iter()
             .enumerate()
-            .filter(|(ordinal, c)| c.len() == 1 && self.decisions[*ordinal].is_some())
+            .filter(|(ordinal, c)| {
+                self.outcome_count(c, false) == 1 && self.decisions[*ordinal].is_some()
+            })
             .count();
         // A recorded reason requirement removes rejects with other reasons
         // where it applies.
@@ -1410,6 +1617,11 @@ impl Core {
                         .all(|(mask, reason)| mask[ordinal] != 1 || c.reason == Some(*reason))
             });
         }
+        let determined_with_reasons = admissible
+            .iter()
+            .enumerate()
+            .filter(|(o, c)| self.outcome_count(c, false) == 1 && self.decisions[*o].is_some())
+            .count();
         let mut refused = 0usize;
         let mut determined = 0usize;
         let mut inconsistent = 0usize;
@@ -1428,13 +1640,13 @@ impl Core {
                     "input_ordinal": ordinal,
                     "row": self.shown(ordinal),
                     "laws": self.declared_laws,
-                    "lawful_outcomes": candidates.len(),
+                    "lawful_outcomes": self.outcome_count(candidates, fixed.get(ordinal).is_some_and(Option::is_some)),
                     "reason": if candidates.is_empty() { "zero-lawful-outcomes" } else { "execution-refusal" },
                     "execution_refusal": refusal.map(|r| json!({"law": r.law, "reason": r.text})),
                 }));
                 continue;
             }
-            match candidates.len() {
+            match self.outcome_count(candidates, fixed.get(ordinal).is_some_and(Option::is_some)) {
                 1 => determined += 1,
                 _ => {
                     let set: BTreeSet<Label> = candidates
@@ -1501,7 +1713,8 @@ impl Core {
             "reference_refused": refused,
             "determined": determined,
             "determined_by_laws": determined_by_laws,
-            "determined_with_reasons": determined,
+            "determined_with_reasons": determined_with_reasons,
+            "determined_with_delivery_requirements": determined,
             "determined_rate": if tuples == 0 { 0.0 } else { determined as f64 / tuples as f64 },
             "inconsistent": inconsistent,
             "residual": residual_witnesses.len(),
@@ -1558,16 +1771,18 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
     let mut records = Vec::new();
     let mut admitted = core.admissible(&[])?;
     let mut reasons = Vec::new();
+    let mut fixed = Vec::new();
     for (index, answer) in answers.iter().enumerate() {
         let mask = core.eval(&answer.where_)?;
         let laws = core.pin(answer)?;
         admitted = core.admissible_from(&laws, Some(&admitted), Some(&mask))?;
+        core.apply_delivery_answer(answer, &mask, &mut admitted, &mut fixed)?;
         if answer.class == Class::Reject
             && let Some(reason) = answer.reason
         {
             reasons.push((mask.clone(), reason));
         }
-        let freedom = core.freedom_from(admitted.clone(), &reasons);
+        let freedom = core.freedom_from(admitted.clone(), &reasons, &fixed);
         if freedom.stats["inconsistent"].as_u64().unwrap_or(0) > 0 {
             let Some(ordinal) = freedom.admitted.iter().position(Vec::is_empty) else {
                 return invalid("question-inconsistent-statistics-without-an-input");
@@ -1595,7 +1810,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         let inside: Vec<usize> = (0..core.tuples()).filter(|o| mask[*o] == 1).collect();
         // An accept's successor, when the answer gives one, on every tuple.
         let successor: Option<Vec<Vec<i128>>> = match (&answer.sets, answer.class) {
-            (Some(sets), Class::Accept) => Some(
+            (Some(sets), Class::Accept | Class::CommittedFailure) => Some(
                 (0..core.state_width)
                     .map(|k| match sets.get(&k) {
                         Some(e) => core.eval(e),
@@ -1610,6 +1825,10 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
             .copied()
             .filter(|o| {
                 core.core_label(*o) != Some(chosen)
+                    || fixed
+                        .get(*o)
+                        .and_then(Option::as_ref)
+                        .is_some_and(|wanted| wanted.as_ref() != core.native_outbox(*o))
                     || successor.as_ref().is_some_and(|columns| {
                         core.decisions[*o].is_some_and(|d| {
                             let post = core.state(d.next);
@@ -1626,6 +1845,15 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
             "reason_requirement": (answer.class == Class::Reject).then(|| core.reason_name(answer.reason)),
             "status": if differs.is_empty() { "recorded" } else { "disagreement" },
         });
+        if let Some(deliveries) = &answer.deliveries {
+            record["delivery_requirement"] = match deliveries {
+                DeliveryAnswer::Case => json!("case"),
+                DeliveryAnswer::Exact(values) => deliveries::shown(values),
+            };
+            record["delivery_requirement_check"] = json!(
+                "declared domains and complete native outbox comparison; not emitted as a law"
+            );
+        }
         if let Some(first) = differs.first() {
             record["disagreement"] = json!({
                 "inputs": differs.len(),
@@ -1648,7 +1876,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         }
         records.push(record);
     }
-    let freedom = core.freedom_from(admitted, &reasons);
+    let freedom = core.freedom_from(admitted, &reasons, &fixed);
     let mut out = json!({
         "status": if freedom.stats["inconsistent"].as_u64().unwrap_or(0) > 0 { "inconsistent" }
             else if freedom.stats["reference_refused"].as_u64().unwrap_or(0) > 0 { "incomplete" }
@@ -1658,6 +1886,9 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         "residual_witnesses": freedom.residual_witnesses,
         "answers": records,
     });
+    if let Some(universe) = &core.delivery_universe {
+        out["delivery_universe"] = universe.json();
+    }
     if let Some(region) = freedom.regions.first() {
         let mut mask = vec![false; core.tuples()];
         for o in &region.ordinals {
@@ -1675,6 +1906,27 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
             "options": region.labels.iter().map(|l| core.option_json(*l, (region.successors > 0).then_some(region.case), current)).collect::<Vec<_>>(),
             "core": current.map(|l| core.option_json(l, Some(region.case), current)),
         });
+        if let Some(universe) = &core.delivery_universe {
+            if region.labels.iter().any(|l| class_of(l.0) != Class::Reject) {
+                let own = core.native_outbox(witness);
+                let mut choices = vec![Vec::new(), universe.example()];
+                if !choices.iter().any(|v| v == own) {
+                    choices.push(own.to_vec());
+                }
+                out["question"]["delivery_choices"] = json!(
+                    choices
+                        .iter()
+                        .map(|v| json!({
+                            "deliveries": deliveries::shown(v), "current": v == own,
+                        }))
+                        .collect::<Vec<_>>()
+                );
+                out["question"]["delivery_question"] = json!(
+                    "Which deliveries should this decision emit? Supply a complete delivery array, or case to retain its delivery expressions."
+                );
+                out["question"]["core"]["deliveries"] = deliveries::shown(own);
+            }
+        }
     }
     Ok(out)
 }
@@ -2073,6 +2325,125 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
 
+    fn delivery_counter(eventful: bool) -> Core {
+        let folder =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core-components/bounded-counter");
+        let mut project = std::fs::read_to_string(folder.join("project.zeno.in"))
+            .unwrap_or_else(|e| panic!("{e}"))
+            .replace("${C}", "1")
+            .replace("${INSTANCE}", "delivery-counter");
+        project.push_str("\ntype 103 destination Sink;\ntype 104 payload Notice;\nfield 132 104 count 105;\nchannel 300 notify destination 103 payload 104;\nchannel 301 alternate destination 103 payload 104;\n");
+        let rules = std::fs::read_to_string(folder.join("policy.json.in"))
+            .unwrap_or_else(|e| panic!("{e}"))
+            .replace("${C}", "1")
+            .replace("${INSTANCE}", "delivery-counter");
+        let mut rules: Value = serde_json::from_str(&rules).unwrap_or_else(|e| panic!("{e}"));
+        rules["leaf_bindings"]["103"] = json!(["Text", 1, 32]);
+        if eventful {
+            rules["cases"][3]["outbox"] = json!([{"ordinal":0,"channel":301,"destination":"sink",
+                "payload":{"132":"value+1"},"idempotency_ordinal":1}]);
+            rules["cases"][4]["outbox"] = json!([{"ordinal":0,"channel":300,"destination":"sink",
+                "payload":{"132":"value"},"idempotency_ordinal":1}]);
+        }
+        Core::from_sources(project, rules.to_string()).unwrap_or_else(|e| panic!("{e:?}"))
+    }
+
+    #[test]
+    fn a_missing_delivery_from_the_universe_is_caught_before_determination() {
+        let mut core = delivery_counter(false);
+        let before = question(&core, &[]).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(before["status"], "open");
+        assert_eq!(before["stats"]["determined"], 6);
+        core.delivery_universe
+            .as_mut()
+            .unwrap_or_else(|| panic!("universe"))
+            .omit_delivery_channel();
+        assert!(matches!(question(&core, &[]), Err(Stop::OutOfScope(_))));
+    }
+
+    #[test]
+    fn delivery_answers_resolve_a_delivery_only_gap_and_detect_conflicts() {
+        let core = delivery_counter(false);
+        let answer = json!({"where":"authorized && action == 150 && value == 0", "class":"Accept",
+            "sets":{"value":"1"}, "deliveries":[]});
+        let checked = core
+            .answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[answer.clone()]}))
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        let report = question(&core, &checked).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(report["stats"]["determined"], 7);
+        assert_eq!(report["answers"][0]["status"], "recorded");
+        let mut conflicting = answer;
+        conflicting["deliveries"] = deliveries::shown(
+            &core
+                .delivery_universe
+                .as_ref()
+                .unwrap_or_else(|| panic!("universe"))
+                .example(),
+        );
+        let checked = core
+            .answers(&json!({"schema":"zeno-fcis/loop-answers/1",
+            "answers":[{"where":"authorized && action == 150 && value == 0","class":"Accept",
+                "sets":{"value":"1"},"deliveries":[]},conflicting]}))
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(
+            question(&core, &checked).unwrap_or_else(|e| panic!("{e:?}"))["status"],
+            "conflict"
+        );
+    }
+
+    #[test]
+    fn delivery_answers_compare_channel_destination_payload_marker_and_ordinal() {
+        let core = delivery_counter(true);
+        let ordinal = (0..core.tuples())
+            .find(|o| {
+                core.native_outbox(*o)
+                    .first()
+                    .is_some_and(|d| d.channel == 300)
+            })
+            .unwrap_or_else(|| panic!("delivery witness"));
+        let original = deliveries::shown(core.native_outbox(ordinal));
+        for changed_field in [
+            "unchanged",
+            "channel",
+            "destination",
+            "payload",
+            "idempotency",
+            "ordinal",
+        ] {
+            let mut wanted = original.clone();
+            match changed_field {
+                "channel" => wanted[0]["channel"] = json!(301),
+                "destination" => wanted[0]["destination"] = json!("other"),
+                "payload" => wanted[0]["payload"]["132"] = json!("0"),
+                "idempotency" => wanted[0]["idempotency_ordinal"] = json!("0"),
+                "ordinal" => wanted[0]["ordinal"] = json!(1),
+                _ => {}
+            }
+            let checked = core
+                .answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{
+                "where":"authorized && action == 151 && value == 1", "class":"Accept",
+                "sets":{"value":"0"},"deliveries":wanted}]}))
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            let report = question(&core, &checked).unwrap_or_else(|e| panic!("{e:?}"));
+            assert_eq!(
+                report["answers"][0]["status"],
+                if changed_field == "unchanged" {
+                    "recorded"
+                } else {
+                    "disagreement"
+                },
+                "{changed_field}: {report}"
+            );
+        }
+        let mut unknown_channel = original;
+        unknown_channel[0]["channel"] = json!(302);
+        assert!(
+            core.answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{
+            "where":"true", "class":"Accept", "deliveries":unknown_channel}]}))
+                .is_err()
+        );
+    }
+
     #[test]
     fn arithmetic_law_writers_compile_and_check_with_the_native_laws() {
         let core = Core::from_sources(cpmm::project(2), cpmm::policy(2, 30, false).to_string())
@@ -2154,6 +2525,7 @@ mod tests {
                 core.admissible(&laws)
                     .unwrap_or_else(|error| panic!("full laws: {error:?}")),
                 &reasons,
+                &[],
             );
             let narrowed = core
                 .freedom(&answers[..prefix])
@@ -2227,5 +2599,12 @@ mod tests {
         assert!(laws.iter().any(|(scope, _)| scope == "reject:201"));
         assert!(!laws.iter().any(|(scope, _)| scope == "reject:203"));
         core.admissible(&laws).unwrap();
+        let failure = core
+            .answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{
+            "where":"authorized && action == 150 && value == 0", "class":"CommittedFailure",
+            "reason":"failure_only", "sets":{"value":"1"}, "deliveries":[]}]}))
+            .unwrap();
+        let report = question(&core, &failure).unwrap();
+        assert_eq!(report["answers"][0]["status"], "disagreement");
     }
 }

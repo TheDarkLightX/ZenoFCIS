@@ -309,6 +309,7 @@ pub(super) struct Machine {
     /// SHA-256 of each decision's outbox, as the review digests it; zero for
     /// a refusal.
     pub(super) outboxes: Vec<[u8; 32]>,
+    deliveries: BTreeMap<usize, Vec<evaluate::Delivery>>,
     /// The index of the genesis state.
     pub(super) genesis: usize,
 }
@@ -329,17 +330,21 @@ impl Machine {
         let genesis = genesis(&space, positions, rules)?;
         let results = parallel(space.tuples(), |ordinal| {
             let tuple = space.at(ordinal);
-            observe(
-                &space,
-                positions,
-                &evaluate::evaluate(authority, framer, &tuple),
-                ordinal,
-            )
+            let outcome = evaluate::evaluate(authority, framer, &tuple);
+            let deliveries = match &outcome {
+                Outcome::Decision(d) => d.outbox.clone(),
+                Outcome::Refused(_) => Vec::new(),
+            };
+            observe(&space, positions, &outcome, ordinal).map(|(a, b)| (a, b, deliveries))
         });
         let mut observed = Vec::with_capacity(results.len());
         let mut outboxes = Vec::with_capacity(results.len());
-        for result in results {
-            let (outcome, outbox) = result?;
+        let mut deliveries = BTreeMap::new();
+        for (ordinal, result) in results.into_iter().enumerate() {
+            let (outcome, outbox, full) = result?;
+            if !full.is_empty() {
+                deliveries.insert(ordinal, full);
+            }
             observed.push(outcome);
             outboxes.push(outbox);
         }
@@ -347,8 +352,16 @@ impl Machine {
             space,
             observed,
             outboxes,
+            deliveries,
             genesis,
         })
+    }
+
+    pub(super) fn outbox_at(&self, ordinal: usize) -> &[evaluate::Delivery] {
+        self.deliveries
+            .get(&ordinal)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     /// The outcome of `state` on `input`.

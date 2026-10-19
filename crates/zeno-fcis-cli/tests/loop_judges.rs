@@ -183,7 +183,7 @@ fn a63_round2_execution_refusals_preserve_the_law_relation() {
     }
 }
 
-fn assert_question_profile_guard(delivers: bool) {
+fn assert_question_delivery_profile(delivers: bool) {
     let directory = Directory::new();
     let app = directory.contract("bounded-counter", &[("C", 1)]);
     let project = Path::new(&app).join("project.zeno");
@@ -210,8 +210,11 @@ fn assert_question_profile_guard(delivers: bool) {
         review_path.to_str().unwrap(),
     ]);
     let review: Value = serde_json::from_slice(&fs::read(review_path).unwrap()).unwrap();
-    assert_eq!(review_exit, Some(2), "{review}");
-    assert_eq!(review["gaps"]["status"], "out-of-scope");
+    assert_eq!(review_exit, Some(0), "{review}");
+    assert_eq!(review["gaps"]["status"], "measured");
+    assert_eq!(review["gaps"]["frame_check"]["mismatches"], 0);
+    assert_eq!(review["gaps"]["admissible"]["full"]["determined"], 6);
+    assert_eq!(review["gaps"]["admissible"]["full"]["undetermined"], 2);
     for entries in [
         None,
         Some(vec![]),
@@ -226,10 +229,20 @@ fn assert_question_profile_guard(delivers: bool) {
         }
         let (exit, report) = run(&args);
         assert_eq!(exit, review_exit, "{report}");
-        assert_eq!(report["status"], "out-of-scope", "{report}");
+        assert_eq!(report["status"], "open", "{report}");
         assert_eq!(
-            report["detail"]["reason"], review["gaps"]["reason"],
+            report["detail"]["stats"]["determined"],
+            review["gaps"]["admissible"]["full"]["determined"],
             "{report}"
+        );
+        assert_eq!(
+            report["detail"]["stats"]["inconsistent"],
+            review["gaps"]["admissible"]["full"]["zero_outcome"]
+        );
+        assert!(
+            report["detail"]["question"]["delivery_choices"]
+                .as_array()
+                .is_some_and(|v| v.len() >= 2)
         );
     }
     assert_eq!(fs::read_to_string(project).unwrap(), source);
@@ -238,12 +251,12 @@ fn assert_question_profile_guard(delivers: bool) {
 
 #[test]
 fn a63_round2_eventful_question_matches_the_gap_profile() {
-    assert_question_profile_guard(true);
+    assert_question_delivery_profile(true);
 }
 
 #[test]
 fn a63_round2_unused_channel_question_matches_the_gap_profile() {
-    assert_question_profile_guard(false);
+    assert_question_delivery_profile(false);
 }
 
 fn arithmetic_contract(directory: &Directory, successor: &str, condition: &str) -> String {

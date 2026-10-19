@@ -36,6 +36,24 @@ pub enum Value {
 }
 
 impl Value {
+    fn atom(&self) -> Option<c::Atom<'_>> {
+        Some(match self {
+            Self::Bool(v) => c::Atom::Bool(*v),
+            Self::I128(v) => c::Atom::I128(*v),
+            Self::U128(v) => c::Atom::U128(*v),
+            Self::Sum { type_id, variant } => c::Atom::Sum {
+                type_id: *type_id,
+                variant: *variant,
+            },
+            Self::Enum { type_id, variant } => c::Atom::Enum {
+                type_id: *type_id,
+                variant: *variant,
+            },
+            Self::Text(v) => c::Atom::Text(v),
+            Self::Bytes(v) => c::Atom::Bytes(v),
+            Self::Other(_) => return None,
+        })
+    }
     fn from_atom(atom: c::Atom<'_>) -> Self {
         match atom {
             c::Atom::Bool(value) => Self::Bool(value),
@@ -547,6 +565,58 @@ impl<'d> LawSet<'d> {
         (ok, selected.unwrap_or(diagnostics))
     }
 
+    /// Whether every selected predicate is independent of the outbox.
+    /// Unknown instructions and selectors refuse this capability.
+    pub fn delivery_independent(&self) -> bool {
+        use laws::{Observation as O, Op};
+        let independent = |o: O| {
+            matches!(
+                o,
+                O::PreRoot
+                    | O::CommandRoot
+                    | O::ContextRoot
+                    | O::PostRoot
+                    | O::InitialRoot
+                    | O::Pre(_)
+                    | O::Command(_)
+                    | O::Context(_)
+                    | O::Post(_)
+                    | O::Initial(_)
+                    | O::Class
+                    | O::HasReason
+                    | O::Reason
+                    | O::PostLength
+                    | O::PatchLength
+                    | O::EffectLength
+                    | O::PatchField(_)
+                    | O::PatchBefore(_)
+                    | O::PatchAfter(_)
+            )
+        };
+        self.laws[..self.selected].iter().all(|law| {
+            law.program.nodes.iter().all(|node| match node {
+                Op::Observe(o) | Op::ObserveWhen(_, o, _) => independent(*o),
+                Op::Literal(_)
+                | Op::Add(..)
+                | Op::Sub(..)
+                | Op::Mul(..)
+                | Op::Div(..)
+                | Op::MulDivFloor(..)
+                | Op::MulDivCeil(..)
+                | Op::SignedMulDivFloor(..)
+                | Op::ProductsGe(..)
+                | Op::ToI128(..)
+                | Op::ToU128(..)
+                | Op::Eq(..)
+                | Op::Lt(..)
+                | Op::And(..)
+                | Op::Not(..)
+                | Op::Select(..) => true,
+                _ => false,
+            })
+        })
+    }
+
     /// The IDs of the selected laws, in order.
     pub fn ids(&self) -> Vec<u32> {
         self.laws[..self.selected]
@@ -572,6 +642,42 @@ impl<'d> LawSet<'d> {
         tuple: &[i128],
         proposed: &Proposed<'_>,
     ) -> (bool, Vec<laws::Diagnostic>) {
+        self.on_transition_with_outbox(framer, tuple, proposed, &[])
+    }
+
+    /// The same pure law check with an explicit, immutable complete outbox.
+    pub fn on_transition_with_outbox(
+        &self,
+        framer: &Framer,
+        tuple: &[i128],
+        proposed: &Proposed<'_>,
+        outbox: &[Delivery],
+    ) -> (bool, Vec<laws::Diagnostic>) {
+        let converted: Option<Vec<laws::Delivery<'_>>> = outbox
+            .iter()
+            .map(|d| {
+                let payload = d
+                    .payload
+                    .iter()
+                    .map(|(id, v)| {
+                        Some(c::Field {
+                            id: *id,
+                            value: v.atom()?,
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                Some(laws::Delivery {
+                    ordinal: d.ordinal,
+                    channel: d.channel,
+                    destination: d.destination.atom()?,
+                    payload,
+                    idempotency: d.idempotency.atom()?,
+                })
+            })
+            .collect();
+        let Some(outbox) = converted else {
+            return (false, Vec::new());
+        };
         let views = [0, 1, 2].map(|index| framer.fields(&framer.roots[index], tuple));
         let pre = framer.view(&framer.roots[0], tuple, &views[0]);
         let command = framer.view(&framer.roots[1], tuple, &views[1]);
@@ -617,7 +723,7 @@ impl<'d> LawSet<'d> {
             post,
             patch: &patch,
             effects: &[],
-            outbox: &[],
+            outbox: &outbox,
             reads: &[],
             attempts: &[],
             usage: self.usage,
