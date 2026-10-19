@@ -78,6 +78,8 @@ queries, and do not prove the whole compiler, runtime or application shell.
 
 ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, are planned for 2.5.1.
 
+The Lean Spot theorems for the rational contract model are classical because core `Rat` operations in Lean 4.30 depend on `Classical.choice`.
+
 ## Knowledge snapshots
 
 **Tested.** A knowledge invocation freezes the selected external files into a

@@ -32,6 +32,8 @@ and bounds. They do not establish an any-length No-free-value theorem,
 full-range refinement, authenticated custody, durable publication or release
 qualification, and no KernelChecked proof is claimed for them.
 
+The Lean Spot theorems for the rational contract model are classical because core `Rat` operations in Lean 4.30 depend on `Classical.choice`.
+
 The refinement gate checks the compiled decision program itself:
 
 ```sh
