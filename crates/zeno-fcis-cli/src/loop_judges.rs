@@ -2605,6 +2605,8 @@ mod tests {
             "reason":"failure_only", "sets":{"value":"1"}, "deliveries":[]}]}))
             .unwrap();
         let report = question(&core, &failure).unwrap();
-        assert_eq!(report["answers"][0]["status"], "disagreement");
+        // The complete counter laws require an accept on this input, so a
+        // failure requirement must be a conflict rather than an unsupported answer.
+        assert_eq!(report["status"], "conflict", "{report}");
     }
 }
