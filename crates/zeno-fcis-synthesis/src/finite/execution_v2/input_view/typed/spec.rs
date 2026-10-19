@@ -34,7 +34,7 @@ pub(crate) open spec fn fields<'a>(view:FieldsView<'a>)->Seq<(u16,LeafView<'a>)>
 }
 pub(crate) open spec fn numeric_field_valid(fs:Seq<Field<Domain>>,i:int)->bool {
     0<=i<fs.len() && (i==0 || fs[i-1].id<fs[i].id) && match fs[i].leaf {
-        Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]<variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false,
+        Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]< #[trigger] variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false,
     }
 }
 pub(crate) open spec fn valid(view:FieldsView)->bool {

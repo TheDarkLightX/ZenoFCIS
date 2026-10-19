@@ -4,7 +4,7 @@ use super::*;
 use vstd::prelude::*;
 verus! {
 pub(in super::super::super::super) open spec fn leaf(d:Domain)->bool {
-    match d {Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]<variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false}
+    match d {Domain::Sum{variants,..}=>0<variants@.len()&&(forall|i:int|0<i<variants@.len()==>variants@[i-1]< #[trigger] variants@[i]),Domain::Bool=>true,Domain::I128{min,max}=>min<=max,Domain::U128{min,max}=>min<=max,_=>false}
 }
 pub(in super::super::super) open spec fn same_domain(a:Domain,b:Domain)->bool {
     match(a,b){
