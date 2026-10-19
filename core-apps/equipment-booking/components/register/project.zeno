@@ -27,5 +27,5 @@ law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.
 law 502 exact_write on accept = command.101.120 == pre.100.111 && post.100.110 == command.101.121 && post.100.111 == pre.100.111 + 1;
 // Core seed versioned-register/1; parameters {"C": 3}.
 // Instance source-set SHA256 c290dfd68bb81df3585bfe128e3ffbb13186350c54b67eb08134c1ba099fc773.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 904f485be5c3a5610f6dbe6a0ea318811e161edd1d35077e8da07dc8acc44218; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 eaf8e2f2d193b5d6e2c6e33fc51b8bbe6f68e0253ae6630de985362089ce0388; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.
