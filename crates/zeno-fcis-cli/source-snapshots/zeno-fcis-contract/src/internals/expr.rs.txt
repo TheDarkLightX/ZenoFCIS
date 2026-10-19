@@ -67,8 +67,11 @@ pub const OPERATORS: [(&str, Binary); 12] = [
 ];
 
 /// Every function with its number of arguments.
-pub const FUNCTIONS: [(&str, usize); 13] = [
+pub const FUNCTIONS: [(&str, usize); 16] = [
     ("choose", 3),
+    ("u128", 1),
+    ("to_i128", 1),
+    ("to_u128", 1),
     ("div_floor", 2),
     ("div_ceil", 2),
     ("mul_div_floor", 3),
@@ -96,6 +99,9 @@ pub enum Rounding {
 pub enum Ast {
     Bool(bool),
     Int(i128),
+    U128(u128),
+    ToI128(Box<Ast>),
+    ToU128(Box<Ast>),
     /// Candidate reason, available only to rejection/failure laws.
     DecisionReason,
     Name(String),
@@ -213,6 +219,18 @@ impl<'t> Parser<'t> {
             }
             "true" => Ast::Bool(true),
             "false" => Ast::Bool(false),
+            "u128" => {
+                self.expect("(")?;
+                let digits = self.next()?;
+                if digits.len() > 1 && digits.starts_with('0') {
+                    return Err("noncanonical U128 literal".into());
+                }
+                let n = digits
+                    .parse::<u128>()
+                    .map_err(|_| "U128 literal out of range")?;
+                self.expect(")")?;
+                Ast::U128(n)
+            }
             _ if token.as_bytes()[0].is_ascii_digit() => Ast::Int(
                 token
                     .parse()
@@ -252,6 +270,14 @@ impl<'t> Parser<'t> {
 
 fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let count = arguments.len();
+    if count == 1 && matches!(name, "to_i128" | "to_u128") {
+        let v = Box::new(arguments.into_iter().next().ok_or("missing cast operand")?);
+        return Ok(if name == "to_i128" {
+            Ast::ToI128(v)
+        } else {
+            Ast::ToU128(v)
+        });
+    }
     if count == 4
         && matches!(
             name,
@@ -361,6 +387,9 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
         out.push(')');
     };
     match ast {
+        Ast::U128(v) => out.push_str(&format!("u128({v})")),
+        Ast::ToI128(v) => call("to_i128", &[v], out),
+        Ast::ToU128(v) => call("to_u128", &[v], out),
         Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
         Ast::Int(value) => out.push_str(&value.to_string()),
         Ast::DecisionReason => out.push_str("decision_reason"),
@@ -472,10 +501,28 @@ pub fn expand_with_limits(
     )
 }
 
+/// Recognizes unsigned syntax without inspecting values through signed integers.
+pub fn uses_unsigned(ast: &Ast) -> bool {
+    match ast {
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
+        Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
+        Ast::Not(v) | Ast::Neg(v) => uses_unsigned(v),
+        Ast::Binary(_, a, b) | Ast::Div(_, a, b) => uses_unsigned(a) || uses_unsigned(b),
+        Ast::Choose(a, b, c)
+        | Ast::MulDiv(_, a, b, c)
+        | Ast::SignedMulDivFloor(a, b, c)
+        | Ast::ScaledMulDiv(_, _, a, b, c, _)
+        | Ast::RepeatMulDiv(_, a, b, c, _) => {
+            uses_unsigned(a) || uses_unsigned(b) || uses_unsigned(c)
+        }
+        Ast::ProductsGe(args) => args.iter().any(uses_unsigned),
+    }
+}
 /// Recognizes the new syntax before expansion, including in unused bindings.
 pub fn uses_new_arithmetic(ast: &Ast) -> bool {
     match ast {
         Ast::ScaledMulDiv(..) | Ast::RepeatMulDiv(..) => true,
+        Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
         Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
         Ast::Neg(a) | Ast::Not(a) => uses_new_arithmetic(a),
         Ast::Binary(_, a, b) | Ast::Div(_, a, b) => {
@@ -519,7 +566,9 @@ fn expand_with<'v>(
             }
             None => ast.clone(),
         },
-        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
+        Ast::Bool(_) | Ast::Int(_) | Ast::U128(_) | Ast::DecisionReason => ast.clone(),
+        Ast::ToI128(v) => Ast::ToI128(recurse(v, stack, fuel)?),
+        Ast::ToU128(v) => Ast::ToU128(recurse(v, stack, fuel)?),
         Ast::Not(inner) => Ast::Not(recurse(inner, stack, fuel)?),
         Ast::Neg(inner) => Ast::Neg(recurse(inner, stack, fuel)?),
         Ast::Binary(operator, left, right) => Ast::Binary(
@@ -622,6 +671,9 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ))
     };
     match expression {
+        ValueExpr::U128(v) => Ok(Ast::U128(*v)),
+        ValueExpr::ToI128(v) => Ok(Ast::ToI128(Box::new(value(v)?))),
+        ValueExpr::ToU128(v) => Ok(Ast::ToU128(Box::new(value(v)?))),
         ValueExpr::Int(number) => Ok(Ast::Int(*number)),
         ValueExpr::Projection(path) => {
             let root = match path.root() {
