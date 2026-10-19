@@ -457,7 +457,7 @@ mod runtime {
                 evidence.cleanup = Cleanup::Unknown;
                 evidence.termination_reason = Some("invocation-stopped-before-final-report".into());
                 if let Err(e) = self.finish(&mut evidence) {
-                    eprintln!("containment-evidence-unavailable:{e}");
+                    let _ = writeln!(std::io::stderr(), "containment-evidence-unavailable:{e}");
                 }
             }
         }
@@ -1314,7 +1314,7 @@ mod runtime {
         match result {
             Ok(code) => code,
             Err(error) => {
-                eprintln!("{}", unavailable(error));
+                let _ = writeln!(std::io::stderr(), "{}", unavailable(error));
                 Some(crate::BLOCKED)
             }
         }
@@ -1542,6 +1542,25 @@ mod runtime {
                     "an invocation must not depend on a predictable application directory another user can occupy");
             }
             // These are evidence records, so the test retains both journals.
+        }
+
+        #[test]
+        fn containment_regression_closed_stderr_keeps_the_internal_refusal_code() {
+            const PROBE: &str = "ZENO_FCIS_REFUSAL_CLOSED_STDERR_TEST";
+            if std::env::var_os(PROBE).is_some() {
+                assert_eq!(bootstrap(), Some(crate::BLOCKED));
+                return;
+            }
+            let (writer, reader) = UnixStream::pair().unwrap_or_else(|e| panic!("{e:?}"));
+            drop(reader);
+            let output = Command::new(std::env::current_exe().unwrap_or_else(|e| panic!("{e:?}")))
+                .args(["--exact", "checker_process::posix::runtime::stage_tests::containment_regression_closed_stderr_keeps_the_internal_refusal_code", "--nocapture"])
+                .env(PROBE, "1")
+                .env(ROLE, "invalid-role")
+                .stderr(Stdio::from(std::os::fd::OwnedFd::from(writer)))
+                .output().unwrap_or_else(|e| panic!("{e:?}"));
+            assert!(output.status.success(), "{output:?}");
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed; 0 failed"));
         }
 
         // Actual re-executed workers: no production flag or alternate decision API.

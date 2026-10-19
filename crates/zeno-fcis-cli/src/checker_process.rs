@@ -2599,7 +2599,10 @@ pub(crate) fn dispatch(
         },
         Err(error) => {
             // The supervisor quotes the child's stderr in its refusal.
-            eprintln!("zeno-fcis: contained child refused: {error}");
+            let _ = std::io::Write::write_fmt(
+                &mut std::io::stderr(),
+                format_args!("zeno-fcis: contained child refused: {error}\n"),
+            );
             Err(error.into())
         }
     };
