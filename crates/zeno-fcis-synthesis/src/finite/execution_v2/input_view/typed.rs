@@ -1,5 +1,5 @@
 //! One primitive byte decoder with explicit legacy versus typed value encoding.
-use super::super::super::value::{Atom, Domain};
+use super::super::super::value::{Atom, Domain, validate_variant_codes};
 use super::super::{Resource, meter::Meter};
 use super::{AccessAttempt, Failure, Field};
 use super::{Leaf, decode_variant, read_big_endian, read_signed_128};
@@ -73,7 +73,7 @@ pub(crate) fn valid(view: FieldsView<'_>) -> bool {
                 }
                 let admitted = match fields[i].leaf {
                     Domain::Sum { variants, .. } => {
-                        !variants.is_empty() && variants.windows(2).all(|w| w[0] < w[1])
+                        validate_variant_codes(variants)
                     }
                     Domain::Bool => true,
                     Domain::I128 { min, max } => min <= max,

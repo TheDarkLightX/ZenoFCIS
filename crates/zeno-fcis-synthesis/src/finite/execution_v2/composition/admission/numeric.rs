@@ -1,6 +1,7 @@
 //! Complete numeric descriptor admission; no program-only admission shortcut.
 use super::super::ingress::original;
 use super::*;
+use super::super::super::super::value::validate_variant_codes;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
@@ -11,7 +12,7 @@ pub(crate) mod spec;
 pub(in super::super) fn leaf(domain: Domain<'_>) -> bool {
     match domain {
         Domain::Sum { variants, .. } => {
-            !variants.is_empty() && variants.windows(2).all(|w| w[0] < w[1])
+            validate_variant_codes(variants)
         }
         Domain::Bool => true,
         Domain::I128 { min, max } => min <= max,

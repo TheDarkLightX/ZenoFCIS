@@ -232,3 +232,27 @@ pub(crate) fn contains(values: &[u16], id: u16) -> bool {
     }
     false
 }
+
+/// Admit a nonempty, strictly increasing table of declared variant codes.
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == (variants@.len() > 0 &&
+        forall|j:int| 0 < j < variants@.len() ==> variants@[j-1] < variants@[j]),
+))]
+pub(crate) fn validate_variant_codes(variants: &[u16]) -> bool {
+    if variants.is_empty() {
+        return false;
+    }
+    let mut index = 1usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(
+        invariant 1 <= index <= variants.len(),
+            forall|j:int| 0 < j < index ==> variants@[j-1] < variants@[j],
+        decreases variants.len() - index,
+    ))]
+    while index < variants.len() {
+        if variants[index - 1] >= variants[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
