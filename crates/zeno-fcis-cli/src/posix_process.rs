@@ -43,7 +43,9 @@ mod runtime {
     use std::fs;
     use std::io::{Read, Write};
     use std::os::fd::AsFd;
-    use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    #[cfg(test)]
+    use std::os::unix::fs::MetadataExt;
     use std::os::unix::{
         net::UnixStream,
         process::{CommandExt, ExitStatusExt},
