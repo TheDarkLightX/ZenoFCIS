@@ -16,41 +16,59 @@
      "full": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 144,
+      "521": 144,
+      "522": 93,
+      "523": 12,
+      "524": 3,
+      "540": 396,
+      "541": 36,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 0,
+      "521": 144,
+      "522": 93,
+      "523": 12,
+      "524": 3,
+      "540": 252,
+      "541": 36,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 432,
       "freedom": {
-       "class": 57,
-       "reject_reason": 432,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 432
      },
      "valid": {
-      "determined": 0,
+      "determined": 288,
       "freedom": {
-       "class": 36,
-       "reject_reason": 288,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 288
      }
     },
-    "admissible_sha256": "605e2235653f5c9e68b1fdd30dbea30cb75b55c9ef878ec8725d9b1311c13943",
+    "admissible_sha256": "d981d9c9458163fe2d90fd0b1c1dcf29d720a7f7977d7eaa78d56aa77318833f",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 288,
      "reject_reason": 200
     }
    },
@@ -244,41 +262,59 @@
      "full": {
       "500": 27,
       "501": 27,
-      "502": 27
+      "502": 27,
+      "520": 198,
+      "521": 117,
+      "522": 66,
+      "523": 12,
+      "524": 12,
+      "540": 405,
+      "541": 27,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 27,
       "501": 27,
-      "502": 27
+      "502": 27,
+      "520": 0,
+      "521": 117,
+      "522": 66,
+      "523": 12,
+      "524": 12,
+      "540": 207,
+      "541": 27,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 432,
       "freedom": {
-       "class": 48,
-       "reject_reason": 432,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 432
      },
      "valid": {
-      "determined": 0,
+      "determined": 234,
       "freedom": {
-       "class": 27,
-       "reject_reason": 234,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 234
      }
     },
-    "admissible_sha256": "d89d7e296b2ea7c17473f7013772e6670e9006459e68642b5b6108b86b1ecbb3",
+    "admissible_sha256": "d981d9c9458163fe2d90fd0b1c1dcf29d720a7f7977d7eaa78d56aa77318833f",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 234,
      "reject_reason": 200
     }
    },
@@ -472,41 +508,59 @@
      "full": {
       "500": 18,
       "501": 18,
-      "502": 18
+      "502": 18,
+      "520": 252,
+      "521": 90,
+      "522": 39,
+      "523": 12,
+      "524": 21,
+      "540": 414,
+      "541": 18,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 18,
       "501": 18,
-      "502": 18
+      "502": 18,
+      "520": 0,
+      "521": 90,
+      "522": 39,
+      "523": 12,
+      "524": 21,
+      "540": 162,
+      "541": 18,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 432,
       "freedom": {
-       "class": 39,
-       "reject_reason": 432,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 432
      },
      "valid": {
-      "determined": 0,
+      "determined": 180,
       "freedom": {
-       "class": 18,
-       "reject_reason": 180,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 180
      }
     },
-    "admissible_sha256": "31b195b81883915956dfe67920ec7b082069d495f1d49111040f235ceb415a38",
+    "admissible_sha256": "d981d9c9458163fe2d90fd0b1c1dcf29d720a7f7977d7eaa78d56aa77318833f",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 180,
      "reject_reason": 200
     }
    },
@@ -696,41 +750,55 @@
      "full": {
       "500": 2,
       "501": 2,
-      "502": 2
+      "502": 2,
+      "520": 4,
+      "521": 1,
+      "522": 1,
+      "540": 6,
+      "541": 2,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 2,
       "501": 2,
-      "502": 2
+      "502": 2,
+      "520": 4,
+      "521": 1,
+      "522": 1,
+      "540": 6,
+      "541": 2,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 2,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      },
      "valid": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 2,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      }
     },
-    "admissible_sha256": "c7881815b5fd4f5769fa9cfb450342a97ca69ff0b5895acd8cd0e541709e9ab1",
+    "admissible_sha256": "39b91b42dd694d226a663bed065ac3e26b6ef04066a5d42870e8cb75be245d21",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 4,
      "reject_reason": 200
     }
    },
@@ -899,41 +967,55 @@
      "full": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 6,
+      "521": 1,
+      "522": 1,
+      "540": 8,
+      "541": 4,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 6,
+      "521": 1,
+      "522": 1,
+      "540": 8,
+      "541": 4,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 12,
       "freedom": {
-       "class": 4,
-       "reject_reason": 12,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 12
      },
      "valid": {
-      "determined": 0,
+      "determined": 12,
       "freedom": {
-       "class": 4,
-       "reject_reason": 12,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 12
      }
     },
-    "admissible_sha256": "eef4ca197f8167da61ffe23ccf6610324d598f3483913581839881c7eb9aa88a",
+    "admissible_sha256": "1e2c1cd7b1a47e07645256378e5931093a44ed75be43571e8184ea98fa10e49a",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 6,
      "reject_reason": 200
     }
    },
@@ -1102,41 +1184,55 @@
      "full": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 8,
+      "521": 1,
+      "522": 1,
+      "540": 10,
+      "541": 6,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 8,
+      "521": 1,
+      "522": 1,
+      "540": 10,
+      "541": 6,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 6,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      },
      "valid": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 6,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      }
     },
-    "admissible_sha256": "135d4540f63a281476a7a0f0eb0e64676cfb01d8a32e981a5badb02e3121f1a8",
+    "admissible_sha256": "3ff41cf22d4c4544514802ce2aecc08eea6c0989c3fa2e735c545f1054b26b88",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 8,
      "reject_reason": 200
     }
    },
@@ -1305,41 +1401,55 @@
      "full": {
       "500": 8,
       "501": 8,
-      "502": 8
+      "502": 8,
+      "520": 10,
+      "521": 1,
+      "522": 1,
+      "540": 12,
+      "541": 8,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 8,
       "501": 8,
-      "502": 8
+      "502": 8,
+      "520": 10,
+      "521": 1,
+      "522": 1,
+      "540": 12,
+      "541": 8,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 20,
       "freedom": {
-       "class": 8,
-       "reject_reason": 20,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 20
      },
      "valid": {
-      "determined": 0,
+      "determined": 20,
       "freedom": {
-       "class": 8,
-       "reject_reason": 20,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 20
      }
     },
-    "admissible_sha256": "c7bd0b3c6eb814a9759e8d3cf72611db6f291505342daf74422fe2fa9fc47151",
+    "admissible_sha256": "1a0c86b34b6e544fe94e2cf74f5ef07486f8c94147d280ea69ebb9861610cea4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 10,
      "reject_reason": 200
     }
    },
@@ -1508,41 +1618,55 @@
      "full": {
       "500": 10,
       "501": 10,
-      "502": 10
+      "502": 10,
+      "520": 12,
+      "521": 1,
+      "522": 1,
+      "540": 14,
+      "541": 10,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 10,
       "501": 10,
-      "502": 10
+      "502": 10,
+      "520": 12,
+      "521": 1,
+      "522": 1,
+      "540": 14,
+      "541": 10,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 10,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      },
      "valid": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 10,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      }
     },
-    "admissible_sha256": "7e999c4ec6715f1dea264ddc5030b144a0f9a100e9bb7ae8c853b7918686ddff",
+    "admissible_sha256": "02f8d0c0f240020510e34d8578d0ac2adee94589cf76312619fcf4f5288e2362",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 12,
      "reject_reason": 200
     }
    },
@@ -1711,41 +1835,55 @@
      "full": {
       "500": 12,
       "501": 12,
-      "502": 12
+      "502": 12,
+      "520": 14,
+      "521": 1,
+      "522": 1,
+      "540": 16,
+      "541": 12,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 12,
       "501": 12,
-      "502": 12
+      "502": 12,
+      "520": 14,
+      "521": 1,
+      "522": 1,
+      "540": 16,
+      "541": 12,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 28,
       "freedom": {
-       "class": 12,
-       "reject_reason": 28,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 28
      },
      "valid": {
-      "determined": 0,
+      "determined": 28,
       "freedom": {
-       "class": 12,
-       "reject_reason": 28,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 28
      }
     },
-    "admissible_sha256": "e6e97f8bd1cc7108f2b8f6fde8f272663f64fa1226d584d9beab4830fff234d9",
+    "admissible_sha256": "b9b0e8cf2a26715b11f76073ad2228aa0ff713b24143c34f5c827ca34c10463c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 14,
      "reject_reason": 200
     }
    },
@@ -1914,41 +2052,55 @@
      "full": {
       "500": 14,
       "501": 14,
-      "502": 14
+      "502": 14,
+      "520": 16,
+      "521": 1,
+      "522": 1,
+      "540": 18,
+      "541": 14,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 14,
       "501": 14,
-      "502": 14
+      "502": 14,
+      "520": 16,
+      "521": 1,
+      "522": 1,
+      "540": 18,
+      "541": 14,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 14,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 14,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "17fbcd8b1686483f2edf6d74f70d2191732ff25490b2144f191a395f293fab66",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -2117,41 +2269,55 @@
      "full": {
       "500": 16,
       "501": 16,
-      "502": 16
+      "502": 16,
+      "520": 18,
+      "521": 1,
+      "522": 1,
+      "540": 20,
+      "541": 16,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 16,
       "501": 16,
-      "502": 16
+      "502": 16,
+      "520": 18,
+      "521": 1,
+      "522": 1,
+      "540": 20,
+      "541": 16,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 36,
       "freedom": {
-       "class": 16,
-       "reject_reason": 36,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 36
      },
      "valid": {
-      "determined": 0,
+      "determined": 36,
       "freedom": {
-       "class": 16,
-       "reject_reason": 36,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 36
      }
     },
-    "admissible_sha256": "cf4fe24fa41ac98c032a8b2bf631e6a22789ab0edab5adcf10b5f4ddb43c20a2",
+    "admissible_sha256": "3cf4195b2dd65275da4f85775dd31bb0a11e75af6fe9e27ddab79a8e37ec7fa8",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 18,
      "reject_reason": 200
     }
    },
@@ -2320,41 +2486,53 @@
      "full": {
       "500": 3,
       "501": 3,
-      "502": 3
+      "502": 3,
+      "520": 4,
+      "521": 1,
+      "540": 5,
+      "541": 3,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 3,
       "501": 3,
-      "502": 3
+      "502": 3,
+      "520": 4,
+      "521": 1,
+      "540": 5,
+      "541": 3,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 3,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      },
      "valid": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 3,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      }
     },
-    "admissible_sha256": "c2a080c5e436eef9709303e81c19e71bf4ed5a68a58f55580906183b50f8e772",
+    "admissible_sha256": "39b91b42dd694d226a663bed065ac3e26b6ef04066a5d42870e8cb75be245d21",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 4,
      "reject_reason": 200
     }
    },
@@ -2522,41 +2700,53 @@
      "full": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 9,
+      "521": 3,
+      "540": 12,
+      "541": 6,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 9,
+      "521": 3,
+      "540": 12,
+      "541": 6,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 18,
       "freedom": {
-       "class": 6,
-       "reject_reason": 18,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 18
      },
      "valid": {
-      "determined": 0,
+      "determined": 18,
       "freedom": {
-       "class": 6,
-       "reject_reason": 18,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 18
      }
     },
-    "admissible_sha256": "9aef4ede90565160c07d9ae77a2ac772082ef2afa4369b4d9ff1535b5e4e13cb",
+    "admissible_sha256": "91b8bb65ae0e4d809fa69f096c366c67972e7f9ba8c1d43c9f88c497aa6000ef",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 9,
      "reject_reason": 200
     }
    },
@@ -2724,41 +2914,53 @@
      "full": {
       "500": 10,
       "501": 10,
-      "502": 10
+      "502": 10,
+      "520": 16,
+      "521": 6,
+      "540": 22,
+      "541": 10,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 10,
       "501": 10,
-      "502": 10
+      "502": 10,
+      "520": 16,
+      "521": 6,
+      "540": 22,
+      "541": 10,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 10,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 10,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "7d800fa5a9e1ce837d2d3c15c82e5e8cd0a979696a672abecbc1f5c4c61614bd",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -2926,41 +3128,53 @@
      "full": {
       "500": 15,
       "501": 15,
-      "502": 15
+      "502": 15,
+      "520": 25,
+      "521": 10,
+      "540": 35,
+      "541": 15,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 15,
       "501": 15,
-      "502": 15
+      "502": 15,
+      "520": 25,
+      "521": 10,
+      "540": 35,
+      "541": 15,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 50,
       "freedom": {
-       "class": 15,
-       "reject_reason": 50,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 50
      },
      "valid": {
-      "determined": 0,
+      "determined": 50,
       "freedom": {
-       "class": 15,
-       "reject_reason": 50,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 50
      }
     },
-    "admissible_sha256": "a8e2e5ec73d34ebce4077e1d6db1f87ddc6c3adca114c9fff1194a0496d70f23",
+    "admissible_sha256": "1994b103729e0e7c64a9210344ffdce8060c61ccdae3233bd717eec348ef7a45",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 25,
      "reject_reason": 200
     }
    },
@@ -3128,41 +3342,53 @@
      "full": {
       "500": 21,
       "501": 21,
-      "502": 21
+      "502": 21,
+      "520": 36,
+      "521": 15,
+      "540": 51,
+      "541": 21,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 21,
       "501": 21,
-      "502": 21
+      "502": 21,
+      "520": 36,
+      "521": 15,
+      "540": 51,
+      "541": 21,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 72,
       "freedom": {
-       "class": 21,
-       "reject_reason": 72,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 72
      },
      "valid": {
-      "determined": 0,
+      "determined": 72,
       "freedom": {
-       "class": 21,
-       "reject_reason": 72,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 72
      }
     },
-    "admissible_sha256": "dd866e0e2c440502d6d0d9e45f6bec53703e304934f7fd49bedeaf586a6656af",
+    "admissible_sha256": "273259590190ae6aedb9af96442b861f50e39e12e060cd9fa8f78173dd940b35",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 36,
      "reject_reason": 200
     }
    },
@@ -3330,41 +3556,53 @@
      "full": {
       "500": 28,
       "501": 28,
-      "502": 28
+      "502": 28,
+      "520": 49,
+      "521": 21,
+      "540": 70,
+      "541": 28,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 28,
       "501": 28,
-      "502": 28
+      "502": 28,
+      "520": 49,
+      "521": 21,
+      "540": 70,
+      "541": 28,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 98,
       "freedom": {
-       "class": 28,
-       "reject_reason": 98,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 98
      },
      "valid": {
-      "determined": 0,
+      "determined": 98,
       "freedom": {
-       "class": 28,
-       "reject_reason": 98,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 98
      }
     },
-    "admissible_sha256": "c931243c74c119db13e8968d451bf8869ad4cac0e9de136ea06828521759c3a8",
+    "admissible_sha256": "16a363608e71dc563fc90516fa752c78a1097aee1c6631450839f59945078966",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 49,
      "reject_reason": 200
     }
    },
@@ -3532,41 +3770,53 @@
      "full": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 64,
+      "521": 28,
+      "540": 92,
+      "541": 36,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 64,
+      "521": 28,
+      "540": 92,
+      "541": 36,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 128,
       "freedom": {
-       "class": 36,
-       "reject_reason": 128,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 128
      },
      "valid": {
-      "determined": 0,
+      "determined": 128,
       "freedom": {
-       "class": 36,
-       "reject_reason": 128,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 128
      }
     },
-    "admissible_sha256": "86bb12863c9ba49bbc5886f4ffec201a186c8b1ac448d7edeb6442ff897e3e93",
+    "admissible_sha256": "23435f5e49cf2fa72113d48715fbef0fe23c8c2dcc6615ffd9c82537d8c08289",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 64,
      "reject_reason": 200
     }
    },
@@ -3734,41 +3984,53 @@
      "full": {
       "500": 45,
       "501": 45,
-      "502": 45
+      "502": 45,
+      "520": 81,
+      "521": 36,
+      "540": 117,
+      "541": 45,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 45,
       "501": 45,
-      "502": 45
+      "502": 45,
+      "520": 81,
+      "521": 36,
+      "540": 117,
+      "541": 45,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 162,
       "freedom": {
-       "class": 45,
-       "reject_reason": 162,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 162
      },
      "valid": {
-      "determined": 0,
+      "determined": 162,
       "freedom": {
-       "class": 45,
-       "reject_reason": 162,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 162
      }
     },
-    "admissible_sha256": "cdbb4cf0ea49a9a5965cc53ff843f39b2ecf8b1519757332a7ea69da1f27e4ae",
+    "admissible_sha256": "95d713920378f0501ba9d1eaf595a3ba283df6f218eacd7bfd522761811b8965",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 81,
      "reject_reason": 200
     }
    },
@@ -3936,41 +4198,55 @@
      "full": {
       "500": 2,
       "501": 2,
-      "502": 2
+      "502": 2,
+      "520": 4,
+      "521": 1,
+      "522": 1,
+      "540": 6,
+      "541": 2,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 2,
       "501": 2,
-      "502": 2
+      "502": 2,
+      "520": 4,
+      "521": 1,
+      "522": 1,
+      "540": 6,
+      "541": 2,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 2,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      },
      "valid": {
-      "determined": 0,
+      "determined": 8,
       "freedom": {
-       "class": 2,
-       "reject_reason": 8,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8
      }
     },
-    "admissible_sha256": "c7881815b5fd4f5769fa9cfb450342a97ca69ff0b5895acd8cd0e541709e9ab1",
+    "admissible_sha256": "39b91b42dd694d226a663bed065ac3e26b6ef04066a5d42870e8cb75be245d21",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 4,
      "reject_reason": 200
     }
    },
@@ -4139,41 +4415,55 @@
      "full": {
       "500": 3,
       "501": 3,
-      "502": 3
+      "502": 3,
+      "520": 6,
+      "521": 2,
+      "522": 1,
+      "540": 9,
+      "541": 3,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 3,
       "501": 3,
-      "502": 3
+      "502": 3,
+      "520": 6,
+      "521": 2,
+      "522": 1,
+      "540": 9,
+      "541": 3,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 12,
       "freedom": {
-       "class": 3,
-       "reject_reason": 12,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 12
      },
      "valid": {
-      "determined": 0,
+      "determined": 12,
       "freedom": {
-       "class": 3,
-       "reject_reason": 12,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 12
      }
     },
-    "admissible_sha256": "217e9e9ce4743ee254c0f1a855f40080acfafa2de56e373fcce0cfb246e00425",
+    "admissible_sha256": "1e2c1cd7b1a47e07645256378e5931093a44ed75be43571e8184ea98fa10e49a",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 6,
      "reject_reason": 200
     }
    },
@@ -4342,41 +4632,55 @@
      "full": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 8,
+      "521": 3,
+      "522": 1,
+      "540": 12,
+      "541": 4,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 8,
+      "521": 3,
+      "522": 1,
+      "540": 12,
+      "541": 4,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 4,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      },
      "valid": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 4,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      }
     },
-    "admissible_sha256": "ee048a52d2affe8f841da0a9659c4203a25125afe7f2807d72df981eb796b7be",
+    "admissible_sha256": "3ff41cf22d4c4544514802ce2aecc08eea6c0989c3fa2e735c545f1054b26b88",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 8,
      "reject_reason": 200
     }
    },
@@ -4545,41 +4849,55 @@
      "full": {
       "500": 5,
       "501": 5,
-      "502": 5
+      "502": 5,
+      "520": 10,
+      "521": 4,
+      "522": 1,
+      "540": 15,
+      "541": 5,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 5,
       "501": 5,
-      "502": 5
+      "502": 5,
+      "520": 10,
+      "521": 4,
+      "522": 1,
+      "540": 15,
+      "541": 5,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 20,
       "freedom": {
-       "class": 5,
-       "reject_reason": 20,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 20
      },
      "valid": {
-      "determined": 0,
+      "determined": 20,
       "freedom": {
-       "class": 5,
-       "reject_reason": 20,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 20
      }
     },
-    "admissible_sha256": "bd76d055aca91cad431fbd7af7030ee201ccca9f62e562c8ee90ad9bec7136c3",
+    "admissible_sha256": "1a0c86b34b6e544fe94e2cf74f5ef07486f8c94147d280ea69ebb9861610cea4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 10,
      "reject_reason": 200
     }
    },
@@ -4748,41 +5066,55 @@
      "full": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 12,
+      "521": 5,
+      "522": 1,
+      "540": 18,
+      "541": 6,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 6,
       "501": 6,
-      "502": 6
+      "502": 6,
+      "520": 12,
+      "521": 5,
+      "522": 1,
+      "540": 18,
+      "541": 6,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 6,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      },
      "valid": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 6,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      }
     },
-    "admissible_sha256": "7b79d326af91080b2c0bc2c5c0372399939802352789e0c49394127766a68513",
+    "admissible_sha256": "02f8d0c0f240020510e34d8578d0ac2adee94589cf76312619fcf4f5288e2362",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 12,
      "reject_reason": 200
     }
    },
@@ -4951,41 +5283,55 @@
      "full": {
       "500": 7,
       "501": 7,
-      "502": 7
+      "502": 7,
+      "520": 14,
+      "521": 6,
+      "522": 1,
+      "540": 21,
+      "541": 7,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 7,
       "501": 7,
-      "502": 7
+      "502": 7,
+      "520": 14,
+      "521": 6,
+      "522": 1,
+      "540": 21,
+      "541": 7,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 28,
       "freedom": {
-       "class": 7,
-       "reject_reason": 28,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 28
      },
      "valid": {
-      "determined": 0,
+      "determined": 28,
       "freedom": {
-       "class": 7,
-       "reject_reason": 28,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 28
      }
     },
-    "admissible_sha256": "8c9ee861222f237b4542991873f873b4d7a5f1f7d771e4f9e7a3d1275b532911",
+    "admissible_sha256": "b9b0e8cf2a26715b11f76073ad2228aa0ff713b24143c34f5c827ca34c10463c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 14,
      "reject_reason": 200
     }
    },
@@ -5154,41 +5500,55 @@
      "full": {
       "500": 8,
       "501": 8,
-      "502": 8
+      "502": 8,
+      "520": 16,
+      "521": 7,
+      "522": 1,
+      "540": 24,
+      "541": 8,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 8,
       "501": 8,
-      "502": 8
+      "502": 8,
+      "520": 16,
+      "521": 7,
+      "522": 1,
+      "540": 24,
+      "541": 8,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 8,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 8,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "15501001618f9b8b86313d74003bd7a8822a8804fb6fce04d247b3a57dd6b85a",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -5357,41 +5717,55 @@
      "full": {
       "500": 9,
       "501": 9,
-      "502": 9
+      "502": 9,
+      "520": 18,
+      "521": 8,
+      "522": 1,
+      "540": 27,
+      "541": 9,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 9,
       "501": 9,
-      "502": 9
+      "502": 9,
+      "520": 18,
+      "521": 8,
+      "522": 1,
+      "540": 27,
+      "541": 9,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 36,
       "freedom": {
-       "class": 9,
-       "reject_reason": 36,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 36
      },
      "valid": {
-      "determined": 0,
+      "determined": 36,
       "freedom": {
-       "class": 9,
-       "reject_reason": 36,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 36
      }
     },
-    "admissible_sha256": "1d995ec8f4c160ad6df95349a24fe504ba5389d846fc8fa736e20016d84b5c9b",
+    "admissible_sha256": "3cf4195b2dd65275da4f85775dd31bb0a11e75af6fe9e27ddab79a8e37ec7fa8",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 18,
      "reject_reason": 200
     }
    },
@@ -5563,41 +5937,53 @@
      "full": {
       "500": 28,
       "501": 28,
-      "502": 28
+      "502": 28,
+      "520": 32,
+      "521": 4,
+      "540": 36,
+      "541": 28,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 28,
       "501": 28,
-      "502": 28
+      "502": 28,
+      "520": 32,
+      "521": 4,
+      "540": 36,
+      "541": 28,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 64,
       "freedom": {
-       "class": 28,
-       "reject_reason": 64,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 64
      },
      "valid": {
-      "determined": 0,
+      "determined": 64,
       "freedom": {
-       "class": 28,
-       "reject_reason": 64,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 64
      }
     },
-    "admissible_sha256": "fcb10f56d7bdde54408b062d174a9c595b679111a42fb106bd628a42412b5677",
+    "admissible_sha256": "374f726fa6f8b32f4698665d71cd30c8a076ed889c206051036136ce48a35b5c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 32,
      "reject_reason": 200
     }
    },
@@ -5782,41 +6168,53 @@
      "full": {
       "500": 144,
       "501": 144,
-      "502": 144
+      "502": 144,
+      "520": 162,
+      "521": 18,
+      "540": 180,
+      "541": 144,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 144,
       "501": 144,
-      "502": 144
+      "502": 144,
+      "520": 162,
+      "521": 18,
+      "540": 180,
+      "541": 144,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 324,
       "freedom": {
-       "class": 144,
-       "reject_reason": 324,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 324
      },
      "valid": {
-      "determined": 0,
+      "determined": 324,
       "freedom": {
-       "class": 144,
-       "reject_reason": 324,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 324
      }
     },
-    "admissible_sha256": "7899b8bf2bef1400beb2116c2e5eb9a2f3fa1d30385f6a6438af99e9cecf88a3",
+    "admissible_sha256": "cb35319fe48e5dde52574bc8c2be8aa4b0c8f9540f899cccb48731dcbeebb6e9",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 162,
      "reject_reason": 200
     }
    },
@@ -6001,41 +6399,53 @@
      "full": {
       "500": 464,
       "501": 464,
-      "502": 464
+      "502": 464,
+      "520": 512,
+      "521": 48,
+      "540": 560,
+      "541": 464,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 464,
       "501": 464,
-      "502": 464
+      "502": 464,
+      "520": 512,
+      "521": 48,
+      "540": 560,
+      "541": 464,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 1024,
       "freedom": {
-       "class": 464,
-       "reject_reason": 1024,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1024
      },
      "valid": {
-      "determined": 0,
+      "determined": 1024,
       "freedom": {
-       "class": 464,
-       "reject_reason": 1024,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1024
      }
     },
-    "admissible_sha256": "28449e933a0e20d43b38e32a6c910e63dddc2bce741989851c9656feeda7df7e",
+    "admissible_sha256": "9be775b04fa8858daed7f3d56356913280f30c4efe5498afcac58e9a78bec52b",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 512,
      "reject_reason": 200
     }
    },
@@ -6220,41 +6630,53 @@
      "full": {
       "500": 1150,
       "501": 1150,
-      "502": 1150
+      "502": 1150,
+      "520": 1250,
+      "521": 100,
+      "540": 1350,
+      "541": 1150,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 1150,
       "501": 1150,
-      "502": 1150
+      "502": 1150,
+      "520": 1250,
+      "521": 100,
+      "540": 1350,
+      "541": 1150,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 2500,
       "freedom": {
-       "class": 1150,
-       "reject_reason": 2500,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2500
      },
      "valid": {
-      "determined": 0,
+      "determined": 2500,
       "freedom": {
-       "class": 1150,
-       "reject_reason": 2500,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2500
      }
     },
-    "admissible_sha256": "0bd1795a70fe624717f47de575ee0c5d344da756b1cc9d7d510afbe43d491109",
+    "admissible_sha256": "264a35e94e31df3b090a24c82230e49bdebab22fa038d02237f133b8393c11b5",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 1250,
      "reject_reason": 200
     }
    },
@@ -6439,41 +6861,53 @@
      "full": {
       "500": 2412,
       "501": 2412,
-      "502": 2412
+      "502": 2412,
+      "520": 2592,
+      "521": 180,
+      "540": 2772,
+      "541": 2412,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 2412,
       "501": 2412,
-      "502": 2412
+      "502": 2412,
+      "520": 2592,
+      "521": 180,
+      "540": 2772,
+      "541": 2412,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 5184,
       "freedom": {
-       "class": 2412,
-       "reject_reason": 5184,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 5184
      },
      "valid": {
-      "determined": 0,
+      "determined": 5184,
       "freedom": {
-       "class": 2412,
-       "reject_reason": 5184,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 5184
      }
     },
-    "admissible_sha256": "6afa0639dca784aae5f4fec6b864e459ecf080db43632d782052f4a730d1177e",
+    "admissible_sha256": "131d1e8870fa6cf05b437e0d7b99b937218584af8e765005b71c3f6fdad2bac1",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 2592,
      "reject_reason": 200
     }
    },
@@ -6658,41 +7092,53 @@
      "full": {
       "500": 4508,
       "501": 4508,
-      "502": 4508
+      "502": 4508,
+      "520": 4802,
+      "521": 294,
+      "540": 5096,
+      "541": 4508,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 4508,
       "501": 4508,
-      "502": 4508
+      "502": 4508,
+      "520": 4802,
+      "521": 294,
+      "540": 5096,
+      "541": 4508,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 9604,
       "freedom": {
-       "class": 4508,
-       "reject_reason": 9604,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 9604
      },
      "valid": {
-      "determined": 0,
+      "determined": 9604,
       "freedom": {
-       "class": 4508,
-       "reject_reason": 9604,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 9604
      }
     },
-    "admissible_sha256": "7217e1a80794fe7f06e6284833990ccd3933e4df02a18f9f5c3bddef1e6980fa",
+    "admissible_sha256": "ca0a5cf9ca4c9c8ad1ec9d2a6a9ec4c46a15df0342a5843b8540047078bffd3a",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 4802,
      "reject_reason": 200
     }
    },
@@ -6877,41 +7323,53 @@
      "full": {
       "500": 7744,
       "501": 7744,
-      "502": 7744
+      "502": 7744,
+      "520": 8192,
+      "521": 448,
+      "540": 8640,
+      "541": 7744,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 7744,
       "501": 7744,
-      "502": 7744
+      "502": 7744,
+      "520": 8192,
+      "521": 448,
+      "540": 8640,
+      "541": 7744,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 16384,
       "freedom": {
-       "class": 7744,
-       "reject_reason": 16384,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16384
      },
      "valid": {
-      "determined": 0,
+      "determined": 16384,
       "freedom": {
-       "class": 7744,
-       "reject_reason": 16384,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16384
      }
     },
-    "admissible_sha256": "ad43f75cf614063adf1c944cb4a599b18234e9bbc1aa9804b3c986fd0e46e286",
+    "admissible_sha256": "2e3451e170882089da85bfe50b6f4c0f2496aebb38480181ee462d6cd8c5ba9c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 8192,
      "reject_reason": 200
     }
    },
@@ -7096,41 +7554,53 @@
      "full": {
       "500": 12474,
       "501": 12474,
-      "502": 12474
+      "502": 12474,
+      "520": 13122,
+      "521": 648,
+      "540": 13770,
+      "541": 12474,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 12474,
       "501": 12474,
-      "502": 12474
+      "502": 12474,
+      "520": 13122,
+      "521": 648,
+      "540": 13770,
+      "541": 12474,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 26244,
       "freedom": {
-       "class": 12474,
-       "reject_reason": 26244,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 26244
      },
      "valid": {
-      "determined": 0,
+      "determined": 26244,
       "freedom": {
-       "class": 12474,
-       "reject_reason": 26244,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 26244
      }
     },
-    "admissible_sha256": "e567f0e582a927292286729535b976ec3a47831a4ab52d3c71aeddb761dc3f86",
+    "admissible_sha256": "88bdd9ef35e8492035a1c355573a2c333009cf7aed85ad49eaa05d33a44f1230",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 13122,
      "reject_reason": 200
     }
    },
@@ -7314,41 +7784,57 @@
      "full": {
       "500": 5,
       "501": 5,
-      "502": 5
+      "502": 5,
+      "520": 16,
+      "521": 4,
+      "522": 6,
+      "523": 1,
+      "540": 27,
+      "541": 5,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 5,
       "501": 5,
-      "502": 5
+      "502": 5,
+      "520": 16,
+      "521": 4,
+      "522": 6,
+      "523": 1,
+      "540": 27,
+      "541": 5,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 10,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 10,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "a9e02453906218dedc9eda4ff7ed8f413543467fb478a48d2c85b64997632f0f",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -7559,41 +8045,57 @@
      "full": {
       "500": 14,
       "501": 14,
-      "502": 14
+      "502": 14,
+      "520": 54,
+      "521": 18,
+      "522": 18,
+      "523": 4,
+      "540": 94,
+      "541": 14,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 14,
       "501": 14,
-      "502": 14
+      "502": 14,
+      "520": 54,
+      "521": 18,
+      "522": 18,
+      "523": 4,
+      "540": 94,
+      "541": 14,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 108,
       "freedom": {
-       "class": 28,
-       "reject_reason": 108,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 108
      },
      "valid": {
-      "determined": 0,
+      "determined": 108,
       "freedom": {
-       "class": 28,
-       "reject_reason": 108,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 108
      }
     },
-    "admissible_sha256": "55bc16165747a0cc8e76b560ba05cb2d80421831b3313524cfb8073aae292bf8",
+    "admissible_sha256": "31cb196a1d45370c9eedf45d55e0edc5493b58cff3280436abaaacd527b367b4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 54,
      "reject_reason": 200
     }
    },
@@ -7804,41 +8306,57 @@
      "full": {
       "500": 30,
       "501": 30,
-      "502": 30
+      "502": 30,
+      "520": 128,
+      "521": 48,
+      "522": 40,
+      "523": 10,
+      "540": 226,
+      "541": 30,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 30,
       "501": 30,
-      "502": 30
+      "502": 30,
+      "520": 128,
+      "521": 48,
+      "522": 40,
+      "523": 10,
+      "540": 226,
+      "541": 30,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 256,
       "freedom": {
-       "class": 60,
-       "reject_reason": 256,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 256
      },
      "valid": {
-      "determined": 0,
+      "determined": 256,
       "freedom": {
-       "class": 60,
-       "reject_reason": 256,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 256
      }
     },
-    "admissible_sha256": "e9eceb0f2a7df691d731f88bf2d2caa98e47c408bf245c7d44946cd59cadd02e",
+    "admissible_sha256": "23c04e4d3c8d5abea295504bcdab63f60f7d857852a0fe95e049676f6dfc65e4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 128,
      "reject_reason": 200
     }
    },
@@ -8049,41 +8567,57 @@
      "full": {
       "500": 55,
       "501": 55,
-      "502": 55
+      "502": 55,
+      "520": 250,
+      "521": 100,
+      "522": 75,
+      "523": 20,
+      "540": 445,
+      "541": 55,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 55,
       "501": 55,
-      "502": 55
+      "502": 55,
+      "520": 250,
+      "521": 100,
+      "522": 75,
+      "523": 20,
+      "540": 445,
+      "541": 55,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 500,
       "freedom": {
-       "class": 110,
-       "reject_reason": 500,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 500
      },
      "valid": {
-      "determined": 0,
+      "determined": 500,
       "freedom": {
-       "class": 110,
-       "reject_reason": 500,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 500
      }
     },
-    "admissible_sha256": "0a35a144b54bfcb4f20162998e814753f7ca5578af8f665d852fb34032446409",
+    "admissible_sha256": "6f48a8dbabd52982b01077ed0d3e56102c57356b9556ce7e8af743afb89b22fc",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 250,
      "reject_reason": 200
     }
    },
@@ -8294,41 +8828,57 @@
      "full": {
       "500": 91,
       "501": 91,
-      "502": 91
+      "502": 91,
+      "520": 432,
+      "521": 180,
+      "522": 126,
+      "523": 35,
+      "540": 773,
+      "541": 91,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 91,
       "501": 91,
-      "502": 91
+      "502": 91,
+      "520": 432,
+      "521": 180,
+      "522": 126,
+      "523": 35,
+      "540": 773,
+      "541": 91,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 864,
       "freedom": {
-       "class": 182,
-       "reject_reason": 864,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 864
      },
      "valid": {
-      "determined": 0,
+      "determined": 864,
       "freedom": {
-       "class": 182,
-       "reject_reason": 864,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 864
      }
     },
-    "admissible_sha256": "7c1cf0e0b99bd723fdcb074f399386e2c3ad50d88eea42e18b593e303673930e",
+    "admissible_sha256": "1ccccb4038e5f095771173477c8459f265f21c2e9e98f451c09905d8f649249e",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 432,
      "reject_reason": 200
     }
    },
@@ -8539,41 +9089,57 @@
      "full": {
       "500": 140,
       "501": 140,
-      "502": 140
+      "502": 140,
+      "520": 686,
+      "521": 294,
+      "522": 196,
+      "523": 56,
+      "540": 1232,
+      "541": 140,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 140,
       "501": 140,
-      "502": 140
+      "502": 140,
+      "520": 686,
+      "521": 294,
+      "522": 196,
+      "523": 56,
+      "540": 1232,
+      "541": 140,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 1372,
       "freedom": {
-       "class": 280,
-       "reject_reason": 1372,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1372
      },
      "valid": {
-      "determined": 0,
+      "determined": 1372,
       "freedom": {
-       "class": 280,
-       "reject_reason": 1372,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1372
      }
     },
-    "admissible_sha256": "4d80ef31cabacc053ac24c47b0f6dbda79133b7aacb4b186dd1cc0e4f7178249",
+    "admissible_sha256": "72e21122d7f770f87e0d13d3c98ae16345e3805445cbcdb9b4d5249ef9d13d53",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 686,
      "reject_reason": 200
     }
    },
@@ -8784,41 +9350,57 @@
      "full": {
       "500": 204,
       "501": 204,
-      "502": 204
+      "502": 204,
+      "520": 1024,
+      "521": 448,
+      "522": 288,
+      "523": 84,
+      "540": 1844,
+      "541": 204,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 204,
       "501": 204,
-      "502": 204
+      "502": 204,
+      "520": 1024,
+      "521": 448,
+      "522": 288,
+      "523": 84,
+      "540": 1844,
+      "541": 204,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 2048,
       "freedom": {
-       "class": 408,
-       "reject_reason": 2048,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2048
      },
      "valid": {
-      "determined": 0,
+      "determined": 2048,
       "freedom": {
-       "class": 408,
-       "reject_reason": 2048,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2048
      }
     },
-    "admissible_sha256": "1511339976b4998a611489d43b9d6b28c7bcefefc7ce1499b3adbf162e51a60d",
+    "admissible_sha256": "48c290284822e20af8abe4e1c81a55e467b4cbdc8e98701a246a5891957606c1",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 1024,
      "reject_reason": 200
     }
    },
@@ -9029,41 +9611,57 @@
      "full": {
       "500": 285,
       "501": 285,
-      "502": 285
+      "502": 285,
+      "520": 1458,
+      "521": 648,
+      "522": 405,
+      "523": 120,
+      "540": 2631,
+      "541": 285,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 285,
       "501": 285,
-      "502": 285
+      "502": 285,
+      "520": 1458,
+      "521": 648,
+      "522": 405,
+      "523": 120,
+      "540": 2631,
+      "541": 285,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 2916,
       "freedom": {
-       "class": 570,
-       "reject_reason": 2916,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2916
      },
      "valid": {
-      "determined": 0,
+      "determined": 2916,
       "freedom": {
-       "class": 570,
-       "reject_reason": 2916,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2916
      }
     },
-    "admissible_sha256": "a1cc7516e8ebe76c30aa1176795c2c422e61e00703328b3f3cac6850718e5c2b",
+    "admissible_sha256": "6557ed6f243c848558ec34a29108a8c14d115e14708ff0141469dc921f8f0b02",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 1458,
      "reject_reason": 200
     }
    },
@@ -9273,40 +9871,54 @@
     "activation": {
      "full": {
       "500": 49,
-      "501": 49
+      "501": 49,
+      "520": 98,
+      "521": 42,
+      "522": 7,
+      "540": 147,
+      "541": 49,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 49,
-      "501": 49
+      "501": 49,
+      "520": 98,
+      "521": 42,
+      "522": 7,
+      "540": 147,
+      "541": 49,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 49,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      },
      "valid": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 49,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      }
     },
-    "admissible_sha256": "c53834ff95ffbb766f2346c36b915b3dc40e5fd7be00fe2658705931729dad0f",
+    "admissible_sha256": "cf49ef80881f10aae43ad7fe7b68f50cf4e773fa097d1576147336c23b8a045c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 98,
      "reject_reason": 200
     }
    },
@@ -9485,40 +10097,54 @@
     "activation": {
      "full": {
       "500": 43,
-      "501": 43
+      "501": 43,
+      "520": 98,
+      "521": 42,
+      "522": 13,
+      "540": 153,
+      "541": 43,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 43,
-      "501": 43
+      "501": 43,
+      "520": 98,
+      "521": 42,
+      "522": 13,
+      "540": 153,
+      "541": 43,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 43,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      },
      "valid": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 43,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      }
     },
-    "admissible_sha256": "bf98a0dcbb7da15703ad365f3a8b0af872f33521fbd881d4ee96bedf00896061",
+    "admissible_sha256": "cf49ef80881f10aae43ad7fe7b68f50cf4e773fa097d1576147336c23b8a045c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 98,
      "reject_reason": 200
     }
    },
@@ -9725,40 +10351,54 @@
     "activation": {
      "full": {
       "500": 38,
-      "501": 38
+      "501": 38,
+      "520": 98,
+      "521": 42,
+      "522": 18,
+      "540": 158,
+      "541": 38,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 38,
-      "501": 38
+      "501": 38,
+      "520": 98,
+      "521": 42,
+      "522": 18,
+      "540": 158,
+      "541": 38,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 38,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      },
      "valid": {
-      "determined": 0,
+      "determined": 196,
       "freedom": {
-       "class": 38,
-       "reject_reason": 196,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 196
      }
     },
-    "admissible_sha256": "7515c4d4e8bd61227f054405120b6c8d54294a1902662c03b2b6ec58828e76d3",
+    "admissible_sha256": "cf49ef80881f10aae43ad7fe7b68f50cf4e773fa097d1576147336c23b8a045c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 98,
      "reject_reason": 200
     }
    },
@@ -9965,40 +10605,54 @@
     "activation": {
      "full": {
       "500": 77,
-      "501": 77
+      "501": 77,
+      "520": 147,
+      "521": 63,
+      "522": 7,
+      "540": 217,
+      "541": 77,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 77,
-      "501": 77
+      "501": 77,
+      "520": 147,
+      "521": 63,
+      "522": 7,
+      "540": 217,
+      "541": 77,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 77,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      },
      "valid": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 77,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      }
     },
-    "admissible_sha256": "6c45325b1a4818797d2b6b9837848625fce9e3813c20d4a247df70679c60769f",
+    "admissible_sha256": "b67fd4b1487e128a3a867d926ba243c960e90d380cf36a07c4005906605a5763",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 147,
      "reject_reason": 200
     }
    },
@@ -10177,40 +10831,54 @@
     "activation": {
      "full": {
       "500": 71,
-      "501": 71
+      "501": 71,
+      "520": 147,
+      "521": 63,
+      "522": 13,
+      "540": 223,
+      "541": 71,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 71,
-      "501": 71
+      "501": 71,
+      "520": 147,
+      "521": 63,
+      "522": 13,
+      "540": 223,
+      "541": 71,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 71,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      },
      "valid": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 71,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      }
     },
-    "admissible_sha256": "2fc9c7f6a163a502fb9955ac04f4d81fdbad5869959c5992787a42697aa5a7de",
+    "admissible_sha256": "b67fd4b1487e128a3a867d926ba243c960e90d380cf36a07c4005906605a5763",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 147,
      "reject_reason": 200
     }
    },
@@ -10417,40 +11085,54 @@
     "activation": {
      "full": {
       "500": 66,
-      "501": 66
+      "501": 66,
+      "520": 147,
+      "521": 63,
+      "522": 18,
+      "540": 228,
+      "541": 66,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 66,
-      "501": 66
+      "501": 66,
+      "520": 147,
+      "521": 63,
+      "522": 18,
+      "540": 228,
+      "541": 66,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 66,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      },
      "valid": {
-      "determined": 0,
+      "determined": 294,
       "freedom": {
-       "class": 66,
-       "reject_reason": 294,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 294
      }
     },
-    "admissible_sha256": "bd222900798a56c2fe608c9cbae3e728ff0b326554f5699e68c394f1091f1e64",
+    "admissible_sha256": "b67fd4b1487e128a3a867d926ba243c960e90d380cf36a07c4005906605a5763",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 147,
      "reject_reason": 200
     }
    },
@@ -10657,40 +11339,54 @@
     "activation": {
      "full": {
       "500": 105,
-      "501": 105
+      "501": 105,
+      "520": 196,
+      "521": 84,
+      "522": 7,
+      "540": 287,
+      "541": 105,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 105,
-      "501": 105
+      "501": 105,
+      "520": 196,
+      "521": 84,
+      "522": 7,
+      "540": 287,
+      "541": 105,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 105,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      },
      "valid": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 105,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      }
     },
-    "admissible_sha256": "d4d15e16f7a29c0d362c1d21c4e5dd42d288a9b0b906df2b1d609a72e1ab1e04",
+    "admissible_sha256": "90e5f8105485b7c8e46eb7a07bba9dd3e6b87106c569e865640b1afbeca6fca7",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 196,
      "reject_reason": 200
     }
    },
@@ -10869,40 +11565,54 @@
     "activation": {
      "full": {
       "500": 99,
-      "501": 99
+      "501": 99,
+      "520": 196,
+      "521": 84,
+      "522": 13,
+      "540": 293,
+      "541": 99,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 99,
-      "501": 99
+      "501": 99,
+      "520": 196,
+      "521": 84,
+      "522": 13,
+      "540": 293,
+      "541": 99,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 99,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      },
      "valid": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 99,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      }
     },
-    "admissible_sha256": "64deebf65ff5684d1f6c579958f6329051f8e92f40dbbf8758ec9ca47e86a9e2",
+    "admissible_sha256": "90e5f8105485b7c8e46eb7a07bba9dd3e6b87106c569e865640b1afbeca6fca7",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 196,
      "reject_reason": 200
     }
    },
@@ -11109,40 +11819,54 @@
     "activation": {
      "full": {
       "500": 94,
-      "501": 94
+      "501": 94,
+      "520": 196,
+      "521": 84,
+      "522": 18,
+      "540": 298,
+      "541": 94,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 94,
-      "501": 94
+      "501": 94,
+      "520": 196,
+      "521": 84,
+      "522": 18,
+      "540": 298,
+      "541": 94,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 94,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      },
      "valid": {
-      "determined": 0,
+      "determined": 392,
       "freedom": {
-       "class": 94,
-       "reject_reason": 392,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 392
      }
     },
-    "admissible_sha256": "1a6fc12404901714d1a44b2836cb573acd1ccc586c24573537f2eccb040fb49e",
+    "admissible_sha256": "90e5f8105485b7c8e46eb7a07bba9dd3e6b87106c569e865640b1afbeca6fca7",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 196,
      "reject_reason": 200
     }
    },
@@ -11350,41 +12074,59 @@
      "full": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 12,
+      "521": 2,
+      "522": 4,
+      "523": 2,
+      "524": 8,
+      "540": 28,
+      "541": 4,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 12,
+      "521": 2,
+      "522": 4,
+      "523": 2,
+      "524": 0,
+      "540": 20,
+      "541": 4,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 5,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 4,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      }
     },
-    "admissible_sha256": "c3a35b8059b377bf4caf31887ca90bd6cdd2f4cb34c371695a3f255aac4bc10d",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 20,
      "reject_reason": 200
     }
    },
@@ -11566,41 +12308,59 @@
      "full": {
       "500": 12,
       "501": 12,
-      "502": 12
+      "502": 12,
+      "520": 24,
+      "521": 3,
+      "522": 6,
+      "523": 3,
+      "524": 24,
+      "540": 60,
+      "541": 12,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 12,
       "501": 12,
-      "502": 12
+      "502": 12,
+      "520": 24,
+      "521": 3,
+      "522": 6,
+      "523": 3,
+      "524": 0,
+      "540": 36,
+      "541": 12,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 72,
       "freedom": {
-       "class": 14,
-       "reject_reason": 72,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 72
      },
      "valid": {
-      "determined": 0,
+      "determined": 48,
       "freedom": {
-       "class": 12,
-       "reject_reason": 48,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 48
      }
     },
-    "admissible_sha256": "59fd1ee3d52b32d1f0d6901369781e5c676d672d79d6b6b47ba65c7d6fc1a3c9",
+    "admissible_sha256": "273259590190ae6aedb9af96442b861f50e39e12e060cd9fa8f78173dd940b35",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 48,
      "reject_reason": 200
     }
    },
@@ -11782,41 +12542,59 @@
      "full": {
       "500": 16,
       "501": 16,
-      "502": 16
+      "502": 16,
+      "520": 48,
+      "521": 8,
+      "522": 16,
+      "523": 8,
+      "524": 48,
+      "540": 128,
+      "541": 16,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 16,
       "501": 16,
-      "502": 16
+      "502": 16,
+      "520": 48,
+      "521": 8,
+      "522": 16,
+      "523": 8,
+      "524": 0,
+      "540": 80,
+      "541": 16,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 144,
       "freedom": {
-       "class": 20,
-       "reject_reason": 144,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 144
      },
      "valid": {
-      "determined": 0,
+      "determined": 96,
       "freedom": {
-       "class": 16,
-       "reject_reason": 96,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 96
      }
     },
-    "admissible_sha256": "846e1365578ebe066019347d016ec436a091b1d2e5533864b4a1e1f09c6b03e4",
+    "admissible_sha256": "62799858693324fda3430e0169edc076442be0c02da230decf59813b859a23b3",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 96,
      "reject_reason": 200
     }
    },
@@ -11998,41 +12776,59 @@
      "full": {
       "500": 24,
       "501": 24,
-      "502": 24
+      "502": 24,
+      "520": 40,
+      "521": 4,
+      "522": 8,
+      "523": 4,
+      "524": 48,
+      "540": 104,
+      "541": 24,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 24,
       "501": 24,
-      "502": 24
+      "502": 24,
+      "520": 40,
+      "521": 4,
+      "522": 8,
+      "523": 4,
+      "524": 0,
+      "540": 56,
+      "541": 24,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 128,
       "freedom": {
-       "class": 27,
-       "reject_reason": 128,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 128
      },
      "valid": {
-      "determined": 0,
+      "determined": 80,
       "freedom": {
-       "class": 24,
-       "reject_reason": 80,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 80
      }
     },
-    "admissible_sha256": "ef6f84c1d008f5dc514c59f9d4ed68f3c224f73c98a6fea08169238b172d5608",
+    "admissible_sha256": "23435f5e49cf2fa72113d48715fbef0fe23c8c2dcc6615ffd9c82537d8c08289",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 88,
      "reject_reason": 200
     }
    },
@@ -12214,41 +13010,59 @@
      "full": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 80,
+      "521": 11,
+      "522": 22,
+      "523": 11,
+      "524": 96,
+      "540": 220,
+      "541": 36,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 36,
       "501": 36,
-      "502": 36
+      "502": 36,
+      "520": 80,
+      "521": 11,
+      "522": 22,
+      "523": 11,
+      "524": 0,
+      "540": 124,
+      "541": 36,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 256,
       "freedom": {
-       "class": 43,
-       "reject_reason": 256,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 256
      },
      "valid": {
-      "determined": 0,
+      "determined": 160,
       "freedom": {
-       "class": 36,
-       "reject_reason": 160,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 160
      }
     },
-    "admissible_sha256": "0f64c003b050682d0151687dac1fbe6a6b85b2ffd5fe2863a43573e8f2c7c591",
+    "admissible_sha256": "23c04e4d3c8d5abea295504bcdab63f60f7d857852a0fe95e049676f6dfc65e4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 176,
      "reject_reason": 200
     }
    },
@@ -12430,41 +13244,59 @@
      "full": {
       "500": 40,
       "501": 40,
-      "502": 40
+      "502": 40,
+      "520": 120,
+      "521": 20,
+      "522": 40,
+      "523": 20,
+      "524": 144,
+      "540": 344,
+      "541": 40,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 40,
       "501": 40,
-      "502": 40
+      "502": 40,
+      "520": 120,
+      "521": 20,
+      "522": 40,
+      "523": 20,
+      "524": 0,
+      "540": 200,
+      "541": 40,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 384,
       "freedom": {
-       "class": 50,
-       "reject_reason": 384,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 384
      },
      "valid": {
-      "determined": 0,
+      "determined": 240,
       "freedom": {
-       "class": 40,
-       "reject_reason": 240,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 240
      }
     },
-    "admissible_sha256": "ca56ca06ea020d995e9737619c92c43d4a218c2e24c1d0d45f84de2d770d09a9",
+    "admissible_sha256": "29ef83c4645d5507ad2564d6dba7e0e7f9e5458d6f3c7f7df6dc4dd0a79071b5",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 264,
      "reject_reason": 200
     }
    },
@@ -12646,41 +13478,59 @@
      "full": {
       "500": 40,
       "501": 40,
-      "502": 40
+      "502": 40,
+      "520": 60,
+      "521": 5,
+      "522": 10,
+      "523": 5,
+      "524": 80,
+      "540": 160,
+      "541": 40,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 40,
       "501": 40,
-      "502": 40
+      "502": 40,
+      "520": 60,
+      "521": 5,
+      "522": 10,
+      "523": 5,
+      "524": 0,
+      "540": 80,
+      "541": 40,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 200,
       "freedom": {
-       "class": 44,
-       "reject_reason": 200,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 200
      },
      "valid": {
-      "determined": 0,
+      "determined": 120,
       "freedom": {
-       "class": 40,
-       "reject_reason": 120,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 120
      }
     },
-    "admissible_sha256": "a887e1072c2e2cc56c5e423b90a4c2dbf9b4d4b9b6e2aad03a3688e97c75f799",
+    "admissible_sha256": "b48d57a6ef526ef8dfd344ebd6b6a125a26dab8bc75a15d73e90271589d087c2",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 140,
      "reject_reason": 200
     }
    },
@@ -12862,41 +13712,59 @@
      "full": {
       "500": 64,
       "501": 64,
-      "502": 64
+      "502": 64,
+      "520": 120,
+      "521": 14,
+      "522": 28,
+      "523": 14,
+      "524": 160,
+      "540": 336,
+      "541": 64,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 64,
       "501": 64,
-      "502": 64
+      "502": 64,
+      "520": 120,
+      "521": 14,
+      "522": 28,
+      "523": 14,
+      "524": 0,
+      "540": 176,
+      "541": 64,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 400,
       "freedom": {
-       "class": 74,
-       "reject_reason": 400,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 400
      },
      "valid": {
-      "determined": 0,
+      "determined": 240,
       "freedom": {
-       "class": 64,
-       "reject_reason": 240,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 240
      }
     },
-    "admissible_sha256": "b6342e9b020a8125cc00d1a3ca38806089e4ea272903904fef1a73bc60158e98",
+    "admissible_sha256": "182d215914ea76206a934b5650f2bc792439007617e41d97a07fd77fab0337d0",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 280,
      "reject_reason": 200
     }
    },
@@ -13078,41 +13946,59 @@
      "full": {
       "500": 76,
       "501": 76,
-      "502": 76
+      "502": 76,
+      "520": 180,
+      "521": 26,
+      "522": 52,
+      "523": 26,
+      "524": 240,
+      "540": 524,
+      "541": 76,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 76,
       "501": 76,
-      "502": 76
+      "502": 76,
+      "520": 180,
+      "521": 26,
+      "522": 52,
+      "523": 26,
+      "524": 0,
+      "540": 284,
+      "541": 76,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 600,
       "freedom": {
-       "class": 92,
-       "reject_reason": 600,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 600
      },
      "valid": {
-      "determined": 0,
+      "determined": 360,
       "freedom": {
-       "class": 76,
-       "reject_reason": 360,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 360
      }
     },
-    "admissible_sha256": "e706aac5d90cd696711166d550ec397c431376ee2487573bbaaeaa47771eae13",
+    "admissible_sha256": "9f0e4afd9fa0b380f9b2d81f18077db3ccc89ab08c8d160730be4032529adca0",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 420,
      "reject_reason": 200
     }
    },
@@ -13294,42 +14180,56 @@
       "500": 3,
       "501": 3,
       "502": 3,
-      "503": 3
+      "503": 3,
+      "520": 8,
+      "521": 4,
+      "522": 1,
+      "540": 13,
+      "541": 3,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 3,
       "501": 3,
       "502": 3,
-      "503": 3
+      "503": 3,
+      "520": 8,
+      "521": 4,
+      "522": 1,
+      "540": 13,
+      "541": 3,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 6,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      },
      "valid": {
-      "determined": 0,
+      "determined": 16,
       "freedom": {
-       "class": 6,
-       "reject_reason": 16,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 16
      }
     },
-    "admissible_sha256": "ba6c0d70f9211143b0619478e47306e9cc82409413304abb0e16397f0d46181b",
+    "admissible_sha256": "3ff41cf22d4c4544514802ce2aecc08eea6c0989c3fa2e735c545f1054b26b88",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 8,
      "reject_reason": 200
     }
    },
@@ -13505,42 +14405,56 @@
       "500": 5,
       "501": 5,
       "502": 5,
-      "503": 5
+      "503": 5,
+      "520": 12,
+      "521": 6,
+      "522": 1,
+      "540": 19,
+      "541": 5,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 5,
       "501": 5,
       "502": 5,
-      "503": 5
+      "503": 5,
+      "520": 12,
+      "521": 6,
+      "522": 1,
+      "540": 19,
+      "541": 5,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 10,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      },
      "valid": {
-      "determined": 0,
+      "determined": 24,
       "freedom": {
-       "class": 10,
-       "reject_reason": 24,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 24
      }
     },
-    "admissible_sha256": "204b7d3522830e4f5bee9824cc34c87b7a98355881fd919ccf061b57786f1f24",
+    "admissible_sha256": "02f8d0c0f240020510e34d8578d0ac2adee94589cf76312619fcf4f5288e2362",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 12,
      "reject_reason": 200
     }
    },
@@ -13716,42 +14630,56 @@
       "500": 7,
       "501": 7,
       "502": 7,
-      "503": 7
+      "503": 7,
+      "520": 16,
+      "521": 8,
+      "522": 1,
+      "540": 25,
+      "541": 7,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 7,
       "501": 7,
       "502": 7,
-      "503": 7
+      "503": 7,
+      "520": 16,
+      "521": 8,
+      "522": 1,
+      "540": 25,
+      "541": 7,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 14,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 14,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "ff8a3b39adb4d475d083166655f6af6607426137424597c78637c60f181c141f",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -13927,42 +14855,56 @@
       "500": 9,
       "501": 9,
       "502": 9,
-      "503": 9
+      "503": 9,
+      "520": 20,
+      "521": 10,
+      "522": 1,
+      "540": 31,
+      "541": 9,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 9,
       "501": 9,
       "502": 9,
-      "503": 9
+      "503": 9,
+      "520": 20,
+      "521": 10,
+      "522": 1,
+      "540": 31,
+      "541": 9,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 40,
       "freedom": {
-       "class": 18,
-       "reject_reason": 40,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 40
      },
      "valid": {
-      "determined": 0,
+      "determined": 40,
       "freedom": {
-       "class": 18,
-       "reject_reason": 40,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 40
      }
     },
-    "admissible_sha256": "bb984a6ea01fbb4ba514884da4f2a888550a199467913280dea4c778431daab9",
+    "admissible_sha256": "62371ef4ed9355d85daf21a17e83db9db86bffb37073463b594bd54fb1ae5868",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 20,
      "reject_reason": 200
     }
    },
@@ -14138,42 +15080,56 @@
       "500": 11,
       "501": 11,
       "502": 11,
-      "503": 11
+      "503": 11,
+      "520": 24,
+      "521": 12,
+      "522": 1,
+      "540": 37,
+      "541": 11,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 11,
       "501": 11,
       "502": 11,
-      "503": 11
+      "503": 11,
+      "520": 24,
+      "521": 12,
+      "522": 1,
+      "540": 37,
+      "541": 11,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 48,
       "freedom": {
-       "class": 22,
-       "reject_reason": 48,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 48
      },
      "valid": {
-      "determined": 0,
+      "determined": 48,
       "freedom": {
-       "class": 22,
-       "reject_reason": 48,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 48
      }
     },
-    "admissible_sha256": "122310a2c28090ef2478f37823661026b582ae5593eabfa2306068e9e1176e55",
+    "admissible_sha256": "d88996323057f84dac5838a5a9b36d6de59c2899172553b57d9e820b0374dfa7",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 24,
      "reject_reason": 200
     }
    },
@@ -14349,42 +15305,56 @@
       "500": 13,
       "501": 13,
       "502": 13,
-      "503": 13
+      "503": 13,
+      "520": 28,
+      "521": 14,
+      "522": 1,
+      "540": 43,
+      "541": 13,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 13,
       "501": 13,
       "502": 13,
-      "503": 13
+      "503": 13,
+      "520": 28,
+      "521": 14,
+      "522": 1,
+      "540": 43,
+      "541": 13,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 56,
       "freedom": {
-       "class": 26,
-       "reject_reason": 56,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 56
      },
      "valid": {
-      "determined": 0,
+      "determined": 56,
       "freedom": {
-       "class": 26,
-       "reject_reason": 56,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 56
      }
     },
-    "admissible_sha256": "7e52ed64ab001ee19bc8377cec7df8bd6aa4341636defafa33a018774090b110",
+    "admissible_sha256": "953a093bb7498535ef13d9bd04bba2e9d7942991f0f8b08eb9c18652a9427edb",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 28,
      "reject_reason": 200
     }
    },
@@ -14560,42 +15530,56 @@
       "500": 15,
       "501": 15,
       "502": 15,
-      "503": 15
+      "503": 15,
+      "520": 32,
+      "521": 16,
+      "522": 1,
+      "540": 49,
+      "541": 15,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 15,
       "501": 15,
       "502": 15,
-      "503": 15
+      "503": 15,
+      "520": 32,
+      "521": 16,
+      "522": 1,
+      "540": 49,
+      "541": 15,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 64,
       "freedom": {
-       "class": 30,
-       "reject_reason": 64,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 64
      },
      "valid": {
-      "determined": 0,
+      "determined": 64,
       "freedom": {
-       "class": 30,
-       "reject_reason": 64,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 64
      }
     },
-    "admissible_sha256": "5fcae3497ff6fb4f0ee00954cd6303a07fa34604622f2926ee518e0f24ab1325",
+    "admissible_sha256": "374f726fa6f8b32f4698665d71cd30c8a076ed889c206051036136ce48a35b5c",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 32,
      "reject_reason": 200
     }
    },
@@ -14771,42 +15755,56 @@
       "500": 17,
       "501": 17,
       "502": 17,
-      "503": 17
+      "503": 17,
+      "520": 36,
+      "521": 18,
+      "522": 1,
+      "540": 55,
+      "541": 17,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 17,
       "501": 17,
       "502": 17,
-      "503": 17
+      "503": 17,
+      "520": 36,
+      "521": 18,
+      "522": 1,
+      "540": 55,
+      "541": 17,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 72,
       "freedom": {
-       "class": 34,
-       "reject_reason": 72,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 72
      },
      "valid": {
-      "determined": 0,
+      "determined": 72,
       "freedom": {
-       "class": 34,
-       "reject_reason": 72,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 72
      }
     },
-    "admissible_sha256": "239d7d67ddb839b10287a0f0d71e1c56bd79270cc4df1367b38b12d442811ec0",
+    "admissible_sha256": "273259590190ae6aedb9af96442b861f50e39e12e060cd9fa8f78173dd940b35",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 36,
      "reject_reason": 200
     }
    },
@@ -15406,7 +16404,7 @@
       "determined": 0,
       "freedom": {
        "class": 3,
-       "reject_reason": 11,
+       "reject_reason": 12,
        "successor": 0
       },
       "reference_refused": 1,
@@ -15416,7 +16414,7 @@
       "determined": 0,
       "freedom": {
        "class": 3,
-       "reject_reason": 11,
+       "reject_reason": 12,
        "successor": 0
       },
       "reference_refused": 1,
@@ -15808,41 +16806,55 @@
      "full": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 16,
+      "521": 8,
+      "522": 4,
+      "540": 28,
+      "541": 4,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 4,
       "501": 4,
-      "502": 4
+      "502": 4,
+      "520": 16,
+      "521": 8,
+      "522": 4,
+      "540": 28,
+      "541": 4,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 4,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      },
      "valid": {
-      "determined": 0,
+      "determined": 32,
       "freedom": {
-       "class": 4,
-       "reject_reason": 32,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 32
      }
     },
-    "admissible_sha256": "b9c64a059a1e54e5715c4bb5845c6d780ada5364169501e03a8d8e8033719073",
+    "admissible_sha256": "edc15f5388f6de0a2fc2fdef30272de831eb9ebd11ef4a0b2c3c937812fe9e36",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 16,
      "reject_reason": 200
     }
    },
@@ -16022,41 +17034,55 @@
      "full": {
       "500": 18,
       "501": 18,
-      "502": 18
+      "502": 18,
+      "520": 81,
+      "521": 54,
+      "522": 9,
+      "540": 144,
+      "541": 18,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 18,
       "501": 18,
-      "502": 18
+      "502": 18,
+      "520": 81,
+      "521": 54,
+      "522": 9,
+      "540": 144,
+      "541": 18,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 162,
       "freedom": {
-       "class": 18,
-       "reject_reason": 162,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 162
      },
      "valid": {
-      "determined": 0,
+      "determined": 162,
       "freedom": {
-       "class": 18,
-       "reject_reason": 162,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 162
      }
     },
-    "admissible_sha256": "d090a30c4eff2023345e86e12820ffbfe40ba48e4e8aafb843f7686f98607287",
+    "admissible_sha256": "95d713920378f0501ba9d1eaf595a3ba283df6f218eacd7bfd522761811b8965",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 81,
      "reject_reason": 200
     }
    },
@@ -16236,41 +17262,55 @@
      "full": {
       "500": 48,
       "501": 48,
-      "502": 48
+      "502": 48,
+      "520": 256,
+      "521": 192,
+      "522": 16,
+      "540": 464,
+      "541": 48,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 48,
       "501": 48,
-      "502": 48
+      "502": 48,
+      "520": 256,
+      "521": 192,
+      "522": 16,
+      "540": 464,
+      "541": 48,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 512,
       "freedom": {
-       "class": 48,
-       "reject_reason": 512,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 512
      },
      "valid": {
-      "determined": 0,
+      "determined": 512,
       "freedom": {
-       "class": 48,
-       "reject_reason": 512,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 512
      }
     },
-    "admissible_sha256": "1df86b00fa3d404995c8771b3aa10d6ff44f51a188da1d4e18ede670e2d77c42",
+    "admissible_sha256": "12eb30ae34e866d0743570e138d8b04988e3316236f5e5a5f102bb91f26712c7",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 256,
      "reject_reason": 200
     }
    },
@@ -16450,41 +17490,55 @@
      "full": {
       "500": 100,
       "501": 100,
-      "502": 100
+      "502": 100,
+      "520": 625,
+      "521": 500,
+      "522": 25,
+      "540": 1150,
+      "541": 100,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 100,
       "501": 100,
-      "502": 100
+      "502": 100,
+      "520": 625,
+      "521": 500,
+      "522": 25,
+      "540": 1150,
+      "541": 100,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 1250,
       "freedom": {
-       "class": 100,
-       "reject_reason": 1250,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1250
      },
      "valid": {
-      "determined": 0,
+      "determined": 1250,
       "freedom": {
-       "class": 100,
-       "reject_reason": 1250,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 1250
      }
     },
-    "admissible_sha256": "4aad405e616877e4b1de51aecbc970ccde29cf36a14e3b74b36af01c74e7a2ee",
+    "admissible_sha256": "ccdd5c78738aafc660aba535dd3c6ea1bf3fd00cac7e4b7f35af7326faa3c14f",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 625,
      "reject_reason": 200
     }
    },
@@ -16664,41 +17718,55 @@
      "full": {
       "500": 180,
       "501": 180,
-      "502": 180
+      "502": 180,
+      "520": 1296,
+      "521": 1080,
+      "522": 36,
+      "540": 2412,
+      "541": 180,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 180,
       "501": 180,
-      "502": 180
+      "502": 180,
+      "520": 1296,
+      "521": 1080,
+      "522": 36,
+      "540": 2412,
+      "541": 180,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 2592,
       "freedom": {
-       "class": 180,
-       "reject_reason": 2592,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2592
      },
      "valid": {
-      "determined": 0,
+      "determined": 2592,
       "freedom": {
-       "class": 180,
-       "reject_reason": 2592,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 2592
      }
     },
-    "admissible_sha256": "a9be1778b02fc2b7870d9983a2c51884b5a8ede82149e16cb95a096380022047",
+    "admissible_sha256": "34b81fca3844ea9f453e37d0042b39ea24eeee85bb72112303011996fde288f4",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 1296,
      "reject_reason": 200
     }
    },
@@ -16878,41 +17946,55 @@
      "full": {
       "500": 294,
       "501": 294,
-      "502": 294
+      "502": 294,
+      "520": 2401,
+      "521": 2058,
+      "522": 49,
+      "540": 4508,
+      "541": 294,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 294,
       "501": 294,
-      "502": 294
+      "502": 294,
+      "520": 2401,
+      "521": 2058,
+      "522": 49,
+      "540": 4508,
+      "541": 294,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 4802,
       "freedom": {
-       "class": 294,
-       "reject_reason": 4802,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 4802
      },
      "valid": {
-      "determined": 0,
+      "determined": 4802,
       "freedom": {
-       "class": 294,
-       "reject_reason": 4802,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 4802
      }
     },
-    "admissible_sha256": "4d2417c479453c504259f501e369cc41b606a3fea7ca0996106da71a2edd2122",
+    "admissible_sha256": "a7a283bbf4c7ae37a43b43a218d41c15b4455df4e4f7184f9fd9eca75c4c8625",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 2401,
      "reject_reason": 200
     }
    },
@@ -17092,41 +18174,55 @@
      "full": {
       "500": 448,
       "501": 448,
-      "502": 448
+      "502": 448,
+      "520": 4096,
+      "521": 3584,
+      "522": 64,
+      "540": 7744,
+      "541": 448,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 448,
       "501": 448,
-      "502": 448
+      "502": 448,
+      "520": 4096,
+      "521": 3584,
+      "522": 64,
+      "540": 7744,
+      "541": 448,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 8192,
       "freedom": {
-       "class": 448,
-       "reject_reason": 8192,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8192
      },
      "valid": {
-      "determined": 0,
+      "determined": 8192,
       "freedom": {
-       "class": 448,
-       "reject_reason": 8192,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 8192
      }
     },
-    "admissible_sha256": "fc7fa3f80bc11d2dfc179a459f57de3921d3c47d2f0bec0ef3dffc981f165e35",
+    "admissible_sha256": "6498d501682f7cb776e8d7767a4acd900007eece95583574e9bc9df725f1b374",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 4096,
      "reject_reason": 200
     }
    },
@@ -17306,41 +18402,55 @@
      "full": {
       "500": 648,
       "501": 648,
-      "502": 648
+      "502": 648,
+      "520": 6561,
+      "521": 5832,
+      "522": 81,
+      "540": 12474,
+      "541": 648,
+      "542": 0
      },
-     "inactive": [],
+     "inactive": [
+      542
+     ],
      "valid": {
       "500": 648,
       "501": 648,
-      "502": 648
+      "502": 648,
+      "520": 6561,
+      "521": 5832,
+      "522": 81,
+      "540": 12474,
+      "541": 648,
+      "542": 0
      }
     },
     "admissible": {
      "full": {
-      "determined": 0,
+      "determined": 13122,
       "freedom": {
-       "class": 648,
-       "reject_reason": 13122,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 13122
      },
      "valid": {
-      "determined": 0,
+      "determined": 13122,
       "freedom": {
-       "class": 648,
-       "reject_reason": 13122,
+       "class": 0,
+       "reject_reason": 0,
        "successor": 0
       },
       "reference_refused": 0,
       "tuples": 13122
      }
     },
-    "admissible_sha256": "100c0a7954a2ab06fb784643d37db8c322f32461ff93d96ca7718032bbbae3f4",
+    "admissible_sha256": "5f3778158debde3c0bc08f42bccb91c54ffc9d3a0d86a58b474b10064eabb108",
     "reject_everything": {
-     "admitted_where_the_contract_decides": true,
-     "refused_where_the_contract_decides": 0,
+     "admitted_where_the_contract_decides": false,
+     "refused_where_the_contract_decides": 6561,
      "reject_reason": 200
     }
    },

@@ -1,10 +1,13 @@
 """Checks of the independent contract-judge reference on hand-computed cases."""
 
+import copy
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import check_contract_judges as judges
 import contract_judges_reference as reference
 import instantiate_core as core
 
@@ -52,6 +55,36 @@ class Grammar(unittest.TestCase):
 
 
 class Judges(unittest.TestCase):
+    def test_counter_variants_preserve_partial_decisions_and_measure_refused_frames(self):
+        recorded = json.loads(judges.KNOWN.read_text())["instances"]
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-judge-variants-") as raw:
+            for name, files in judges.VARIANTS.items():
+                with self.subTest(variant=name):
+                    folder = Path(raw) / name
+                    judges.write(folder, files())
+                    expected = copy.deepcopy(recorded[name])
+                    if name == "variant-bounded-counter-c2-refusal":
+                        # Twelve frames admit several Reject reasons, including
+                        # the one where an Accept is refused by law 504.
+                        for domain in ("full", "valid"):
+                            expected["gaps"]["admissible"][domain]["freedom"]["reject_reason"] = 12
+                    self.assertEqual(judges.reference_answers(folder), expected)
+
+    def test_gap_alternatives_remain_visible_when_the_program_refuses(self):
+        files = judges.counter_variant(2, False, True, False)
+        contract = reference.Contract(files["project.zeno"], json.loads(files["v2/policy.json"]))
+        machine = reference.Machine(contract)
+        state, frame = (1,), (150, 1)
+        self.assertIsNone(machine.table[(state, frame)])
+        for reason in (200, 201):
+            self.assertTrue(contract.admits(state, frame, ("Reject", reason, state)))
+        measured = reference.gaps(contract, machine)
+        for domain in ("full", "valid"):
+            self.assertEqual(measured["admissible"][domain]["reference_refused"], 1)
+            self.assertEqual(measured["admissible"][domain]["freedom"]["reject_reason"], 12)
+        order = [(s, x) for s in contract.states for x in contract.inputs]
+        self.assertEqual(measured["admissible_lines"][order.index((state, frame))], "-")
+
     def test_a_bounded_counter_has_three_reachable_minimal_states_and_no_determined_tuple(self):
         contract = instance("bounded-counter", {"C": 2})
         machine = reference.Machine(contract)
@@ -120,6 +153,8 @@ class Judges(unittest.TestCase):
             contract=instance(family, {"C":2}, complete=True)
             measured=reference.gaps(contract, reference.Machine(contract))
             self.assertEqual(measured["admissible"]["full"]["determined"], measured["admissible"]["full"]["tuples"])
+            self.assertFalse(measured["reject_everything"]["admitted_where_the_contract_decides"])
+            self.assertTrue(measured["reject_everything"]["refused_where_the_contract_decides"])
 
     def test_deliveries_are_outside_the_reference(self):
         app = core.ROOT / "examples/dual-approval"
@@ -137,6 +172,14 @@ class Judges(unittest.TestCase):
             answers = reference.answers(root, ["true"], None)
         self.assertEqual(answers["lemmas"][0]["verdict"], "inductive")
         self.assertEqual(answers["profile"]["states"]["schema"], 2)
+
+
+class ReviewPackets(unittest.TestCase):
+    def test_missing_and_old_review_packets_are_mismatches(self):
+        for packet in (None, {"schema": "zeno-fcis/contract-review/3"}):
+            with self.subTest(packet=packet), patch.object(judges, "cli", return_value=packet):
+                with self.assertRaises(judges.Mismatch):
+                    judges.cli_answers(Path("unused"), Path("unused"), {"review_exit": 0}, Path("unused"))
 
 
 if __name__ == "__main__":

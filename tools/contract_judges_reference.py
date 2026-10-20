@@ -674,20 +674,18 @@ def gaps(contract: Contract, machine: Machine) -> dict:
             if reject_reason is not None and reference is not None and not contract.admits(
                     state, command_context, ("Reject", reject_reason, tuple(state))):
                 vacuous += 1
-            if reference is None:
-                lines.append("-")
-                for domain in domains:
-                    measures[domain]["tuples"] += 1
-                    measures[domain]["reference_refused"] += 1
-                continue
             admitted = [decision for decision in candidates(contract, state)
                         if contract.admits(state, command_context, decision)]
-            lines.append(str(len(admitted)))
+            # Executable refusal and law freedom are separate observations.
+            # Retain the digest's refusal marker while measuring alternatives.
+            lines.append("-" if reference is None else str(len(admitted)))
             for domain in domains:
                 counts = measures[domain]
                 counts["tuples"] += 1
-                for law in contract.laws:
-                    activation[domain][str(law["id"])] += contract.law_applies(law, reference[0], reference[1])
+                counts["reference_refused"] += reference is None
+                if reference is not None:
+                    for law in contract.laws:
+                        activation[domain][str(law["id"])] += contract.law_applies(law, reference[0], reference[1])
                 if len(admitted) == 1:
                     counts["determined"] += 1
                     continue
