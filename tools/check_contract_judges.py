@@ -222,7 +222,9 @@ def cli_answers(binary: Path, directory: Path, known: dict, log: Path, strict: b
     exit_of = lambda code: code if strict else None
     app = str(directory)
     review = cli(binary, ["contract", "review", app, "--gaps"], exit_of(known["review_exit"]), log)
-    require(review["schema"] == "zeno-fcis/contract-review/3", "review packet is not version 3")
+    require(review["schema"] == "zeno-fcis/contract-review/4", "review packet is not version 4")
+    require(review["integer_encoding"] == "safe-number-or-decimal-string/1",
+            "review packet has an unsupported integer encoding")
     profile = cli(binary, ["contract", "profile", app], exit_of(0), log)
     arguments = ["contract", "lemma", app]
     for formula in known["lemma_formulas"]:
