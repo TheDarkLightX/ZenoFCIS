@@ -432,7 +432,8 @@ class Journey:
                 raise JourneyError("a blocked synth verify wrote a receipt")
             return {"offline_parallel": result, "loop_open": {**loop, "acquisition": acquisition},
                     "synth_verify": "conformance-unknown: unsupported-runtime-platform"}
-        self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent"},
+        command += ["--containment-backend", "systemd"]
+        self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent", "backend": "systemd"},
                     "offline-parallel")
         if parallel.read_bytes() != serial["receipt"].read_bytes():
             raise JourneyError("the contained receipt differs from the serial one")
@@ -442,7 +443,7 @@ class Journey:
         if not conformance.is_file():
             raise JourneyError("synth verify wrote no receipt")
         return {"offline_parallel": "equivalent; the receipt equals the serial receipt and replays",
-                "synth_verify": "passed"}
+                "containment_backend": "systemd", "synth_verify": "passed"}
 
     def main(self) -> None:
         if not self.archive.is_file():

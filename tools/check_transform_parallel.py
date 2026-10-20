@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import statistics
 import subprocess
@@ -44,9 +45,11 @@ MAX_CHUNKS = 65_536
 # A contained parallel run also names its group-resources containment; the
 # semantic report and receipt bytes must still equal the serial run's.
 PARALLEL_ONLY = ('progress', 'backend', 'containment', 'required_profile')
-# Encoding and serial checks stay on finite-data POSIX even when the environment
-# selects systemd; offline parallel checks keep the environment's choice.
+# Encoding and serial checks use finite-data POSIX. Linux parallel checks
+# explicitly select the required group-resources backend.
 FINITE_DATA = ('--containment-backend', 'auto')
+PARALLEL_BACKEND = 'systemd' if platform.system() == 'Linux' else 'auto'
+PARALLEL_CONTAINMENT = ('--containment-backend', PARALLEL_BACKEND)
 SOURCES = ('crates', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo',
            'docs/benchmarks/cases.json',
            'docs/benchmarks/withdrawal-queue/artifacts', 'crates/zeno-fcis-cli/tests/fixtures/transform-check',
@@ -130,7 +133,7 @@ def comparable(report):
 
 def invoke(cli, work, subject, label, flags, receipt=True):
     path = work / f'{subject["name"]}.{label}.receipt.json'
-    backend = () if '--offline-parallel' in flags else FINITE_DATA
+    backend = PARALLEL_CONTAINMENT if '--offline-parallel' in flags else FINITE_DATA
     command = [cli, *backend, 'transform', 'check', '--original', subject['original'],
                '--candidate', subject['candidate'], *subject['extra'], *flags]
     if receipt:
@@ -426,7 +429,7 @@ def main():
     report = {'schema': 'zeno-fcis/transform-parallel-parity/2', 'cli': str(cli), 'cli_sha256': sha(cli),
               'git_head': head, 'git_dirty': None if head is None else bool(git('status', '--porcelain')),
               'sources_sha256': sources, 'sources_combined_sha256': combined,
-              'environment': environment(cli),
+              'environment': environment(cli), 'containment_backend': PARALLEL_BACKEND,
               'subjects': len(found), 'known_answer_vectors': len(everything) - len(found),
               'unencodable_cases': unencodable, 'workers': list(WORKERS), 'chunk_tuples': list(CHUNKS),
               'runs': sum(1 + len(row['parallel']) for row in results),
@@ -449,6 +452,7 @@ def main():
     (work / 'result.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
     summary = {key: report[key] for key in ('subjects', 'known_answer_vectors', 'runs',
                                             'multi_range_multi_worker_runs', 'sources_combined_sha256')}
+    summary['containment_backend'] = PARALLEL_BACKEND
     summary['decision_debug_speedup'] = report['decision_debug_timing_single_run']['speedup']
     if args.release_timing:
         summary['decision_release_median_speedup'] = report['release_timing']['median_speedup']
