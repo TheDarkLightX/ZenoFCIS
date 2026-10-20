@@ -28,5 +28,5 @@ law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.
 law 502 exact_movement on accept = (command.101.120 == 150 -> post.100.110 == pre.100.110 + 1) && (command.101.120 == 151 -> post.100.110 + 1 == pre.100.110);
 // Core seed bounded-counter/1; parameters {"C": 2}.
 // Instance source-set SHA256 3ec6f6eb601fbed759721e8fde42878710e629d8f62c0a947db924a92f27de06.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/bounded-counter.json SHA256 7cb573708ca70166b099111e635d0234ffcdbfc41ac51aeb25038bda7217727a; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/bounded-counter.json SHA256 c2213825efba2241c39a92ff6b25cd87776a72baabdbe0eec42a878d06409a1a; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

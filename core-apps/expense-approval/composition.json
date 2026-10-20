@@ -11,7 +11,7 @@
     {
       "family": "consumable-budget",
       "instance": "components/budget/core-instance.json",
-      "instance_sha256": "c71f16f1db7c162848f340283ec418de76ba768ef4abd40c3e2e90a90ab10432",
+      "instance_sha256": "d38920a589de035c1226ea4f6fb2ccc0d4b0568490916ef65133eb6711376803",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "budget",
       "owns_fields": [
@@ -36,7 +36,7 @@
     {
       "family": "approval-queue",
       "instance": "components/queue/core-instance.json",
-      "instance_sha256": "f6037c122ac276879652e2ec6f6043d717e425a7b630761f927deca3259abbbf",
+      "instance_sha256": "258c0ffd7bc97f185e18a14dc7a9e972a91e24ddd102c0002de50acec4243e71",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "queue",
       "owns_fields": [
@@ -68,7 +68,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "4c84ab907b16ee3fded7a3a7b487b90e925cfdd1c828655230c0e1b3f2ce513c",
+      "instance_sha256": "e0b8f8daaaad7ecc83e8f18e227bd9bd6c4c824ef2983d3f319ce19fdb719f49",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "memo",
       "owns_fields": [],
