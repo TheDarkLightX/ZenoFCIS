@@ -1,0 +1,5 @@
+zeno 1;
+project 1 goodstein;
+type 100 state GoodsteinValue;
+claim 500 finite_zero all finite 6 = eventually atom(post.100 == 0);
+claim 501 eventual_zero lean unbounded = eventually atom(post.100 == 0);
