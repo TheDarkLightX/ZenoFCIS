@@ -4,38 +4,38 @@
   "entries": [
     {
       "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "50445810a52d307ebaf50675d9ca694f6b8582e0534a12af5d0b881474034608",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "154ed6246d9264aa2c049da33220d69a7d487ad6f2465352703b06454cf178ba",
       "reason": "Public CLI task and strategy labels concatenated by the linker."
     },
     {
       "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "aa2794c1178ed02d1a29997089f98256a073349bdf292f6dc9db11ff77003d5a",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "3584a6ad981e22710b50200a5b0c155fb13458eefee9d9c3270afa0300421914",
       "reason": "Public CLI effect labels, pinned Rust core error labels and public synthesis enum names concatenated by the linker."
     },
     {
       "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "fe2c633ba1c44e9b4b2d660894a2e1210db6b1af525dd5874bcacd506dd32bb8",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "5b56564b0d3b956b39dea29b73b513c22b7db0fdfe827a744326b32e31336ed7",
       "reason": "Public strategy-knowledge labels concatenated by the linker."
     },
     {
       "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "50445810a52d307ebaf50675d9ca694f6b8582e0534a12af5d0b881474034608",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "154ed6246d9264aa2c049da33220d69a7d487ad6f2465352703b06454cf178ba",
       "reason": "Public CLI task and strategy labels concatenated by the linker."
     },
     {
       "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "aa2794c1178ed02d1a29997089f98256a073349bdf292f6dc9db11ff77003d5a",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "3584a6ad981e22710b50200a5b0c155fb13458eefee9d9c3270afa0300421914",
       "reason": "Public CLI effect labels, pinned Rust core error labels and public synthesis enum names concatenated by the linker."
     },
     {
       "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
-      "file_sha256": "1f6da130a8aa093bc5e567899a7993b2397828b69f6907fc943c9b125ba76477",
-      "fingerprint_sha256": "fe2c633ba1c44e9b4b2d660894a2e1210db6b1af525dd5874bcacd506dd32bb8",
+      "file_sha256": "3617e6a7464d3141a7e18ab07ebc16c4e5253b89342d19a4746c4adbf508bb45",
+      "fingerprint_sha256": "5b56564b0d3b956b39dea29b73b513c22b7db0fdfe827a744326b32e31336ed7",
       "reason": "Public strategy-knowledge labels concatenated by the linker."
     }
   ]
