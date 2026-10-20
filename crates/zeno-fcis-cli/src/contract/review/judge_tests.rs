@@ -183,7 +183,7 @@ fn the_declared_laws_of_a_bounded_counter_determine_no_tuple_and_admit_rejecting
 }
 
 #[test]
-fn a_contract_that_delivers_is_outside_the_gap_judge() {
+fn a_delivery_contract_is_measured_when_its_universe_is_complete() {
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
     let read = |file: &str| {
         fs::read_to_string(app.join(file)).unwrap_or_else(|error| panic!("{file}: {error}"))
@@ -194,7 +194,7 @@ fn a_contract_that_delivers_is_outside_the_gap_judge() {
         Core::options(None),
     )
     .unwrap_or_else(|error| panic!("{error}"));
-    assert_eq!(gaps.status(), "out-of-scope");
+    assert_eq!(gaps.status(), "measured");
 }
 
 #[test]
