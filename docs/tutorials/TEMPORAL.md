@@ -23,6 +23,13 @@ proof obligation.
 Each step is one logical event. The number does not represent seconds,
 processor cycles, or wall-clock time.
 
+The [Goodstein example](../../examples/goodstein/README.md) shows why a finite
+zero witness, an unfinished prefix, and a general termination theorem are
+different claims. It includes a standalone Lean progress theorem and contrasts
+logical steps with Zeno-style timing. The public Lean exporter is currently
+blocked, as explained in the [formal-tools tutorial](FORMAL_TOOLS.md); parsing
+an unbounded claim does not supply its proof.
+
 ## How finite claims are judged
 
 A finite claim covers every nonempty trace of at most its horizon of events.
