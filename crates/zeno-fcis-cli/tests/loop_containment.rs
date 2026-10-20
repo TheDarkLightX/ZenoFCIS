@@ -998,7 +998,7 @@ mod posix_controls {
             .collect::<String>();
         let state = json!({"schema":"zeno-fcis/capture-session/1", "spec":{"inputs":[{"kind":"Bool"}],"outputs":[{"kind":"Bool"}]},
             "source_sha256":source_hash,"table_sha256":sha(&serde_json::to_vec(&rows).unwrap_or_else(|e| panic!("{e}"))),"program_sha256":sha(&bytes),
-            "checker":{"semantics":"zeno-fcis/transform-check/4","evaluator_identity":evaluator},"rows":rows,"reference_observations":12,
+            "checker":{"semantics":"zeno-fcis/transform-check/5","evaluator_identity":evaluator},"rows":rows,"reference_observations":12,
             "budget":{"max_tuples":2,"rounds":2,"max_examples":2,"node_visits":100000},"attempts":0,"invocations":0,"reserved_visits":0,
             "examples":[],"status":"ready","events":[],"candidate":null,"receipt":null});
         fs::write(Path::new(&session).join("capture.json"), state.to_string())

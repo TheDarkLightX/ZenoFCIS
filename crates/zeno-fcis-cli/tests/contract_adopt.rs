@@ -654,7 +654,7 @@ fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
     );
     let report = json(&output);
     assert_eq!(report["status"], "refreshed");
-    assert_eq!(report["checker"], "zeno-fcis/transform-check/4");
+    assert_eq!(report["checker"], "zeno-fcis/transform-check/5");
     assert_eq!(report["refreshed"], json!([1]));
     // The application is the committed fixture again, which is current.
     assert_eq!(snapshot(&dir), snapshot(&fixture()));
