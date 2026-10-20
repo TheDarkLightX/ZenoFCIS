@@ -529,8 +529,7 @@ fn measure(
                     &laws,
                     framer,
                     &machine,
-                    &states,
-                    &reasons,
+                    (&states, &reasons),
                     failure,
                     ordinal,
                     delivery_universe.as_ref(),
@@ -623,12 +622,12 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    states: &[Vec<i128>],
-    reasons: &[u32],
+    domains: (&[Vec<i128>], &[u32]),
     failure: bool,
     ordinal: usize,
     universe: Option<&DeliveryUniverse>,
 ) -> TupleGap {
+    let (states, reasons) = domains;
     let space = &machine.space;
     let tuple = space.at(ordinal);
     let state = ordinal / space.inputs;
@@ -695,13 +694,13 @@ fn tuple_gap(
         if !check(class, reason, post, &[]).0 {
             continue;
         }
-        if class != Class::Reject {
-            if let Some(u) = universe {
-                let witness = u.example();
-                witness_mismatch |= witness.is_empty()
-                    || !u.allows(&witness)
-                    || !check(class, reason, post, &witness).0;
-            }
+        if class != Class::Reject
+            && let Some(u) = universe
+        {
+            let witness = u.example();
+            witness_mismatch |= witness.is_empty()
+                || !u.allows(&witness)
+                || !check(class, reason, post, &witness).0;
         }
         admissible += if universe.is_some() && class != Class::Reject {
             2

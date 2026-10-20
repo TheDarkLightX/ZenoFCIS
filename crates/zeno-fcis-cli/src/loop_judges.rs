@@ -1047,29 +1047,30 @@ impl Core {
                     "delivery-observing laws require a complete delivery decision universe".into(),
                 ));
             }
-            if previous.is_none() && added.is_empty() {
-                if let Some(universe) = &self.delivery_universe {
-                    for (ordinal, decision) in self.decisions.iter().enumerate() {
-                        if let Some(d) = decision {
-                            let outbox = self.native_outbox(ordinal);
-                            if !universe.allows(outbox)
-                                || !laws
-                                    .on_transition_with_outbox(
-                                        &framer,
-                                        &self.tuple(ordinal),
-                                        &Proposed {
-                                            class: d.class,
-                                            reason: d.reason,
-                                            post: &states[d.next],
-                                        },
-                                        outbox,
-                                    )
-                                    .0
-                            {
-                                return invalid(
-                                    "question-delivery-frames-disagree-with-native-decision",
-                                );
-                            }
+            if previous.is_none()
+                && added.is_empty()
+                && let Some(universe) = &self.delivery_universe
+            {
+                for (ordinal, decision) in self.decisions.iter().enumerate() {
+                    if let Some(d) = decision {
+                        let outbox = self.native_outbox(ordinal);
+                        if !universe.allows(outbox)
+                            || !laws
+                                .on_transition_with_outbox(
+                                    &framer,
+                                    &self.tuple(ordinal),
+                                    &Proposed {
+                                        class: d.class,
+                                        reason: d.reason,
+                                        post: &states[d.next],
+                                    },
+                                    outbox,
+                                )
+                                .0
+                        {
+                            return invalid(
+                                "question-delivery-frames-disagree-with-native-decision",
+                            );
                         }
                     }
                 }
@@ -1079,45 +1080,46 @@ impl Core {
                 .map(|ordinal| {
                     let tuple = self.tuple(ordinal);
                     let pre = &states[ordinal / self.inputs];
-                    let admits =
-                        |class: Class, reason: Option<u32>, post: &[i128]| -> Result<bool> {
-                            let admitted = laws
-                                .on_transition(
-                                    &framer,
-                                    &tuple,
-                                    &Proposed {
-                                        class,
-                                        reason,
-                                        post,
-                                    },
-                                )
-                                .0;
-                            if admitted && class != Class::Reject {
-                                if let Some(u) = &self.delivery_universe {
-                                    let witness = u.example();
-                                    if witness.is_empty()
-                                        || !u.allows(&witness)
-                                        || !laws
-                                            .on_transition_with_outbox(
-                                                &framer,
-                                                &tuple,
-                                                &Proposed {
-                                                    class,
-                                                    reason,
-                                                    post,
-                                                },
-                                                &witness,
-                                            )
-                                            .0
-                                    {
-                                        return invalid(
-                                            "question-delivery-multiplicity-witness-refused",
-                                        );
-                                    }
-                                }
+                    let admits = |class: Class,
+                                  reason: Option<u32>,
+                                  post: &[i128]|
+                     -> Result<bool> {
+                        let admitted = laws
+                            .on_transition(
+                                &framer,
+                                &tuple,
+                                &Proposed {
+                                    class,
+                                    reason,
+                                    post,
+                                },
+                            )
+                            .0;
+                        if admitted
+                            && class != Class::Reject
+                            && let Some(u) = &self.delivery_universe
+                        {
+                            let witness = u.example();
+                            if witness.is_empty()
+                                || !u.allows(&witness)
+                                || !laws
+                                    .on_transition_with_outbox(
+                                        &framer,
+                                        &tuple,
+                                        &Proposed {
+                                            class,
+                                            reason,
+                                            post,
+                                        },
+                                        &witness,
+                                    )
+                                    .0
+                            {
+                                return invalid("question-delivery-multiplicity-witness-refused");
                             }
-                            Ok(admitted)
-                        };
+                        }
+                        Ok(admitted)
+                    };
                     if let Some(previous) = previous {
                         let candidates = &previous[ordinal];
                         if mask.is_some_and(|mask| mask[ordinal] != 1) {
