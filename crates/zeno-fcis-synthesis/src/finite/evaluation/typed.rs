@@ -303,12 +303,14 @@ pub(crate) fn node<'a>(
                 return Err(Failure::Reference);
             };
             match (signed, v) {
-                (true, Atom::U128(v)) => i128::try_from(v)
-                    .map(|v| Atom::I128(v))
-                    .map_err(|_| Failure::Arithmetic),
-                (false, Atom::I128(v)) => u128::try_from(v)
-                    .map(|v| Atom::U128(v))
-                    .map_err(|_| Failure::Arithmetic),
+                (true, Atom::U128(v)) => match i128::try_from(v) {
+                    Ok(value) => Ok(Atom::I128(value)),
+                    Err(_) => Err(Failure::Arithmetic),
+                },
+                (false, Atom::I128(v)) => match u128::try_from(v) {
+                    Ok(value) => Ok(Atom::U128(value)),
+                    Err(_) => Err(Failure::Arithmetic),
+                },
                 _ => Err(Failure::Kind),
             }
         }
@@ -335,7 +337,10 @@ pub(crate) fn node<'a>(
                             }
                             _ => None,
                         };
-                        result.map(|v| Atom::U128(v)).ok_or(Failure::Arithmetic)
+                        match result {
+                            Some(value) => Ok(Atom::U128(value)),
+                            None => Err(Failure::Arithmetic),
+                        }
                     }
                     _ => Err(Failure::Kind),
                 };
