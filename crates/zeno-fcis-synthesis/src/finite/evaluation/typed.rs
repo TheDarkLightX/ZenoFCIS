@@ -303,14 +303,20 @@ pub(crate) fn node<'a>(
                 return Err(Failure::Reference);
             };
             match (signed, v) {
-                (true, Atom::U128(v)) => match i128::try_from(v) {
-                    Ok(value) => Ok(Atom::I128(value)),
-                    Err(_) => Err(Failure::Arithmetic),
-                },
-                (false, Atom::I128(v)) => match u128::try_from(v) {
-                    Ok(value) => Ok(Atom::U128(value)),
-                    Err(_) => Err(Failure::Arithmetic),
-                },
+                (true, Atom::U128(v)) => {
+                    if v <= i128::MAX as u128 {
+                        Ok(Atom::I128(v as i128))
+                    } else {
+                        Err(Failure::Arithmetic)
+                    }
+                }
+                (false, Atom::I128(v)) => {
+                    if v >= 0 {
+                        Ok(Atom::U128(v as u128))
+                    } else {
+                        Err(Failure::Arithmetic)
+                    }
+                }
                 _ => Err(Failure::Kind),
             }
         }
@@ -318,21 +324,22 @@ pub(crate) fn node<'a>(
             let (Some(a), Some(b)) = (values.get(a as usize), values.get(b as usize)) else {
                 return Err(Failure::Reference);
             };
-            if matches!(w, IntegerWidth::Unsigned128) {
+            if matches!(w, IntegerWidth::Unsigned128)
+                && matches!((a, b), (Atom::U128(_), Atom::U128(_)))
+            {
                 return match (a, b) {
                     (Atom::U128(a), Atom::U128(b)) => {
                         let result = match op {
                             Instruction::ScalarMul(..) => a.checked_mul(b),
                             Instruction::ScalarDiv(_, up, _, _) => {
-                                if b == 0 {
-                                    None
-                                } else {
-                                    let q = a / b;
+                                if let Some(q) = a.checked_div(b) {
                                     if up && a % b != 0 {
                                         q.checked_add(1)
                                     } else {
                                         Some(q)
                                     }
+                                } else {
+                                    None
                                 }
                             }
                             _ => None,

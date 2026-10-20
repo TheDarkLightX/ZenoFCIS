@@ -193,7 +193,7 @@ fn input_leaf<'a>(c: &'a Contract<'_>, index: usize) -> &'a InputLeaf {
             &fields
                 .iter()
                 .find(|(field, _)| Some(*field) == id)
-                .expect("compiler binding belongs to root")
+                .unwrap_or_else(|| panic!("compiler binding belongs to root"))
                 .1
         }
     }
@@ -209,7 +209,7 @@ fn fields(c: &Contract<'_>, row: &[Atom<'static>], source: Source) -> Vec<c::Fie
             value: match (input_leaf(c, i), v) {
                 (InputLeaf::Sum { type_id, .. }, Atom::I128(n)) => Atom::Sum {
                     type_id: *type_id,
-                    variant: u16::try_from(*n).expect("enumerated variant"),
+                    variant: u16::try_from(*n).unwrap_or_else(|_| panic!("enumerated variant")),
                 },
                 _ => *v,
             },
@@ -441,8 +441,7 @@ pub(super) fn review(
         let gaps = options
             .map(|o| {
                 gap_measure(
-                    sources.project,
-                    &schema,
+                    (sources.project, &schema),
                     &contract,
                     authority,
                     &space,
@@ -592,8 +591,7 @@ impl GapCounts {
     }
 }
 fn gap_measure(
-    project: &str,
-    schema: &[u8],
+    (project, schema): (&str, &[u8]),
     c: &Contract<'_>,
     a: &NumericAuthority<'_>,
     space: &Space,
@@ -638,14 +636,17 @@ fn gap_measure(
         .and_then(|n| n.checked_add(1))
         .and_then(|n| n.checked_mul(space.rows.len() as u128))
         .and_then(|n| n.checked_mul(c.declarations.laws.len() as u128));
-    if work.is_none_or(|n| n > options.max_work as u128) {
-        return Ok(gaps::Gaps::Inconclusive(Inconclusive {
-            reason: "work-exceeds-limit",
-            size: work,
-            limit: options.max_work,
-        }));
-    }
-    let before = gap_metrics(schema, c, a, space, rules, observed, work.unwrap())?;
+    let needed = match work {
+        Some(n) if n <= options.max_work as u128 => n,
+        _ => {
+            return Ok(gaps::Gaps::Inconclusive(Inconclusive {
+                reason: "work-exceeds-limit",
+                size: work,
+                limit: options.max_work,
+            }));
+        }
+    };
+    let before = gap_metrics(schema, c, a, space, rules, observed, needed)?;
     let Some(proposals) = options.proposals else {
         return Ok(gaps::Gaps::Measured(before));
     };
@@ -704,10 +705,10 @@ fn gap_measure(
             let mut active = 0;
             for (i, row) in space.rows.iter().enumerate() {
                 if let Some((ok, ds)) = actual_laws(c, a, row, &laws)? {
-                    if let Some(diag) = ds.iter().find(|diag| diag.id == *id) {
-                        if !matches!(diag.verdict, l::Verdict::Skipped) {
-                            active += 1;
-                        }
+                    if let Some(diag) = ds.iter().find(|diag| diag.id == *id)
+                        && !matches!(diag.verdict, l::Verdict::Skipped)
+                    {
+                        active += 1;
                     }
                     if !ok {
                         return Ok(gaps::Gaps::FalseAlarm(
@@ -721,8 +722,7 @@ fn gap_measure(
         let mut after_options = options;
         after_options.proposals = None;
         let after = gap_measure(
-            &source,
-            &bytes,
+            (&source, &bytes),
             &probe,
             pa,
             space,

@@ -227,7 +227,7 @@ impl Descriptor {
     ) -> Result<(), Failure> {
         let bytes = super::collection::encode(value, meter)?;
         let end = self
-            .with_schema(|d| compound::walk(&bytes, &d.definitions, 0, bytes.len(), type_id, meter))
+            .with_schema(|d| compound::walk(&bytes, d.definitions, 0, bytes.len(), type_id, meter))
             .map_err(|e| match e {
                 compound::Failure::Wire => Failure::Wire,
                 compound::Failure::Budget(e) => Failure::Budget(e),
@@ -327,10 +327,10 @@ impl Descriptor {
             }
         }
         for t in &self.types {
-            if let Shape::Vector { bytes, .. } = t.shape {
-                if bytes < 5 {
-                    return Err(Failure::Descriptor);
-                }
+            if let Shape::Vector { bytes, .. } = t.shape
+                && bytes < 5
+            {
+                return Err(Failure::Descriptor);
             }
         }
         if let Some(spec) = &self.order {

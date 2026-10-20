@@ -78,8 +78,7 @@ fn cut(
     ids: &[u32],
     id: u32,
     newp: u128,
-    upper: Option<u32>,
-    lower: Option<u32>,
+    (upper, lower): (Option<u32>, Option<u32>),
     m: &mut Meter,
 ) -> Result<Vec<u32>, Failure> {
     // Direct linked-neighbor transcription, independent of producer gap enumeration.
@@ -122,15 +121,15 @@ fn cut(
     let usable =
         upper.is_none_or(|_| u.is_some()) && lower.is_none_or(|_| l.is_some()) && valid(u, l, m)?;
     if !usable {
-        if let Some(i) = u {
-            if r::pcmp(newp, key(i, m)?, m)? == Ordering::Greater {
-                u = None
-            }
+        if let Some(i) = u
+            && r::pcmp(newp, key(i, m)?, m)? == Ordering::Greater
+        {
+            u = None
         }
-        if let Some(i) = l {
-            if r::pcmp(newp, key(i, m)?, m)? == Ordering::Less {
-                l = None
-            }
+        if let Some(i) = l
+            && r::pcmp(newp, key(i, m)?, m)? == Ordering::Less
+        {
+            l = None
         }
         let ascend = u.is_none() && l.is_some();
         if nodes.is_empty() {
@@ -506,8 +505,7 @@ fn expected(
             &post.order,
             id,
             r::priority(&post, id, m)?,
-            c.upper,
-            c.lower,
+            (c.upper, c.lower),
             m,
         )?;
     }
@@ -555,12 +553,11 @@ pub(super) fn verify(
             pre,
             c,
             x,
-            Some(plan.state()),
-            Some(plan.trace()),
+            (Some(plan.state()), Some(plan.trace())),
             None,
             m,
         ),
-        Err(reason) => probe(p, pre, c, x, None, None, Some(*reason), m),
+        Err(reason) => probe(p, pre, c, x, (None, None), Some(*reason), m),
     }
 }
 pub(super) fn probe(
@@ -568,8 +565,7 @@ pub(super) fn probe(
     pre: &State,
     c: &Command,
     x: Context,
-    state: Option<&State>,
-    trace: Option<&Trace>,
+    (state, trace): (Option<&State>, Option<&Trace>),
     reason: Option<Reason>,
     m: &mut Meter,
 ) -> Result<(), Failure> {

@@ -148,7 +148,9 @@ fn review_directory(
                 }
                 atomic_replace(
                     path,
-                    serde_json::to_string_pretty(&report).unwrap().as_bytes(),
+                    serde_json::to_string_pretty(&report)
+                        .map_err(|e| Failure::Read(e.to_string()))?
+                        .as_bytes(),
                 )
                 .map_err(|e| Failure::Read(e.to_string()))?;
             }

@@ -147,8 +147,7 @@ pub fn values(d: &t::Descriptor, id: u32, cap: usize) -> Result<Vec<Value>, Cont
                 .collect::<Result<Vec<_>, ContractError>>()?;
             keyed.sort_by(|a, b| a.0.cmp(&b.0));
             fn extend(
-                keys: &[(Vec<u8>, Value)],
-                vals: &[Value],
+                (keys, vals): (&[(Vec<u8>, Value)], &[Value]),
                 start: usize,
                 chosen: &mut Vec<t::MapEntry>,
                 limits: t::CollectionLimits,
@@ -178,7 +177,7 @@ pub fn values(d: &t::Descriptor, id: u32, cap: usize) -> Result<Vec<Value>, Cont
                         chosen.push(
                             t::MapEntry::try_new(keys[i].1.clone(), val.clone()).map_err(error)?,
                         );
-                        extend(keys, vals, i + 1, chosen, limits, next, cap, out)?;
+                        extend((keys, vals), i + 1, chosen, limits, next, cap, out)?;
                         chosen.pop();
                     }
                 }
@@ -186,8 +185,7 @@ pub fn values(d: &t::Descriptor, id: u32, cap: usize) -> Result<Vec<Value>, Cont
             }
             let mut out = Vec::new();
             extend(
-                &keyed,
-                &vals,
+                (&keyed, &vals),
                 0,
                 &mut Vec::new(),
                 *limits,

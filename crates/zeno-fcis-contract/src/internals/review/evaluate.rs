@@ -548,8 +548,8 @@ impl<'d> LawSet<'d> {
         Self {
             laws,
             selected,
-            required: required,
-            limits: limits,
+            required,
+            limits,
             usage,
         }
     }

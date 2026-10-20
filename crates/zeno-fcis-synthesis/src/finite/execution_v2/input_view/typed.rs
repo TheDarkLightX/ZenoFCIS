@@ -1,5 +1,5 @@
 //! One primitive byte decoder with explicit legacy versus typed value encoding.
-use super::super::super::value::{Atom, Domain, validate_variant_codes};
+use super::super::super::value::{Atom, Domain, contains_variant_code, validate_variant_codes};
 use super::super::{Resource, meter::Meter};
 use super::{AccessAttempt, Failure, Field};
 use super::{Leaf, decode_variant, read_big_endian, read_signed_128};
@@ -72,9 +72,7 @@ pub(crate) fn valid(view: FieldsView<'_>) -> bool {
                     return false;
                 }
                 let admitted = match fields[i].leaf {
-                    Domain::Sum { variants, .. } => {
-                        validate_variant_codes(variants)
-                    }
+                    Domain::Sum { variants, .. } => validate_variant_codes(variants),
                     Domain::Bool => true,
                     Domain::I128 { min, max } => min <= max,
                     Domain::U128 { min, max } => min <= max,
@@ -265,9 +263,15 @@ pub(crate) fn decode_value(
             let (actual, start) = read_big_endian(bytes, payload_offset, 4)?;
             let (variant, end) = read_big_endian(bytes, start, 2)?;
             let (payload, end) = read_big_endian(bytes, end, 1)?;
-            if actual != u128::from(type_id)
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                crate::finite::canonical_v2::spec::unsigned_bound(bytes@, start as int, 2);
+                reveal_with_fuel(crate::finite::canonical_v2::spec::power, 3);
+                assert(variant <= u16::MAX);
+            }
+            if actual != type_id as u128
                 || payload != 0
-                || !variants.iter().any(|v| u128::from(*v) == variant)
+                || !contains_variant_code(variants, variant as u16)
             {
                 return None;
             }

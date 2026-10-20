@@ -526,21 +526,21 @@ fn reinsert(
         (Some(i), Some(j)) if i + 1 == j => Some(j),
         _ => None,
     };
-    if let Some(j) = hint {
-        if gaps.contains(&j) {
-            chosen = Some(j)
-        }
+    if let Some(j) = hint
+        && gaps.contains(&j)
+    {
+        chosen = Some(j)
     }
     if chosen.is_none() {
-        if let Some(i) = u {
-            if pcmp(priority(s, detached[i], m)?, p, m)? == Ordering::Less {
-                u = None
-            }
+        if let Some(i) = u
+            && pcmp(priority(s, detached[i], m)?, p, m)? == Ordering::Less
+        {
+            u = None
         }
-        if let Some(i) = l {
-            if pcmp(priority(s, detached[i], m)?, p, m)? == Ordering::Greater {
-                l = None
-            }
+        if let Some(i) = l
+            && pcmp(priority(s, detached[i], m)?, p, m)? == Ordering::Greater
+        {
+            l = None
         }
         chosen = match (u, l) {
             (None, Some(j)) => {
@@ -595,7 +595,7 @@ pub(super) fn decay(base: u128, minutes: u64, m: &mut Meter) -> Result<u128, Fai
     let mut y = Q;
     while n > 1 {
         step(m)?;
-        if n % 2 == 0 {
+        if n.is_multiple_of(2) {
             x = decmul(x, x, m)?;
             n /= 2
         } else {
@@ -623,17 +623,17 @@ impl Traversal {
     pub fn evaluate(&self, pre: &State, command: &Command, context: Context) -> Evaluation {
         let mut m = meter::new(self.policy.limits);
         let mut result = self.run(pre, command, context, &mut m);
-        if let Ok(candidate) = &result {
-            if let Err(failure) = super::redemption_laws::verify(
+        if let Ok(candidate) = &result
+            && let Err(failure) = super::redemption_laws::verify(
                 &self.policy,
                 pre,
                 command,
                 context,
                 candidate,
                 &mut m,
-            ) {
-                result = Err(failure);
-            }
+            )
+        {
+            result = Err(failure);
         }
         Evaluation {
             result,
@@ -922,8 +922,7 @@ impl Traversal {
                 pre,
                 command,
                 context,
-                state,
-                trace,
+                (state, trace),
                 reason,
                 &mut m,
             )

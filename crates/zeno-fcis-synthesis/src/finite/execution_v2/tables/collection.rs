@@ -81,7 +81,7 @@ pub(crate) fn decode(
     let start = m.used.used(Resource::Step);
     let end = d
         .with_schema(|s| {
-            super::super::compound::walk(bytes, &s.definitions, 0, bytes.len(), root, m)
+            super::super::compound::walk(bytes, s.definitions, 0, bytes.len(), root, m)
         })
         .map_err(|e| match e {
             super::super::compound::Failure::Wire => Failure::Wire,
@@ -184,10 +184,10 @@ pub(crate) fn reconstruct(
 pub(crate) fn check_state(d: &Descriptor, v: &Value, m: &mut Meter) -> Result<(), Failure> {
     if d.ordered() {
         check_literal(d, d.roots[0], v, m, 0)?;
-        if let Some(spec) = &d.order {
-            if !super::ordered::valid(d, spec, v, m)? {
-                return Err(Failure::Law(980));
-            }
+        if let Some(spec) = &d.order
+            && !super::ordered::valid(d, spec, v, m)?
+        {
+            return Err(Failure::Law(980));
         }
         return Ok(());
     }

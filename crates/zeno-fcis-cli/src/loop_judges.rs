@@ -1908,26 +1908,26 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
             "options": region.labels.iter().map(|l| core.option_json(*l, (region.successors > 0).then_some(region.case), current)).collect::<Vec<_>>(),
             "core": current.map(|l| core.option_json(l, Some(region.case), current)),
         });
-        if let Some(universe) = &core.delivery_universe {
-            if region.labels.iter().any(|l| class_of(l.0) != Class::Reject) {
-                let own = core.native_outbox(witness);
-                let mut choices = vec![Vec::new(), universe.example()];
-                if !choices.iter().any(|v| v == own) {
-                    choices.push(own.to_vec());
-                }
-                out["question"]["delivery_choices"] = json!(
-                    choices
-                        .iter()
-                        .map(|v| json!({
-                            "deliveries": deliveries::shown(v), "current": v == own,
-                        }))
-                        .collect::<Vec<_>>()
-                );
-                out["question"]["delivery_question"] = json!(
-                    "Which deliveries should this decision emit? Supply a complete delivery array, or case to retain its delivery expressions."
-                );
-                out["question"]["core"]["deliveries"] = deliveries::shown(own);
+        if let Some(universe) = &core.delivery_universe
+            && region.labels.iter().any(|l| class_of(l.0) != Class::Reject)
+        {
+            let own = core.native_outbox(witness);
+            let mut choices = vec![Vec::new(), universe.example()];
+            if !choices.iter().any(|v| v == own) {
+                choices.push(own.to_vec());
             }
+            out["question"]["delivery_choices"] = json!(
+                choices
+                    .iter()
+                    .map(|v| json!({
+                        "deliveries": deliveries::shown(v), "current": v == own,
+                    }))
+                    .collect::<Vec<_>>()
+            );
+            out["question"]["delivery_question"] = json!(
+                "Which deliveries should this decision emit? Supply a complete delivery array, or case to retain its delivery expressions."
+            );
+            out["question"]["core"]["deliveries"] = deliveries::shown(own);
         }
     }
     Ok(out)

@@ -561,17 +561,19 @@ fn reason_laws(d: &Descriptor<'_>) -> bool {
         decreases d.laws.len()-i,
     ))]
     while i < d.laws.len() {
-        if let laws::Scope::RejectReason(id) = d.laws[i].scope {
-            if !reason(d, Class::Reject, Some(id)) {
-                #[cfg(verus_keep_ghost)]
-                proof! {
-                    assert(!spec::reason_law(d, i as int));
-                    assert(!spec::reason_laws(d)) by {
-                        if spec::reason_laws(d) { assert(spec::reason_law(d, i as int)); }
-                    }
+        let invalid = match d.laws[i].scope {
+            laws::Scope::RejectReason(id) => !reason(d, Class::Reject, Some(id)),
+            _ => false,
+        };
+        if invalid {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(!spec::reason_law(d, i as int));
+                assert(!spec::reason_laws(d)) by {
+                    if spec::reason_laws(d) { assert(spec::reason_law(d, i as int)); }
                 }
-                return false;
             }
+            return false;
         }
         i += 1;
     }

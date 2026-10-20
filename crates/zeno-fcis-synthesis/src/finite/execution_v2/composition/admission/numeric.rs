@@ -1,7 +1,7 @@
 //! Complete numeric descriptor admission; no program-only admission shortcut.
+use super::super::super::super::value::validate_variant_codes;
 use super::super::ingress::original;
 use super::*;
-use super::super::super::super::value::validate_variant_codes;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
@@ -11,14 +11,31 @@ pub(crate) mod spec;
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::leaf(domain),))]
 pub(in super::super) fn leaf(domain: Domain<'_>) -> bool {
     match domain {
-        Domain::Sum { variants, .. } => {
-            validate_variant_codes(variants)
-        }
+        Domain::Sum { variants, .. } => validate_variant_codes(variants),
         Domain::Bool => true,
         Domain::I128 { min, max } => min <= max,
         Domain::U128 { min, max } => min <= max,
         _ => false,
     }
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == (left@ == right@),))]
+fn same_variant_codes(left: &[u16], right: &[u16]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut i = 0usize;
+    #[cfg_attr(verus_keep_ghost, verus_spec(invariant i <= left.len(), left.len() == right.len(),
+        forall|j:int| 0 <= j < i ==> left@[j] == right@[j], decreases left.len() - i,))]
+    while i < left.len() {
+        if left[i] != right[i] {
+            return false;
+        }
+        i += 1;
+    }
+    #[cfg(verus_keep_ghost)]
+    proof! { assert(left@ =~= right@); }
+    true
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::same_domain(a,b),))]
@@ -33,7 +50,7 @@ pub(in super::super) fn same_domain(a: Domain<'_>, b: Domain<'_>) -> bool {
                 type_id: b,
                 variants: y,
             },
-        ) => a == b && x == y,
+        ) => a == b && same_variant_codes(x, y),
         (Domain::Bool, Domain::Bool) => true,
         (Domain::I128 { min: a, max: b }, Domain::I128 { min: c, max: d }) => a == c && b == d,
         (Domain::U128 { min: a, max: b }, Domain::U128 { min: c, max: d }) => a == c && b == d,
@@ -48,8 +65,8 @@ fn code_matches(original: Domain<'_>, numeric: Domain<'_>) -> bool {
     match (original, numeric) {
         (Domain::Sum { variants, .. }, Domain::I128 { min, max }) => {
             !variants.is_empty()
-                && i128::from(variants[0]) == min
-                && i128::from(variants[variants.len() - 1]) == max
+                && (variants[0] as i128) == min
+                && (variants[variants.len() - 1] as i128) == max
         }
         _ => same_domain(original, numeric),
     }

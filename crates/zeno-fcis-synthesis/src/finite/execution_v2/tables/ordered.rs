@@ -72,11 +72,10 @@ pub(super) fn admit(d: &Descriptor, s: &OrderSpec) -> Result<(), Failure> {
             _ => {}
         }
     }
-    if let Some(seq) = seq {
-        if !matches!(d.ty(seq)?.shape,Shape::Vector{element,max,..} if element==key && max==l.max_entries)
-        {
-            return Err(Failure::Descriptor);
-        }
+    if let Some(seq) = seq
+        && !matches!(d.ty(seq)?.shape,Shape::Vector{element,max,..} if element==key && max==l.max_entries)
+    {
+        return Err(Failure::Descriptor);
     }
     Ok(())
 }
@@ -194,10 +193,10 @@ pub(super) fn valid(
         let Some(item) = collection::lookup(d, mt, map, id, m)? else {
             return Ok(false);
         };
-        if let Some(prev) = &previous {
-            if pcompare(prev, &item, m)? == Ordering::Less {
-                return Ok(false);
-            }
+        if let Some(prev) = &previous
+            && pcompare(prev, &item, m)? == Ordering::Less
+        {
+            return Ok(false);
         }
         previous = Some(item);
     }
@@ -311,20 +310,18 @@ pub(super) fn maybe(v: &Value) -> Result<Option<&Value>, Failure> {
         _ => Err(Failure::Kind),
     }
 }
+type CommandFields<'a> = (
+    u8,
+    &'a Value,
+    &'a Value,
+    Option<&'a Value>,
+    Option<&'a Value>,
+);
 pub(super) fn command<'a>(
     d: &Descriptor,
     tid: u32,
     v: &'a Value,
-) -> Result<
-    (
-        u8,
-        &'a Value,
-        &'a Value,
-        Option<&'a Value>,
-        Option<&'a Value>,
-    ),
-    Failure,
-> {
+) -> Result<CommandFields<'a>, Failure> {
     let fs = d.record(tid)?;
     let op = u8::try_from(integer(record_field(v, fs[0].id)?)?).map_err(|_| Failure::Kind)?;
     Ok((
@@ -384,8 +381,7 @@ fn gap(
     map: &Value,
     xs: &[Value],
     p: Priority,
-    upper: Option<usize>,
-    lower: Option<usize>,
+    (upper, lower): (Option<usize>, Option<usize>),
     m: &mut Meter,
 ) -> Result<bool, Failure> {
     step(m)?;
@@ -408,19 +404,17 @@ fn gap(
 /// Exact V1 validInsertPosition / sanitized-hint ascend-or-descend behavior.
 pub(super) fn cut(
     d: &Descriptor,
-    mt: u32,
-    map: &Value,
+    (mt, map): (u32, &Value),
     xs: &[Value],
     p: Priority,
-    upper: Option<&Value>,
-    lower: Option<&Value>,
+    (upper, lower): (Option<&Value>, Option<&Value>),
     mode: u8,
     m: &mut Meter,
 ) -> Result<usize, Failure> {
     let mut u = position(xs, upper, m)?;
     let mut l = position(xs, lower, m)?;
     let endpoints_exist = upper.is_none_or(|_| u.is_some()) && lower.is_none_or(|_| l.is_some());
-    if endpoints_exist && gap(d, mt, map, xs, p, u, l, m)? {
+    if endpoints_exist && gap(d, mt, map, xs, p, (u, l), m)? {
         return Ok(l.unwrap_or(xs.len()));
     }
     if mode == 1 {
@@ -431,8 +425,7 @@ pub(super) fn cut(
                 map,
                 xs,
                 p,
-                j.checked_sub(1),
-                if j < xs.len() { Some(j) } else { None },
+                (j.checked_sub(1), if j < xs.len() { Some(j) } else { None }),
                 m,
             )? {
                 return Ok(j);
@@ -463,7 +456,7 @@ pub(super) fn cut(
             return Ok(xs.len());
         }
         for j in (0..=start).rev() {
-            if gap(d, mt, map, xs, p, j.checked_sub(1), Some(j), m)? {
+            if gap(d, mt, map, xs, p, (j.checked_sub(1), Some(j)), m)? {
                 return Ok(j);
             }
         }
@@ -479,8 +472,7 @@ pub(super) fn cut(
                 map,
                 xs,
                 p,
-                Some(j - 1),
-                if j < xs.len() { Some(j) } else { None },
+                (Some(j - 1), if j < xs.len() { Some(j) } else { None }),
                 m,
             )? {
                 return Ok(j);
@@ -558,7 +550,15 @@ pub(super) fn edit(
         }
         if let Some(item) = new {
             let p = priority(&item, m)?;
-            let j = cut(d, mt, &replacements[0].1, &xs, p, upper, lower, s.mode, m)?;
+            let j = cut(
+                d,
+                (mt, &replacements[0].1),
+                &xs,
+                p,
+                (upper, lower),
+                s.mode,
+                m,
+            )?;
             reserve(&key, m)?;
             xs.insert(j, key);
         }

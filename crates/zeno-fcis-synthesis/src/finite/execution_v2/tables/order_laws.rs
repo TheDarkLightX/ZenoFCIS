@@ -28,12 +28,10 @@ pub(super) fn admit_frame(
 
 fn cut(
     d: &Descriptor,
-    mt: u32,
-    map: &Value,
+    (mt, map): (u32, &Value),
     ids: &[Value],
     p: ordered::Priority,
-    upper: Option<&Value>,
-    lower: Option<&Value>,
+    (upper, lower): (Option<&Value>, Option<&Value>),
     mode: u8,
     m: &mut Meter,
 ) -> Result<usize, Failure> {
@@ -105,25 +103,25 @@ fn cut(
         (Some(i), Some(j)) if i + 1 == j => Some(j),
         _ => None,
     };
-    if let Some(j) = hinted {
-        if gaps.contains(&j) {
-            return Ok(j);
-        }
+    if let Some(j) = hinted
+        && gaps.contains(&j)
+    {
+        return Ok(j);
     }
     if mode == 1 {
         return gaps.first().copied().ok_or(Failure::Undefined);
     }
     // Independent V1 transcription: remove impossible anchors, then choose first
     // admissible gap encountered in the linked-list search direction.
-    if let Some(i) = u {
-        if ordered::number_cmp(priorities[i], p, m)? == core::cmp::Ordering::Less {
-            u = None;
-        }
+    if let Some(i) = u
+        && ordered::number_cmp(priorities[i], p, m)? == core::cmp::Ordering::Less
+    {
+        u = None;
     }
-    if let Some(i) = l {
-        if ordered::number_cmp(priorities[i], p, m)? == core::cmp::Ordering::Greater {
-            l = None;
-        }
+    if let Some(i) = l
+        && ordered::number_cmp(priorities[i], p, m)? == core::cmp::Ordering::Greater
+    {
+        l = None;
     }
     let selected = match (u, l) {
         (None, Some(j)) => {
@@ -281,10 +279,8 @@ pub(super) fn outcome(
             );
         }
     }
-    if !inserted {
-        if let Some(x) = replacement.as_ref() {
-            out.push(MapEntry::try_new(copy(&target, m)?, copy(x, m)?).map_err(|_| Failure::Wire)?);
-        }
+    if !inserted && let Some(x) = replacement.as_ref() {
+        out.push(MapEntry::try_new(copy(&target, m)?, copy(x, m)?).map_err(|_| Failure::Wire)?);
     }
     let mut snapshot = 29u64;
     for e in &out {
@@ -316,7 +312,15 @@ pub(super) fn outcome(
         }
         if let Some(item) = &replacement {
             let p = priority(item, m)?;
-            let j = cut(d, mt, &replacements[0].1, &ids, p, upper, lower, s.mode, m)?;
+            let j = cut(
+                d,
+                (mt, &replacements[0].1),
+                &ids,
+                p,
+                (upper, lower),
+                s.mode,
+                m,
+            )?;
             ids.insert(j, copy(&target, m)?);
         }
         let out = Value::vector(ids).map_err(|_| Failure::Wire)?;

@@ -44,7 +44,7 @@ fn array(j: &Json) -> Result<&[Json], ContractError> {
         _ => Err(err("expected an array")),
     }
 }
-fn field<'a>(a: &'a [Json], i: usize) -> Result<&'a Json, ContractError> {
+fn field(a: &[Json], i: usize) -> Result<&Json, ContractError> {
     a.get(i).ok_or_else(|| err("missing operator argument"))
 }
 fn vec(xs: Vec<Value>) -> Result<Value, ContractError> {

@@ -22,10 +22,10 @@ fn numeric_compare(a: Data, b: Data) -> Result<core::cmp::Ordering, Failure> {
             _ => Err(Failure::Kind),
         }
     }
-    if let (Data::Value(a), Data::Value(b)) = (&a, &b) {
-        if let (ValueRef::I128(a), ValueRef::I128(b)) = (a.view(), b.view()) {
-            return Ok(a.cmp(&b));
-        }
+    if let (Data::Value(a), Data::Value(b)) = (&a, &b)
+        && let (ValueRef::I128(a), ValueRef::I128(b)) = (a.view(), b.view())
+    {
+        return Ok(a.cmp(&b));
     }
     let a = unsigned(a)?;
     let b = unsigned(b)?;
@@ -942,10 +942,9 @@ pub(super) fn state_laws(d: &Descriptor, state: &Value, m: &mut Meter) -> Result
             scope: Scope::State,
             expression,
         } = law
+            && !env.eval(d, expression, m)?.boolean()?
         {
-            if !env.eval(d, expression, m)?.boolean()? {
-                return Err(Failure::Law(*id));
-            }
+            return Err(Failure::Law(*id));
         }
     }
     Ok(())

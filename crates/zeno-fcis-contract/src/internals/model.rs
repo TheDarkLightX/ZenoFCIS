@@ -694,10 +694,9 @@ impl Outputs {
                 }
                 if let (Atom::U128(value), TypeKind::U128 { min, max }) =
                     (&value, declarations.kind(type_id)?)
+                    && !(min..=max).contains(value)
                 {
-                    if !(min..=max).contains(value) {
-                        return Err(rules_error(place, "U128ConstantOutOfRange"));
-                    }
+                    return Err(rules_error(place, "U128ConstantOutOfRange"));
                 }
                 Ok(Expr::Constant(value))
             }
@@ -761,13 +760,13 @@ fn laws(
     }
     let mut laws = Vec::new();
     for law in &declarations.laws {
-        if let LawScope::RejectReason(reason) = law.scope {
-            if law.genesis || !reasons(declarations, rules)?.contains(&(reason, Class::Reject)) {
-                return Err(ContractError::new(
-                    format!("project.zeno law {}", law.id),
-                    "reason scope requires a declared Reject reason and excludes genesis",
-                ));
-            }
+        if let LawScope::RejectReason(reason) = law.scope
+            && (law.genesis || !reasons(declarations, rules)?.contains(&(reason, Class::Reject)))
+        {
+            return Err(ContractError::new(
+                format!("project.zeno law {}", law.id),
+                "reason scope requires a declared Reject reason and excludes genesis",
+            ));
         }
         let place = format!("project.zeno law {}", law.id);
         let kind = rules.law_kinds[&law.id];
