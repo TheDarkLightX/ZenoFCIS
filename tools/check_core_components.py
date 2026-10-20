@@ -308,8 +308,9 @@ def main():
         require(all((args.cli, args.work_dir, args.target_dir)), "execution requires --cli, --work-dir and --target-dir")
         cli, work, target = args.cli.resolve(), args.work_dir.resolve(), args.target_dir.resolve()
         require(cli.is_file(), "CLI does not exist; build it under the assigned resource slot")
-        require(not any(path == Path('/dev/shm') or Path('/dev/shm') in path.parents for path in (work, target)),
-                "use disk-backed test directories")
+        # Evidence survives interruption; the explicitly selected build cache may be volatile.
+        require(work != Path('/dev/shm') and Path('/dev/shm') not in work.parents,
+                "use a disk-backed evidence directory")
         import prove_core_families as proof
         initial = proof.snapshot_inputs(cli)
         work.mkdir(parents=False, exist_ok=False)
