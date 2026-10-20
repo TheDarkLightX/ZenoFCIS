@@ -250,6 +250,8 @@ pub(crate) fn implementation() -> String {
         include_str!("loop_learn.rs"),
         include_str!("loop_search_limits.rs"),
         zeno_fcis_loop_doors::source_fingerprint::LEARN,
+        zeno_fcis_loop_doors::source_fingerprint::FUZZ,
+        include_str!("loop_fuzz.rs"),
         zeno_fcis_loop_doors::source_fingerprint::CAPTURE,
         // END L1/L2 compiled source binding.
         zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA,

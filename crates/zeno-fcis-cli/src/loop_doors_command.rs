@@ -84,6 +84,9 @@ const ATTEMPT_RESERVE: Duration = Duration::from_millis(50);
 #[path = "loop_learn.rs"]
 mod learn;
 
+#[path = "loop_fuzz.rs"]
+mod fuzz;
+
 // BEGIN L1: proposal diagnostics, separate from checker authority.
 #[path = "loop_search_limits.rs"]
 mod search_limits;
@@ -91,6 +94,18 @@ mod search_limits;
 
 #[derive(Subcommand)]
 pub(crate) enum DoorCommand {
+    /// Search for replayed differences before qualification; no hit is inconclusive.
+    Fuzz {
+        /// Canonical reference program, read once into an owned snapshot.
+        #[arg(long)]
+        original: PathBuf,
+        /// Canonical candidate with the reference's exact input/output domains.
+        #[arg(long)]
+        candidate: PathBuf,
+        /// Bounded seeds, initial state bindings and work limits.
+        #[arg(long)]
+        request: PathBuf,
+    },
     // BEGIN black-box capture command (additive)
     /// Capture an executable reference from examples, with full-domain checker acceptance.
     Capture {
@@ -324,6 +339,11 @@ pub(crate) fn run_with_policy(
     knowledge: Option<&crate::loop_knowledge::LoopPolicy>,
 ) -> (u8, Value) {
     match command {
+        DoorCommand::Fuzz {
+            original,
+            candidate,
+            request,
+        } => fuzz::command(&original, &candidate, &request),
         // BEGIN black-box capture dispatch (additive)
         DoorCommand::Capture { command } => capture::run(command),
         // END black-box capture dispatch

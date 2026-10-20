@@ -21,10 +21,10 @@ import check_release_privacy as privacy
 # reviewed. Changing a source hash requires another review, not auto-discovery.
 POLICY = (
     ("crates/zeno-fcis-cli/src/loop_doors_command.rs",
-     "8432147b9b744fc3ea4a7fcef9b2416b602ac9efaceaa349bbd1cef154df682d",
+     "e35dcd53b8365657ccf24583d6fabe975b44685717faa0799d5bc7cfe5f671fc",
      ("ask-when-it-matters",)),
     ("crates/zeno-fcis-cli/src/effects.rs",
-     "932300ee8fc9c20d0bd8d60410a2d8a23dc3da5657dfe8cfc7f0f39cae24b37e",
+     "28e18bef084c4574df7197ec4f938463894d083fad0bc32366fa0e02b1a89d3f",
      ("strategy-task-manifest", "task-original-programs")),
     ("crates/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs",
      "cb924b3c9d3124e8a7d7f5920be752f1762bf4603602e399b5a35efba213b729",
