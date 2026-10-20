@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## 2.5.0 - 2026-10-18
 
+- **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,
+  and stores created by 2.4 applications are incompatible with the 2.5 integer
+  encoding. Use the 2.4.0 CLI and matching 2.4 runtime, or re-adopt the original
+  pre-adoption contract with a newly checked 2.5 candidate and receipt and
+  start a new store. Re-adoption does not migrate existing stores.
+  Compatibility is planned for 2.5.1.
+
 - **Tested and finite checked:** extend loop doors, exact transform checks,
   replay and point evaluation to the main signed 128-bit arithmetic route.
 - **Tested:** add explicit POSIX/systemd containment selection and CPU-time

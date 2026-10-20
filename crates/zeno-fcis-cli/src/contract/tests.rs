@@ -1467,9 +1467,12 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
     );
     assert_eq!(
         refused.reason(),
-        "differs from version 1's policy as these declarations and rules produce it: an edit \
-         after adoption 1 changes version 1, which existing stores may run. Once a version is \
-         superseded, only another adoption changes the contract"
+        "differs from version 1's policy as these declarations and rules produce it: \
+         version 1 was edited after adoption, or this contract was adopted by ZenoFCIS 2.4.x, \
+         whose integer encoding changed in 2.5. Restore any edits to superseded versions. \
+         For a 2.4-adopted contract, operate the app with the ZenoFCIS 2.4.0 CLI, or re-adopt \
+         it under 2.5 from the original pre-adoption contract with a newly checked candidate \
+         and receipt. Compatibility is planned for 2.5.1"
     );
     // The unedited inputs still give version 1 exactly.
     let kept = generate_contract(ContractSources {

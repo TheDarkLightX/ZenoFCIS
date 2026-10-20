@@ -5,6 +5,19 @@ acceptance depends on the stated check, domain and assumptions. The
 [installation guide](INSTALLATION.md) describes how to verify published assets
 once they are available.
 
+## Breaking change
+
+ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
+2.4.x, their i64 transform receipts, and stores created by 2.4 applications
+are incompatible with 2.5. Use the ZenoFCIS 2.4.0 CLI and matching 2.4
+runtime for those applications and stores.
+
+To start a separate 2.5 lineage, return to the original pre-adoption
+declarations and rules, check the candidate with the 2.5 CLI, and use
+`contract adopt` under 2.5 with the new receipt. Start a new store;
+re-adoption does not migrate a 2.4 store. Keep the retained policies,
+digests and receipts unchanged. Compatibility is planned for 2.5.1.
+
 ## Arithmetic loops
 
 **Tested and finite checked.** Arithmetic expressions now reach the normal
