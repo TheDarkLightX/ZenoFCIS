@@ -15,7 +15,7 @@
       "participates": "op == 0",
       "path": "counter",
       "policy_sha256": "02bf43eb28608b51c1d851f6041c03f196cb4b1bc102f61c760726f4cfb8c0ea",
-      "program_sha256": "35fd7b393ba5fdc2437032c81ddca7def60f6f3bac625a0227aa125f2697353b",
+      "program_sha256": "062dd33837a005187467c82c86ec7d768d361d3371d849a6378727bbe56c197c",
       "project_sha256": "10f71127b689e33798ecee6fd55ee8980f282ef71142ca9298e113a4c86e9821"
     },
     {
@@ -32,7 +32,7 @@
       "participates": "op != 2",
       "path": "budget",
       "policy_sha256": "3b182556d4492c35b0d0ed8cb979c43670ecbef742ebb3d8dfc8c8bc695cff51",
-      "program_sha256": "3b2e0224b2cb4b646fffaaed06e2282b5624771f3ac437e0b9e83f5a0df32fdf",
+      "program_sha256": "428b19cad225cadeb5ff1a58adb4f28f9b65bc66d081b20d9f7fbb5c1b9ec4f9",
       "project_sha256": "4002c1198514628122b2aec3d776bf0cd0bcf2057e9fc6ccf5860f80fa07de38"
     }
   ],
