@@ -1466,8 +1466,8 @@ impl Contract {
             output_types: vec![
                 InputLeaf::I128 { min: 0, max: 11 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
                 InputLeaf::Bool,
                 InputLeaf::Bool,
@@ -1499,8 +1499,8 @@ impl Contract {
                 outputs: &[
                     ScalarDomain::Int { min: 0, max: 11 },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                     ScalarDomain::Bool,
                     ScalarDomain::Bool,

@@ -5,7 +5,7 @@
   "starting_source_manifest_sha256": "bdca784516973287a59731112d2b70b0215e3884a06f1133c90d232432626b87",
   "cli": {
     "path": "zeno-fcis",
-    "sha256": "8bc42371380717c994c07f74cce91dd15ff809658a43dd2eb1a92ff41224296c",
+    "sha256": "67d029be2cbe6d8c68a0d134fe15349096958233e84234a9631aa9b7c37558ad",
     "observed_version": "zeno-fcis 2.5.0"
   },
   "specification": {
