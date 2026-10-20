@@ -614,6 +614,12 @@ pub(super) fn describe(path: &[String]) -> Value {
 
 effects! { crate::loop_command::doors::DoorCommand {
     leaves {
+        "fuzz" => Self::Fuzz { .. } => declared((
+                &["original-program", "candidate-program", "fuzz-request", "caller-cpu-limits"],
+                &["transient-user-unit"],
+                true,
+                None,
+            ));
         "pipeline" => Self::Pipeline { .. } => declared((
                 &[
                     "original-program",

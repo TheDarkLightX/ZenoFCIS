@@ -55,6 +55,7 @@ extern crate alloc;
 
 pub mod expr;
 pub mod family;
+pub mod fuzz;
 pub mod inverse;
 pub mod lower;
 pub mod repair;
@@ -116,6 +117,8 @@ pub mod source_fingerprint {
     pub const CAPTURE: &str = include_str!("capture.rs");
     /// Exact source bytes owned by this crate.
     pub const EXPR: &str = include_str!("expr.rs");
+    /// Exact source bytes of the counterexample challenger.
+    pub const FUZZ: &str = include_str!("fuzz.rs");
     /// Exact source bytes owned by this crate.
     pub const INVERSE: &str = include_str!("inverse.rs");
     /// Exact source bytes owned by this crate.

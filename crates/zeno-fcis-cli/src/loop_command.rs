@@ -1752,6 +1752,7 @@ pub(crate) fn knowledge_subjects(command: &crate::Command) -> Option<Vec<String>
         } => vec!["expressions-door"],
         Command::Candidate { .. } => vec!["candidate"],
         Command::Doors(d) => match d {
+            D::Fuzz { .. } => vec!["counterexample-fuzz"],
             D::Strategy { kb_op: Some(_), .. } => return None,
             D::Strategy {
                 kind: Some(kind), ..
