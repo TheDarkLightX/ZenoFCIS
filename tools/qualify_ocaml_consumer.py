@@ -23,9 +23,10 @@ PATH is the `zeno-fcis` CLI built from this checkout. Every stage fails closed:
    the C3 run writes all 18 native-codec negative frames.
 6. `tools/check_ocaml_consumer.py` passes with 16 C3 and 16 endpoint tuples, 24
    native negatives, 11 client negative groups and an UNKNOWN commit recovered.
-7. Two checked-overflow controls on copies of the endpoint policy (field 111
-   `high + 1` where `action == 150`; field 110 `low - 1` where `true`) generate,
-   and their reviews refuse exactly 16 of 32 inputs with an arithmetic refusal on
+7. Two checked-i128 overflow controls on copies of the endpoint policy add
+   a zero correction formed at the i128 endpoints. On nonoverflowing inputs
+   they keep `high + 1` and `low - 1`; on the other half they overflow eagerly.
+   Their reviews refuse exactly 16 of 32 inputs with an arithmetic refusal on
    law-consistent states. No app or store is created for them.
 8. Clippy with `-D warnings` on both apps.
 
@@ -59,9 +60,15 @@ OCAML_VERSION = b"4.14.1\n"
 MODULE_TESTS_LINE = "OCaml opaque ownership and strict report groups: 2 passed"
 NEGATIVE_WORD_CASES = {"unknown-word", "duplicate-word", "missing-word", "bool-domain",
                        "integer-outside-i64", "frame-and-words"}
+# The i64 endpoint operations fit the 2.5 evaluator. Force real i128
+# overflow on one endpoint, and a zero correction on the other endpoint.
+I128_MIN, I128_MAX = -(1 << 127), (1 << 127) - 1
+I64_MIN, I64_MAX = -(1 << 63), (1 << 63) - 1
 OVERFLOW_CONTROLS = (
-    ("max-plus-one", "action == 150", "111", "high + 1"),
-    ("min-minus-one", "true", "110", "low - 1"),
+    ("max-plus-one", "action == 150", "111",
+     f"high + 1 + (({I128_MAX} + (high - {I64_MAX} + 1)) - {I128_MAX})"),
+    ("min-minus-one", "true", "110",
+     f"low - 1 + (({I128_MIN} + (low - ({I64_MIN}) - 1)) - ({I128_MIN}))"),
 )
 APPS = {
     "c3": {"inputs": 16, "examples": 16},
@@ -284,6 +291,36 @@ class Qualification:
                  markers=("decision examples checked: 16",))
         return negatives
 
+    def wide_profile_refusal(self, packages: dict, version: str) -> dict:
+        """A generated app with an integer beyond i64 must not advertise the profile."""
+        import check_generated_application as applications
+        contract = self.work / "wide-contract"
+        app = self.work / "wide-consumer"
+        shutil.copytree(ROOT / "integrations/ocaml/tests/endpoint", contract)
+        declaration = contract / "project.zeno"
+        text = declaration.read_text()
+        old = "type 106 int High in 9223372036854775806..=9223372036854775807;"
+        require(text.count(old) == 1, "the endpoint High declaration changed")
+        declaration.write_text(text.replace(old, old.replace("5807;", "5808;")))
+        self.run("wide-scaffold", [self.cli, "new", app, "--contract", contract, "--source", ROOT])
+        applications.check_generated_binding(app, packages, version)
+        consumer = tomllib.loads((app / "Cargo.toml").read_text())["package"]
+        allowed = {(key, version): path / "Cargo.toml" for key, path in packages.items()}
+        allowed[(consumer["name"], consumer["version"])] = app / "Cargo.toml"
+        applications.resolve_reviewed_graph(app, allowed, self.environment)
+        self.run("wide-build", ["cargo", "+1.97.1", "build", "--manifest-path", app / "Cargo.toml",
+                                "--locked", "--offline"])
+        native = self.target / "debug" / consumer["name"]
+        report = json.loads(self.run("wide-version", [native, "version", "--format", "json"]))
+        require(report["host_profile"] is None, "wide app advertises the i64 consumer profile")
+        refused = json.loads(self.run("wide-frame", [native, "frame", "action=Up",
+                                                    "probe=9223372036854775808", "authorized=true",
+                                                    "--format", "json"], expected=1))
+        require(refused["error"]["code"] == "refused"
+                and "outside zeno-fcis/native-scalar-consumer/1" in refused["error"]["message"],
+                "wide scalar frame did not refuse the unsupported profile")
+        return {"high_max": "9223372036854775808", "host_profile": None, "frame_exit": 1}
+
     def overflow_controls(self, contract: Path) -> list[dict]:
         root = self.work / "overflow-controls"
         root.mkdir()
@@ -333,6 +370,7 @@ class Qualification:
         problems = consumer_report_problems(json.loads(correspondence.read_text()))
         require(not problems, "consumer check: " + "; ".join(problems))
         self.report["overflow_controls"] = self.overflow_controls(apps["endpoints"]["contract"])
+        self.report["wide_profile_refusal"] = self.wide_profile_refusal(packages, version)
         for name, app in apps.items():
             self.run(f"{name}-clippy", ["cargo", "+1.97.1", "clippy", "--manifest-path", app["app"] / "Cargo.toml",
                                         "--all-targets", "--locked", "--offline", "--", "-D", "warnings"])

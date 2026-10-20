@@ -1104,7 +1104,13 @@ pub fn scalar_profile() -> AppResult<()> {
                             min: lower,
                             max: upper,
                         }),
-                    ) => min <= max && *min == *lower && *max == *upper,
+                    ) => {
+                        min <= max
+                            && *min >= i128::from(i64::MIN)
+                            && *max <= i128::from(i64::MAX)
+                            && *min == *lower
+                            && *max == *upper
+                    }
                     (
                         InputLeaf::Sum {
                             type_id, variants, ..
