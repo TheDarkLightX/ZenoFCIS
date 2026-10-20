@@ -64,8 +64,8 @@ The command requires a clean exact commit. Run it, `build-host-binary`,
 `merge-hosts` and the custody check from a fresh clone of that commit. They
 refuse untracked files and any ignored file outside `target/`, `node_modules/`
 and `__pycache__/` folders, and a working checkout usually holds such files.
-For example, a workspace test run writes
-`crates/zeno-fcis-generated-code-tests/python/`.
+Generated-code tests write their Rust and Python fixtures only into Cargo's
+`OUT_DIR`, including its `python/` subdirectory. They add no source-tree output.
 
 The build uses pinned Rust `1.97.1`, fetches the locked external graph,
 packages every public crate with `--locked`, then unpacks the complete crate

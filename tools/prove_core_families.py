@@ -21,9 +21,7 @@ import check_core_components as checks
 PROOFS = core.CATALOG / 'proofs'
 SCHEMA = 'zeno-fcis/core-family-finite-certificate/1'
 RUNTIME_SCHEMA = 'zeno-fcis/core-family-runtime-source/1'
-# build.rs regenerates these ignored test products from the pinned Rust source.
-# They are neither compiler inputs nor part of a clean source checkout.
-GENERATED_TEST_OUTPUT = 'crates/zeno-fcis-generated-code-tests/python'
+# Build products live in OUT_DIR; every crate source remains identity-bound.
 INPUTS = ('tools/instantiate_core.py', 'tools/check_core_components.py',
           'tools/prove_core_families.py', 'tools/test_data/core_components/reference.py')
 NATIVE_REPORT_SHA256 = '44810a073bf01525d7175cffcc9047ce1a2f9bbf17dbb0afbbd248d89bc26476'
@@ -74,7 +72,7 @@ def runtime_sources(root=None):
     # mandatory interpreter/law/Authority implementation; no output/cache tree.
     root = core.ROOT if root is None else root
     paths = [path for path in (root / 'crates').rglob('*')
-             if path.is_file() and not path.is_relative_to(root / GENERATED_TEST_OUTPUT)]
+             if path.is_file()]
     paths += [root / name for name in ('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml')]
     paths += [path for path in (root / '.cargo').rglob('*') if path.is_file()]
     return {'schema': RUNTIME_SCHEMA,

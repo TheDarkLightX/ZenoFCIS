@@ -3,9 +3,8 @@
 //! Runs the generated Python test module's `replay()` function via `python3` and
 //! asserts that all vectors replay with the expected decode outcomes. The
 //! Python files are generated at build time by `build.rs` into the `python/`
-//! directory next to this crate's `Cargo.toml`.
+//! subdirectory of Cargo's `OUT_DIR`.
 
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -17,10 +16,7 @@ use zeno_fcis_schema::{
 };
 
 fn fixture_python_dir() -> PathBuf {
-    let manifest_dir = PathBuf::from(
-        env::var_os("CARGO_MANIFEST_DIR").unwrap_or_else(|| panic!("CARGO_MANIFEST_DIR not set")),
-    );
-    manifest_dir.join("python")
+    PathBuf::from(env!("OUT_DIR")).join("python")
 }
 
 /// Runs `script` with `python3 -c` from `python_dir` and returns its stdout.

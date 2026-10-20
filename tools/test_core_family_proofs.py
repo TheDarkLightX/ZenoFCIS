@@ -12,7 +12,7 @@ import check_core_components as checks
 
 
 class CertificateBoundaryTests(unittest.TestCase):
-    def test_build_outputs_do_not_stale_source_but_generator_and_siblings_do(self):
+    def test_external_outputs_do_not_stale_source_but_all_crate_files_do(self):
         with tempfile.TemporaryDirectory(prefix='core-runtime-source-') as temporary:
             root = Path(temporary)
             for name in ('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml',
@@ -22,13 +22,19 @@ class CertificateBoundaryTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('original source')
             original = proof.runtime_sources(root)
-            output = root / 'crates/zeno-fcis-generated-code-tests/python'
-            output.mkdir()
+            output = root / 'target/debug/build/generated-code-tests/out/python'
+            output.mkdir(parents=True)
             (output / 'codegen_fixture.py').write_text('generated test adapter')
             (output / 'zcve.py').write_text('generated test codec')
             self.assertEqual(proof.runtime_sources(root), original)
             (output / 'codegen_fixture.py').write_text('regenerated adapter')
             self.assertEqual(proof.runtime_sources(root), original)
+            misplaced = root / 'crates/zeno-fcis-generated-code-tests/python/codegen_fixture.py'
+            misplaced.parent.mkdir()
+            misplaced.write_text('unexpected file under crates')
+            self.assertNotEqual(proof.runtime_sources(root), original)
+            misplaced.unlink()
+            misplaced.parent.rmdir()
             generator = root / 'crates/zeno-fcis-generated-code-tests/build.rs'
             generator.write_text('changed generator source')
             self.assertNotEqual(proof.runtime_sources(root), original)
