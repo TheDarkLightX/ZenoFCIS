@@ -10,7 +10,7 @@
     "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
     "replay_required": true,
     "scope": "closed finite family",
-    "sha256": "4a759e70e52d607b88f65d36c790171a5732ff6ecc05efa60a4b08bd029e935c"
+    "sha256": "d0af0b95caff230f2137b80a044a87063689b2601dc5f02f7385f9dc8ea59643"
   },
   "input_domains": [
     [
