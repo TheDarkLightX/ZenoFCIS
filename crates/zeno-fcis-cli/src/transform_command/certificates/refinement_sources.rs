@@ -170,7 +170,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/evaluation/typed.rs",
-        "c903c4c6f85baff56871f200422979148bc4d21ad0acfde9f4de4cdf6cc5ddbf",
+        "df635585ec007d16a9e9ea164553c0e6ee8ff1afc7695acafeea717e678536f0",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/evaluation/typed/admission.rs",
@@ -190,7 +190,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs",
-        "50689233450076505bd283c6ca512608ccef5790d9fdaf152b0b7d8306cd6c53",
+        "17c776131f0a6a2da8403c8f4bc77b59edd07d11c63da4fd465bdd912ab108c5",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound_spec.rs",
@@ -214,7 +214,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs",
-        "e41073962de62c19497d752d4edc1cfc66b36d9560d4916e269d571babe3f4a5",
+        "a889687b66d9233477cafc36532a13f32b56267684e4d558c06a0821b77d7070",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/family_spec.rs",
@@ -298,11 +298,11 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission.rs",
-        "a8dfe7b291e570a2de7756c63b0944e85e641491cfb086494e44bfb97488a4b9",
+        "780d836f6610c5c561a1cfc98d536235dbf78ecba0e70d07de74bb6e7fc22767",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission/numeric.rs",
-        "0e43959110c40a92e53ec487a7c19144e448846d25c92cbd266b6e2938da6336",
+        "ab7e7d7642343da5106c10641e5c910157560d5d6c62d709edf1a1893fd920da",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission/numeric/spec.rs",
@@ -342,7 +342,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/shared.rs",
-        "b1c8d92725569d070f2da0623ef96647763ae9756dae849a80c6c32e92166fdf",
+        "5de8d8c31774101e99bac99be451473ebb5c2ff0aea3f44a0eee3e206b875538",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/shared_spec.rs",
@@ -418,7 +418,7 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed.rs",
-        "dd95c96a036e418ea010655ccd60e6e155ba871f79472004ccb0c84f2afa8aa0",
+        "3687a19a79cbe3ab55b9f457ecb390b54d6c44c5126136ec2237817d6fca98cf",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed/spec.rs",
@@ -478,11 +478,11 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/collection.rs",
-        "d04dd308d2dcba2d37eaa01585cf504502bd19926066cd1761bb17c8768b4555",
+        "1dd2d08d4e50ed2f5658bd42eb1ab1b957bfcd8fa92aa551ffecfcf075af0623",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/expression.rs",
-        "11cc1bdcffbbc27a0929a69a107f82b28777044418f75b438b7a4dcfbbd8409c",
+        "f26e0803b46a772602ec295ceb52923695137c200b0399f767f868c980b22aa0",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/mod.rs",
@@ -490,11 +490,11 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/order_laws.rs",
-        "7c55efa05497b5243ba0889a08e52b347b0e33625e3ea2209792d7239274186b",
+        "3908d83f9a3816225ef9200dede7f15da9b559e3c984a766b2b0757d217901a3",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/ordered.rs",
-        "d5fc706c1446705b8860cd50be671971c827aa93feb7a1ffcbe2f4254cd8c50c",
+        "73bb7b70c5bf5a04f7e0e3ee3d1b79d171b8d9a0e79dcf109f45349128c9b108",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/policy.rs",
@@ -502,15 +502,15 @@ pub(super) const HARNESS_INCLUDE_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption.rs",
-        "b2a31d78f266cde0b0c210f8ac476496809b3c75614af39a5a0d5e3226ba93f7",
+        "a685688e4265868cf58d77db2fb42676362375c4b0a836ea3087f7ae4d18cc2f",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption_laws.rs",
-        "4b1a74f40cf11f9d7d440a55820c2d4ca6fe4df3c27ff91a72f8d84182c733b8",
+        "a6cca70644a4a32ceb5f0705c7c50641f42c91db78a3a08c028d0b3c758a2432",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/schema.rs",
-        "b3629891c5756e8f369342e9b4d1e4a0141b4ba0318d562dbfd75275461fb23b",
+        "c53834051046b66ef3f3d45c6c1b25752cf1996b03606013e0b8561e402f0a46",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/util.rs",
@@ -704,7 +704,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/evaluation/typed.rs",
-        "c903c4c6f85baff56871f200422979148bc4d21ad0acfde9f4de4cdf6cc5ddbf",
+        "df635585ec007d16a9e9ea164553c0e6ee8ff1afc7695acafeea717e678536f0",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/evaluation/typed/admission.rs",
@@ -724,7 +724,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs",
-        "50689233450076505bd283c6ca512608ccef5790d9fdaf152b0b7d8306cd6c53",
+        "17c776131f0a6a2da8403c8f4bc77b59edd07d11c63da4fd465bdd912ab108c5",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound_spec.rs",
@@ -828,11 +828,11 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission.rs",
-        "a8dfe7b291e570a2de7756c63b0944e85e641491cfb086494e44bfb97488a4b9",
+        "780d836f6610c5c561a1cfc98d536235dbf78ecba0e70d07de74bb6e7fc22767",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission/numeric.rs",
-        "0e43959110c40a92e53ec487a7c19144e448846d25c92cbd266b6e2938da6336",
+        "ab7e7d7642343da5106c10641e5c910157560d5d6c62d709edf1a1893fd920da",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission/numeric/spec.rs",
@@ -872,7 +872,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/shared.rs",
-        "b1c8d92725569d070f2da0623ef96647763ae9756dae849a80c6c32e92166fdf",
+        "5de8d8c31774101e99bac99be451473ebb5c2ff0aea3f44a0eee3e206b875538",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/shared_spec.rs",
@@ -948,7 +948,7 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed.rs",
-        "dd95c96a036e418ea010655ccd60e6e155ba871f79472004ccb0c84f2afa8aa0",
+        "3687a19a79cbe3ab55b9f457ecb390b54d6c44c5126136ec2237817d6fca98cf",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/typed/spec.rs",
@@ -1008,11 +1008,11 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/collection.rs",
-        "d04dd308d2dcba2d37eaa01585cf504502bd19926066cd1761bb17c8768b4555",
+        "1dd2d08d4e50ed2f5658bd42eb1ab1b957bfcd8fa92aa551ffecfcf075af0623",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/expression.rs",
-        "11cc1bdcffbbc27a0929a69a107f82b28777044418f75b438b7a4dcfbbd8409c",
+        "f26e0803b46a772602ec295ceb52923695137c200b0399f767f868c980b22aa0",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/mod.rs",
@@ -1020,11 +1020,11 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/order_laws.rs",
-        "7c55efa05497b5243ba0889a08e52b347b0e33625e3ea2209792d7239274186b",
+        "3908d83f9a3816225ef9200dede7f15da9b559e3c984a766b2b0757d217901a3",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/ordered.rs",
-        "d5fc706c1446705b8860cd50be671971c827aa93feb7a1ffcbe2f4254cd8c50c",
+        "73bb7b70c5bf5a04f7e0e3ee3d1b79d171b8d9a0e79dcf109f45349128c9b108",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/policy.rs",
@@ -1032,15 +1032,15 @@ pub(super) const RUNTIME_REFINEMENT_SOURCES: &[(&str, &str)] = &[
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption.rs",
-        "b2a31d78f266cde0b0c210f8ac476496809b3c75614af39a5a0d5e3226ba93f7",
+        "a685688e4265868cf58d77db2fb42676362375c4b0a836ea3087f7ae4d18cc2f",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/redemption_laws.rs",
-        "4b1a74f40cf11f9d7d440a55820c2d4ca6fe4df3c27ff91a72f8d84182c733b8",
+        "a6cca70644a4a32ceb5f0705c7c50641f42c91db78a3a08c028d0b3c758a2432",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/tables/schema.rs",
-        "b3629891c5756e8f369342e9b4d1e4a0141b4ba0318d562dbfd75275461fb23b",
+        "c53834051046b66ef3f3d45c6c1b25752cf1996b03606013e0b8561e402f0a46",
     ),
     (
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/util.rs",
