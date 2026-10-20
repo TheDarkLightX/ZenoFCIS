@@ -4,8 +4,8 @@
   "starting_head": "fda32144231bd5f8adbe201eff3a958caa2caaf6",
   "starting_source_manifest_sha256": "bdca784516973287a59731112d2b70b0215e3884a06f1133c90d232432626b87",
   "cli": {
-    "path": "../sol-251asm-target/debug/zeno-fcis",
-    "sha256": "16b244daad7263f5d219472f0deaff583c4f8b04656ffa9ae00aacb483b4109e",
+    "path": "zeno-fcis",
+    "sha256": "2cc028ea4c1d144fe81519f0e91786dbffea2330cebda7cf82fe8de966eee2b6",
     "observed_version": "zeno-fcis 2.5.0"
   },
   "specification": {
@@ -14,7 +14,7 @@
     "PRIOR_OWNER_ANSWERS.md": "2b21b14ec63afc3e09e3f109a1cfd1a45df8ea7ada1c80d1709cbd8ad15cfb98"
   },
   "files": {
-    "README.md": "8e2c0d1268f2c2f305878799fa8cfafc17e801608c1419a5d4c921728505ad91",
+    "README.md": "c68ce16cc928e70d079bbaaeb4947e26b92fc4f7f527ffd18fc953e8f2fa5d04",
     "components/balance/project.zeno": "b37024cae398ea9ef381445e72970c2ce4fb096b5ddb8c1b5e0e7ceee568f747",
     "components/balance/src/v2_contract.rs": "71e68c2cc4a52bb03eb2021a9e6de628f24dc27f70ac548dab10276528d038aa",
     "components/balance/v2/policy.json": "960cccef70bead9e4717d186b2e5100f6a4bdb69d0bae975711586e216bb0bf6",
@@ -75,7 +75,7 @@
     "tools/search_compounding.py": "6cd8d6e64edc2ad418c08ebcd63f77635b5c7f056709d2abd419d6a979edd4b1",
     "tools/spot_http.py": "a9587ed890295b8de574d675165e06d48c59aa8b198666cc77c245f99691c0c1",
     "tools/spot_reference.py": "b3f9ae36161d1385524d3f9c9746a08f47b8d9a4fcec2fdfeb583792f53bfec3",
-    "tools/write_manifest.py": "5b4be76cf384cbd172fcda2624927522834ed48cef5ecba98d978e24b2f5d4ab",
+    "tools/write_manifest.py": "f8b1f4def1c80136f9a47b168a2f76eeee553d515695154f04fd72b7e65847a2",
     "v2/policy.json": "bd8ea637c6cf23312893e24794269f0c8bbda7eeb1c3c2897d961c8b07fb2483",
     "v2/policy.zcve": "edd36dcc68eb198f7ed473cbc63a5c744848c89d70163e34739ac61a43032808",
     "v2/schema.zcve": "55eee8d116a0044b17cebe48aaf63356b6cd1176175f47cb530bb6adfdac167a"
