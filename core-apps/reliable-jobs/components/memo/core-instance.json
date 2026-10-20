@@ -10,7 +10,7 @@
     "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
     "replay_required": true,
     "scope": "closed finite family",
-    "sha256": "5e0651348ae821600c3106355ec5dfe6a27e28f68d65bae424b1943d5b337f1e"
+    "sha256": "2f0c57ed4ab69ec5f7a0e05cbfbf26590f5232e3dc94013da1ec08cec9e4827e"
   },
   "input_domains": [
     [
@@ -53,12 +53,12 @@
     "C": 3
   },
   "schema": "zeno-fcis/core-seed-instance/1",
-  "source_set_sha256": "16006ce29ea7d91a5e0b2e3e68373fd0018a68d585861679d05749f4e0721d25",
+  "source_set_sha256": "12b8eb44bc928aa7e1fa057885ac3fb45a66f153c751828a0e9985f93190daf4",
   "source_sha256": {
     "examples/c3.txt": "f92248e3955e2e86c8e52d2f452133e145491952d66564946395439f3ce0e8f7",
     "family.json": "9a3ab13390d324ac620015529a7283fa003c57ca4dc1828546982c6ff603caa0",
-    "policy.json.in": "242474fb27df230ff8a797314e9b23e1ec4592bba0c86dda4d99c2a6de88528f",
-    "project.zeno.in": "1a99f7ff9a44f4a6f143263c7d8a1f056ccaaa526db296bfa0d83b714aaeab8b"
+    "policy.json.in": "e2f9f7a696147e2612d46a9ea8c425c39e106c45f9da2632ad797d799fd7741e",
+    "project.zeno.in": "87d99f2401dc921f0bb15cda7f6216323900d3fd5e437c76fe81911b19bba162"
   },
   "state_tuples": 32,
   "version": 1

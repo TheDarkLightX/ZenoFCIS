@@ -11,7 +11,7 @@
     {
       "family": "consumable-budget",
       "instance": "components/budget/core-instance.json",
-      "instance_sha256": "1dd9bab49b680d57f58aa7cd9853a2eef14405d62a9537ab5685f7f3f9983844",
+      "instance_sha256": "dd2425ece96923d7d997061006f5c9c62d4bcefad6988973fdbf641b1453fb63",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "budget",
       "owns_fields": [
@@ -20,7 +20,7 @@
       "parameters": {
         "C": 7
       },
-      "source_set_sha256": "1ec32ec25ca42c4afdf4a766a522de7697263a4bdb3f0e31bf309ea277c59029",
+      "source_set_sha256": "9c2b6a5b69a5e005bdaace18bda30b7de81822af8c8e9b9f6a723b6f240bc31e",
       "views": {
         "command": [
           "3"
@@ -36,7 +36,7 @@
     {
       "family": "approval-queue",
       "instance": "components/queue/core-instance.json",
-      "instance_sha256": "dcebb71560688c7c221be85cf8c1a520555d42c165583ce71939220f4c79a90d",
+      "instance_sha256": "28d6516a9cb070bcbdd7f02e415a821728fe8d1b84e00d3056c523e1896fb0d8",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "queue",
       "owns_fields": [
@@ -48,7 +48,7 @@
       "parameters": {
         "K": 2
       },
-      "source_set_sha256": "a2b329091913bbb427c9fff92c2fc9f9fa718103ec63e00a7f2836eb910f0dc7",
+      "source_set_sha256": "196d2c838546820890f645786787f10724a49250ad21cda07525c27c7352a653",
       "views": {
         "command": [
           "action"
@@ -68,14 +68,14 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "015f610e0f91c2c9d7ae9d5fad3fac69d8b16c3796410896e0ed00a370f0489d",
+      "instance_sha256": "25f84b4fd7ca79fb1040da4f79df9e77b437e97ddb4b02a7315d4f1ba25173aa",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "memo",
       "owns_fields": [],
       "parameters": {
         "C": 7
       },
-      "source_set_sha256": "ecf2167bf84c13c05a1042b34ff33be379ae4d15e1326df8ea940e0eede6fc1c",
+      "source_set_sha256": "2d65883d4b22d48d298cc2d6b1a58874dcec1107cba9417687609b96e0cecb06",
       "views": {
         "command": [
           "key",

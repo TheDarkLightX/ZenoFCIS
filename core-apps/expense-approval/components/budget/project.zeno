@@ -22,7 +22,13 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 7;
 law 501 conservation on accept = post.100.110 + command.101.120 == pre.100.110;
 law 502 authorized_nonincreasing_budget on accept = context.102.130 == 1 && post.100.110 <= pre.100.110;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 > pre.100.110);
+law 540 legitimate_acceptance on reject = !(((true) && !(context.102.130 == 0)) && !(command.101.120 > pre.100.110));
+law 541 acceptance_eligibility on accept = ((true) && !(context.102.130 == 0)) && !(command.101.120 > pre.100.110);
+law 542 no_committed_failure on failure = false;
 // Core seed consumable-budget/1; parameters {"C": 7}.
-// Instance source-set SHA256 1ec32ec25ca42c4afdf4a766a522de7697263a4bdb3f0e31bf309ea277c59029.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/consumable-budget.json SHA256 ffac2f37ca8890600b6180b51455a928377ecfbb4c4807bc50040a87b19496c2; replay required; no KernelChecked claim.
+// Instance source-set SHA256 9c2b6a5b69a5e005bdaace18bda30b7de81822af8c8e9b9f6a723b6f240bc31e.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/consumable-budget.json SHA256 5437e48e3525225da35ea121bc03dbd22c3c4e976b5d4ddcabbbff294eebb166; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

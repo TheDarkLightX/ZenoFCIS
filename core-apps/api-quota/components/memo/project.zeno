@@ -26,7 +26,13 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.111 && post.100.111 <= 2 && 0 <= post.100.112 && post.100.112 <= 2;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.111 && post.100.111 <= 2 && 0 <= post.100.112 && post.100.112 <= 2;
 law 502 exact_record on accept = post.100.110 == 1 && post.100.111 == command.101.120 && post.100.112 == command.101.121 && ((pre.100.110 == 1 && pre.100.111 == command.101.120) -> post.100.112 == pre.100.112);
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (pre.100.110 == 1 && pre.100.111 == command.101.120 && pre.100.112 != command.101.121);
+law 540 legitimate_acceptance on reject = !(((true) && !(context.102.130 == 0)) && !(pre.100.110 == 1 && pre.100.111 == command.101.120 && pre.100.112 != command.101.121));
+law 541 acceptance_eligibility on accept = ((true) && !(context.102.130 == 0)) && !(pre.100.110 == 1 && pre.100.111 == command.101.120 && pre.100.112 != command.101.121);
+law 542 no_committed_failure on failure = false;
 // Core seed idempotency-slot/1; parameters {"C": 2}.
-// Instance source-set SHA256 4d80b0bd5011e48d45e39bec853822b5a17280f5af9bb679528a6364242ebe8b.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 5e0651348ae821600c3106355ec5dfe6a27e28f68d65bae424b1943d5b337f1e; replay required; no KernelChecked claim.
+// Instance source-set SHA256 c80ea160ae0c81b82736a094b707febf603bf7373dd4656d62f86fa6aa1b8409.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 2f0c57ed4ab69ec5f7a0e05cbfbf26590f5232e3dc94013da1ec08cec9e4827e; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

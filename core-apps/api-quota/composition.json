@@ -12,7 +12,7 @@
     {
       "family": "rate-limiter",
       "instance": "components/quota/core-instance.json",
-      "instance_sha256": "768f195347a141fbc74a6190c9fefd3413cbda03465327da9a0075b454161ec0",
+      "instance_sha256": "9ed9951d57250af0f27073315cfd643f68fc4ec04cd08dc41ea3732a9c7e9c90",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "quota",
       "owns_fields": [
@@ -23,7 +23,7 @@
         "N": 3,
         "W": 1
       },
-      "source_set_sha256": "a5120ce5e55fb3cdb18f9d89739eb671a7905af2109bc63f9fd257bd1a12a794",
+      "source_set_sha256": "8e0f3c3b0912e7a82f6c6532920f068f4120f148fb86d4e7470b12a52df8447a",
       "views": {
         "command": [
           "150"
@@ -41,7 +41,7 @@
     {
       "family": "idempotency-slot",
       "instance": "components/memo/core-instance.json",
-      "instance_sha256": "d540e49f743b91bc9066a88969892f35e251e6a7753b080dec2346b5b6e693d3",
+      "instance_sha256": "ebbf29b9fd1647cc7fa1d6b9cb9cef79b0679c7dfaa8be222600266e1fbae0d1",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "memo",
       "owns_fields": [
@@ -52,7 +52,7 @@
       "parameters": {
         "C": 2
       },
-      "source_set_sha256": "4d80b0bd5011e48d45e39bec853822b5a17280f5af9bb679528a6364242ebe8b",
+      "source_set_sha256": "c80ea160ae0c81b82736a094b707febf603bf7373dd4656d62f86fa6aa1b8409",
       "views": {
         "command": [
           "request_key",

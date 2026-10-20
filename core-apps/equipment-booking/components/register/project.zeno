@@ -25,7 +25,14 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3 && 0 <= post.100.111 && post.100.111 <= 3;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3 && 0 <= post.100.111 && post.100.111 <= 3;
 law 502 exact_write on accept = command.101.120 == pre.100.111 && post.100.110 == command.101.121 && post.100.111 == pre.100.111 + 1;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 != pre.100.111);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && (pre.100.111 == 3);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && !(pre.100.111 == 3));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) && !(command.101.120 != pre.100.111)) && !(pre.100.111 == 3);
+law 542 no_committed_failure on failure = false;
 // Core seed versioned-register/1; parameters {"C": 3}.
-// Instance source-set SHA256 c290dfd68bb81df3585bfe128e3ffbb13186350c54b67eb08134c1ba099fc773.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 f80e63d1127665c41d900bf75c325f55c6aade883380bba4ad7d485090eae9f0; replay required; no KernelChecked claim.
+// Instance source-set SHA256 c7d34ba7cc856c765984b8fea3122cb7e190e574b917d463330ac4a3e30c2dc2.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 4beaaf6d96fa470b5c16212d3f2628faf07201f1ad9c50bfa5216a7d048809f0; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

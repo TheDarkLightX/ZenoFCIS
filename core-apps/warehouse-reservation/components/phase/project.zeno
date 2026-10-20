@@ -24,7 +24,14 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 2;
 law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 2;
 law 502 exact_transition on accept = (command.101.120 == 1 -> (pre.100.110 == 2 && post.100.110 == 0)) && (command.101.120 == 0 -> post.100.110 == pre.100.110 + 1);
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 == 1 && pre.100.110 != 2);
+law 522 reason_202 on reject:202 = (((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 2)) && (command.101.120 == 0 && pre.100.110 == 2);
+law 540 legitimate_acceptance on reject = !((((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 2)) && !(command.101.120 == 0 && pre.100.110 == 2));
+law 541 acceptance_eligibility on accept = (((true) && !(context.102.130 == 0)) && !(command.101.120 == 1 && pre.100.110 != 2)) && !(command.101.120 == 0 && pre.100.110 == 2);
+law 542 no_committed_failure on failure = false;
 // Core seed finite-phase-machine/1; parameters {"C": 2}.
-// Instance source-set SHA256 920a526465fd382df456e42086b7250020d85b9d8a96f7bb32aba60d9a2bad7c.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 95517259e6560a0985832e417170ca7eb159731f78261f88ab17807135386466; replay required; no KernelChecked claim.
+// Instance source-set SHA256 ee88afe2b3175493773681c20a324e19a1b3690e821b6c90091fbdea3b659783.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/finite-phase-machine.json SHA256 c39eb7b3580c24bddef7e3daa7d4cef697fc4abddf9649f33a163be451f86a0c; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.
