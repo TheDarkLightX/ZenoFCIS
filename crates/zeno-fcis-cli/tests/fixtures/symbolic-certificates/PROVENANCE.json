@@ -3,20 +3,33 @@
   "producer_binary_sha256": "e8d7870d57ab55e81619d2373b043da05ea1d37ca393931bdb5d8b9788cd64c4",
   "proposal_transform": "tools/symbolic_certificate_checker/elaborate.py",
   "proposal_transform_sha256": "86ffd642a75e668043b117a92707a6a3d46c7d2b48ea62790d7d46833b3b63c8",
-  "subject": "one Input(0) with ordered identity output and full inclusive i64 input/output domains",
+  "subject": "one Input(0) with ordered identity output and full inclusive i128 input/output domains",
   "acceptance": "regenerate every query and independently check every certificate; fixture provenance grants no evidence or authority",
   "certificates": {
     "0.alethe": {
       "meaning": "outputs",
-      "sha256": "a95ae020ea5e92868e93555b7a5111f0f20cd6206f69983917b1fde10ee3fbc2"
+      "sha256": "71edb6e6a57b883531f1f819941ba3c46801b34fb394db2610017454d11ea4bb",
+      "query_sha256": "f6f2cae4407f5d4fd2c84a0fed853ef56b28915179930ceb59cd493c01aec825",
+      "raw_proof_sha256": "8e6ec36f1e2b929bf531a3797efec8e377395d04feb5c460703255d5a7004ab7"
     },
     "1.alethe": {
       "meaning": "arithmetic-failure",
-      "sha256": "8888c3a73dc139efd417b4ff5838ec30abf8beb78cdce8f15f17d4b01fd66e9b"
+      "sha256": "f3e2fe4ce8f7b0a2abaccfc1e895c45baca1b129a99121746b728eb08c903572",
+      "query_sha256": "c4b61f15dba20292dd86e1732209e039a954184f1f36697bc5b9e5fce3b5b956",
+      "raw_proof_sha256": "f3e2fe4ce8f7b0a2abaccfc1e895c45baca1b129a99121746b728eb08c903572"
     },
     "2.alethe": {
       "meaning": "output-domain-failure",
-      "sha256": "a3fcfd16172539d6bd997f57ae654e6c11423a52d664d81ed8aa54feca414e77"
+      "sha256": "b047ef604744bfcaf9ffe2146e0621293afdea0172123c9959c17166f5b48118",
+      "query_sha256": "6b9b8f086b5b2fd62eb80d215c16e6b62d6be04c0e719277cc5d07a359616b52",
+      "raw_proof_sha256": "f06ac21db9af9e6f9d50ab5d3f0bfa1be569bcee2058c4c87810fb51c0973fcc"
     }
-  }
+  },
+  "producer_arguments": [
+    "--produce-proofs",
+    "--proof-format-mode=alethe",
+    "--proof-granularity=theory-rewrite",
+    "--dump-proofs",
+    "--dag-thresh=0"
+  ]
 }

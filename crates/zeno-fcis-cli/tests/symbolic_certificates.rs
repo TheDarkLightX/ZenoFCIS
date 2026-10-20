@@ -211,7 +211,13 @@ fn pinned_certificate_command_checks_full_i128_replays_and_refuses_controls() {
         recorded["certificate_checker"]["build_provenance_verified"],
         false
     );
-    assert_eq!(recorded["domain"]["size"], "18446744073709551616");
+    let full_i128 = json!([{
+        "kind": "int", "min": i128::MIN.to_string(), "max": i128::MAX.to_string()
+    }]);
+    assert_eq!(recorded["domain"]["inputs"], full_i128);
+    assert_eq!(recorded["outputs"], full_i128);
+    // The full domain has 2^128 values, beyond the u128 cardinality field.
+    assert_eq!(recorded["domain"]["size"], Value::Null);
     assert_eq!(
         recorded["certificates"]
             .as_array()

@@ -2,9 +2,9 @@ unsat
 (
 (assume a0 (= p0 x0))
 (assume a1 (= q0 x0))
-(assume a2 (and (<= (- 9223372036854775808) x0) (<= x0 9223372036854775807)))
+(assume a2 (and (<= (- 170141183460469231731687303715884105728) x0) (<= x0 170141183460469231731687303715884105727)))
 (assume a3 false)
 (assume a4 true)
 (step t0 (cl (not false)) :rule false)
-(step t1 (cl) :rule resolution :premises (a3 t0) :args (false true))
+(step t1 (cl) :rule resolution :premises (a3 t0))
 )
