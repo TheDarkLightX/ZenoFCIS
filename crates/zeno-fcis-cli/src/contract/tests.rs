@@ -1204,7 +1204,9 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     assert_eq!(generated.previous()[0].policy(), counter.policy);
     assert_ne!(generated.policy(), counter.policy, "the program changed");
     assert_eq!(
-        generated.program().expect("legacy signed program"),
+        generated
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
         padded_once
     );
     assert!(generated.source().contains("pub const VERSION: u32 = 2;"));
@@ -1457,7 +1459,9 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
         "the edit changes the policy"
     );
     assert_eq!(
-        fresh.program().expect("legacy signed program"),
+        fresh
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
         original,
         "but not the decision program"
     );

@@ -17,10 +17,12 @@ fn entry_laws_are_eager_and_runtime_sum_is_checked() {
         limits: schema::all_limits(),
     };
     let table = Value::map_canonical(vec![
-        MapEntry::try_new(Value::signed(0), Value::signed(i128::MAX)).unwrap(),
-        MapEntry::try_new(Value::signed(1), Value::signed(1)).unwrap(),
+        MapEntry::try_new(Value::signed(0), Value::signed(i128::MAX))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        MapEntry::try_new(Value::signed(1), Value::signed(1))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let expression = Expr::SumI128(
         Box::new(Expr::Literal(0, table)),
         Box::new(Expr::EntryValue),
@@ -55,11 +57,18 @@ fn entry_laws_are_eager_and_runtime_sum_is_checked() {
 }
 #[test]
 fn union_frame_charges_complete_values_and_write_comparisons() {
-    let v = Value::bytes(vec![1; 1000]).unwrap();
-    let table =
-        Value::map_canonical(vec![MapEntry::try_new(Value::signed(0), v).unwrap()]).unwrap();
+    let v = Value::bytes(vec![1; 1000])
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let table = Value::map_canonical(vec![
+        MapEntry::try_new(Value::signed(0), v)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    ])
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let mut m = meter::new(schema::all_limits());
-    assert!(collection::frame(&table, &table, &[], &mut m).unwrap());
+    assert!(
+        collection::frame(&table, &table, &[], &mut m)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+    );
     assert_eq!(m.used.used(Resource::Byte), 34 + 2 * 1005);
     assert_eq!(m.used.used(Resource::Read), 1);
     let mut limit = schema::all_limits();
@@ -109,21 +118,26 @@ fn lookup_full_scan_has_exact_reference_tariff() {
         laws: vec![],
         limits: schema::all_limits(),
     };
-    let empty = Value::map_canonical(vec![]).unwrap();
+    let empty = Value::map_canonical(vec![])
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let full = Value::map_canonical(vec![
-        MapEntry::try_new(Value::signed(0), Value::signed(0)).unwrap(),
-        MapEntry::try_new(Value::signed(1), Value::signed(1)).unwrap(),
+        MapEntry::try_new(Value::signed(0), Value::signed(0))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        MapEntry::try_new(Value::signed(1), Value::signed(1))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     ])
-    .unwrap();
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let key = Value::signed(2);
     let mut base = meter::new(schema::all_limits());
     assert_eq!(
-        collection::lookup(&d, 204, &empty, &key, &mut base).unwrap(),
+        collection::lookup(&d, 204, &empty, &key, &mut base)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         None
     );
     let mut scan = meter::new(schema::all_limits());
     assert_eq!(
-        collection::lookup(&d, 204, &full, &key, &mut scan).unwrap(),
+        collection::lookup(&d, 204, &full, &key, &mut scan)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         None
     );
     assert_eq!(
@@ -141,7 +155,8 @@ fn lookup_full_scan_has_exact_reference_tariff() {
     for k in 0..2 {
         let mut m = meter::new(schema::all_limits());
         assert_eq!(
-            collection::lookup(&d, 204, &full, &Value::signed(k), &mut m).unwrap(),
+            collection::lookup(&d, 204, &full, &Value::signed(k), &mut m)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
             Some(Value::signed(k))
         );
     }
@@ -178,21 +193,32 @@ fn u128_table_wide_sum_oracle() {
         let xs: Vec<u128> = if columns[0] == "-" {
             vec![]
         } else {
-            columns[0].split(',').map(|n| n.parse().unwrap()).collect()
+            columns[0]
+                .split(',')
+                .map(|n| {
+                    n.parse()
+                        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                })
+                .collect()
         };
         let expected = [
-            columns[1].parse::<u128>().unwrap(),
-            columns[2].parse::<u128>().unwrap(),
+            columns[1]
+                .parse::<u128>()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            columns[2]
+                .parse::<u128>()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ];
         let table = Value::map_canonical(
             xs.iter()
                 .enumerate()
                 .map(|(i, n)| {
-                    MapEntry::try_new(Value::unsigned(i as u128), Value::unsigned(*n)).unwrap()
+                    MapEntry::try_new(Value::unsigned(i as u128), Value::unsigned(*n))
+                        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
                 })
                 .collect(),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let expression = Expr::SumU128(
             Box::new(Expr::Literal(0, table)),
             Box::new(Expr::EntryValue),
@@ -250,15 +276,18 @@ fn u128_table_nicr_wide_oracle() {
         let c: Vec<_> = row.split('\t').collect();
         let expected = c[2].parse::<u128>().ok();
         let actual = redemption::nicr(
-            c[0].parse().unwrap(),
-            c[1].parse().unwrap(),
+            c[0].parse()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            c[1].parse()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
             &mut meter::new(schema::all_limits()),
         );
         unsigned_comparison(enabled, actual.ok() == expected, row);
     }
     // Three-factor quotient crosses the old signed boundary and checks its final U128 range.
     assert_eq!(
-        redemption::mul3div(u128::MAX, 1, 1, 1, &mut meter::new(schema::all_limits())).unwrap(),
+        redemption::mul3div(u128::MAX, 1, 1, 1, &mut meter::new(schema::all_limits()))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         u128::MAX
     );
     assert!(

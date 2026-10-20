@@ -14,7 +14,7 @@ fn fixtures() -> &'static PathBuf {
             )
             .arg(&root)
             .output()
-            .unwrap();
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(r.status.success(), "{r:?}");
         root
     })
@@ -22,19 +22,25 @@ fn fixtures() -> &'static PathBuf {
 fn compile(name: &str) -> tables::Compiled {
     let p = fixtures().join(name);
     tables::compile(
-        &std::fs::read_to_string(p.join("project.zeno")).unwrap(),
-        &std::fs::read_to_string(p.join("v2/policy.json")).unwrap(),
+        &std::fs::read_to_string(p.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &std::fs::read_to_string(p.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )
     .unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 fn record(xs: Vec<(u16, Value)>) -> Value {
-    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect()).unwrap()
+    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn field(v: &Value, id: u16) -> &Value {
     let ValueRef::Record(fs) = v.view() else {
         panic!()
     };
-    fs.iter().find(|f| f.id() == id).unwrap().value()
+    fs.iter()
+        .find(|f| f.id() == id)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .value()
 }
 fn number(v: &Value) -> i128 {
     let ValueRef::I128(x) = v.view() else {
@@ -52,14 +58,22 @@ fn item(p: i128, b: bool) -> Value {
 fn state(mode: u8, items: &[(i128, i128, bool)], order: &[i128]) -> Value {
     let mut es = items
         .iter()
-        .map(|(id, p, b)| t::MapEntry::try_new(Value::signed(*id), item(*p, *b)).unwrap())
+        .map(|(id, p, b)| {
+            t::MapEntry::try_new(Value::signed(*id), item(*p, *b))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        })
         .collect::<Vec<_>>();
     es.sort_by(|a, b| a.encoded_key().cmp(b.encoded_key()));
-    let mut fs = vec![(110, Value::map_canonical(es).unwrap())];
+    let mut fs = vec![(
+        110,
+        Value::map_canonical(es)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )];
     if mode != 0 {
         fs.push((
             111,
-            Value::vector(order.iter().map(|x| Value::signed(*x)).collect()).unwrap(),
+            Value::vector(order.iter().map(|x| Value::signed(*x)).collect())
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ));
     }
     record(fs)
@@ -101,9 +115,15 @@ fn command(
     record(fs)
 }
 fn run(a: &t::Authority, pre: &Value, cmd: &Value) -> t::Evaluation {
-    let s = a.frame(0, pre).unwrap();
-    let c = a.frame(1, cmd).unwrap();
-    let x = a.frame(2, &record(vec![])).unwrap();
+    let s = a
+        .frame(0, pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let c = a
+        .frame(1, cmd)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let x = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     a.evaluate(t::Raw {
         state: &s,
         command: &c,
@@ -147,9 +167,10 @@ fn ordered_complete_domains_have_unique_lawful_outcomes() {
     for mode in 0..=1 {
         for capacity in 0..=3 {
             let c = compile(&format!("ordered-{mode}-{capacity}"));
-            let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+            let a = t::Authority::bind(&c.schema, &c.policy)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             let states = tables_review::values(&c.descriptor, 100, 10000)
-                .unwrap()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
                 .into_iter()
                 .filter(|s| valid(s, mode))
                 .collect::<Vec<_>>();
@@ -161,7 +182,8 @@ fn ordered_complete_domains_have_unique_lawful_outcomes() {
                     [1, 9, 33, 33]
                 }[capacity]
             );
-            let commands = tables_review::values(&c.descriptor, 101, 1000).unwrap();
+            let commands = tables_review::values(&c.descriptor, 101, 1000)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(commands.len(), if mode == 0 { 32 } else { 288 });
             for pre in &states {
                 for cmd in &commands {
@@ -177,7 +199,7 @@ fn ordered_complete_domains_have_unique_lawful_outcomes() {
                             decision.post(),
                             decision.reason(),
                         )
-                        .unwrap();
+                        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
                     assert!(report.iter().all(|r| r.holds), "{report:?}");
                     // Independent complete-law predicate is checked against every business reason;
                     // reject-all and a wrong reason must have no alternative lawful decision.
@@ -207,7 +229,7 @@ fn ordered_complete_domains_have_unique_lawful_outcomes() {
                         decision.reason(),
                         decision.removed(),
                     )
-                    .unwrap();
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
                     if decision.removed().is_some() {
                         assert!(
                             a.check_ordered_result(
@@ -241,9 +263,25 @@ fn ordered_complete_laws_admit_all_frames_at_138_139_boundary() {
         let mut d = compiled.descriptor.clone();
         d.laws.retain(|law| law.id() != 991);
         d.frame_bytes[0] = bound;
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
-        assert_eq!(a.frame(0, &pre).unwrap().len(), 67);
-        assert_eq!(a.frame(0, &post).unwrap().len(), 139);
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        assert_eq!(
+            a.frame(0, &pre)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .len(),
+            67
+        );
+        assert_eq!(
+            a.frame(0, &post)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .len(),
+            139
+        );
         assert!(a.check_state(&pre).is_ok());
         let evaluation = run(&a, &pre, &cmd);
         let laws = a.check_laws(&pre, &cmd, &ctx, Some(&post), None);
@@ -256,10 +294,15 @@ fn ordered_complete_laws_admit_all_frames_at_138_139_boundary() {
         } else {
             assert!(evaluation.result().is_ok());
             assert!(a.check_state(&post).is_ok());
-            let reports = result.unwrap();
+            let reports =
+                result.unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(reports.len(), 9);
             assert!(reports.iter().all(|r| r.holds));
-            assert!(laws.unwrap().iter().all(|r| r.holds));
+            assert!(
+                laws.unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    .iter()
+                    .all(|r| r.holds)
+            );
         }
         // Exercise independent expected-outcome eligibility through evaluate,
         // bypassing the public law probe and the producer's successor admission.
@@ -267,14 +310,19 @@ fn ordered_complete_laws_admit_all_frames_at_138_139_boundary() {
             .types
             .iter()
             .find(|t| matches!(t.shape, t::Shape::Bool))
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .id;
         d.cases = vec![t::Case {
             when: t::Expr::Literal(bool_ty, Value::boolean(true)),
             plan: t::Plan::Reject(303),
         }];
-        let reject_all =
-            t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let reject_all = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let evaluation = run(&reject_all, &pre, &cmd);
         if bound < 139 {
             assert!(matches!(evaluation.result(), Err(t::Failure::Wire)));
@@ -286,10 +334,26 @@ fn ordered_complete_laws_admit_all_frames_at_138_139_boundary() {
     for source in 0..3 {
         let mut d = compiled.descriptor.clone();
         d.laws.retain(|law| law.id() != 991);
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let value = [&pre, &cmd, &ctx][source];
-        d.frame_bytes[source] = a.frame(source, value).unwrap().len() as u64 - 1;
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        d.frame_bytes[source] = a
+            .frame(source, value)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .len() as u64
+            - 1;
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(matches!(
             a.check_laws(&pre, &cmd, &ctx, None, Some(303)),
             Err(t::Failure::Wire)
@@ -303,7 +367,8 @@ fn ordered_complete_laws_admit_all_frames_at_138_139_boundary() {
 #[test]
 fn ordered_v1_hints_preserve_history_and_payload() {
     let c = compile("ordered-v1-three");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let pre = state(2, &[(0, 2, false), (1, 1, true), (2, 1, false)], &[0, 1, 2]);
     for (upper, lower, want) in [
         (None, None, vec![0, 1, 2]),
@@ -314,17 +379,25 @@ fn ordered_v1_hints_preserve_history_and_payload() {
         (None, Some(1), vec![0, 1, 2]),
     ] {
         let r = run(&a, &pre, &command(2, 2, 1, 1, false, upper, lower));
-        let post = r.result().unwrap().post().unwrap();
+        let post = r
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .post()
+            .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(
             field(post, 111),
-            &Value::vector(want.into_iter().map(Value::signed).collect()).unwrap(),
+            &Value::vector(want.into_iter().map(Value::signed).collect())
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
             "upper={upper:?} lower={lower:?}"
         );
         let ValueRef::Map(es) = field(post, 110).view() else {
             panic!()
         };
         assert_eq!(
-            es.iter().find(|e| number(e.key()) == 1).unwrap().value(),
+            es.iter()
+                .find(|e| number(e.key()) == 1)
+                .unwrap_or_else(|| panic!("required value missing"))
+                .value(),
             &item(1, true)
         );
     }
@@ -335,39 +408,68 @@ fn ordered_minimum_iteration_negative_priority_and_publication() {
         let c = compile(&format!("ordered-{mode}-3"));
         let mut d = c.descriptor.clone();
         if mode == 0 {
-            let ty = d.types.iter_mut().find(|t| t.id == 201).unwrap();
+            let ty = d
+                .types
+                .iter_mut()
+                .find(|t| t.id == 201)
+                .unwrap_or_else(|| panic!("required value missing"));
             ty.shape = t::Shape::I128 { min: -2, max: 2 };
         }
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let pre = if mode == 0 {
             state(mode, &[(0, 2, false), (1, -1, true)], &[])
         } else {
             state(mode, &[(0, 1, false), (1, 1, true)], &[0, 1])
         };
-        let frame = a.frame(0, &pre).unwrap();
+        let frame = a
+            .frame(0, &pre)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let query = a.ordered_query(&frame, true);
-        let min = query.result().unwrap().unwrap();
+        let min = query
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|| panic!("required value missing"));
         let ValueRef::Tuple(xs) = min.view() else {
             panic!()
         };
         assert_eq!(number(&xs[0]), 1);
         let query = a.ordered_query(&frame, false);
-        let ValueRef::Vector(xs) = query.result().unwrap().unwrap().view() else {
+        let ValueRef::Vector(xs) = query
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|| panic!("required value missing"))
+            .view()
+        else {
             panic!()
         };
         assert_eq!(xs.len(), 2);
         assert_eq!(&xs[0], min);
         let cmd = command(mode, 1, 0, 1, false, None, None);
-        let s = a.frame(0, &pre).unwrap();
-        let c = a.frame(1, &cmd).unwrap();
-        let x = a.frame(2, &record(vec![])).unwrap();
+        let s = a
+            .frame(0, &pre)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let c = a
+            .frame(1, &cmd)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let x = a
+            .frame(2, &record(vec![]))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let raw = t::Raw {
             state: &s,
             command: &c,
             context: &x,
         };
         let evaluation = a.evaluate(raw);
-        let subject = evaluation.subject().unwrap().to_vec();
+        let subject = evaluation
+            .subject()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .to_vec();
         assert!(a.replay(raw, &subject).result().is_ok());
         let p = a.publish(raw);
         assert!(matches!(p, t::PublicationOutcome::Commit(_)));
@@ -376,7 +478,8 @@ fn ordered_minimum_iteration_negative_priority_and_publication() {
 #[test]
 fn ordered_malformed_sequence_and_byte_precedence() {
     let c = compile("ordered-1-2");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     for seq in [&[0, 0][..], &[0][..], &[1, 0][..]] {
         let bad = state(1, &[(0, 2, false), (1, 1, true)], seq);
         assert!(matches!(
@@ -387,65 +490,99 @@ fn ordered_malformed_sequence_and_byte_precedence() {
     let pre = state(1, &[(0, 1, false)], &[0]);
     // ItemTooLarge precedes full, snapshot and sequence; MissingKey precedes edit preflight.
     let mut d = c.descriptor.clone();
-    if let t::Shape::Table { ref mut limits, .. } =
-        d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+    if let t::Shape::Table { ref mut limits, .. } = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 204)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         limits.max_item_bytes = 62;
     }
     assert!(d.policy_bytes().is_ok());
-    let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+    let a = t::Authority::bind(
+        &d.schema_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &d.policy_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let empty = state(1, &[], &[]);
     assert_eq!(
         run(&a, &empty, &command(1, 0, 0, 1, false, None, None))
             .result()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .reason(),
         Some(306)
     );
     assert_eq!(
         run(&a, &empty, &command(1, 2, 0, 1, false, None, None))
             .result()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .reason(),
         Some(303)
     );
     assert!(
         run(&a, &empty, &command(1, 1, 0, 1, false, None, None))
             .result()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .post()
             .is_some()
     );
     let mut d = c.descriptor.clone();
-    if let t::Shape::Table { ref mut limits, .. } =
-        d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+    if let t::Shape::Table { ref mut limits, .. } = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 204)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         limits.max_snapshot_bytes = 92;
     }
-    if let t::Shape::Vector { ref mut bytes, .. } =
-        d.types.iter_mut().find(|t| t.id == 206).unwrap().shape
+    if let t::Shape::Vector { ref mut bytes, .. } = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 206)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         *bytes = 22;
     }
-    let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+    let a = t::Authority::bind(
+        &d.schema_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &d.policy_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(
         run(&a, &pre, &command(1, 0, 1, 1, false, None, None))
             .result()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .reason(),
         Some(308)
     );
     let mut d = c.descriptor.clone();
-    if let t::Shape::Vector { ref mut bytes, .. } =
-        d.types.iter_mut().find(|t| t.id == 206).unwrap().shape
+    if let t::Shape::Vector { ref mut bytes, .. } = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 206)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         *bytes = 22;
     }
-    let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+    let a = t::Authority::bind(
+        &d.schema_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &d.policy_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(
         run(&a, &pre, &command(1, 0, 1, 1, false, None, None))
             .result()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .reason(),
         Some(315)
     );
@@ -457,48 +594,73 @@ fn ordered_v1_cut_matches_independent_linked_reference() {
         .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/ordered_cut_reference.py"))
         .arg(&path)
         .output()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(output.status.success(), "{output:?}");
-    let corpus: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let corpus: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(path).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let c = compile("ordered-v1-three");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let state_from = |s: &serde_json::Value| {
         let items = s["items"]
             .as_array()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .iter()
             .map(|v| {
                 (
-                    v[0].as_i64().unwrap() as i128,
-                    v[1].as_i64().unwrap() as i128,
-                    v[2].as_bool().unwrap(),
+                    v[0].as_i64()
+                        .unwrap_or_else(|| panic!("required value missing"))
+                        as i128,
+                    v[1].as_i64()
+                        .unwrap_or_else(|| panic!("required value missing"))
+                        as i128,
+                    v[2].as_bool()
+                        .unwrap_or_else(|| panic!("required value missing")),
                 )
             })
             .collect::<Vec<_>>();
         let order = s["order"]
             .as_array()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .iter()
-            .map(|v| v.as_i64().unwrap() as i128)
+            .map(|v| {
+                v.as_i64()
+                    .unwrap_or_else(|| panic!("required value missing")) as i128
+            })
             .collect::<Vec<_>>();
         state(2, &items, &order)
     };
     let states = corpus["states"]
         .as_array()
-        .unwrap()
+        .unwrap_or_else(|| panic!("required value missing"))
         .iter()
         .map(state_from)
         .collect::<Vec<_>>();
-    let rows = corpus["rows"].as_array().unwrap();
+    let rows = corpus["rows"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"));
     for row in rows {
-        let pre = &states[row["state"].as_u64().unwrap() as usize];
+        let pre = &states[row["state"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("required value missing"))
+            as usize];
         let opt = |key: &str| row[key].as_i64().map(i128::from);
         let cmd = command(
             2,
-            row["op"].as_i64().unwrap() as i128,
-            row["id"].as_i64().unwrap() as i128,
-            row["priority"].as_i64().unwrap() as i128,
-            row["payload"].as_bool().unwrap(),
+            row["op"]
+                .as_i64()
+                .unwrap_or_else(|| panic!("required value missing")) as i128,
+            row["id"]
+                .as_i64()
+                .unwrap_or_else(|| panic!("required value missing")) as i128,
+            row["priority"]
+                .as_i64()
+                .unwrap_or_else(|| panic!("required value missing")) as i128,
+            row["payload"]
+                .as_bool()
+                .unwrap_or_else(|| panic!("required value missing")),
             opt("upper"),
             opt("lower"),
         );
@@ -523,10 +685,15 @@ fn ordered_v1_cut_matches_independent_linked_reference() {
 #[test]
 fn ordered_v1_rejects_zero_key_profile_and_malformed_hint() {
     let c = compile("ordered-2-2");
-    let rules = std::fs::read_to_string(fixtures().join("ordered-2-2/v2/policy.json")).unwrap();
+    let rules = std::fs::read_to_string(fixtures().join("ordered-2-2/v2/policy.json"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(zeno_fcis_contract::internals::rules::Rules::read(&rules).is_err());
     let mut d = c.descriptor.clone();
-    d.types.iter_mut().find(|t| t.id == 201).unwrap().shape = t::Shape::I128 { min: 0, max: 2 };
+    d.types
+        .iter_mut()
+        .find(|t| t.id == 201)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape = t::Shape::I128 { min: 0, max: 2 };
     assert!(d.policy_bytes().is_err());
     let mut d = c.descriptor.clone();
     let duplicate = state(2, &[(0, 1, false)], &[0, 0]);
@@ -536,13 +703,18 @@ fn ordered_v1_rejects_zero_key_profile_and_malformed_hint() {
     );
     assert!(d.policy_bytes().is_err());
     let mut d = c.descriptor.clone();
-    if let t::Shape::Table { ref mut key, .. } =
-        d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+    if let t::Shape::Table { ref mut key, .. } = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 204)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         *key = 206;
     }
     assert!(d.policy_bytes().is_err());
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let cmd = command(2, 0, 0, 1, false, None, None);
     let ValueRef::Record(fs) = cmd.view() else {
         panic!()

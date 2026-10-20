@@ -6868,17 +6868,22 @@ mod u128_binding_tests {
                 )),
             );
             let claim = ClaimDecl::new(
-                StableId::new(600).unwrap(),
-                Identifier::try_new("unsigned_check").unwrap(),
+                StableId::new(600).unwrap_or_else(|| panic!("required value missing")),
+                Identifier::try_new("unsigned_check")
+                    .unwrap_or_else(|| panic!("required value missing")),
                 vec![BackendId::Z3],
                 ClaimMode::Relational,
                 ClaimFormula::Relational(formula.clone()),
             );
             assert_eq!(
-                export_smt(&claim, ToolBackend::Z3).unwrap_err(),
+                export_smt(&claim, ToolBackend::Z3).map_or_else(
+                    |error| error,
+                    |value| panic!("expected refusal, got {value:?}")
+                ),
                 ExportError::U128SubjectUnsupported
             );
-            let step = original_logic::TraceStep::try_new(vec![]).unwrap();
+            let step = original_logic::TraceStep::try_new(vec![])
+                .unwrap_or_else(|| panic!("required value missing"));
             let context = original_logic::EvaluationContext::new(
                 &step,
                 &Missing,

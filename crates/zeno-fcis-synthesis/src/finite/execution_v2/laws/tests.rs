@@ -1758,14 +1758,25 @@ fn reason_subset_skips_other_reasons_and_refuses_output_observations() {
     let frame = transition(&[], &reject);
     let result = evaluate(&laws, &[], &frame, limits());
     assert_eq!(result.result, Ok(()));
-    assert_eq!(result.diagnostics.last().unwrap().verdict, Verdict::Skipped);
-    laws.last_mut().unwrap().scope = Scope::RejectReason(200);
+    assert_eq!(
+        result
+            .diagnostics
+            .last()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .verdict,
+        Verdict::Skipped
+    );
+    laws.last_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .scope = Scope::RejectReason(200);
     assert_eq!(
         evaluate(&laws, &[], &frame, limits()).result,
         Err(Failure::Violated)
     );
     let post = [Op::Observe(Observation::PostLength)];
-    laws.last_mut().unwrap().program = Program {
+    laws.last_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .program = Program {
         nodes: &post,
         root: 0,
     };
@@ -1773,11 +1784,15 @@ fn reason_subset_skips_other_reasons_and_refuses_output_observations() {
         evaluate(&laws, &[], &frame, limits()).result,
         Err(Failure::Metadata)
     );
-    laws.last_mut().unwrap().program = Program {
+    laws.last_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .program = Program {
         nodes: &truth,
         root: 0,
     };
-    laws.last_mut().unwrap().genesis = true;
+    laws.last_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .genesis = true;
     assert_eq!(
         evaluate(&laws, &[], &frame, limits()).result,
         Err(Failure::Metadata)

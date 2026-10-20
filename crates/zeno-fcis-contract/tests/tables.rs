@@ -14,7 +14,7 @@ fn fixtures() -> &'static PathBuf {
             .arg(tool)
             .arg(&root)
             .output()
-            .unwrap();
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(output.status.success(), "{output:?}");
         root
     })
@@ -22,16 +22,20 @@ fn fixtures() -> &'static PathBuf {
 fn compile(name: &str) -> tables::Compiled {
     let dir = fixtures().join(name);
     tables::compile(
-        &std::fs::read_to_string(dir.join("project.zeno")).unwrap(),
-        &std::fs::read_to_string(dir.join("v2/policy.json")).unwrap(),
+        &std::fs::read_to_string(dir.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &std::fs::read_to_string(dir.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )
     .unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 fn authority(c: &tables::Compiled) -> t::Authority {
-    t::Authority::bind(&c.schema, &c.policy).unwrap()
+    t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn record(xs: Vec<(u16, Value)>) -> Value {
-    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect()).unwrap()
+    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn number(v: &Value) -> i128 {
     match v.view() {
@@ -43,7 +47,10 @@ fn field(v: &Value, id: u16) -> &Value {
     let ValueRef::Record(fs) = v.view() else {
         panic!("not record")
     };
-    fs.iter().find(|f| f.id() == id).unwrap().value()
+    fs.iter()
+        .find(|f| f.id() == id)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .value()
 }
 fn map(v: &Value) -> BTreeMap<i128, i128> {
     let ValueRef::Map(xs) = field(v, 110).view() else {
@@ -76,11 +83,11 @@ fn state(xs: &BTreeMap<i128, i128>, set: bool) -> Value {
                             Value::signed(*v)
                         },
                     )
-                    .unwrap()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
                 })
                 .collect(),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )])
 }
 fn command(operation: i128, key: i128, value: i128) -> Value {
@@ -91,9 +98,15 @@ fn command(operation: i128, key: i128, value: i128) -> Value {
     ])
 }
 fn run(a: &t::Authority, pre: &Value, command: &Value, context: &Value) -> t::Evaluation {
-    let s = a.frame(0, pre).unwrap();
-    let c = a.frame(1, command).unwrap();
-    let x = a.frame(2, context).unwrap();
+    let s = a
+        .frame(0, pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let c = a
+        .frame(1, command)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let x = a
+        .frame(2, context)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     a.evaluate(t::Raw {
         state: &s,
         command: &c,
@@ -106,7 +119,8 @@ fn collection_contracts_execute_and_match_independent_reference_c0_to_c3() {
         for capacity in 0..=3 {
             let compiled = compile(&format!("{kind}-{capacity}"));
             let a = authority(&compiled);
-            let states = tables_review::values(&compiled.descriptor, 100, 1000).unwrap();
+            let states = tables_review::values(&compiled.descriptor, 100, 1000)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(
                 states.len(),
                 if kind == "map" {
@@ -147,7 +161,9 @@ fn collection_contracts_execute_and_match_independent_reference_c0_to_c3() {
                                 }
                                 _ => None,
                             };
-                            let wire_before = a.frame(0, &pre).unwrap();
+                            let wire_before = a.frame(0, &pre).unwrap_or_else(|error| {
+                                panic!("required result failed: {error:?}")
+                            });
                             let result = run(&a, &pre, &command(operation, key, value), &context);
                             let d = result.result().unwrap_or_else(|e| {
                                 panic!("{kind} C={capacity} op={operation} pre={old:?}: {e:?}")
@@ -159,7 +175,12 @@ fn collection_contracts_execute_and_match_independent_reference_c0_to_c3() {
                                 assert!(d.post().is_none());
                                 assert!(d.patch().is_empty());
                             }
-                            assert_eq!(a.frame(0, &pre).unwrap(), wire_before);
+                            assert_eq!(
+                                a.frame(0, &pre).unwrap_or_else(|error| panic!(
+                                    "required result failed: {error:?}"
+                                )),
+                                wire_before
+                            );
                         }
                     }
                 }
@@ -172,7 +193,8 @@ fn finite_review_gap_and_state_lemma_c0_to_c3() {
     for kind in ["map", "set"] {
         for c in 0..=3 {
             let p = compile(&format!("{kind}-{c}"));
-            let report = tables_review::review(&p, 20000, 100000000, true).unwrap();
+            let report = tables_review::review(&p, 20000, 100000000, true)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(report["status"], "finite-checked", "{kind} C={c}: {report}");
             assert_eq!(report["gaps"]["determined"], report["tuples"]);
             assert_eq!(report["lemma"]["genesis"], "checked");
@@ -187,7 +209,9 @@ fn map_replace_at_capacity() {
     let pre = state(&BTreeMap::from([(0, 0)]), false);
     let r = run(&a, &pre, &command(0, 0, 1), &record(vec![]));
     assert_eq!(
-        r.result().unwrap().post(),
+        r.result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .post(),
         Some(&state(&BTreeMap::from([(0, 1)]), false))
     );
 }
@@ -201,18 +225,34 @@ fn remove_absent_is_ok() {
         &command(2, 0, 0),
         &record(vec![]),
     );
-    assert!(r.result().unwrap().reason().is_none());
-    assert_eq!(r.result().unwrap().post(), Some(&c.descriptor.genesis));
+    assert!(
+        r.result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .reason()
+            .is_none()
+    );
+    assert_eq!(
+        r.result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .post(),
+        Some(&c.descriptor.genesis)
+    );
 }
 #[test]
 fn decode_recounts_entries() {
     let c = compile("map-2");
     let a = authority(&c);
     let pre = state(&BTreeMap::from([(0, 1)]), false);
-    let mut wire = a.frame(0, &pre).unwrap();
+    let mut wire = a
+        .frame(0, &pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     wire[56..60].copy_from_slice(&0u32.to_be_bytes());
-    let cmd = a.frame(1, &command(6, 0, 0)).unwrap();
-    let context = a.frame(2, &record(vec![])).unwrap();
+    let cmd = a
+        .frame(1, &command(6, 0, 0))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let context = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(
         a.evaluate(t::Raw {
             state: &wire,
@@ -228,9 +268,15 @@ fn decode_rejects_unsorted_duplicates() {
     let c = compile("map-3");
     let a = authority(&c);
     let pre = state(&BTreeMap::from([(0, 0), (1, 1)]), false);
-    let original = a.frame(0, &pre).unwrap();
-    let cmd = a.frame(1, &command(6, 0, 0)).unwrap();
-    let context = a.frame(2, &record(vec![])).unwrap();
+    let original = a
+        .frame(0, &pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let cmd = a
+        .frame(1, &command(6, 0, 0))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let context = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     for duplicate in [false, true] {
         let mut wire = original.clone();
         if duplicate {
@@ -263,7 +309,7 @@ fn frame_union_domain() {
         .laws
         .iter()
         .find(|l| matches!(l, t::Law::Frame { .. }))
-        .unwrap()
+        .unwrap_or_else(|| panic!("required value missing"))
         .clone();
     let mut d = d.clone();
     d.laws = vec![frame];
@@ -303,7 +349,7 @@ fn sums(state: &Value) -> [i128; 2] {
         };
         sum[number(&k[1]) as usize] = sum[number(&k[1]) as usize]
             .checked_add(number(e.value()))
-            .unwrap();
+            .unwrap_or_else(|| panic!("required value missing"));
     }
     sum
 }
@@ -312,7 +358,14 @@ fn balances_multiple_users_assets_and_refusal_journey() {
     let c = compile("balances");
     let a = authority(&c);
     let mut state = c.descriptor.genesis.clone();
-    assert!(a.genesis(&a.frame(0, &state).unwrap()).result().is_ok());
+    assert!(
+        a.genesis(
+            &a.frame(0, &state)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        )
+        .result()
+        .is_ok()
+    );
     let mut nonce = 0;
     for (op, s, d, asset, amount, totals) in [
         (0, 0, 0, 0, 5, [5, 0]),
@@ -332,7 +385,7 @@ fn balances_multiple_users_assets_and_refusal_journey() {
             .result()
             .unwrap_or_else(|e| panic!("journey op={op}: {e:?}"))
             .post()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .clone();
         nonce += 1;
         assert_eq!(number(field(&state, 111)), nonce);
@@ -346,16 +399,32 @@ fn balances_multiple_users_assets_and_refusal_journey() {
         (2, 3, 3, 1, 0, 309),
         (2, 3, 3, 1, 1, 303),
     ] {
-        let bytes = a.frame(0, &state).unwrap();
+        let bytes = a
+            .frame(0, &state)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let r = run(
             &a,
             &state,
             &balance_command(op, s, d, asset, amount, nonce),
             &auth(true),
         );
-        assert_eq!(r.result().unwrap().reason(), Some(reason));
-        assert!(r.result().unwrap().post().is_none());
-        assert_eq!(a.frame(0, &state).unwrap(), bytes);
+        assert_eq!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .reason(),
+            Some(reason)
+        );
+        assert!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .post()
+                .is_none()
+        );
+        assert_eq!(
+            a.frame(0, &state)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            bytes
+        );
     }
 }
 #[test]
@@ -369,14 +438,22 @@ fn balance_self_transfer_conserves() {
             &balance_command(0, 0, 0, 0, maximum, 0),
             &auth(true),
         );
-        let pre = first.result().unwrap().post().unwrap();
+        let pre = first
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .post()
+            .unwrap_or_else(|| panic!("required value missing"));
         let r = run(
             &a,
             pre,
             &balance_command(2, 0, 0, 0, maximum, 1),
             &auth(true),
         );
-        let post = r.result().unwrap().post().unwrap();
+        let post = r
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .post()
+            .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(field(pre, 110), field(post, 110));
         assert_eq!(sums(pre), sums(post));
         assert_eq!(number(field(post, 111)), 2);
@@ -393,8 +470,18 @@ fn zero_credit_does_not_create() {
             &balance_command(op, 3, 2, 1, 0, 0),
             &auth(true),
         );
-        assert_eq!(r.result().unwrap().reason(), Some(309));
-        assert!(r.result().unwrap().post().is_none());
+        assert_eq!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .reason(),
+            Some(309)
+        );
+        assert!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .post()
+                .is_none()
+        );
     }
 }
 #[test]
@@ -413,7 +500,12 @@ fn balance_guard_order_and_arithmetic() {
             &balance_command(0, 0, 0, 0, 0, cmd_nonce),
             &auth(authorized),
         );
-        assert_eq!(r.result().unwrap().reason(), Some(expected));
+        assert_eq!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .reason(),
+            Some(expected)
+        );
     }
     let r = run(
         &a,
@@ -421,18 +513,34 @@ fn balance_guard_order_and_arithmetic() {
         &balance_command(0, 0, 0, 0, max, 0),
         &auth(true),
     );
-    let pre = r.result().unwrap().post().unwrap();
+    let pre = r
+        .result()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        .post()
+        .unwrap_or_else(|| panic!("required value missing"));
     let overflow = run(&a, pre, &balance_command(0, 0, 0, 0, 1, 1), &auth(true));
-    assert_eq!(overflow.result().unwrap().reason(), Some(305));
+    assert_eq!(
+        overflow
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .reason(),
+        Some(305)
+    );
 }
 #[test]
 fn budgets_replay_and_publication_are_source_bound() {
     let c = compile("map-2");
     let a = authority(&c);
-    let s = a.frame(0, &c.descriptor.genesis).unwrap();
+    let s = a
+        .frame(0, &c.descriptor.genesis)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let command = command(0, 1, 1);
-    let cw = a.frame(1, &command).unwrap();
-    let xw = a.frame(2, &record(vec![])).unwrap();
+    let cw = a
+        .frame(1, &command)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let xw = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let raw = t::Raw {
         state: &s,
         command: &cw,
@@ -442,15 +550,34 @@ fn budgets_replay_and_publication_are_source_bound() {
     let again = a.evaluate(raw);
     assert_eq!(good.subject(), again.subject());
     assert_eq!(good.usage(), again.usage());
-    assert!(a.replay(raw, good.subject().unwrap()).result().is_ok());
+    assert!(
+        a.replay(
+            raw,
+            good.subject()
+                .unwrap_or_else(|| panic!("required value missing"))
+        )
+        .result()
+        .is_ok()
+    );
     assert!(a.replay(raw, b"stale").result().is_err());
     let t::PublicationOutcome::Commit(p) = a.publish(raw) else {
         panic!()
     };
-    assert_eq!(p.subject(), good.subject().unwrap());
+    assert_eq!(
+        p.subject(),
+        good.subject()
+            .unwrap_or_else(|| panic!("required value missing"))
+    );
     assert_eq!(
         p.post(),
-        a.frame(0, good.result().unwrap().post().unwrap()).unwrap()
+        a.frame(
+            0,
+            good.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .post()
+                .unwrap_or_else(|| panic!("required value missing"))
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
     );
     for resource in [
         t::Resource::Read,
@@ -464,22 +591,31 @@ fn budgets_replay_and_publication_are_source_bound() {
         let mut exact = c.descriptor.clone();
         exact.limits = exact.limits.with_limit(resource, used);
         let exact = t::Authority::bind(
-            &exact.schema_bytes().unwrap(),
-            &exact.policy_bytes().unwrap(),
+            &exact
+                .schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &exact
+                .policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(exact.evaluate(raw).result().is_ok(), "exact {resource:?}");
         let mut d = c.descriptor.clone();
         d.limits = d.limits.with_limit(resource, used - 1);
-        let budget =
-            t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let budget = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let refused = budget.evaluate(raw);
         assert!(
             matches!(refused.result(), Err(t::Failure::Budget(_))),
             "{resource:?}: {:?}",
             refused.result()
         );
-        assert!(refused.usage().used(resource) <= used - 1);
+        assert!(refused.usage().used(resource) < used);
         assert!(refused.subject().is_none());
     }
 }
@@ -487,11 +623,13 @@ fn budgets_replay_and_publication_are_source_bound() {
 fn unsupported_domains_are_inconclusive_and_scalar_consumers_refuse() {
     let c = compile("balances");
     assert_eq!(
-        tables_review::review(&c, 100, 100, false).unwrap()["status"],
+        tables_review::review(&c, 100, 100, false)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))["status"],
         "inconclusive"
     );
     let dir = fixtures().join("map-1");
-    let rules = std::fs::read_to_string(dir.join("v2/policy.json")).unwrap();
+    let rules = std::fs::read_to_string(dir.join("v2/policy.json"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(zeno_fcis_contract::internals::rules::Rules::read(&rules).is_err());
 }
 
@@ -499,12 +637,22 @@ fn unsupported_domains_are_inconclusive_and_scalar_consumers_refuse() {
 fn sum_overflow_is_undefined() {
     let c = compile("map-2");
     let mut d = c.descriptor;
-    let amount = d.types.iter_mut().find(|t| t.id == 201).unwrap();
+    let amount = d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 201)
+        .unwrap_or_else(|| panic!("required value missing"));
     amount.shape = t::Shape::I128 {
         min: 0,
         max: i128::MAX,
     };
-    assert_eq!(d.policy_bytes().unwrap_err(), t::Failure::Arithmetic);
+    assert_eq!(
+        d.policy_bytes().map_or_else(
+            |error| error,
+            |value| panic!("expected refusal, got {value:?}")
+        ),
+        t::Failure::Arithmetic
+    );
 }
 #[test]
 fn law_probe_checks_successor_state_invariants() {
@@ -528,7 +676,10 @@ fn law_probe_checks_successor_state_invariants() {
             Some(&post),
             None
         )
-        .unwrap_err(),
+        .map_or_else(
+            |error| error,
+            |value| panic!("expected refusal, got {value:?}")
+        ),
         t::Failure::Law(410)
     );
 }
@@ -548,9 +699,13 @@ fn gap_candidates_include_unused_declared_reasons_and_exclude_991() {
             Box::new(t::Expr::Literal(206, Value::signed(399))),
         ),
     }];
-    c.policy = c.descriptor.policy_bytes().unwrap();
+    c.policy = c
+        .descriptor
+        .policy_bytes()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(
-        tables_review::review(&c, 100, 100000, true).unwrap()["status"],
+        tables_review::review(&c, 100, 100000, true)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))["status"],
         "law-gaps"
     );
     c.descriptor.laws = vec![t::Law::Predicate {
@@ -561,8 +716,12 @@ fn gap_candidates_include_unused_declared_reasons_and_exclude_991() {
             Box::new(t::Expr::Literal(206, Value::signed(0))),
         ),
     }];
-    c.policy = c.descriptor.policy_bytes().unwrap();
-    let r = tables_review::review(&c, 100, 100000, true).unwrap();
+    c.policy = c
+        .descriptor
+        .policy_bytes()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let r = tables_review::review(&c, 100, 100000, true)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(r["status"], "law-gaps");
     assert_eq!(r["gaps"]["case_conformance_991_used"], false);
 }
@@ -574,7 +733,7 @@ fn table_literal_rechecks_item_and_snapshot_limits() {
         .types
         .iter_mut()
         .find(|t| t.id == 204)
-        .unwrap()
+        .unwrap_or_else(|| panic!("required value missing"))
         .shape
     {
         limits.max_item_bytes = 49;
@@ -602,10 +761,17 @@ fn byte_item_full_snapshot_and_missing_precedence() {
         let d = &mut c.descriptor;
         d.laws.clear();
         d.frame_bytes = [2048; 3];
-        d.types.iter_mut().find(|t| t.id == 201).unwrap().shape =
-            t::Shape::Bytes { min: 0, max: 100 };
-        if let t::Shape::Table { limits, .. } =
-            &mut d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+        d.types
+            .iter_mut()
+            .find(|t| t.id == 201)
+            .unwrap_or_else(|| panic!("required value missing"))
+            .shape = t::Shape::Bytes { min: 0, max: 100 };
+        if let t::Shape::Table { limits, .. } = &mut d
+            .types
+            .iter_mut()
+            .find(|t| t.id == 204)
+            .unwrap_or_else(|| panic!("required value missing"))
+            .shape
         {
             *limits = t::CollectionLimits {
                 max_entries: capacity,
@@ -629,15 +795,35 @@ fn byte_item_full_snapshot_and_missing_precedence() {
                 Box::new(t::Plan::RejectEdit),
             ),
         }];
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let cmd = record(vec![
             (120, Value::signed(op)),
             (121, Value::signed(0)),
-            (122, Value::bytes(vec![1]).unwrap()),
+            (
+                122,
+                Value::bytes(vec![1])
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            ),
         ]);
         let r = run(&a, &d.genesis, &cmd, &record(vec![]));
-        assert_eq!(r.result().unwrap().reason(), Some(expected));
-        assert!(r.result().unwrap().patch().is_empty());
+        assert_eq!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .reason(),
+            Some(expected)
+        );
+        assert!(
+            r.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .patch()
+                .is_empty()
+        );
     }
 }
 #[test]
@@ -650,17 +836,31 @@ fn subject_binds_final_usage_and_exact_patch() {
         &command(0, 1, 1),
         &record(vec![]),
     );
-    let d = r.result().unwrap();
+    let d = r
+        .result()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(d.patch().len(), 1);
     assert_eq!(d.patch()[0].0, 110);
     assert_eq!(&d.patch()[0].1, field(&c.descriptor.genesis, 110));
-    assert_eq!(&d.patch()[0].2, field(d.post().unwrap(), 110));
-    let subject = r.subject().unwrap();
+    assert_eq!(
+        &d.patch()[0].2,
+        field(
+            d.post().unwrap_or_else(|| panic!("required value missing")),
+            110
+        )
+    );
+    let subject = r
+        .subject()
+        .unwrap_or_else(|| panic!("required value missing"));
     let mut at = 0;
     let mut artifact = &[][..];
     for i in 0..8 {
         let tag = subject[at];
-        let count = u128::from_be_bytes(subject[at + 1..at + 17].try_into().unwrap()) as usize;
+        let count = u128::from_be_bytes(
+            subject[at + 1..at + 17]
+                .try_into()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        ) as usize;
         at += 17;
         if tag == 1 {
             if i == 7 {
@@ -673,7 +873,8 @@ fn subject_binds_final_usage_and_exact_patch() {
     }
     assert_eq!(at, subject.len());
     let artifact =
-        zeno_fcis_codec::decode_value(artifact, zeno_fcis_codec::DecodeLimits::default()).unwrap();
+        zeno_fcis_codec::decode_value(artifact, zeno_fcis_codec::DecodeLimits::default())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let ValueRef::Tuple(fields) = artifact.view() else {
         panic!()
     };
@@ -702,21 +903,32 @@ fn wrong_set_value_and_malformed_genesis_are_refused() {
     let invalid = record(vec![(
         110,
         Value::map_canonical(vec![
-            t::MapEntry::try_new(Value::signed(0), Value::signed(0)).unwrap(),
+            t::MapEntry::try_new(Value::signed(0), Value::signed(0))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )]);
     assert!(
         run(&a, &invalid, &command(0, 0, 0), &record(vec![]))
             .result()
             .is_err()
     );
-    assert!(a.genesis(&a.frame(0, &invalid).unwrap()).result().is_err());
+    assert!(
+        a.genesis(
+            &a.frame(0, &invalid)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        )
+        .result()
+        .is_err()
+    );
     let not_genesis = state(&BTreeMap::from([(0, 0)]), true);
     assert!(
-        a.genesis(&a.frame(0, &not_genesis).unwrap())
-            .result()
-            .is_err()
+        a.genesis(
+            &a.frame(0, &not_genesis)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        )
+        .result()
+        .is_err()
     );
 }
 #[test]
@@ -737,7 +949,9 @@ fn balances_zero_capacity_keeps_zero_before_full_and_missing() {
             &balance_command(operation, 0, 1, 0, amount, 0),
             &auth(true),
         );
-        let decision = result.result().unwrap();
+        let decision = result
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(decision.reason(), Some(expected));
         assert!(decision.post().is_none());
         assert!(decision.patch().is_empty());
@@ -757,12 +971,13 @@ fn balances_laws_pin_decision_independently() {
                 110,
                 Value::map_canonical(vec![
                     t::MapEntry::try_new(
-                        Value::tuple(vec![Value::signed(account), Value::signed(0)]).unwrap(),
+                        Value::tuple(vec![Value::signed(account), Value::signed(0)])
+                            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
                         Value::signed(1),
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
                 ])
-                .unwrap(),
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
             ),
             (111, Value::signed(1)),
         ])
@@ -808,8 +1023,13 @@ fn balances_laws_pin_decision_independently() {
             when: t::Expr::Literal(208, Value::boolean(true)),
             plan,
         }];
-        let faulty =
-            t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let faulty = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let result = run(&faulty, pre, &cmd, &auth(authorized));
         assert!(matches!(result.result(), Err(t::Failure::Law(_))));
         assert!(result.subject().is_none());
@@ -823,7 +1043,8 @@ fn balances_finite_decisions_are_unique_without_991() {
     for (capacity, tuples) in [(0, 192), (1, 960), (2, 1728)] {
         let c = compile(&format!("balances-finite-{capacity}"));
         assert!(c.descriptor.laws.iter().all(|law| law.id() != 991));
-        let report = tables_review::review(&c, 20000, 100000000, true).unwrap();
+        let report = tables_review::review(&c, 20000, 100000000, true)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(report["status"], "finite-checked", "{report}");
         assert_eq!(report["tuples"], tuples);
         assert_eq!(report["gaps"]["determined"], tuples);
@@ -836,8 +1057,12 @@ fn balances_finite_decisions_are_unique_without_991() {
 fn record_literal_rechecks_nested_table_limits() {
     for (item, snapshot, admissible) in [(49, 79, false), (50, 78, false), (50, 79, true)] {
         let mut d = compile("map-1").descriptor;
-        if let t::Shape::Table { limits, .. } =
-            &mut d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+        if let t::Shape::Table { limits, .. } = &mut d
+            .types
+            .iter_mut()
+            .find(|t| t.id == 204)
+            .unwrap_or_else(|| panic!("required value missing"))
+            .shape
         {
             limits.max_item_bytes = item;
             limits.max_snapshot_bytes = snapshot;
@@ -854,8 +1079,13 @@ fn record_literal_rechecks_nested_table_limits() {
         d.laws.clear();
         assert_eq!(d.policy_bytes().is_ok(), admissible);
         if admissible {
-            let a =
-                t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+            let a = t::Authority::bind(
+                &d.schema_bytes()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+                &d.policy_bytes()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            )
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert!(
                 run(&a, &d.genesis, &command(3, 0, 0), &record(vec![]))
                     .result()
@@ -870,9 +1100,17 @@ fn set_item_preflight_precedes_membership_and_preserves_usage() {
     let mut d = compile("set-1").descriptor;
     d.laws.clear();
     d.frame_bytes = [2048; 3];
-    d.types.iter_mut().find(|t| t.id == 200).unwrap().shape = t::Shape::Bytes { min: 0, max: 1 };
-    if let t::Shape::Table { limits, .. } =
-        &mut d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+    d.types
+        .iter_mut()
+        .find(|t| t.id == 200)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape = t::Shape::Bytes { min: 0, max: 1 };
+    if let t::Shape::Table { limits, .. } = &mut d
+        .types
+        .iter_mut()
+        .find(|t| t.id == 204)
+        .unwrap_or_else(|| panic!("required value missing"))
+        .shape
     {
         *limits = t::CollectionLimits {
             max_entries: 1,
@@ -896,21 +1134,41 @@ fn set_item_preflight_precedes_membership_and_preserves_usage() {
     let pre = record(vec![(
         110,
         Value::map_canonical(vec![
-            t::MapEntry::try_new(Value::bytes(vec![]).unwrap(), Value::unit()).unwrap(),
+            t::MapEntry::try_new(
+                Value::bytes(vec![])
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+                Value::unit(),
+            )
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )]);
     let cmd = record(vec![
         (120, Value::signed(0)),
-        (121, Value::bytes(vec![0]).unwrap()),
+        (
+            121,
+            Value::bytes(vec![0])
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        ),
         (122, Value::signed(0)),
     ]);
     let evaluate = |d: &t::Descriptor| {
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         run(&a, &pre, &cmd, &record(vec![]))
     };
     let good = evaluate(&d);
-    assert_eq!(good.result().unwrap().reason(), Some(306));
+    assert_eq!(
+        good.result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .reason(),
+        Some(306)
+    );
     assert_eq!(good.usage().used(t::Resource::Read), 9);
     for (resource, expected) in [
         (t::Resource::Read, 9),
@@ -926,7 +1184,13 @@ fn set_item_preflight_precedes_membership_and_preserves_usage() {
     }
     d.limits = d.limits.with_limit(t::Resource::Read, 9);
     let limited = evaluate(&d);
-    assert_eq!(limited.result().unwrap().reason(), Some(306));
+    assert_eq!(
+        limited
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .reason(),
+        Some(306)
+    );
     assert_eq!(limited.usage(), good.usage());
     assert_eq!(evaluate(&d).usage(), limited.usage());
 }

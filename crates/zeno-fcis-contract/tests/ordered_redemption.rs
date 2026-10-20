@@ -3,20 +3,23 @@ use serde_json::{Value as J, json};
 use std::{path::PathBuf, sync::OnceLock};
 use zeno_fcis_synthesis::finite::v2_authority::tables::{self as t, redemption as r};
 fn num(j: &J) -> u128 {
-    j.as_str().unwrap().parse().unwrap()
+    j.as_str()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .parse()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn u32_(j: &J) -> u32 {
-    u32::try_from(num(j)).unwrap()
+    u32::try_from(num(j)).unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn u64_(j: &J) -> u64 {
-    u64::try_from(num(j)).unwrap()
+    u64::try_from(num(j)).unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn opt(j: &J) -> Option<u32> {
     if j.is_null() { None } else { Some(u32_(j)) }
 }
 fn pairs(j: &J) -> Vec<(u32, u128)> {
     j.as_array()
-        .unwrap()
+        .unwrap_or_else(|| panic!("required value missing"))
         .iter()
         .map(|x| (u32_(&x[0]), num(&x[1])))
         .collect()
@@ -25,12 +28,14 @@ fn state(j: &J) -> r::State {
     r::State {
         vaults: j["vaults"]
             .as_array()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .iter()
             .map(|v| r::Vault {
                 id: u32_(&v["id"]),
                 owner: u32_(&v["owner"]),
-                active: v["active"].as_bool().unwrap(),
+                active: v["active"]
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("required value missing")),
                 collateral: num(&v["collateral"]),
                 debt: num(&v["debt"]),
                 stake: num(&v["stake"]),
@@ -38,7 +43,12 @@ fn state(j: &J) -> r::State {
                 snapshot_d: num(&v["snapshot_d"]),
             })
             .collect(),
-        order: j["order"].as_array().unwrap().iter().map(u32_).collect(),
+        order: j["order"]
+            .as_array()
+            .unwrap_or_else(|| panic!("required value missing"))
+            .iter()
+            .map(u32_)
+            .collect(),
         priorities: pairs(&j["priorities"]),
         reward_c: num(&j["reward_c"]),
         reward_d: num(&j["reward_d"]),
@@ -127,9 +137,13 @@ fn vectors() -> &'static Vec<J> {
             )
             .arg(&path)
             .output()
-            .unwrap();
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(out.status.success(), "{out:?}");
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+        serde_json::from_slice(
+            &std::fs::read(path)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
     })
 }
 fn trace_json(x: &r::Trace) -> J {
@@ -138,10 +152,13 @@ fn trace_json(x: &r::Trace) -> J {
 #[test]
 fn redemption_matches_independent_v1_rule_integer_reference() {
     for row in vectors() {
-        let name = row["name"].as_str().unwrap();
+        let name = row["name"]
+            .as_str()
+            .unwrap_or_else(|| panic!("required value missing"));
         let pre = state(&row["pre"]);
         let saved = pre.clone();
-        let a = r::Traversal::bind(policy(&row["policy"])).unwrap();
+        let a = r::Traversal::bind(policy(&row["policy"]))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let cmd = command(&row["command"]);
         let ctx = context(&row["context"]);
         let evaluation = a.evaluate(&pre, &cmd, ctx);
@@ -149,7 +166,17 @@ fn redemption_matches_independent_v1_rule_integer_reference() {
             .result()
             .unwrap_or_else(|e| panic!("{name}: {e:?}"));
         if let Some(reason) = row["expected"]["reason"].as_str() {
-            assert_eq!(format!("{:?}", result.unwrap_err()), reason, "{name}")
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    result.map_or_else(
+                        |error| error,
+                        |value| panic!("expected refusal, got {value:?}")
+                    )
+                ),
+                reason,
+                "{name}"
+            )
         } else {
             let plan = result.unwrap_or_else(|e| panic!("{name}: {e:?}"));
             assert_eq!(plan.state(), &state(&row["expected"]["state"]), "{name}");
@@ -167,8 +194,12 @@ fn redemption_rechecks_eligibility_inside_floor_tie() {
         "tie-eligibility-departure",
         "first-hint-cannot-skip-lower-eligible",
     ] {
-        let row = vectors().iter().find(|x| x["name"] == name).unwrap();
-        let a = r::Traversal::bind(policy(&row["policy"])).unwrap();
+        let row = vectors()
+            .iter()
+            .find(|x| x["name"] == name)
+            .unwrap_or_else(|| panic!("required value missing"));
+        let a = r::Traversal::bind(policy(&row["policy"]))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let pre = state(&row["pre"]);
         assert!(
             pre.priorities
@@ -176,7 +207,10 @@ fn redemption_rechecks_eligibility_inside_floor_tie() {
                 .all(|(_, p)| *p == pre.priorities[0].1)
         );
         let r = a.evaluate(&pre, &command(&row["command"]), context(&row["context"]));
-        let plan = r.result().unwrap().unwrap();
+        let plan = r
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(plan.trace().visited, vec![2, 1, 0]);
         assert_eq!(plan.trace().closed, vec![2]);
         assert!(!plan.trace().first_hint_used);
@@ -191,7 +225,10 @@ fn redemption_debt_only_rewards_explicitly_depart_from_pinned_v1() {
         "debt-only-reward-departure",
         "debt-only-reward-v1-constant-control",
     ] {
-        let row = vectors().iter().find(|x| x["name"] == name).unwrap();
+        let row = vectors()
+            .iter()
+            .find(|x| x["name"] == name)
+            .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(row["expected"], row["v1_corrected_expected"]);
         assert_eq!(row["v1_expected"], json!({"reason":"NoPositiveExecution"}));
         let pre = state(&row["pre"]);
@@ -199,9 +236,13 @@ fn redemption_debt_only_rewards_explicitly_depart_from_pinned_v1() {
         assert!(pre.reward_d > 0);
         let cmd = command(&row["command"]);
         assert_eq!(cmd.partial_nicr, 174129353233830845771);
-        let a = r::Traversal::bind(policy(&row["policy"])).unwrap();
+        let a = r::Traversal::bind(policy(&row["policy"]))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let evaluation = a.evaluate(&pre, &cmd, context(&row["context"]));
-        let plan = evaluation.result().unwrap().unwrap();
+        let plan = evaluation
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(plan.trace().settled, vec![1]);
         assert_eq!(plan.trace().executed, 100 * 10u128.pow(18));
         assert_eq!(plan.state().vaults[1].debt, 2010 * 10u128.pow(18));
@@ -220,16 +261,23 @@ fn redemption_pending_detection_exhausts_both_snapshot_lags() {
                 u8::from(collateral_lag),
                 u8::from(debt_lag)
             );
-            let row = vectors().iter().find(|x| x["name"] == name).unwrap();
+            let row = vectors()
+                .iter()
+                .find(|x| x["name"] == name)
+                .unwrap_or_else(|| panic!("required value missing"));
             assert_eq!(row["expected"], row["v1_corrected_expected"]);
             assert_eq!(
                 row["expected"] != row["v1_expected"],
                 debt_lag && !collateral_lag
             );
             let pre = state(&row["pre"]);
-            let a = r::Traversal::bind(policy(&row["policy"])).unwrap();
+            let a = r::Traversal::bind(policy(&row["policy"]))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             let evaluation = a.evaluate(&pre, &command(&row["command"]), context(&row["context"]));
-            let plan = evaluation.result().unwrap().unwrap();
+            let plan = evaluation
+                .result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(
                 plan.trace().settled,
                 if collateral_lag || debt_lag {
@@ -246,7 +294,8 @@ fn redemption_pending_detection_exhausts_both_snapshot_lags() {
 fn redemption_refuses_stale_nicr_and_unsorted_redistribution() {
     let row = &vectors()[0];
     let mut pre = state(&row["pre"]);
-    let a = r::Traversal::bind(policy(&row["policy"])).unwrap();
+    let a = r::Traversal::bind(policy(&row["policy"]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let cmd = command(&row["command"]);
     let ctx = context(&row["context"]);
     pre.priorities[0].1 += 1;
@@ -299,13 +348,14 @@ fn redemption_budget_denial_retains_work_and_no_candidate() {
     let ctx = context(&row["context"]);
     let p = policy(&row["policy"]);
     let full = r::Traversal::bind(p.clone())
-        .unwrap()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
         .evaluate(&pre, &cmd, ctx);
     let used = full.usage().used(t::Resource::Step);
     assert!(used > 1000);
     let mut p = p;
     p.limits = p.limits.with_limit(t::Resource::Step, used - 1);
-    let a = r::Traversal::bind(p).unwrap();
+    let a =
+        r::Traversal::bind(p).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let one = a.evaluate(&pre, &cmd, ctx);
     assert!(matches!(one.result(), Err(t::Failure::Budget(_))));
     let two = a.evaluate(&pre, &cmd, ctx);
@@ -317,12 +367,15 @@ fn redemption_budget_denial_retains_work_and_no_candidate() {
 fn redemption_complete_laws_reject_wrong_reason_trace_and_recipient() {
     for row in vectors() {
         let p = policy(&row["policy"]);
-        let a = r::Traversal::bind(p).unwrap();
+        let a = r::Traversal::bind(p)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let pre = state(&row["pre"]);
         let c = command(&row["command"]);
         let x = context(&row["context"]);
         let evaluation = a.evaluate(&pre, &c, x);
-        let result = evaluation.result().unwrap();
+        let result = evaluation
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let reasons = [
             r::Reason::Unauthorized,
             r::Reason::Replay,
@@ -386,7 +439,8 @@ fn redemption_complete_laws_reject_wrong_reason_trace_and_recipient() {
 fn redemption_owned_policy_and_oversized_input_admission() {
     let row = &vectors()[0];
     let mut p = policy(&row["policy"]);
-    let a = r::Traversal::bind(p.clone()).unwrap();
+    let a = r::Traversal::bind(p.clone())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     p.reserve = 1;
     assert_eq!(p.reserve, 1);
     let mut pre = state(&row["pre"]);
@@ -394,12 +448,16 @@ fn redemption_owned_policy_and_oversized_input_admission() {
     let c = command(&row["command"]);
     let x = context(&row["context"]);
     let e = a.evaluate(&pre, &c, x);
-    let plan = e.result().unwrap().unwrap();
+    let plan = e
+        .result()
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(plan.trace().reserve_burn, 50 * 10u128.pow(18));
     assert_eq!(pre, snapshot);
     let mut q = policy(&row["policy"]);
     q.limits = t::zero_limits();
-    let a = r::Traversal::bind(q).unwrap();
+    let a =
+        r::Traversal::bind(q).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     pre.vaults.push(pre.vaults[0].clone());
     pre.vaults.push(pre.vaults[0].clone());
     let e = a.evaluate(&pre, &c, x);
@@ -422,15 +480,19 @@ fn redistribution_repairs_pinned_swaps_and_preserves_committed_ties() {
         .arg(&path)
         .arg("--redistribution")
         .output()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(out.status.success(), "{out:?}");
-    let rows: Vec<J> = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    let rows: Vec<J> = serde_json::from_slice(
+        &std::fs::read(path).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     for row in &rows {
         let pre = state(&row["pre"]);
         let saved = pre.clone();
         let expected = state(&row["expected"]);
         let p = policy(&row["policy"]);
-        let a = r::Traversal::bind(p.clone()).unwrap();
+        let a = r::Traversal::bind(p.clone())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let repair = a.redistribute(&pre, expected.reward_c, expected.reward_d);
         let post = repair
             .result()
@@ -448,7 +510,8 @@ fn redistribution_repairs_pinned_swaps_and_preserves_committed_ties() {
             t::Resource::Step,
             repair.usage().used(t::Resource::Step) - 1,
         );
-        let limited = r::Traversal::bind(p).unwrap();
+        let limited = r::Traversal::bind(p)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let denied = limited.redistribute(&pre, expected.reward_c, expected.reward_d);
         assert!(matches!(denied.result(), Err(t::Failure::Budget(_))));
         assert_eq!(
@@ -469,7 +532,12 @@ fn redistribution_repairs_pinned_swaps_and_preserves_committed_ties() {
         let (lower_c, lower_d) = if post.reward_c > 0 {
             (post.reward_c - 1, post.reward_d)
         } else {
-            (post.reward_c, post.reward_d.checked_sub(1).unwrap())
+            (
+                post.reward_c,
+                post.reward_d
+                    .checked_sub(1)
+                    .unwrap_or_else(|| panic!("required value missing")),
+            )
         };
         assert!(a.redistribute(post, lower_c, lower_d).result().is_err());
     }

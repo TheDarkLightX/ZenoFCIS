@@ -2,7 +2,8 @@ use super::super::meter;
 use super::*;
 use alloc::vec;
 fn record(xs: Vec<(u16, Value)>) -> Value {
-    Value::record_canonical(xs.into_iter().map(|(id, v)| Field::new(id, v)).collect()).unwrap()
+    Value::record_canonical(xs.into_iter().map(|(id, v)| Field::new(id, v)).collect())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn fixture(mode: u8) -> (Descriptor, Value) {
     let field = |id, ty| FieldType {
@@ -69,14 +70,19 @@ fn fixture(mode: u8) -> (Descriptor, Value) {
                     (3, Value::unit()),
                 ]),
             )
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
         })
         .collect();
-    let mut fs = vec![(1, Value::map_canonical(es).unwrap())];
+    let mut fs = vec![(
+        1,
+        Value::map_canonical(es)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )];
     if mode != 0 {
         fs.push((
             2,
-            Value::vector(vec![Value::signed(0), Value::signed(2), Value::signed(1)]).unwrap(),
+            Value::vector(vec![Value::signed(0), Value::signed(2), Value::signed(1)])
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ));
     }
     let pre = record(fs);
@@ -104,13 +110,19 @@ fn fixture(mode: u8) -> (Descriptor, Value) {
 fn ordered_scan_and_iteration_reference_reads() {
     for mode in 0..2 {
         let (d, pre) = fixture(mode);
-        let spec = d.order.as_ref().unwrap();
+        let spec = d
+            .order
+            .as_ref()
+            .unwrap_or_else(|| panic!("required value missing"));
         let mut m = meter::new(schema::all_limits());
-        let pair = ordered::minimum(&d, spec, &pre, &mut m).unwrap().unwrap();
+        let pair = ordered::minimum(&d, spec, &pre, &mut m)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(pair.0, Value::signed(1));
         assert_eq!(m.used.used(Resource::Read), if mode == 0 { 3 } else { 4 });
         let mut m = meter::new(schema::all_limits());
-        let _ = ordered::items(&d, spec, &pre, &mut m).unwrap();
+        let _ = ordered::items(&d, spec, &pre, &mut m)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(m.used.used(Resource::Read), if mode == 0 { 9 } else { 12 });
     }
 }
@@ -134,7 +146,7 @@ fn ordered_redemption_fused_wide_integer_boundaries() {
             ordered::Priority::Signed(0),
             &mut exact
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         core::cmp::Ordering::Greater
     );
     assert_eq!(exact.used.used(Resource::Byte), 34);
@@ -163,7 +175,10 @@ fn ordered_redemption_fused_wide_integer_boundaries() {
 fn ordered_frame_admission_is_metered_and_retry_stable() {
     let (mut d, pre) = fixture(1);
     let mut m = meter::new(schema::all_limits());
-    let framed = collection::encode(&pre, &mut m).unwrap().len() as u64 + 48;
+    let framed = collection::encode(&pre, &mut m)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        .len() as u64
+        + 48;
     d.frame_bytes[0] = framed - 1;
     let mut one = meter::new(schema::all_limits());
     assert!(matches!(

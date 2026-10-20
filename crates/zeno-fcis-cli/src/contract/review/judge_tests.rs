@@ -33,13 +33,18 @@ impl Core {
             .project
             .split("// Independent complete relation")
             .next()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .to_owned();
-        let mut rules: Value = serde_json::from_str(&core.rules).unwrap();
+        let mut rules: Value = serde_json::from_str(&core.rules)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         rules["law_kinds"]
             .as_object_mut()
-            .unwrap()
-            .retain(|id, _| id.parse::<u32>().unwrap() < 520);
+            .unwrap_or_else(|| panic!("required value missing"))
+            .retain(|id, _| {
+                id.parse::<u32>()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    < 520
+            });
         core.rules = rules.to_string();
         core
     }
@@ -689,7 +694,8 @@ fn complete_relations_and_contradictions_are_separate_from_execution() {
         contradiction
             .project
             .push_str("law 550 contradiction on accept = false;\n");
-        let mut rules: Value = serde_json::from_str(&contradiction.rules).unwrap();
+        let mut rules: Value = serde_json::from_str(&contradiction.rules)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         rules["law_kinds"]["550"] = json!("AuthoritySubjectRecipient");
         contradiction.rules = rules.to_string();
         let negative = contradiction.gaps(None);
@@ -697,7 +703,12 @@ fn complete_relations_and_contradictions_are_separate_from_execution() {
         assert_eq!(c["status"], "incomplete");
         assert!(count(&c["zero_outcome"]) > 0);
         assert!(count(&c["execution_refusals"]) > 0);
-        assert!(!c["residual_witnesses"].as_array().unwrap().is_empty());
+        assert!(
+            !c["residual_witnesses"]
+                .as_array()
+                .unwrap_or_else(|| panic!("required value missing"))
+                .is_empty()
+        );
     }
 }
 
@@ -720,7 +731,8 @@ fn rejecting_all_wrong_reasons_and_unconstrained_frames_cannot_complete() {
         "field 110 100 value 105;",
         "field 110 100 value 105;\nfield 111 100 extra 108;",
     );
-    let mut r: Value = serde_json::from_str(&extra.rules).unwrap();
+    let mut r: Value = serde_json::from_str(&extra.rules)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     r["genesis"]["111"] = json!(false);
     extra.rules = r.to_string();
     let g = extra.gaps(None);

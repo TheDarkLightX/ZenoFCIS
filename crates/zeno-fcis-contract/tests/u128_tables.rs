@@ -20,7 +20,7 @@ fn fixtures() -> &'static PathBuf {
                 )
                 .arg(root.join(family))
                 .output()
-                .unwrap();
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert!(output.status.success(), "{output:?}");
         }
         root
@@ -29,13 +29,16 @@ fn fixtures() -> &'static PathBuf {
 fn compile(family: &str, name: &str) -> tables::Compiled {
     let p = fixtures().join(family).join(name);
     tables::compile(
-        &std::fs::read_to_string(p.join("project.zeno")).unwrap(),
-        &std::fs::read_to_string(p.join("v2/policy.json")).unwrap(),
+        &std::fs::read_to_string(p.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &std::fs::read_to_string(p.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn record(xs: Vec<(u16, Value)>) -> Value {
-    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect()).unwrap()
+    Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
 fn state(entries: &BTreeMap<u128, u128>) -> Value {
     record(vec![(
@@ -44,11 +47,12 @@ fn state(entries: &BTreeMap<u128, u128>) -> Value {
             entries
                 .iter()
                 .map(|(k, v)| {
-                    t::MapEntry::try_new(Value::unsigned(*k), Value::unsigned(*v)).unwrap()
+                    t::MapEntry::try_new(Value::unsigned(*k), Value::unsigned(*v))
+                        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
                 })
                 .collect(),
         )
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )])
 }
 fn command(op: i128, key: u128, value: u128) -> Value {
@@ -59,9 +63,15 @@ fn command(op: i128, key: u128, value: u128) -> Value {
     ])
 }
 fn run(a: &t::Authority, pre: &Value, cmd: &Value) -> t::Evaluation {
-    let s = a.frame(0, pre).unwrap();
-    let c = a.frame(1, cmd).unwrap();
-    let x = a.frame(2, &record(vec![])).unwrap();
+    let s = a
+        .frame(0, pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let c = a
+        .frame(1, cmd)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let x = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     a.evaluate(t::Raw {
         state: &s,
         command: &c,
@@ -80,7 +90,8 @@ fn u128_table_exhaustive_small_alphabet() {
     let mut total = 0;
     for capacity in 0..=3 {
         let c = compile("unsigned", &format!("map-{capacity}"));
-        let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+        let a = t::Authority::bind(&c.schema, &c.policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         for left in 0..=4 {
             for right in 0..=4 {
                 let mut entries = BTreeMap::new();
@@ -145,7 +156,8 @@ fn u128_table_exhaustive_small_alphabet() {
 fn u128_table_keys_preserve_kind() {
     println!("U128_TABLE_WITNESS key MAX remains unsigned");
     let c = compile("unsigned", "map-2");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let pre = state(&BTreeMap::from([(u128::MAX, 1u128 << 127)]));
     let cmd = command(3, u128::MAX, 0);
     let e = run(&a, &pre, &cmd);
@@ -157,14 +169,21 @@ fn u128_table_keys_preserve_kind() {
     let mixed = record(vec![(
         110,
         Value::map_canonical(vec![
-            t::MapEntry::try_new(Value::signed(0), Value::unsigned(0)).unwrap(),
+            t::MapEntry::try_new(Value::signed(0), Value::unsigned(0))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ])
-        .unwrap(),
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
     )]);
     assert!(a.check_state(&mixed).is_err());
-    let s = a.frame(0, &pre).unwrap();
-    let cmd = a.frame(1, &command(2, u128::MAX, 0)).unwrap();
-    let x = a.frame(2, &record(vec![])).unwrap();
+    let s = a
+        .frame(0, &pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let cmd = a
+        .frame(1, &command(2, u128::MAX, 0))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let x = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     if std::env::var_os("U128_TABLE_DISABLE_COMPARISON").is_none() {
         let published = a.publish(t::Raw {
             state: &s,
@@ -178,9 +197,13 @@ fn u128_table_keys_preserve_kind() {
 fn u128_sum_requires_static_bound() {
     println!("U128_TABLE_WITNESS empty sum with unestablished body bound");
     let p = fixtures().join("unsigned/map-0");
-    let source = std::fs::read_to_string(p.join("project.zeno")).unwrap();
-    let mut rules: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(p.join("v2/policy.json")).unwrap()).unwrap();
+    let source = std::fs::read_to_string(p.join("project.zeno"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let mut rules: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(p.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     // Each source is U128, but adding 1 to its declared MAX has no static fit bound.
     rules["laws"] = serde_json::json!([{"id":500,"scope":"state","assert":["eq",
         ["sum_u128",["input","pre",[110]],["add",["value"],["literal",201,"1"]]],
@@ -201,11 +224,19 @@ fn u128_sum_requires_static_bound() {
 #[test]
 fn legacy_i128_table_bytes_are_unchanged() {
     let baseline: serde_json::Value =
-        serde_json::from_str(include_str!("test-data/u128-tables/legacy-i128.json")).unwrap();
-    for row in baseline["rows"].as_array().unwrap() {
+        serde_json::from_str(include_str!("test-data/u128-tables/legacy-i128.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    for row in baseline["rows"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"))
+    {
         let c = compile(
-            row["family"].as_str().unwrap(),
-            row["name"].as_str().unwrap(),
+            row["family"]
+                .as_str()
+                .unwrap_or_else(|| panic!("required value missing")),
+            row["name"]
+                .as_str()
+                .unwrap_or_else(|| panic!("required value missing")),
         );
         for (name, bytes) in [("schema", c.schema), ("policy", c.policy)] {
             let hash: String = RustCryptoSha256::hash(&bytes)
@@ -213,16 +244,27 @@ fn legacy_i128_table_bytes_are_unchanged() {
                 .iter()
                 .map(|n| format!("{n:02x}"))
                 .collect();
-            assert_eq!(hash, row[name].as_str().unwrap(), "{} {name}", row["name"]);
+            assert_eq!(
+                hash,
+                row[name]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("required value missing")),
+                "{} {name}",
+                row["name"]
+            );
         }
     }
 }
 #[test]
 fn u128_table_decimal_and_schema_bounds_are_exact() {
     let p = fixtures().join("unsigned/map-1");
-    let source = std::fs::read_to_string(p.join("project.zeno")).unwrap();
-    let rules: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(p.join("v2/policy.json")).unwrap()).unwrap();
+    let source = std::fs::read_to_string(p.join("project.zeno"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let rules: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(p.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     for bad in [
         serde_json::json!(0),
         serde_json::json!(true),
@@ -237,8 +279,10 @@ fn u128_table_decimal_and_schema_bounds_are_exact() {
     let c = compile("unsigned", "map-1");
     assert!(tables_review::values(&c.descriptor, 200, 1000).is_err());
     let source = source.replace(&format!("Key in 0..={}", u128::MAX), "Key in 0..=1");
-    let c = tables::compile(&source, &rules.to_string()).unwrap();
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let c = tables::compile(&source, &rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(a.check_state(&state(&BTreeMap::from([(2, 0)]))).is_err());
 }
 
@@ -252,21 +296,30 @@ fn unsigned_item(p: u128) -> Value {
 fn ordered_state(items: &[(i128, u128)], ids: &[i128]) -> Value {
     let mut entries: Vec<_> = items
         .iter()
-        .map(|(id, p)| t::MapEntry::try_new(Value::signed(*id), unsigned_item(*p)).unwrap())
+        .map(|(id, p)| {
+            t::MapEntry::try_new(Value::signed(*id), unsigned_item(*p))
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+        })
         .collect();
     entries.sort_by(|a, b| a.encoded_key().cmp(b.encoded_key()));
     record(vec![
-        (110, Value::map_canonical(entries).unwrap()),
+        (
+            110,
+            Value::map_canonical(entries)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        ),
         (
             111,
-            Value::vector(ids.iter().map(|id| Value::signed(*id)).collect()).unwrap(),
+            Value::vector(ids.iter().map(|id| Value::signed(*id)).collect())
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         ),
     ])
 }
 #[test]
 fn u128_ordered_v1_high_priorities_and_complete_laws() {
     let c = compile("unsigned", "ordered-3");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     for priorities in [
         [1, 1, 1],
         [1, 1u128 << 127, u128::MAX],
@@ -288,13 +341,22 @@ fn u128_ordered_v1_high_priorities_and_complete_laws() {
             // the first descending gap. Each independent complete law checks it.
             let pos = ids
                 .iter()
-                .position(|key| items.iter().find(|(k, _)| k == key).unwrap().1 <= p)
+                .position(|key| {
+                    items
+                        .iter()
+                        .find(|(k, _)| k == key)
+                        .unwrap_or_else(|| panic!("required value missing"))
+                        .1
+                        <= p
+                })
                 .unwrap_or(ids.len());
             ids.insert(pos, id);
             items.push((id, p));
             let expected = ordered_state(&items, &ids);
             let e = run(&a, &pre, &cmd);
-            let d = e.result().unwrap();
+            let d = e
+                .result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
             assert_eq!(d.post(), Some(&expected));
             assert!(
                 a.check_ordered_result(&pre, &cmd, &record(vec![]), d.post(), None, None)
@@ -302,22 +364,42 @@ fn u128_ordered_v1_high_priorities_and_complete_laws() {
             );
             pre = expected;
         }
-        let framed = a.frame(0, &pre).unwrap();
+        let framed = a
+            .frame(0, &pre)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let query = a.ordered_query(&framed, true);
-        let ValueRef::Tuple(pair) = query.result().unwrap().unwrap().view() else {
+        let ValueRef::Tuple(pair) = query
+            .result()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+            .unwrap_or_else(|| panic!("required value missing"))
+            .view()
+        else {
             panic!()
         };
-        assert_eq!(pair[0], Value::signed(*ids.last().unwrap()));
+        assert_eq!(
+            pair[0],
+            Value::signed(
+                *ids.last()
+                    .unwrap_or_else(|| panic!("required value missing"))
+            )
+        );
     }
 }
 #[test]
 fn u128_table_noncanonical_and_limit_refusals_keep_work() {
     let c = compile("unsigned", "map-2");
-    let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+    let a = t::Authority::bind(&c.schema, &c.policy)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let pre = state(&BTreeMap::from([(0, 1), (u128::MAX, u128::MAX)]));
-    let raw = a.frame(0, &pre).unwrap();
-    let cmd = a.frame(1, &command(3, u128::MAX, 0)).unwrap();
-    let ctx = a.frame(2, &record(vec![])).unwrap();
+    let raw = a
+        .frame(0, &pre)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let cmd = a
+        .frame(1, &command(3, u128::MAX, 0))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let ctx = a
+        .frame(2, &record(vec![]))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     // The map starts after the 48-byte envelope and the 7-byte record/field prefix.
     for bad in [0u32, 1, 3] {
         let mut wire = raw.clone();
@@ -359,14 +441,23 @@ fn u128_table_noncanonical_and_limit_refusals_keep_work() {
     }
     for item_bound in [49, 50] {
         let mut d = c.descriptor.clone();
-        let t::Shape::Table { ref mut limits, .. } =
-            d.types.iter_mut().find(|t| t.id == 204).unwrap().shape
+        let t::Shape::Table { ref mut limits, .. } = d
+            .types
+            .iter_mut()
+            .find(|t| t.id == 204)
+            .unwrap_or_else(|| panic!("required value missing"))
+            .shape
         else {
             panic!()
         };
         limits.max_item_bytes = item_bound;
-        let bound =
-            t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let bound = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(bound.check_state(&pre).is_ok(), item_bound == 50);
     }
     let full = run(&a, &pre, &command(3, u128::MAX, 0));
@@ -374,8 +465,13 @@ fn u128_table_noncanonical_and_limit_refusals_keep_work() {
     d.limits = d
         .limits
         .with_limit(t::Resource::Step, full.usage().used(t::Resource::Step) - 1);
-    let limited =
-        t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+    let limited = t::Authority::bind(
+        &d.schema_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        &d.policy_bytes()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let one = run(&limited, &pre, &command(3, u128::MAX, 0));
     assert!(matches!(one.result(), Err(t::Failure::Budget(_))));
     assert_eq!(
@@ -394,8 +490,11 @@ fn u128_table_arithmetic_and_destination_refuse_without_output() {
     for bounded in [false, true] {
         let mut d = c.descriptor.clone();
         if bounded {
-            d.types.iter_mut().find(|t| t.id == 201).unwrap().shape =
-                t::Shape::U128 { min: 0, max: 1 };
+            d.types
+                .iter_mut()
+                .find(|t| t.id == 201)
+                .unwrap_or_else(|| panic!("required value missing"))
+                .shape = t::Shape::U128 { min: 0, max: 1 };
         }
         // This probe isolates checked arithmetic and the destination schema;
         // the full finite suite above separately checks independent table laws.
@@ -416,7 +515,13 @@ fn u128_table_arithmetic_and_destination_refuse_without_output() {
                 Box::new(t::Plan::RejectEdit),
             ),
         }];
-        let a = t::Authority::bind(&d.schema_bytes().unwrap(), &d.policy_bytes().unwrap()).unwrap();
+        let a = t::Authority::bind(
+            &d.schema_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+            &d.policy_bytes()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let pre = state(&BTreeMap::new());
         let saved = pre.clone();
         let cmd = command(0, u128::MAX, if bounded { 1 } else { u128::MAX });
@@ -430,7 +535,9 @@ fn u128_table_arithmetic_and_destination_refuse_without_output() {
         assert_eq!(e.usage(), run(&a, &pre, &cmd).usage());
         let ok = run(&a, &pre, &command(0, u128::MAX, 0));
         assert_eq!(
-            ok.result().unwrap().post(),
+            ok.result()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                .post(),
             Some(&state(&BTreeMap::from([(u128::MAX, 1)])))
         );
     }
@@ -444,17 +551,21 @@ fn u128_set_keys_cover_the_complete_small_alphabet() {
             110,
             Value::map_canonical(
                 keys.iter()
-                    .map(|k| t::MapEntry::try_new(Value::unsigned(*k), Value::unit()).unwrap())
+                    .map(|k| {
+                        t::MapEntry::try_new(Value::unsigned(*k), Value::unit())
+                            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    })
                     .collect(),
             )
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         )])
     }
     let keys = [0, u128::MAX];
     let mut total = 0;
     for capacity in 0..=3 {
         let c = compile("unsigned", &format!("set-{capacity}"));
-        let a = t::Authority::bind(&c.schema, &c.policy).unwrap();
+        let a = t::Authority::bind(&c.schema, &c.policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         for mask in 0..4 {
             let old: BTreeSet<_> = keys
                 .into_iter()
@@ -481,7 +592,9 @@ fn u128_set_keys_cover_the_complete_small_alphabet() {
                     }
                     let pre = set(&old);
                     let e = run(&a, &pre, &command(op, key, 0));
-                    let result = e.result().unwrap();
+                    let result = e
+                        .result()
+                        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
                     assert_eq!(result.reason(), reason);
                     assert_eq!(
                         result.post(),

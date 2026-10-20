@@ -41,22 +41,32 @@ impl Directory {
     fn incomplete_contract(&self, family: &str, parameters: &[(&str, i128)]) -> String {
         let app = self.contract(family, parameters);
         let project = Path::new(&app).join("project.zeno");
-        let source = fs::read_to_string(&project).unwrap();
+        let source = fs::read_to_string(&project)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         fs::write(
             &project,
             source
                 .split("// Independent complete relation")
                 .next()
-                .unwrap(),
+                .unwrap_or_else(|| panic!("required value missing")),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let policy = Path::new(&app).join("v2/policy.json");
-        let mut rules: Value = serde_json::from_str(&fs::read_to_string(&policy).unwrap()).unwrap();
+        let mut rules: Value = serde_json::from_str(
+            &fs::read_to_string(&policy)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         rules["law_kinds"]
             .as_object_mut()
-            .unwrap()
-            .retain(|id, _| id.parse::<u32>().unwrap() < 520);
-        fs::write(policy, rules.to_string()).unwrap();
+            .unwrap_or_else(|| panic!("required value missing"))
+            .retain(|id, _| {
+                id.parse::<u32>()
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    < 520
+            });
+        fs::write(policy, rules.to_string())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         app
     }
 
@@ -112,15 +122,21 @@ fn answers(items: &[Value]) -> Value {
 fn counter_with_law(directory: &Directory, scope: &str, predicate: &str) -> String {
     let app = directory.contract("bounded-counter", &[("C", 1)]);
     let project = Path::new(&app).join("project.zeno");
-    let mut source = fs::read_to_string(&project).unwrap();
+    let mut source = fs::read_to_string(&project)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     source.push_str(&format!(
         "\nlaw 550 contradiction on {scope} = {predicate};\n"
     ));
-    fs::write(project, source).unwrap();
+    fs::write(project, source).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let policy = Path::new(&app).join("v2/policy.json");
-    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&policy).unwrap()).unwrap();
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     rules["law_kinds"]["550"] = json!("AuthoritySubjectRecipient");
-    fs::write(policy, rules.to_string()).unwrap();
+    fs::write(policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     app
 }
 
@@ -136,14 +152,26 @@ fn assert_zero_outcome_question(scope: &str, predicate: &str, zero: u64) {
     assert_eq!(stats["reference_refused"], zero);
     assert_eq!(stats["determined"], 8 - zero);
     assert_eq!(stats["determined_rate"], (8 - zero) as f64 / 8.0);
-    let residuals = report["detail"]["residual_witnesses"].as_array().unwrap();
+    let residuals = report["detail"]["residual_witnesses"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"));
     assert_eq!(residuals.len() as u64, zero);
     for residual in residuals {
         assert_eq!(residual["lawful_outcomes"], 0);
         assert_eq!(residual["reason"], "zero-lawful-outcomes");
-        assert!(residual["input_ordinal"].as_u64().unwrap() < 8);
+        assert!(
+            residual["input_ordinal"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("required value missing"))
+                < 8
+        );
         assert!(residual["row"].is_object());
-        assert!(residual["laws"].as_array().unwrap().contains(&json!(550)));
+        assert!(
+            residual["laws"]
+                .as_array()
+                .unwrap_or_else(|| panic!("required value missing"))
+                .contains(&json!(550))
+        );
         assert_eq!(residual["execution_refusal"]["law"], 550);
     }
 }
@@ -163,9 +191,14 @@ fn a63_round2_execution_refusals_preserve_the_law_relation() {
     let directory = Directory::new();
     let app = directory.contract("bounded-counter", &[("C", 1)]);
     let policy = Path::new(&app).join("v2/policy.json");
-    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&policy).unwrap()).unwrap();
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     rules["cases"][0]["when"] = json!("true");
-    fs::write(policy, rules.to_string()).unwrap();
+    fs::write(policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let (exit, report) = run(&["loop", "question", "--contract", &app]);
     assert_eq!(exit, Some(2), "{report}");
     assert_eq!(report["status"], "incomplete", "{report}");
@@ -175,7 +208,9 @@ fn a63_round2_execution_refusals_preserve_the_law_relation() {
     assert_eq!(stats["reference_refused"], 4);
     assert_eq!(stats["determined"], 4);
     assert_eq!(stats["determined_rate"], 0.5);
-    let residuals = report["detail"]["residual_witnesses"].as_array().unwrap();
+    let residuals = report["detail"]["residual_witnesses"]
+        .as_array()
+        .unwrap_or_else(|| panic!("required value missing"));
     assert_eq!(residuals.len(), 4);
     for residual in residuals {
         assert_eq!(residual["lawful_outcomes"], 1);
@@ -187,17 +222,25 @@ fn assert_question_delivery_profile(delivers: bool) {
     let directory = Directory::new();
     let app = directory.contract("bounded-counter", &[("C", 1)]);
     let project = Path::new(&app).join("project.zeno");
-    let mut source = fs::read_to_string(&project).unwrap();
+    let mut source = fs::read_to_string(&project)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     source.push_str("\ntype 103 destination Sink;\ntype 104 payload Notice;\nfield 132 104 count 105;\nchannel 300 notify destination 103 payload 104;\n");
-    fs::write(&project, &source).unwrap();
+    fs::write(&project, &source)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let policy = Path::new(&app).join("v2/policy.json");
-    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&policy).unwrap()).unwrap();
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(&policy)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     rules["leaf_bindings"]["103"] = json!(["Text", 1, 32]);
     if delivers {
         rules["cases"][4]["outbox"] = json!([{"ordinal":0,"channel":300,"destination":"sink","payload":{"132":"value"},"idempotency_ordinal":0}]);
     }
-    fs::write(&policy, rules.to_string()).unwrap();
-    let policy_before = fs::read(&policy).unwrap();
+    fs::write(&policy, rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let policy_before =
+        fs::read(&policy).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let review_path = directory.0.join("review.json");
     let (review_exit, _) = run(&[
         "contract",
@@ -207,9 +250,14 @@ fn assert_question_delivery_profile(delivers: bool) {
         "--format",
         "json",
         "--out",
-        review_path.to_str().unwrap(),
+        review_path
+            .to_str()
+            .unwrap_or_else(|| panic!("required value missing")),
     ]);
-    let review: Value = serde_json::from_slice(&fs::read(review_path).unwrap()).unwrap();
+    let review: Value = serde_json::from_slice(
+        &fs::read(review_path).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(review_exit, Some(0), "{review}");
     assert_eq!(review["gaps"]["status"], "measured");
     assert_eq!(review["gaps"]["frame_check"]["mismatches"], 0);
@@ -245,8 +293,15 @@ fn assert_question_delivery_profile(delivers: bool) {
                 .is_some_and(|v| v.len() >= 2)
         );
     }
-    assert_eq!(fs::read_to_string(project).unwrap(), source);
-    assert_eq!(fs::read(policy).unwrap(), policy_before);
+    assert_eq!(
+        fs::read_to_string(project)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        source
+    );
+    assert_eq!(
+        fs::read(policy).unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        policy_before
+    );
 }
 
 #[test]
@@ -1017,7 +1072,8 @@ fn later_owned_votes_are_unrealizable_in_this_order_with_a_reorder_suggestion() 
 fn complete_catalogue_laws_leave_no_question_and_refuse_a_wrong_reason_answer() {
     let directory = Directory::new();
     let contract = directory.contract("bounded-counter", &[("C", 2)]);
-    let source = fs::read(Path::new(&contract).join("project.zeno")).unwrap();
+    let source = fs::read(Path::new(&contract).join("project.zeno"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let (exit, report) = run(&["loop", "question", "--contract", &contract]);
     assert_eq!(exit, Some(0), "{report}");
     assert_eq!(report["status"], "determined", "{report}");
@@ -1041,12 +1097,13 @@ fn complete_catalogue_laws_leave_no_question_and_refuse_a_wrong_reason_answer() 
     assert!(
         report["detail"]["requirement"]["laws"]
             .as_array()
-            .unwrap()
+            .unwrap_or_else(|| panic!("required value missing"))
             .iter()
             .any(|law| law["scope"] == "reject:200")
     );
     assert_eq!(
-        fs::read(Path::new(&contract).join("project.zeno")).unwrap(),
+        fs::read(Path::new(&contract).join("project.zeno"))
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         source
     );
 }

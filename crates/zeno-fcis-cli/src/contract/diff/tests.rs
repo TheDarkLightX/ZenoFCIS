@@ -166,7 +166,9 @@ impl Files {
                 let current =
                     generate_contract(result.sources(&sources)).unwrap_or_else(|e| panic!("{e:?}"));
                 let receipt = transform::check(
-                    current.program().expect("legacy signed program"),
+                    current
+                        .program()
+                        .unwrap_or_else(|| panic!("legacy signed program")),
                     &candidate,
                     Limits {
                         steps: DEFAULT_STEP_LIMIT,
@@ -303,15 +305,21 @@ fn adopted(files: &Files) -> Files {
     let adoptions = files.adoption_sources();
     let sources = files.sources(&adoptions);
     let current = generate_contract(sources).unwrap_or_else(|error| panic!("{error}"));
-    let program = import_program(current.program().expect("legacy signed program"))
-        .unwrap_or_else(|error| panic!("{error}"));
+    let program = import_program(
+        current
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
     let candidate = padded(&program);
     let limits = Limits {
         steps: DEFAULT_STEP_LIMIT,
         input_tuples: DEFAULT_MAX_INPUT_TUPLES,
     };
     let receipt = transform::check(
-        current.program().expect("legacy signed program"),
+        current
+            .program()
+            .unwrap_or_else(|| panic!("legacy signed program")),
         &candidate,
         limits,
     )

@@ -31,14 +31,18 @@ fn review_sources<'a>(p: &'a str, r: &'a str, e: Option<&'a str>) -> review::Rev
 fn u128_generate_and_review_keep_high_bit_values() {
     let p = project(H, H + 1);
     let r = rules(H);
-    let g = generate_contract(sources(&p, &r)).unwrap();
+    let g = generate_contract(sources(&p, &r))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(g.program().is_none());
     assert!(g.source().contains("NumericDescriptor"));
     let e = format!("{H} {} 0 | accept - {} | -\n", H + 1, H + 1);
-    let one = review::review(review_sources(&p, &r, Some(&e)), 100).unwrap();
-    let two = review::review(review_sources(&p, &r, Some(&e)), 100).unwrap();
+    let one = review::review(review_sources(&p, &r, Some(&e)), 100)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let two = review::review(review_sources(&p, &r, Some(&e)), 100)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(one.packet(), two.packet());
-    let packet: Value = serde_json::from_str(one.packet()).unwrap();
+    let packet: Value = serde_json::from_str(one.packet())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(packet["summary"]["examples"]["disagreements"], 0);
     assert_eq!(packet["summary"]["inputs"]["count"], 8);
     assert!(one.packet().contains(&(H + 1).to_string()));
@@ -53,16 +57,21 @@ fn u128_finite_gaps_proposals_and_limits() {
         max_work: 100000,
         proposals: None,
     };
-    let run = |options| review::review_with_gaps(review_sources(&p, &r, None), options).unwrap();
+    let run = |options| {
+        review::review_with_gaps(review_sources(&p, &r, None), options)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+    };
     let baseline = run(settings);
-    let packet: Value = serde_json::from_str(baseline.packet()).unwrap();
+    let packet: Value = serde_json::from_str(baseline.packet())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(packet["gaps"]["admissible"]["full"]["undetermined"], 8);
     let proposal = "law 600 exact on commit = post.100.110 == command.101.120;";
     let more = run(review::gaps::Options {
         proposals: Some(proposal),
         ..settings
     });
-    let packet: Value = serde_json::from_str(more.packet()).unwrap();
+    let packet: Value = serde_json::from_str(more.packet())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(
         packet["gaps"]["proposals"]["after"]["admissible"]["full"]["determined"],
         8
@@ -86,8 +95,8 @@ fn u128_lemma_state_transition_and_inconclusive() {
         format!("post.100.110 >= u128({H})"),
         "post.100.110 == u128(0)".into(),
     ];
-    let review::lemma::Lemmas::Judged(result) =
-        review::lemma::judge(&p, &r, &formulas, 100).unwrap()
+    let review::lemma::Lemmas::Judged(result) = review::lemma::judge(&p, &r, &formulas, 100)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
     else {
         panic!("finite domain")
     };
@@ -95,13 +104,14 @@ fn u128_lemma_state_transition_and_inconclusive() {
     assert_eq!(result[1]["verdict"], "false");
     let review::lemma::Lemmas::Judged(result) =
         review::lemma::judge_transitions(&p, &r, &["post.100.110 == command.101.120".into()], 100)
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
     else {
         panic!("finite domain")
     };
     assert_eq!(result[0]["verdict"], "checked");
     assert!(matches!(
-        review::lemma::judge(&project(0, u128::MAX), &rules(0), &formulas, 100).unwrap(),
+        review::lemma::judge(&project(0, u128::MAX), &rules(0), &formulas, 100)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
         review::lemma::Lemmas::Inconclusive(_)
     ));
 }
@@ -110,15 +120,40 @@ fn u128_tau_and_signed_program_binding_refuse_even_low_values() {
     for (min, max) in [(0, 1), (H, H + 1)] {
         let p = project(min, max);
         let r = rules(min);
-        let err = tau::export(&p, &r, 100, 1).unwrap_err();
+        let err = tau::export(&p, &r, 100, 1).map_or_else(
+            |error| error,
+            |value| panic!("expected refusal, got {value:?}"),
+        );
         assert_eq!(err.reason(), "U128SubjectUnsupported");
-        let parsed = Rules::read(&r).unwrap();
-        let d = Declarations::read(&p, &parsed.leaf_bindings).unwrap();
-        let bytes = schema::encode(&d).unwrap();
-        let c = Contract::build(&d, &parsed, schema_commitment(&bytes).unwrap()).unwrap();
-        assert_eq!(c.program().unwrap_err().reason(), "U128SubjectUnsupported");
+        let parsed =
+            Rules::read(&r).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let d = Declarations::read(&p, &parsed.leaf_bindings)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let bytes =
+            schema::encode(&d).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let c = Contract::build(
+            &d,
+            &parsed,
+            schema_commitment(&bytes)
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(
-            review::domain::positions(&d).unwrap_err().reason(),
+            c.program()
+                .map_or_else(
+                    |error| error,
+                    |value| panic!("expected refusal, got {value:?}")
+                )
+                .reason(),
+            "U128SubjectUnsupported"
+        );
+        assert_eq!(
+            review::domain::positions(&d)
+                .map_or_else(
+                    |error| error,
+                    |value| panic!("expected refusal, got {value:?}")
+                )
+                .reason(),
             "U128SubjectUnsupported"
         );
     }
@@ -128,8 +163,10 @@ fn u128_review_preserves_existing_sum_variants() {
     let p = project(H, H + 1)
         + " type 109 data Mode; variant 130 109 First none; variant 131 109 Second none; field 121 101 mode 109;";
     let r = rules(H);
-    let result = review::review(review_sources(&p, &r, None), 100).unwrap();
-    let packet: Value = serde_json::from_str(result.packet()).unwrap();
+    let result = review::review(review_sources(&p, &r, None), 100)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    let packet: Value = serde_json::from_str(result.packet())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(packet["summary"]["inputs"]["count"], 16);
     assert_eq!(packet["domain_size"], "16");
 }
@@ -150,18 +187,19 @@ fn u128_symbolic_refuses_before_solver_and_sqlite_migration_before_mapping() {
             &mut solve,
         )
         .err()
-        .unwrap();
+        .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(error.reason(), "U128SubjectUnsupported");
-        let r = Rules::read(&r).unwrap();
-        let d = Declarations::read(&p, &r.leaf_bindings).unwrap();
+        let r = Rules::read(&r).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let d = Declarations::read(&p, &r.leaf_bindings)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let file = rules::read_migration(
             r#"{"schema":"zeno-fcis/migration/1","state":{"110":{"from":110}}}"#,
             "migration",
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let e = migration::compile(&file, &d, &d, "migration")
             .err()
-            .unwrap();
+            .unwrap_or_else(|| panic!("required value missing"));
         assert_eq!(e.reason(), "U128SubjectUnsupported");
     }
 }
@@ -171,7 +209,10 @@ fn u128_search_optimizer_and_loop_doors_share_a_refusing_signed_json_binding() {
     for max in [1u128, u128::MAX] {
         let subject = json!({"inputs":[{"kind":"U128","min":"0","max":max.to_string()}],"outputs":[{"kind":"Int","min":"0","max":"1"}],"nodes":[["Int","0"]],"roots":[0]});
         assert_eq!(
-            program_from_json(&subject).unwrap_err(),
+            program_from_json(&subject).map_or_else(
+                |error| error,
+                |value| panic!("expected refusal, got {value:?}")
+            ),
             ProgramJsonError::U128SubjectUnsupported
         );
     }
@@ -182,12 +223,16 @@ fn u128_new_scaffolds_a_native_typed_application() {
     let root = Path::new("/tmp/sol-u128").join(format!("generated-u128-{}", std::process::id()));
     let input = root.join("input");
     let app = root.join("app");
-    std::fs::create_dir_all(input.join("v2")).unwrap();
-    std::fs::create_dir_all(input.join("tests")).unwrap();
-    std::fs::create_dir_all(&app).unwrap();
+    std::fs::create_dir_all(input.join("v2"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    std::fs::create_dir_all(input.join("tests"))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    std::fs::create_dir_all(&app)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let project = project(H, H + 1).replace(" law 501 reject_false on reject = false;", "")
         + " type 108 bool Flag; field 111 100 flag 108; type 109 data Mode; variant 130 109 First none; variant 131 109 Second none; field 121 101 mode 109;";
-    let mut rules: Value = serde_json::from_str(&rules(H)).unwrap();
+    let mut rules: Value = serde_json::from_str(&rules(H))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     rules["cases"][0]["when"] = json!("context.102");
     rules["leaf_bindings"]["108"] = json!(["Bool"]);
     rules["genesis"]["111"] = json!(false);
@@ -201,9 +246,14 @@ fn u128_new_scaffolds_a_native_typed_application() {
         u128::MAX,
         u128::MAX
     ));
-    rules["law_kinds"].as_object_mut().unwrap().remove("501");
-    std::fs::write(input.join("project.zeno"), project).unwrap();
-    std::fs::write(input.join("v2/policy.json"), rules.to_string()).unwrap();
+    rules["law_kinds"]
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .remove("501");
+    std::fs::write(input.join("project.zeno"), project)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    std::fs::write(input.join("v2/policy.json"), rules.to_string())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     std::fs::write(
         input.join("tests/decision-examples.txt"),
         format!(
@@ -213,53 +263,63 @@ fn u128_new_scaffolds_a_native_typed_application() {
             H + 1
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let tree = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .unwrap()
+        .unwrap_or_else(|| panic!("required value missing"))
         .parent()
-        .unwrap();
+        .unwrap_or_else(|| panic!("required value missing"));
     assert_eq!(
         crate::contract_files::scaffold(&app, &input, Some(tree)),
         crate::OK
     );
     assert!(
         std::fs::read_to_string(app.join("src/lib.rs"))
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .contains("NumericDescriptor")
     );
     std::fs::write(
         "/tmp/sol-u128/generated-app-path.txt",
-        app.to_str().unwrap(),
+        app.to_str()
+            .unwrap_or_else(|| panic!("required value missing")),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
 }
 #[test]
 fn u128_reject_examples_require_the_unchanged_pre_state() {
     let p = project(H, H + 1).replace(" law 501 reject_false on reject = false;", "");
-    let mut r: Value = serde_json::from_str(&rules(H)).unwrap();
+    let mut r: Value = serde_json::from_str(&rules(H))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     r["cases"][0]["when"] = json!("context.102");
-    r["law_kinds"].as_object_mut().unwrap().remove("501");
+    r["law_kinds"]
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("required value missing"))
+        .remove("501");
     let r = r.to_string();
     for (post, disagrees) in [(H, 0), (H + 1, 1)] {
         let examples = format!("{H} {} 1 | reject 300 {post} | -\n", H + 1);
-        let report = review::review(review_sources(&p, &r, Some(&examples)), 100).unwrap();
-        let packet: Value = serde_json::from_str(report.packet()).unwrap();
+        let report = review::review(review_sources(&p, &r, Some(&examples)), 100)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let packet: Value = serde_json::from_str(report.packet())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert_eq!(packet["summary"]["examples"]["disagreements"], disagrees);
     }
 }
 #[test]
 fn u128_law_refusal_findings_keep_full_width_human_witnesses() {
     let p = project(H, H + 1);
-    let mut r: Value = serde_json::from_str(&rules(H)).unwrap();
+    let mut r: Value = serde_json::from_str(&rules(H))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     r["cases"][0]["when"] = json!("context.102");
     let r = r.to_string();
-    let result = review::review(review_sources(&p, &r, None), 100).unwrap();
+    let result = review::review(review_sources(&p, &r, None), 100)
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     let lines = result.law_refusal_lines();
     assert_eq!(lines.len(), 1);
     assert!(lines[0].contains("4 inputs"));
     assert!(lines[0].contains(&H.to_string()));
-    let packet: Value = serde_json::from_str(result.packet()).unwrap();
+    let packet: Value = serde_json::from_str(result.packet())
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert_eq!(
         packet["law_refusals"][0]["input"][0]["value"],
         H.to_string()
@@ -272,12 +332,16 @@ fn u128_policy4_signed_only_build_checks_unused_bindings() {
     let p = project(0, 1)
         .replace("type 105 u128", "type 105 int")
         .replace(">= u128(0)", ">= 0");
-    let mut r: Value = serde_json::from_str(&rules(0)).unwrap();
+    let mut r: Value = serde_json::from_str(&rules(0))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     r["genesis"]["110"] = json!(0);
     for expression in ["choose(true, u128(0), 1)", "to_u128(context.102)"] {
         r["variables"] = json!({"bad":expression});
         let text = r.to_string();
-        let error = generate_contract(sources(&p, &text)).unwrap_err();
+        let error = generate_contract(sources(&p, &text)).map_or_else(
+            |error| error,
+            |value| panic!("expected refusal, got {value:?}"),
+        );
         assert!(
             error.reason().contains("KindMismatch"),
             "{expression}: {error}"
@@ -285,7 +349,8 @@ fn u128_policy4_signed_only_build_checks_unused_bindings() {
     }
     r["variables"] = json!({});
     let text = r.to_string();
-    let generated = generate_contract(sources(&p, &text)).unwrap();
+    let generated = generate_contract(sources(&p, &text))
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
     assert!(generated.program().is_none());
     assert!(generated.source().contains("NumericDescriptor"));
     assert!(review::review(review_sources(&p, &text, None), 100).is_ok());

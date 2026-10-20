@@ -2542,8 +2542,14 @@ mod tests {
             // Complete base laws can expose a contradiction before the last
             // submitted answer. The question flow returns that first prefix.
             let expected = if report["status"] == "conflict" {
-                let first = report["answer"].as_u64().unwrap() as usize + 1;
-                core.freedom(&answers[..first]).unwrap().stats
+                let first = report["answer"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("required value missing"))
+                    as usize
+                    + 1;
+                core.freedom(&answers[..first])
+                    .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
+                    .stats
             } else {
                 reference.stats
             };
@@ -2581,32 +2587,37 @@ mod tests {
         let base =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core-components/bounded-counter");
         let mut project = std::fs::read_to_string(base.join("project.zeno.in"))
-            .unwrap()
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .replace("${C}", "1");
         project.push_str(
             "reason 203 failure_only precedence 3;\nlaw 503 failure_shape on failure = true;\n",
         );
         let mut policy: Value = serde_json::from_str(
             &std::fs::read_to_string(base.join("policy.json.in"))
-                .unwrap()
+                .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
                 .replace("${C}", "1")
                 .replace("${INSTANCE}", "c1"),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         policy["law_kinds"]["503"] = json!("CommittedFailureEffects");
-        policy["cases"].as_array_mut().unwrap().insert(0, json!({"when":"false","class":"CommittedFailure","reason":203,"post":{"110":"value"},"outbox":[]}));
-        let core = Core::from_sources(project, policy.to_string()).unwrap();
-        let answers=core.answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{"where":"!authorized","class":"Reject","reason":"not_authorized"}]})).unwrap();
-        let laws = core.pin(&answers[0]).unwrap();
+        policy["cases"].as_array_mut().unwrap_or_else(|| panic!("required value missing")).insert(0, json!({"when":"false","class":"CommittedFailure","reason":203,"post":{"110":"value"},"outbox":[]}));
+        let core = Core::from_sources(project, policy.to_string())
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let answers=core.answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{"where":"!authorized","class":"Reject","reason":"not_authorized"}]})).unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let laws = core
+            .pin(&answers[0])
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         assert!(laws.iter().any(|(scope, _)| scope == "reject:201"));
         assert!(!laws.iter().any(|(scope, _)| scope == "reject:203"));
-        core.admissible(&laws).unwrap();
+        core.admissible(&laws)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         let failure = core
             .answers(&json!({"schema":"zeno-fcis/loop-answers/1","answers":[{
             "where":"authorized && action == 150 && value == 0", "class":"CommittedFailure",
             "reason":"failure_only", "sets":{"value":"1"}, "deliveries":[]}]}))
-            .unwrap();
-        let report = question(&core, &failure).unwrap();
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+        let report = question(&core, &failure)
+            .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
         // The complete counter laws require an accept on this input, so a
         // failure requirement must be a conflict rather than an unsupported answer.
         assert_eq!(report["status"], "conflict", "{report}");
