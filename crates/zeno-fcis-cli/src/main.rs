@@ -460,7 +460,7 @@ fn execute() -> u8 {
     {
         Ok(cli) => {
             if let Command::Commons { args } = &cli.command {
-                return ExitCode::from(zeno_fcis_commons::cli::run(args));
+                return zeno_fcis_commons::cli::run(args);
             }
             if let Command::Kb { operation } = cli.command {
                 return knowledge_command::execute(&cli.kb, operation);
