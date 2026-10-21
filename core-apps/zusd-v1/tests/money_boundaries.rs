@@ -995,7 +995,7 @@ fn small_money_limits_and_public_inventory_refusals() {
     other.pool.total = 1;
     assert_eq!(
         zenofcis_zusd_v1::composition::move_gain_to_vault(
-            composition::GainToVaultInputs {
+            zenofcis_zusd_v1::composition::GainToVaultInputs {
                 pre: &rows,
                 pool: &other,
                 actor: id(1),

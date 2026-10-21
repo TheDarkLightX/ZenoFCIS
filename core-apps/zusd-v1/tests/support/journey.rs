@@ -12,7 +12,7 @@ use zenofcis_zusd_v1::{
 static NEXT: AtomicU64 = AtomicU64::new(0);
 fn directory(label: &str) -> PathBuf {
     loop {
-        let p = PathBuf::from("/tmp/zf26-zusd/tmp").join(format!(
+        let p = std::env::temp_dir().join(format!(
             "step4-{label}-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
