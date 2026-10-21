@@ -48,6 +48,8 @@ def description(model, guard='actor == 0', reactive=False, empty=False):
 
 
 def roots(spec):
+    if spec['model']=='contract':
+        return tuple(State(tuple(spec['genesis']), (), c) for c in spec['coalitions'])
     if spec['model']=='oracle-withholding':
         return (State((0,0),(0,0),1,1,2),)
     if spec['model']=='quantifier':
@@ -64,18 +66,25 @@ def snapshot(state):
 
 
 def terminal(spec, state):
+    if spec['model']=='contract':
+        return (state.bad or bool(state.stage) or
+                (spec.get('horizon') is not None and state.entitlement >= spec['horizon']))
     return state.bad or (spec['model'] in ('quantifier','oracle-withholding') and state.native[0]==1)
 
 
 def events(spec, state):
     if terminal(spec, state) or spec['empty']:
         return []
+    if spec['model']=='contract':
+        return [dict(action, native_event=i) for i,action in enumerate(spec['events'])
+                if state.coalition & (1 << action['actor'])]
     if spec['model'] in ('quantifier','oracle-withholding'):
         return [dict(actor=0,request=[0]),dict(actor=0,request=[1])]
     return moves(spec, snapshot(state), state.coalition)
 
 
 def responses(spec):
+    if spec['model']=='contract': return (spec['guard'],)
     if spec['model']=='oracle-withholding': return ORACLE_RESPONSES
     return GUARDS if spec['reactive'] else (spec['guard'],)
 
@@ -88,6 +97,16 @@ def table_name(model, guard):
 
 def step(spec, tables, state, event, guard):
     action = events(spec, state)[event]
+    if spec['model']=='contract':
+        row = tables[tuple(state.native)+(action['native_event'],)]
+        enabled = row['guards'][guard]
+        actual = row['class'] if enabled else 'Blocked'
+        holds = row['holds'] if enabled else row['blocked_holds']
+        holds = holds and actual in spec['objective'].get('on', ['Accept','Reject','CommittedFailure','Refused','Blocked'])
+        depth = state.entitlement+1 if spec.get('horizon') is not None else 0
+        return State(tuple(row['post']) if enabled else state.native, (), state.coalition,
+                     depth, stage=int(holds and spec['objective']['kind']=='reachability'),
+                     bad=bool(holds and spec['objective']['kind']=='safety'))
     if spec['model']=='oracle-withholding':
         available=int(bool(state.native[1] or event==0))
         settled=guard=='settle' and available
