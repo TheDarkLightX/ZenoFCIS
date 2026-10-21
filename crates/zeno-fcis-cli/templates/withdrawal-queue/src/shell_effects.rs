@@ -210,7 +210,7 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
         })();
         self.last_transcript = stack.layers.into_iter().find_map(|layer| match layer {
             Layer::Record(transcript) => Some(transcript),
-            Layer::Identity => None,
+            Layer::Identity | Layer::Policy(_) => None,
         });
         result
     }
