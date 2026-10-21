@@ -5,26 +5,70 @@ import time
 SOLVER_WORK = 1_000_000
 
 
-def safety(graph, spec=None):
+class Meter:
+    """Exclusive invocation scratch; shared across fixed-guard attempts."""
+    def __init__(self):
+        self.work=0; self.end=time.monotonic()+30; self.stop=''
+
+    def charge(self, amount):
+        self.work+=amount
+        if self.work>SOLVER_WORK: self.stop='solver work budget'
+        if time.monotonic()>=self.end: self.stop='solver time budget'
+        return not self.stop
+
+
+def safety(graph, spec=None, meter=None):
     """nu W. Safe intersect universal Pre(W)."""
     if graph.status!='complete': return None
     W={i for i,s in enumerate(graph.states) if not s.bad and (graph.edges[i] or (spec is not None and terminal(spec,s)))}
-    work=0; end=time.monotonic()+30
+    meter=meter or Meter()
     while True:
-        work+=sum(len(graph.edges[i]) for i in W)
-        if work>SOLVER_WORK or time.monotonic()>=end: return None
+        if not meter.charge(len(W)+sum(len(graph.edges[i]) for i in W)): return None
         following={i for i in W if all(t in W for _,_,t in graph.edges[i])}
         if following==W: return sorted(W)
         W=following
 
 
-def certify(spec,tables,**budgets):
+def certify(spec,tables,solver_meter=None,**budgets):
     graph=build(spec,tables,**budgets)
-    W=safety(graph,spec)
+    meter=solver_meter or Meter()
+    if spec['model']=='contract' and graph.status=='complete':
+        if spec['objective']['kind']=='reachability':
+            return contract_reachability(spec,graph,meter)
+    W=safety(graph,spec,meter)
     if W is None or not set(graph.roots)<=set(W):
+        if spec['model']=='contract' and W is not None:
+            return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
+                        certificate=dict(kind='counterexample',**counterexample(graph)))
         return dict(status='UNKNOWN' if W is None else 'not safe',stop=graph.stop if graph.status!='complete' else 'solver budget',graph=graph.wire())
     return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
-                certificate=dict(kind='safety',W=W))
+                certificate=dict(kind='bounded' if spec.get('horizon') is not None else 'safety',W=W))
+
+
+def contract_reachability(spec,graph,meter):
+    """Universal ranked attractor for a fixed controller, environment owns events."""
+    packet=dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire())
+    if spec.get('horizon') is not None:
+        return dict(packet,certificate=dict(kind='bounded'))
+    ranks={i:0 for i,s in enumerate(graph.states) if s.stage}
+    while True:
+        if not meter.charge(len(graph.states)+sum(map(len,graph.edges))):
+            return dict(status='UNKNOWN',stop=meter.stop)
+        following={i:1+max(ranks[t] for _,_,t in row)
+                   for i,row in enumerate(graph.edges) if i not in ranks and row and
+                   all(t in ranks for _,_,t in row)}
+        if not following: break
+        ranks.update(following)
+    if set(graph.roots)<=ranks.keys():
+        return dict(packet,certificate=dict(kind='reachability',ranks=sorted(ranks.items())))
+    losing=set(range(len(graph.states)))-ranks.keys()
+    choices={i:next((e,g,t) for e,g,t in graph.edges[i] if t in losing) for i in losing}
+    root=next(i for i in graph.roots if i in losing)
+    at=root; seen={}; moves=[]
+    while at not in seen:
+        seen[at]=len(moves); e,g,at=choices[at]; moves.append([e,g])
+    return dict(packet,certificate=dict(kind='reachability-counterexample',root=root,moves=moves,
+                repeat_at=seen[at],avoidance=[[i,*choices[i][:2]] for i in sorted(choices)]))
 
 
 def counterexample(graph):

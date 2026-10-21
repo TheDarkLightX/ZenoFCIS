@@ -105,3 +105,10 @@ def load(path):
     with Path(path).open('rb') as source:
         game = validate(decode(source.read(65537)))
     return game, (Path(path).resolve().parent / game['contract']).resolve()
+
+
+def description(game, native, guard=0, horizon=None):
+    return dict(model='contract', game=game, positions=native['positions'],
+                genesis=native['genesis'], coalitions=list(coalitions(game)),
+                events=expand(game,native['positions']), guards=game.get('guards',['true']),
+                guard=guard, objective=game['objective'], horizon=horizon, empty=False)

@@ -62,11 +62,19 @@ class Certificate(unittest.TestCase):
                 ast.parse("__name__ == '__main__'",mode='eval').body))], type_ignores=[])
         imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
                  for node in ast.walk(core) if isinstance(node,(ast.Import,ast.ImportFrom))}
-        self.assertLessEqual(imports,{'argparse','hashlib','itertools','json','pathlib','subprocess'})
+        self.assertLessEqual(imports,{'argparse','hashlib','itertools','json','pathlib','subprocess','game_check'})
         all_imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
                      for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
         self.assertLessEqual(all_imports, {'argparse','hashlib','itertools','json','pathlib','subprocess',
-                                          'sys','telemetry','guide_help'})
+                                          'sys','telemetry','guide_help','game_check'})
+
+        # The additional checker modules may share input validation, never
+        # graph construction or fixed-point search.
+        for name in ('game_check.py','game_spec.py'):
+            tree=ast.parse(Path(__file__).with_name(name).read_text())
+            imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
+                     for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
+            self.assertLessEqual(imports,{'hashlib','itertools','json','pathlib','subprocess','time','game_spec'})
 
     def test_standalone_checker_does_not_require_optional_helpers(self):
         import os
