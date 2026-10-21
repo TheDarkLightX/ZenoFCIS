@@ -3,6 +3,7 @@
 
 mod account_lockout;
 mod agent_treasury_guard;
+mod app_factory;
 mod binding;
 mod checker_process;
 mod compliance_gateway;
@@ -12,7 +13,6 @@ mod contract;
 mod contract_adopt;
 mod contract_diff;
 mod contract_evolve;
-mod app_factory;
 mod contract_files;
 mod draft_command;
 mod durable_counter;
@@ -550,10 +550,18 @@ fn run(command: Command) -> u8 {
             }
         },
         Command::New {
-            dir, template, contract, app, source,
-        } => if app {
-            app_factory::scaffold(&dir, contract.as_deref().unwrap_or(&dir), source.as_deref())
-        } else { new_project(&dir, template, contract.as_deref(), source.as_deref()) },
+            dir,
+            template,
+            contract,
+            app,
+            source,
+        } => {
+            if app {
+                app_factory::scaffold(&dir, contract.as_deref().unwrap_or(&dir), source.as_deref())
+            } else {
+                new_project(&dir, template, contract.as_deref(), source.as_deref())
+            }
+        }
         Command::Check {
             project,
             format,

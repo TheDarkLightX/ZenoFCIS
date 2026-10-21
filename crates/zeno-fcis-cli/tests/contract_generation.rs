@@ -521,14 +521,26 @@ fn app_requires_a_contract_and_keeps_a_nonempty_target() {
     let root = TempRoot::new("app-refusals");
     let target = root.path().join("app");
     let no_contract = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
-        .arg("new").arg(&target).arg("--app").output()
+        .arg("new")
+        .arg(&target)
+        .arg("--app")
+        .output()
         .unwrap_or_else(|error| panic!("CLI: {error}"));
     assert!(!no_contract.status.success());
     assert!(!target.exists());
     fs::create_dir(&target).unwrap_or_else(|error| panic!("create: {error}"));
-    fs::write(target.join("retained"), b"owner data").unwrap_or_else(|error| panic!("write: {error}"));
+    fs::write(target.join("retained"), b"owner data")
+        .unwrap_or_else(|error| panic!("write: {error}"));
     let occupied = new_application(&target, &template("withdrawal-queue"), &["--app"]);
     assert!(!occupied.status.success());
-    assert_eq!(fs::read(target.join("retained")).unwrap_or_else(|error| panic!("read: {error}")), b"owner data");
-    assert_eq!(fs::read_dir(&target).unwrap_or_else(|error| panic!("list: {error}")).count(), 1);
+    assert_eq!(
+        fs::read(target.join("retained")).unwrap_or_else(|error| panic!("read: {error}")),
+        b"owner data"
+    );
+    assert_eq!(
+        fs::read_dir(&target)
+            .unwrap_or_else(|error| panic!("list: {error}"))
+            .count(),
+        1
+    );
 }
