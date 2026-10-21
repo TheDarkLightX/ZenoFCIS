@@ -324,10 +324,13 @@ fn pinned_config() -> ToolConfig {
 
 fn run_fixture(name: &str, source: &str, expected: bool) {
     let obligation = exported_fixture(source);
+    run_obligation(name, obligation, &pinned_config(), expected);
+}
+
+fn run_obligation(name: &str, obligation: ExportedObligation, config: &ToolConfig, expected: bool) {
     record_source(name, obligation.source());
     let started = Instant::now();
-    let run = execute_tool(&pinned_config(), obligation)
-        .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+    let run = execute_tool(config, obligation).unwrap_or_else(|error| panic!("{name}: {error:?}"));
     if let Some(directory) = std::env::var_os("ZENO_FCIS_LEAN_EVIDENCE") {
         let directory = PathBuf::from(directory);
         fs::create_dir_all(&directory)
@@ -378,6 +381,114 @@ fn pinned_lean_inductive_pilots() {
     for (name, source) in PILOTS {
         run_fixture(name, source, true);
     }
+}
+
+#[test]
+#[ignore = "requires the workflow-pinned Lean distribution"]
+fn pinned_lean_constructive_symbolic_fragment() {
+    // Unbounded i128 fields exercise symbolic proofs, not enumeration. Each law
+    // gives a different arithmetic/logical route to its post-state invariant.
+    let cases = [
+        (
+            "linear_order",
+            "post.100.110 == pre.100.110 + context.102 && post.100.111 == pre.100.111 + context.102",
+            "pre.100.110 <= pre.100.111",
+        ),
+        (
+            "negative_scale",
+            "post.100.110 == (0 - 3) * pre.100.111 && post.100.111 == pre.100.110 * (0 - 3)",
+            "pre.100.110 <= pre.100.111",
+        ),
+        (
+            "nested_logic",
+            "!(post.100.110 <= 0 && post.100.111 <= 0) && !(post.100.110 == post.100.111)",
+            "(pre.100.110 > 0 || pre.100.111 > 0) && pre.100.110 != pre.100.111",
+        ),
+        (
+            "negated_implication",
+            "!(post.100.110 >= 0 -> post.100.111 < 0)",
+            "!(pre.100.110 < 0) && pre.100.111 >= 0",
+        ),
+        (
+            "implication_goal",
+            "post.100.110 < 0 || post.100.111 >= 0",
+            "pre.100.110 >= 0 -> pre.100.111 >= 0",
+        ),
+        (
+            "integer_rounding",
+            "post.100.110 * 2 >= 1 && post.100.111 * 3 < 6",
+            "pre.100.110 >= 1 && pre.100.111 <= 1",
+        ),
+        ("constant_true", "true", "true"),
+        ("constant_false", "true", "false"),
+    ];
+    for (name, law, invariant) in cases {
+        let source = CONTROLS[2]
+            .1
+            .replace("Bounded in 0..=3;", "Bounded;")
+            .replace("post.100.110 == pre.100.110 + 1", law)
+            .replace("pre.100.110 <= 3", invariant);
+        let obligation = exported_fixture(&source);
+        let mut config = pinned_config();
+        if name.starts_with("constant_") {
+            config.allowed_axioms = vec!["propext".to_owned()];
+        }
+        run_obligation(name, obligation, &config, true);
+    }
+}
+
+#[test]
+#[ignore = "requires the workflow-pinned Lean distribution"]
+fn pinned_lean_classical_proof_is_refused_by_name() {
+    let mut obligation = exported_fixture(PILOTS[0].1);
+    let original = String::from_utf8(obligation.source.clone()).unwrap_or_else(|_| unreachable!());
+    let mut source = original.replace(
+        "\ntheorem history_holds (",
+        "\ntheorem constructive_history_holds (",
+    );
+    source = source.replace("#print axioms history_holds", "");
+    source.push_str(
+        r#"
+theorem history_holds (g : State) (hg : StateInv g) :
+  ∀ (h : List State), Chain Step g h → ∀ s ∈ h, StateInv s := by
+  rcases Classical.em (StateInv g) with yes | no
+  · exact constructive_history_holds g yes
+  · exact False.elim (no hg)
+
+#print axioms history_holds
+"#,
+    );
+    obligation.source = source.into_bytes();
+    obligation.source_hash =
+        commitment::<RustCryptoSha256>(zeno_fcis_codec::domains::FORMAL_SOURCE, &obligation.source)
+            .unwrap_or_else(|_| unreachable!());
+    assert!(source_is_bound(&obligation));
+    record_source("classical_control", obligation.source());
+    // The manifest explicitly allows choice: the unconditional ceiling must
+    // still refuse the successfully compiled theorem and name its dependency.
+    let mut config = pinned_config();
+    config
+        .allowed_axioms
+        .insert(0, "Classical.choice".to_owned());
+    let run = execute_tool(&config, obligation)
+        .unwrap_or_else(|error| panic!("classical control: {error:?}"));
+    let stdout = String::from_utf8_lossy(run.stdout());
+    println!("classical_control: {:?}\n{stdout}", run.status());
+    if let Some(directory) = std::env::var_os("ZENO_FCIS_LEAN_EVIDENCE") {
+        fs::write(
+            PathBuf::from(directory).join("classical_control.stdout"),
+            run.stdout(),
+        )
+        .unwrap_or_else(|error| panic!("classical control evidence: {error}"));
+    }
+    assert!(!stdout.contains("error:"), "{stdout}");
+    assert!(stdout.contains("Classical.choice"), "{stdout}");
+    assert_eq!(
+        run.status(),
+        &ToolRunStatus::Blocked(ToolFailure::DisallowedLeanAxiom(
+            "Classical.choice".to_owned()
+        ))
+    );
 }
 
 static POSITIVE_BASELINE: std::sync::Once = std::sync::Once::new();
@@ -593,6 +704,29 @@ fn inductive_lean_tampered_evidence_is_blocked() {
         ),
         ToolRunStatus::KernelChecked
     );
+    // Even an explicitly widened manifest cannot admit a forbidden dependency.
+    // Check names rather than a blacklist: an unknown future axiom is refused.
+    for name in ["Classical.choice", "Lean.ofReduceBool", "unreviewed_axiom"] {
+        config.allowed_axioms = vec![name.to_owned()];
+        assert_eq!(
+            classify(&config, &output(THEOREM, name), &obligation),
+            ToolRunStatus::Blocked(ToolFailure::DisallowedLeanAxiom(name.to_owned()))
+        );
+    }
+    // The fixed ceiling does not replace the manifest's exact admission rule.
+    for axioms in [vec![], vec!["propext"], vec!["Quot.sound", "propext"]] {
+        config.allowed_axioms = axioms.iter().map(|name| (*name).to_owned()).collect();
+        assert_eq!(
+            classify(&config, &output(THEOREM, &axioms.join(", ")), &obligation),
+            ToolRunStatus::KernelChecked
+        );
+    }
+    config.allowed_axioms = vec![];
+    assert_eq!(
+        classify(&config, &valid, &obligation),
+        ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport)
+    );
+    config.allowed_axioms = vec!["Quot.sound".to_owned(), "propext".to_owned()];
     let mut changed = obligation.clone();
     changed.source.push(b' ');
     assert!(!source_is_bound(&changed));

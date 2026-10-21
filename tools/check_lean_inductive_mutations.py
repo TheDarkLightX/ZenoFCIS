@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check normal Lean induction results, then compile and kill seven exporter faults.
+"""Check Lean induction controls, seven exporter faults and the axiom ceiling.
 
 Requires the repository-pinned Lean distribution in ZENO_FCIS_LEAN{,_ROOT}.
 Each mutation is applied to an isolated source copy. A Rust build failure or
@@ -86,6 +86,11 @@ def main():
     print(facts.stdout, flush=True)
     if facts.returncode or "1 passed; 0 failed" not in facts.stdout:
         raise SystemExit("normal-source rendered-facts baseline did not pass")
+    axiom_test = "lean_inductive::tests::inductive_lean_tampered_evidence_is_blocked"
+    axiom_baseline = run(ROOT, env, axiom_test, True, ignored=False)
+    print(axiom_baseline.stdout, flush=True)
+    if axiom_baseline.returncode or "1 passed; 0 failed" not in axiom_baseline.stdout:
+        raise SystemExit("normal-source axiom ceiling baseline did not pass")
     baseline = run(ROOT, env, PREFIX, False)
     print(baseline.stdout, flush=True)
     if baseline.returncode or "7 passed; 0 failed" not in baseline.stdout:
@@ -121,12 +126,36 @@ def main():
             if fixture == "domain" and "omega could not prove the goal" not in result.stdout:
                 raise SystemExit("domain mutation failed without the required proof diagnostic")
             print(f"KILLED: {name} by {PREFIX + fixture}", flush=True)
+        gate_path = copy / "crates/zeno-fcis-formal-tools/src/lib.rs"
+        gate_original = gate_path.read_text()
+        gate = '''            if let Some(name) = axioms
+                .iter()
+                .find(|name| !matches!(name.as_str(), "propext" | "Quot.sound"))
+            {
+                return ToolRunStatus::Blocked(ToolFailure::DisallowedLeanAxiom(name.clone()));
+            }
+'''
+        if gate_original.count(gate) != 1:
+            raise SystemExit("axiom ceiling mutation anchor must match once")
+        gate_path.write_text(gate_original.replace(gate, "", 1))
+        result = run(copy, env, axiom_test, True, ignored=False)
+        gate_path.write_text(gate_original)
+        print(result.stdout, flush=True)
+        if (result.returncode == 0 or "test result: FAILED." not in result.stdout
+                or "assertion `left == right` failed" not in result.stdout
+                or 'DisallowedLeanAxiom("Classical.choice")' not in result.stdout):
+            raise SystemExit("axiom ceiling removal did not reach the named refusal assertion")
+        print(f"KILLED: axiom ceiling removed by {axiom_test}", flush=True)
     # The real source must still pass after all isolated mutations.
     restored = run(ROOT, env, PREFIX, False)
     print(restored.stdout, flush=True)
     if restored.returncode or "7 passed; 0 failed" not in restored.stdout:
         raise SystemExit("real-source controls did not pass after mutation runs")
-    print(f"PASS: normal controls, {len(MUTATIONS)} compiled result flips, restored controls")
+    restored_axioms = run(ROOT, env, axiom_test, True, ignored=False)
+    print(restored_axioms.stdout, flush=True)
+    if restored_axioms.returncode or "1 passed; 0 failed" not in restored_axioms.stdout:
+        raise SystemExit("real-source axiom ceiling did not pass after mutation run")
+    print(f"PASS: normal controls, {len(MUTATIONS)} compiled result flips, axiom ceiling, restored controls")
 
 
 if __name__ == "__main__":

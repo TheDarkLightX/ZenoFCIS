@@ -487,6 +487,8 @@ pub enum ToolFailure {
     UnsupportedEvidence,
     ModelReplayFailed,
     LeanAxiomReport,
+    /// A reported dependency outside the fixed constructive axiom ceiling.
+    DisallowedLeanAxiom(String),
     Io(String),
 }
 
@@ -2188,6 +2190,7 @@ fn failure_record(failure: &ToolFailure) -> Result<Vec<u8>, ToolFailure> {
         ToolFailure::ModelReplayFailed => (19, None),
         ToolFailure::LeanAxiomReport => (20, None),
         ToolFailure::Io(message) => (21, Some(message.as_bytes().to_vec())),
+        ToolFailure::DisallowedLeanAxiom(name) => (22, Some(name.as_bytes().to_vec())),
     };
     let mut bytes = vec![tag];
     if let Some(detail) = detail {
@@ -2767,10 +2770,24 @@ fn classify(
         {
             ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
         }
-        ToolBackend::Lean => match parse_lean_axioms(&text) {
-            Some(axioms) if axioms == config.allowed_axioms => ToolRunStatus::KernelChecked,
-            _ => ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport),
-        },
+        ToolBackend::Lean => {
+            let Some(axioms) = parse_lean_axioms(&text) else {
+                return ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport);
+            };
+            // A manifest may narrow admission, but cannot authorize classical
+            // choice, native evaluation or any other unreviewed dependency.
+            if let Some(name) = axioms
+                .iter()
+                .find(|name| !matches!(name.as_str(), "propext" | "Quot.sound"))
+            {
+                return ToolRunStatus::Blocked(ToolFailure::DisallowedLeanAxiom(name.clone()));
+            }
+            if axioms == config.allowed_axioms {
+                ToolRunStatus::KernelChecked
+            } else {
+                ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport)
+            }
+        }
     }
 }
 
@@ -2807,6 +2824,7 @@ fn failure_name(failure: &ToolFailure) -> &'static str {
         ToolFailure::UnsupportedEvidence => "unsupported_evidence",
         ToolFailure::ModelReplayFailed => "model_replay_failed",
         ToolFailure::LeanAxiomReport => "lean_axiom_report",
+        ToolFailure::DisallowedLeanAxiom(_) => "disallowed_lean_axiom",
         ToolFailure::Io(_) => "io",
     }
 }

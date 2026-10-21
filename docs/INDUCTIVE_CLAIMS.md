@@ -255,6 +255,12 @@ and Boolean connectives. The export preserves i128 ranges, declared domains,
 strict checked-arithmetic definedness, and the law groups for each decision
 kind. The standalone source uses only Lean's core library.
 
+Every formula in this fragment is decidable. The proof normalizes its Boolean
+connectives with constructive decidability before asking `omega` for an
+arithmetic proof of contradiction. It checks symbolic integer bounds without
+enumerating states. This is not a complete decision procedure: a proof search
+failure or resource limit gives no checked evidence.
+
 The generated `StateInv` describes the invariant. `Admitted` describes the model's
 committing steps, and `step_preserves` proves that each keeps `StateInv`.
 `Step` also permits an unchanged state for rejection or technical refusal.
@@ -281,7 +287,10 @@ Every assumed law must also be enforced on the decisions its group names.
 
 The evidence level is **kernel checked, for this fragment, under these
 premises**, only when the pinned runtime and exact configured axiom report
-are admitted. The generated source, project identity, resolved-law identity,
+are admitted. The report may contain only `propext` and `Quot.sound`;
+any other axiom is refused by name, even if the manifest allows it. This
+excludes `Classical.choice` and native-evaluation axioms transitively.
+The generated source, project identity, resolved-law identity,
 runtime inventory, and run record bind that evidence to its inputs.
 The CLI's ignored `pinned_lean_kernel_checks_both_inductive_pilots_through_prove`
 test exercises both pilots; running ordinary tests alone does not run it.

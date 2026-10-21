@@ -283,7 +283,7 @@ is shared.
    ```
 
    The development candidate routes claim 600 through `--backend lean`.
-   The 2026-10-18 run used the pinned Lean 4.30.0 runtime and an explicit
+   The 2026-10-19 run used the pinned Lean 4.30.0 runtime and an explicit
    manifest allowing exactly `propext` and `Quot.sound`. Its recorded
    output includes:
 

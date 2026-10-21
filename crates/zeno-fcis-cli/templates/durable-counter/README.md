@@ -137,7 +137,7 @@ project file.
 The development candidate also exports claim 600 through `--backend lean`
 for the restricted linear fragment. Its finite-history theorem assumes the
 initial state satisfies the invariant; it does not infer a genesis value from
-`project.zeno`. The 2026-10-18 run used the pinned Lean 4.30.0 runtime
+`project.zeno`. The 2026-10-19 run used the pinned Lean 4.30.0 runtime
 and an explicit manifest allowing exactly `propext` and `Quot.sound`.
 Its recorded output includes:
 

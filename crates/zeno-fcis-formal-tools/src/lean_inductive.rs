@@ -124,7 +124,7 @@ pub fn export_inductive_lean_with_limits(
     let before = &rendered[grouped.len()];
     let inv = satisfied(before).replace("pre.", "s.");
     source.push_str(&format!("\ndef StateInv (s : State) : Prop := {inv}\n\ndef Admitted (pre post : State) (inputs : Inputs) (kind : Nat) : Prop :=\n  {}\n\n", conjunction(assumptions)));
-    source.push_str("theorem step_preserves (pre post : State) (inputs : Inputs) (kind : Nat) :\n  StateInv pre → Admitted pre post inputs kind → StateInv post := by\n  intro hinv hadmitted\n  simp only [StateInv, Admitted, inI128, true_and, and_true] at *\n  repeat' first | apply And.intro | intro\n  all_goals\n    try simp only [Decidable.imp_iff_not_or] at *\n    omega\n\n");
+    source.push_str(STEP_PROOF);
     source.push_str(HISTORY);
     if source.len() > limits.max_source_bytes() {
         return Err(ExportError::ResourceLimit);
@@ -148,6 +148,26 @@ fn grouped_laws(hypotheses: &StepHypotheses) -> Vec<(&LawDecl, Option<u8>)> {
         )
         .collect()
 }
+
+// Every supported formula is quantifier-free over decidable integer comparisons.
+// Normalize its logic before omega: omega's general propositional preprocessing
+// supplies classical instances even when constructive instances exist. With a
+// False goal and only arithmetic literals, conjunctions and disjunctions left,
+// its arithmetic certificate does not need that preprocessing. The independent
+// axiom gate still checks the transitive dependencies of each resulting theorem.
+const STEP_PROOF: &str = r#"set_option linter.unusedSimpArgs false in
+theorem step_preserves (pre post : State) (inputs : Inputs) (kind : Nat) :
+  StateInv pre → Admitted pre post inputs kind → StateInv post := by
+  intro hinv hadmitted
+  simp only [StateInv, Admitted, inI128, true_and, and_true] at *
+  all_goals
+    apply Decidable.byContradiction
+    intro hnot
+    simp only [Decidable.imp_iff_not_or, Decidable.not_and_iff_not_or_not,
+      not_or, Decidable.not_not] at *
+    all_goals omega
+
+"#;
 
 const HISTORY: &str = r#"def Step (s s' : State) : Prop :=
   (∃ inputs kind, Admitted s s' inputs kind) ∨ s' = s
