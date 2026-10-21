@@ -1,5 +1,4 @@
 //! Finite distribution checks and named mutation-detection obligations.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use zeno_fcis_contract::distribution::{Limits, PREMISE, Verdict, check};
 
@@ -23,11 +22,12 @@ fn mass(kind: &str, numerator: &str, denominator: &str) -> serde_json::Value {
 }
 
 #[test]
-fn distribution_examples_check_exactly_with_their_premise() {
+fn distribution_examples_check_exactly_with_their_premise() -> Result<(), Box<dyn std::error::Error>>
+{
     for (project, policy, tuples, work) in
         [(REPORTER, POLICY, 16, 32), (PAYOUT, PAYOUT_POLICY, 8, 24)]
     {
-        let result = check(project, policy, Limits::default()).unwrap();
+        let result = check(project, policy, Limits::default())?;
         assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
         assert_eq!(result.packet()["premise"], PREMISE);
         assert_eq!(result.packet()["measured"]["tuples"], tuples);
@@ -42,12 +42,14 @@ fn distribution_examples_check_exactly_with_their_premise() {
             ])
         );
     }
+    Ok(())
 }
 
 #[test]
-fn distribution_committed_failure_is_one_distinct_outcome() {
+fn distribution_committed_failure_is_one_distinct_outcome() -> Result<(), Box<dyn std::error::Error>>
+{
     // Counting the failure's written value would make this target hold.
-    let result = check(FAILURE, FAILURE_POLICY, Limits::default()).unwrap();
+    let result = check(FAILURE, FAILURE_POLICY, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
     let r = &result.packet()["result"];
     assert_eq!(r["non_random_input"][0]["value"], "0");
@@ -69,7 +71,7 @@ fn distribution_committed_failure_is_one_distinct_outcome() {
         "uniform over {committed-failure, 2, 1, 0}",
     ] {
         let project = FAILURE.replace("uniform over {0, 1, 2, 3}", target);
-        let result = check(&project, FAILURE_POLICY, Limits::default()).unwrap();
+        let result = check(&project, FAILURE_POLICY, Limits::default())?;
         assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
         assert_eq!(result.packet()["measured"]["complete_fibers"], 4);
         assert_eq!(
@@ -86,17 +88,19 @@ fn distribution_committed_failure_is_one_distinct_outcome() {
         "uniform over {0, 1, 2, 3}",
         "{0: 1/4, 1: 1/4, 2: 1/4, 3: 1/8, committed-failure: 1/8}",
     );
-    let result = check(&wrong, FAILURE_POLICY, Limits::default()).unwrap();
+    let result = check(&wrong, FAILURE_POLICY, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
     assert_eq!(
         result.packet()["result"]["witness"]["outcome"],
         "committed-failure"
     );
+    Ok(())
 }
 
 #[test]
-fn distribution_modulo_bias_is_refuted_with_a_minimal_witness() {
-    let result = check(BIAS, BIAS_POLICY, Limits::default()).unwrap();
+fn distribution_modulo_bias_is_refuted_with_a_minimal_witness()
+-> Result<(), Box<dyn std::error::Error>> {
+    let result = check(BIAS, BIAS_POLICY, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
     let r = &result.packet()["result"];
     assert_eq!(r["expected"][0]["numerator"], "1");
@@ -110,17 +114,21 @@ fn distribution_modulo_bias_is_refuted_with_a_minimal_witness() {
     );
     // One assignment has mass 1/4 <= 1/3; these two have mass 1/2 > 1/3.
     assert_eq!(result.packet()["measured"]["tuples"], 4);
+    Ok(())
 }
 
 #[test]
-fn distribution_random_width_must_match_the_entire_input_domain() {
+fn distribution_random_width_must_match_the_entire_input_domain()
+-> Result<(), Box<dyn std::error::Error>> {
     let wrong = REPORTER.replace("bits 2", "bits 1");
     assert!(
         check(&wrong, POLICY, Limits::default())
-            .unwrap_err()
+            .err()
+            .ok_or("random-width mismatch was accepted")?
             .reason()
             .contains("width")
     );
+    Ok(())
 }
 
 #[test]
@@ -130,15 +138,17 @@ fn distribution_weights_must_sum_exactly_to_one() {
 }
 
 #[test]
-fn distribution_counts_every_random_value() {
-    let result = check(REPORTER, POLICY, Limits::default()).unwrap();
+fn distribution_counts_every_random_value() -> Result<(), Box<dyn std::error::Error>> {
+    let result = check(REPORTER, POLICY, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
     assert_eq!(result.packet()["measured"]["tuples"], 16);
     assert_eq!(result.packet()["measured"]["complete_fibers"], 4);
+    Ok(())
 }
 
 #[test]
-fn distribution_every_verdict_retains_the_randomness_premise() {
+fn distribution_every_verdict_retains_the_randomness_premise()
+-> Result<(), Box<dyn std::error::Error>> {
     for (p, r, limits, wanted) in [
         (REPORTER, POLICY, Limits::default(), Verdict::Checked),
         (BIAS, BIAS_POLICY, Limits::default(), Verdict::Refuted),
@@ -152,7 +162,7 @@ fn distribution_every_verdict_retains_the_randomness_premise() {
             Verdict::Unknown,
         ),
     ] {
-        let result = check(p, r, limits).unwrap();
+        let result = check(p, r, limits)?;
         assert_eq!(result.verdict(), wanted);
         assert_eq!(result.packet()["premise"], PREMISE);
         assert_eq!(result.packet()["random_inputs"][0]["uniform"], true);
@@ -161,23 +171,26 @@ fn distribution_every_verdict_retains_the_randomness_premise() {
             assert!(result.packet()["claim"].is_null());
         }
     }
+    Ok(())
 }
 
 #[test]
-fn distribution_singleton_parameter_boundary_includes_zero_bits() {
+fn distribution_singleton_parameter_boundary_includes_zero_bits()
+-> Result<(), Box<dyn std::error::Error>> {
     let singleton = REPORTER
         .replace("Reporter in 0..=3", "Reporter in 0..=0")
         .replace("RandomBits in 0..=3", "RandomBits in 0..=0")
         .replace("bits 2", "bits 0")
         .replace("{0, 1, 2, 3}", "{0}");
-    let result = check(&singleton, POLICY, Limits::default()).unwrap();
+    let result = check(&singleton, POLICY, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
     assert_eq!(result.packet()["random_domain_size"], "1");
     assert_eq!(result.packet()["measured"]["tuples"], 1);
+    Ok(())
 }
 
 #[test]
-fn distribution_budgets_never_promote_a_partial_fold() {
+fn distribution_budgets_never_promote_a_partial_fold() -> Result<(), Box<dyn std::error::Error>> {
     for (limit, tuples, work) in [
         (
             Limits {
@@ -204,7 +217,7 @@ fn distribution_budgets_never_promote_a_partial_fold() {
             0,
         ),
     ] {
-        let result = check(REPORTER, POLICY, limit).unwrap();
+        let result = check(REPORTER, POLICY, limit)?;
         assert_eq!(result.verdict(), Verdict::Unknown);
         assert_eq!(result.packet()["measured"]["tuples"], tuples);
         assert_eq!(result.packet()["measured"]["work"], work);
@@ -217,15 +230,16 @@ fn distribution_budgets_never_promote_a_partial_fold() {
                 max_work: 32,
                 ..Limits::default()
             }
-        )
-        .unwrap()
+        )?
         .verdict(),
         Verdict::Checked
     );
+    Ok(())
 }
 
 #[test]
-fn distribution_conditions_on_each_non_random_input_tuple() {
+fn distribution_conditions_on_each_non_random_input_tuple() -> Result<(), Box<dyn std::error::Error>>
+{
     // Pooled over both command values this is uniform. Each fixed command
     // is deterministic, so the conditional distribution must be refuted.
     let project = PAYOUT.replace("1 - context.102.130", "command.101");
@@ -239,13 +253,15 @@ fn distribution_conditions_on_each_non_random_input_tuple() {
             "\"111\": \"context.102.130\"",
             "\"111\": \"1 - command.101\"",
         );
-    let result = check(&project, &policy, Limits::default()).unwrap();
+    let result = check(&project, &policy, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
     assert_eq!(result.packet()["result"]["witness"]["size"], 2);
+    Ok(())
 }
 
 #[test]
-fn distribution_multiple_random_inputs_form_the_full_product() {
+fn distribution_multiple_random_inputs_form_the_full_product()
+-> Result<(), Box<dyn std::error::Error>> {
     let project = REPORTER
         .replace("RandomBits in 0..=3", "RandomBits in 0..=1")
         .replace(
@@ -261,19 +277,24 @@ fn distribution_multiple_random_inputs_form_the_full_product() {
         "\"110\": \"context.102.130\"",
         "\"110\": \"2 * context.102.130 + context.102.131\"",
     );
-    let result = check(&project, &policy, Limits::default()).unwrap();
+    let result = check(&project, &policy, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
     assert_eq!(result.packet()["random_domain_size"], "4");
     assert_eq!(
-        result.packet()["random_inputs"].as_array().unwrap().len(),
+        result.packet()["random_inputs"]
+            .as_array()
+            .ok_or("missing random input array")?
+            .len(),
         2
     );
+    Ok(())
 }
 
 #[test]
-fn distribution_refusals_and_undefined_projections_are_unknown() {
+fn distribution_refusals_and_undefined_projections_are_unknown()
+-> Result<(), Box<dyn std::error::Error>> {
     // An ordinary reject is a decision, but has no post-state projection.
-    let mut policy: serde_json::Value = serde_json::from_str(POLICY).unwrap();
+    let mut policy: serde_json::Value = serde_json::from_str(POLICY)?;
     policy["cases"][0]["class"] = serde_json::json!("Reject");
     policy["cases"][0]["reason"] = serde_json::json!(200);
     policy["cases"][0]["post"] = serde_json::json!({});
@@ -281,8 +302,7 @@ fn distribution_refusals_and_undefined_projections_are_unknown() {
         &format!("{REPORTER}\nreason 200 denied precedence 0;"),
         &policy.to_string(),
         Limits::default(),
-    )
-    .unwrap();
+    )?;
     assert_eq!(result.verdict(), Verdict::Unknown);
     assert_eq!(
         result.packet()["result"]["reason"],
@@ -294,15 +314,15 @@ fn distribution_refusals_and_undefined_projections_are_unknown() {
         "\"110\": \"context.102.130 + 4\"",
     );
     assert_eq!(
-        check(REPORTER, &refused, Limits::default())
-            .unwrap()
-            .verdict(),
+        check(REPORTER, &refused, Limits::default())?.verdict(),
         Verdict::Unknown
     );
+    Ok(())
 }
 
 #[test]
-fn distribution_invalid_declarations_fail_closed_and_results_are_owned() {
+fn distribution_invalid_declarations_fail_closed_and_results_are_owned()
+-> Result<(), Box<dyn std::error::Error>> {
     for project in [
         REPORTER.replace("independent uniform", "uniform"),
         REPORTER.replace("bits 2", "bits 128"),
@@ -317,14 +337,15 @@ fn distribution_invalid_declarations_fail_closed_and_results_are_owned() {
         assert!(check(&project, POLICY, Limits::default()).is_err());
     }
     let mut project = REPORTER.to_owned();
-    let result = check(&project, POLICY, Limits::default()).unwrap();
+    let result = check(&project, POLICY, Limits::default())?;
     let original = result.packet().clone();
     project.clear();
     let mut detached = result.packet().clone();
     detached["premise"] = serde_json::Value::Null;
     assert_eq!(result.packet(), &original);
     assert_eq!(
-        check(REPORTER, POLICY, Limits::default()).unwrap().packet(),
+        check(REPORTER, POLICY, Limits::default())?.packet(),
         &original
     );
+    Ok(())
 }

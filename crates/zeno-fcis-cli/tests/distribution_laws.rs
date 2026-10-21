@@ -1,11 +1,10 @@
 //! Public command exits, witnesses, limits and deterministic packets.
-#![allow(clippy::unwrap_used)]
 
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn run(example: &str, more: &[&str], exit: i32) -> Vec<u8> {
+fn run(example: &str, more: &[&str], exit: i32) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/distribution-laws")
         .join(example);
@@ -13,19 +12,19 @@ fn run(example: &str, more: &[&str], exit: i32) -> Vec<u8> {
         .args(["contract", "distribution"])
         .arg(path)
         .args(more)
-        .output()
-        .unwrap();
+        .output()?;
     assert_eq!(
         output.status.code(),
         Some(exit),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    output.stdout
+    Ok(output.stdout)
 }
 
 #[test]
-fn distribution_cli_checks_refutes_and_reports_unknown_with_the_premise() {
+fn distribution_cli_checks_refutes_and_reports_unknown_with_the_premise()
+-> Result<(), Box<dyn std::error::Error>> {
     for (example, extra, exit, status) in [
         ("reporter-choice", vec![], 0, "checked"),
         ("payout-tie", vec![], 0, "checked"),
@@ -33,14 +32,14 @@ fn distribution_cli_checks_refutes_and_reports_unknown_with_the_premise() {
         ("reporter-choice", vec!["--max-tuples", "15"], 2, "UNKNOWN"),
         ("reporter-choice", vec!["--max-work", "31"], 2, "UNKNOWN"),
     ] {
-        let first = run(example, &extra, exit);
-        assert_eq!(first, run(example, &extra, exit));
-        let result: Value = serde_json::from_slice(&first).unwrap();
+        let first = run(example, &extra, exit)?;
+        assert_eq!(first, run(example, &extra, exit)?);
+        let result: Value = serde_json::from_slice(&first)?;
         assert_eq!(result["status"], status);
         assert!(
             result["premise"]
                 .as_str()
-                .unwrap()
+                .ok_or("missing textual randomness premise")?
                 .contains("uniform independent random bits")
         );
         assert_eq!(result["authority"], "none");
@@ -54,10 +53,12 @@ fn distribution_cli_checks_refutes_and_reports_unknown_with_the_premise() {
             assert!(result["claim"].is_null());
         }
     }
+    Ok(())
 }
 
 #[test]
-fn distribution_cli_saved_packet_and_both_summaries_retain_the_premise() {
+fn distribution_cli_saved_packet_and_both_summaries_retain_the_premise()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/distribution-laws/reporter-choice");
     let out =
@@ -69,34 +70,33 @@ fn distribution_cli_saved_packet_and_both_summaries_retain_the_premise() {
             .arg("--out")
             .arg(&out)
             .args(["--format", format])
-            .output()
-            .unwrap();
+            .output()?;
         assert!(
             output.status.success(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let summary = String::from_utf8(output.stdout).unwrap();
+        let summary = String::from_utf8(output.stdout)?;
         assert!(summary.contains("given uniform independent random bits"));
-        let packet: Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+        let packet: Value = serde_json::from_slice(&std::fs::read(&out)?)?;
         assert!(
             packet["premise"]
                 .as_str()
-                .unwrap()
+                .ok_or("missing textual randomness premise")?
                 .contains("uniform independent random bits")
         );
     }
-    std::fs::remove_file(out).unwrap();
+    std::fs::remove_file(out)?;
+    Ok(())
 }
 
 #[test]
-fn distribution_cli_declares_its_effects() {
+fn distribution_cli_declares_its_effects() -> Result<(), Box<dyn std::error::Error>> {
     let output = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
         .args(["describe", "contract", "distribution"])
-        .output()
-        .unwrap();
+        .output()?;
     assert!(output.status.success());
-    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let result: Value = serde_json::from_slice(&output.stdout)?;
     let effects = &result["command"]["effects"];
     assert_eq!(effects["classification"], "declared");
     assert_eq!(
@@ -108,4 +108,5 @@ fn distribution_cli_declares_its_effects() {
         serde_json::json!(["optional-judge-packet"])
     );
     assert_eq!(effects["executes_tools"], false);
+    Ok(())
 }
