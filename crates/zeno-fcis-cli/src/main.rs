@@ -745,13 +745,11 @@ fn new_project(
     result
 }
 
-/// Writes a new project into the empty directory `dir`.
-fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Option<&Path>) -> u8 {
-    if let Some(contract) = contract {
-        return contract_files::scaffold(dir, contract, source);
-    }
+fn application_template_files(
+    template: Template,
+) -> Option<&'static [(&'static str, &'static [u8])]> {
     // Exhaustive, so a new template cannot compile without choosing its files.
-    let application = match template {
+    match template {
         Template::Minimal | Template::MiniDeterminator => None,
         Template::DurableCounter => Some(durable_counter::FILES),
         Template::PreparedCounter => Some(prepared_counter::FILES),
@@ -761,7 +759,15 @@ fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Op
         Template::ComplianceGateway => Some(compliance_gateway::FILES),
         Template::WithdrawalQueue => Some(withdrawal_queue::FILES),
         Template::AgentTreasuryGuard => Some(agent_treasury_guard::FILES),
-    };
+    }
+}
+
+/// Writes a new project into the empty directory `dir`.
+fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Option<&Path>) -> u8 {
+    if let Some(contract) = contract {
+        return contract_files::scaffold(dir, contract, source);
+    }
+    let application = application_template_files(template);
     if let Some(files) = application {
         let manifest = files
             .iter()
@@ -2071,6 +2077,17 @@ mod tests {
                 panic!("bundled template did not parse");
             };
             assert!(elaborate_project(parsed, ProjectLimits::default()).is_ok());
+        }
+    }
+
+    #[test]
+    fn every_application_template_file_list_has_unique_paths() {
+        for template in Template::value_variants() {
+            if let Some(files) = application_template_files(*template) {
+                let names: std::collections::BTreeSet<_> =
+                    files.iter().map(|(name, _)| *name).collect();
+                assert_eq!(names.len(), files.len(), "duplicate path in {template:?}");
+            }
         }
     }
 

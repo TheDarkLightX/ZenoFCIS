@@ -762,3 +762,33 @@ pub(crate) fn read_input(path: &Path) -> std::io::Result<Vec<u8>> {
     }
     Ok(bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contract_template_file_lists_have_unique_paths() {
+        for (name, files) in [("scalar", APPLICATION), ("numeric", NUMERIC_APPLICATION)] {
+            let mut names = std::collections::BTreeSet::new();
+            for path in [
+                "Cargo.toml",
+                "Cargo.lock",
+                "README.md",
+                PROJECT,
+                RULES,
+                EXAMPLES,
+                "ui.json",
+                SCHEMA,
+                SOURCE,
+                POLICY,
+                "rust-toolchain.toml",
+            ] {
+                assert!(names.insert(path), "duplicate contract path {path}");
+            }
+            for (path, _) in files {
+                assert!(names.insert(path), "duplicate {name} template path {path}");
+            }
+        }
+    }
+}

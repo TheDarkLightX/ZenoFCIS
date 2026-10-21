@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import tomllib
 import sys
 
@@ -23,6 +24,26 @@ def external(lock):
 def hashes(root):
     return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(root.rglob("*")) if p.is_file()}
+
+def prepare_library(cli, template):
+    """Stage reviewed files; reuse only a complete matching library."""
+    destination = ROOT / "site/apps" / template
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".library-", dir=destination.parent) as temporary:
+        staged = Path(temporary) / template
+        run(cli.resolve(), "new", staged, "--template", template, "--source", ROOT)
+        manifest = staged / "Cargo.toml"
+        manifest.write_text(manifest.read_text().split("\n[patch.crates-io]\n", 1)[0])
+        for name in ["Cargo.lock", "rust-toolchain.toml"]:
+            (staged / name).unlink(missing_ok=True)
+        expected = hashes(staged)
+        if destination.exists():
+            for name, digest in expected.items():
+                path = destination / name
+                if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                    raise ValueError(f"AppLibraryIncompleteOrChanged:{template}:{name}")
+            return
+        staged.rename(destination)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -47,17 +68,9 @@ def main():
         raise ValueError("AppRequiresStandaloneContract")
     if not (contract / "ui.json").is_file():
         raise ValueError("UiMissingMetadata:ui.json")
-    # The existing site workspace resolves its six generated demonstration libraries.
-    # Generate only missing copies, using the same CLI and reviewed template files.
+    # Resolve the six site libraries from complete, reviewed template files.
     for template in ["account-lockout", "order-fulfillment", "inventory-reservation", "compliance-gateway", "withdrawal-queue", "agent-treasury-guard"]:
-        destination = ROOT / "site/apps" / template
-        if not destination.exists():
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            run(args.cli.resolve(), "new", destination, "--template", template, "--source", ROOT)
-            manifest = destination / "Cargo.toml"
-            manifest.write_text(manifest.read_text().split("\n[patch.crates-io]\n", 1)[0])
-            for name in ["Cargo.lock", "rust-toolchain.toml"]:
-                (destination / name).unlink(missing_ok=True)
+        prepare_library(args.cli, template)
     target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")).resolve()
     cargo = ("cargo", "+1.97.1", "build", "--locked", "--offline", "--release", "--manifest-path", ROOT / "site/Cargo.toml", "-p", "zeno-fcis-site-factory")
     run(*cargo, "--bin", "ui_contract")
@@ -69,7 +82,6 @@ def main():
     sys.path.insert(0, str(ROOT / "site"))
     from wasm import private_module
     # Every law and mounted-runtime check completes before scaffold emission.
-    import tempfile
     with tempfile.TemporaryDirectory(prefix="app-build-") as temporary:
         work = Path(temporary)
         runtime = work / "core.wasm"
