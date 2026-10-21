@@ -1110,13 +1110,15 @@ mod tests {
             assert_eq!(classes.len(), want.len());
             for seed in 0..128usize {
                 let predicate: Vec<i128> = (0..pos.len())
-                    .map(|ordinal| match (ordinal * 7 + ordinal / 3 + seed * 11) % 7 {
-                        0 | 1 => 1,
-                        2 => 0,
-                        3 => 2,
-                        4 => i128::MIN,
-                        _ => i128::MAX,
-                    })
+                    .map(
+                        |ordinal| match (ordinal * 7 + ordinal / 3 + seed * 11) % 7 {
+                            0 | 1 => 1,
+                            2 => 0,
+                            3 => 2,
+                            4 => i128::MIN,
+                            _ => i128::MAX,
+                        },
+                    )
                     .collect();
                 let mut on = Vec::new();
                 let mut off = Vec::new();
@@ -1155,5 +1157,4 @@ mod tests {
             "only Boolean value 1 is true"
         );
     }
-
 }
