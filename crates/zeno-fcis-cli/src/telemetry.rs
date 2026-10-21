@@ -114,7 +114,10 @@ impl Invocation {
             // On help and malformed arguments, retain only recognized command
             // words. Arbitrary argument text never enters the record.
             let mut cursor = &parser;
-            for word in std::env::args().skip(1) {
+            for word in std::env::args_os()
+                .skip(1)
+                .filter_map(|word| word.into_string().ok())
+            {
                 if let Some(child) = cursor.find_subcommand(&word) {
                     command.push(child.get_name().to_owned());
                     cursor = child;
@@ -217,7 +220,9 @@ pub(crate) fn observe(value: &Value) {
         Some("inconclusive" | "not-inductive" | "unknown" | "UNKNOWN" | "blocked") => {
             Some("unknown")
         }
-        Some("refused" | "invalid" | "error" | "contract-invalid" | "malformed") => Some("refused"),
+        Some("refused" | "invalid" | "error" | "contract-invalid" | "malformed" | "vacuous") => {
+            Some("refused")
+        }
         _ => None,
     };
     if let Some(class) = class {
@@ -241,9 +246,11 @@ pub(crate) fn observe(value: &Value) {
                         | "used_work"
                         | "reserved_work"
                         | "steps"
-                ) && child.is_number()
+                ) && let Some(number) = child
+                    .as_u64()
+                    .or_else(|| child.as_str()?.parse::<u64>().ok())
                 {
-                    found.insert(name, child.clone());
+                    found.insert(name, json!(number));
                 } else if matches!(
                     key.as_str(),
                     "accounting"
@@ -270,10 +277,10 @@ pub(crate) fn observe(value: &Value) {
 }
 
 fn utc_now() -> String {
-    let seconds = SystemTime::now()
+    let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+        .unwrap_or_default();
+    let seconds = elapsed.as_secs();
     // Gregorian civil date from days since the Unix epoch.
     let days = seconds / 86400 + 719468;
     let era = days / 146097;
@@ -286,9 +293,10 @@ fn utc_now() -> String {
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     year += u64::from(month <= 2);
     format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
         seconds / 3600 % 24,
         seconds / 60 % 60,
-        seconds % 60
+        seconds % 60,
+        elapsed.subsec_millis()
     )
 }

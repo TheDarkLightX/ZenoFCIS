@@ -39,9 +39,10 @@ transaction. Re-importing that line appends nothing, including after archival.
 An episode is a maximal consecutive run with the same actor and subject.
 Changing either splits it; missing subjects are singletons. Summaries include
 all runs and failure rates, and mean iterations and elapsed time to the first
-accepted verdict in completed episodes. Iterations include all command calls
-in that episode prefix; time includes the gaps between calls and the last
-call's duration. Incomplete episodes keep null acceptance measures. Records
+accepted verdict in completed episodes. For each command, iterations count that command's calls up to its first
+accepted verdict within the episode. Another command's acceptance supplies no
+acceptance measure. Time runs from that command's first call to the end of its
+first accepted call, including intervening gaps and other commands. Incomplete episodes keep null acceptance measures. Records
 are summarized in import order, so importing out of order changes episodes.
 Telemetry is untrusted coordination data and establishes no checker verdict,
 performance comparison, production authority or release qualification.

@@ -22,6 +22,7 @@ class ObservationStream:
         self.stream = stream
         self.pending = ""
         self.work = {}
+        self.verdict = None
 
     def __getattr__(self, name):
         return getattr(self.stream, name)
@@ -45,10 +46,16 @@ class ObservationStream:
     def observe(self, value, path=""):
         if not isinstance(value, dict):
             return
+        if not path:
+            status = value.get("status", value.get("verdict"))
+            self.verdict = {"accepted": "accepted", "checked": "accepted", "refuted": "refuted",
+                "UNKNOWN": "unknown", "unknown": "unknown", "inconclusive": "unknown",
+                "refused": "refused", "invalid": "refused"}.get(status, self.verdict)
         for key, child in value.items():
             name = f"{path}.{key}" if path else key
-            if key in WORK_KEYS and type(child) is int and child >= 0:
-                self.work[name] = child
+            if key in WORK_KEYS and (type(child) is int and child >= 0
+                    or isinstance(child, str) and child.isascii() and child.isdecimal() and len(child) <= 39):
+                self.work[name] = int(child)
             elif key in CONTAINERS:
                 self.observe(child, name)
 
@@ -125,7 +132,7 @@ def run_cli(function, command=None):
                 "actor": os.environ.get("ZENO_FCIS_COMMONS_ACTOR", "unknown"),
                 "command": command or ["python", Path(sys.argv[0]).stem],
                 "inputs": inputs, "subject_sha256": subject_digest(inputs),
-                "exit_code": code, "verdict": "accepted" if code == 0 else "refused",
+                "exit_code": code, "verdict": observer.verdict or ("accepted" if code == 0 else "refused"),
                 "work_units": observer.work or None, "duration_ms": (time.monotonic_ns() - started) // 1_000_000})
         except Exception:
             pass

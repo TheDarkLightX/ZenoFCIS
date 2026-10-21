@@ -55,6 +55,18 @@ class TelemetryImportTests(unittest.TestCase):
         self.assertIsNone(summary["commands"][0]["iterations_to_accept"])
         self.assertIsNone(summary["commands"][0]["time_to_accept_ms"])
 
+    def test_acceptance_belongs_to_the_command_that_reported_it(self):
+        rows = [run(second=0), run(second=1, verdict="accepted", command=["prove"]),
+                run(second=2, verdict="accepted")]
+        commands = {row["command"]: row for row in summarize(rows)["commands"]}
+        self.assertEqual(commands["check"]["iterations_to_accept"], 2)
+        self.assertEqual(commands["check"]["time_to_accept_ms"], 2010)
+        self.assertEqual(commands["prove"]["iterations_to_accept"], 1)
+        self.assertEqual(commands["prove"]["time_to_accept_ms"], 10)
+        incomplete = {row["command"]: row for row in summarize(rows[:2])["commands"]}
+        self.assertIsNone(incomplete["check"]["iterations_to_accept"])
+        self.assertEqual(incomplete["check"]["accepted_episodes"], 0)
+
     def test_malformed_line_does_not_append(self):
         self.write([{**run(), "inputs": [{"contents": "private source"}]}])
         head = self.store.head()

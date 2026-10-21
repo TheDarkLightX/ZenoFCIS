@@ -55,8 +55,9 @@ class TelemetryTests(unittest.TestCase):
     def test_reported_measured_work_is_observed_without_result_data(self):
         import io
         observer = telemetry.ObservationStream(io.StringIO())
-        observer.write(json.dumps({"measured": {"work": 17, "source": "private"}}) + "\n")
+        observer.write(json.dumps({"status": "UNKNOWN", "measured": {"work": "17", "source": "private"}}) + "\n")
         self.assertEqual(observer.work, {"measured.work": 17})
+        self.assertEqual(observer.verdict, "unknown")
 
     def test_python_concurrent_lines(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
@@ -75,7 +76,7 @@ class CliTelemetryTests(TelemetryTests):
                               capture_output=True, check=False)
 
     def test_cli_unwritable_preserves_exit_and_output(self):
-        for args in [["check", str(self.file), "--format", "json"], ["--help"], ["not-a-command"]]:
+        for args in [["check", str(self.file), "--format", "json"], ["--help"], ["not-a-command"], [b"\xff"]]:
             plain = self.cli(args)
             measured = self.cli(args, self.root)
             self.assertEqual((measured.returncode, measured.stdout, measured.stderr),
@@ -85,6 +86,7 @@ class CliTelemetryTests(TelemetryTests):
         self.cli(["check", str(self.file), "--format", "json"], self.log)
         row = json.loads(self.log.read_text())
         self.assertEqual(row["schema"], telemetry.SCHEMA)
+        self.assertRegex(row["timestamp"], r"T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$")
         self.assertEqual(row["command"], ["check"])
         self.assertEqual(row["inputs"][0]["sha256"], hashlib.sha256(self.file.read_bytes()).hexdigest())
         self.assertNotIn(self.file.read_text().strip(), self.log.read_text())

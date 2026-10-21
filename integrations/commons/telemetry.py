@@ -102,14 +102,14 @@ def summarize(rows):
         episodes.append(current)
     commands = {}
     for episode in episodes:
-        first_accept = next((index for index, row in enumerate(episode) if row["verdict"] == "accepted"), None)
-        accepted = first_accept is not None
-        prefix = episode[:first_accept + 1] if accepted else episode
-        start = datetime.fromisoformat(episode[0]["timestamp"].replace("Z", "+00:00"))
-        end = datetime.fromisoformat(prefix[-1]["timestamp"].replace("Z", "+00:00"))
-        elapsed = max(0, round((end - start).total_seconds() * 1000) + prefix[-1]["duration_ms"])
         for command in sorted({" ".join(row["command"]) for row in episode}):
             selected = [row for row in episode if " ".join(row["command"]) == command]
+            first_accept = next((index for index, row in enumerate(selected) if row["verdict"] == "accepted"), None)
+            accepted = first_accept is not None
+            prefix = selected[:first_accept + 1] if accepted else selected
+            start = datetime.fromisoformat(selected[0]["timestamp"].replace("Z", "+00:00"))
+            end = datetime.fromisoformat(prefix[-1]["timestamp"].replace("Z", "+00:00"))
+            elapsed = max(0, round((end - start).total_seconds() * 1000) + prefix[-1]["duration_ms"])
             stats = commands.setdefault(command, {"command": command, "runs": 0, "failures": 0,
                 "accepted_episodes": 0, "iterations": [], "times": []})
             stats["runs"] += len(selected)
