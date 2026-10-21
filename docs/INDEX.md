@@ -161,6 +161,7 @@ supported V2 route.
 ### Persistence, shells, and mounted runtimes
 
 - [SQLite shell refinement](SQLITE_SHELL_REFINEMENT.md)
+- [SQLite shell fault simulation](SHELL_SIMULATION.md)
 - [Strict artifact decoding and SQLite history](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)
 - [Outbox delivery identity](OUTBOX_DELIVERY_IDENTITY.md)
 - [Authenticated-state adapter](AUTHENTICATED_STATE_ADAPTER.md)

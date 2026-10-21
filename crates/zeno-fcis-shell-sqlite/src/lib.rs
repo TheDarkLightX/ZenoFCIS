@@ -9,6 +9,17 @@
 /// Durable consumer of the mandatory library-owned V2 publication capability.
 pub mod v2;
 
+/// How an explicitly selected simulation crash point interrupts a commit.
+#[cfg(feature = "crash-injection")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CrashMode {
+    /// Return an injected error and allow transaction rollback.
+    #[default]
+    Error,
+    /// Abort the process without running destructors.
+    Abort,
+}
+
 mod crash {
     /// Fault-injection point in the concrete commit protocol.
     #[cfg_attr(not(feature = "crash-injection"), allow(unreachable_pub))]
@@ -22,6 +33,9 @@ mod crash {
         AfterStateWrite,
         /// Fail after replay, bundle, and receipt publication.
         AfterReplayWrite,
+        /// Interrupt after the first outbox INSERT, for per-statement abort tests.
+        #[cfg(feature = "crash-injection")]
+        AfterFirstOutboxWrite,
         /// Fail after every outbox row is written.
         AfterOutboxWrite,
         /// Fail immediately before SQLite commit.

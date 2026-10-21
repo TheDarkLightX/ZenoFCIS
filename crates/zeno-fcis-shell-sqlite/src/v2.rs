@@ -937,6 +937,63 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         expected_version: Option<u64>,
         byte_limit: Option<usize>,
     ) -> Result<CommitReceipt, Error> {
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            expected_version,
+            byte_limit,
+            #[cfg(feature = "crash-injection")]
+            super::CrashMode::Error,
+            #[cfg(feature = "crash-injection")]
+            || {},
+        )
+    }
+    /// Per-call simulation controls. The callback is consumed before BEGIN,
+    /// never retained, and cannot access this handle while it is borrowed.
+    /// These controls confer no decision or publication authority.
+    #[cfg(feature = "crash-injection")]
+    pub fn commit_with_test_controls(
+        &mut self,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+        mode: super::CrashMode,
+        before_transaction: impl FnOnce(),
+    ) -> Result<CommitReceipt, Error> {
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            None,
+            None,
+            mode,
+            before_transaction,
+        )
+    }
+    /// Set a connection-local wait limit for deterministic busy simulations.
+    #[cfg(feature = "crash-injection")]
+    pub fn set_test_busy_timeout(&mut self, timeout: std::time::Duration) -> Result<(), Error> {
+        Ok(self.connection.busy_timeout(timeout)?)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn commit_controlled(
+        &mut self,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+        expected_version: Option<u64>,
+        byte_limit: Option<usize>,
+        #[cfg(feature = "crash-injection")] mode: super::CrashMode,
+        #[cfg(feature = "crash-injection")] before_transaction: impl FnOnce(),
+    ) -> Result<CommitReceipt, Error> {
+        let interrupt = |point| {
+            #[cfg(feature = "crash-injection")]
+            if mode == super::CrashMode::Abort && crash == Some(point) {
+                std::process::abort();
+            }
+            inject(crash, point)
+        };
         if publication.identity() != self.current().identity() {
             return Err(Error::Identity);
         }
@@ -945,7 +1002,9 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         }
         let compact = compact_publication(publication.identity(), publication.subject())?;
         self.synchronize()?;
-        inject(crash, CrashPoint::BeforeTransaction)?;
+        #[cfg(feature = "crash-injection")]
+        before_transaction();
+        interrupt(CrashPoint::BeforeTransaction)?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1009,12 +1068,12 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             publication.subject(),
         )?;
         let chain = hash(zeno_fcis_codec::domains::V2_CHAIN, &certificate)?;
-        inject(crash, CrashPoint::AfterValidation)?;
+        interrupt(CrashPoint::AfterValidation)?;
         let changed = tx.execute("UPDATE v2_state SET sequence=?1,state=?2,root=?3,chain=?4 WHERE singleton=1 AND sequence=?5 AND root=?6 AND chain=?7", params![sequence, publication.poststate(), post_root.as_bytes().as_slice(), chain.as_bytes().as_slice(), self.anchor.sequence, self.anchor.root.as_bytes().as_slice(), self.anchor.chain.as_bytes().as_slice()])?;
         if changed != 1 {
             return Err(Error::Concurrent);
         }
-        inject(crash, CrashPoint::AfterStateWrite)?;
+        interrupt(CrashPoint::AfterStateWrite)?;
         tx.execute(
             "INSERT INTO v2_commits VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
             params![
@@ -1031,10 +1090,17 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
                 certificate
             ],
         )?;
-        inject(crash, CrashPoint::AfterReplayWrite)?;
-        insert_deliveries(&tx, sequence, &publication, &certificate)?;
-        inject(crash, CrashPoint::AfterOutboxWrite)?;
-        inject(crash, CrashPoint::BeforeCommit)?;
+        interrupt(CrashPoint::AfterReplayWrite)?;
+        insert_deliveries(
+            &tx,
+            sequence,
+            &publication,
+            &certificate,
+            #[cfg(feature = "crash-injection")]
+            || interrupt(CrashPoint::AfterFirstOutboxWrite),
+        )?;
+        interrupt(CrashPoint::AfterOutboxWrite)?;
+        interrupt(CrashPoint::BeforeCommit)?;
         let data_version = data_version(&tx)?;
         tx.commit()?;
         self.anchor = Anchor {
@@ -1044,7 +1110,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             chain,
         };
         self.data_version = data_version;
-        inject(crash, CrashPoint::AfterCommit)?;
+        interrupt(CrashPoint::AfterCommit)?;
         Ok(CommitReceipt {
             sequence: sequence as u64,
             chain,
@@ -2107,6 +2173,7 @@ fn insert_deliveries(
     sequence: i64,
     p: &Publication<'_>,
     certificate: &[u8],
+    #[cfg(feature = "crash-injection")] after_outbox_write: impl Fn() -> Result<(), Error>,
 ) -> Result<(), Error> {
     for (lane, ds) in [(0_u8, p.effects()), (1_u8, p.outbox())] {
         for d in ds {
@@ -2127,6 +2194,10 @@ fn insert_deliveries(
                     entry.as_bytes().as_slice()
                 ],
             )?;
+            #[cfg(feature = "crash-injection")]
+            if lane == 1 && d.ordinal() == 0 {
+                after_outbox_write()?;
+            }
         }
     }
     Ok(())
