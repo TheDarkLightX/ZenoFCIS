@@ -368,3 +368,4 @@ core-apps/zusd-v1/DESIGN.md
 core-apps/zusd-v1/STEP4.md
 core-apps/zusd-v1/NO_FREE_VALUE.md
 core-apps/zusd-v1/tests/test-data/loop-receipts/README.md
+crates/zeno-fcis-bls/CONTRACT.md
