@@ -168,6 +168,121 @@ core: one concrete run rules out the core the declared laws allowed. When a run
 fails on the contract, no kill is credited, since a mutant could fail it for
 the same reason.
 
+## Can the seller be paid twice?
+
+A seller wants to know that a repeated release cannot pay them again, and that
+no payout follows a refund. The escrow example declares these questions in
+`v2/run-properties.json`:
+
+```json
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {"kind": "at_most_once", "name": "seller_paid_at_most_once", "channel": 300},
+    {"kind": "never_after", "name": "no_payout_after_refund", "a": 301, "b": 300},
+    {"kind": "predicate", "name": "one_payout_per_decision", "formula": "outbox.300 <= 1"}
+  ]
+}
+```
+
+```text
+zeno-fcis contract runs examples/apps/escrow-deal
+```
+
+All three receive `inductive`. This means proved inductively over reachable
+states of this contract paired with its observer, exhaustive over the declared
+finite domains. It holds for runs of any length in that finite model. It does
+not claim a property over unbounded domains, other parameter choices, shell
+replay keys, stale revisions or external payment completion. A delivery here
+is an admitted outbox obligation; a destination's payment and retry behavior
+needs its own assurance.
+
+The first built-in form counts deliveries on the named channel over the whole
+run, saturating at two so the observer remains bounded. Optional `key_field`
+counts separately for every value in that payload field's declared finite
+domain, including multiple matching deliveries in one decision. It currently
+requires a numeric, Boolean or variant key domain of at most 64 values.
+`never_after` excludes a B delivery on a decision strictly later than an A
+delivery. A and B in the same decision do not violate that form; use a
+predicate to exclude that too. Neither form depends on delivery ordinals to
+count payments.
+
+Use an ordinary state lemma when the contract already retains the required
+fact. An observer is for history the contract does not store. For example:
+
+```json
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "observer": {
+    "saw_refusal": {"min": 0, "max": 1, "initial": 0,
+      "update": "choose(verdict.reject || verdict.refused, 1, before.saw_refusal)"}
+  },
+  "properties": [
+    {"kind": "predicate", "name": "refusals_recorded",
+     "formula": "verdict.reject -> observer.saw_refusal == 1"}
+  ]
+}
+```
+
+Updates run simultaneously on every decision, including rejects, committed
+failures and technical refusals. They read `before.NAME`, the verdict and the
+complete deliveries; predicates read both `before.NAME` and the updated
+`observer.NAME`, plus `pre.`, actual `post.`, and delivery observations.
+Verdict flags are `verdict.accept`, `verdict.reject`, `verdict.failure`, and
+`verdict.refused`. At genesis all flags are false, deliveries are empty,
+`pre.` and `post.` both mean genesis, and before/observer values are the declared
+initial values. Command and context are absent at genesis. The predicate must
+be defined and true there too.
+
+Observer fields have explicit inclusive integer bounds. Undeclared names,
+wrong types, duplicate JSON keys and unknown fields are refused. Expressions
+are limited to 4096 bytes and the existing bounded expression admission. Arithmetic
+uses the library's existing eager checked scalar interpreter. Undefined
+expressions and updates outside observer bounds block an inductive result.
+The checker admits at most 32 declared observer fields and 64 properties.
+`--max-tuples` bounds both the contract domain and each full declared product
+of contract and observer domains; exceeding either is inconclusive (exit 2).
+An unbounded observer counter must be replaced with a bounded sufficient fact,
+such as zero/one/two-or-more.
+
+The checker observes the actual library Authority, pairs its finite states
+with observer values, and reuses the state lemma judge's initiation and
+reachable consecution check. Exhausting every outgoing input from every
+reachable pair establishes a closed finite invariant. A failed predicate is
+`false` (exit 1); its breadth-first parents give a shortest run from genesis
+as scenario lines, with exact delivery ordinals. A failed genesis obligation
+has a zero-step trace. Undefined results and incomplete enumeration exit 2
+and claim nothing. The packet schema is `zeno-fcis/contract-run-properties/1`;
+it binds the project, policy and property file by SHA-256 and grants no
+runtime, resource or publication authority.
+
+## Reading deliveries in a question
+
+Transition lemmas (`lemma --transition`) and condition probes can read
+`outbox.count` for all deliveries, `outbox.CHANNEL` for a channel's count and
+`outbox.CHANNEL.FIELD` for the checked sum of that payload field over every
+matching delivery. For example, `outbox.300 <= 1` and
+`outbox.300.140 == post.100.112 - pre.100.112` test the seller's deliveries.
+The legacy payload-qualified shorthand is supported only when exactly one
+channel uses that payload type; shared payload types require the channel ID.
+State-only lemmas continue to read state, since a state alone has no deliveries.
+
+`delivery.INDEX.exists`, `.channel`, `.ordinal`, `.idempotency` and
+`.field.FIELD` inspect an individual delivery at its zero-based list index,
+up to the policy's declared maximum delivery count. An absent delivery or
+field reads zero, with `exists` false; use the flag when absence matters.
+Only numeric, Boolean and variant payload fields have a number form.
+An unrepresentable value or overflowing field sum is undefined when read.
+
+A scenario delivery may be written `CHANNEL@ORDINAL:IDEMPOTENCY PAYLOAD...`.
+For example, `300@0:0 2` requires channel 300, delivery ordinal 0,
+idempotency ordinal 0 and payload 2. Each optional pair is compared exactly;
+the older `300 2` continues to compare only channel and payload. A mismatch
+fails the scenario. Scenarios therefore observe deliveries, including their
+identity ordinals. Technical refusals use `inputs | refused CLASS STATE | -`,
+where CLASS is the reported refusal class and STATE repeats the pre-state.
+These are diagnostic scenario observations and cannot commit a decision.
+
 ## Asking a question
 
 `contract probe` answers one exact question between edits:

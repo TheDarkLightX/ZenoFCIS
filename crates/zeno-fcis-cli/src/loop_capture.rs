@@ -170,7 +170,7 @@ fn inconclusive(reason: &str) -> (u8, Value) {
 }
 
 /// JSON with no duplicate keys, nonintegral numbers, trailing bytes or deep recursion.
-pub(super) fn strict_json(bytes: &[u8]) -> Result<Value, String> {
+pub(crate) fn strict_json(bytes: &[u8]) -> Result<Value, String> {
     struct Strict(Value);
     impl<'de> Deserialize<'de> for Strict {
         fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {

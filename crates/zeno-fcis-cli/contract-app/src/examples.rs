@@ -22,7 +22,8 @@
 //!   declared channel's ID followed by one number per payload field. When
 //!   the contract declares exactly one channel, the payload numbers alone
 //!   are also a delivery on it; the count of numbers tells the two forms
-//!   apart.
+//!   apart. An explicit channel may instead be CHANNEL@ORDINAL:IDEMPOTENCY;
+//!   the optional pair pins both unsigned identity ordinals.
 //! - A number is a decimal integer: 0 or 1 for a boolean, the value of an
 //!   integer, the variant ID of a sum. Each lies in the declared domain of
 //!   its input, state field or payload field.
@@ -50,6 +51,7 @@ pub(crate) struct Line {
     pub(crate) post: Vec<i128>,
     /// Each delivery's channel and payload numbers.
     pub(crate) outbox: Vec<(u32, Vec<i128>)>,
+    pub(crate) ordinals: Vec<Option<(u32, u128)>>,
 }
 
 /// The first malformed line and what is wrong with it.
@@ -279,12 +281,48 @@ fn example(line: &str, number: usize, shape: &Shape) -> Result<Line, String> {
     for (value, input) in post.iter().zip(&shape.inputs) {
         input.domain.check(*value, &input.name("post-state"))?;
     }
+    let mut ordinals = Vec::new();
     let outbox = if deliveries == "-" {
         Vec::new()
     } else {
         deliveries
             .split(';')
-            .map(|delivery| self::delivery(&numbers(delivery)?, &shape.channels))
+            .map(|delivery| {
+                let mut words = delivery.split_whitespace();
+                let first = words.next().ok_or("empty delivery")?;
+                let (channel, ordinal) = if let Some((channel, suffix)) = first.split_once('@') {
+                    let (ordinal, idempotency) = suffix
+                        .split_once(':')
+                        .ok_or("expected channel@ordinal:idempotency")?;
+                    (
+                        channel,
+                        Some((
+                            ordinal.parse::<u32>().map_err(|_| "invalid ordinal")?,
+                            idempotency
+                                .parse::<u128>()
+                                .map_err(|_| "invalid idempotency ordinal")?,
+                        )),
+                    )
+                } else {
+                    (first, None)
+                };
+                ordinals.push(ordinal);
+                let text = std::iter::once(channel)
+                    .chain(words)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let values = numbers(&text)?;
+                if ordinal.is_some()
+                    && !shape.channels.iter().any(|(id, fields)| {
+                        values.first() == Some(&i128::from(*id)) && values.len() == fields.len() + 1
+                    })
+                {
+                    return Err(
+                        "identity ordinals require an explicit channel and its payload".to_owned(),
+                    );
+                }
+                self::delivery(&values, &shape.channels)
+            })
             .collect::<Result<_, _>>()?
     };
     Ok(Line {
@@ -294,6 +332,7 @@ fn example(line: &str, number: usize, shape: &Shape) -> Result<Line, String> {
         reason,
         post,
         outbox,
+        ordinals,
     })
 }
 

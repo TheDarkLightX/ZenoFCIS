@@ -259,6 +259,26 @@ pub(super) fn conditions(
     what: &str,
     formula: &str,
 ) -> Result<Vec<Truth>, ContractError> {
+    if formula.contains("outbox.") || formula.contains("verdict.") || formula.contains("delivery.")
+    {
+        let expression = super::observations::Expression::compile(
+            formula,
+            &super::observations::names(loaded),
+            true,
+        )?;
+        return Ok(parallel(machine.space.tuples(), |ordinal| {
+            if matches!(machine.observed[ordinal], Observed::Refused { .. }) {
+                return Truth::Refused;
+            }
+            match super::observations::values(loaded, machine, ordinal)
+                .and_then(|v| expression.evaluate(&v))
+            {
+                Some(1) => Truth::Holds,
+                Some(0) => Truth::Fails,
+                _ => Truth::Undefined,
+            }
+        }));
+    }
     let (extended, id) = machine::with_law(
         project,
         &loaded.rules,

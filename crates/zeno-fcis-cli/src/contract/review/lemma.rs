@@ -35,6 +35,41 @@ use super::evaluate::LawSet;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
 use super::probe::{self, Truth};
 
+/// Shared initiation and reachable consecution check. Breadth-first parents
+/// make the first failed obligation a shortest run, including a zero-step
+/// genesis failure. The caller supplies bounded, owned product states.
+pub(super) fn induction<S: Clone + Ord>(
+    genesis: S,
+    initial_holds: bool,
+    inputs: usize,
+    mut step: impl FnMut(&S, usize) -> Result<(S, bool), ContractError>,
+) -> Result<(usize, Option<Vec<usize>>), ContractError> {
+    if !initial_holds {
+        return Ok((1, Some(Vec::new())));
+    }
+    let mut states = vec![genesis.clone()];
+    let mut indices = std::collections::BTreeMap::from([(genesis, 0)]);
+    let mut parents = vec![None];
+    let mut at = 0;
+    while at < states.len() {
+        for input in 0..inputs {
+            let (next, holds) = step(&states[at], input)?;
+            if !holds {
+                let mut trace = Machine::trace(&parents, at);
+                trace.push(input);
+                return Ok((states.len(), Some(trace)));
+            }
+            if let std::collections::btree_map::Entry::Vacant(entry) = indices.entry(next.clone()) {
+                entry.insert(states.len());
+                states.push(next);
+                parents.push(Some((at, input)));
+            }
+        }
+        at += 1;
+    }
+    Ok((states.len(), None))
+}
+
 /// The lemma judge's result.
 #[derive(Clone, Debug)]
 pub(crate) enum Lemmas {
@@ -159,7 +194,7 @@ pub(crate) fn judge_transitions(
         let mut result = json!({
             "mode": "transition-relation", "formula": formula, "verdict": verdict,
             "scope": "all admitted committed decisions in the declared finite domain",
-            "decided_by": "library-authority-and-law-evaluator",
+            "decided_by": if formula.contains("outbox.") || formula.contains("delivery.") || formula.contains("verdict.") { "library-authority-and-scalar-interpreter" } else { "library-authority-and-law-evaluator" },
             "tuples": space.tuples(), "admitted": admitted, "checked": count(Truth::Holds),
             "failed": failed, "undefined": undefined, "refused": refused,
             "rejected_without_state_change": space.tuples() - refused - admitted,
@@ -254,10 +289,24 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
     // The nearest reachable state outside the lemma, nearest first, then
     // least: its shortest trace's last step leaves a reachable state the
     // lemma admits, since a nearer violation would have been chosen.
-    let violation = (0..space.states)
-        .filter(|state| reachable[*state] && !holds[*state])
-        .map(|state| (Machine::trace(&parent, state), state))
-        .min_by_key(|(trace, state)| (trace.len(), *state));
+    let (_, failed_run) = induction(
+        machine.genesis,
+        holds[machine.genesis],
+        space.inputs,
+        |state, input| {
+            let next = machine.of(*state, input).after(*state);
+            Ok((next, holds[next]))
+        },
+    )
+    .unwrap_or_else(|_| unreachable!("state lookup cannot fail"));
+    // Retain the state judge's established tie break: nearest violation,
+    // then least state ordinal. Run predicates use the first BFS witness.
+    let violation = failed_run.and_then(|_| {
+        (0..space.states)
+            .filter(|state| reachable[*state] && !holds[*state])
+            .map(|state| (Machine::trace(&parent, state), state))
+            .min_by_key(|(trace, state)| (trace.len(), *state))
+    });
     let verdict = if !holds[machine.genesis] {
         out["reason"] = json!("genesis does not satisfy the lemma");
         out["genesis"] = crate::report_numbers::integers(&space.state(machine.genesis));

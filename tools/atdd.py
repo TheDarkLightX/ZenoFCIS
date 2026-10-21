@@ -675,6 +675,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Find the decisions and decision tables the declared laws admit",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::judge_tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::review::run_properties::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_judges", "--locked")),
     ),
     "core-profile": AcceptanceScenario(

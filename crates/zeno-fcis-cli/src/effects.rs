@@ -837,6 +837,12 @@ effects! { crate::judge_command::Command {
                 false,
                 None,
             ));
+        "runs" => Self::Runs { .. } => declared((
+                &["application-contract", "run-properties"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
         "profile" => Self::Profile { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],

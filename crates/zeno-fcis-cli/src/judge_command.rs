@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use zeno_fcis_contract::internals::review::evaluate::{digest, hex};
 
 use crate::contract::review::{
-    self, DEFAULT_MAX_TUPLES, Inconclusive, lemma, probe, profile, scenario,
+    self, DEFAULT_MAX_TUPLES, Inconclusive, lemma, probe, profile, run_properties, scenario,
 };
 use crate::contract_files::read_input;
 use crate::{
@@ -49,6 +49,14 @@ pub(super) struct Common {
 pub(super) enum Command {
     /// Check keyed collections by data independence: every admissible view of the named entries, with alias merges and summary deltas. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
     Collections {
+        #[command(flatten)]
+        common: Common,
+    },
+    /// Check declared bounded observers and safety properties over runs of any length. Exhaustive finite domains only; advisory.
+    Runs {
+        /// Observer and property declarations; defaults to v2/run-properties.json.
+        #[arg(long)]
+        file: Option<PathBuf>,
         #[command(flatten)]
         common: Common,
     },
@@ -179,6 +187,39 @@ pub(super) fn run(command: Command) -> u8 {
                 ))
             },
         ),
+        Command::Runs { file, common } => {
+            let path = file.unwrap_or_else(|| common.dir.join(run_properties::FILE));
+            judge(
+                &common,
+                "zeno-fcis/contract-run-properties/1",
+                Some(&path),
+                true,
+                |sources| {
+                    Ok(
+                        match run_properties::judge(
+                            sources.project,
+                            sources.rules,
+                            sources.extra.unwrap_or_default(),
+                            common.max_tuples,
+                        )? {
+                            lemma::Lemmas::Inconclusive(stop) => Judged::Inconclusive(stop),
+                            lemma::Lemmas::Judged(properties) => {
+                                let (exit, status) =
+                                    if properties.iter().any(|p| p["verdict"] == "false") {
+                                        (INVALID, "refuted")
+                                    } else if properties.iter().any(|p| p["verdict"] != "inductive")
+                                    {
+                                        (BLOCKED, "inconclusive")
+                                    } else {
+                                        (OK, "inductive")
+                                    };
+                                Judged::Done(json!({"properties":properties}), exit, status)
+                            }
+                        },
+                    )
+                },
+            )
+        }
         Command::Distribution { max_work, common } => judge(
             &common,
             "zeno-fcis/distribution-laws/1",
