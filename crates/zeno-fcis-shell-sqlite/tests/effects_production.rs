@@ -564,19 +564,27 @@ fn agrees(scenario: Scenario, budgets: std::ops::RangeInclusive<u8>) {
 }
 
 /// Two commit programs on two handles at retry budget zero, and the
-/// delivery program at budgets zero and one; the ignored test below runs
-/// every budget of the frozen profile.
+/// delivery program at budgets zero and one; the ignored tests below add
+/// the rest of the SQLite scope.
 #[test]
 fn production_agrees_with_model() {
     agrees(Scenario::Commit, 0..=0);
     agrees(Scenario::Delivery, 0..=1);
 }
 
+/// Commit at retry budget one closes on SQLite in about three hours in
+/// release. Budget two is checked only in the simulation: each budget
+/// multiplied the SQLite runs about seventy-fold (5,498, then 399,718).
 #[test]
-#[ignore = "every retry budget of the frozen profile; run it in release"]
-fn production_agrees_with_model_all_budgets() {
-    agrees(Scenario::Commit, 0..=2);
-    agrees(Scenario::Delivery, 0..=2);
+#[ignore = "commit at retry budget one on SQLite; run it in release"]
+fn production_agrees_with_model_commit_budget_one() {
+    agrees(Scenario::Commit, 1..=1);
+}
+
+#[test]
+#[ignore = "delivery at retry budget two on SQLite; run it in release"]
+fn production_agrees_with_model_delivery_budget_two() {
+    agrees(Scenario::Delivery, 2..=2);
 }
 
 #[test]

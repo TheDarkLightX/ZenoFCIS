@@ -225,8 +225,12 @@ backdated copies, a building mutant and restoration against one shared target.
 This protects the named behavioral checks from stale artifact reuse.
 
 The default tests explore retry budgets 0 and 1 in the simulation, and fewer
-on SQLite. The ignored tests `explore_frozen_profile_all_budgets` and
-`production_agrees_with_model_all_budgets` cover every budget.
+on SQLite. The ignored test `explore_frozen_profile_all_budgets` covers every
+budget in the simulation. On SQLite, the ignored tests
+`production_agrees_with_model_commit_budget_one` and
+`production_agrees_with_model_delivery_budget_two` close commit at budget 1
+and delivery at budget 2. Commit at budget 2 is checked only in the
+simulation: each budget multiplied the SQLite runs about seventy-fold.
 
 ## Opt in from an application
 
