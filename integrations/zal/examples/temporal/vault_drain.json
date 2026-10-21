@@ -5,22 +5,22 @@
   "kind": "law",
   "authority": {
     "status": "OPEN",
-    "source": "Proposed formalization; placeholder definitions await owner review."
+    "source": "Proposed, awaiting owner confirmation. Definitions are recovered from the existing vault, stablecoin and oracle relations; no claim reaches users until the owner confirms them."
   },
-  "scope": "Declared ordered event observations; example definitions are placeholders.",
+  "scope": "Proposed definitions, awaiting owner confirmation: every event of the composed vault, oracle, collateral and governance machine.",
   "trace": {
     "domain": "Traces",
     "mode": "finite",
     "horizon": 4,
-    "source_revision": "example-observations/1",
+    "source_revision": "proposed composed vault model; no source is bound yet",
     "event_schema": "pre-input-outcome-post/1",
     "order": "authoritative recorded event order, including rejections and retries",
     "projection": "retain each recorded event without sorting, merging or deduplication",
-    "model": "placeholder composed model; execution membership is unproved",
-    "environment": "placeholder capabilities; no omitted actor is implicitly excluded",
-    "initialization": "separate initial-state check, including zero-operation executions",
-    "transitions": "requires exact source-model membership",
-    "continuity": "requires post/pre correspondence at every retained boundary",
+    "model": "proposed: the composed vault, oracle, collateral and governance machine; execution membership is unproved until that model exists",
+    "environment": "proposed: the declared attacker capabilities (compromised signer keys up to a declared count, stale pre-signed approvals, many accounts, atomic batches, flash liquidity and price-setting power on thin markets); a capability left out is a stated blind spot",
+    "initialization": "initial custody v0 of each asset is fixed at genesis and checked separately, including executions with no operation",
+    "transitions": "requires exact membership in the composed model",
+    "continuity": "requires post/pre correspondence of custody, credits and discharges at every retained boundary",
     "arithmetic": "checked-i128",
     "evidence": "obligation"
   },
@@ -35,31 +35,176 @@
       "plural": "traces",
       "noun": "admitted traces",
       "trace": true
+    },
+    "Assets": {
+      "member": "asset",
+      "plural": "assets",
+      "noun": "custody assets",
+      "values": [
+        "collateral",
+        "stable",
+        "stake"
+      ]
     }
   },
   "symbols": {
-    "Loss": {
-      "kind": "predicate",
-      "arity": 0,
-      "args": [],
-      "clause": "uncompensated vault loss is present before or after the event",
-      "definition": "PLACEHOLDER one-asset policy: D(q) := v(q)+p(q)<v0+c(q); Loss := D(pre) or D(post). p counts independently justified entitlement discharges, never approval alone. v0=10, integer asset units. Other assets, valuation and allowed losses await review.",
-      "version": "placeholder/1",
+    "v": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "Assets"
+      ],
+      "noun": "custody",
+      "state": true,
       "observation": "event",
+      "version": "proposed/1",
+      "definition": "Proposed, awaiting owner confirmation. Units of the asset held in every reserved custody account of the machine (pools, deposits, stakes, surplus and claim custody), in that asset's own units; no price converts one asset into another.",
       "native": [
         {
-          "args": [],
-          "before": "pre.100.110"
+          "args": [
+            "collateral"
+          ],
+          "before": "pre.100.130",
+          "after": "post.100.130"
+        },
+        {
+          "args": [
+            "stable"
+          ],
+          "before": "pre.100.131",
+          "after": "post.100.131"
+        },
+        {
+          "args": [
+            "stake"
+          ],
+          "before": "pre.100.132",
+          "after": "post.100.132"
+        }
+      ]
+    },
+    "c": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "Assets"
+      ],
+      "noun": "cumulative legitimate credit",
+      "state": true,
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Proposed, awaiting owner confirmation. Cumulative authenticated external funding of the asset into custody since genesis. Internal reward or claim moves are reclassifications, neither credit nor discharge.",
+      "native": [
+        {
+          "args": [
+            "collateral"
+          ],
+          "before": "pre.100.133",
+          "after": "post.100.133"
+        },
+        {
+          "args": [
+            "stable"
+          ],
+          "before": "pre.100.134",
+          "after": "post.100.134"
+        },
+        {
+          "args": [
+            "stake"
+          ],
+          "before": "pre.100.135",
+          "after": "post.100.135"
+        }
+      ]
+    },
+    "p": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "Assets"
+      ],
+      "noun": "cumulative justified discharge",
+      "state": true,
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Proposed, awaiting owner confirmation. Cumulative exact external payouts and burns of the asset, each bound to an entitlement the relation computes from independently evaluated inputs and consumed once; an approval alone, including a compromised signer's, never discharges.",
+      "native": [
+        {
+          "args": [
+            "collateral"
+          ],
+          "before": "pre.100.136",
+          "after": "post.100.136"
+        },
+        {
+          "args": [
+            "stable"
+          ],
+          "before": "pre.100.137",
+          "after": "post.100.137"
+        },
+        {
+          "args": [
+            "stake"
+          ],
+          "before": "pre.100.138",
+          "after": "post.100.138"
+        }
+      ]
+    },
+    "v0": {
+      "kind": "function",
+      "arity": 1,
+      "args": [
+        "Assets"
+      ],
+      "noun": "initial custody",
+      "state": false,
+      "observation": "event",
+      "version": "proposed/1",
+      "definition": "Proposed, awaiting owner confirmation. Custody of the asset at genesis, a constant of the trace.",
+      "native": [
+        {
+          "args": [
+            "collateral"
+          ],
+          "before": "pre.100.139"
+        },
+        {
+          "args": [
+            "stable"
+          ],
+          "before": "pre.100.140"
+        },
+        {
+          "args": [
+            "stake"
+          ],
+          "before": "pre.100.141"
         }
       ]
     }
   },
-  "definitions": [],
+  "definitions": [
+    {
+      "name": "Loss",
+      "params": [
+        {
+          "name": "a",
+          "domain": "Assets"
+        }
+      ],
+      "clause": "{0} suffers uncompensated vault loss before or after the event",
+      "version": "proposed/1",
+      "body": "v(a) + p(a) < v0(a) + c(a) or v'(a) + p'(a) < v0(a) + c'(a)"
+    }
+  ],
   "readings": [
     {
-      "version": "placeholder/1",
-      "body": "forall sigma in Traces: always(not Loss())",
-      "intuitive": "no admitted operation sequence reaches uncompensated vault loss",
+      "version": "proposed/1",
+      "body": "forall sigma in Traces: forall a in Assets: always(not Loss(a))",
+      "intuitive": "no admitted operation sequence reaches uncompensated vault loss in any asset",
       "plain": "no admitted operation sequence drains the vault",
       "mode": "finite"
     }
@@ -68,44 +213,293 @@
     {
       "id": "legitimate_withdrawal",
       "paths": [
-        "pre.100.110"
+        "pre.100.130",
+        "post.100.130",
+        "pre.100.131",
+        "post.100.131",
+        "pre.100.132",
+        "post.100.132",
+        "pre.100.133",
+        "post.100.133",
+        "pre.100.134",
+        "post.100.134",
+        "pre.100.135",
+        "post.100.135",
+        "pre.100.136",
+        "post.100.136",
+        "pre.100.137",
+        "post.100.137",
+        "pre.100.138",
+        "post.100.138",
+        "pre.100.139",
+        "pre.100.140",
+        "pre.100.141"
       ],
       "events": [
         [
+          10,
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
           0
         ]
       ],
       "expected": true,
-      "note": "v0=10,c=0; v=7,p=3 offsets the withdrawal; initial D checked separately."
+      "note": "Collateral v0=10, c=0: a withdrawal of 3 discharged against its entitlement leaves v=7, p=3; initial custody is checked separately."
     },
     {
       "id": "partial_drain",
       "paths": [
-        "pre.100.110"
+        "pre.100.130",
+        "post.100.130",
+        "pre.100.131",
+        "post.100.131",
+        "pre.100.132",
+        "post.100.132",
+        "pre.100.133",
+        "post.100.133",
+        "pre.100.134",
+        "post.100.134",
+        "pre.100.135",
+        "post.100.135",
+        "pre.100.136",
+        "post.100.136",
+        "pre.100.137",
+        "post.100.137",
+        "pre.100.138",
+        "post.100.138",
+        "pre.100.139",
+        "pre.100.140",
+        "pre.100.141"
       ],
       "events": [
         [
-          1
+          10,
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
+          0
         ]
       ],
       "expected": false,
-      "note": "v0=10,c=0; v=7,p=0 is a loss, including a partial drain."
+      "note": "Collateral v0=10, c=0: v=7 with no discharge is a loss, including a partial drain."
+    },
+    {
+      "id": "approval_is_no_discharge",
+      "paths": [
+        "pre.100.130",
+        "post.100.130",
+        "pre.100.131",
+        "post.100.131",
+        "pre.100.132",
+        "post.100.132",
+        "pre.100.133",
+        "post.100.133",
+        "pre.100.134",
+        "post.100.134",
+        "pre.100.135",
+        "post.100.135",
+        "pre.100.136",
+        "post.100.136",
+        "pre.100.137",
+        "post.100.137",
+        "pre.100.138",
+        "post.100.138",
+        "pre.100.139",
+        "pre.100.140",
+        "pre.100.141"
+      ],
+      "events": [
+        [
+          10,
+          10,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
+          0
+        ],
+        [
+          10,
+          4,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
+          0
+        ]
+      ],
+      "expected": false,
+      "note": "A transfer of 6 backed only by signer approval leaves p unchanged, so the second event is a loss."
+    },
+    {
+      "id": "legitimate_credit",
+      "paths": [
+        "pre.100.130",
+        "post.100.130",
+        "pre.100.131",
+        "post.100.131",
+        "pre.100.132",
+        "post.100.132",
+        "pre.100.133",
+        "post.100.133",
+        "pre.100.134",
+        "post.100.134",
+        "pre.100.135",
+        "post.100.135",
+        "pre.100.136",
+        "post.100.136",
+        "pre.100.137",
+        "post.100.137",
+        "pre.100.138",
+        "post.100.138",
+        "pre.100.139",
+        "pre.100.140",
+        "pre.100.141"
+      ],
+      "events": [
+        [
+          10,
+          15,
+          0,
+          0,
+          0,
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
+          0
+        ]
+      ],
+      "expected": true,
+      "note": "An authenticated deposit of 5 raises custody and credit together."
     },
     {
       "id": "initial_disaster",
       "paths": [
-        "pre.100.110"
+        "pre.100.130",
+        "post.100.130",
+        "pre.100.131",
+        "post.100.131",
+        "pre.100.132",
+        "post.100.132",
+        "pre.100.133",
+        "post.100.133",
+        "pre.100.134",
+        "post.100.134",
+        "pre.100.135",
+        "post.100.135",
+        "pre.100.136",
+        "post.100.136",
+        "pre.100.137",
+        "post.100.137",
+        "pre.100.138",
+        "post.100.138",
+        "pre.100.139",
+        "pre.100.140",
+        "pre.100.141"
       ],
       "events": [
         [
-          1
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10,
+          0,
+          0
         ]
       ],
       "expected": false,
-      "note": "D(pre) is already true; no-operation initialization remains a separate obligation."
+      "note": "Custody 9 below v0=10 before the first event: D(pre) holds; zero-operation initialization remains a separate check."
     }
   ],
-  "formula": "forall sigma in Traces: always(not Loss())",
+  "formula": "forall sigma in Traces: forall a in Assets: always(not Loss(a))",
   "native_schema": {
     "state": 100,
     "fields": [
@@ -124,6 +518,54 @@
       {
         "id": 113,
         "kind": "bool"
+      },
+      {
+        "id": 130,
+        "kind": "int"
+      },
+      {
+        "id": 131,
+        "kind": "int"
+      },
+      {
+        "id": 132,
+        "kind": "int"
+      },
+      {
+        "id": 133,
+        "kind": "int"
+      },
+      {
+        "id": 134,
+        "kind": "int"
+      },
+      {
+        "id": 135,
+        "kind": "int"
+      },
+      {
+        "id": 136,
+        "kind": "int"
+      },
+      {
+        "id": 137,
+        "kind": "int"
+      },
+      {
+        "id": 138,
+        "kind": "int"
+      },
+      {
+        "id": 139,
+        "kind": "int"
+      },
+      {
+        "id": 140,
+        "kind": "int"
+      },
+      {
+        "id": 141,
+        "kind": "int"
       }
     ]
   }
