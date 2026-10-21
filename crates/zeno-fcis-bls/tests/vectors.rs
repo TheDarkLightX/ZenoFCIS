@@ -24,7 +24,8 @@ fn admitted(pk: &[u8]) -> Result<PopKey, String> {
     }
     let row = named("sk-to-pk-parity-3");
     if hex(row.expected) == pk {
-        let sk = SecretKey::from_bytes(&row.a[0]).unwrap();
+        let sk = SecretKey::from_bytes(&row.a[0])
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         return PopKey::admit(pk, &sk.sign(pk, POP_PROOF_DST, &[]).to_bytes())
             .map_err(|e| format!("{e:?}"));
     }
@@ -65,20 +66,18 @@ fn run(v: &Vector) -> Result<String, String> {
                 // vectors and rogue_key_gate test require public admission refusal.
                 let keys =
                     v.a.iter()
-                        .map(|p| PublicKey::key_validate(p).unwrap())
+                        .map(|p| {
+                            PublicKey::key_validate(p)
+                                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+                        })
                         .collect::<Vec<_>>();
                 let agg = AggregatePublicKey::aggregate(&keys.iter().collect::<Vec<_>>(), true)
-                    .unwrap()
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
                     .to_public_key();
                 assert_eq!(
-                    Signature::from_bytes(&v.c[0]).unwrap().verify(
-                        true,
-                        &v.b[0],
-                        POP_DST,
-                        &[],
-                        &agg,
-                        true
-                    ),
+                    Signature::from_bytes(&v.c[0])
+                        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+                        .verify(true, &v.b[0], POP_DST, &[], &agg, true),
                     BLST_ERROR::BLST_SUCCESS
                 );
                 return Ok("ACCEPT".into());
