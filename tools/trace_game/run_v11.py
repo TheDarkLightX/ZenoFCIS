@@ -106,7 +106,7 @@ def main():
     for name in CERTIFICATES:
         measure([sys.executable,'-B','tools/trace_game/certificate_check.py',out,f'{name}.json'],out,f'check-{name}',env)
         results[name]=json.loads((out/f'check-{name}.log').read_text())
-    tests=['test_product','test_certificate','test_guards','test_unrealizable','test_strategy',
+    tests=['test_product','test_certificate','test_guards','test_unrealizable','test_strategy','test_admission',
            'test_check.Check','test_check.Standalone.test_standalone_refuses_specimen']
     measure([sys.executable,'-B','-m','unittest','-v',*tests],out,'tests',env)
     measure(['cargo','+1.97.1','test','--locked','--offline','-p','zeno-fcis-cli','--example','trace_game','-j','2'],

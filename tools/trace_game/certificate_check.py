@@ -19,6 +19,10 @@ def need(condition, message):
         raise ValueError(message)
 
 
+def valid_index(value, size):
+    return type(value) is int and 0 <= value < size
+
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -81,7 +85,7 @@ def validate_tables(packets):
         packet=packets[name]; table={}
         for row in packet['table']['rows']:
             s,r=row['state'],row['request']; key=tuple(s+r)
-            need(all(type(v) is int for v in s+r),'native integer encoding')
+            need(all(type(v) is int for v in s+r+row['outcome']['post']),'native integer encoding')
             need(key not in table,'duplicate native row')
             need(row['outcome']==reference(model,s,r,guard),'independent native relation')
             need(bool(row['complete_native']),'missing native outcome bytes')
@@ -107,7 +111,9 @@ def validate_spec(spec):
     need(spec['guard'] in (ORACLE_RESPONSES if oracle else GRAMMAR),'guard outside grammar')
     if oracle: need(spec['reactive'] is True,'declared controller class')
     need(type(spec['reactive']) is bool and type(spec['empty']) is bool,'model flags')
-    need(spec['powers']==POWERS and spec['unfair_delay'] is False and spec['only_objective'] is None
+    need(set(spec['powers'])==set(POWERS)
+         and all(type(spec['powers'][k]) is type(v) and spec['powers'][k]==v for k,v in POWERS.items())
+         and spec['unfair_delay'] is False and spec['only_objective'] is None
          and spec['disabled_objective'] is None,'frozen capabilities/objectives/environment')
     need(spec['move_order']=='environment first, controller responds','observation order')
     need(spec['observations']==(['oracle','remaining','request'] if oracle else ['actor','request'])
@@ -177,16 +183,22 @@ def checked_graph(packet,tables):
     need(g['status']=='complete','incomplete product: UNKNOWN')
     states=g['states']; edges=g['edges']; n=len(states)
     need(0<n<=10000 and len(edges)==n and sum(map(len,edges))<=100000,'product size')
+    need(all(valid_index(i,n) for i in g['roots']),'root index encoding')
+    for s in states:
+        need(type(s) is list and len(s)==7 and type(s[-1]) is bool,'product state encoding')
+        need(all(type(v) is int for v in s[0]+s[1]+s[2:6]),'product integer encoding')
     index={key(s):i for i,s in enumerate(states)}
     need(len(index)==n,'duplicate product state')
     expected_roots=[index.get(key(s)) for s in initial_states(spec)]
     need(None not in expected_roots and g['roots']==expected_roots,'initial product membership')
     for i,s in enumerate(states):
-        need(type(s) is list and len(s)==7 and type(s[-1]) is bool,'product state encoding')
-        need(all(type(v) is int for v in s[0]+s[1]+s[2:6]),'product integer encoding')
-        need(permitted(spec,s) or is_terminal(spec,s),'non-vacuity: empty environment gives UNKNOWN')
+        allowed=permitted(spec,s)
+        need(allowed or is_terminal(spec,s),'non-vacuity: empty environment gives UNKNOWN')
+        for event,guard,target in edges[i]:
+            need(valid_index(event,len(allowed)),'edge event index encoding')
+            need(valid_index(target,n),'edge target index encoding')
         expected=[]
-        for event in range(len(permitted(spec,s))):
+        for event in range(len(allowed)):
             for guard in (tuple(spec['strategy_grammar']) if spec['reactive'] else (spec['guard'],)):
                 target=index.get(key(successor(spec,tables,s,event,guard)))
                 need(target is not None,'missing product successor')
@@ -218,9 +230,10 @@ def check(packet,tables):
     if cert['kind']=='unrealizability':
         rows=cert['ranks']; rank={}; strategy={}
         for i,r,event in rows:
-            need(type(i) is int and 0<=i<len(states) and i not in rank,'ranked state encoding')
+            need(valid_index(i,len(states)) and i not in rank,'ranked state encoding')
             need(type(r) is int and r>=0,'rank encoding')
             rank[i]=r; strategy[i]=event
+        need(valid_index(cert['root'],len(states)),'unrealizability root index encoding')
         need(cert['root'] in packet['graph']['roots'] and cert['root'] in rank,'ranked initial state')
         for i,r in rank.items():
             if r==0:
@@ -228,7 +241,7 @@ def check(packet,tables):
             else:
                 need(not states[i][-1],'Bad must have rank zero')
                 event=strategy[i]
-                need(type(event) is int and 0<=event<len(permitted(spec,states[i])),'permitted environment strategy')
+                need(valid_index(event,len(permitted(spec,states[i]))),'permitted environment strategy')
                 targets=[t for e,_,t in edges[i] if e==event]
                 need(targets and all(t in rank and rank[t]<r for t in targets),'rank step does not decrease for every response')
         return dict(evidence='certified unrealizability',
@@ -236,9 +249,11 @@ def check(packet,tables):
                     controller_class=spec['strategy_grammar'] if spec['reactive'] else [spec['guard']],
                     model=spec['model'],initial_rank=rank[cert['root']])
     if cert['kind']=='counterexample':
+        need(valid_index(cert['root'],len(states)),'counterexample root index encoding')
         need(not spec['reactive'] and cert['root'] in packet['graph']['roots'],'fixed counterexample root')
         at=cert['root']
         for event,guard in cert['moves']:
+            need(valid_index(event,len(permitted(spec,states[at]))),'counterexample event index encoding')
             need(guard==spec['guard'],'counterexample guard')
             targets=[t for e,g,t in edges[at] if (e,g)==(event,guard)]
             need(len(targets)==1,'counterexample permitted move'); at=targets[0]
@@ -253,10 +268,14 @@ def check(packet,tables):
         need(strategy['reads']==['actor','request'],'strategy reading hidden variable')
         need(strategy['order']==spec['move_order'],'strategy observation order')
         need(strategy['grammar']=='observation-table/1','strategy outside grammar')
+        # Derive the domain from independently checked permitted moves, across
+        # the whole product rather than restricting it to the submitted W.
+        domain={(actor,tuple(request)) for s in states for actor,request in permitted(spec,s)}
         for rule in strategy['rules']:
             need(set(rule)=={'actor','request','guard'},'strategy reading hidden variable')
             need(type(rule['actor']) is int and all(type(v) is int for v in rule['request']),'strategy observation encoding')
             obs=(rule['actor'],tuple(rule['request']))
+            need(obs in domain,'strategy observation outside declared domain')
             need(obs not in policy and rule['guard'] in GRAMMAR,'strategy outside grammar')
             policy[obs]=rule['guard']
     def chosen(i,event):
@@ -266,7 +285,9 @@ def check(packet,tables):
         return policy[a,tuple(r)]
     if cert['kind']=='guard':
         need(cert['guard'] in GRAMMAR and cert['guard']==spec['guard'] and cert['grammar']==list(GRAMMAR),'guard outside grammar')
-    winning=cert['W']; need(winning==sorted(set(winning)) and all(type(i) is int and 0<=i<len(states) for i in winning),'winning set encoding')
+    winning=cert['W']
+    need(all(valid_index(i,len(states)) for i in winning),'winning set encoding')
+    need(winning==sorted(set(winning)),'winning set encoding')
     W=set(winning)
     need(set(packet['graph']['roots'])<=W,'initial membership in W')
     for i in winning:
