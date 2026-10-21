@@ -31,7 +31,8 @@ def _disk_checker_identity():
     digest = hashlib.sha256(b"zal/checker/3\0")
     for name in ["behavior.py", "behavior2.py", "workflow.py", "factory.py", "shared.py",
                  "terminal.py", "mcp.py", "workspace.py", "server.py", "workspace.html",
-                 "explain.py", "constructs.py", "ladder_tools.py", "ladder.py", "ladder_en.json", "temporal_lowering.py"]:
+                 "explain.py", "constructs.py", "ladder_tools.py", "ladder.py", "ladder_en.json", "temporal_lowering.py",
+                 "withdrawal_pilot.py", "withdrawal_pilot.lean", "withdrawal_pilot_refutation.lean"]:
         path = here / name
         digest.update(name.encode() + b"\0")
         digest.update(path.read_bytes())

@@ -18,3 +18,4 @@ Feature: Finite behavior dialogue with deterministic meaning help
     And registry help and revision-bound ladder tools refuse drift and stale revisions without new authority
     And machine-profile temporal verdicts match an independent lasso and finite-word oracle
     And every planted machine-profile checker defect fails its named test
+    And the withdrawal pilot checks its contract adapter, every tick history through length 12 and its planted defects

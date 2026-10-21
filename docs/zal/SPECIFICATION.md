@@ -287,7 +287,8 @@ Agreement records bind the candidate revision, canonical English and checker.
 The checker identity version `zal/checker/3` hashes `behavior.py`, `behavior2.py`, `workflow.py`,
 `factory.py`, `shared.py`, `terminal.py`, `mcp.py`, `workspace.py`, `server.py`,
 `workspace.html`, `explain.py`, `constructs.py`, `ladder_tools.py`, `ladder.py`,
-`ladder_en.json` and `temporal_lowering.py`.
+`ladder_en.json`, `temporal_lowering.py`, `withdrawal_pilot.py`,
+`withdrawal_pilot.lean` and `withdrawal_pilot_refutation.lean`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no
