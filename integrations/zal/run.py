@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 import sys
 
-from behavior import MAX_SOURCE, check, legend, parse, semantic_diff
+import behavior
+from behavior import MAX_SOURCE
+import behavior2
 from factory import lower, qualify, write_new
 from workflow import checker_identity
 
@@ -37,16 +39,20 @@ def main():
     try:
         with options.source.open(encoding="ascii") as stream:
             source = stream.read(MAX_SOURCE + 1)
-        model = parse(source, options.syntax)
+        model = behavior2.parse_any(source, options.syntax)
+        profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
         if options.command == "render":
             print(model.render(options.to == "english"), end="")
             return 0
         if options.command == "check":
-            result = check(model, checker_identity())
+            result = profile.check(model, checker_identity())
         elif options.command == "legend":
-            result = legend(model)
+            result = profile.legend(model)
         elif options.command == "diff":
-            result = semantic_diff(model, parse(options.candidate.read_text(encoding="ascii"), options.candidate_syntax))
+            candidate = behavior2.parse_any(options.candidate.read_text(encoding="ascii"), options.candidate_syntax)
+            if type(candidate) is not type(model):
+                raise behavior.Refusal("Comparison needs two models of the same profile")
+            result = profile.semantic_diff(model, candidate)
         elif options.command == "export":
             write_new(lower(model), options.out)
             result = {"status": "exported", "revision": model.revision, "authority": "none"}
@@ -58,6 +64,8 @@ def main():
             cli = options.cli.resolve() if options.cli else target / "debug/zeno-fcis"
             result = qualify(model, root, cli, options.out)
         else:
+            if profile is behavior2:
+                raise behavior.Refusal("The browser workspace supports profile zal/finite-fsm/1 only")
             from server import serve
             serve(source if options.syntax == "symbolic" else model.render(), Path.cwd(), options.port, options.workspace)
             return 0
