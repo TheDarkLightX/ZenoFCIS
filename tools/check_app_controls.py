@@ -17,6 +17,8 @@ import tempfile
 
 APP = "src/app.rs"
 CONTROLS = [
+    ("pending-delivery-unreported", "committed_reply_marks_pending_delivery", "pending delivery not reported",
+     'result["delivery"] = Value::from("pending");', ""),
     ("stale-preview-head", "preview_uses_the_latest_committed_head", "preview read a stale head after commit",
      "let head = self.durable.verified_snapshot()?;\n        if request.expected() != head.version {",
      "let mut head = self.durable.verified_snapshot()?;\n        head.version = 0;\n        head.state = crate::genesis().map_err(failed)?;\n        if request.expected() != head.version {"),

@@ -1793,3 +1793,106 @@ fn preview_uses_the_latest_committed_head() {
     drop(server);
     ok(std::fs::remove_dir_all(root));
 }
+
+#[test]
+fn committed_reply_marks_pending_delivery() {
+    use zeno_fcis_shell::effects::port::{Delivery, Fault, Sent};
+    use zeno_fcis_shell_sqlite::effects::production::Transport;
+    struct Unavailable;
+    impl Transport for Unavailable {
+        fn send(&mut self, _: &Delivery) -> Sent {
+            Sent::Unknown(Fault::Io)
+        }
+    }
+    let Some(journey) = Journey::new("pending-delivery") else {
+        return;
+    };
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let authority = &lineage.authorities()[0];
+    let table = ok(application::app::party_contexts(
+        authority,
+        &journey.parties,
+        journey.clock().as_ref(),
+    ));
+    let production = ok(Production::open_exclusive(
+        &journey.path,
+        &lineage,
+        1,
+        Unavailable,
+        Some(Clock::default()),
+    ));
+    let store = production.store();
+    let mut endpoint = ok(Application::with_parties(
+        &lineage,
+        production,
+        store,
+        &journey.path,
+        table,
+    ));
+    if let Some(clock) = journey.clock() {
+        endpoint = ok(endpoint.with_clock(clock));
+    }
+    let endpoint = endpoint.with_views(ok(application::app::party_views(&journey.parties)));
+    let config = ok(application::app::ingress_config(
+        &journey.parties,
+        RustCryptoSha256::hash(authority.identity()),
+        "http://localhost".into(),
+    ));
+    let mut server = Server::new(config, endpoint, Sink::default());
+    let mut pending = None;
+    for (index, step) in journey.fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        if let Some(time) = step["clock"].as_str() {
+            journey.set_clock(time);
+        }
+        let party = step["party"].as_str().unwrap();
+        let (status, _, original, bytes) = send(
+            &mut server,
+            &journey,
+            party,
+            step["command"].as_array().unwrap(),
+            u8::try_from(index + 1).unwrap(),
+        );
+        if step["class"] == "Reject" {
+            assert_eq!(status, 422);
+            continue;
+        }
+        assert_eq!(status, 200, "delivery failure changed committed reply");
+        let reply: Value = ok(serde_json::from_slice(&bytes));
+        let (_, state) = snapshot(&mut server, &journey.credential(party));
+        if state["pending"] != "0" {
+            assert_eq!(
+                reply["delivery"], "pending",
+                "pending delivery not reported"
+            );
+            pending = Some((party.to_owned(), original, reply));
+        }
+    }
+    if journey.fixture["deliveries"].as_u64().unwrap_or(0) > 0 {
+        let (party, original, committed) = pending.expect("a committed delivery remains pending");
+        let (status, bytes) = exchange_as(
+            &mut server,
+            "/command",
+            &journey.credential(&party),
+            &original,
+        );
+        assert_eq!(status, 200, "delivery failure changed committed reply");
+        let replay: Value = ok(serde_json::from_slice(&bytes));
+        assert_eq!(
+            replay["packet"], committed["packet"],
+            "pending delivery changed original packet"
+        );
+        assert_eq!(
+            replay["delivery"], "pending",
+            "pending delivery not reported"
+        );
+    }
+}

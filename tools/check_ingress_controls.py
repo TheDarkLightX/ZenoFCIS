@@ -17,6 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 HTTP = "crates/zeno-fcis-ingress/src/http.rs"
 DURABLE = "crates/zeno-fcis-ingress/src/durable.rs"
 CONTROLS = [
+    ("global-outbox-blocking", "journey", "failing_destination_does_not_block_replies_or_other_destinations", "unrelated destination was blocked", DURABLE,
+     "let delivery = DeliveryProgram::start_per_destination(", "let delivery = DeliveryProgram::start("),
+    ("destination-order", "journey", "failing_destination_does_not_block_replies_or_other_destinations", "destination order broken", "crates/zeno-fcis-shell/src/effects/program.rs",
+     "continuation.blocked.insert(destination);", "let _ = destination;"),
+    ("delivery-replaces-commit", "journey", "failing_destination_does_not_block_replies_or_other_destinations", "delivery failure changed committed reply", DURABLE,
+     "let _ = run::<DeliveryProgram>(&mut self.terminal, delivery, trace, sink);",
+     "if !matches!(run::<DeliveryProgram>(&mut self.terminal, delivery, trace, sink)?, Outcome::Ok(_)) { return Err(Refusal::Unavailable); }"),
     ("external-tail-served", "journey", "external_tail_is_never_served", "external tail was served", DURABLE,
      "self.load(trace, sink)?;\n        let actual = match self.call(Operation::ReadState(self.store), trace, sink)? {",
      "self.load(trace, sink)?;\n        if let Some(head) = &self.head { return Ok(head.clone()); }\n        let actual = match self.call(Operation::ReadState(self.store), trace, sink)? {"),

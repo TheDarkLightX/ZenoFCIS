@@ -163,6 +163,20 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
         }
     }
 
+    /// Whether this commit still owns a pending delivery after its delivery run.
+    pub fn delivery_pending(&mut self, version: u64) -> Result<bool, Refusal> {
+        match self.call(
+            Operation::ReadOutbox(self.store),
+            Trace::empty(Event::Request),
+            &mut Ignore,
+        )? {
+            Response::ReadOutbox(Outcome::Ok(pending)) => {
+                Ok(pending.iter().any(|d| d.version == version))
+            }
+            _ => Err(Refusal::Unavailable),
+        }
+    }
+
     fn call(
         &mut self,
         operation: Operation,
@@ -298,7 +312,7 @@ impl<H: Terminal> Durable<'_, '_, H> {
         trace.event = Event::Commit;
         trace.commit = Some(receipt.chain);
         sink.record(trace);
-        let delivery = DeliveryProgram::start(
+        let delivery = DeliveryProgram::start_per_destination(
             DeliveryInvocation {
                 epoch: 2,
                 store: self.store,
@@ -309,14 +323,9 @@ impl<H: Terminal> Durable<'_, '_, H> {
                 jitter: NonZeroU64::MIN,
             },
         );
-        // Delivery failure does not erase or replace the already committed packet.
-        // Return uncertainty so the caller retries the same original key.
-        if !matches!(
-            run::<DeliveryProgram>(&mut self.terminal, delivery, trace, sink)?,
-            Outcome::Ok(_)
-        ) {
-            return Err(Refusal::Unavailable);
-        }
+        // Commit and delivery are separate outcomes. Failed destinations stay
+        // pending; they cannot replace an already committed reply with a refusal.
+        let _ = run::<DeliveryProgram>(&mut self.terminal, delivery, trace, sink);
         Ok(packet)
     }
 }

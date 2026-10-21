@@ -108,7 +108,8 @@ context, and asks the native core to preview each command. A command is
 offered only after an accepting preview for those exact inputs and revision.
 Review and confirm its details. The server authenticates again, rechecks the
 core and atomically commits state, receipt, replay record and outbox. The UI
-shows a completed decision only after the commit and delivery run complete.
+shows the committed decision after the commit and delivery attempt complete;
+its outbox may still have pending deliveries.
 
 The browser saves the exact request before sending. An interrupted request
 leaves a recovery record. Reload, sign in with the same credential and use
@@ -240,10 +241,13 @@ reply with the original request. Keep the program fast and
 only writes to.
 
 Exit status 0 acknowledges the delivery. Any other exit, a program that
-cannot start, or the time limit leaves the delivery pending: the commit
-stands, the request's reply is 503, and the outbox sends it again on the
-next delivery run, such as a retry of the same request. Delivery is
-therefore at least once. The program, or the service it calls, must treat
+cannot start, or the time limit leaves the delivery pending. The commit
+stands and the request returns its committed result with `"delivery": "pending"`
+when that commit still has a pending record. Delivery failure never replaces
+that result with 503. Later records for the failed destination wait; records
+for other destinations proceed. On the next delivery run, such as a retry of
+the same request, each destination resumes with its oldest pending record.
+The retry budget is shared by the run. Delivery is therefore at least once. The program, or the service it calls, must treat
 the delivery ID as an idempotency key and apply each ID once. The curl
 example posts the JSON object to a webhook, which deduplicates on
 `delivery`. A mail command, such as
@@ -313,7 +317,7 @@ are refused, and an `Origin` header, when present, must equal
 |---|---|---|
 | `GET /state` | No body. | JSON: `contract`, the hexadecimal SHA-256 of the Authority identity; `principal`; `revision`, the commits so far; `values`, the state fields, `null` where the party's view hides one; `context`, this party's context values; and `pending`, the undelivered outbox entries. Integers are decimal strings. |
 | `POST /preview` | A command body whose payload is the JSON list of every input as decimal strings: the state `values` (a hidden one may stay `null`), then the command fields, then this party's `context`. | JSON: `reply`, the decision the Authority would make (`input`, `class`, `reason`, `post`, with hidden state values `null`), and `command`, the framed command in hexadecimal. Nothing is committed. |
-| `POST /command` | A command body whose payload is the framed command bytes from the preview. | JSON: `packet`, the reply packet in hexadecimal, `revision` and `reply`. |
+| `POST /command` | A command body whose payload is the framed command bytes from the preview. | JSON: `packet`, the reply packet in hexadecimal, `revision` and `reply`; also `delivery: "pending"` when that commit has an undelivered record. |
 | `GET /` and the other assets | No body; no credential is needed. | The public, immutable interface files, including `/app.json`. |
 
 A command body is the format version, then four fields:
@@ -330,7 +334,7 @@ Statuses: 200 done; 400 a malformed request, body or route; 401 a missing or
 unknown credential; 403 another origin, contract or context; 409 the store
 moved past the expected revision, or the key already names a different
 request; 413 too large; 422 the contract refused the command (a preview
-shows its reason); 503 storage or delivery is uncertain, so retry the same
+shows its reason); 503 storage is uncertain, so retry the same
 body, or, with the body `Clock`, the server clock is outside the contract's
 range. An error reply's body is the refusal's name, such as `Credential`.
 
@@ -529,7 +533,9 @@ cover withdrawal queue, inventory reservation, the wide counter and the
 three-party escrow example. The counter declares no deliveries, so its
 journey checks an empty outbox.
 Other contracts get an accepting genesis smoke journey and need their own
-reviewed refusal and delivery journey before adoption.
+reviewed refusal and delivery journey before adoption. The per-destination
+retry mode has regression and planted-control checks; the existing finite
+shell-effects exploration covers the original delivery mode.
 
 Run `python3 tools/check_app_factory.py` from the checkout for generated
 applications with features off and on, their socket-free HTTP/SQLite

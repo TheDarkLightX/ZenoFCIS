@@ -19,7 +19,7 @@ pub const SCHEMA: &str = "zeno-fcis/shell-effects/1";
 /// SHA-256 of the step-function source, framed by [`source_digest`], as hex.
 /// Changing `program.rs` needs a deliberate new binding here.
 pub const PROGRAM_SOURCE_SHA256: &str =
-    "957176a60da6f2ddb49d96cf0067dead49d097fd040695ce22bad9f03ebc86e3";
+    "dde6e52db1982d4cbeef2198d24baf9a533b8af5b8239e8e716144a1def90937";
 
 /// Largest byte cap a field may declare.
 pub const MAX_BYTES: u64 = 1 << 20;

@@ -470,7 +470,13 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
                 &original.context,
             )?,
         );
-        encoded(json!({"packet":hex(&packet),"revision":entry.version.to_string(),"reply":reply}))
+        let version = entry.version;
+        let mut result =
+            json!({"packet":hex(&packet),"revision":version.to_string(),"reply":reply});
+        if self.durable.delivery_pending(version)? {
+            result["delivery"] = Value::from("pending");
+        }
+        encoded(result)
     }
 }
 // One line of the submission journal that the generated command line's

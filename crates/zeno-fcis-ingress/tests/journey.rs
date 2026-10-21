@@ -1373,3 +1373,134 @@ fn startup_audit_refuses_nonpositive_commit_rows() {
         );
     });
 }
+
+#[derive(Default)]
+struct Destinations {
+    recovered: bool,
+    attempted: Vec<Delivery>,
+    delivered: Vec<Delivery>,
+}
+#[derive(Clone, Default)]
+struct SplitTransport(std::rc::Rc<std::cell::RefCell<Destinations>>);
+impl Transport for SplitTransport {
+    fn send(&mut self, delivery: &Delivery) -> Sent {
+        let mut state = self.0.borrow_mut();
+        state.attempted.push(delivery.clone());
+        if delivery.ordinal == 0 && !state.recovered {
+            return Sent::Unknown(port::Fault::Io);
+        }
+        state.delivered.push(delivery.clone());
+        Sent::Sent(Report {
+            delivery_id: delivery.id,
+            payload_sha256: delivery.payload_sha256,
+        })
+    }
+}
+
+#[test]
+fn failing_destination_does_not_block_replies_or_other_destinations() {
+    fixture::with_destinations(true, |catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let destinations = std::rc::Rc::new(std::cell::RefCell::new(Destinations::default()));
+        let production = ok(Production::open_exclusive(
+            &files.store,
+            &lineage,
+            1,
+            SplitTransport(destinations.clone()),
+            Some(Ticks::default()),
+        ));
+        let store = production.store();
+        let durable = ok(Durable::new(
+            authority,
+            production,
+            store,
+            principal(),
+            &fixture::context(),
+        ));
+        let mut server = Server::new(config(contract), durable, Sink::default());
+        let first = exchange(&mut server, &body(contract, 120, 1, 0), false);
+        assert_eq!(
+            status(&first),
+            200,
+            "delivery failure changed committed reply"
+        );
+        assert_eq!(
+            destinations
+                .borrow()
+                .delivered
+                .iter()
+                .filter(|d| d.ordinal == 1)
+                .count(),
+            1,
+            "unrelated destination was blocked"
+        );
+        let second = exchange(&mut server, &body(contract, 120, 2, 1), false);
+        assert_eq!(
+            status(&second),
+            200,
+            "delivery failure changed committed reply"
+        );
+        assert_eq!(
+            destinations
+                .borrow()
+                .delivered
+                .iter()
+                .filter(|d| d.ordinal == 1)
+                .count(),
+            2,
+            "unrelated destination was blocked"
+        );
+        assert!(
+            destinations
+                .borrow()
+                .attempted
+                .iter()
+                .filter(|d| d.ordinal == 0)
+                .all(|d| d.version == 1),
+            "destination order broken before recovery"
+        );
+        // Retry attempts use the exact same delivery ID and content.
+        let state = destinations.borrow();
+        let retries: Vec<_> = state.attempted.iter().filter(|d| d.ordinal == 0).collect();
+        assert!(retries.len() > 1);
+        assert!(
+            retries.iter().all(|d| *d == retries[0]),
+            "retry changed delivery identity"
+        );
+        drop(state);
+        destinations.borrow_mut().recovered = true;
+        let third = exchange(&mut server, &body(contract, 121, 3, 2), false);
+        assert_eq!(
+            status(&third),
+            200,
+            "delivery failure changed committed reply"
+        );
+        for ordinal in [0, 1] {
+            let versions: Vec<_> = destinations
+                .borrow()
+                .delivered
+                .iter()
+                .filter(|d| d.ordinal == ordinal)
+                .map(|d| d.version)
+                .collect();
+            assert_eq!(
+                versions,
+                vec![1, 2, 3],
+                "destination order broken after recovery"
+            );
+        }
+        let replay = exchange(&mut server, &body(contract, 120, 1, 0), false);
+        assert_eq!(status(&replay), 200);
+        assert_eq!(
+            packet(&replay),
+            packet(&first),
+            "pending delivery changed original packet"
+        );
+        let (mut durable, _) = server.into_parts();
+        assert_eq!(ok(durable.pending()), 0);
+    });
+}

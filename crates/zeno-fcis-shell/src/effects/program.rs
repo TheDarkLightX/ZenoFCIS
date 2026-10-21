@@ -6,7 +6,7 @@
 //! private phase plus saved values. It has no `Clone`, so within one process
 //! it is resumed at most once; a crash destroys it.
 
-use alloc::vec::Vec;
+use alloc::{collections::BTreeSet, vec::Vec};
 use core::num::NonZeroU64;
 
 use zeno_fcis_codec::Hash32;
@@ -314,6 +314,9 @@ pub struct DeliveryContinuation {
     invocation: DeliveryInvocation,
     policy: DeliveryPolicy,
     pending: Vec<Delivery>,
+    isolate_destinations: bool,
+    blocked: BTreeSet<Vec<u8>>,
+    failed: Option<Outcome<u64>>,
     current: usize,
     acknowledged: u64,
     may_have_sent: bool,
@@ -326,6 +329,26 @@ impl DeliveryProgram {
     /// Requests the exact pending records.
     #[must_use]
     pub fn start(invocation: DeliveryInvocation, policy: DeliveryPolicy) -> DeliveryStep {
+        Self::start_with_isolation(invocation, policy, false)
+    }
+
+    /// Continue other destinations after one exhausts its retries. Later
+    /// records for that destination stay pending, preserving its order. The
+    /// run still reports its failure; it does not turn partial progress into
+    /// an all-delivered result. The retry budget remains shared by the run.
+    #[must_use]
+    pub fn start_per_destination(
+        invocation: DeliveryInvocation,
+        policy: DeliveryPolicy,
+    ) -> DeliveryStep {
+        Self::start_with_isolation(invocation, policy, true)
+    }
+
+    fn start_with_isolation(
+        invocation: DeliveryInvocation,
+        policy: DeliveryPolicy,
+        isolate_destinations: bool,
+    ) -> DeliveryStep {
         let id = OpId::first(invocation.epoch);
         Step::Request(
             id,
@@ -337,6 +360,9 @@ impl DeliveryProgram {
                 invocation,
                 policy,
                 pending: Vec::new(),
+                isolate_destinations,
+                blocked: BTreeSet::new(),
+                failed: None,
                 current: 0,
                 acknowledged: 0,
                 may_have_sent: false,
@@ -474,16 +500,16 @@ fn sent_one(mut continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep 
             ask(continuation, DeliveryPhase::Acknowledge, operation)
         }
         Sent::Sent(_) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
-        Sent::Refused(code) => delivery_done(&continuation, Outcome::Refused(code)),
+        Sent::Refused(code) => failed_destination(continuation, Outcome::Refused(code)),
         Sent::NotSent(code) => {
             if continuation.retries == 0 {
-                return delivery_done(&continuation, Outcome::Refused(code));
+                return failed_destination(continuation, Outcome::Refused(code));
             }
             back_off(continuation)
         }
         Sent::Unknown(fault) => {
             if continuation.retries == 0 {
-                return delivery_done(&continuation, Outcome::Unknown(fault));
+                return failed_destination(continuation, Outcome::Unknown(fault));
             }
             back_off(continuation)
         }
@@ -506,7 +532,7 @@ fn acknowledged(continuation: DeliveryContinuation, outcome: Outcome<()>) -> Del
             continuation.current += 1;
             send(continuation)
         }
-        Outcome::Refused(code) => delivery_done(&continuation, Outcome::Refused(code)),
+        Outcome::Refused(code) => failed_destination(continuation, Outcome::Refused(code)),
         Outcome::NotApplied(fault) => retry_acknowledge(continuation, Outcome::NotApplied(fault)),
         Outcome::Unknown(fault) => retry_acknowledge(continuation, Outcome::Unknown(fault)),
     }
@@ -516,7 +542,7 @@ fn acknowledged(continuation: DeliveryContinuation, outcome: Outcome<()>) -> Del
 /// answers AlreadyAcknowledged.
 fn retry_acknowledge(mut continuation: DeliveryContinuation, failed: Outcome<u64>) -> DeliveryStep {
     if continuation.retries == 0 {
-        return delivery_done(&continuation, failed);
+        return failed_destination(continuation, failed);
     }
     let Some(delivery) = continuation.pending.get(continuation.current) else {
         return delivery_done(&continuation, Outcome::Refused(Code::Protocol));
@@ -530,10 +556,43 @@ fn retry_acknowledge(mut continuation: DeliveryContinuation, failed: Outcome<u64
     ask(continuation, DeliveryPhase::Acknowledge, operation)
 }
 
-/// Sends the current record's exact bytes, or ends when none is left.
-fn send(continuation: DeliveryContinuation) -> DeliveryStep {
+fn failed_destination(
+    mut continuation: DeliveryContinuation,
+    failed: Outcome<u64>,
+) -> DeliveryStep {
+    if !continuation.isolate_destinations {
+        return delivery_done(&continuation, failed);
+    }
     let Some(delivery) = continuation.pending.get(continuation.current) else {
-        return delivery_done(&continuation, Outcome::Ok(continuation.acknowledged));
+        return delivery_done(&continuation, Outcome::Refused(Code::Protocol));
+    };
+    let destination = delivery.destination.clone();
+    continuation.blocked.insert(destination);
+    if continuation.failed.is_none() {
+        continuation.failed = Some(failed);
+    }
+    continuation.current += 1;
+    send(continuation)
+}
+
+/// Sends the next eligible record, skipping destinations already blocked in
+/// this run. The blocked set is owned invocation scratch, never retained state.
+fn send(mut continuation: DeliveryContinuation) -> DeliveryStep {
+    while continuation
+        .pending
+        .get(continuation.current)
+        .is_some_and(|d| continuation.blocked.contains(&d.destination))
+    {
+        continuation.current += 1;
+    }
+    let Some(delivery) = continuation.pending.get(continuation.current) else {
+        return delivery_done(
+            &continuation,
+            continuation
+                .failed
+                .clone()
+                .unwrap_or(Outcome::Ok(continuation.acknowledged)),
+        );
     };
     let operation = Operation::Send(continuation.invocation.store, delivery.clone());
     ask(continuation, DeliveryPhase::Send, operation)

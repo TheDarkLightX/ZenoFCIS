@@ -22,6 +22,13 @@ pub(crate) fn with_authority(run: impl FnOnce(&Authority<'_>)) {
     with_catalog(|catalog| run(&ok(authority::bind(catalog))));
 }
 pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
+    with_destinations(false, run);
+}
+
+pub(crate) fn with_destinations(
+    two_destinations: bool,
+    run: impl FnOnce(&catalog::BoundCatalog<'_>),
+) {
     let contract = counter::Contract::new();
     let mut descriptor = contract.descriptor();
     // Same counter commands; two notifications make omission of a second entry observable.
@@ -33,6 +40,11 @@ pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
             if let Some(first) = plans.first().copied() {
                 plans.push(c::DeliveryPlan {
                     ordinal: 1,
+                    destination: if two_destinations {
+                        c::Expr::Constant(c::Atom::Text(b"other-observer"))
+                    } else {
+                        first.destination
+                    },
                     ..first
                 });
             }
