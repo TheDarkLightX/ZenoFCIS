@@ -118,7 +118,9 @@ history and returns the original packet. Do not delete an unresolved record
 or invent another key because a reply was lost.
 
 Restart with the same start command and configuration. SQLite keeps the
-state and pending outbox. `ZENO_APP_STORE`, `ZENO_APP_RECEIVER`,
+state and pending outbox. The server writes the submission journal the
+generated command line's `history` reads, in the same format as `submit`,
+so `history` lists and decides again every request the server committed. `ZENO_APP_STORE`, `ZENO_APP_RECEIVER`,
 `ZENO_APP_CONTEXT` and `ZENO_APP_ADDRESS` select the database, local file
 receiver, context file and loopback address. The receiver stores each exact
 payload under its delivery ID, with `ID.json` beside it: an envelope naming

@@ -422,16 +422,41 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
     }
     fn execute(&mut self, request: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
         let (authority, clock, last) = (self.authority, self.clock.as_ref(), self.last);
-        let packet = self.durable.execute_admitted(
+        let path = self.path.as_path();
+        let mut journaled = None;
+        let result = self.durable.execute_admitted(
             request,
-            &mut |configured| admit(authority, clock, last, configured),
+            &mut |configured| {
+                let context = admit(authority, clock, last, configured)?;
+                // A new decision's submission is on disk before its commit.
+                let line = Submission {
+                    sequence: request.expected().checked_add(1).ok_or(Refusal::Conflict)?,
+                    command: crate::session::root_numbers(
+                        authority.descriptor().command,
+                        request.bytes(),
+                    )
+                    .map_err(|_| Refusal::Malformed)?,
+                    context: context_numbers(authority, &context)?,
+                };
+                journaled = journal(path, request.expected(), &line).map_err(failed)?;
+                Ok(context)
+            },
             &|configured, stored| same_party(authority, clock, configured, stored),
             sink,
-        )?;
+        );
         let history = self
             .lineage
             .audit_history_read_only(&self.path)
             .map_err(failed)?;
+        // A line whose commit did not happen is removed again.
+        if let Some((file, kept, sequence)) = journaled
+            && history.snapshot.version() < sequence
+        {
+            file.set_len(kept)
+                .and_then(|()| file.sync_all())
+                .map_err(failed)?;
+        }
+        let packet = result?;
         let original = history
             .commits
             .iter()
@@ -454,6 +479,80 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
             json!({"packet":hex(&packet),"revision":original.sequence.to_string(),"reply":reply}),
         )
     }
+}
+// One line of the submission journal that the generated command line's
+// `history` reads: `SEQUENCE CONTRACT_VERSION | COMMAND | CONTEXT`.
+struct Submission {
+    sequence: u64,
+    command: Vec<i128>,
+    context: Vec<i128>,
+}
+impl Submission {
+    fn line(&self) -> String {
+        let joined = |numbers: &[i128]| strings(numbers).join(" ");
+        format!(
+            "{} {} | {} | {}\n",
+            self.sequence,
+            crate::v2_contract::VERSION,
+            joined(&self.command),
+            joined(&self.context)
+        )
+    }
+}
+// Under the journal's exclusive lock, held until the commit's outcome: remove
+// any line past the store's head, left by a stop before a commit, then append
+// and synchronize this submission. A store with commits but no journal keeps
+// none, since its earlier commits cannot be recorded.
+fn journal(
+    store: &Path,
+    head: u64,
+    submission: &Submission,
+) -> std::io::Result<Option<(fs::File, u64, u64)>> {
+    use std::io::Seek as _;
+    let path = crate::journal_path(store);
+    let open = || fs::OpenOptions::new().read(true).append(true).open(&path);
+    let mut file = match open() {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && head == 0 => {
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)?
+                .sync_all()?;
+            fs::File::open(
+                path.parent()
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .unwrap_or(Path::new(".")),
+            )?
+            .sync_all()?;
+            open()?
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        other => other?,
+    };
+    file.lock()?;
+    let mut text = String::new();
+    file.seek(std::io::SeekFrom::Start(0))?;
+    file.read_to_string(&mut text)?;
+    let mut kept = 0;
+    for line in text.split_inclusive('\n') {
+        let Some(complete) = line.strip_suffix('\n') else {
+            break;
+        };
+        let sequence: u64 = complete
+            .split_whitespace()
+            .next()
+            .and_then(|word| word.parse().ok())
+            .ok_or_else(|| std::io::Error::other("malformed submission journal"))?;
+        if sequence > head {
+            break;
+        }
+        kept += line.len();
+    }
+    let kept = u64::try_from(kept).map_err(std::io::Error::other)?;
+    file.set_len(kept)?;
+    file.write_all(submission.line().as_bytes())?;
+    file.sync_all()?;
+    Ok(Some((file, kept, submission.sequence)))
 }
 /// Supplied real time for the checked bounded retry programs, in milliseconds.
 pub struct Clock(Instant);

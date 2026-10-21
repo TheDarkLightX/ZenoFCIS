@@ -266,6 +266,19 @@ fn app_factory_journey() {
         assert_eq!(delivered, expected);
     }
     assert_eq!(received(&receiver), delivered as usize);
+    // The server journals every admitted request, so `history` reads the store.
+    let accepted = fixture["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|step| step["class"] != "Reject")
+        .count();
+    let history = application::history(&path).map(|history| history.entries.len());
+    assert_eq!(
+        history,
+        Ok(accepted),
+        "an admitted request is missing from the journal"
+    );
     assert!(
         !all_traces
             .iter()
@@ -716,6 +729,12 @@ fn parties_journey() {
             application::app::hex(party.principal.as_bytes())
         );
     }
+    let history = application::history(&journey.path).map(|history| history.entries.len());
+    assert_eq!(
+        history,
+        Ok(accepted.len()),
+        "an admitted request is missing from the journal"
+    );
     // A party's view hides state values in its snapshots and replies, chosen by
     // its credential, whatever its request holds.
     let state = ok(application::current(&journey.path)).state;

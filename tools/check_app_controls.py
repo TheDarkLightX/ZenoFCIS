@@ -32,6 +32,8 @@ CONTROLS = [
      "let shown: Vec<bool> = serde_json::from_slice::<Value>(request.bytes()).ok()"
      ".and_then(|v| v.as_array().map(|a| a.iter().map(|x| !x.is_null()).collect())).unwrap_or_default();"
      "\n        let view = Some(shown.as_slice());"),
+    ("journal-drops-request", "parties_journey", "an admitted request is missing from the journal",
+     "file.write_all(submission.line().as_bytes())?;", ""),
 ]
 
 
