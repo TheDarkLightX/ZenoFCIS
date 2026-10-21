@@ -104,13 +104,21 @@ class CommonsTests(unittest.TestCase):
         with self.assertRaises(CommonsError):
             b.lease_take("/tmp/zf-x")
         a.lease_renew("/tmp/zf-x", ttl_seconds=600)
-        self.clock.at += 601
-        self.assertEqual(b.lease_check("/tmp/zf-x"), [])  # expired leases free the resource
-        b.lease_take("/tmp/zf-x")
+        self.clock.at += 601  # a stopped renewal, a paused process or a clock jump: the lease is stale, not free
+        self.assertEqual([(c["owner"], c["state"]) for c in b.lease_check("/tmp/zf-x")], [("builder-a", "stale")])
+        with self.assertRaisesRegex(CommonsError, "never released"):
+            b.lease_take("/tmp/zf-x/sub")
+        taken = b.lease_take("/tmp/zf-x", force_reason="builder-a posted finished, workspace released")
+        self.assertEqual(taken["displaced"], [["/tmp/zf-x", "builder-a"]])
+        [event] = [e for e in b.events(kind_prefix="lease.take") if e["actor"] == "builder-b"]
+        self.assertIn("force_reason", event["body"])
         with self.assertRaises(CommonsError):
             a.lease_release("/tmp/zf-x")  # only the owner releases, unless forced with a reason
         a.lease_release("/tmp/zf-x", force_reason="owner confirmed it finished")
         self.assertEqual(b.leases(), [])
+        a.lease_take("/tmp/zf-y", ttl_seconds=600)
+        self.clock.at += 601
+        self.assertEqual(a.lease_renew("/tmp/zf-y", ttl_seconds=600)["resource"], "/tmp/zf-y")  # the holder renews
 
     def test_lease_on_a_folder_protects_its_parent_and_children(self):
         a, lead = self.open("reviewer"), self.open("lead")
@@ -123,9 +131,12 @@ class CommonsTests(unittest.TestCase):
 
     def test_done_requires_released_leases(self):
         a = self.open("builder")
-        a.lease_take("branch:dev/2.6-x")
+        a.lease_take("branch:dev/2.6-x", ttl_seconds=60)
         with self.assertRaises(CommonsError):
             a.status("done")
+        self.clock.at += 3600
+        with self.assertRaises(CommonsError):
+            a.status("done")  # a stale lease is still held
         a.lease_release("branch:dev/2.6-x")
         self.assertEqual(a.status("done")["state"], "done")
         with self.assertRaises(CommonsError):
@@ -287,6 +298,75 @@ class CommonsTests(unittest.TestCase):
         with self.assertRaises(CommonsError):
             s.record_update(rid, note="x" * (65536 - len(record["body"])))
         self.assertEqual(s.record(rid)["body"], record["body"])
+
+    def test_anchors_detect_a_rewritten_history_and_removed_events(self):
+        s = self.open("lead")
+        for i in range(6):
+            s.emit("atdd", "result", f"s-{i}", {"exit": 0})
+        anchors = [s.head()]
+        self.assertTrue(s.verify(anchors=anchors)["ok"])
+        raw = sqlite3.connect(self.dir / DB_NAME)
+        rows = raw.execute("SELECT seq, at, actor, kind, subject, body FROM events ORDER BY seq").fetchall()
+        prev = "0" * 64
+        import hashlib
+        for seq, at, actor, kind, subject, body in rows:  # rewrite every event consistently from the start
+            body = json.loads(body)
+            if seq == 3:
+                body = {"exit": 1}
+            text = json.dumps(body, sort_keys=True, separators=(",", ":"))
+            digest = hashlib.sha256((prev + json.dumps([at, actor, kind, subject, body], sort_keys=True,
+                                                       separators=(",", ":"), ensure_ascii=False)).encode()).hexdigest()
+            raw.execute("UPDATE events SET body=?, prev=?, hash=? WHERE seq=?", (text, prev, digest, seq))
+            prev = digest
+        raw.commit()
+        self.assertTrue(s.verify()["ok"])  # the chain alone cannot see a full rewrite
+        rewritten = s.verify(anchors=anchors)
+        self.assertFalse(rewritten["ok"])
+        self.assertIn("rewritten", rewritten.get("reason", ""))
+        raw.execute("DELETE FROM events WHERE seq=(SELECT MAX(seq) FROM events)")
+        raw.commit()
+        raw.close()
+        removed = s.verify(anchors=anchors)
+        self.assertFalse(removed["ok"])
+        self.assertIn("removed", removed.get("reason", ""))
+
+    def test_the_store_refuses_links_and_foreign_schemas_before_writing(self):
+        other = Path(self.tmp.name) / "other.sqlite3"
+        raw = sqlite3.connect(other)
+        raw.execute("CREATE TABLE notes(x)")
+        raw.commit()
+        raw.close()
+        linked = Path(self.tmp.name) / "linked"
+        linked.mkdir()
+        (linked / DB_NAME).symlink_to(other)
+        with self.assertRaisesRegex(CommonsError, "symbolic link"):
+            Commons(linked, "lead")
+        foreign = Path(self.tmp.name) / "foreign"
+        foreign.mkdir()
+        raw = sqlite3.connect(foreign / DB_NAME)
+        raw.execute("CREATE TABLE notes(x)")
+        raw.commit()
+        raw.close()
+        with self.assertRaisesRegex(CommonsError, "not Commons tables"):
+            Commons(foreign, "lead")
+        raw = sqlite3.connect(foreign / DB_NAME)
+        self.assertEqual(raw.execute("SELECT name FROM sqlite_master").fetchall(), [("notes",)])  # untouched
+        raw.close()
+        s = self.open("lead")
+        s.close()
+        raw = sqlite3.connect(self.dir / DB_NAME)
+        raw.execute("CREATE TRIGGER t AFTER INSERT ON events BEGIN DELETE FROM records; END")
+        raw.commit()
+        raw.close()
+        with self.assertRaisesRegex(CommonsError, "trigger t"):
+            Commons(self.dir, "lead")
+        raw = sqlite3.connect(self.dir / DB_NAME)
+        raw.execute("DROP TRIGGER t")
+        raw.commit()
+        raw.close()
+        (self.dir / "archive").symlink_to(Path(self.tmp.name))
+        with self.assertRaisesRegex(CommonsError, "symbolic link"):
+            Commons(self.dir, "lead")
 
     def test_refusals(self):
         s = self.open("lead")

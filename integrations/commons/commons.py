@@ -173,15 +173,36 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+TABLES = ("meta", "events", "leases", "agents", "messages", "records", "identities", "links", "checkpoints",
+          "sqlite_sequence")
+
+
+def _refuse_links(directory: Path) -> None:
+    """Sandboxed agents can write the store directory, so host processes never follow links placed in it."""
+    for name in (DB_NAME, DB_NAME + "-wal", DB_NAME + "-shm", DB_NAME + "-journal", ARCHIVE_DIR):
+        if (directory / name).is_symlink():
+            raise CommonsError(f"{name} in the store is a symbolic link; refusing to open it")
+
+
 class Commons:
-    """One store directory. Safe for many processes: every write is one immediate transaction."""
+    """One store directory. Safe for many processes: every write is one immediate transaction.
+
+    The directory is shared with sandboxed agents, so opening it checks before writing anything: no symbolic
+    links, the opened file is the store's own, and the schema holds only the Commons tables (no triggers or
+    views). SQLite runs in defensive mode with untrusted schemas."""
 
     def __init__(self, directory: str | os.PathLike, actor: str, clock=_now):
         self.directory = Path(directory)
         self.actor = _name(actor, "actor")
         self.clock = clock
         self.directory.mkdir(parents=True, exist_ok=True)
+        _refuse_links(self.directory)
         self.db = sqlite3.connect(self.directory / DB_NAME, timeout=30.0, isolation_level=None)
+        try:
+            self._check_opened()
+        except BaseException:
+            self.db.close()
+            raise
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA busy_timeout=30000")
         self.db.execute("PRAGMA synchronous=NORMAL")
@@ -190,6 +211,24 @@ class Commons:
         found = self.db.execute("SELECT value FROM meta WHERE key='format'").fetchone()[0]
         if found != FORMAT:
             raise CommonsError(f"store format {found} is not {FORMAT}")
+
+    def _check_opened(self) -> None:
+        if hasattr(sqlite3, "SQLITE_DBCONFIG_DEFENSIVE"):
+            self.db.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
+        self.db.execute("PRAGMA trusted_schema=OFF")
+        self.db.execute("PRAGMA cell_size_check=ON")
+        # SQLite reports a linked file under its target's path, so this also catches a file swapped for a link
+        # between the check above and the open.
+        opened = self.db.execute("PRAGMA database_list").fetchone()[2]
+        expected = os.path.join(os.path.realpath(self.directory), DB_NAME)
+        if opened and opened != expected:
+            raise CommonsError("the opened database is not the store's own file; refusing")
+        foreign = [(kind, name) for kind, name in self.db.execute(
+            "SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_autoindex_%'")
+            if kind != "table" or name not in TABLES]
+        if foreign:
+            raise CommonsError("the store holds objects that are not Commons tables: "
+                               + ", ".join(f"{k} {n}" for k, n in foreign[:5]))
 
     def close(self) -> None:
         self.db.close()
@@ -256,27 +295,48 @@ class Commons:
         return row[0]
 
     # ---- coordination: leases -------------------------------------------------------------------------
-    def _active_leases(self, cursor, at: float):
-        return cursor.execute("SELECT resource, owner, note, expires_at FROM leases WHERE expires_at > ?",
-                              (at,)).fetchall()
+    # Time only signals liveness. A lease past its expiry is "stale": its holder stopped renewing, but may be
+    # paused rather than finished, and clocks can jump. A stale lease still protects its resource until the
+    # holder releases it, or someone takes or releases it with a recorded force reason.
+    def _unreleased_leases(self, cursor):
+        return cursor.execute("SELECT resource, owner, note, expires_at FROM leases").fetchall()
 
-    def lease_take(self, resource: str, ttl_seconds: float = 3600.0, note: str = "") -> dict:
+    @staticmethod
+    def _lease_view(resource, owner, note, expires, at) -> dict:
+        return {"resource": resource, "owner": owner, "note": note, "expires": _iso(expires),
+                "state": "active" if expires > at else "stale"}
+
+    def lease_take(self, resource: str, ttl_seconds: float = 3600.0, note: str = "", force_reason: str = "") -> dict:
         resource = normalize_resource(resource)
         if not (60 <= ttl_seconds <= 7 * 86400):
             raise CommonsError("ttl_seconds must be between 60 and 604800")
         note = _text(note, "note", allow_empty=True)
+        force_reason = _text(force_reason, "force reason", allow_empty=True)
 
         def apply(cursor, seq, at):
             self._require_registered(cursor)
-            for held, owner, _, expires in self._active_leases(cursor, at):
-                if owner != self.actor and _covers(held, resource):
+            displaced = []
+            for held, owner, _, expires in self._unreleased_leases(cursor):
+                if owner == self.actor or not _covers(held, resource):
+                    continue
+                if expires > at:
                     raise CommonsError(f"{resource} overlaps {held}, leased by {owner} until {_iso(expires)}")
+                if not force_reason.strip():
+                    raise CommonsError(f"{resource} overlaps {held}: {owner}'s lease went stale at {_iso(expires)} but "
+                                       f"was never released. Confirm {owner} has finished, then take it with a force reason")
+                displaced.append([held, owner])
+            for held, _ in displaced:
+                cursor.execute("DELETE FROM leases WHERE resource=?", (held,))
             cursor.execute("DELETE FROM leases WHERE resource=?", (resource,))
             cursor.execute("INSERT INTO leases VALUES(?,?,?,?,?,?)",
                            (resource, self.actor, note, seq, at, at + ttl_seconds))
-            return {"seq": seq, "resource": resource, "owner": self.actor, "expires": _iso(at + ttl_seconds)}
+            return {"seq": seq, "resource": resource, "owner": self.actor, "expires": _iso(at + ttl_seconds),
+                    "displaced": displaced}
 
-        return self._write("lease.take", resource, {"ttl_seconds": ttl_seconds, "note": note}, apply)
+        body = {"ttl_seconds": ttl_seconds, "note": note}
+        if force_reason.strip():
+            body["force_reason"] = force_reason
+        return self._write("lease.take", resource, body, apply)
 
     def lease_renew(self, resource: str, ttl_seconds: float = 3600.0) -> dict:
         resource = normalize_resource(resource)
@@ -284,10 +344,10 @@ class Commons:
         def apply(cursor, seq, at):
             self._require_registered(cursor)
             row = cursor.execute("SELECT owner, expires_at FROM leases WHERE resource=?", (resource,)).fetchone()
-            if not row or row[1] <= at:
-                raise CommonsError(f"no active lease on {resource}; take it again")
+            if not row:
+                raise CommonsError(f"no lease on {resource}; take it")
             if row[0] != self.actor:
-                raise CommonsError(f"{resource} is leased by {row[0]}")
+                raise CommonsError(f"{resource} is leased by {row[0]}")  # a stale lease is renewed by its holder
             cursor.execute("UPDATE leases SET heartbeat_at=?, expires_at=? WHERE resource=?",
                            (at, at + ttl_seconds, resource))
             return {"seq": seq, "resource": resource, "expires": _iso(at + ttl_seconds)}
@@ -310,16 +370,14 @@ class Commons:
         return self._write("lease.release", resource, {"force_reason": force_reason}, apply)
 
     def lease_check(self, resource: str) -> list[dict]:
-        """Active leases that cover the resource or lie inside it. Empty means it is free to change."""
+        """Unreleased leases, active or stale, that cover the resource or lie inside it. Empty means free."""
         resource = normalize_resource(resource)
         at = self.clock()
-        return [{"resource": held, "owner": owner, "note": note, "expires": _iso(expires)}
-                for held, owner, note, expires in self._active_leases(self.db, at) if _covers(held, resource)]
+        return [self._lease_view(*row, at) for row in self._unreleased_leases(self.db) if _covers(row[0], resource)]
 
     def leases(self) -> list[dict]:
         at = self.clock()
-        return [{"resource": r, "owner": o, "note": n, "expires": _iso(e)}
-                for r, o, n, e in self._active_leases(self.db, at)]
+        return [self._lease_view(*row, at) for row in self._unreleased_leases(self.db)]
 
     # ---- coordination: agent lifecycle ------------------------------------------------------------------
     def status(self, state: str, step: str = "", question: str = "") -> dict:
@@ -332,7 +390,7 @@ class Commons:
         def apply(cursor, seq, at):
             self._require_registered(cursor)
             if state == "done":
-                held = [r for r, o, _, _ in self._active_leases(cursor, at) if o == self.actor]
+                held = [r for r, o, _, _ in self._unreleased_leases(cursor) if o == self.actor]
                 if held:
                     raise CommonsError("release your leases before posting done: " + ", ".join(held))
             cursor.execute(
@@ -554,11 +612,24 @@ class Commons:
         return self.db.execute("SELECT first, last, prev, head, segment, sha256, bytes, events, archived_seq "
                                "FROM checkpoints ORDER BY last").fetchall()
 
-    def verify(self, archives: bool = False) -> dict:
+    def verify(self, archives: bool = False, anchors=None) -> dict:
         """Recompute the hash chain. Any edit, deletion or reordering of past events breaks it.
 
         Without archives the live events are checked from the latest checkpoint (from_seq says where). With
-        archives every segment is checked too, so the whole history is recomputed from the first event."""
+        archives every segment is checked too, so the whole history is recomputed from the first event.
+        Anchors are (seq, hash) pairs kept outside the store: each one in the checked range must still match,
+        which detects a history rewritten from the start or events removed from the end."""
+        result = self._verify_chain(archives, {a["seq"]: a["hash"] for a in (anchors or [])})
+        return result
+
+    def _verify_chain(self, archives: bool, anchors: dict) -> dict:
+        seen: dict[int, str] = {}
+
+        def note(rows):
+            for row in rows:
+                if row[0] in anchors:
+                    seen[row[0]] = row[7]
+
         checkpoints = self._checkpoints()
         archived = {c[1]: c for c in checkpoints}
         prev, first, checked = GENESIS, 1, 0
@@ -583,6 +654,7 @@ class Commons:
                 bad = self._archived_event_mismatch(rows, archived)
                 if bad:
                     return {"ok": False, "broken_at": bad, "checked": checked, "reason": "an archive record disagrees with its checkpoint"}
+                note(rows)
                 prev, first, checked = head, last + 1, checked + events
         elif checkpoints:
             prev, first = checkpoints[-1][3], checkpoints[-1][1] + 1
@@ -593,8 +665,25 @@ class Commons:
         bad = self._archived_event_mismatch(rows, archived)
         if bad:
             return {"ok": False, "broken_at": bad, "checked": checked, "reason": "an archive record disagrees with its checkpoint"}
-        return {"ok": True, "checked": checked + result["checked"], "head": result["head"],
-                "from_seq": 1 if archives else first, "archives": len(checkpoints) if archives else 0}
+        note(rows)
+        top = rows[-1][0] if rows else first - 1
+        start = 1 if archives else first
+        for seq, digest in sorted(anchors.items()):
+            if seq > top:
+                return {"ok": False, "broken_at": seq, "checked": checked + result["checked"],
+                        "reason": f"anchor at event {seq} is past the newest event {top}: events were removed"}
+            if seq >= start and seen.get(seq) != digest:
+                return {"ok": False, "broken_at": seq, "checked": checked + result["checked"],
+                        "reason": f"anchor at event {seq} does not match: the history was rewritten"}
+        checked_anchors = sum(1 for seq in anchors if seq >= start)
+        return {"ok": True, "checked": checked + result["checked"], "head": result["head"], "from_seq": start,
+                "archives": len(checkpoints) if archives else 0, "anchors_checked": checked_anchors,
+                "anchors_before_range": len(anchors) - checked_anchors}
+
+    def head(self) -> dict:
+        """The newest event's sequence number and hash, for an anchor kept outside the store."""
+        row = self.db.execute("SELECT seq, hash FROM events ORDER BY seq DESC LIMIT 1").fetchone()
+        return {"seq": row[0], "hash": row[1]} if row else {"seq": 0, "hash": GENESIS}
 
     @staticmethod
     def _archived_event_mismatch(rows, archived: dict) -> int | None:
@@ -632,8 +721,9 @@ class Commons:
         The segment is written, read back and chain-checked before anything is removed. The removal is one
         transaction that also appends a store.archived event naming the segment's hash, so the live chain binds
         it. Read messages, broadcasts and messages to finished agents in the archived range leave the live
-        message table (their text stays in the segment); unread messages to other agents stay. Expired leases
-        are dropped. Records are knowledge and are never archived; each is capped at the text limit."""
+        message table (their text stays in the segment); unread messages to other agents stay. Leases stay
+        until released. Records are knowledge and are never archived; each is capped at the text limit.
+        Which events move is decided by sequence numbers and size, never by the clock."""
         if not isinstance(keep_events, int) or keep_events < 0:
             raise CommonsError("keep_events must be a non-negative number of events")
         before = self.storage(budget_bytes, max_live_events)
@@ -652,6 +742,7 @@ class Commons:
             raise CommonsError(f"the event chain is broken at {checked['broken_at']}; archive refused")
         head = checked["head"]
         folder = self.directory / ARCHIVE_DIR
+        _refuse_links(self.directory)
         folder.mkdir(exist_ok=True)
         name = f"events-{base + 1:012d}-{cut:012d}.jsonl.xz"
         path = folder / name
@@ -689,9 +780,8 @@ class Commons:
                 "DELETE FROM messages WHERE seq <= ? AND (recipient = '*' "
                 "OR seq <= COALESCE((SELECT read_through FROM agents a WHERE a.name = messages.recipient), 0) "
                 "OR (SELECT state FROM agents a WHERE a.name = messages.recipient) = 'done')", (cut,)).rowcount
-            expired = cursor.execute("DELETE FROM leases WHERE expires_at <= ?", (at,)).rowcount
             return {"seq": seq, "archived": len(rows), "segment": name, "first": base + 1, "last": cut,
-                    "messages_removed": removed, "expired_leases_removed": expired}
+                    "messages_removed": removed}
 
         try:
             result = self._write("store.archived", name, body, apply)

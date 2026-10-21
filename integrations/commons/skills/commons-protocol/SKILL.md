@@ -81,6 +81,11 @@ $C ack <N>                                                         # after readi
 $C lease release /tmp/zf26-x && $C status done                     # done is refused while you hold leases
 ```
 
+A lease past its expiry is **stale, not free**. Its holder may be paused rather than finished, and clocks can
+jump, so a stale lease still blocks `lease check` and `lease take`. Renew while you work. If you need a stale
+lease's resource, message its holder. Take it with `--force-reason "..."` only after the holder or the lead
+confirms it has finished; the reason is recorded.
+
 Every report you send states **"read through message N"**, and lists the IDs of the records you added.
 
 ## Size and history
@@ -89,7 +94,8 @@ The store keeps the newest 20,000 events live. A keeper service runs `$C archive
 events move to compressed segments under `archive/`, and each move is checked against the hash chain and recorded
 in it. Records and unread messages always stay live. `$C storage` shows the sizes. `$C verify --archives` checks
 the whole history. `$C export records --format md` and `$C export events --with-archive` write copies. Agents
-don't run `archive`; the lead and the keeper do.
+don't run `archive`; the lead and the keeper do. The keeper also writes the newest event's number and hash to an
+anchor file outside the store, so `verify --anchors` can detect a history that was rewritten or cut short.
 
 ## What never goes in
 

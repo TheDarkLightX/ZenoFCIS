@@ -9,6 +9,7 @@ import json
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -29,6 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("dashboard", help="agents, leases, record counts and your unread messages")
     p = sub.add_parser("verify", help="recompute the event hash chain (from the latest checkpoint, or all of it)")
     p.add_argument("--archives", action="store_true", help="also check every archive segment from the first event")
+    p.add_argument("--anchors", default="", help="a JSON-lines file of {seq, hash} anchors kept outside the store")
+    p = sub.add_parser("anchor", help="append the newest event's number and hash to a file kept outside the store")
+    p.add_argument("--out", required=True)
     sub.add_parser("storage", help="live and archive sizes, and whether the live store is over its budget")
     p = sub.add_parser("archive", help="move all but the newest events into a compressed, chain-checked segment")
     p.add_argument("--keep", type=int, default=None, help="events to keep live (default 20000)")
@@ -49,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     lease = sub.add_parser("lease", help="take, renew, release, check or list leases").add_subparsers(dest="op", required=True)
     p = lease.add_parser("take"); p.add_argument("resource"); p.add_argument("--ttl", type=float, default=3600); p.add_argument("--note", default="")
+    p.add_argument("--force-reason", default="", help="take over a stale lease after confirming its holder finished")
     p = lease.add_parser("renew"); p.add_argument("resource"); p.add_argument("--ttl", type=float, default=3600)
     p = lease.add_parser("release"); p.add_argument("resource"); p.add_argument("--force-reason", default="")
     p = lease.add_parser("check", help="exit 3 if the resource, or anything inside it, is leased"); p.add_argument("resource")
@@ -106,8 +111,19 @@ def run(args) -> tuple[int, object]:
         if cmd == "whoami":
             return 0, c.identity(args.who)
         if cmd == "verify":
-            out = c.verify(args.archives)
+            anchors = [json.loads(line) for line in Path(args.anchors).read_text().splitlines() if line.strip()] \
+                if args.anchors else None
+            out = c.verify(args.archives, anchors)
             return (0 if out["ok"] else 2), out
+        if cmd == "anchor":
+            head = c.head()
+            check = c.verify()
+            if not check["ok"]:
+                raise CommonsError(f"the chain is broken at {check['broken_at']}; no anchor written")
+            line = json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **head}, sort_keys=True)
+            with open(args.out, "a", encoding="utf-8") as stream:
+                stream.write(line + "\n")
+            return 0, head
         if cmd == "storage":
             return 0, c.storage()
         if cmd == "archive":
@@ -138,7 +154,7 @@ def run(args) -> tuple[int, object]:
             return 0, out
         if cmd == "lease":
             if args.op == "take":
-                return 0, c.lease_take(args.resource, args.ttl, args.note)
+                return 0, c.lease_take(args.resource, args.ttl, args.note, args.force_reason)
             if args.op == "renew":
                 return 0, c.lease_renew(args.resource, args.ttl)
             if args.op == "release":
@@ -176,7 +192,7 @@ def run(args) -> tuple[int, object]:
         raise CommonsError(f"unknown command {cmd}")
     finally:
         try:
-            if args.command not in ("archive", "storage", "export") and c.storage()["over_budget"]:
+            if args.command not in ("archive", "storage", "export", "anchor") and c.storage()["over_budget"]:
                 print("commons: the live store is over its budget; run `commons archive` (see `commons storage`)",
                       file=sys.stderr)
         except (sqlite3.Error, OSError):
