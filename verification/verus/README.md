@@ -491,3 +491,24 @@ specification is the subject of the gates above, not of this unit.
 The check runs the whole crate under `--no-cheating`, requires the reviewed
 obligation count and theorem names, and runs five planted program defects
 that must each fail the proof.
+## Composed-domain outcome and invariant theorem
+
+The harness `composed_domain.rs` includes the production ordered resolver and
+concrete state application, plus a conditional n-component finite-history
+induction. Its premises include local decision-table preservation, delivered
+input assumptions and read-only invariants, and coupling checks at member and
+outside-failure endings. A concrete three-component pilot discharges them.
+The reviewed counts, contracts, specifications and runtime body inventory are in
+`composed-domain.json`. The [proof boundary](../../docs/COMPOSED_DOMAIN_PROOF.md)
+separates proved code from tested parsing, planning, table and binding bridges.
+
+```sh
+python3 tools/test_check_composed_domain.py
+python3 tools/check_composed_domain.py --out evidence/composed-domain.json
+```
+
+The gate runs unfiltered positive verification and restricted semantic controls
+for omitted cuts, dropped read-only invariants, wrong prefixes, own-only
+application, read-only writes and an extra callback after Reject. Native
+specimens and reference disagreement can be replayed separately with
+`python3 tools/test_composed_domain_runtime_controls.py --out evidence/composed-native.json`.

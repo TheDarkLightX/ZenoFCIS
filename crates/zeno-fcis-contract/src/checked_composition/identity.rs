@@ -57,6 +57,8 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/checked_composition/predicate.rs",
     "src/checked_composition/receipt.rs",
     "src/checked_composition/refusal.rs",
+    "src/checked_composition/resolve.rs",
+    "src/checked_composition/resolve_spec.rs",
     "src/checked_composition/structure.rs",
     "src/checked_composition/table.rs",
     "src/checked_composition/term.rs",

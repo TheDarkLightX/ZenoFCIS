@@ -217,3 +217,5 @@ Its V2 API differs from the historical crates.io `1.1.0` API and is used from th
 The documentation describes implemented APIs and explicit boundaries. It does
 not claim general deployment qualification, a bundled concurrent runtime, or
 an end-to-end proof for arbitrary downstream projects.
+
+- [Composed-domain proof boundary](COMPOSED_DOMAIN_PROOF.md)
