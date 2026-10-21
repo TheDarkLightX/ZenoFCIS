@@ -70,3 +70,36 @@ def unrealizable(spec,tables,**budgets):
     return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
                 certificate=dict(kind='unrealizability',root=initial,
                                  ranks=[[i,rank[i],strategy.get(i)] for i in sorted(rank)]))
+
+
+def reactive(spec,tables,**budgets):
+    """Perfect-information upper bound, then conservative observation-uniform extraction.
+
+    A failed uniform extraction is UNKNOWN, never an impossibility certificate.
+    Grammar: a total finite lookup from (current actor, current request) to G.
+    No native, hidden, reference, future outcome, or monitor field is readable.
+    """
+    from product import events
+    spec=dict(spec,reactive=True)
+    graph=build(spec,tables,**budgets)
+    if graph.status!='complete': return dict(status='UNKNOWN',stop=graph.stop)
+    W={i for i,s in enumerate(graph.states) if not s.bad}
+    while True:
+        following={i for i in W if all(any(t in W for e,g,t in graph.edges[i] if e==event)
+                                      for event in {e for e,_,_ in graph.edges[i]})}
+        if following==W: break
+        W=following
+    if not set(graph.roots)<=W: return dict(status='not established',stop='initial state outside reactive fixed point')
+    cells={}
+    for i in sorted(W):
+        for event,action in enumerate(events(spec,graph.states[i])):
+            observation=(action['actor'],tuple(action['request']))
+            safe={g for e,g,t in graph.edges[i] if e==event and t in W}
+            cells[observation]=cells.get(observation,set(GUARDS)) & safe
+    if any(not choices for choices in cells.values()):
+        return dict(status='UNKNOWN',stop='no observation-uniform strategy extracted')
+    rules=[dict(actor=a,request=list(r),guard=next(g for g in GUARDS if g in choices))
+           for (a,r),choices in sorted(cells.items())]
+    return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
+                certificate=dict(kind='strategy',W=sorted(W),strategy=dict(grammar='observation-table/1',
+                                 reads=['actor','request'],order=spec['move_order'],rules=rules)))

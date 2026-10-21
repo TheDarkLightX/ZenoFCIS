@@ -3,13 +3,13 @@ import unittest
 from certificate_check import check
 from product import description, roots, events, step, GUARDS
 from solve import fixed_guard
-from test_certificate import Certificate
+import test_certificate
 
 
 class Guards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        Certificate.setUpClass(); cls.tables=Certificate.tables
+        test_certificate.Certificate.setUpClass(); cls.tables=test_certificate.Certificate.tables
 
     def test_native_fixed_guard(self):
         p=fixed_guard(description('withdrawal'),self.tables)

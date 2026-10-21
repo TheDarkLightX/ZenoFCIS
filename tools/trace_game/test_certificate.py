@@ -8,13 +8,13 @@ from product import build
 from solve import safety
 from product import description
 from solve import certify
-from test_product import Product
+import test_product
 
 
 class Certificate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        Product.setUpClass(); cls.tables=Product.tables
+        test_product.Product.setUpClass(); cls.tables=test_product.Product.tables
         for name,fault in (('guard-true','unauthorized'),('guard-false','deny-withdraw')):
             cls.tables[name]={key:core(list(key[:4]),list(key[4:]),fault) for key in cls.tables['lawful']}
         cls.packet=certify(description('withdrawal'),cls.tables)

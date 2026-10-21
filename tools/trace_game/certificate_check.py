@@ -244,7 +244,26 @@ def check(packet,tables):
             need(len(targets)==1,'counterexample permitted move'); at=targets[0]
         need(states[at][-1],'counterexample has no violation')
         return dict(evidence='counterexample',scope='this fixed guard',model=spec['model'])
-    need(cert['kind'] in ('safety','guard') and not spec['reactive'],'evidence kind')
+    need((cert['kind'] in ('safety','guard') and not spec['reactive'])
+         or (cert['kind']=='strategy' and spec['reactive'] and spec['model']!='oracle-withholding'),'evidence kind')
+    policy={}
+    if cert['kind']=='strategy':
+        strategy=cert['strategy']
+        need(set(strategy)=={'grammar','reads','order','rules'},'strategy grammar fields')
+        need(strategy['reads']==['actor','request'],'strategy reading hidden variable')
+        need(strategy['order']==spec['move_order'],'strategy observation order')
+        need(strategy['grammar']=='observation-table/1','strategy outside grammar')
+        for rule in strategy['rules']:
+            need(set(rule)=={'actor','request','guard'},'strategy reading hidden variable')
+            need(type(rule['actor']) is int and all(type(v) is int for v in rule['request']),'strategy observation encoding')
+            obs=(rule['actor'],tuple(rule['request']))
+            need(obs not in policy and rule['guard'] in GRAMMAR,'strategy outside grammar')
+            policy[obs]=rule['guard']
+    def chosen(i,event):
+        if cert['kind']!='strategy': return spec['guard']
+        a,r=permitted(spec,states[i])[event]
+        need((a,tuple(r)) in policy,'strategy is not total on W')
+        return policy[a,tuple(r)]
     if cert['kind']=='guard':
         need(cert['guard'] in GRAMMAR and cert['guard']==spec['guard'] and cert['grammar']==list(GRAMMAR),'guard outside grammar')
     winning=cert['W']; need(winning==sorted(set(winning)) and all(type(i) is int and 0<=i<len(states) for i in winning),'winning set encoding')
@@ -253,7 +272,7 @@ def check(packet,tables):
     for i in winning:
         need(not states[i][-1],'unsafe state inside W')
         need(edges[i] or is_terminal(spec,states[i]),'non-vacuity: empty environment gives UNKNOWN')
-        need(all(t in W for _,_,t in edges[i]),'closure under every permitted move')
+        need(all(t in W for e,g,t in edges[i] if g==chosen(i,e)),'closure under every permitted move')
     # One specified reference-corpus journey from EACH initial state inside W.
     for root in packet['graph']['roots']:
         at=root
@@ -262,11 +281,11 @@ def check(packet,tables):
         for request in requests:
             options=permitted(spec,states[at]); event=next((i for i,(actor,r) in enumerate(options) if r==request and (spec['model']!='withdrawal' or actor==0)),None)
             need(event is not None,'legitimate journey not permitted: UNKNOWN')
-            at=next(t for e,_,t in edges[at] if e==event)
+            at=next(t for e,g,t in edges[at] if e==event and g==chosen(at,event))
             need(at in W,'legitimate journey outside W')
         need((is_terminal(spec,states[at]) if spec['model']=='quantifier' else states[at][0][2 if spec['model']=='withdrawal' else 4]>0 and states[at][3]==0),'legitimate journey incomplete: UNKNOWN')
-    return dict(evidence='certified guard' if cert['kind']=='guard' else 'certified safety',
-                claim=f"guard {spec['guard']}, from grammar G, is certified safe" if cert['kind']=='guard' else 'safe on every finite history of the declared model',
+    return dict(evidence='certified winning strategy' if cert['kind']=='strategy' else 'certified guard' if cert['kind']=='guard' else 'certified safety',
+                claim='strategy sigma, in grammar Sigma, is certified winning' if cert['kind']=='strategy' else f"guard {spec['guard']}, from grammar G, is certified safe" if cert['kind']=='guard' else 'safe on every finite history of the declared model',
                 model=spec['model'], states=len(states), winning=len(W), roots=len(packet['graph']['roots']))
 
 
