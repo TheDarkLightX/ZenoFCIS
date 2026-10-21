@@ -61,7 +61,7 @@ export class DurableTransport {
       const prepared=await this.call('/preview',envelope(b.contract,'00'.repeat(32),b.revision,new TextEncoder().encode(JSON.stringify(b.input))));
       let reply=prepared.reply;
       if(data.kind==='dispatch'){
-        if(reply.class!=='Accept')throw Error('Core no longer accepts the confirmed request.');
+        if(reply.class!=='Accept'||!validReply(this.bundle.description,b.input,reply))throw Error('Core no longer accepts the confirmed request.');
         const key=hex(this.random(new Uint8Array(32))),body=envelope(b.contract,key,b.revision,unhex(prepared.command));
         // Persist before sending. Storage failure prevents the send.
         this.storage.setItem(pendingKey,JSON.stringify({contract:b.contract,principal:b.principal,binding:b,body:hex(body)}));

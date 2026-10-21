@@ -25,6 +25,7 @@ def main():
     run(["node", ROOT / "site/tests/zenoui-integer-input.test.mjs"])
     run(["node", ROOT / "site/tests/zenoui-decimal-rules.test.mjs"])
     run(["node", ROOT / "site/tests/zenoui-label-text.test.mjs"])
+    run(["node", ROOT / "site/tests/zenoui-durable-dispatch.test.mjs"])
     for name, project in PROJECTS.items():
         out = args.out.resolve() / name
         run(["python3", ROOT / "tools/zenoui.py", project, "--out", out / "app",

@@ -22,6 +22,10 @@ CONTROLS = [
      "invisible character accepted",
      "/[<>\\p{Cc}\\p{Cf}\\p{Cs}\\p{Co}\\p{Zl}\\p{Zp}\\u034f\\u115f\\u1160\\u17b4\\u17b5\\u180b-\\u180f\\u2065\\u3164\\ufe00-\\ufe0f\\uffa0\\ufff0-\\ufff8\\u{E0000}-\\u{E0FFF}]/u",
      "/[<>\\x00-\\x1f]/"),
+    ("dispatch-without-reply-check", "site/public/zenoui/durable.js", ["node", "site/tests/zenoui-durable-dispatch.test.mjs"],
+     "a changed preview was dispatched",
+     "if(reply.class!=='Accept'||!validReply(this.bundle.description,b.input,reply))throw",
+     "if(reply.class!=='Accept')throw"),
 ]
 
 
