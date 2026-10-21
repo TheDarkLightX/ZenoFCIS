@@ -31,14 +31,16 @@ function orderedKeys(record, first) {
   return [...first.filter((key) => key in record), ...rest];
 }
 
+function display(value) { return typeof value === "boolean" ? (value ? "yes" : "no") : String(value); }
+
 function describeRecord(record) {
-  return Object.keys(record).sort().map((key) => `${key} ${record[key]}`).join(", ");
+  return Object.keys(record).sort().map((key) => `${key} ${display(record[key])}`).join(", ");
 }
 
 function describeChanges(before, after, fields) {
   const changes = orderedKeys(after, fields)
     .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
-    .map((key) => `${key} ${before[key]} → ${after[key]}`);
+    .map((key) => `${key} ${display(before[key])} → ${display(after[key])}`);
   return changes.length === 0 ? "No field changed." : `Changed: ${changes.join(", ")}.`;
 }
 
@@ -99,7 +101,9 @@ export async function mount(container, template) {
   const proposeButtons = [];
   const form = node("form", "controls");
   form.addEventListener("submit", (event) => event.preventDefault());
-  form.append(node("p", "help", template.help));
+  if (template.name === "agent-treasury-guard") {
+    form.append(node("details","context-help",node("summary",null,"About the supplied facts"),node("p","help",template.help)));
+  } else form.append(node("p", "help", template.help));
   if (context.length > 0) {
     form.append(node("div", "context", ...context.map((field) => field.wrapper)));
   }
@@ -123,6 +127,11 @@ export async function mount(container, template) {
   status.id = `${template.name}-status`;
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
+  const challenge = template.name === "agent-treasury-guard" ? node("div", "challenge-score") : null;
+  if (challenge) {
+    challenge.setAttribute("role", "status");
+    challenge.setAttribute("aria-live", "polite");
+  }
   const facts = node("dl", "facts");
   facts.id = `${template.name}-state`;
   const outbox = node("ol", "outbox", node("li", "empty", "Nothing queued."));
@@ -150,6 +159,7 @@ export async function mount(container, template) {
     }))) : null;
 
   container.replaceChildren(
+    ...(challenge ? [challenge] : []),
     form,
     status,
     node("div", "panels",
@@ -168,6 +178,21 @@ export async function mount(container, template) {
   let count = 0;
   // Every request sent since the last reset, with the module's report.
   const history = [];
+  // The scoreboard shows its three counters from the start, before the module loads.
+  renderChallenge();
+
+  function renderChallenge() {
+    if (!challenge) return;
+    const tally = challengeSummary(history);
+    const reasons = Object.entries(tally.reasons).map(([reason,count]) => `${reason}: ${count}`).join("; ");
+    const counters = node("div","challenge-counters");
+    for (const [value,label] of [[tally.requests,"requests sent"],[tally.refused,"refused"],[tally.violations,"observed law violations"]]) {
+      counters.append(node("p",null,node("strong",null,String(value)),` ${label}`));
+    }
+    challenge.replaceChildren(counters);
+    if (reasons) challenge.append(node("details",null,node("summary",null,"Why requests were refused"),node("p",null,reasons)));
+
+  }
 
   function setBusy(value) {
     busy = value;
@@ -177,7 +202,7 @@ export async function mount(container, template) {
   function renderState(state) {
     facts.replaceChildren();
     for (const key of orderedKeys(state.state, template.fields)) {
-      facts.append(node("dt", null, node("code", null, key)), node("dd", null, String(state.state[key])));
+      facts.append(node("dt", null, node("code", null, key)), node("dd", null, display(state.state[key])));
     }
     facts.append(
       node("dt", null, "Committed bundles"), node("dd", null, String(state.bundles)),
@@ -189,7 +214,7 @@ export async function mount(container, template) {
     for (const entry of state.outbox) {
       outbox.append(node("li", null,
         node("strong", null, entry.channel_name ?? `channel ${entry.channel}`),
-        ` (channel ${entry.channel}) to ${entry.destination}: ${describeRecord(entry.payload)}. `,
+        ` to ${entry.destination}: ${describeRecord(entry.payload)}. `,
         `${entry.acknowledged ? "Acknowledged" : "Pending"}; delivery `,
         node("span", "hash", short(entry.delivery_id))));
     }
@@ -210,15 +235,16 @@ export async function mount(container, template) {
       const [className, label] = KIND_LABELS[report.decision];
       head.append(node("span", `badge ${className}`, label), node("span", "request", `#${count} ${template.describe(request)}`));
       if (note) head.append(node("span", "note", note));
-      if (report.reason) body.append(`Reason ${report.reason.id} ${report.reason.name}. `);
+      if (report.reason) body.append(`Reason: ${report.reason.name}. `);
       body.append(report.commit ? `Committed as bundle ${report.bundles}; the exact replay was idempotent. ` : "Nothing was published. ");
       body.append(node("span", "transition", describeChanges(report.before, report.after, template.fields)));
       for (const entry of report.outbox) body.append(node("span", "transition", `Queued ${describeEntry(entry)}.`));
-      const laws = node("ul", "laws", ...report.laws.map((law) => node("li", null, `Law ${law.id} ${law.name}: ${law.status}`)));
+      const laws = node("ul", "laws", ...report.laws.map((law) => node("li", null, `Law ${law.name}: ${law.status}`)));
       body.append(node("details", null, node("summary", null, `${report.laws.length} law${report.laws.length === 1 ? "" : "s"} evaluated`), laws));
       const [identityKind, identityHash] = report.authorization_id ? ["Authorization", report.authorization_id] : ["Rejection", report.rejection_id];
       body.append(node("span", "transition", `${identityKind} `, node("span", "hash", identityHash)));
     }
+    body.append(node("details",null,node("summary",null,"Technical record"),node("pre",null,JSON.stringify({request,report},null,2))));
     const item = node("li", null, head, body);
     timeline.append(item);
     if (reveal) item.scrollIntoView({ block: "nearest" });
@@ -236,6 +262,7 @@ export async function mount(container, template) {
   function send(request, note, reveal) {
     const report = demo.step(request);
     history.push({ request, report });
+    renderChallenge();
     renderReport(request, report, note, reveal);
     renderState(demo.state());
     announce(request, report);
@@ -257,6 +284,7 @@ export async function mount(container, template) {
     const state = demo.reset();
     count = 0;
     history.length = 0;
+    renderChallenge();
     timeline.replaceChildren(node("li", "empty", "No decisions yet."));
     renderState(state);
     status.textContent = `Reset to the exact genesis: ${template.genesis}.`;
@@ -299,4 +327,21 @@ export async function mount(container, template) {
   reset();
   setBusy(false);
   return { reset, runDemonstration, history, state: () => demo.state(), status };
+}
+
+// A display tally over actual reports. This does not decide or certify inputs.
+export function challengeSummary(history) {
+  const tally = { requests: history.length, refused: 0, decisions: 0, violations: 0, reasons: {} };
+  for (const { report } of history) {
+    if (!report.error) {
+      tally.decisions++;
+      tally.violations += (report.laws ?? []).filter((law) => !["Satisfied", "Skipped"].includes(law.status)).length;
+    }
+    if (report.error || report.decision === "Reject") {
+      tally.refused++;
+      const reason = report.error ? `${report.stage}: ${report.error}` : (report.reason?.name ?? "rejected");
+      tally.reasons[reason] = (tally.reasons[reason] ?? 0) + 1;
+    }
+  }
+  return tally;
 }

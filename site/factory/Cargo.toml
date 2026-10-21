@@ -1,0 +1,19 @@
+[package]
+name = "zeno-fcis-site-factory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+zeno-fcis-program-search = "=2.5.0"
+zeno-fcis-contract = "=2.5.0"
+serde_json = "=1.0.151"
+zeno-fcis-site-common = { path = "../common" }
+zeno-fcis-synthesis = "=2.5.0"
+
+[lints]
+workspace = true

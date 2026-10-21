@@ -192,11 +192,19 @@ pub fn reset<A: Application>() -> u32
 where
     Demo<A>: Send,
 {
+    reset_instance(|| Demo::<A>::new().map(|demo| Box::new(demo) as Box<dyn DemoInstance + Send>))
+}
+
+/// Installs an owned demo session. Preparation and transport confer no decision authority.
+#[must_use]
+pub fn reset_instance(
+    build: impl FnOnce() -> Result<Box<dyn DemoInstance + Send>, Refusal>,
+) -> u32 {
     with_boundary(|boundary| {
         boundary.restart();
-        let result = Demo::<A>::new().and_then(|demo| {
+        let result = build().and_then(|demo| {
             let state = demo.state()?;
-            boundary.demo = Some(Box::new(demo));
+            boundary.demo = Some(demo);
             Ok(state)
         });
         boundary.respond(result)

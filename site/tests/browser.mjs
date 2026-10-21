@@ -1,5 +1,7 @@
 // Capture only after the demonstration finishes. A virtual-time budget can
 // expire while asynchronous Wasm compilation is still running on a CI host.
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -10,7 +12,7 @@ if (!chrome || !profile || !url || !Number.isSafeInteger(timeout) || timeout < 1
 }
 const deadline = Date.now() + timeout;
 const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-  "--disable-extensions", `--user-data-dir=${profile}`, "--remote-debugging-pipe"];
+  "--disable-extensions", "--disable-background-networking", `--user-data-dir=${profile}`, "--remote-debugging-pipe"];
 if (process.getuid?.() === 0) args.push("--no-sandbox");
 // Chrome reads DevTools messages on fd 3 and writes them on fd 4. This opens
 // no listening port and touches only the caller's temporary browser profile.
@@ -81,6 +83,12 @@ function checkDeadline(last) {
 try {
   const { targetId } = await command("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await command("Target.attachToTarget", { targetId, flatten: true });
+  const width=Number(process.env.SITE_VIEWPORT_WIDTH ?? "1440");
+  await command("Emulation.setDeviceMetricsOverride", {width,height:900,deviceScaleFactor:1,mobile:width<500},sessionId);
+  await command("Emulation.setEmulatedMedia", {features:[
+    {name:"prefers-color-scheme",value:process.env.SITE_THEME ?? "light"},
+    {name:"prefers-reduced-motion",value:process.env.SITE_MOTION ?? "reduce"},
+  ]},sessionId);
   await command("Page.enable", {}, sessionId);
   await command("Page.setLifecycleEventsEnabled", { enabled: true }, sessionId);
   const navigation = await command("Page.navigate", { url }, sessionId);
@@ -97,11 +105,38 @@ try {
       const label = (output ?? document.querySelector(".status"))?.textContent?.trim() ?? "";
       const ready = output ? label !== "" && label !== "pending"
         : label.includes("decided in this browser when the page loaded");
-      return { ready, label: label.slice(0, 300), html: ready ? document.documentElement.outerHTML : null };
+      return { ready, keyboard:document.body.dataset.keyboard, keyboardKey:document.body.dataset.keyboardKey ?? "Enter", label: label.slice(0, 300), html: ready ? document.documentElement.outerHTML : null };
     })()` }, sessionId);
     if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
     const state = result.result.value;
+    if (state.keyboard) {
+      await command("Runtime.evaluate",{expression:'delete document.body.dataset.keyboard; delete document.body.dataset.keyboardKey'},sessionId);
+      const key=state.keyboardKey,code={Enter:13,ArrowRight:39,ArrowLeft:37,ArrowUp:38,ArrowDown:40,Home:36,End:35}[key];
+      if(!code)throw new Error(`unsupported test key ${key}`);
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key,code:key,windowsVirtualKeyCode:code,...(key==="Enter"?{text:"\r"}:{})},sessionId);
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key,code:key,windowsVirtualKeyCode:code},sessionId);
+    }
     if (state.ready) {
+      if (process.env.SITE_SCREENSHOT_DIR && url.includes("factory.html") && !new URL(url).searchParams.has("control")) {
+        await mkdir(process.env.SITE_SCREENSHOT_DIR,{recursive:true});
+        for (const act of ["synthesis","inventory","search","money","challenge"]) {
+          await command("Runtime.evaluate",{expression:`(() => {
+            const frame=document.querySelector("iframe"), doc=frame.contentDocument;
+            const section=${JSON.stringify(act)}==="challenge" ? doc.querySelector('details[data-template="agent-treasury-guard"]') : doc.querySelector('[data-factory-act="${act}"]');
+            if(section.tagName==="DETAILS") section.open=true;
+            section.scrollIntoView({block:"start"});
+          })()`},sessionId);
+          await delay(250);
+          const {data}=await command("Page.captureScreenshot",{format:"png"},sessionId);
+          await writeFile(path.join(process.env.SITE_SCREENSHOT_DIR,`round2-${act}-${width}-${process.env.SITE_THEME ?? "light"}-${process.env.SITE_MOTION ?? "reduce"}.png`),Buffer.from(data,"base64"));
+          if(act==="inventory") {
+            await command("Runtime.evaluate",{expression:'document.querySelector("iframe").contentDocument.querySelector(".inventory-map").scrollIntoView({block:"start"})'},sessionId);
+            await delay(150);
+            const grid=await command("Page.captureScreenshot",{format:"png"},sessionId);
+            await writeFile(path.join(process.env.SITE_SCREENSHOT_DIR,`round2-inventory-grid-${width}-${process.env.SITE_THEME ?? "light"}-${process.env.SITE_MOTION ?? "reduce"}.png`),Buffer.from(grid.data,"base64"));
+          }
+        }
+      }
       process.stdout.write(state.html + "\n");
       break;
     }

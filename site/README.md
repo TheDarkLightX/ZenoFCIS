@@ -70,7 +70,7 @@ python3 -m http.server --directory site/public 8000
 ```
 
 Then open `http://localhost:8000/`. `build.py` runs, in order:
-`cargo fetch --locked` in the workspace, as the gate does, so that every
+`cargo fetch --locked --offline` in the workspace, as the gate does, so that every
 later cargo command runs offline against the reviewed lock; the CLI build
 and `zeno-fcis new` for every template, compared byte for byte with the
 source template; the lock check against the workspace
@@ -78,7 +78,8 @@ lock (`--relock` regenerates `site/Cargo.lock` from it); `cargo fmt --check`,
 clippy with `-D warnings` for the host and for wasm32, and the host tests;
 two release builds of each module, with the application and the demo crate
 rebuilt from scratch in between, which must produce identical bytes, and the
-sizes; the compiled API checks and `node site/tests/replay.mjs`; `node --check` on every script; and
+sizes; native factory expectations and controls; the compiled API checks,
+`node site/tests/replay.mjs` and the challenge tally check; `node --check` on every script; and
 `site/tests/deploy_check.py`, which needs Chrome (`--no-browser` skips it,
 `--chrome PATH` names the binary). `--only TEMPLATE` limits the module,
 replay, and browser steps to one template, and `--stage STAGE` runs one step,
@@ -150,7 +151,7 @@ its own browser capture so that a failure identifies the template involved.
 The normal decision path uses each template's complete declarative V2 policy;
 it calls no application-owned decision or law callback. The library's Verus
 verification establishes its implementation against its stated specifications
-and trusted base. The authored policy still needs review against intended
+and trusted base. The declared policy still needs review against intended
 behavior. Independent examples and host conformance tests detect policy and
 integration mistakes; they do not prove that a deployment meets every
 requirement. Earlier synthesis, controller and solver evidence remains
@@ -185,3 +186,57 @@ demonstration was decided in this browser when the page loaded, and the
 timeline holds one entry per decision, so the first view shows the judge at
 work. Every other section resets to its genesis when it is opened, ready for
 the viewer's requests or its own demonstration button.
+
+## The factory, live
+
+The new section loads `factory.js` at page load; its worker and its single
+`factory.wasm` module load only when a visitor presses Run. The worker keeps
+long checks off the UI thread. It makes only same-origin requests for scripts
+and the module, and contacts no model or other service.
+
+`factory/` links the checkout's finite synthesis, contract compiler and program
+search crates. It parses the pinned treasury problem, enumerates each candidate
+through the library evaluator, calls `finite::synthesize`, and replays every
+selected case. Inventory review parses and compiles the original contract and
+one of six mutations at runtime, binds both authorities, and scans all 864
+inputs. Its first witness follows native review order: declared examples,
+then the first differing decided input, then the first remaining difference.
+The worker reports checked cells in chunks of at most 48, then cross-checks
+their difference count against the complete review. The canvas groups all
+864 cells by action and quantity. Selecting a cell runs a fresh library
+evaluation in Wasm; the colour is not used to infer its decision. Display
+names come from the template declarations, while raw vectors and mutation
+identifiers remain in collapsed Technical records. Reduced motion renders
+only the completed grid and candidate bars.
+Program search checks a swapped seed, includes the example’s 7-node proposal,
+tries its own rewrites and independently replays the selected output table.
+The swap panel runs the pilot’s 12-node numeric graph with explicit decimal
+inputs; a separate widened-domain probe checks overflow refusal and actual
+attempted work. The normal pilot bounds do not overflow this graph.
+The treasury panel counts requests, refusals by reason and observed law
+violations from its actual reports; reset clears these display counts.
+
+The `native` build stage generates test-only expectations from the native
+factory binary and checks synthesis and mutation witnesses against the pinned
+CLI. It also writes the existing example gate's summaries for Node replay,
+which needs no subprocess. These JSON files stay outside the public artifact.
+`factory.mjs` compares full Wasm results and timings; `factory-worker.mjs` runs
+the published worker in Node worker threads with local module bytes and kills
+all-pass, ignored-difference and unchecked-counterexample controls. Chrome's
+factory harness separately exercises the served UI and worker with native
+keyboard activation, both colour themes, reduced motion and desktop/phone
+widths. Set `SITE_SCREENSHOT_DIR` when running the deploy check to retain each
+act’s `round2-` screenshots, including a grid close-up. The browser check
+samples every canvas cell against native results, checks the first-witness
+ring and colour contrast in both themes, and kills a deliberately stale
+canvas with `stale_grid_colours_fail_native_grid_check`. A nonbrowser check
+also verifies the actual drawing commands; it does not replace raster checks.
+The numeric vectors also match an independent Python
+big-integer reference and the graph is compared with the pilot source.
+
+Each result names its bounded evidence. Compiled code, browser behavior,
+specification adequacy, authentication, external delivery and receipt authority
+are separate concerns. Runtime contract models and input frames belong to one
+invocation, the authorities borrow them immutably, and only owned JSON leaves
+the closure. The retained worker caches a loaded module, not decisions or
+contract models. The shared ABI's session and byte limits still apply.

@@ -3,19 +3,262 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZenoFCIS in the browser</title>
+<title>ZenoFCIS: a neurosymbolic software factory</title>
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<header class="banner">
-  <h1>ZenoFCIS: a proposer suggests, a judge decides</h1>
-  <p>
-    The example applications, running in this page through their own commit
-    authorities, with an in-memory shell in place of SQLite.
-  </p>
+<header class="banner hero">
+  <div class="topbar">
+    <a class="mark" href="#top" id="top">ZenoFCIS<span>2.4.0</span></a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#releases">Releases</a>
+      <a href="#factory">The factory, live</a>
+      <a href="#demo">Live demo</a>
+      <a href="#start">Get started</a>
+      <a href="https://github.com/TheDarkLightX/ZenoFCIS">GitHub</a>
+    </nav>
+  </div>
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">Rust library and CLI · MIT or Apache-2.0</p>
+      <h1>A neurosymbolic <em>software factory</em> for high-assurance FCIS applications</h1>
+      <p class="thesis">AI proposes. Exact checkers decide.</p>
+      <p class="lede">
+        ZenoFCIS builds a working application from a reviewed contract. The library makes every
+        decision from that contract and checks its laws before anything is stored. Models, agents
+        and synthesis can propose programs and repairs; none of them can approve its own work.
+      </p>
+      <div class="actions">
+        <a class="button primary" href="#factory">Watch the checkers work</a>
+        <a class="button" href="https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0">Get 2.4.0</a>
+      </div>
+      <p class="facts"><span>Linux x86_64</span><span>Apple silicon macOS</span><span>Signed checksums</span></p>
+    </div>
+    <figure class="ledger" aria-labelledby="ledger-title">
+      <div class="ledger-head">
+        <strong id="ledger-title">account-lockout · the demonstration below</strong>
+        <span>Three failed logins lock the account for 900 seconds. Every request carries its own time; the decision never reads a clock.</span>
+      </div>
+      <ol>
+        <li><span class="t">t=1000</span><span class="cmd">LoginFailed</span><span class="chip failure">COMMITTED FAILURE</span>
+          <span class="why">The login fails and the attempt is recorded.</span></li>
+        <li><span class="t">t=1020</span><span class="cmd">LoginFailed</span><span class="chip failure">COMMITTED FAILURE</span>
+          <span class="why">Third failure: locked until 1920, alert queued in the outbox.</span></li>
+        <li><span class="t">t=1500</span><span class="cmd">LoginSucceeded</span><span class="chip reject">REJECT</span>
+          <span class="why">account_locked: a login during the lock.</span></li>
+        <li><span class="t">t=1000</span><span class="cmd">LoginSucceeded</span><span class="chip reject">REJECT</span>
+          <span class="why">clock_regressed: a stale clock cannot end a lock early.</span></li>
+        <li><span class="t">t=1920</span><span class="cmd">LoginSucceeded</span><span class="chip accept">ACCEPT</span>
+          <span class="why">The lock has expired.</span></li>
+      </ol>
+      <figcaption>Decided by the library authority from the template's contract. Every applicable law checked before each commit.</figcaption>
+    </figure>
+  </div>
 </header>
 
 <main>
+<section class="section landing" id="how" aria-labelledby="how-title">
+  <div class="section-head">
+    <p class="eyebrow">How the factory works</p>
+    <h2 id="how-title">People, models, synthesis and checkers each do one job</h2>
+    <p>Functional core, imperative shell: the core decides and the shell acts. ZenoFCIS makes that boundary enforceable, then puts a checker at every point where a proposal enters.</p>
+  </div>
+  <ol class="steps">
+    <li><h3>Specify</h3><p>The contract states the state, the commands, the decisions and the laws they must keep. People review it, helped by gap finding, focused questions and teach-back.</p></li>
+    <li><h3>Propose</h3><p>Models, agents and synthesis propose programs, repairs, sketches and smaller equivalent programs. A proposal is only a proposal.</p></li>
+    <li><h3>Decide</h3><p>Exact checkers accept or refuse each proposal. A refusal comes back with the failing input, so the next proposal can fix it.</p></li>
+    <li><h3>Build and run</h3><p><code>zeno-fcis new --contract</code> generates the application. Its SQLite shell stores each decision with a receipt and delivers effects through an outbox.</p></li>
+  </ol>
+</section>
+<section class="section landing" id="evidence" aria-labelledby="evidence-title">
+  <div class="section-head">
+    <p class="eyebrow">Evidence</p>
+    <h2 id="evidence-title">Every claim says how it was checked</h2>
+    <p>ZenoFCIS states each guarantee at its true strength, over a named domain, with its trusted assumptions.</p>
+  </div>
+  <div class="evidence">
+    <div><h3>Tested</h3><p class="means">Examples and properties run against the code.</p>
+      <p class="example">The account-lockout demo replays <span class="num">20</span> independent decision examples in your browser.</p></div>
+    <div><h3>Checked on every input</h3><p class="means">Exhaustive over a declared finite domain. Nothing in that domain is skipped.</p>
+      <p class="example">Inventory reservation: <span class="num">864</span> inputs. Agent treasury guard: <span class="num">6,144</span> fact tuples. A withdrawal-queue upgrade compares <span class="num">1,296,000</span> input tuples.</p></div>
+    <div><h3>Attested</h3><p class="means">An SMT solver's result, recorded with its inputs. The solver itself is trusted.</p>
+      <p class="example">CVC5 attests that the withdrawal queue's action laws alone keep the vault solvent, over the declared integer ranges.</p></div>
+    <div><h3>Kernel-checked</h3><p class="means">A proof checked by the Lean 4 kernel.</p>
+      <p class="example">Coming in 2.5: an exact-value theorem for the ZenoDEX Spot pool's algebraic contract.</p></div>
+    <div><h3>Proved</h3><p class="means">Verus proofs that library code meets its mathematical contract.</p>
+      <p class="example">Admission, original-byte interpretation, scalar execution, complete decisions, laws and genesis, authority and replay.</p></div>
+  </div>
+</section>
+<section class="section landing" id="releases" aria-labelledby="releases-title">
+  <div class="section-head">
+    <p class="eyebrow">Releases</p>
+    <h2 id="releases-title">What ships now, and what comes next</h2>
+    <p>Each release states exactly what it checks. Plans change; a planned item is a direction, not a promise.</p>
+  </div>
+  <div class="releases">
+    <article class="release">
+      <div class="when"><span class="ver">2.4.0</span><span class="chip released">RELEASED</span><span class="date">October 2026</span></div>
+      <div>
+        <ul>
+          <li><strong>Money math in checked rules.</strong> Exact multiply-then-divide with declared floor or ceiling, a full-width intermediate, and a refusal when the result does not fit. Values never wrap or saturate. Two- and three-factor product comparisons cover fees, swap outputs, liquidity mint and burn, and quorum.</li>
+          <li><strong>AI proposes, the checker decides.</strong> Repair from exact failing inputs, sketch completion, families and transfer, program search for smaller equivalent programs, capture of a Python function as a checked core, and learning from examples.</li>
+          <li><strong>Help with the specification.</strong> A gap finder, focused questions, teach-back, invariant checks with counterexamples, scenarios and probes, state profiles, and decomposition with blame.</li>
+          <li><strong>Private knowledge.</strong> A Datalog reasoning engine over your own knowledge bases, with provenance. Your knowledge stays out of source and release packages.</li>
+          <li><strong>Two platforms.</strong> Linux x86_64 and Apple silicon macOS, each with its own build and installed-binary checks.</li>
+        </ul>
+        <p class="limits"><strong>Limits in 2.4.0:</strong> amounts in rules are 64-bit; contained AI loops need Linux with a systemd user session; the component catalog's laws do not fully determine its decisions.</p>
+      </div>
+    </article>
+    <article class="release">
+      <div class="when"><span class="ver">2.5</span><span class="chip dev">IN DEVELOPMENT</span></div>
+      <ul>
+        <li><strong>Wider, safer arithmetic.</strong> 128-bit amounts and signed floor division, with existing 64-bit programs keeping their meaning. Declared units and scales such as e8 prices and basis points, with unit mistakes refused. Chains of up to 16 rounded steps, each matched against a big-integer reference.</li>
+        <li><strong>Loops on more machines.</strong> The loops work on money math. Their finite checks run contained without systemd, so they work on macOS, in CI and in containers. Capturing a Python function still needs Linux.</li>
+        <li><strong>ZenoDEX Spot.</strong> A constant-product exchange core on ZenoFCIS. "No free value" is checked over 9.1 billion single-user operation sequences, and a Lean-checked theorem shows a group of accounts cannot gain exact value over any number of operations. Linking that theorem to the executable code is still open.</li>
+        <li><strong>Sturdier evidence.</strong> Knowledge evidence runs on a private snapshot of the bytes it checked, and qualification runs its controls in parallel.</li>
+      </ul>
+    </article>
+    <article class="release">
+      <div class="when"><span class="ver">2.5.1</span><span class="chip planned">PLANNED</span></div>
+      <ul>
+        <li><strong>ZenoDEX stablecoin vault and oracle.</strong> A zUSD vault and a price oracle with three independent reporters; stale or replayed reports are refused.</li>
+        <li><strong>Governance as checked rules.</strong> Signer thresholds, timelocks from announcement, outflow caps, and an exit that always stays open.</li>
+        <li><strong>Search for loss paths before release.</strong> The loops search for operation sequences, including chains across components, that could lose user funds. Each one found becomes a law the system must keep.</li>
+        <li><strong>Rules over time.</strong> Rules about sequences of events, and knowledge that spans several domains.</li>
+      </ul>
+    </article>
+    <article class="release">
+      <div class="when"><span class="ver">Later</span><span class="chip planned">PLANNED</span></div>
+      <ul>
+        <li><strong>More of each application under checked rules,</strong> including its user-interface logic.</li>
+        <li><strong>Wider domains and more platforms</strong>, with every guarantee still stated at its true strength.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+<section class="section landing" aria-labelledby="scope-title">
+  <div class="section-head">
+    <p class="eyebrow">Scope</p>
+    <h2 id="scope-title">What the checks do not claim</h2>
+  </div>
+  <ul class="scope">
+    <li><h3>That the rules say what you meant</h3><p>The checks prove the code follows the contract. People still review whether the contract captures the intended behaviour.</p></li>
+    <li><h3>That outside facts are true</h3><p>A deployment must authenticate callers and supply trusted time and prices. The core takes them as inputs.</p></li>
+    <li><h3>That the shell is proved</h3><p>Storage and delivery are tested, not formally verified. Durability against power loss still depends on the drive.</p></li>
+    <li><h3>That a passing stage is a release</h3><p>A release has its own qualification, signed checksums and source binding.</p></li>
+  </ul>
+</section>
+<section class="section landing" id="start" aria-labelledby="start-title">
+  <div class="section-head">
+    <p class="eyebrow">Get started</p>
+    <h2 id="start-title">Install 2.4.0 on Linux</h2>
+  </div>
+  <div class="code"><pre><span class="c"># Download the archive and the signed checksum list, then verify</span>
+VERSION=2.4.0
+ARCHIVE="zeno-fcis-$VERSION-x86_64-unknown-linux-gnu"
+BASE=https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v$VERSION
+curl -fLO "$BASE/$ARCHIVE.tar.gz"
+curl -fLO "$BASE/DOWNLOADS.sha256"
+sha256sum --ignore-missing --check DOWNLOADS.sha256
+tar -xzf "$ARCHIVE.tar.gz"
+"$ARCHIVE/zeno-fcis" describe</pre></div>
+  <p class="note">macOS, source builds and the library API are in the <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/INSTALLATION.md">installation guide</a>.</p>
+</section>
+<section class="section landing factory" id="factory" aria-labelledby="factory-title">
+  <div class="section-head">
+    <p class="eyebrow">The factory, live</p>
+    <h2 id="factory-title">Watch the checkers work</h2>
+    <p>Each act runs the 2.4.0 library, compiled to WebAssembly, in a background worker on this page. Nothing here is a recording: every result is computed when you press the button, and nothing is sent to a server.</p>
+  </div>
+  <div class="acts">
+  <article class="act factory-act" data-factory-act="synthesis" aria-labelledby="act-synthesis-title">
+    <header class="act-head">
+      <p class="act-kicker">Act 1 · Synthesis</p>
+      <h3 id="act-synthesis-title">The checker chooses the rule order</h3>
+      <p class="act-lede">When a request breaks two rules at once, the treasury guard’s order of checks decides which reason it gives: model or price, trade cap or daily budget, slippage or reserve. Synthesis tries all eight orders against the contract and keeps the one that is right on all 6,144 inputs.</p>
+    </header>
+    <div class="act-controls">
+      <button type="button" class="run" data-act="synthesis">Run synthesis</button>
+      <p class="factory-status" role="status" aria-live="polite">Runs in this browser.</p>
+    </div>
+    <div class="factory-output" aria-label="Synthesis results"></div>
+  </article>
+  <article class="act factory-act" data-factory-act="inventory" aria-labelledby="act-inventory-title">
+    <header class="act-head">
+      <p class="act-kicker">Act 2 · Every input</p>
+      <h3 id="act-inventory-title">Plant a bug and watch it surface</h3>
+      <p class="act-lede">The inventory contract is compiled here from its rules, and all 864 inputs are decided with every applicable law checked. Plant a bug in the rules and the same check shows each decision it changes.</p>
+    </header>
+    <div class="act-controls">
+      <label class="mutation-label"><span>Bug to plant</span>
+        <select class="mutant-choice">
+          <option value="none">None: the rules as written</option>
+          <option value="m0002">Off by one: &gt; becomes ≥ at the stock check</option>
+          <option value="m0018">Raise the capacity limit by one unit</option>
+          <option value="m0040">Forget the quantity check</option>
+          <option value="m0054">Swap two refusal reasons</option>
+          <option value="m0061">Forget to queue the shipment</option>
+          <option value="m0049">Reorder two independent checks</option>
+        </select>
+      </label>
+      <button type="button" class="run" data-act="inventory">Check every input</button>
+      <p class="factory-status" role="status" aria-live="polite">Bugs come from the contract review’s mutation catalog.</p>
+    </div>
+    <div class="factory-output" aria-label="Inventory results"></div>
+  </article>
+  <article class="act factory-act" data-factory-act="search" aria-labelledby="act-search-title">
+    <header class="act-head">
+      <p class="act-kicker">Act 3 · Program search</p>
+      <h3 id="act-search-title">A smaller program with the same answers</h3>
+      <p class="act-lede">Search proposes a smaller version of the withdrawal queue’s 16-node decision kernel, and the checker compares it with the original on every input. A proposal with two outputs swapped is refused, with the input that shows it.</p>
+    </header>
+    <div class="act-controls">
+      <button type="button" class="run" data-act="search">Run program search</button>
+      <p class="factory-status" role="status" aria-live="polite">Deterministic; no model service is called.</p>
+    </div>
+    <div class="factory-output" aria-label="Program search results"></div>
+    <p class="act-note">The example supplies a 7-node starting point and search also tries its own rewrites; the result is not claimed to be the smallest possible program. The command-line loop also runs contained and issues receipts; this page does neither.</p>
+  </article>
+  <article class="act factory-act" data-factory-act="money" aria-labelledby="act-money-title">
+    <header class="act-head">
+      <p class="act-kicker">Act 4 · Money math</p>
+      <h3 id="act-money-title">Exact rounding, and overflow refused</h3>
+      <p class="act-lede">The Spot pilot’s swap: the fee rounds up, the output rounds down, and the product of the reserves may never decrease. A result that does not fit is refused, never wrapped.</p>
+    </header>
+    <div class="money-inputs">
+      <label><span>Amount in</span><input type="number" min="0" max="3000000000" step="1" data-money="amount" value="1000"></label>
+      <label><span>Fee, basis points</span><input type="number" min="0" max="10000" step="1" data-money="fee_bps" value="30"></label>
+      <label><span>Input reserve</span><input type="number" min="1" max="3000000000" step="1" data-money="reserve_in" value="10000"></label>
+      <label><span>Output reserve</span><input type="number" min="1" max="3000000000" step="1" data-money="reserve_out" value="20000"></label>
+    </div>
+    <div class="act-controls">
+      <button type="button" class="run" data-act="money">Calculate the swap</button>
+      <p class="factory-status" role="status" aria-live="polite">Whole units, up to 3,000,000,000.</p>
+    </div>
+    <div class="factory-output" aria-label="Swap results"></div>
+  </article>
+  <aside class="act act-teaser" aria-labelledby="act-challenge-title">
+    <p class="act-kicker">Act 5 · Try to break it</p>
+    <h3 id="act-challenge-title">You are the agent</h3>
+    <p class="act-lede">Send the treasury guard any swap you like. Every request that would break a law is refused, with its reason.</p>
+    <p><a class="button" href="#agent-treasury-guard" data-open-example="agent-treasury-guard">Open the challenge</a></p>
+  </aside>
+  </div>
+  <div class="factory-limits">
+    <p>The finite acts are checked on every input of their declared domain, in your browser; money math checks the inputs you supply and one overflow probe. Verus proofs cover the library’s source; the WebAssembly compiler and your browser are trusted. Nothing here issues a receipt, and none of it shows that a specification says what you meant.</p>
+    <p>This page’s interface is LLM-generated and tested in browsers. The decisions, checks, synthesis and search inside it are the library’s own code.</p>
+  </div>
+</section>
+<section class="section landing" id="demo" aria-labelledby="demo-title">
+  <div class="section-head">
+    <p class="eyebrow">Live demo</p>
+    <h2 id="demo-title">Six generated applications, deciding in your browser</h2>
+    <p>Each example below is a template exactly as <code>zeno-fcis new</code> writes it, compiled to WebAssembly. The first one has already run its demonstration in this page; open any other to try it.</p>
+  </div>
+</section>
+
   <section aria-labelledby="about-heading" class="prose">
     <h2 id="about-heading">Proposers, judges, and the shell</h2>
     <p>
@@ -80,7 +323,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -133,7 +376,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -182,7 +425,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -234,7 +477,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -285,7 +528,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -310,7 +553,10 @@
   </details>
 
   <details class="example" id="agent-treasury-guard" data-template="agent-treasury-guard">
-    <summary><h2>Agent treasury guard</h2></summary>
+    <summary><h2>Act 5 · Try to break the treasury guard</h2></summary>
+    <p class="challenge-intro">You are the agent. Propose a swap that exceeds a limit and see whether the core refuses it. Try different requests: the scoreboard counts what happened and every returned decision still has to satisfy its laws.</p>
+    <details class="challenge-about">
+      <summary>About this example</summary>
     <div class="prose">
       <p>
         A treasury that an AI agent trades for. The agent proposes swaps; its
@@ -341,7 +587,7 @@
           <li>
             The library's functional core has machine-checked proofs against its
             formal specifications, within a stated scope and named trusted
-            base. The authored policy
+            base. The declared policy
             still needs review against the intended rules. Input authentication,
             browser storage, display and external delivery remain host concerns.
           </li>
@@ -362,6 +608,7 @@
         </ul>
       </details>
     </div>
+    </details>
     <div class="demo">Loading the example.</div>
   </details>
 </main>
@@ -372,8 +619,13 @@
     which also replays each template's examples through its module and requires
     two builds of it to be identical.
   </p>
+  <p class="foot">
+    <span>ZenoFCIS · Copyright 2026 TheDarkLightX and ZenoFCIS contributors · MIT or Apache-2.0</span>
+    <span>This page loads nothing from other sites: no fonts, trackers or analytics.</span>
+  </p>
 </footer>
 
 <script type="module" src="site.js"></script>
+<script type="module" src="factory.js"></script>
 </body>
 </html>

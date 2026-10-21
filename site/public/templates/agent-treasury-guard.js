@@ -49,7 +49,7 @@ export const template = {
     { name: "SwapFailed", label: "Report the swap failed", fields: [intent] },
   ],
   genesis: "6 quote, 1 base, nothing spent, tick 0, no swap outstanding, nothing queued",
-  outbox: "Swap requests to zenodex on channel 300 (swap_request), shaped after ZenoDEX's SwapIntent: the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
+  outbox: "Swap requests to zenodex on the swap_request channel, shaped after ZenoDEX's SwapIntent: the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
   // The scripted agent's proposals, shown on their own: the guard refuses
   // most of them.
   proposer: {

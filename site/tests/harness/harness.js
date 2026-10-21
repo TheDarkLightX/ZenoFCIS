@@ -30,6 +30,7 @@ for (const name of names) {
         laws: (report.laws ?? []).map((law) => [law.id, law.status]),
       })),
       summary: template.summary(state, panel.history),
+      challenge: container.querySelector(".challenge-score")?.textContent ?? null,
       steps_counted: state.steps,
       status: container.querySelector(".status").textContent,
       timeline: container.querySelectorAll(".timeline > li").length,

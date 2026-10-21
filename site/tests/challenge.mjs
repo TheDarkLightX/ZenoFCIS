@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { instantiate } from "../public/demo-module.js";
+import { challengeSummary } from "../public/panel.js";
+import { template } from "../public/templates/agent-treasury-guard.js";
+const demo=await instantiate(readFileSync(new URL("../public/agent-treasury-guard.wasm",import.meta.url)));
+demo.reset();
+const history=template.demonstration.map(({request})=>({report:demo.step(request)}));
+const tally=challengeSummary(history);
+assert.equal(tally.requests,template.demonstration.length);
+assert.equal(tally.refused,template.demonstration.filter(s=>s.expect==="Reject").length);
+assert.equal(tally.violations,0);
+assert.ok(Object.keys(tally.reasons).length>=4);
+history.push({report:demo.stepText("{}")});
+assert.equal(challengeSummary(history).refused,tally.refused+1);
+assert.equal(challengeSummary([{report:{decision:"Accept",laws:[{status:"Refused(Violated)"}]}}]).violations,1);
+assert.equal(challengeSummary([]).requests,0);
+console.log(`treasury challenge: ${tally.requests} real requests, ${tally.refused} refused with reasons, zero observed law violations; reset and planted violation passed`);

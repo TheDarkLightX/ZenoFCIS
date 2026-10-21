@@ -217,6 +217,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]
@@ -381,6 +382,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeno-fcis-contract"
+version = "2.5.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-crypto",
+ "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
+]
+
+[[package]]
 name = "zeno-fcis-core"
 version = "2.5.0"
 
@@ -428,6 +442,14 @@ version = "2.5.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-program-search"
+version = "2.5.0"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-synthesis",
 ]
 
 [[package]]
@@ -516,6 +538,17 @@ version = "0.0.0"
 dependencies = [
  "compliance-gateway",
  "zeno-fcis-site-common",
+]
+
+[[package]]
+name = "zeno-fcis-site-factory"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "zeno-fcis-contract",
+ "zeno-fcis-program-search",
+ "zeno-fcis-site-common",
+ "zeno-fcis-synthesis",
 ]
 
 [[package]]

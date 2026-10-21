@@ -4,7 +4,7 @@
 # the published crates' graph.
 [workspace]
 resolver = "3"
-members = ["common", "demos/*"]
+members = ["common", "demos/*", "factory"]
 # `zeno-fcis new` writes each application here; each is its own workspace root.
 exclude = ["apps"]
 
@@ -33,6 +33,8 @@ doc_markdown = "allow"
 # registry; every pin resolves to this checkout. The SQLite shell is absent:
 # no demo enables the feature, so the resolver never selects it.
 [patch.crates-io]
+zeno-fcis-program-search = { path = "../crates/zeno-fcis-program-search" }
+zeno-fcis-contract = { path = "../crates/zeno-fcis-contract" }
 zeno-fcis-authority = { path = "../crates/zeno-fcis-authority" }
 zeno-fcis-bootstrap = { path = "../crates/zeno-fcis-bootstrap" }
 zeno-fcis-catalog = { path = "../crates/zeno-fcis-catalog" }
