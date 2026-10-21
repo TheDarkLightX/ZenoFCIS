@@ -38,6 +38,12 @@ on:
 permissions:
   contents: read
 
+# Native controls execute the CLI inside the same 128 MiB evidence bound as CI.
+# Strip debug info while retaining debug assertions and overflow checks.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
 jobs:
   qualification:
     name: qualification (${{ matrix.gate }})

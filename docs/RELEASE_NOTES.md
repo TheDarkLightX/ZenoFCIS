@@ -377,6 +377,11 @@ context are application inputs; ZenoFCIS does not authenticate them.
 
 ### Platforms and upgrading
 
+The initial 2.5.0 publication is Linux-only. The Mac binary is deferred until
+native platform validation is complete; its full portable test suite has not
+passed. The optional Mac build and installed-binary journey do not replace
+that outstanding validation.
+
 The release process publishes a binary for each of these targets only after
 its platform qualification, installation and release-custody checks pass:
 

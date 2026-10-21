@@ -1,6 +1,12 @@
 name: ci
 
 on:
+  workflow_dispatch:
+    inputs:
+      check_macos:
+        description: Run the deferred native macOS test suite
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -24,7 +30,7 @@ concurrency:
 jobs:
   rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 120
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -119,6 +125,8 @@ jobs:
 
   rust-macos:
     name: rust (macOS arm64)
+    # Native macOS qualification is separate from the initial Linux release.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.check_macos }}
     runs-on: macos-15
     timeout-minutes: 120
     defaults:

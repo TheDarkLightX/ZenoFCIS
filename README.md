@@ -77,10 +77,10 @@ the imperative shell. A passing stage check is not a release receipt.
 **2.5.0** is the current release source. It builds on the first stable V2
 line, 2.3.0; the [2.5.0 release notes](docs/RELEASE_NOTES.md) describe the
 new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. Its release set has two host executables: the
-**Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on Apple silicon**
-(`aarch64-apple-darwin`). The release process requires both archives to pass
-their host build, custody and installed-binary checks before publication. See
+and publication remain separate release gates. The initial release provides the
+**Linux x86_64 GNU CLI** (glibc 2.39 or later). A **macOS on Apple silicon**
+(`aarch64-apple-darwin`) binary will follow native platform validation.
+Every published archive must pass its build, custody and installed-binary checks. See
 [installation](docs/INSTALLATION.md) and the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
@@ -639,8 +639,8 @@ python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 `rc_package.py build` writes a full local release package: all public `.crate`
 packages, Rustdoc, source and diagnostic binary archives, checksums, a
 CycloneDX SBOM, and provenance inputs. This is local packaging output. The
-release process requires both host CLI archives and their installed-use
-records before publication, and the signed release checksum list identifies
+release process requires each published host archive and its installed-use
+record to pass custody checks, and the signed release checksum list identifies
 the assets actually published. See the [packaging reference](docs/PACKAGING.md).
 
 ## License

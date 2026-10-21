@@ -2,8 +2,9 @@
 
 ZenoFCIS `2.5.0` is the current release source. Final qualification and
 publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
-The intended 2.5.0 release set includes CLI archives for **Linux x86_64 GNU**
-and **macOS on Apple silicon**, with offline Rustdoc. After qualification and
+The initial 2.5.0 release set includes the **Linux x86_64 GNU** CLI archive
+and offline Rustdoc. The **macOS on Apple silicon** archive is deferred until
+native platform validation is complete. After qualification and
 publication, the signed `DOWNLOADS.sha256` on the release page will list the
 assets available to install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
@@ -27,8 +28,8 @@ exact source pins, signed checksum assets and qualification limits.
   need). Ubuntu 24.04, where they were built, ships glibc 2.39. On an older
   glibc, such as Ubuntu 22.04's 2.35, the dynamic loader refuses to start the
   executable and names the missing `GLIBC_2.39` version.
-- **macOS on Apple silicon** (`aarch64-apple-darwin`): the 2.5.0 release
-  workflow builds this required archive on GitHub's macOS 15 arm64 image
+- **macOS on Apple silicon** (`aarch64-apple-darwin`): deferred from the initial
+  publication. The optional release workflow builds this archive on GitHub's macOS 15 arm64 image
   (`macos-15`), with a minimum-version field of macOS 11.0. The archive joins
   the release set only if an installed-binary journey passes on that image.
   Qualification is bound to the matching workflow run, and other macOS

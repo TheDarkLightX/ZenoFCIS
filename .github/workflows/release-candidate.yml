@@ -2,6 +2,11 @@ name: release-candidate
 
 on:
   workflow_dispatch:
+    inputs:
+      include_macos:
+        description: Add the macOS binary after native platform qualification
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -108,6 +113,7 @@ jobs:
 
   macos-host-binary:
     name: macos-host-binary (aarch64-apple-darwin)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_macos }}
     runs-on: macos-15
     timeout-minutes: 120
     defaults:
@@ -209,6 +215,10 @@ jobs:
 
   release-set:
     needs: [assemble, macos-host-binary]
+    # A skipped, unrequested host must not block Linux. A failed requested host must.
+    if: ${{ !cancelled() && needs.assemble.result == 'success' && (needs.macos-host-binary.result == 'success' || (needs.macos-host-binary.result == 'skipped' && !(github.event_name == 'workflow_dispatch' && inputs.include_macos))) }}
+    env:
+      MAC_INCLUDED: ${{ needs.macos-host-binary.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     defaults:
@@ -239,12 +249,13 @@ jobs:
           path: ${{ runner.temp }}/release
 
       - name: Download the macOS host evidence
+        if: ${{ needs.macos-host-binary.result == 'success' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: zeno-fcis-host-aarch64-apple-darwin-${{ github.sha }}
           path: ${{ runner.temp }}/hosts/aarch64-apple-darwin
 
-      - name: Bind both downloads to the jobs that produced them
+      - name: Bind downloads to the jobs that produced them
         env:
           LINUX_SUMS: ${{ needs.assemble.outputs.checksums_sha256 }}
           LINUX_ARCHIVE: ${{ needs.assemble.outputs.archive }}
@@ -265,12 +276,14 @@ jobs:
             "$LINUX_RECORD_SHA256" hosts/x86_64-unknown-linux-gnu/HOST-BINARY.json \
             "$LINUX_INPUTS_SHA256" hosts/x86_64-unknown-linux-gnu/COMPILED-INPUTS-x86_64-unknown-linux-gnu.json \
             | sha256sum --check --strict
-          cd "$RUNNER_TEMP/hosts/aarch64-apple-darwin"
-          printf '%s  %s\n' \
-            "$MAC_ARCHIVE_SHA256" "binaries/$MAC_ARCHIVE" \
-            "$MAC_RECORD_SHA256" HOST-BINARY.json \
-            "$MAC_INPUTS_SHA256" COMPILED-INPUTS-aarch64-apple-darwin.json \
-            "$MAC_JOURNEY_SHA256" INSTALLED-JOURNEY.json | sha256sum --check --strict
+          if [[ "$MAC_INCLUDED" == true ]]; then
+            cd "$RUNNER_TEMP/hosts/aarch64-apple-darwin"
+            printf '%s  %s\n' \
+              "$MAC_ARCHIVE_SHA256" "binaries/$MAC_ARCHIVE" \
+              "$MAC_RECORD_SHA256" HOST-BINARY.json \
+              "$MAC_INPUTS_SHA256" COMPILED-INPUTS-aarch64-apple-darwin.json \
+              "$MAC_JOURNEY_SHA256" INSTALLED-JOURNEY.json | sha256sum --check --strict
+          fi
 
       - name: Run the Linux installed-binary journey
         id: journey
@@ -281,11 +294,15 @@ jobs:
             --report "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
           echo "journey_sha256=$(sha256sum "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
 
-      - name: Merge both hosts into one release set
+      - name: Assemble the checked hosts into one release set
         run: |
+          host=()
+          if [[ "$MAC_INCLUDED" == true ]]; then
+            host=(--host "$RUNNER_TEMP/hosts/aarch64-apple-darwin")
+          fi
           python3 tools/rc_package.py merge-hosts \
             --release "$RUNNER_TEMP/release" \
-            --host "$RUNNER_TEMP/hosts/aarch64-apple-darwin" \
+            "${host[@]}" \
             --journey "x86_64-unknown-linux-gnu=$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
 
       - name: Check archive-member and source custody
@@ -307,7 +324,9 @@ jobs:
           python3 - "$RUNNER_TEMP/evidence/JOB-OUTPUTS.json" <<'PY'
           import json, os, sys
           from pathlib import Path
-          hosts = {'x86_64-unknown-linux-gnu': 'LINUX', 'aarch64-apple-darwin': 'MAC'}
+          hosts = {'x86_64-unknown-linux-gnu': 'LINUX'}
+          if os.environ['MAC_INCLUDED'] == 'true':
+              hosts['aarch64-apple-darwin'] = 'MAC'
           fields = ('archive', 'archive_sha256', 'record_sha256', 'inputs_sha256', 'journey_sha256')
           bindings = {host: {field: os.environ[f'{prefix}_{field.upper()}'] for field in fields}
                       for host, prefix in hosts.items()}
