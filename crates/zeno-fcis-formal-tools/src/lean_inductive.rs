@@ -314,7 +314,16 @@ fn render_value(value: &ValueExpr, budget: &mut SmtRenderBudget) -> Result<SmtVa
                 budget,
             )?
         }
-        ValueExpr::Var(_) | ValueExpr::Div(_, _, _) | ValueExpr::Sum { .. } => {
+        ValueExpr::U128(_)
+        | ValueExpr::ToI128(_)
+        | ValueExpr::ToU128(_)
+        | ValueExpr::MulDiv(_, _, _, _)
+        | ValueExpr::SignedMulDivFloor(_, _, _)
+        | ValueExpr::ScaledMulDiv(_, _, _, _, _, _)
+        | ValueExpr::RepeatMulDiv(_, _, _, _, _)
+        | ValueExpr::Var(_)
+        | ValueExpr::Div(_, _, _)
+        | ValueExpr::Sum { .. } => {
             return Err(ExportError::UnsupportedMode);
         }
     };
@@ -327,7 +336,14 @@ fn is_constant(value: &ValueExpr) -> bool {
         ValueExpr::Add(left, right) | ValueExpr::Sub(left, right) | ValueExpr::Mul(left, right) => {
             is_constant(left) && is_constant(right)
         }
-        ValueExpr::Projection(_)
+        ValueExpr::U128(_)
+        | ValueExpr::ToI128(_)
+        | ValueExpr::ToU128(_)
+        | ValueExpr::MulDiv(_, _, _, _)
+        | ValueExpr::SignedMulDivFloor(_, _, _)
+        | ValueExpr::ScaledMulDiv(_, _, _, _, _, _)
+        | ValueExpr::RepeatMulDiv(_, _, _, _, _)
+        | ValueExpr::Projection(_)
         | ValueExpr::Var(_)
         | ValueExpr::Div(_, _, _)
         | ValueExpr::Sum { .. } => false,

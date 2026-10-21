@@ -255,7 +255,22 @@ fn inductive_lean_strictness_and_fragment_are_explicit() {
 fn inductive_lean_all_unsupported_expression_forms_refuse() {
     let identifier = Identifier::try_new("item").unwrap_or_else(|| unreachable!());
     let mut budget = SmtRenderBudget::new(ExportLimits::default());
+    let int = || Box::new(ValueExpr::Int(1));
     for value in [
+        ValueExpr::U128(u128::MAX),
+        ValueExpr::ToI128(int()),
+        ValueExpr::ToU128(int()),
+        ValueExpr::MulDiv(spec_authoring::DivisionMode::Floor, int(), int(), int()),
+        ValueExpr::SignedMulDivFloor(int(), int(), int()),
+        ValueExpr::ScaledMulDiv(
+            spec_authoring::DivisionMode::Floor,
+            false,
+            int(),
+            int(),
+            int(),
+            1,
+        ),
+        ValueExpr::RepeatMulDiv(false, int(), int(), int(), 1),
         ValueExpr::Var(identifier.clone()),
         ValueExpr::Div(
             spec_authoring::DivisionMode::Floor,
@@ -269,6 +284,7 @@ fn inductive_lean_all_unsupported_expression_forms_refuse() {
             body: Box::new(ValueExpr::Int(1)),
         },
     ] {
+        assert!(!is_constant(&value));
         assert!(matches!(
             render_value(&value, &mut budget),
             Err(ExportError::UnsupportedMode)
