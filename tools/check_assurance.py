@@ -507,6 +507,16 @@ def check_resolver_package_self_test(checker: ResolvedChecker) -> list[str]:
             "Cargo.toml": "[package]\nname='inactive_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
             "src/lib.rs": "#![cfg(test)]\n#![no_std]\n#![forbid(unsafe_code)]\nunsupported!();\n",
         },
+        "literal-path-positive": {
+            "Cargo.toml": "[package]\nname='path_positive'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/lib.rs": '#![no_std]\n#![forbid(unsafe_code)]\n#[path="fixed.rs"] mod renamed;\n',
+            "src/fixed.rs": "pub fn value()->u8{7}\n",
+        },
+        "literal-path-effect": {
+            "Cargo.toml": "[package]\nname='path_effect'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/lib.rs": '#![no_std]\n#![forbid(unsafe_code)]\n#[path="fixed.rs"] mod renamed;\n',
+            "src/fixed.rs": 'pub fn ambient(){std::env::var("EFFECT");}\n',
+        },
     }
     with tempfile.TemporaryDirectory(prefix="zeno-assurance-package-") as directory:
         base = Path(directory)
@@ -530,6 +540,15 @@ def check_resolver_package_self_test(checker: ResolvedChecker) -> list[str]:
         if not any(str(base / "inactive" / "src/lib.rs") in location
                    for location in report["resolution"]["skipped_cfg"]):
             failures.append("package self-test omitted custody of the recognized inactive root")
+        positive = str(base / "literal-path-positive") + "/"
+        if any(f["file"].startswith(positive) for f in report["findings"]):
+            failures.append("literal path self-test rejected the pure declared module")
+        if str(base / "literal-path-positive/src/fixed.rs") not in report["resolution"]["active_files"]:
+            failures.append("literal path self-test did not traverse the pure module")
+        effect = str(base / "literal-path-effect/src/fixed.rs")
+        if not any(f["file"] == effect and f["rule"] == "environment" and f["severity"] == "error"
+                   for f in report["findings"]):
+            failures.append("literal path self-test missed the actual ambient effect")
         if not semantic_report_failures(report):
             failures.append("package self-test unsupported closure became assurance success")
         return failures

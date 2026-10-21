@@ -1155,3 +1155,176 @@ fn parent_traversal_through_source_symlink_refuses_context() -> io::Result<()> {
         "symlink-parent",
     )
 }
+
+#[test]
+fn path_modules_follow_file_relative_and_inline_directories() -> io::Result<()> {
+    let fixture = Fixture::new(&[
+        ("Cargo.toml", MANIFEST),
+        ("src/lib.rs", &format!("{HEAD}mod outer;")),
+        (
+            "src/outer.rs",
+            "#[path=\"actual.rs\"] pub mod renamed; pub mod inline { #[path=\"selected.rs\"] pub mod nested; }",
+        ),
+        (
+            "src/actual.rs",
+            "pub mod leaf; pub fn value()->u8{leaf::value()}",
+        ),
+        ("src/leaf.rs", "pub fn value()->u8{7}"),
+        ("src/outer/inline/selected.rs", "pub fn value()->u8{8}"),
+        (
+            "src/actual/leaf.rs",
+            "pub fn unused(){std::env::var(\"DECOY\");}",
+        ),
+        (
+            "src/selected.rs",
+            "pub fn unused(){std::time::Instant::now();}",
+        ),
+    ])?;
+    let report = fixture.report();
+    assert!(report.findings.is_empty(), "{report:?}");
+    assert!(report.unreadable.is_empty(), "{report:?}");
+    let active = &report
+        .resolution
+        .as_ref()
+        .ok_or_else(|| io::Error::other("missing scope summary"))?
+        .active_files;
+    for file in [
+        "src/actual.rs",
+        "src/leaf.rs",
+        "src/outer/inline/selected.rs",
+    ] {
+        assert!(
+            active.contains(&fixture.0.join(file).display().to_string()),
+            "{file}: {report:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn path_module_ambient_effects_are_found_in_the_actual_target() -> io::Result<()> {
+    let fixture = Fixture::new(&[
+        ("Cargo.toml", MANIFEST),
+        (
+            "src/lib.rs",
+            &format!("{HEAD}#[path=\"actual.rs\"] pub mod renamed;"),
+        ),
+        ("src/actual.rs", "pub mod leaf;"),
+        (
+            "src/leaf.rs",
+            "pub fn ambient(){std::env::var(\"EFFECT\");}",
+        ),
+        ("src/actual/leaf.rs", "pub fn harmless()->u8{7}"),
+    ])?;
+    let report = fixture.report();
+    assert!(
+        report.findings.iter().any(|f| f.rule == "environment"
+            && f.file == fixture.0.join("src/leaf.rs").display().to_string()),
+        "{report:?}"
+    );
+    assert!(
+        !rules(&report)
+            .iter()
+            .any(|rule| rule.starts_with("resolution-")),
+        "{report:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn path_on_inline_module_sets_its_child_directory() -> io::Result<()> {
+    let fixture = Fixture::new(&[
+        ("Cargo.toml", MANIFEST),
+        ("src/lib.rs", &format!("{HEAD}mod outer;")),
+        (
+            "src/outer.rs",
+            "#[path=\"folder\"] pub mod inline { pub mod leaf; }",
+        ),
+        (
+            "src/folder/leaf.rs",
+            "pub fn ambient(){std::time::Instant::now();}",
+        ),
+        ("src/outer/folder/leaf.rs", "pub fn harmless()->u8{7}"),
+    ])?;
+    let report = fixture.report();
+    assert!(
+        report.findings.iter().any(|f| f.rule == "clock"
+            && f.file == fixture.0.join("src/folder/leaf.rs").display().to_string()),
+        "{report:?}"
+    );
+    assert!(
+        !rules(&report)
+            .iter()
+            .any(|rule| rule.starts_with("resolution-")),
+        "{report:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn ambiguous_conditional_cyclic_and_unloaded_module_paths_refuse() -> io::Result<()> {
+    for declaration in [
+        "#[path=\"other.rs\"] #[path=\"other.rs\"] mod child;",
+        "#[path=concat!(\"other\",\".rs\")] mod child;",
+        "#[path=\"\"] mod child;",
+        "#[cfg_attr(feature=\"choose\",path=\"other.rs\")] mod child;",
+        "#[path=\"lib.rs\"] mod child;",
+        "#[path=\"missing.rs\"] mod child;",
+        "#[path=\"other.rs\"] mod one; #[path=\"other.rs\"] mod two;",
+    ] {
+        let fixture = Fixture::new(&[
+            ("Cargo.toml", MANIFEST),
+            ("src/lib.rs", &format!("{HEAD}{declaration}")),
+            ("src/other.rs", "pub fn harmless()->u8{7}"),
+        ])?;
+        let report = fixture.report();
+        assert!(
+            rules(&report).contains("resolution-module-path"),
+            "{declaration}: {report:?}"
+        );
+        assert_eq!(report.status(), "violations", "{declaration}: {report:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn shared_path_source_cannot_overwrite_scopes_across_crate_roots() -> io::Result<()> {
+    let fixture = Fixture::new(&[
+        (
+            "first/Cargo.toml",
+            "[package]\nname='first'\nversion='0.0.0'\nedition='2024'\n",
+        ),
+        ("first/src/lib.rs", "mod shared;"),
+        (
+            "first/src/shared.rs",
+            "pub fn effect(){std::time::Instant::now();}",
+        ),
+        (
+            "second/Cargo.toml",
+            "[package]\nname='second'\nversion='0.0.0'\nedition='2024'\n",
+        ),
+        (
+            "second/src/lib.rs",
+            "mod std {pub mod time {pub struct Instant; impl Instant {pub fn now(){}}}} #[path=\"../../first/src/shared.rs\"] mod shared;",
+        ),
+    ])?;
+    let report = check_resolved_paths(&[fixture.0.join("first"), fixture.0.join("second")]);
+    assert!(rules(&report).contains("clock"), "{report:?}");
+    assert!(
+        rules(&report).contains("resolution-module-path"),
+        "{report:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn path_attributes_outside_module_declarations_still_refuse() -> io::Result<()> {
+    for source in [
+        "#[path=\"elsewhere.rs\"] fn value()->u8{7}",
+        "#[path=\"elsewhere.rs\"] struct Value;",
+    ] {
+        let report = Fixture::source(source)?.report();
+        assert!(report.errors() > 0, "{report:?}");
+    }
+    Ok(())
+}
