@@ -26,5 +26,7 @@ review or supply runtime authority.
   and modal navigation rules, and a navigation bound. Discovery and execution
   permission are different requirements.
 
-The sample temporal definitions are visibly marked PLACEHOLDER and OPEN.
+The withdrawal definitions are recovered from the withdrawal-queue contract;
+the vault and interface definitions are marked proposed, awaiting owner
+confirmation, and OPEN.
 No default policy number or wording is represented as owner-approved.

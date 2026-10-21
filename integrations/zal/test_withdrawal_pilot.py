@@ -115,8 +115,14 @@ class WithdrawalPilotChecks(unittest.TestCase):
 
     def test_independent_window_oracle(self):
         self.assertTrue(all(w.window_oracle(word,w.K,True,self.columns) for word in self.words))
-        alarmed=sum(any(word[p][self.columns[0][0]] or word[p][self.columns[1][0]] for p in range(len(word)-w.K)) for word in self.words)
-        self.assertGreater(alarmed,0)
+        # Not vacuous: complete windows reach the bound, and some are delayed
+        # by at least four ticks, which only an honoured alarm causes.
+        offsets=[next(q-p for q in range(p,p+w.K+1) if word[q][completion])
+                 for word in self.words for request,completion in self.columns
+                 for p in range(len(word)-w.K) if word[p][request]]
+        self.assertEqual(max(offsets),w.K)
+        self.assertGreater(sum(offset>=4 for offset in offsets),0)
+        print('PILOT windows: %d complete request windows, %d delayed four or more ticks'%(len(offsets),sum(offset>=4 for offset in offsets)))
 
     def test_unbounded_split_and_rows(self):
         name,obligation=w.run_assumption_split(self.unbounded)

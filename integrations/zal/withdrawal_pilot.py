@@ -55,6 +55,7 @@ def load_graph(text):
     if graph.get('profile')!=GRAPH_PROFILE or graph.get('authority')!='none':
         raise AdapterRefusal('adapter:graph-profile')
     if graph['domain']!=DOMAIN:raise AdapterRefusal('adapter:declared-domain')
+    if graph.get('complete') is not True:raise AdapterRefusal('adapter:incomplete-graph')
     return graph
 
 

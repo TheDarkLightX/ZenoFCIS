@@ -40,6 +40,8 @@ const LANES: [i128; 2] = [170, 171];
 const AMOUNTS: [i128; 2] = [1, 2];
 const CALLERS: [i128; 4] = [190, 191, 192, 193];
 const ALARMS: [i128; 2] = [0, 1];
+// Miri interprets two decisions only; the graph then reports itself incomplete.
+const MIRI_DECISIONS: usize = 2;
 
 fn value(kind: Leaf, n: i128) -> Value {
     match kind {
@@ -110,75 +112,84 @@ fn main() {
     let mut queue = VecDeque::from([0usize]);
     let mut decisions = String::new();
     let mut count = 0usize;
-    while let Some(from) = queue.pop_front() {
+    let inputs: Vec<[i128; 5]> = ACTIONS
+        .iter()
+        .flat_map(|&action| {
+            LANES.iter().flat_map(move |&lane| {
+                AMOUNTS.iter().flat_map(move |&amount| {
+                    CALLERS.iter().flat_map(move |&caller| {
+                        ALARMS
+                            .iter()
+                            .map(move |&alarm| [action, lane, amount, caller, alarm])
+                    })
+                })
+            })
+        })
+        .collect();
+    let mut complete = true;
+    'explore: while let Some(from) = queue.pop_front() {
         let state = vaults[from].clone();
-        for action in ACTIONS {
-            for lane in LANES {
-                for amount in AMOUNTS {
-                    for caller in CALLERS {
-                        for alarm in ALARMS {
-                            let raw = [
-                                frame(&framing.state, record(STATE, &state)),
-                                frame(&framing.command, record(COMMAND, &[action, lane, amount])),
-                                frame(&framing.context, record(CONTEXT, &[caller, alarm])),
-                            ];
-                            let output = authority.evaluate(c::Raw {
-                                state: &raw[0],
-                                command: &raw[1],
-                                context: &raw[2],
-                            });
-                            let (class, reason, to, outbox) = match output.result() {
-                                Err(refusal) => {
-                                    (format!("refused {refusal:?}"), None, None, vec![])
-                                }
-                                Ok(candidate) => {
-                                    let class = match candidate.class() {
-                                        c::Class::Accept => "accept",
-                                        c::Class::Reject => "reject",
-                                        c::Class::CommittedFailure => "failure",
-                                        other => panic!("unexpected class {other:?}"),
-                                    };
-                                    let to = (class != "reject").then(|| {
-                                        let post = fields(candidate.post(), STATE);
-                                        *index.entry(post.clone()).or_insert_with(|| {
-                                            vaults.push(post);
-                                            queue.push_back(vaults.len() - 1);
-                                            vaults.len() - 1
-                                        })
-                                    });
-                                    let outbox = candidate
-                                        .outbox()
-                                        .iter()
-                                        .map(|d| {
-                                            let mut row = vec![i128::from(d.channel)];
-                                            row.extend(d.payload.iter().map(|f| number(&f.value)));
-                                            list(&row)
-                                        })
-                                        .collect::<Vec<_>>();
-                                    (class.to_owned(), candidate.reason(), to, outbox)
-                                }
-                            };
-                            if count > 0 {
-                                decisions.push(',');
-                            }
-                            count += 1;
-                            let _ = write!(
-                                decisions,
-                                "[{from},{action},{lane},{amount},{caller},{alarm},\"{class}\",{},{},[{}]]",
-                                reason.map_or_else(|| "null".to_owned(), |r| r.to_string()),
-                                to.map_or_else(|| "null".to_owned(), |t| t.to_string()),
-                                outbox.join(",")
-                            );
-                        }
-                    }
-                }
+        for [action, lane, amount, caller, alarm] in inputs.iter().copied() {
+            if cfg!(miri) && count == MIRI_DECISIONS {
+                complete = false;
+                break 'explore;
             }
+            let raw = [
+                frame(&framing.state, record(STATE, &state)),
+                frame(&framing.command, record(COMMAND, &[action, lane, amount])),
+                frame(&framing.context, record(CONTEXT, &[caller, alarm])),
+            ];
+            let output = authority.evaluate(c::Raw {
+                state: &raw[0],
+                command: &raw[1],
+                context: &raw[2],
+            });
+            let (class, reason, to, outbox) = match output.result() {
+                Err(refusal) => (format!("refused {refusal:?}"), None, None, vec![]),
+                Ok(candidate) => {
+                    let class = match candidate.class() {
+                        c::Class::Accept => "accept",
+                        c::Class::Reject => "reject",
+                        c::Class::CommittedFailure => "failure",
+                        other => panic!("unexpected class {other:?}"),
+                    };
+                    let to = (class != "reject").then(|| {
+                        let post = fields(candidate.post(), STATE);
+                        *index.entry(post.clone()).or_insert_with(|| {
+                            vaults.push(post);
+                            queue.push_back(vaults.len() - 1);
+                            vaults.len() - 1
+                        })
+                    });
+                    let outbox = candidate
+                        .outbox()
+                        .iter()
+                        .map(|d| {
+                            let mut row = vec![i128::from(d.channel)];
+                            row.extend(d.payload.iter().map(|f| number(&f.value)));
+                            list(&row)
+                        })
+                        .collect::<Vec<_>>();
+                    (class.to_owned(), candidate.reason(), to, outbox)
+                }
+            };
+            if count > 0 {
+                decisions.push(',');
+            }
+            count += 1;
+            let _ = write!(
+                decisions,
+                "[{from},{action},{lane},{amount},{caller},{alarm},\"{class}\",{},{},[{}]]",
+                reason.map_or_else(|| "null".to_owned(), |r| r.to_string()),
+                to.map_or_else(|| "null".to_owned(), |t| t.to_string()),
+                outbox.join(",")
+            );
         }
     }
     let rendered: Vec<String> = vaults.iter().map(|v| list(v)).collect();
     println!(
         "{{\"profile\":\"withdrawal-queue/decision-graph/1\",\"authority\":\"none\",\
-\"genesis_commits\":{commits},\"changed_genesis_refused\":{changed_refused},\
+\"complete\":{complete},\"genesis_commits\":{commits},\"changed_genesis_refused\":{changed_refused},\
 \"domain\":{{\"action\":{},\"lane\":{},\"amount\":{},\"caller\":{},\"alarm\":{}}},\
 \"vaults\":[{}],\"decisions\":[{decisions}]}}",
         list(&ACTIONS),

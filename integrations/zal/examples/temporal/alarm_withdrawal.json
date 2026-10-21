@@ -113,7 +113,7 @@
   "definitions": [],
   "readings": [
     {
-      "version": "placeholder/1",
+      "version": "withdrawal-queue/1",
       "body": "forall sigma in Traces: A(sigma) => (forall r in Requests: always(R(r) => eventually(C(r))))",
       "intuitive": "provided A, every legitimate submitted withdrawal eventually returns its matching assets, even when alarms occur",
       "plain": "provided A, an alarm may delay a withdrawal but never freeze it",

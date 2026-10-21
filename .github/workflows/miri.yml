@@ -37,6 +37,7 @@ jobs:
           {"group": "synthesis-library-law-count", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::laws::tests::no_law_count_cap_and_structural_frame_refusals"},
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
           {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
+          {"group": "synthesis-example-withdrawal-queue-decisions", "packages": "-p zeno-fcis-synthesis", "target": "--example withdrawal_queue_decisions", "command": "run"},
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
           {"group": "synthesis-scalar-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_arithmetic"},
           {"group": "synthesis-scalar-routes", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_routes"},
