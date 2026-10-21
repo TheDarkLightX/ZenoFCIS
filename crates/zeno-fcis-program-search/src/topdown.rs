@@ -8,6 +8,9 @@
 //! sample for the next round. Plans are untrusted; the portfolio checks every
 //! result on the complete domain before admitting it.
 
+#[path = "indexed.rs"]
+mod indexed;
+
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec;
 use alloc::vec::Vec;
@@ -26,6 +29,7 @@ struct Entry {
     node: Node,
     value: Vec<i128>,
     cost: usize,
+    expanded_cost: usize,
     inputs: u64,
 }
 
@@ -359,6 +363,9 @@ impl<'a> TopDown<'a> {
             node,
             value,
             cost: 1 + below.len(),
+            expanded_cost: operands[..count].iter().fold(1usize, |sum, id| {
+                sum.saturating_add(self.arena[*id].expanded_cost)
+            }),
             inputs,
         });
         self.index.insert(node, id);
@@ -740,7 +747,7 @@ pub(crate) fn top_down(
         .collect();
     let shape = &env.settings.shape;
     if n > shape.cegis_tuples {
-        return counterexample_guided(original, &targets, env, meter);
+        return counterexample_guided(original, &targets, env, meter, false);
     }
     let depth = shape
         .depth
@@ -756,11 +763,35 @@ pub(crate) fn top_down(
     search.program_for(&targets, meter)
 }
 
+pub(crate) fn indexed_branches(
+    original: &Graph,
+    sig: &[Vec<i128>],
+    env: &Env<'_>,
+    meter: &mut Meter,
+) -> Result<Option<Graph>, Stop> {
+    let live = env.reference.live();
+    if live.is_empty() {
+        return Ok(None);
+    }
+    let kinds = original.kinds();
+    let targets: Vec<_> = original
+        .roots
+        .iter()
+        .map(|root| (sig[*root].clone(), kinds[*root]))
+        .collect();
+    if live.len() > env.settings.shape.cegis_tuples {
+        return counterexample_guided(original, &targets, env, meter, true);
+    }
+    let mut search = TopDown::new(original, live, 2, env, meter)?;
+    indexed::program_for(&mut search, &targets, meter)
+}
+
 fn counterexample_guided(
     original: &Graph,
     targets: &[(Vec<i128>, Kind)],
     env: &Env<'_>,
     meter: &mut Meter,
+    indexed: bool,
 ) -> Result<Option<Graph>, Stop> {
     let shape = &env.settings.shape;
     let live = env.reference.live();
@@ -803,7 +834,12 @@ fn counterexample_guided(
             .map(|(values, kind)| (sample.iter().map(|p| values[*p as usize]).collect(), *kind))
             .collect();
         let mut search = TopDown::new(original, &ordinals, depth, env, meter)?;
-        let Some(candidate) = search.program_for(&local, meter)? else {
+        let proposal = if indexed {
+            indexed::program_for(&mut search, &local, meter)?
+        } else {
+            search.program_for(&local, meter)?
+        };
+        let Some(candidate) = proposal else {
             return Ok(None);
         };
         let Some(program) = candidate.to_program() else {

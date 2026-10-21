@@ -1,6 +1,6 @@
 //! Untrusted search for smaller equivalent ZenoFCIS finite decision programs.
 //!
-//! The search proposes; it never judges. Four proposers work over
+//! The search proposes; it never judges. Proposers work over
 //! *signatures*: the value of every node on every declared input tuple on
 //! which the original does not trap, in `ordered-product-last-input-fastest-v1`
 //! order. (On a tuple where the original traps, nodes have no values; a
@@ -16,6 +16,9 @@
 //! - **decision-diagram resynthesis** rebuilds outputs with few values as
 //!   reduced decision diagrams over input variable orders, on small domains
 //!   where the original never traps.
+//!
+//! An opt-in indexed branch proposer runs after the ordinary portfolio,
+//! constructing depth-two splits from exact per-example feasibility indexes.
 //!
 //! A portfolio, which may also start from supplied seed programs, runs them
 //! in rounds until a round improves nothing, keeping every admitted program
@@ -112,7 +115,9 @@ pub struct Budget {
     /// Most `i128` cells in each of three tables: the original's observations,
     /// a program's node signatures, and the top-down plan values. Each table
     /// is limited separately, so together they can hold up to three times
-    /// this; smaller buffers are not counted.
+    /// this. Indexed branch tables and their concurrent scratch share the
+    /// plan cap, with bytes rounded up to i128 cells; smaller buffers in the
+    /// other proposers are not counted.
     pub max_cells: u64,
     /// Work units: one per evaluated instruction per tuple, and one per value
     /// examined by a proposer.
@@ -154,6 +159,8 @@ pub struct Proposers {
     pub two_valued: bool,
     /// Decision-diagram resynthesis over variable orders.
     pub diagram: bool,
+    /// Exact indexed depth-two branch proposals, after the ordinary portfolio.
+    pub indexed_branches: bool,
 }
 
 impl Default for Proposers {
@@ -165,6 +172,7 @@ impl Default for Proposers {
             complement: true,
             two_valued: true,
             diagram: true,
+            indexed_branches: false,
         }
     }
 }
@@ -646,6 +654,13 @@ fn run(original: &[u8], seeds: &[&[u8]], settings: &Settings) -> Result<Outcome,
         if archive.best_cost() >= before {
             break;
         }
+    }
+    // Preserve the ordinary portfolio's complete prefix and incumbent.
+    if proposers.indexed_branches
+        && let Some(sig) = reference.signatures(&graph, &space, budget.max_cells, &mut meter)?
+    {
+        let proposal = topdown::indexed_branches(&graph, &sig, &env, &mut meter)?;
+        archive.offer(proposal, "indexed-branches", rounds, &env, &mut meter)?;
     }
     let best = &archive.entries[archive.best()];
     let provenance = Provenance {

@@ -74,7 +74,7 @@ policy.
 | `zeno-fcis-refine` | Exact normalized-decision comparison and promotion reports |
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
-| `zeno-fcis-program-search` | Untrusted, deterministic search for smaller equivalent finite programs (resubstitution, top-down synthesis, folding, decision-diagram resynthesis); proposes only, `transform check` decides |
+| `zeno-fcis-program-search` | Untrusted, deterministic search for smaller equivalent finite programs (resubstitution, top-down synthesis, folding, decision-diagram resynthesis, opt-in indexed branches); proposes; the exact check accepts |
 | `zeno-fcis-loop-doors` | Untrusted proposer-side doors of the bounded loop: the loop expression language with holes and family parameters, lowering, inverse semantics, failing regions, repair sites and repairs, sketch completion and family fits and transfer; proposes only, `transform check` decides |
 | `zeno-fcis-contract` | Application-contract compiler core shared with the `zeno-fcis` binary, and the checked assume-guarantee composition checker with its groups, aggregate generation and assembly validation, receipt and replay |
 | `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private checkers, compilers, and other tools |

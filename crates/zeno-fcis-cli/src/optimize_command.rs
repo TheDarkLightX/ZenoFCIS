@@ -49,31 +49,26 @@ pub(super) struct Arguments {
     /// original first; only an accepted one is used.
     #[arg(long)]
     with_candidate: Vec<PathBuf>,
+    /// Try indexed branch proposals after the ordinary search; the exact checker accepts.
+    #[arg(long)]
+    indexed_branches: bool,
 }
 
 pub(super) fn run(arguments: Arguments) -> u8 {
-    let (exit, report) = optimize_files(
-        &arguments.program,
-        arguments.strategy.as_deref(),
-        arguments.candidate_out.as_deref(),
-        arguments.receipt.as_deref(),
-        arguments.max_input_tuples,
-        arguments.profile.as_deref().and_then(Profile::parse),
-        &arguments.with_candidate,
-    );
+    let (exit, report) = optimize_files(&arguments);
     crate::print_json(&report);
     exit
 }
 
-fn optimize_files(
-    program: &Path,
-    strategy: Option<&Path>,
-    candidate_out: Option<&Path>,
-    receipt: Option<&Path>,
-    max_input_tuples: u64,
-    profile: Option<Profile>,
-    with_candidate: &[PathBuf],
-) -> (u8, Value) {
+fn optimize_files(arguments: &Arguments) -> (u8, Value) {
+    let program = &arguments.program;
+    let strategy = arguments.strategy.as_deref();
+    let candidate_out = arguments.candidate_out.as_deref();
+    let receipt = arguments.receipt.as_deref();
+    let max_input_tuples = arguments.max_input_tuples;
+    let profile = arguments.profile.as_deref().and_then(Profile::parse);
+    let with_candidate = &arguments.with_candidate;
+    let indexed_branches = arguments.indexed_branches;
     // Unlike `exists`, `symlink_metadata` also sees a dangling link, which
     // exclusive creation would refuse after the whole search.
     for path in [candidate_out, receipt].into_iter().flatten() {
@@ -189,8 +184,13 @@ fn optimize_files(
                     "max_input_tuples": stop.limit
                 }),
             ),
-            Outcome::Searched(search) => {
+            Outcome::Searched(mut search) => {
+                let indexed =
+                    indexed_branches.then(|| optimize::indexed_branches(&mut search, &original));
                 let mut detail = search.json();
+                if let Some(indexed) = indexed {
+                    detail["indexed_branches"] = indexed;
+                }
                 match &search.best {
                     Some(best) => {
                         let receipt_bytes = best.equivalence.receipt();

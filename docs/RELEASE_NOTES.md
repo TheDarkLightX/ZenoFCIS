@@ -1,4 +1,14 @@
-# ZenoFCIS 2.5.0 release notes
+# ZenoFCIS release notes
+
+## 2.6 draft: indexed branch proposals
+
+The program-search library adds an opt-in indexed branch proposer, disabled
+by default. `zeno-fcis optimize --indexed-branches` tries it after the ordinary
+search and retains the better checked result. It proposes; the exact check
+accepts. Index memory and work consume the existing budgets; a budget stop
+provides no candidate. The bounded fragment is not a program optimality claim.
+
+## 2.5.0
 
 Code is LLM-generated or synthesized;
 acceptance depends on the stated check, domain and assumptions. The

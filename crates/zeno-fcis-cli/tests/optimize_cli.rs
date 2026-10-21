@@ -487,6 +487,7 @@ fn describe_declares_optimize_effects() {
             "candidate_out",
             "containment_backend",
             "help",
+            "indexed_branches",
             "kb",
             "kb_task",
             "max_input_tuples",
@@ -504,4 +505,37 @@ fn describe_declares_optimize_effects() {
         .unwrap_or_else(|| panic!("tuple cap"));
     assert_eq!(cap["defaults"], json!(["100000000"]));
     assert_eq!(command["subcommands"], json!([]));
+}
+
+#[test]
+fn indexed_branches_flag_is_opt_in_and_receipt_replays() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let first = optimize(&original, &[]);
+    let second = optimize(&original, &[]);
+    assert_eq!(first, second);
+    assert!(first.1["detail"].get("indexed_branches").is_none());
+    let candidate = directory.0.join("indexed.zcve");
+    let receipt = directory.0.join("indexed.receipt.json");
+    let (exit, on) = optimize(
+        &original,
+        &[
+            "--indexed-branches",
+            "--candidate-out",
+            &candidate.to_string_lossy(),
+            "--receipt",
+            &receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(0), "{on}");
+    assert!(on["detail"].get("indexed_branches").is_some());
+    assert!(
+        on["detail"]["best"]["nodes"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("missing node count"))
+            <= first.1["detail"]["best"]["nodes"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("missing node count"))
+    );
+    assert_eq!(replay(&receipt, &original, &candidate).0, Some(0));
 }
