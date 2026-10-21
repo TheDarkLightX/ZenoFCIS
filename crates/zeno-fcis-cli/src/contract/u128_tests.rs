@@ -220,7 +220,16 @@ fn u128_search_optimizer_and_loop_doors_share_a_refusing_signed_json_binding() {
 #[test]
 fn u128_new_scaffolds_a_native_typed_application() {
     use std::path::Path;
-    let root = Path::new("/tmp/sol-u128").join(format!("generated-u128-{}", std::process::id()));
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_else(|error| panic!("fixture time: {error:?}"))
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "zeno-fcis-u128-scaffold-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&root)
+        .unwrap_or_else(|error| panic!("create exclusive fixture: {error:?}"));
     let input = root.join("input");
     let app = root.join("app");
     std::fs::create_dir_all(input.join("v2"))
@@ -278,12 +287,8 @@ fn u128_new_scaffolds_a_native_typed_application() {
             .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
             .contains("NumericDescriptor")
     );
-    std::fs::write(
-        "/tmp/sol-u128/generated-app-path.txt",
-        app.to_str()
-            .unwrap_or_else(|| panic!("required value missing")),
-    )
-    .unwrap_or_else(|error| panic!("required result failed: {error:?}"));
+    std::fs::remove_dir_all(&root)
+        .unwrap_or_else(|error| panic!("remove completed fixture: {error:?}"));
 }
 #[test]
 fn u128_reject_examples_require_the_unchanged_pre_state() {
