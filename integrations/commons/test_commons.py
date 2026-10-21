@@ -499,6 +499,16 @@ class InterfaceTests(unittest.TestCase):
         self.assertEqual(md.returncode, 0)
         self.assertIn("# Zeno Commons records", md.stdout)
 
+    def test_cli_update_takes_status_note_ref_title_and_severity(self):
+        rid = json.loads(self.cli("lead", "add", "gap", "A gap", "--tag", "severity-low").stdout)["id"]
+        done = self.cli("lead", "update", rid, "--status", "resolved", "--note", "fixed", "--ref", "abc123",
+                        "--title", "A gap, retitled", "--severity", "high")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        shown = json.loads(self.cli("lead", "show", rid).stdout)
+        self.assertEqual((shown["status"], shown["title"], shown["refs"]), ("resolved", "A gap, retitled", ["abc123"]))
+        self.assertIn("severity-high", shown["tags"])
+        self.assertEqual(self.cli("lead", "merge", rid, "--into", rid).returncode, 2)  # refused, not a crash
+
     def test_mcp_round_trip(self):
         proc = subprocess.Popen([sys.executable, "-I", str(HERE / "mcp.py"), "--store", self.store, "--actor", "agent-1"],
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
