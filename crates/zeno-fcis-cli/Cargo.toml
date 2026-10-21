@@ -28,6 +28,7 @@ zeno-fcis-crypto = { version = "=2.5.0", path = "../zeno-fcis-crypto", features 
 zeno-fcis-formal-tools = { version = "=2.5.0", path = "../zeno-fcis-formal-tools" }
 zeno-fcis-spec = { version = "=2.5.0", path = "../zeno-fcis-spec" }
 zeno-fcis-shell-sqlite = { version = "=2.5.0", path = "../zeno-fcis-shell-sqlite" }
+zeno-fcis-commons = { version = "=2.5.0", path = "../zeno-fcis-commons" }
 zeno-fcis-loop-doors = { version = "=2.5.0", path = "../zeno-fcis-loop-doors" }
 zeno-fcis-program-search = { version = "=2.5.0", path = "../zeno-fcis-program-search" }
 

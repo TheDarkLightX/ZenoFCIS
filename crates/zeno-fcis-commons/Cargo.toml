@@ -1,0 +1,19 @@
+[package]
+name = "zeno-fcis-commons"
+description = "Shared SQLite-backed ZenoFCIS Commons coordination store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+rusqlite = { version = "=0.40.1", features = ["bundled"] }
+serde_json = { version = "=1.0.151", features = ["arbitrary_precision"] }
+sha2 = { version = "=0.11.0", default-features = false }
+
+[lints]
+workspace = true

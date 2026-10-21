@@ -50,6 +50,7 @@ mod transform_parallel;
 mod transform_plan;
 mod withdrawal_queue;
 
+use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write as _};
 use std::path::{Path, PathBuf};
@@ -206,6 +207,16 @@ enum ContractCommand {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Shared coordination and knowledge store.
+    Commons {
+        /// Commons subcommand and arguments.
+        #[arg(
+            value_name = "ARGS",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
+        args: Vec<OsString>,
+    },
     /// Construct a checked priority collection from approved frozen requirements.
     Construct(construction::Construct),
     /// Read-only structured usage knowledge operations.
@@ -448,6 +459,9 @@ fn execute() -> u8 {
         .and_then(|matches| Cli::from_arg_matches(&matches))
     {
         Ok(cli) => {
+            if let Command::Commons { args } = &cli.command {
+                return ExitCode::from(zeno_fcis_commons::cli::run(args));
+            }
             if let Command::Kb { operation } = cli.command {
                 return knowledge_command::execute(&cli.kb, operation);
             }
@@ -575,6 +589,7 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 fn run(command: Command) -> u8 {
     match command {
         Command::Guide { command } => guide::run(command),
+        Command::Commons { args } => zeno_fcis_commons::cli::run(&args),
         Command::Construct(args) => construction::construct(args),
         Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),

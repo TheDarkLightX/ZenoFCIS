@@ -1478,6 +1478,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.119",
  "zeno-fcis-codec",
+ "zeno-fcis-commons",
  "zeno-fcis-contract",
  "zeno-fcis-crypto",
  "zeno-fcis-formal-tools",
@@ -1515,6 +1516,15 @@ dependencies = [
  "rpds",
  "zeno-fcis-codec",
  "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-commons"
+version = "2.5.0"
+dependencies = [
+ "rusqlite",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

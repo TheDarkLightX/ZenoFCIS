@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from commons import DB_NAME, Commons, CommonsError, normalize_resource  # noqa: E402
+from archive_test_support import ARCHIVE_REFUSAL, is_archive_refusal  # noqa: E402
 
 
 class Clock:
@@ -370,21 +372,28 @@ class CommonsTests(unittest.TestCase):
 
     def test_a_duplicate_gap_folds_into_its_canonical_gap(self):
         first, second = self.open("sec-review"), self.open("zenomail")
-        canonical = first.record_add("gap", "Judges cannot see deliveries", "lemmas see state only",
-                                     tags=["judges", "severity-medium"], refs=["log-a"])["id"]
-        duplicate = second.record_add("gap", "Lemmas cannot observe deliveries a decision makes", "paid at most once",
-                                      tags=["security", "severity-high"], refs=["log-b"])["id"]
+        canonical = first.record_add(
+            "gap", "Judges cannot see deliveries", "lemmas see state only",
+            tags=["judges", "severity-medium"], refs=["log-a"],
+        )["id"]
+        duplicate = second.record_add(
+            "gap", "Lemmas cannot observe deliveries a decision makes", "paid at most once",
+            tags=["security", "severity-high"], refs=["log-b"],
+        )["id"]
         second.link(duplicate, "duplicates", canonical)
-        second.link(duplicate, "duplicates", canonical)  # idempotent: folded once
+        second.link(duplicate, "duplicates", canonical)
         merged = first.record(canonical)
         self.assertEqual(first.record(duplicate)["status"], "superseded")
-        self.assertEqual(merged["tags"], ["judges", "security", "severity-high"])  # the higher severity wins
+        self.assertEqual(merged["tags"], ["judges", "security", "severity-high"])
         self.assertEqual(merged["refs"], sorted(["log-a", "log-b", duplicate]))
         self.assertEqual(merged["body"].count("folded in duplicate"), 1)
         [gap] = first.gaps()
-        self.assertEqual((gap["id"], gap["severity"], gap["reporters"]), (canonical, "high", ["sec-review", "zenomail"]))
+        self.assertEqual(
+            (gap["id"], gap["severity"], gap["reporters"]),
+            (canonical, "high", ["sec-review", "zenomail"]),
+        )
         with self.assertRaises(CommonsError):
-            first.link(canonical, "duplicates", duplicate)  # no folding into a closed record
+            first.link(canonical, "duplicates", duplicate)
 
     def test_an_imported_gap_counts_its_original_reporter_not_the_importer(self):
         s = self.open("lead")
@@ -395,7 +404,7 @@ class CommonsTests(unittest.TestCase):
         self.assertEqual(gap["reporters"], ["sec-review"])
         events = len(s.events(limit=1000))
         s.import_gaps(log)
-        self.assertEqual(len(s.events(limit=1000)), events)  # reimport writes nothing
+        self.assertEqual(len(s.events(limit=1000)), events)
 
     def test_gaps_rank_by_severity_then_reporters_then_age(self):
         a, b = self.open("agent-a"), self.open("agent-b")
@@ -410,18 +419,22 @@ class CommonsTests(unittest.TestCase):
         a.record_update(unrated, severity="medium")
         done = a.record_add("gap", "Already fixed", tags=["severity-blocker"])["id"]
         a.record_update(done, status="resolved")
-        order = [g["id"] for g in a.gaps()]
+        order = [gap["id"] for gap in a.gaps()]
         self.assertEqual(order, [blocker, twice, high_old, high_new, unrated, low])
-        self.assertIn(done, [g["id"] for g in a.gaps(include_closed=True)])
+        self.assertIn(done, [gap["id"] for gap in a.gaps(include_closed=True)])
 
     def test_dedup_proposes_similar_gaps_and_leaves_distinct_ones(self):
         s = self.open("lead")
-        a = s.record_add("gap", "Per-request work grows with the store's history", "every request replays history")["id"]
-        b = s.record_add("gap", "Serve state and command in time that does not grow with the store's history",
-                         "replays every decision on each request")["id"]
+        older = s.record_add(
+            "gap", "Per-request work grows with the store's history", "every request replays history",
+        )["id"]
+        newer = s.record_add(
+            "gap", "Serve state and command in time that does not grow with the store's history",
+            "replays every decision on each request",
+        )["id"]
         s.record_add("gap", "Show token amounts with decimals", "1.5 tokens at scale e18")
         pairs = s.similar("gap", threshold=0.2)
-        self.assertEqual([(p["older"], p["newer"]) for p in pairs], [(a, b)])
+        self.assertEqual([(pair["older"], pair["newer"]) for pair in pairs], [(older, newer)])
 
     def test_refusals(self):
         s = self.open("lead")
@@ -449,11 +462,33 @@ class InterfaceTests(unittest.TestCase):
 
     def cli(self, actor, *args):
         command = os.environ.get("ZENO_FCIS_COMMONS_CLI")
-        base = command.split() if command else [sys.executable, "-I", str(HERE / "cli.py")]
-        run = lambda *a: subprocess.run([*base, "--actor", actor, *a], env=self.env, capture_output=True, text=True, timeout=60)
+        base = shlex.split(command) if command else [sys.executable, "-I", str(HERE / "cli.py")]
+        is_rust = bool(command) and ("commons" in base or Path(base[0]).name == "zeno-fcis")
+        if is_rust and "commons" not in base:
+            base.append("commons")
+
+        def run(*arguments):
+            return subprocess.run(
+                ["nice", "-n", "19", "ionice", "-c3", *base, "--store", self.store,
+                 "--actor", actor, *arguments],
+                env=self.env, capture_output=True, text=True, timeout=60)
+
         if args[0] != "register" and run("whoami").returncode != 0:
             run("register", "--role", "test")
         return run(*args)
+
+    def mcp_command(self):
+        command = os.environ.get("ZENO_FCIS_COMMONS_CLI")
+        base = shlex.split(command) if command else [sys.executable, "-I", str(HERE / "mcp.py")]
+        is_rust = bool(command) and ("commons" in base or Path(base[0]).name == "zeno-fcis")
+        if is_rust:
+            if "commons" not in base:
+                base.append("commons")
+            base.append("mcp")
+        elif command:
+            base = [str(HERE / "mcp.py") if item.endswith("cli.py") else item for item in base]
+        return ["nice", "-n", "19", "ionice", "-c3", *base,
+                "--store", self.store, "--actor", "agent-1"]
 
     def test_cli_brief_advice_is_one_line_per_item(self):
         self.cli("lead", "add", "lesson", "Lease folders before cleanup", "--tag", "cleanup")
@@ -480,7 +515,17 @@ class InterfaceTests(unittest.TestCase):
     def test_cli_export_events_with_archive_recomputes_the_chain(self):
         for i in range(12):
             self.cli("lead", "emit", "test", "tick", f"t-{i}")
-        self.assertEqual(self.cli("lead", "archive", "--keep", "4").returncode, 0)
+        archived = self.cli("lead", "archive", "--keep", "4")
+        if is_archive_refusal(archived):
+            self.assertEqual(archived.returncode, 2)
+            self.assertEqual(json.loads(archived.stderr)["refused"], ARCHIVE_REFUSAL)
+            verify = self.cli("lead", "verify", "--archives")
+            export = self.cli("lead", "export", "events", "--with-archive")
+            self.assertEqual((verify.returncode, export.returncode), (2, 2))
+            self.assertTrue(is_archive_refusal(verify))
+            self.assertTrue(is_archive_refusal(export))
+            self.skipTest(ARCHIVE_REFUSAL)
+        self.assertEqual(archived.returncode, 0, archived.stderr)
         out = Path(self.tmp.name) / "events.jsonl"
         self.assertEqual(self.cli("lead", "export", "events", "--with-archive", "--out", str(out)).returncode, 0)
         prev, seqs = "0" * 64, []
@@ -500,17 +545,26 @@ class InterfaceTests(unittest.TestCase):
         self.assertIn("# Zeno Commons records", md.stdout)
 
     def test_cli_update_takes_status_note_ref_title_and_severity(self):
-        rid = json.loads(self.cli("lead", "add", "gap", "A gap", "--tag", "severity-low").stdout)["id"]
-        done = self.cli("lead", "update", rid, "--status", "resolved", "--note", "fixed", "--ref", "abc123",
-                        "--title", "A gap, retitled", "--severity", "high")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        shown = json.loads(self.cli("lead", "show", rid).stdout)
-        self.assertEqual((shown["status"], shown["title"], shown["refs"]), ("resolved", "A gap, retitled", ["abc123"]))
+        added = self.cli("lead", "add", "gap", "A gap", "--tag", "severity-low")
+        self.assertEqual(added.returncode, 0, added.stderr)
+        record_id = json.loads(added.stdout)["id"]
+        updated = self.cli(
+            "lead", "update", record_id, "--status", "resolved", "--note", "fixed", "--ref", "abc123",
+            "--title", "A gap, retitled", "--severity", "high", "--tag", "triaged",
+        )
+        self.assertEqual(updated.returncode, 0, updated.stderr)
+        shown = json.loads(self.cli("lead", "show", record_id).stdout)
+        self.assertEqual(
+            (shown["status"], shown["title"], shown["refs"]),
+            ("resolved", "A gap, retitled", ["abc123"]),
+        )
         self.assertIn("severity-high", shown["tags"])
-        self.assertEqual(self.cli("lead", "merge", rid, "--into", rid).returncode, 2)  # refused, not a crash
+        self.assertIn("triaged", shown["tags"])
+        self.assertEqual(self.cli("lead", "merge", record_id, "--into", record_id).returncode, 2)
 
     def test_mcp_round_trip(self):
-        proc = subprocess.Popen([sys.executable, "-I", str(HERE / "mcp.py"), "--store", self.store, "--actor", "agent-1"],
+        proc = subprocess.Popen(self.mcp_command(),
+                                env=self.env,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},

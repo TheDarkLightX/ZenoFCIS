@@ -92,6 +92,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-shell-sqlite": 5,
     "zeno-fcis-ingress": 6,
     "zeno-fcis-bls": 5,  # shell-only oracle and receipt verification
+    "zeno-fcis-commons": 5,  # effectful coordination store, without decision authority
     "zenofcis-zusd-v1": 3,  # exact native oracle composition, no shell crypto
     "zeno-fcis-collections": 3,
 }

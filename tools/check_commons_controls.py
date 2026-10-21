@@ -70,7 +70,8 @@ CONTROLS = [
 
 def run_test(directory: Path, test: str) -> str:
     """'pass', 'fail' (an assertion refuted the mutant) or 'error' (it crashed, which does not count as caught)."""
-    done = subprocess.run([sys.executable, "-m", "unittest", f"test_commons.{test}"], cwd=directory,
+    done = subprocess.run(["nice", "-n", "19", "ionice", "-c3", sys.executable, "-m", "unittest",
+                           f"test_commons.{test}"], cwd=directory,
                           capture_output=True, text=True, timeout=300)
     if done.returncode == 0:
         return "pass"

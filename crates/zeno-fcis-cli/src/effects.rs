@@ -71,6 +71,7 @@ macro_rules! effects {
 effects! { crate::Command {
     leaves {
         "construct" => Self::Construct(..) => declared((&["requirements-bundle", "owner-approval", "source-tree"], &["construction-artifacts"], true, None));
+        "commons" => Self::Commons { .. } => declared((&["commons-store"], &["commons-store"], true, None));
         "describe" => Self::Describe { .. } => declared((&[], &[], false, None));
         "optimize" => Self::Optimize { .. } => declared((
                 &[
