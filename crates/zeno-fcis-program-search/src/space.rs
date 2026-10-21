@@ -263,16 +263,26 @@ impl Reference {
             return Ok(Verdict::Abi);
         }
         let count = ordinals.map_or(space.count(), <[u32]>::len);
-        meter.charge(count.saturating_mul(candidate.nodes().len().max(1)))?;
+        let per_tuple = candidate.nodes().len().max(1);
         let mut tuple = Vec::new();
         let mut outputs = Vec::new();
-        for index in 0..count {
-            let ordinal = match ordinals {
-                Some(list) => list[index] as usize,
-                None => index,
-            };
-            if !self.agrees(candidate, space, ordinal, &mut tuple, &mut outputs) {
-                return Ok(Verdict::Differs(ordinal as u64));
+        // Charge before evaluating each bounded chunk, not before the entire
+        // domain. A first counterexample needs only its chunk's reserved work;
+        // equality still requires enough budget to charge *every* tuple.
+        // This deliberately overcharges at most one partially used chunk,
+        // retaining fail-closed conservative metering and deterministic order.
+        const CHECK_CHUNK: usize = 128;
+        for start in (0..count).step_by(CHECK_CHUNK) {
+            let end = start.saturating_add(CHECK_CHUNK).min(count);
+            meter.charge((end - start).saturating_mul(per_tuple))?;
+            for index in start..end {
+                let ordinal = match ordinals {
+                    Some(list) => list[index] as usize,
+                    None => index,
+                };
+                if !self.agrees(candidate, space, ordinal, &mut tuple, &mut outputs) {
+                    return Ok(Verdict::Differs(ordinal as u64));
+                }
             }
         }
         Ok(Verdict::Equal)
@@ -373,5 +383,93 @@ impl Reference {
             }
         }
         Ok(Some(signatures))
+    }
+}
+
+
+#[cfg(test)]
+mod compare_charge_tests {
+    use super::*;
+    use zeno_fcis_synthesis::finite::Op;
+
+    fn admitted(nodes: Vec<Op>, roots: Vec<u16>) -> Program {
+        Program::try_new(
+            vec![Domain::Int { min: 0, max: 255 }],
+            vec![Domain::Bool],
+            nodes,
+            roots,
+        )
+        .unwrap_or_else(|error| panic!("test program invalid: {error:?}"))
+    }
+
+    #[test]
+    fn first_counterexample_does_not_precharge_the_whole_domain() {
+        let original = admitted(vec![Op::Bool(false)], vec![0]);
+        let wrong = admitted(vec![Op::Bool(true)], vec![0]);
+        let space = Space::new(original.inputs(), 256)
+            .unwrap_or_else(|error| panic!("test domain invalid: {error:?}"));
+        let mut setup = Meter::new(u64::MAX);
+        let reference = Reference::new(&original, &space, 1024, &mut setup)
+            .unwrap_or_else(|error| panic!("reference refused: {error:?}"));
+
+        let mut mismatch_budget = Meter::new(128);
+        assert_eq!(
+            reference.compare(&wrong, &space, None, &mut mismatch_budget),
+            Ok(Verdict::Differs(0))
+        );
+        assert_eq!(mismatch_budget.used(), 128);
+
+        let mut insufficient = Meter::new(127);
+        assert_eq!(
+            reference.compare(&wrong, &space, None, &mut insufficient),
+            Err(Stop::WorkBudget { limit: 127 }),
+            "without budget for even one chunk, no comparison verdict is given"
+        );
+
+        let mut insufficient_equal = Meter::new(255);
+        assert_eq!(
+            reference.compare(&original, &space, None, &mut insufficient_equal),
+            Err(Stop::WorkBudget { limit: 255 }),
+            "partial matching must never become an equivalence verdict"
+        );
+        let mut full = Meter::new(256);
+        assert_eq!(
+            reference.compare(&original, &space, None, &mut full),
+            Ok(Verdict::Equal)
+        );
+        assert_eq!(full.used(), 256);
+
+        let mut reordered = Meter::new(2);
+        assert_eq!(
+            reference.compare(&wrong, &space, Some(&[250, 0]), &mut reordered),
+            Ok(Verdict::Differs(250)),
+            "the first disagreement follows caller-supplied ordinal order"
+        );
+        assert_eq!(reordered.used(), 2);
+    }
+
+    #[test]
+    fn last_counterexample_still_needs_the_full_budget() {
+        let original = admitted(vec![Op::Bool(false)], vec![0]);
+        let last_only = admitted(
+            vec![Op::Input(0), Op::Int(255), Op::Eq(0, 1)],
+            vec![2],
+        );
+        let space = Space::new(original.inputs(), 256)
+            .unwrap_or_else(|error| panic!("test domain invalid: {error:?}"));
+        let mut setup = Meter::new(u64::MAX);
+        let reference = Reference::new(&original, &space, 1024, &mut setup)
+            .unwrap_or_else(|error| panic!("reference refused: {error:?}"));
+        let mut short = Meter::new(767);
+        assert_eq!(
+            reference.compare(&last_only, &space, None, &mut short),
+            Err(Stop::WorkBudget { limit: 767 })
+        );
+        let mut enough = Meter::new(768);
+        assert_eq!(
+            reference.compare(&last_only, &space, None, &mut enough),
+            Ok(Verdict::Differs(255))
+        );
+        assert_eq!(enough.used(), 768);
     }
 }
