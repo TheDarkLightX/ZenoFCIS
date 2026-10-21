@@ -62,15 +62,12 @@ const SPLIT_CLASS_LIMIT: usize = 64;
 
 fn split_classes(want: &[i128]) -> Option<Vec<u8>> {
     let unique = distinct_up_to(want, SPLIT_CLASS_LIMIT)?;
-    Some(
-        want.iter()
-            .map(|value| {
-                // Every value occurs in unique, which has at most 64 members.
-                u8::try_from(unique.partition_point(|entry| entry < value))
-                    .unwrap_or(u8::MAX)
-            })
-            .collect(),
-    )
+    want.iter()
+        .map(|value| {
+            // Every value occurs in unique, which has at most 64 members.
+            u8::try_from(unique.partition_point(|entry| entry < value)).ok()
+        })
+        .collect()
 }
 
 /// Exact equivalent of distinct_count(on) + distinct_count(off). A predicate
@@ -88,7 +85,6 @@ fn split_mask_score(pos: &[u32], classes: &[u8], values: &[i128]) -> Option<usiz
     }
     (on != 0 && off != 0).then_some(on.count_ones() as usize + off.count_ones() as usize)
 }
-
 
 impl<'a> TopDown<'a> {
     fn new(
