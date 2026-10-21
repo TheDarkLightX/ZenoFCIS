@@ -21,6 +21,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="create the store if needed and print its dashboard")
+    p = sub.add_parser("register", help="register an identity: a unique name and a hash ID (defaults to your actor name)")
+    p.add_argument("--name", default=""); p.add_argument("--kind", default="agent"); p.add_argument("--role", default="")
+    p = sub.add_parser("whoami", help="your registered identity, or another agent's by name or ID")
+    p.add_argument("who", nargs="?", default="")
     sub.add_parser("dashboard", help="agents, leases, record counts and your unread messages")
     sub.add_parser("verify", help="recompute the event hash chain")
 
@@ -43,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--question", default="")
     sub.add_parser("agents", help="every agent's latest state and read-through number")
 
-    p = sub.add_parser("send", help="send a numbered message to an agent, or * for everyone")
+    p = sub.add_parser("send", help="send a numbered message to an agent by name or hash ID, or * for everyone")
     p.add_argument("to"); p.add_argument("body")
     p = sub.add_parser("inbox", help="your unread messages")
     p.add_argument("--all", action="store_true")
@@ -83,6 +87,10 @@ def run(args) -> tuple[int, object]:
         cmd = args.command
         if cmd in ("init", "dashboard"):
             return 0, c.dashboard()
+        if cmd == "register":
+            return 0, c.register(args.name, args.kind, args.role)
+        if cmd == "whoami":
+            return 0, c.identity(args.who)
         if cmd == "verify":
             out = c.verify()
             return (0 if out["ok"] else 2), out

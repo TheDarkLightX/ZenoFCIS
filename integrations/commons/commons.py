@@ -114,6 +114,9 @@ CREATE TABLE IF NOT EXISTS records(
   id TEXT PRIMARY KEY, type TEXT NOT NULL, status TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
   tags TEXT NOT NULL, refs TEXT NOT NULL, author TEXT NOT NULL, created_seq INTEGER NOT NULL,
   updated_seq INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS identities(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, role TEXT NOT NULL,
+  registered_by TEXT NOT NULL, registered_seq INTEGER NOT NULL, registered_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS links(
   src TEXT NOT NULL, rel TEXT NOT NULL, dst TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(src, rel, dst));
 """
@@ -160,6 +163,47 @@ class Commons:
             cursor.execute("ROLLBACK")
             raise
 
+    # ---- identity: every agent has a unique name and a hash ID -----------------------------------------
+    def register(self, name: str = "", kind: str = "agent", role: str = "") -> dict:
+        """Register an identity. An agent registers itself (name defaults to the actor); a lead may register others.
+
+        The ID is a hash of the registration (name, kind, role, time and a random nonce), so two registrations of
+        different agents never collide, and the ID stays fixed for the agent's lifetime in this store.
+        """
+        name = _name(name or self.actor, "agent name")
+        kind, role = _name(kind, "kind"), _text(role, "role", allow_empty=True)[:200]
+        nonce = os.urandom(16).hex()
+
+        def apply(cursor, seq, at):
+            row = cursor.execute("SELECT id FROM identities WHERE name=?", (name,)).fetchone()
+            if row:
+                raise CommonsError(f"{name} is already registered as {row[0]}")
+            digest = hashlib.sha256(_canonical([name, kind, role, at, nonce]).encode()).hexdigest()
+            agent_id = "ag-" + digest[:16]
+            cursor.execute("INSERT INTO identities VALUES(?,?,?,?,?,?,?)", (agent_id, name, kind, role, self.actor, seq, at))
+            return {"seq": seq, "id": agent_id, "name": name, "kind": kind, "role": role}
+
+        return self._write("identity.register", name, {"kind": kind, "role": role, "nonce": nonce}, apply)
+
+    def identity(self, name_or_id: str = "") -> dict:
+        key = name_or_id or self.actor
+        row = self.db.execute("SELECT id, name, kind, role, registered_by, registered_at FROM identities WHERE name=? OR id=?",
+                              (key, key)).fetchone()
+        if not row:
+            raise CommonsError(f"no registered identity {key}; register first")
+        return {"id": row[0], "name": row[1], "kind": row[2], "role": row[3], "registered_by": row[4],
+                "registered": _iso(row[5])}
+
+    def _require_registered(self, cursor) -> None:
+        if not cursor.execute("SELECT 1 FROM identities WHERE name=?", (self.actor,)).fetchone():
+            raise CommonsError(f"{self.actor} is not registered; run register first so others can address you")
+
+    def _resolve(self, cursor, name_or_id: str) -> str:
+        row = cursor.execute("SELECT name FROM identities WHERE name=? OR id=?", (name_or_id, name_or_id)).fetchone()
+        if not row:
+            raise CommonsError(f"no registered agent {name_or_id}")
+        return row[0]
+
     # ---- coordination: leases -------------------------------------------------------------------------
     def _active_leases(self, cursor, at: float):
         return cursor.execute("SELECT resource, owner, note, expires_at FROM leases WHERE expires_at > ?",
@@ -172,6 +216,7 @@ class Commons:
         note = _text(note, "note", allow_empty=True)
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             for held, owner, _, expires in self._active_leases(cursor, at):
                 if owner != self.actor and _covers(held, resource):
                     raise CommonsError(f"{resource} overlaps {held}, leased by {owner} until {_iso(expires)}")
@@ -186,6 +231,7 @@ class Commons:
         resource = normalize_resource(resource)
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             row = cursor.execute("SELECT owner, expires_at FROM leases WHERE resource=?", (resource,)).fetchone()
             if not row or row[1] <= at:
                 raise CommonsError(f"no active lease on {resource}; take it again")
@@ -201,6 +247,7 @@ class Commons:
         resource = normalize_resource(resource)
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             row = cursor.execute("SELECT owner FROM leases WHERE resource=?", (resource,)).fetchone()
             if not row:
                 raise CommonsError(f"no lease on {resource}")
@@ -232,6 +279,7 @@ class Commons:
             raise CommonsError("a blocked status needs the question that blocks it")
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             if state == "done":
                 held = [r for r, o, _, _ in self._active_leases(cursor, at) if o == self.actor]
                 if held:
@@ -246,18 +294,25 @@ class Commons:
         return self._write("agent.status", self.actor, {"state": state, "step": step, "question": question}, apply)
 
     def agents(self) -> list[dict]:
-        rows = self.db.execute("SELECT name, state, step, question, updated_at, read_through FROM agents ORDER BY name")
-        return [{"agent": n, "state": s, "step": st, "question": q, "updated": _iso(u), "read_through": r}
-                for n, s, st, q, u, r in rows]
+        """Every registered agent with its hash ID, kind, role, latest state and read-through number."""
+        rows = self.db.execute(
+            "SELECT i.name, i.id, i.kind, i.role, a.state, a.step, a.question, a.updated_at, a.read_through "
+            "FROM identities i LEFT JOIN agents a ON a.name = i.name ORDER BY i.name")
+        return [{"agent": n, "id": i, "kind": k, "role": r, "state": s or "registered", "step": st or "",
+                 "question": q or "", "updated": _iso(u) if u else "", "read_through": rt or 0}
+                for n, i, k, r, s, st, q, u, rt in rows]
 
     # ---- coordination: messages -------------------------------------------------------------------------
     def send(self, recipient: str, body: str) -> dict:
+        """Send to a registered agent by name or hash ID, or to '*' for everyone."""
         recipient = recipient if recipient == "*" else _name(recipient, "recipient")
         body = _text(body, "message")
 
         def apply(cursor, seq, at):
-            cursor.execute("INSERT INTO messages VALUES(?,?,?,?,?)", (seq, self.actor, recipient, body, at))
-            return {"seq": seq, "to": recipient}
+            self._require_registered(cursor)
+            to = recipient if recipient == "*" else self._resolve(cursor, recipient)
+            cursor.execute("INSERT INTO messages VALUES(?,?,?,?,?)", (seq, self.actor, to, body, at))
+            return {"seq": seq, "to": to}
 
         return self._write("message.send", recipient, {"body": body}, apply)
 
@@ -279,6 +334,7 @@ class Commons:
             raise CommonsError("through must be a non-negative message number")
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             top = cursor.execute("SELECT COALESCE(MAX(seq), 0) FROM events").fetchone()[0]
             if through > top:
                 raise CommonsError(f"message {through} does not exist yet")
@@ -308,6 +364,7 @@ class Commons:
         record_id = _name(record_id, "record id")
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             if cursor.execute("SELECT id FROM records WHERE id=?", (record_id,)).fetchone():
                 raise _Existing()  # idempotent: same content, same id, and no event is written
             cursor.execute("INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -329,6 +386,7 @@ class Commons:
         refs = refs or []
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             row = cursor.execute("SELECT status, refs, body FROM records WHERE id=?", (record_id,)).fetchone()
             if not row:
                 raise CommonsError(f"no record {record_id}")
@@ -346,6 +404,7 @@ class Commons:
             raise CommonsError(f"relation must be one of {', '.join(LINK_RELATIONS)}")
 
         def apply(cursor, seq, at):
+            self._require_registered(cursor)
             for rid in (src, dst):
                 if not cursor.execute("SELECT 1 FROM records WHERE id=?", (rid,)).fetchone():
                     raise CommonsError(f"no record {rid}")
@@ -456,7 +515,8 @@ class Commons:
                 continue
             title = str(row.get("need") or row.get("task") or "gap")[:300]
             body = "\n".join(f"{k}: {row[k]}" for k in ("task", "what_zenofcis_lacks", "workaround", "evidence") if row.get(k))
-            tags = [str(row.get("agent", "unknown")), "severity-" + str(row.get("severity", "unknown")).lower(), "feature-gap"]
+            clean = lambda v: re.sub(r"[^a-z0-9._:@/-]+", "-", str(v).lower()).strip("-._:@/")[:100] or "unknown"
+            tags = [clean(row.get("agent", "unknown")), "severity-" + clean(row.get("severity", "unknown")), "feature-gap"]
             out = self.record_add("gap", title, body, tags=tags)
             added, existing = added + (not out["existing"]), existing + out["existing"]
         return {"added": added, "existing": existing}

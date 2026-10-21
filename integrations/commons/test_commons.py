@@ -41,10 +41,42 @@ class CommonsTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def open(self, actor):
+    def open(self, actor, register=True):
         store = Commons(self.dir, actor, clock=self.clock)
         self.addCleanup(store.close)
+        if register:
+            try:
+                store.identity()
+            except CommonsError:
+                store.register(kind="agent", role="test")
         return store
+
+    def test_identities_have_unique_names_and_hash_ids_and_are_addressable(self):
+        a, b = self.open("builder-a"), self.open("builder-b")
+        ida, idb = a.identity()["id"], b.identity()["id"]
+        self.assertRegex(ida, r"^ag-[0-9a-f]{16}$")
+        self.assertNotEqual(ida, idb)
+        with self.assertRaises(CommonsError):
+            a.register("builder-b")  # names are unique
+        sent = a.send(idb, "by hash id")  # address by ID ...
+        self.assertEqual(sent["to"], "builder-b")
+        a.send("builder-b", "by name")    # ... or by name
+        self.assertEqual(len(b.inbox()["messages"]), 2)
+        with self.assertRaises(CommonsError):
+            a.send("nobody", "unknown recipient")
+        listed = {row["agent"]: row["id"] for row in a.agents()}
+        self.assertEqual(listed, {"builder-a": ida, "builder-b": idb})
+
+    def test_unregistered_actors_cannot_coordinate_but_tools_can_emit(self):
+        ghost = self.open("ghost", register=False)
+        for act in (lambda: ghost.lease_take("/tmp/work-ghost"), lambda: ghost.status("working"),
+                    lambda: ghost.record_add("lesson", "x"), lambda: ghost.ack(0)):
+            with self.assertRaises(CommonsError):
+                act()
+        self.open("lead")
+        with self.assertRaises(CommonsError):
+            ghost.send("lead", "hello")
+        self.assertGreater(ghost.emit("atdd", "result", "scenario-x", {"exit": 0}), 0)
 
     def test_concurrent_writers_lose_nothing_and_sequence_only_grows(self):
         Commons(self.dir, "setup").close()
@@ -54,7 +86,7 @@ class CommonsTests(unittest.TestCase):
         for p in procs:
             p.join(120)
             self.assertEqual(p.exitcode, 0)
-        store = self.open("reader")
+        store = self.open("reader", register=False)
         events = store.events(limit=10000)
         self.assertEqual(len(events), 480)
         self.assertEqual([e["seq"] for e in events], list(range(1, 481)))
@@ -196,8 +228,19 @@ class InterfaceTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def cli(self, actor, *args):
-        return subprocess.run([sys.executable, "-I", str(HERE / "cli.py"), "--actor", actor, *args],
-                              env=self.env, capture_output=True, text=True, timeout=60)
+        command = os.environ.get("ZENO_FCIS_COMMONS_CLI")
+        base = command.split() if command else [sys.executable, "-I", str(HERE / "cli.py")]
+        run = lambda *a: subprocess.run([*base, "--actor", actor, *a], env=self.env, capture_output=True, text=True, timeout=60)
+        if args[0] != "register" and run("whoami").returncode != 0:
+            run("register", "--role", "test")
+        return run(*args)
+
+    def test_cli_register_and_whoami(self):
+        first = self.cli("builder", "register", "--kind", "builder", "--role", "collections")
+        self.assertEqual(first.returncode, 0)
+        ident = json.loads(first.stdout)
+        self.assertEqual(json.loads(self.cli("lead", "whoami", ident["id"]).stdout)["name"], "builder")
+        self.assertEqual(self.cli("builder", "register").returncode, 2)
 
     def test_cli_lease_check_exit_code_and_refusal(self):
         self.assertEqual(self.cli("builder", "lease", "take", "/tmp/work-x").returncode, 0)
@@ -213,6 +256,7 @@ class InterfaceTests(unittest.TestCase):
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+            {"jsonrpc": "2.0", "id": 20, "method": "tools/call", "params": {"name": "commons_register", "arguments": {"role": "test"}}},
             {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "commons_record_add", "arguments": {
                 "type": "gap", "title": "No keyed collections", "tags": ["collections"]}}},
             {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "commons_advise", "arguments": {
@@ -223,9 +267,10 @@ class InterfaceTests(unittest.TestCase):
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(replies[0]["result"]["serverInfo"]["name"], "zenofcis-commons")
         self.assertIn("commons_advise", [t["name"] for t in replies[1]["result"]["tools"]])
-        advice = json.loads(replies[3]["result"]["content"][0]["text"])["advice"]
+        self.assertRegex(json.loads(replies[2]["result"]["content"][0]["text"])["id"], r"^ag-")
+        advice = json.loads(replies[4]["result"]["content"][0]["text"])["advice"]
         self.assertEqual(advice[0]["title"], "No keyed collections")
-        self.assertTrue(replies[4]["result"]["isError"])
+        self.assertTrue(replies[5]["result"]["isError"])
 
     def test_emit_hook_is_a_no_op_without_a_store_and_never_raises(self):
         code = ("import sys; sys.path.insert(0, %r); from emit import emit; "

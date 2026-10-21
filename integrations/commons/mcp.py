@@ -24,6 +24,9 @@ def schema(properties, required):
 
 
 TOOLS = [
+    ("commons_register", "Register your identity once: your server's actor name plus kind and role. Returns your hash ID. Others address you by name or ID.",
+     schema({"kind": TEXT, "role": TEXT}, [])),
+    ("commons_whoami", "Your identity, or another agent's by name or hash ID.", schema({"who": TEXT}, [])),
     ("commons_advise", "Read before acting: lessons, refutations, gaps and risks relevant to an action, plus leases on any paths named in text and your unread messages.",
      schema({"action": TEXT, "tags": NAMES, "text": TEXT}, ["action"])),
     ("commons_dashboard", "Agents and their states, active leases, record counts and your unread message count.", schema({}, [])),
@@ -35,7 +38,7 @@ TOOLS = [
     ("commons_status", "Post your lifecycle state: working (with step), blocked (with question), idle, or done (only after releasing leases).",
      schema({"state": {"type": "string", "enum": list(AGENT_STATES)}, "step": TEXT, "question": TEXT}, ["state"])),
     ("commons_agents", "Every agent's latest state and read-through message number.", schema({}, [])),
-    ("commons_send", "Send a numbered message to an agent, or '*' for everyone.", schema({"to": TEXT, "body": TEXT}, ["to", "body"])),
+    ("commons_send", "Send a numbered message to an agent by name or hash ID, or '*' for everyone.", schema({"to": TEXT, "body": TEXT}, ["to", "body"])),
     ("commons_inbox", "Your unread messages. Report 'read through N' when you report.", schema({"include_read": {"type": "boolean"}}, [])),
     ("commons_ack", "Mark your messages read through a message number.", schema({"through": {"type": "integer"}}, ["through"])),
     ("commons_record_add", "Write when you learn: add a hypothesis, claim, evidence, refutation, counterexample, result, gap, lesson, decision, question, answer, risk or note. Cite evidence in refs.",
@@ -60,6 +63,8 @@ class Bridge:
     def call(self, name: str, a: dict):
         s = self.store
         table = {
+            "commons_register": lambda: s.register("", a.get("kind", "agent"), a.get("role", "")),
+            "commons_whoami": lambda: s.identity(a.get("who", "")),
             "commons_advise": lambda: s.advise(a["action"], a.get("tags"), a.get("text", "")),
             "commons_dashboard": s.dashboard,
             "commons_lease_take": lambda: s.lease_take(a["resource"], a.get("ttl_seconds", 3600), a.get("note", "")),
@@ -91,7 +96,7 @@ class Bridge:
         if method == "initialize":
             return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
                     "serverInfo": {"name": "zenofcis-commons", "version": "0.1.0"},
-                    "instructions": "Shared state of the software factory. Read before acting (commons_advise), write when "
+                    "instructions": "Shared state of the software factory. Register once (commons_register). Read before acting (commons_advise), write when "
                                     "you learn (commons_record_add), acknowledge messages and lease what you use. "
                                     "Records cite evidence; they do not prove anything by themselves."}
         if method == "ping":

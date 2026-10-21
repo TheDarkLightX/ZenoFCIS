@@ -30,6 +30,8 @@ CONTROLS = [
     ("reimport-writes-events", "                raise _Existing()  # idempotent: same content, same id, and no event is written",
      "                return {\"seq\": seq, \"id\": record_id, \"existing\": True}",
      "CommonsTests.test_import_is_idempotent_and_writes_no_events_the_second_time"),
+    ("unregistered-writes", "        if not cursor.execute(\"SELECT 1 FROM identities WHERE name=?\", (self.actor,)).fetchone():\n            raise CommonsError(f\"{self.actor} is not registered; run register first so others can address you\")",
+     "        pass", "CommonsTests.test_unregistered_actors_cannot_coordinate_but_tools_can_emit"),
 ]
 
 
