@@ -1,0 +1,127 @@
+//! Keyed collections checked by data independence.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use zeno_fcis_contract::collections::{Limits, PREMISES, Verdict, check};
+
+const TOKENS: &str = include_str!("../../../examples/collections/token-balances/project.zeno");
+const TOKEN_RULES: &str =
+    include_str!("../../../examples/collections/token-balances/v2/policy.json");
+
+fn rules_with(edit: impl FnOnce(&mut serde_json::Value)) -> String {
+    let mut rules: serde_json::Value = serde_json::from_str(TOKEN_RULES).unwrap();
+    edit(&mut rules);
+    rules.to_string()
+}
+
+fn case(rules: &mut serde_json::Value, rule: &str) -> usize {
+    rules["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|c| c["rule"] == rule)
+        .unwrap()
+}
+
+#[test]
+fn collections_token_balances_check_over_every_admissible_view() {
+    let result = check(TOKENS, TOKEN_RULES, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    let packet = result.packet();
+    assert_eq!(packet["premises"].as_array().unwrap().len(), PREMISES.len());
+    assert_eq!(packet["key_types"][0]["positions"], 2);
+    assert_eq!(packet["key_types"][0]["patterns"], "2");
+    assert_eq!(packet["maps"][0]["capacity"], "1048576");
+    // Independent count: two key patterns. Distinct accounts: 5 x 5 views
+    // with supply >= their balances, 115 states; one account: 5 views, 29.
+    // Each of the 144 takes 2 actions x 4 amounts x 2 desks.
+    assert_eq!(packet["measured"]["admissible_views"], 2304);
+    assert_eq!(packet["measured"]["tuples"], 28_672);
+}
+
+#[test]
+fn collections_self_transfer_that_mints_is_refuted_on_the_aliased_pattern() {
+    // Credit the receiver on a transfer to oneself: with sender == receiver
+    // the account gains the amount while the supply stays put.
+    let rules = rules_with(|r| {
+        let index = case(r, "a transfer to the same account changes nothing");
+        r["cases"][index]["post"] =
+            serde_json::json!({"170": "1", "171": "receiver_balance + amount"});
+    });
+    let result = check(TOKENS, &rules, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    let found = &result.packet()["result"];
+    assert_eq!(found["obligation"], "summary delta");
+    // The witness names one account twice.
+    assert_eq!(
+        found["view"]["command.101.131"],
+        found["view"]["command.101.132"]
+    );
+}
+
+#[test]
+fn collections_aliased_entries_that_write_different_values_are_refuted() {
+    // Without the self-transfer case, a transfer to oneself writes the
+    // debit to the sender and the credit to the receiver: one account, two
+    // values.
+    let rules = rules_with(|r| {
+        let index = case(r, "a transfer to the same account changes nothing");
+        r["cases"].as_array_mut().unwrap().remove(index);
+    });
+    let result = check(TOKENS, &rules, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["obligation"], "alias merge");
+}
+
+#[test]
+fn collections_a_supply_the_rules_forget_to_raise_is_refuted() {
+    let rules = rules_with(|r| {
+        let index = case(r, "mint to the receiver");
+        r["cases"][index]["post"]["120"] = serde_json::json!("supply");
+    });
+    let result = check(TOKENS, &rules, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["obligation"], "summary delta");
+}
+
+#[test]
+fn collections_rules_use_keys_only_by_equality() {
+    for misuse in [
+        "command.101.131 < command.101.132",
+        "command.101.131 == 0",
+        "command.101.131 + 1 == command.101.132",
+    ] {
+        let rules = rules_with(|r| {
+            r["variables"]["self_transfer"] = serde_json::json!(misuse);
+        });
+        let refused = check(TOKENS, &rules, Limits::default()).unwrap_err();
+        assert!(
+            refused.reason().contains("a key is compared only"),
+            "{misuse}: {refused:?}"
+        );
+    }
+}
+
+#[test]
+fn collections_genesis_starts_with_empty_maps() {
+    let rules = rules_with(|r| r["genesis"]["160"] = serde_json::json!(1));
+    assert!(
+        check(TOKENS, &rules, Limits::default())
+            .unwrap_err()
+            .reason()
+            .contains("absent")
+    );
+    let rules = rules_with(|r| r["genesis"]["120"] = serde_json::json!(2));
+    assert!(
+        check(TOKENS, &rules, Limits::default())
+            .unwrap_err()
+            .reason()
+            .contains("summary")
+    );
+}
+
+#[test]
+fn collections_a_view_domain_beyond_the_limit_is_unknown() {
+    let result = check(TOKENS, TOKEN_RULES, Limits { max_tuples: 100 }).unwrap();
+    assert_eq!(result.verdict(), Verdict::Unknown);
+    assert!(result.packet()["claim"].is_null());
+}

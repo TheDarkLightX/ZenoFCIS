@@ -32,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 pub mod checked_composition;
+pub mod collections;
 pub mod distribution;
 #[doc(hidden)]
 pub mod internals;
