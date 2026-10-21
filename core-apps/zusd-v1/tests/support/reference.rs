@@ -6,13 +6,19 @@ pub fn lawful<T: PartialEq>(
     candidate: &Result<T, Failure>,
     reference: &Result<T, Failure>,
 ) -> bool {
-    match candidate {
-        Err(Failure::Reject(id)) => {
-            common::REASONS.contains(id) && reference.as_ref().err() == Some(&Failure::Reject(*id))
-        }
+    // A63 form: every `on reject:ID` condition is an implication, and ALL
+    // declared conditions conjoin. The independent reference row fixes F_ID;
+    // the producer's selected case supplies no predicate or eligibility fact.
+    let reasons_hold = common::REASONS.iter().all(|id| {
+        candidate.as_ref().err() != Some(&Failure::Reject(*id))
+            || reference.as_ref().err() == Some(&Failure::Reject(*id))
+    });
+    let exact_accept = match candidate {
         Ok(value) => reference.as_ref().ok() == Some(value),
-        Err(_) => false,
-    }
+        Err(Failure::Reject(id)) => common::REASONS.contains(id),
+        Err(_) => false, // E forbids technical failure; unbound rows are outside E.
+    };
+    reasons_hold && exact_accept
 }
 pub fn row<T: PartialEq + std::fmt::Debug>(
     candidate: Result<T, Failure>,
