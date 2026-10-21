@@ -49,6 +49,7 @@ sign or leading zero.
 | `framework_reject_law` | no | Nonzero ID of the [framework reject law](#framework-laws); default 909. |
 | `adoptions` | no | Written by `zeno-fcis contract adopt`; see [Adoptions](#adoptions). |
 | `evolutions` | no | Written by `zeno-fcis contract evolve`; see [Evolutions](#evolutions). |
+| `clock` | no | The context field the application server sets to the current time; see [Server clock](#server-clock). |
 | `idempotency` | no | A note for reviewers, text. Generation ignores it. |
 | `original_domain` | no | A note for reviewers, text. Generation ignores it. |
 
@@ -442,6 +443,32 @@ IDs.
   idempotency value and payload. Each `when` is computed from the inputs
   again, not taken from the decision program. Adoption relies on this law;
   see [Contract adoption](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+
+## Server clock
+
+“After day 7 the operator may refund.” A rule can read the time when the
+contract declares one context field as the server clock:
+
+```json
+"clock": {"field": 131, "unit": "days", "epoch": "2026-11-01"}
+```
+
+<!-- policy-keys: clock -->
+| Key | Value |
+|---|---|
+| `field` | A context field of integer type with a declared range, such as `type 115 int Day in 0..=14;`. |
+| `unit` | `days` or `minutes`. |
+| `epoch` | The UTC date, `YYYY-MM-DD` from 1970-01-01, at which the field counts 0. |
+
+Rules and laws read the field like any other context field, for example
+`action == 163 && context.102.131 <= 7`. The field's declared range bounds
+the time a store accepts. Because that range is already part of the finite
+input domain, `contract review`, the judges and the interface build check
+every time without change. Generation checks only the key's form; the
+application build checks that the field is a context integer with a
+declared range. The key is not part of the canonical policy, so it leaves
+the contract identity unchanged. The [build guide](BUILD_AN_APP.md#a-server-clock-for-deadlines)
+describes how the server sets the field.
 
 ## UI metadata: `ui.json`
 

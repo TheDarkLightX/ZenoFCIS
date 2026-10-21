@@ -288,7 +288,7 @@ const FAILURE_LAW: u32 = 908;
 const REJECT_LAW: u32 = 909;
 
 /// The keys a rules file may hold; `docs/CONTRACT_RULES.md` documents each.
-pub const FILE_KEYS: [&str; 15] = [
+pub const FILE_KEYS: [&str; 16] = [
     "schema",
     "template",
     "roots",
@@ -302,10 +302,14 @@ pub const FILE_KEYS: [&str; 15] = [
     "framework_reject_law",
     "adoptions",
     "evolutions",
+    // The application server's clock; checked here, it does not affect the contract.
+    "clock",
     // Reviewer notes; they do not affect the contract.
     "idempotency",
     "original_domain",
 ];
+/// The keys of `clock`.
+pub const CLOCK_KEYS: [&str; 3] = ["field", "unit", "epoch"];
 /// The keys of `roots`.
 pub const ROOT_KEYS: [&str; 3] = ["state", "command", "context"];
 /// The keys of one case; `rule` names the rule for reviewers only.
@@ -521,6 +525,9 @@ impl Rules {
             if file.optional(note).is_some() {
                 file.text(note)?;
             }
+        }
+        if file.optional("clock").is_some() {
+            check_clock(&file.object("clock")?)?;
         }
         let roots = file.object("roots")?;
         roots.only(&ROOT_KEYS)?;
@@ -1254,6 +1261,45 @@ fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, Contra
 }
 
 /// One JSON object of the rules file, with the place it was read from.
+/// The application server's clock: a context field, its unit and its epoch, a
+/// UTC date. Generation checks only this form; the application build checks
+/// that the field is a context integer with a declared range.
+fn check_clock(clock: &Object<'_>) -> Result<(), ContractError> {
+    clock.only(&CLOCK_KEYS)?;
+    clock.number::<u32>("field")?;
+    if !["days", "minutes"].contains(&clock.text("unit")?) {
+        return Err(clock.error("unit", "must be `days` or `minutes`"));
+    }
+    if !utc_date(clock.text("epoch")?) {
+        return Err(clock.error("epoch", "must be a UTC date `YYYY-MM-DD` from 1970-01-01"));
+    }
+    Ok(())
+}
+
+fn utc_date(text: &str) -> bool {
+    let number = |range: std::ops::Range<usize>| {
+        text.get(range)
+            .filter(|part| part.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|part| part.parse::<u32>().ok())
+    };
+    let (Some(year), Some(month), Some(day)) = (number(0..4), number(5..7), number(8..10)) else {
+        return false;
+    };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let last = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        1..=12 => 31,
+        _ => 0,
+    };
+    text.len() == 10
+        && text.as_bytes()[4] == b'-'
+        && text.as_bytes()[7] == b'-'
+        && year >= 1970
+        && (1..=last).contains(&day)
+}
+
 pub(super) struct Object<'j> {
     place: String,
     entries: &'j [(String, Json)],

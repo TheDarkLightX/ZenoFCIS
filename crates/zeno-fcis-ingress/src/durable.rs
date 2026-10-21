@@ -19,6 +19,9 @@ use zeno_fcis_synthesis::finite::{
     v2_composition::Raw,
 };
 
+/// Derives a new decision's context from the party's configured context.
+pub type Admit<'f> = dyn FnMut(&[u8]) -> Result<Vec<u8>, Refusal> + 'f;
+
 /// Serial shell around an immutable Authority, each configured principal's
 /// canonical context and one production terminal. Each context must express that
 /// principal's rights in the application's checked contract. The authenticated
@@ -96,7 +99,28 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
 }
 impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
     fn execute(&mut self, command: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
-        let context = match self.context(command.principal) {
+        self.execute_admitted(
+            command,
+            &mut |configured| Ok(configured.to_vec()),
+            &|configured, stored| configured == stored,
+            sink,
+        )
+    }
+}
+impl<H: Terminal> Durable<'_, '_, H> {
+    /// Execute with a context admitted for this request, such as one carrying the
+    /// server clock. The authenticated principal still selects its configured
+    /// context: `admit` derives a new decision's context from it, and `replays`
+    /// decides whether an original request's stored context belongs to it. A
+    /// replay reuses the stored decision and never calls `admit`.
+    pub fn execute_admitted(
+        &mut self,
+        command: &Command,
+        admit: &mut Admit<'_>,
+        replays: &dyn Fn(&[u8], &[u8]) -> bool,
+        sink: &mut dyn TraceSink,
+    ) -> Result<Vec<u8>, Refusal> {
+        let configured = match self.context(command.principal) {
             Some(context) if command.contract == digest(self.authority.identity()) => {
                 context.to_vec()
             }
@@ -112,7 +136,7 @@ impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
         let original = history.commits.iter().find(|entry| entry.key == key);
         let data = if let Some(entry) = original {
             if entry.publication.command != command.bytes
-                || entry.publication.context != context
+                || !replays(&configured, &entry.publication.context)
                 || Some(entry.version) != command.expected.checked_add(1)
             {
                 return Err(Refusal::Replay);
@@ -126,6 +150,7 @@ impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
             if head.version != command.expected {
                 return Err(Refusal::Conflict);
             }
+            let context = admit(&configured)?;
             match self.authority.publish(Raw {
                 state: &head.state,
                 command: &command.bytes,

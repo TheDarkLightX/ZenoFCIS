@@ -9,7 +9,8 @@
     "pre.100.113": {"label": "Refunded to buyer", "unit": "units"},
     "command.101.120": {"label": "Command", "unit": "unitless"},
     "command.101.121": {"label": "Deposit amount (used by Deposit only)", "unit": "units"},
-    "context.102": {"label": "Party", "unit": "unitless"}
+    "context.102.130": {"label": "Party", "unit": "unitless"},
+    "context.102.131": {"label": "Day", "unit": "unitless"}
   },
   "variants": {
     "150": "Open",
@@ -33,6 +34,7 @@
   },
   "reasons": {
     "200": "This party cannot take that step. The buyer deposits and releases, the seller ships, and the operator refunds.",
-    "201": "The deal is not at the right stage for that step."
+    "201": "The deal is not at the right stage for that step.",
+    "202": "The operator can refund only after day 7, the seller's shipping deadline."
   }
 }

@@ -2016,11 +2016,12 @@ fn the_rules_reference_documents_exactly_what_the_generator_reads() {
     use super::expr::{FUNCTIONS, OPERATORS};
     use super::model::required_declaration;
     use super::rules::{
-        ADOPTION_KEYS, CASE_KEYS, DELIVERY_KEYS, EVOLUTION_KEYS, FILE_KEYS, LEAVES, LawKind,
-        MIGRATION_FIELD_KEYS, MIGRATION_KEYS, ROOT_KEYS, SHORTCUT_KEYS,
+        ADOPTION_KEYS, CASE_KEYS, CLOCK_KEYS, DELIVERY_KEYS, EVOLUTION_KEYS, FILE_KEYS, LEAVES,
+        LawKind, MIGRATION_FIELD_KEYS, MIGRATION_KEYS, ROOT_KEYS, SHORTCUT_KEYS,
     };
     for (table, keys) in [
         ("file", FILE_KEYS.as_slice()),
+        ("clock", CLOCK_KEYS.as_slice()),
         ("roots", ROOT_KEYS.as_slice()),
         ("case", CASE_KEYS.as_slice()),
         ("delivery", DELIVERY_KEYS.as_slice()),

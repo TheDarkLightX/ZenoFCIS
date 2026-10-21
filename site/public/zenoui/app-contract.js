@@ -37,12 +37,14 @@ export function describe(raw, meta) {
     const options=f.domain.kind==='bool' ? [{value:'0',label:'No'},{value:'1',label:'Yes'}] : f.domain.kind==='sum'
       ? f.options.map(o=>({value:o.value,label:text(meta.variants[o.value],`UiMissingLabel:variant.${o.value}`)})) : [];
     if (!['bool','sum','int'].includes(f.domain.kind)) throw Error(`UiUnsupportedDomain:${f.path}`);
+    if (Object.hasOwn(f,'clock') && (f.clock!==true || f.source!=='context' || f.domain.kind!=='int')) throw Error(`UiInvalidClock:${f.path}`);
     const out={...f,label:text(m.label,`UiMissingLabel:${f.path}`),unit:text(m.unit,`UiMissingUnit:${f.path}`),options};
     if (!inDomain(out,out.initial)) throw Error(`UiInvalidInitial:${f.path}`);
     if (Object.hasOwn(m,'values')) out.values=valueLabels(out,m.values);
     return out;
   });
   if (Object.keys(meta.fields).some(p=>!fields.some(f=>f.path===p))) throw Error('UiUnknownFieldMetadata');
+  if (fields.filter(f=>f.clock).length>1) throw Error('UiInvalidClock');
   const action=fields.find(f=>f.path===meta.action && f.source==='command' && f.domain.kind==='sum');
   if (!action) throw Error('UiMissingCommandDiscriminator');
   const commands=action.options.map(o=>{

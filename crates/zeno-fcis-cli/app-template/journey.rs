@@ -150,14 +150,18 @@ fn scalar(v: &Value) -> i128 {
 }
 #[test]
 fn app_factory_journey() {
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    // A journey of several parties runs on one server in `parties_journey`.
+    if fixture["parties"].is_array() {
+        return;
+    }
     let root = std::env::temp_dir().join(format!("app-journey-{}", std::process::id()));
     ok(std::fs::create_dir(&root));
     let path = root.join("app.sqlite");
     let receiver = root.join("received");
     ok(application::init(&path));
-    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
-        "../app-checks/journey.json"
-    )));
     let bundle: Value = ok(serde_json::from_slice(include_bytes!("../www/app.json")));
     let mut observations = Vec::new();
     let mut all_traces = Vec::new();
@@ -468,156 +472,308 @@ fn parties_file_start_up_refusals() {
     ok(std::fs::remove_dir_all(root));
 }
 
+// A store and its parties for one test: the fixture's parties, their files and,
+// for a contract with a server clock, a clock file the test sets.
+struct Journey {
+    root: std::path::PathBuf,
+    path: std::path::PathBuf,
+    receiver: std::path::PathBuf,
+    parties: Vec<application::app::Party>,
+    fixture: Value,
+}
+impl Journey {
+    fn new(name: &str) -> Option<Self> {
+        let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+            "../app-checks/journey.json"
+        )));
+        let entries: Vec<_> = fixture["parties"]
+            .as_array()?
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p["name"].as_str().unwrap(), i, i, p["context"].clone()))
+            .collect();
+        let root = std::env::temp_dir().join(format!("app-{name}-{}", std::process::id()));
+        ok(std::fs::create_dir(&root));
+        let path = root.join("app.sqlite");
+        ok(application::init(&path));
+        let parties = ok(application::app::load_parties(&parties_file(
+            &root, &entries,
+        )));
+        Some(Self {
+            receiver: root.join("received"),
+            path,
+            root,
+            parties,
+            fixture,
+        })
+    }
+    fn clock(&self) -> Option<application::app::ServerClock> {
+        ok(application::app::ServerClock::declared(Some(
+            self.root.join("clock"),
+        )))
+    }
+    fn set_clock(&self, time: &str) {
+        ok(std::fs::write(self.root.join("clock"), time));
+    }
+    fn credential(&self, name: &str) -> String {
+        let index = self.parties.iter().position(|p| p.name == name).unwrap();
+        application::app::hex(&[u8::try_from(0x31 + index).unwrap(); 32])
+    }
+}
+impl Drop for Journey {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+// One server, as app-server binds it, over the journey's store.
+fn serve<'a, 'p>(
+    journey: &Journey,
+    lineage: &'a Lineage<'a, 'p>,
+) -> Server<Application<'a, 'p, Production<'a, 'p, FileReceiver, Clock>>, Sink> {
+    let authority = &lineage.authorities()[0];
+    let table = ok(application::app::party_contexts(
+        authority,
+        &journey.parties,
+        journey.clock().as_ref(),
+    ));
+    let production = ok(Production::open(
+        &journey.path,
+        lineage,
+        1,
+        ok(FileReceiver::new(&journey.receiver)),
+        Some(Clock::default()),
+    ));
+    let store = production.store();
+    let mut endpoint = ok(Application::with_parties(
+        lineage,
+        production,
+        store,
+        &journey.path,
+        table,
+    ));
+    if let Some(clock) = journey.clock() {
+        endpoint = ok(endpoint.with_clock(clock));
+    }
+    let config = ok(application::app::ingress_config(
+        &journey.parties,
+        RustCryptoSha256::hash(authority.identity()),
+        "http://localhost".into(),
+    ));
+    Server::new(config, endpoint, Sink::default())
+}
+fn snapshot<B: zeno_fcis_ingress::Endpoint>(
+    server: &mut Server<B, Sink>,
+    credential: &str,
+) -> (u16, Value) {
+    let (status, bytes) = exchange_as(server, "/state", credential, &[]);
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+// Preview, then send one step as its party; returns the original request and reply.
+fn send<B: zeno_fcis_ingress::Endpoint>(
+    server: &mut Server<B, Sink>,
+    journey: &Journey,
+    name: &str,
+    command: &[Value],
+    key: u8,
+) -> (u16, Value, Vec<u8>, Vec<u8>) {
+    let credential = journey.credential(name);
+    let (status, state) = snapshot(server, &credential);
+    assert_eq!(status, 200, "snapshot for {name}");
+    let contract = Hash32::new(ok(<[u8; 32]>::try_from(ok(application::app::unhex(
+        state["contract"].as_str().unwrap(),
+    )))));
+    let revision: u64 = ok(state["revision"].as_str().unwrap().parse());
+    let mut input: Vec<Value> = state["values"].as_array().unwrap().clone();
+    input.extend(command.iter().cloned());
+    input.extend(state["context"].as_array().unwrap().iter().cloned());
+    let body = encode_command(
+        contract,
+        Hash32::new([key; 32]),
+        revision,
+        &ok(serde_json::to_vec(&input)),
+    );
+    let (status, bytes) = exchange_as(server, "/preview", &credential, &body);
+    assert_eq!(status, 200, "preview for {name}");
+    let preview: Value = ok(serde_json::from_slice(&bytes));
+    let framed = ok(application::app::unhex(
+        preview["command"].as_str().unwrap(),
+    ));
+    let original = encode_command(contract, Hash32::new([key; 32]), revision, &framed);
+    let (status, bytes) = exchange_as(server, "/command", &credential, &original);
+    (status, preview["reply"].clone(), original, bytes)
+}
+
 #[test]
 fn parties_journey() {
-    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
-        "../app-checks/journey.json"
-    )));
-    let Some(parties) = fixture["parties"].as_array() else {
+    let Some(journey) = Journey::new("parties") else {
         return;
     };
-    let root = std::env::temp_dir().join(format!("app-parties-{}", std::process::id()));
-    ok(std::fs::create_dir(&root));
-    let path = root.join("app.sqlite");
-    let receiver = root.join("received");
-    ok(application::init(&path));
     let contract = v2_contract::Contract::new();
     let descriptor = contract.descriptor();
-    let authority = ok(application::authority(&descriptor));
-    let hash = RustCryptoSha256::hash(authority.identity());
-    let entries: Vec<_> = parties
-        .iter()
-        .enumerate()
-        .map(|(i, p)| (p["name"].as_str().unwrap(), i, i, p["context"].clone()))
-        .collect();
-    let loaded = ok(application::app::load_parties(&parties_file(
-        &root, &entries,
-    )));
-    let credential = |name: &str| {
-        let index = parties.iter().position(|p| p["name"] == name).unwrap();
-        application::app::hex(&[u8::try_from(0x31 + index).unwrap(); 32])
-    };
-    let steps = fixture["steps"].as_array().unwrap();
-    let first: Vec<i128> = steps[0]["command"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(scalar)
-        .collect();
-    // Each party's canonical context, framed as the server frames it.
-    let table: Vec<_> = loaded
-        .iter()
-        .map(|party| {
-            let mut input = ok(application::current(&path)).state;
-            input.extend(&first);
-            input.extend(&party.context);
-            (
-                party.principal,
-                ok(application::wire(&descriptor, &input))[2].clone(),
-            )
-        })
-        .collect();
     let catalog = ok(v2_contract::checked_catalog(&descriptor));
     let catalogs = [&catalog];
     let lineage = ok(Lineage::bind(&catalogs, &[]));
-    let serve = |table: Vec<(Hash32, Vec<u8>)>| {
-        let production = ok(Production::open(
-            &path,
-            &lineage,
-            1,
-            ok(FileReceiver::new(&receiver)),
-            Some(Clock::default()),
-        ));
-        let store = production.store();
-        let endpoint = ok(Application::with_parties(
-            &lineage, production, store, &path, table,
-        ));
-        let config = ok(application::app::ingress_config(
-            &loaded,
-            hash,
-            "http://localhost".into(),
-        ));
-        Server::new(config, endpoint, Sink::default())
-    };
     // One server process serves every party's step in turn.
-    let mut server = serve(table.clone());
+    let mut server = serve(&journey, &lineage);
     let mut accepted = Vec::new();
+    let steps = journey.fixture["steps"].as_array().unwrap().clone();
     for (index, step) in steps.iter().enumerate() {
         let name = step["party"].as_str().unwrap();
-        let party = loaded.iter().find(|p| p.name == name).unwrap();
-        let before = ok(application::current(&path));
-        let mut input = before.state.clone();
-        input.extend(step["command"].as_array().unwrap().iter().map(scalar));
-        let command = input.clone();
-        input.extend(&party.context);
-        let frames = ok(application::wire(&descriptor, &input));
-        let key = Hash32::new([u8::try_from(index + 1).unwrap(); 32]);
-        let strings: Vec<String> = input.iter().map(ToString::to_string).collect();
-        let preview_body = encode_command(
-            hash,
-            key,
-            before.head.commits,
-            &ok(serde_json::to_vec(&strings)),
-        );
-        let (status, bytes) =
-            exchange_as(&mut server, "/preview", &credential(name), &preview_body);
-        assert_eq!(status, 200);
-        let preview: Value = ok(serde_json::from_slice(&bytes));
-        assert_eq!(preview["reply"]["class"], step["class"], "step {index}");
+        if let Some(time) = step["clock"].as_str() {
+            journey.set_clock(time);
+        }
+        let before = ok(application::current(&journey.path));
+        let command = step["command"].as_array().unwrap();
+        let key = u8::try_from(index + 1).unwrap();
         // A request cannot choose another party's context.
-        for other in loaded.iter().filter(|p| p.context != party.context) {
-            let mut forged: Vec<String> = command.iter().map(ToString::to_string).collect();
-            forged.extend(other.context.iter().map(ToString::to_string));
+        let (_, own) = snapshot(&mut server, &journey.credential(name));
+        for other in journey.parties.iter().filter(|p| p.name != name) {
+            let (_, theirs) = snapshot(&mut server, &journey.credential(&other.name));
+            if theirs["context"] == own["context"] {
+                continue;
+            }
+            let mut forged: Vec<Value> = own["values"].as_array().unwrap().clone();
+            forged.extend(command.iter().cloned());
+            forged.extend(theirs["context"].as_array().unwrap().iter().cloned());
+            let contract = Hash32::new(ok(<[u8; 32]>::try_from(ok(application::app::unhex(
+                own["contract"].as_str().unwrap(),
+            )))));
             let body = encode_command(
-                hash,
-                key,
+                contract,
+                Hash32::new([key; 32]),
                 before.head.commits,
                 &ok(serde_json::to_vec(&forged)),
             );
-            let (status, _) = exchange_as(&mut server, "/preview", &credential(name), &body);
+            let (status, _) =
+                exchange_as(&mut server, "/preview", &journey.credential(name), &body);
             assert_eq!(status, 403, "a request chose another party's context");
         }
-        let original = encode_command(hash, key, before.head.commits, &frames[1]);
-        let (status, bytes) = exchange_as(&mut server, "/command", &credential(name), &original);
+        let (status, reply, original, bytes) = send(&mut server, &journey, name, command, key);
+        assert_eq!(reply["class"], step["class"], "step {index}");
         if step["class"] == "Reject" {
             assert_eq!(status, 422, "a party used another party's permission");
-            assert_eq!(ok(application::current(&path)), before);
+            assert_eq!(ok(application::current(&journey.path)), before);
         } else {
             assert_eq!(status, 200, "{}", String::from_utf8_lossy(&bytes));
-            accepted.push((name, original, bytes));
+            accepted.push((name.to_owned(), original, bytes));
         }
     }
-    let (status, _) = exchange_as(&mut server, "/state", &"ee".repeat(32), &[]);
+    let (status, _) = snapshot(&mut server, &"ee".repeat(32));
     assert_eq!(status, 401, "unknown credential admitted");
-    for party in &loaded {
-        let (status, bytes) = exchange_as(&mut server, "/state", &credential(&party.name), &[]);
+    for party in &journey.parties {
+        let (status, state) = snapshot(&mut server, &journey.credential(&party.name));
         assert_eq!(status, 200);
-        let snapshot: Value = ok(serde_json::from_slice(&bytes));
-        let context: Vec<String> = party.context.iter().map(ToString::to_string).collect();
+        let mut context: Vec<Value> = state["context"].as_array().unwrap().clone();
+        if let Some(clock) = journey.clock() {
+            context.remove(clock.position());
+        }
+        let expected: Vec<Value> = party.context.iter().map(|v| json!(v.to_string())).collect();
+        assert_eq!(context, expected, "snapshot of another party");
         assert_eq!(
-            snapshot["context"],
-            json!(context),
-            "snapshot of another party"
-        );
-        assert_eq!(
-            snapshot["principal"],
+            state["principal"],
             application::app::hex(party.principal.as_bytes())
         );
     }
     drop(server);
     // After a restart the party recovers its original packet; another party cannot.
-    let mut server = serve(table);
+    let mut server = serve(&journey, &lineage);
     let (name, original, packet) = accepted.last().unwrap();
-    let (status, bytes) = exchange_as(&mut server, "/command", &credential(name), original);
+    let (status, bytes) = exchange_as(&mut server, "/command", &journey.credential(name), original);
     assert_eq!(status, 200);
     assert_eq!(&bytes, packet, "restart changed original packet");
-    for other in loaded.iter().filter(|p| p.name != *name) {
-        let (status, _) = exchange_as(&mut server, "/command", &credential(&other.name), original);
+    for other in journey.parties.iter().filter(|p| p.name != *name) {
+        let (status, _) = exchange_as(
+            &mut server,
+            "/command",
+            &journey.credential(&other.name),
+            original,
+        );
         assert_ne!(status, 200, "another party replayed a request");
     }
-    if let Some(expected) = fixture["deliveries"].as_u64() {
-        assert_eq!(received(&receiver) as u64, expected);
+    if let Some(expected) = journey.fixture["deliveries"].as_u64() {
+        assert_eq!(received(&journey.receiver) as u64, expected);
     }
+}
+
+#[test]
+fn server_clock_journey() {
+    let Some(journey) = Journey::new("clock") else {
+        return;
+    };
+    let Some(clock) = journey.clock() else {
+        return;
+    };
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let mut server = serve(&journey, &lineage);
+    let steps = journey.fixture["steps"].as_array().unwrap().clone();
+    let mut last = None;
+    for (index, step) in steps.iter().enumerate() {
+        journey.set_clock(step["clock"].as_str().unwrap());
+        let name = step["party"].as_str().unwrap();
+        let command = step["command"].as_array().unwrap();
+        let key = u8::try_from(index + 1).unwrap();
+        let (status, reply, original, bytes) = send(&mut server, &journey, name, command, key);
+        // Every decision records the server's time, not the request's.
+        assert_eq!(
+            reply["input"][reply["input"].as_array().unwrap().len()
+                - journey.parties[0].context.len()
+                - 1
+                + clock.position()],
+            step["clock"]
+        );
+        if status == 200 {
+            last = Some((name.to_owned(), original, bytes, step["clock"].clone()));
+        }
+    }
+    let (name, original, packet, time) = last.expect("an accepted clocked step");
+    let committed: i128 = ok(time.as_str().unwrap().parse());
+    // Time moves on: the original request still returns its original decision.
+    journey.set_clock(&(committed + 1).to_string());
+    let (status, bytes) = exchange_as(
+        &mut server,
+        "/command",
+        &journey.credential(&name),
+        &original,
+    );
+    assert_eq!(status, 200, "clock read again at replay");
+    assert_eq!(bytes, packet, "clock read again at replay");
     drop(server);
-    ok(std::fs::remove_dir_all(root));
+    // After a restart the clock never goes back before the last committed time.
+    journey.set_clock("0");
+    let mut server = serve(&journey, &lineage);
+    let (status, state) = snapshot(&mut server, &journey.credential(&name));
+    assert_eq!(status, 200);
+    assert_eq!(
+        state["context"][clock.position()],
+        json!(committed.to_string()),
+        "clock went backward after a restart"
+    );
+    // A time outside the declared range is refused, never clamped.
+    let before = ok(application::current(&journey.path));
+    journey.set_clock("1000000");
+    let (status, _) = snapshot(&mut server, &journey.credential(&name));
+    assert_eq!(status, 503, "out-of-range clock clamped");
+    let body = encode_command(
+        RustCryptoSha256::hash(ok(application::authority(&descriptor)).identity()),
+        Hash32::new([0xcc; 32]),
+        before.head.commits,
+        &ok(application::app::unhex(
+            original_command(&original).as_str(),
+        )),
+    );
+    let (status, bytes) = exchange_as(&mut server, "/command", &journey.credential(&name), &body);
+    assert_eq!(status, 503, "out-of-range clock clamped");
+    assert_eq!(bytes, b"Clock");
+    assert_eq!(ok(application::current(&journey.path)), before);
+}
+// The framed command of an original request body, as hexadecimal.
+fn original_command(body: &[u8]) -> String {
+    application::app::hex(&body[73..])
 }

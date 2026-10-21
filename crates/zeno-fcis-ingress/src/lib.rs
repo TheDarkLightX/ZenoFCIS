@@ -9,7 +9,7 @@ mod http;
 mod trace;
 
 pub use assets::Asset;
-pub use durable::Durable;
+pub use durable::{Admit, Durable};
 pub use http::{Config, MAX_BODY, MAX_HEADER, MAX_PARTIES, Server, runtime};
 pub use trace::{Event, Trace, TraceSink};
 
@@ -83,6 +83,9 @@ pub enum Refusal {
     Conflict,
     /// Store or transport is unavailable, uncertain, or crashed. Retain the key.
     Unavailable,
+    /// The server clock lies outside the contract's declared range. Refused,
+    /// never wrapped or clamped into range.
+    Clock,
 }
 
 /// Shell endpoint. It may acquire and commit; decisions remain with Authority.

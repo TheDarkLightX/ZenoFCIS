@@ -2,17 +2,20 @@
 
 "An escrow app: a buyer deposits, the seller marks it shipped, then the buyer
 releases the money or the operator refunds it; money is never created or
-lost."
+lost." The operator may refund only after day 7, the seller's shipping
+deadline.
 
 ## The journey
 
 One server serves three people, each with their own credential. The buyer
-signs in and deposits 2 units. The seller signs in and marks the goods
-shipped; a refund from the seller is refused, because only the operator
-refunds. The buyer releases the money, and the seller's payout of 2 units
-is delivered. In another deal the operator refunds a funded deposit to the
-buyer before shipping. Each person sees the same deal and only the commands
-their own credential permits.
+signs in and deposits 2 units on day 1. The seller signs in and marks the
+goods shipped on day 3; a refund from the seller is refused, because only
+the operator refunds. On day 5 the operator's refund is refused: the
+deadline has not passed. On day 8 it is accepted, and the buyer's refund of
+2 units is delivered. Had the buyer released the money instead, the
+seller's payout would have been delivered. Everyone sees the same deal, and
+the contract refuses whatever their own credential does not permit. The
+server sets the day; nobody types it.
 
 ## The contract
 
@@ -23,16 +26,21 @@ and `tests/decision-examples.txt`. `parties/` holds an example parties file.
   Refunded), the units held, the units paid to the seller and the units
   refunded to the buyer. A deposit is 1 to 3 units.
 - A command is Deposit, Mark shipped, Release or Refund, with an amount that
-  only Deposit reads. The context is the party: Buyer, Seller or Operator.
+  only Deposit reads. The context is the party, Buyer, Seller or Operator,
+  and the day, 0 to 14, which the server sets as the declared
+  [server clock](../../../docs/CONTRACT_RULES.md#server-clock), counted in
+  days from the epoch 2026-11-01.
 - The rules, first match decides: the buyer deposits and releases, the
   seller marks shipped and the operator refunds (reason 200); each step
-  needs its stage (reason 201). A refund is allowed when the deal is funded
-  or shipped, so a deposit never sticks. Release pays the held units on the
+  needs its stage (reason 201); the operator refunds only after day 7
+  (reason 202). A refund is allowed when the deal is funded or shipped, so
+  a deposit never sticks. Release pays the held units on the
   seller channel; refund pays them on the buyer channel.
 - The laws: each stage holds exactly the money it should; money is
   conserved, and only a deposit adds to the total; the right party takes
-  each step; and every unit paid out is an actual delivery on that payee's
-  channel, with at most one delivery per decision.
+  each step; the operator refunds only after day 7; and every unit paid out
+  is an actual delivery on that payee's channel, with at most one delivery
+  per decision.
 
 ## Check and build
 
@@ -48,12 +56,13 @@ target/debug/zeno-fcis contract lemma examples/apps/escrow-deal \
 target/debug/zeno-fcis new escrow-deal --contract examples/apps/escrow-deal --app
 ```
 
-The review enumerates all 11,520 inputs: the 10 examples agree with the
-contract, no law refuses a decision from a lawful state, and 98 of 107 rule
-mutants are distinguished. The lemma judge finds both lemmas, never paid and
+The review enumerates all 172,800 inputs, every day included: the 13
+examples agree with the contract, no law refuses a decision from a lawful
+state, and 107 of 118 rule mutants are distinguished. The lemma judge finds both lemmas, never paid and
 refunded and never more than 3 units, inductive over the declared domain.
 `tools/check_app_factory.py --tcp` runs the three-party journey in
-`test-data/app-journeys/escrow-deal.json` on one server.
+`test-data/app-journeys/escrow-deal.json` on one server, with a test clock,
+and `tools/check_app_controls.py` plants the clock defects its tests catch.
 
 ## Run with three parties
 
@@ -71,8 +80,15 @@ fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, "w") as stream:
     stream.write(secrets.token_hex(32) + "\n")' "run/$name.credential"
 done
-ZENO_APP_PARTIES=run/parties.json cargo +1.97.1 run --locked --offline --bin app-server
+echo 1 > run/day
+ZENO_APP_PARTIES=run/parties.json ZENO_APP_CLOCK_FILE=run/day \
+  cargo +1.97.1 run --locked --offline --bin app-server
 ```
+
+`ZENO_APP_CLOCK_FILE` sets the day for trying the example; write another
+number to the file to move it. Without it the server counts days from the
+epoch by its system clock, so after 2026-11-15 every new request is refused
+with `Clock`.
 
 Adjust the `cp` source to where your checkout is. Give each person their own
 credential. The credential a request presents selects that party's
@@ -82,8 +98,8 @@ describes the parties file and the HTTP API.
 
 ## Scope
 
-- One deal per store, with small amounts, so the review can enumerate every
-  input. There are no time-outs: the operator refunds when asked.
+- One deal per store, with small amounts and a two-week day range, so the
+  review can enumerate every input.
 - Deliveries go to the example file receiver, which keeps each payload with
   an envelope naming its destination, `seller` or `buyer`. Paying anyone
   needs a reviewed transport, and a successful delivery does not show that a

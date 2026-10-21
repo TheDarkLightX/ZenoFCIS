@@ -263,7 +263,7 @@ fn result_response(
                 Refusal::Size => StatusCode::PAYLOAD_TOO_LARGE,
                 Refusal::Replay | Refusal::Conflict => StatusCode::CONFLICT,
                 Refusal::Decision => StatusCode::UNPROCESSABLE_ENTITY,
-                Refusal::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+                Refusal::Unavailable | Refusal::Clock => StatusCode::SERVICE_UNAVAILABLE,
                 Refusal::Malformed => StatusCode::BAD_REQUEST,
             },
             format!("{error:?}").into_bytes(),

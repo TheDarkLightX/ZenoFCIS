@@ -51,3 +51,22 @@ test('contract_guide_documents_exactly_the_metadata_keys',async()=>{
  assert.deepEqual(keys(tables[1]),['label','unit','values']);
  assert.deepEqual(keys(tables[2]),['label','consequential']);
 });
+test('a_server_clock_field_is_checked_and_left_out_of_reply_matching',async()=>{
+ const {validReply}=await import('../public/zenoui/app-state.js');
+ const raw=clock=>({fields:[
+  {path:'pre.100.110',source:'state',index:0,domain:{kind:'int',min:'0',max:'3'},options:[],initial:'0'},
+  {path:'command.101',source:'command',index:1,domain:{kind:'sum',type_id:101,variants:[120]},options:[{value:'120'}],initial:'120'},
+  {path:'context.102.131',source:'context',index:2,domain:{kind:'int',min:'0',max:'14'},options:[],initial:'0',...clock}],
+  reasons:[],enablement:{table:[false,false,false,true]},domain:'60'});
+ const meta={format:'zenoui/metadata/1',title:'Deadline',action:'command.101',
+  fields:{'pre.100.110':{label:'Count',unit:'items'},'command.101':{label:'Command',unit:'unitless'},'context.102.131':{label:'Day',unit:'unitless'}},
+  variants:{'120':'Add'},commands:{'120':{label:'Add',consequential:true}},reasons:{}};
+ const clocked=describe(raw({clock:true}),meta),plain=describe(raw({}),meta);
+ const reply=day=>({input:['0','120',day],class:'Accept',reason:null,post:['1'],checked:'1',total:'1'});
+ assert.ok(validReply(clocked,['0','120','3'],reply('5')),'the server sets the clock');
+ assert.equal(validReply(plain,['0','120','3'],reply('5')),false,'other context values must match');
+ assert.equal(validReply(clocked,['1','120','3'],reply('5')),false,'other inputs must match');
+ for(const bad of [{clock:false},{clock:'yes'}])assert.throws(()=>describe(raw(bad),meta),/UiInvalidClock/);
+ const onState=raw({});onState.fields[0].clock=true;
+ assert.throws(()=>describe(onState,meta),/UiInvalidClock/);
+});

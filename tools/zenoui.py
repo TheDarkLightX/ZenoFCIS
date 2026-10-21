@@ -80,6 +80,13 @@ def main():
         raise ValueError("UiMissingMetadata:ui.json")
     json.loads(metadata.read_text(), object_pairs_hook=unique)
     raw = json.loads(run([args.oracle.resolve(), project], capture_output=True, text=True).stdout)
+    # The server sets a declared clock field; the interface compares replies without it.
+    clock = json.loads((project / "v2/policy.json").read_text(), object_pairs_hook=unique).get("clock")
+    if clock is not None:
+        marked = [f for f in raw["descriptor"]["fields"] if f["path"] == f"context.102.{clock['field']}"]
+        if len(marked) != 1 or marked[0]["source"] != "context" or marked[0]["domain"]["kind"] != "int":
+            raise ValueError("UiClockField")
+        marked[0]["clock"] = True
     name = project.name
     with tempfile.TemporaryDirectory(prefix="zenoui-") as temporary:
         work = Path(temporary)

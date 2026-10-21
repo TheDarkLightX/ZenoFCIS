@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Plant each generated-application defect, check its named test fails, then restore.
+
+Run it on the escrow example built with `zeno-fcis new ... --contract
+examples/apps/escrow-deal --app`. The application is copied first, so the
+built application is never changed. Default execution uses real loopback;
+--memory selects the socket-free harness.
+"""
+from __future__ import annotations
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+APP = "src/app.rs"
+CONTROLS = [
+    ("clock-read-at-replay", "server_clock_journey", "clock read again at replay",
+     "&|configured, stored| same_party(authority, clock, configured, stored),",
+     "&|configured, stored| admit(authority, clock, last, configured).is_ok_and(|now| now == stored),"),
+    ("clock-backward-after-restart", "server_clock_journey", "clock went backward after a restart",
+     "for commit in &history.commits {", "for commit in history.commits.iter().take(0) {"),
+    ("clock-clamped", "server_clock_journey", "out-of-range clock clamped",
+     "if time < self.range.0 || time > self.range.1 {",
+     "let time = time.clamp(self.range.0, self.range.1);\n        if false {"),
+]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--app", type=Path, required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--memory", action="store_true")
+    parser.add_argument("--only", action="append", default=[])
+    args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, CARGO_NET_OFFLINE="true")
+    if args.memory:
+        env.pop("APP_JOURNEY_TCP", None)
+    else:
+        env["APP_JOURNEY_TCP"] = "1"
+    cargo = ["cargo", "+1.97.1", "test", "--offline", "--locked", "--all-features", "--test", "app_journey"]
+    rows = []
+
+    def run(root, command, label):
+        result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=900)
+        log = result.stdout + result.stderr
+        args.out.with_name(label + ".log").write_text(log)
+        return result.returncode, log
+
+    with tempfile.TemporaryDirectory(prefix="app-controls-") as directory:
+        app = Path(directory) / "app"
+        shutil.copytree(args.app, app, ignore=shutil.ignore_patterns("target"))
+        for name, test, marker, before, after in CONTROLS:
+            if args.only and name not in args.only:
+                continue
+            check = cargo + [test, "--", "--exact", "--nocapture"]
+            code, log = run(app, check, name + "-baseline-before")
+            if code or "1 passed" not in log:
+                raise RuntimeError(f"baseline failed: {name}")
+            target = app / APP
+            original = target.read_text()
+            if original.count(before) != 1:
+                raise RuntimeError(f"nonunique mutation anchor: {name}")
+            target.write_text(original.replace(before, after))
+            build, _ = run(app, cargo + ["--no-run"], name + "-build")
+            code, log = run(app, check, name + "-mutant")
+            target.write_text(original)
+            restored, baseline = run(app, check, name + "-baseline-after")
+            killed = code == 101 and marker in log and "test result: FAILED" in log
+            row = dict(control=name, check=test, marker=marker, build=build, mutant=code, baseline=restored,
+                       killed=killed, transport="memory" if args.memory else "loopback")
+            rows.append(row)
+            args.out.write_text(json.dumps(rows, indent=2) + "\n")
+            print(json.dumps(row), flush=True)
+            if build or not killed or restored or "1 passed" not in baseline:
+                raise RuntimeError(f"control did not meet build/fail/baseline obligation: {name}")
+    print(f"app controls: PASS ({len(rows)} compiled mutants; named failures; restored baselines)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

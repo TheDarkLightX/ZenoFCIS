@@ -181,6 +181,45 @@ start-up, so adding or rotating one needs a restart. There is no rate limit
 or lockout. The all-entry comparison is a reviewed source form checked by
 `tools/check_ingress.py`, not a timing proof of the compiled code.
 
+## A server clock for deadlines
+
+“The operator may refund a deal only after day 7, the seller's shipping
+deadline.”
+
+The buyer deposits on day 1 and the seller ships on day 3. On day 5 the
+operator's refund is refused with the deadline's reason; on day 8 the same
+refund is accepted and the buyer's refund is delivered. Nobody types the
+day: the server sets it. The
+[escrow example](../examples/apps/escrow-deal/README.md) runs this journey.
+
+The contract declares one context field as the [server
+clock](CONTRACT_RULES.md#server-clock), with a unit, days or minutes, and an
+epoch date. Its declared range, such as `0..=14`, bounds the times the store
+accepts. Context files and the parties file's contexts omit the clock field.
+
+When the server admits a new request, it sets the field to the current time
+in those units since the epoch, but never earlier than the latest time a
+committed decision recorded, including after a restart. The committed
+context records that time. A time outside the declared range is refused
+with status 503 and the body `Clock`; it is never wrapped or clamped. A
+replay of an original request returns its original decision even after the
+time has moved on: the server compares the stored context with the party's
+own, apart from the time, and never reads the clock again. `/state` and
+`/preview` report the time the server would use now; the interface compares
+replies without the clock field, since the server, not the request, sets it.
+Because the field's whole range is already in the contract's finite input
+domain, `contract review`, the judges and the interface build check every
+time without any change.
+
+`ZENO_APP_CLOCK_FILE` names a file holding the current time in the clock's
+units, read at every admission. It is a test and operator tool, not a
+security boundary: whoever controls the server's configuration or system
+time controls the clock. The clock has a single time zone, UTC. A preview is
+advice: when the time changes between a preview and its command, the
+command is decided at the new time. After the range's upper bound the store
+refuses every new request, so choose the range and epoch for the
+deployment's lifetime.
+
 ## HTTP API
 
 The browser interface uses these endpoints, and any client can call them.
@@ -212,7 +251,8 @@ unknown credential; 403 another origin, contract or context; 409 the store
 moved past the expected revision, or the key already names a different
 request; 413 too large; 422 the contract refused the command (a preview
 shows its reason); 503 storage or delivery is uncertain, so retry the same
-body. An error reply's body is the refusal's name, such as `Credential`.
+body, or, with the body `Clock`, the server clock is outside the contract's
+range. An error reply's body is the refusal's name, such as `Credential`.
 
 After a lost reply, send the identical body with the same credential: the
 server returns the original packet. A changed body under the same key is

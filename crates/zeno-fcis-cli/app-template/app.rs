@@ -109,13 +109,160 @@ fn decision(
         json!({"input":strings(&input),"class":format!("{:?}",candidate.class()),"reason":candidate.reason().map(|v|v.to_string()),"post":strings(&post),"checked":"1","total":"1"}),
     )
 }
+/// The server clock: one context field the server sets at admission, counted
+/// in days or minutes since a UTC epoch date, within the field's declared range.
+pub struct ServerClock {
+    position: usize,
+    unit: i128,
+    epoch: i128,
+    range: (i128, i128),
+    source: Option<PathBuf>,
+}
+impl ServerClock {
+    /// The clock `v2/policy.json` declares, if any. `source` names a file holding
+    /// the current time in the clock's units, a test and operator tool read at
+    /// every admission; without it the server reads the system time.
+    pub fn declared(source: Option<PathBuf>) -> AppResult<Option<Self>> {
+        let policy: Value = serde_json::from_slice(include_bytes!("../v2/policy.json"))
+            .map_err(|_| "policy encoding")?;
+        let Some(clock) = policy.get("clock") else {
+            return Ok(None);
+        };
+        let bundle: Value =
+            serde_json::from_slice(include_bytes!("../www/app.json")).map_err(|_| "UI bundle")?;
+        let fields = bundle["description"]["fields"]
+            .as_array()
+            .ok_or("UI fields")?;
+        let context: Vec<&Value> = fields.iter().filter(|f| f["source"] == "context").collect();
+        let position = context
+            .iter()
+            .position(|f| f["field"] == clock["field"] && f["domain"]["kind"] == "int")
+            .ok_or("the clock field must be an integer context field")?;
+        let bound = |key: &str| {
+            context[position]["domain"][key]
+                .as_str()
+                .and_then(|text| text.parse::<i128>().ok())
+                .ok_or("clock range")
+        };
+        let unit = match clock["unit"].as_str() {
+            Some("days") => 86_400,
+            Some("minutes") => 60,
+            _ => return Err("clock unit".into()),
+        };
+        let epoch = clock["epoch"].as_str().ok_or("clock epoch")?;
+        let date = |range: std::ops::Range<usize>| {
+            epoch
+                .get(range)
+                .and_then(|part| part.parse::<i128>().ok())
+                .ok_or("clock epoch")
+        };
+        let (year, month, day) = (date(0..4)?, date(5..7)?, date(8..10)?);
+        // Days from 1970-01-01 to a proleptic Gregorian date.
+        let shifted = if month <= 2 { year - 1 } else { year };
+        let era = shifted.div_euclid(400);
+        let of_era = shifted - era * 400;
+        let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+        let of_cycle = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+        Ok(Some(Self {
+            position,
+            unit,
+            epoch: (era * 146_097 + of_cycle - 719_468) * 86_400,
+            range: (bound("min")?, bound("max")?),
+            source,
+        }))
+    }
+    /// Index of the clock among the context values.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+    fn now(&self) -> Result<i128, Refusal> {
+        match &self.source {
+            Some(file) => std::str::from_utf8(&bounded(file).map_err(|_| Refusal::Unavailable)?)
+                .ok()
+                .and_then(|text| text.trim().parse::<i128>().ok())
+                .ok_or(Refusal::Unavailable),
+            None => {
+                let seconds = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| Refusal::Unavailable)?
+                    .as_secs();
+                Ok((i128::from(seconds) - self.epoch).div_euclid(self.unit))
+            }
+        }
+    }
+    // Never earlier than the last committed time; refused outside the range.
+    fn admitted(&self, last: Option<i128>) -> Result<i128, Refusal> {
+        let time = self.now()?.max(last.unwrap_or(i128::MIN));
+        if time < self.range.0 || time > self.range.1 {
+            return Err(Refusal::Clock);
+        }
+        Ok(time)
+    }
+}
+fn context_numbers(authority: &Authority<'_>, context: &[u8]) -> Result<Vec<i128>, Refusal> {
+    crate::session::root_numbers(authority.descriptor().context, context).map_err(failed)
+}
+fn clock_of(
+    authority: &Authority<'_>,
+    clock: &ServerClock,
+    context: &[u8],
+) -> Result<i128, Refusal> {
+    context_numbers(authority, context)?
+        .get(clock.position)
+        .copied()
+        .ok_or(Refusal::Binding)
+}
+// The configured context with its clock field set to `time`.
+fn context_at(
+    authority: &Authority<'_>,
+    clock: &ServerClock,
+    configured: &[u8],
+    time: i128,
+) -> Result<Vec<u8>, Refusal> {
+    let mut values = context_numbers(authority, configured)?;
+    *values.get_mut(clock.position).ok_or(Refusal::Binding)? = time;
+    let value =
+        crate::root_value(authority.descriptor().context, &values).map_err(|_| Refusal::Binding)?;
+    crate::frame(&crate::v2_contract::FRAMING.context, value).map_err(|_| Refusal::Binding)
+}
+// The context a new request is decided with: the clock is read now, never earlier
+// than the last committed time.
+fn admit(
+    authority: &Authority<'_>,
+    clock: Option<&ServerClock>,
+    last: Option<i128>,
+    configured: &[u8],
+) -> Result<Vec<u8>, Refusal> {
+    match clock {
+        Some(clock) => context_at(authority, clock, configured, clock.admitted(last)?),
+        None => Ok(configured.to_vec()),
+    }
+}
+// A context belongs to the party when it is the configured one, apart from the
+// clock time it records.
+fn same_party(
+    authority: &Authority<'_>,
+    clock: Option<&ServerClock>,
+    configured: &[u8],
+    stored: &[u8],
+) -> bool {
+    match clock {
+        Some(clock) => clock_of(authority, clock, stored)
+            .and_then(|time| context_at(authority, clock, configured, time))
+            .is_ok_and(|expected| expected == stored),
+        None => configured == stored,
+    }
+}
 /// Exclusive shell endpoint. The authenticated principal alone selects its copied
-/// context; HTTP cannot select one.
+/// context; HTTP cannot select one. With a server clock, the server sets that
+/// context's clock field when it admits a new request.
 pub struct Application<'a, 'p, H> {
     durable: Durable<'a, 'p, H>,
     authority: &'a Authority<'p>,
     lineage: &'a Lineage<'a, 'p>,
     path: PathBuf,
+    clock: Option<ServerClock>,
+    last: Option<i128>,
 }
 impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
     /// Bind the immutable configuration and the exclusive terminal once.
@@ -149,7 +296,24 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
             authority,
             lineage,
             path: path.to_owned(),
+            clock: None,
+            last: None,
         })
+    }
+    /// Set the clock field at admission. The latest committed time, read back
+    /// from the store's audited history, is the earliest time admitted after a
+    /// restart.
+    pub fn with_clock(mut self, clock: ServerClock) -> Result<Self, Refusal> {
+        let history = self
+            .lineage
+            .audit_history_read_only(&self.path)
+            .map_err(failed)?;
+        for commit in &history.commits {
+            let time = clock_of(self.authority, &clock, &commit.context)?;
+            self.last = Some(self.last.map_or(time, |last| last.max(time)));
+        }
+        self.clock = Some(clock);
+        Ok(self)
     }
     /// Return the exclusively owned terminal for restart and test inspection.
     pub fn into_terminal(self) -> H {
@@ -158,11 +322,8 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
 }
 impl<H: Terminal> Endpoint for Application<'_, '_, H> {
     fn snapshot(&mut self, principal: Hash32) -> Result<Vec<u8>, Refusal> {
-        let context = self
-            .durable
-            .context(principal)
-            .ok_or(Refusal::Binding)?
-            .to_vec();
+        let configured = self.durable.context(principal).ok_or(Refusal::Binding)?;
+        let context = admit(self.authority, self.clock.as_ref(), self.last, configured)?;
         let history = self
             .lineage
             .audit_history_read_only(&self.path)
@@ -172,14 +333,13 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
             history.snapshot.state(),
         )
         .map_err(failed)?;
-        let context = crate::session::root_numbers(self.authority.descriptor().context, &context)
-            .map_err(failed)?;
+        let context = context_numbers(self.authority, &context)?;
         encoded(
             json!({"contract":hex(RustCryptoSha256::hash(self.authority.identity()).as_bytes()),"principal":hex(principal.as_bytes()),"revision":history.snapshot.version().to_string(),"values":strings(&values),"context":strings(&context),"pending":history.snapshot.pending().to_string()}),
         )
     }
     fn preview(&mut self, request: &Command) -> Result<Vec<u8>, Refusal> {
-        let context = self
+        let configured = self
             .durable
             .context(request.principal())
             .ok_or(Refusal::Binding)?
@@ -194,17 +354,28 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
         let values: Value =
             serde_json::from_slice(request.bytes()).map_err(|_| Refusal::Malformed)?;
         let inputs = numbers(&values)?;
-        let frames =
+        let mut frames =
             crate::wire(self.authority.descriptor(), &inputs).map_err(|_| Refusal::Malformed)?;
-        if frames[0] != history.snapshot.state() || frames[2] != context {
+        let clock = self.clock.as_ref();
+        if frames[0] != history.snapshot.state()
+            || !same_party(self.authority, clock, &configured, &frames[2])
+        {
             return Err(Refusal::Binding);
         }
+        // The server, not the request, sets the clock.
+        frames[2] = admit(self.authority, clock, self.last, &configured)?;
         encoded(
-            json!({"reply":decision(self.authority, &frames[0], &frames[1], &context)?,"command":hex(&frames[1])}),
+            json!({"reply":decision(self.authority, &frames[0], &frames[1], &frames[2])?,"command":hex(&frames[1])}),
         )
     }
     fn execute(&mut self, request: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
-        let packet = self.durable.execute(request, sink)?;
+        let (authority, clock, last) = (self.authority, self.clock.as_ref(), self.last);
+        let packet = self.durable.execute_admitted(
+            request,
+            &mut |configured| admit(authority, clock, last, configured),
+            &|configured, stored| same_party(authority, clock, configured, stored),
+            sink,
+        )?;
         let history = self
             .lineage
             .audit_history_read_only(&self.path)
@@ -214,6 +385,10 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
             .iter()
             .find(|entry| entry.replay_id == request.replay_key())
             .ok_or(Refusal::Binding)?;
+        if let Some(clock) = &self.clock {
+            let time = clock_of(self.authority, clock, &original.context)?;
+            self.last = Some(self.last.map_or(time, |last| last.max(time)));
+        }
         encoded(
             json!({"packet":hex(&packet),"revision":original.sequence.to_string(),"reply":decision(self.authority, &original.prestate, &original.command, &original.context)?}),
         )
@@ -458,6 +633,34 @@ pub fn load_parties(path: &Path) -> AppResult<Vec<Party>> {
     }
     Ok(parties)
 }
+/// Each party's principal and canonical configured context. With a server clock,
+/// a party's context values omit the clock field, which holds the range's lower
+/// bound until admission sets it.
+pub fn party_contexts(
+    authority: &Authority<'_>,
+    parties: &[Party],
+    clock: Option<&ServerClock>,
+) -> AppResult<Vec<(Hash32, Vec<u8>)>> {
+    let schema = authority.descriptor().context;
+    let mut table = Vec::new();
+    for party in parties {
+        let mut context = party.context.clone();
+        if let Some(clock) = clock {
+            if clock.position > context.len() {
+                return Err(format!("party {}: context width", party.name));
+            }
+            context.insert(clock.position, clock.range.0);
+        }
+        if context.len() != crate::width(schema)? {
+            return Err(format!("party {}: context width", party.name));
+        }
+        let framed = crate::root_value(schema, &context)
+            .and_then(|value| crate::frame(&crate::v2_contract::FRAMING.context, value))
+            .map_err(|_| format!("party {}: context outside its declared domain", party.name))?;
+        table.push((party.principal, framed));
+    }
+    Ok(table)
+}
 /// The ingress configuration for these parties at a loopback origin.
 pub fn ingress_config(parties: &[Party], contract: Hash32, origin: String) -> AppResult<Config> {
     Config::with_parties(
@@ -525,37 +728,9 @@ pub fn run() -> AppResult<()> {
             };
             drop(V2SqliteShell::create(&path, authority, genesis).map_err(|_| "create store")?);
         }
-        let bundle: Value =
-            serde_json::from_slice(include_bytes!("../www/app.json")).map_err(|_| "UI bundle")?;
-        let fields = bundle["description"]["fields"]
-            .as_array()
-            .ok_or("UI fields")?;
-        let mut input = Vec::new();
-        for f in fields {
-            input.push(
-                f["initial"]
-                    .as_str()
-                    .ok_or("initial field")?
-                    .parse::<i128>()
-                    .map_err(|_| "initial number")?,
-            );
-        }
-        let context_width = fields.iter().filter(|f| f["source"] == "context").count();
-        if context_width > input.len() {
-            return Err("context width".into());
-        }
-        let offset = input.len() - context_width;
-        let mut table = Vec::new();
-        for party in &parties {
-            if party.context.len() != context_width {
-                return Err(format!("party {}: context width", party.name));
-            }
-            input[offset..].copy_from_slice(&party.context);
-            let framed = crate::wire(authority.descriptor(), &input).map_err(|_| {
-                format!("party {}: context outside its declared domain", party.name)
-            })?;
-            table.push((party.principal, framed[2].clone()));
-        }
+        let clock =
+            ServerClock::declared(std::env::var_os("ZENO_APP_CLOCK_FILE").map(PathBuf::from))?;
+        let table = party_contexts(authority, &parties, clock.as_ref())?;
         let production = Production::open(
             &path,
             lineage,
@@ -565,8 +740,13 @@ pub fn run() -> AppResult<()> {
         )
         .map_err(|_| "open store")?;
         let store = production.store();
-        let endpoint = Application::with_parties(lineage, production, store, &path, table)
+        let mut endpoint = Application::with_parties(lineage, production, store, &path, table)
             .map_err(|_| "bind shell")?;
+        if let Some(clock) = clock {
+            endpoint = endpoint
+                .with_clock(clock)
+                .map_err(|_| "read the clock history")?;
+        }
         let config = ingress_config(
             &parties,
             RustCryptoSha256::hash(authority.identity()),

@@ -19,8 +19,10 @@ function binding(s,id) {
     shown:s.app.fields.map((f,i)=>({label:f.label,type:f.type_name,unit:f.unit,value:input[i]}))};
 }
 function same(a,b) { return canonical(a)===canonical(b); }
+// The server sets a clock field, so replies are compared without it.
+const unclocked=(app,input)=>Array.isArray(input)?input.map((v,i)=>app.fields[i]?.clock?null:v):input;
 export function validReply(app, input, reply) {
-  if(!reply||!same(reply.input,input)||reply.checked!=='1'||reply.total!=='1'||!['Accept','Reject','CommittedFailure','Refused'].includes(reply.class)) return false;
+  if(!reply||!same(unclocked(app,reply.input),unclocked(app,input))||reply.checked!=='1'||reply.total!=='1'||!['Accept','Reject','CommittedFailure','Refused'].includes(reply.class)) return false;
   if(!Array.isArray(reply.post))return false;
   if(reply.class==='Accept' && reply.reason!==null)return false;
   if(['Reject','CommittedFailure'].includes(reply.class) && !app.reasons.some(r=>r.id===reply.reason))return false;
