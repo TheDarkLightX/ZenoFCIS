@@ -182,23 +182,37 @@ export function mountFactory(root) {
       try {
         const event=data.error?{type:'Fail',identity:data.identity,ordinal:data.ordinal,message:data.error}:data.detail?{type:'CellResult',identity:data.identity,ordinal:data.ordinal,result:data.detail}:data.result?{type:'Result',identity:data.identity,result:data.result,elapsed:data.elapsed}:{type:'Progress',identity:data.identity,progress:data.progress,candidate:data.candidate};
         dispatch(event);
-      }catch(error){dispatch({type:'Fail',identity:data.identity,message:error.message});}
+      }catch(error){dispatch({type:'Fail',identity:data.identity,ordinal:data.ordinal,message:error.message});}
     };
     worker.onerror=()=>dispatch({type:'Fail',identity:{...state.identity,epoch:connectionEpoch},message:'The worker could not run. Reload and try again.'});
+  }
+  // Drop everything a reply drew before its drawing failed.
+  function discard(act) {
+    if(act==='inventory'){inventoryGrid?.dispose();inventoryGrid=null;gridTask=null;selectedPanel=null;}
+    resetRegions(act).instrument.replaceChildren(element('p','help','This result could not be shown, so nothing from it is claimed.'));
   }
   function dispatch(event) {
     const before=state,result=step(state,event);
     if(result.state===before)return false;
     state=result.state;
-    paint(result.view,event);
+    // A stopped run settles before painting, so a drawing error cannot keep it alive.
+    if((event.type==='Fail'&&event.ordinal===undefined)||event.type==='Cancel') {
+      if(pending){clearTimeout(pending.timer);pending.reject(new Error(event.message??'Cancelled'));pending=null;}
+      worker?.terminate();worker=null;
+    }
+    try{paint(result.view,event);}
+    catch(error){
+      // A reply the reducer admitted but the page cannot draw is not admitted: fail its run or cell instead.
+      if(!['Progress','Result','CellResult'].includes(event.type))throw error;
+      state=before;
+      if(event.type!=='CellResult')discard(before.act);
+      dispatch({type:'Fail',identity:event.identity,ordinal:event.ordinal,message:event.type==='CellResult'?'The page could not show this decision':'The page could not show this result, so none is claimed'});
+      return true;
+    }
     if(event.type==='Result'&&pending) {
       clearTimeout(pending.timer);const task=pending;pending=null;
       const detail={identity:state.identity,result:result.view.tasks[state.act].result,elapsed:result.view.tasks[state.act].elapsed};
       root.dispatchEvent(new CustomEvent('factory-result',{detail}));task.resolve(detail);
-    }
-    if((event.type==='Fail'&&event.ordinal===undefined)||event.type==='Cancel') {
-      if(pending){clearTimeout(pending.timer);pending.reject(new Error(event.message??'Cancelled'));pending=null;}
-      worker?.terminate();worker=null;
     }
     for(const intent of result.intents) {
       if(intent.kind==='cancel')continue;

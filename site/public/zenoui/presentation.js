@@ -34,6 +34,10 @@ const next=x=>(BigInt(x)+1n).toString();
 // Frozen domains of the shipped factory, independent of producer-supplied counts.
 const TOTALS=Object.freeze({synthesis:6144,inventory:864,search:16,money:1});
 const MONEY_FIELDS=Object.freeze(['amount','fee_bps','reserve_in','reserve_out']);
+const CLASSES=Object.freeze(['Accept','Reject','CommittedFailure','Refused']);
+const text=x=>typeof x==='string'&&x.length>0;
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const plain=x=>{try{return typeof JSON.stringify(x)==='string';}catch{return false;}};
 function own(x) { return structuredClone(x); }
 function freeze(x) { if(x && typeof x==='object'&&!Object.isFrozen(x)){Object.values(x).forEach(freeze);Object.freeze(x);}return x; }
 export function sameIdentity(a,b) {return !!a&&!!b&&['epoch','run','request'].every(k=>id(a[k])&&a[k]===b[k]);}
@@ -64,10 +68,12 @@ export function initial(epoch='0',preferences={motion:'reduce',theme:'light',wid
 function sequence(values,length) {return Array.isArray(values)&&values.length===length&&Array.from(values).every(value=>value!==undefined);}
 function validateResult(act,r,task) {
   if(!r||r.act!==act)throw new Error('Result belongs to another act');
+  if(!plain(r))throw new Error('Result is not a plain technical record');
   if(act==='money'){
     if(!sequence(r.input,4)||!sequence(r.outputs,6)||typeof r.outputs[5]!=='boolean'||!sequence(r.overflow?.input,4))throw new Error('Invalid money result');
     for(const v of [...r.input,...r.outputs.slice(0,5),...r.overflow.input])if(typeof v!=='string'||!/^(0|[1-9][0-9]*)$/.test(v))throw new Error('Wide integer must be a decimal string');
     if(r.input.some((value,i)=>value!==task.submitted[MONEY_FIELDS[i]]))throw new Error('Money result belongs to another request');
+    if(!integer(r.overflow.steps))throw new Error('Invalid money result');
     return evidence(1,1,false); // A tuple and a probe never establish a domain theorem.
   }
   const total=TOTALS[act];
@@ -85,7 +91,17 @@ function validateResult(act,r,task) {
       const ordinal=(((available*6+reserved)*4+action-150)*3+quantity-1)*2+authorized;
       return c.ordinal!==i||ordinal!==i||typeof c.different!=='boolean';
     }))throw new Error('Unordered or incomplete result grid coverage');
-    if(r.grid.cells.filter(c=>c.different).length!==r.differences)throw new Error('Grid counts disagree');
+    const cells=r.grid.cells;
+    if(cells.some(c=>!CLASSES.includes(c.class)||!CLASSES.includes(c.mutant_class)))throw new Error('Unknown inventory decision class');
+    if(cells.some(c=>c.class!==c.mutant_class&&!c.different))throw new Error('A changed decision is not marked as a difference');
+    if(cells.filter(c=>c.different).length!==r.differences||(r.mutant==='none'&&r.differences!==0))throw new Error('Grid counts disagree');
+    if(cells.filter(c=>c.mutant_class!=='Refused').length!==r.mutant_passed||cells.filter(c=>c.class!=='Refused').length!==r.passed)throw new Error('Passing counts disagree with the grid');
+    // The ringed cell is the one the review's witness names, and it is a difference; neither exists without one.
+    const first=r.grid.first_ordinal,w=r.first_difference,decision=d=>{const {laws,...rest}=d??{};return JSON.stringify(rest);};
+    if(r.differences===0?first!==null||w!==null||r.status!=='equivalent over the full domain':r.status!=='distinguished'||!integer(first,total-1)||!w)throw new Error('Difference witness disagrees with the grid');
+    if(first!==null&&(!cells[first].different||!same(w.input,cells[first].input)||w.original?.class!==cells[first].class||w.mutant?.class!==cells[first].mutant_class||decision(w.original)===decision(w.mutant)))throw new Error('The ringed cell is not the witnessed difference');
+    const names=r.names;
+    if(!sequence(names?.inputs,5)||names.inputs.some(input=>!text(input?.name))||[150,151,152,153].some(v=>!text(names.variants?.[v]))||['fields','reasons','channels','laws'].some(key=>!names[key]||typeof names[key]!=='object'))throw new Error('Missing inventory names');
   }
   if(act==='synthesis') {
     if(!sequence(r.candidates,8)||r.assignments!==r.candidates.length)throw new Error('Incomplete candidate coverage');
@@ -94,9 +110,14 @@ function validateResult(act,r,task) {
     if(selected.length!==1||selected[0].checked!==total||selected[0].witness!==null)throw new Error('No complete selected candidate');
     if(r.candidates.some(c=>c.status==='refuted'&&(!c.witness||!Array.isArray(c.witness.input)||c.witness.input.length!==12||!Array.isArray(c.witness.output))))throw new Error('Missing candidate counterexample');
     if(JSON.stringify(r.first_counterexample)!==JSON.stringify(r.candidates.find(c=>c.status==='refuted')?.witness))throw new Error('Candidate counterexample disagrees');
+    const w=r.first_counterexample;
+    if(!sequence(r.inputs,12)||r.inputs.some(name=>!text(name))||!text(r.names?.sums?.TreasuryAction?.[w.input[0]])||!text(r.names?.reason_ranks?.[w.output[0]]))throw new Error('Missing synthesis names');
   }
   if(act==='search') {
     if(!sequence(r.table,total)||r.table.some((row,i)=>!bits(row.input,4)||row.input.some((v,bit)=>v!==(i>>(3-bit)&1))||!bits(row.output,3)))throw new Error('Incomplete search replay coverage');
+    if(!integer(r.before_nodes)||!integer(r.after_nodes)||!integer(r.work))throw new Error('Invalid search evidence');
+    const w=r.first_difference;
+    if(!integer(w?.ordinal,total-1)||!same(w.input,r.table[w.ordinal].input)||!same(w.original,r.table[w.ordinal].output)||!bits(w.swapped,3)||same(w.swapped,w.original))throw new Error('Missing refused-proposal witness');
   }
   return evidence(total,total,true);
 }
@@ -189,7 +210,7 @@ function resultView(act,task) {
   if(act==='inventory') {
     metrics.push(metric('checked',count(r.domain)),metric('passed',count(r.mutant==='none'?r.passed:r.mutant_passed),'good'));
     metrics.push(r.mutant==='none'?metric('law_checks',count(r.law_checks)):metric('differences',count(r.differences),r.differences?'warn':'good'));
-    summary=r.mutant==='none'?`${count(r.passed)} of ${count(r.domain)} decisions satisfy every applicable law.`:r.differences===0?`This change alters no decision on any of the ${count(r.domain)} inputs: the two versions are equivalent.`:`The bug changes ${count(r.differences)} of ${count(r.domain)} decisions. The first is ringed in the grid, and its two decisions are compared in the panel.`;
+    summary=r.mutant==='none'?`${count(r.passed)} of ${count(r.domain)} decisions satisfy every applicable law.`:r.differences===0?`This change alters no decision on any of the ${count(r.domain)} inputs: the two versions are equivalent.`:`The bug changes ${count(r.differences)} of ${count(r.domain)} decisions. One of them is ringed in the grid, and its two decisions are compared in the panel.`;
   } else if(act==='synthesis') {
     const selected=r.candidates.find(c=>c.status==='selected');
     metrics.push(metric('assignments',count(r.assignments)),metric('refuted',count(r.candidates.filter(c=>c.status==='refuted').length),'warn'),metric('passed',`${count(r.passed)} / ${count(r.domain)}`,'good'));

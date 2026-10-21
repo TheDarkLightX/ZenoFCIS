@@ -2,14 +2,15 @@
 // The DOM adapter supplies no Chrome layout, raster or keyboard evidence.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {readFileSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 import * as core from '../public/zenoui/presentation.js';
 import {project} from '../public/zenoui/semantic.js';
 import {GRID,checkLayout} from '../public/factory-layout.js';
 import {instantiate} from '../public/demo-module.js';
 import {runFactory} from '../public/factory-runner.js';
 import {ORIGIN,documentFrom,moduleLoader} from './browser-fixture.mjs';
-const json=file=>JSON.parse(readFileSync(new URL(file,import.meta.url)));
+const text=file=>readFileSync(new URL(file,import.meta.url),'utf8');
+const json=file=>JSON.parse(text(file));
 const native=json('./harness/factory-native.json'),details=json('./harness/inventory-details-native.json');
 const contract=json('../public/zenoui/inventory.semantic.json');
 const page=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
@@ -18,10 +19,10 @@ const money={amount:'1000',fee_bps:'30',reserve_in:'10000',reserve_out:'20000'};
 const clone=x=>structuredClone(x);
 const start=(act='search',draft=act==='money'?money:act.startsWith('inventory/')?{mutant:act.split('/')[1]}:{})=>core.step(core.initial('7'),{type:'Start',act,draft}).state;
 const finish=(s,r)=>core.step(s,{type:'Result',identity:s.identity,result:r,elapsed:1});
-function rejectResult(state,result){
- const before=JSON.stringify(state);assert.throws(()=>finish(state,result));
- assert.equal(JSON.stringify(state),before,'refusal preserves the pure pre-state');
- assert.equal(core.view(state).tasks[state.act].verdict,null,'no result verdict before admission');
+function rejectResult(state,result,name='refused payload'){
+ const before=JSON.stringify(state);assert.throws(()=>finish(state,result),undefined,name);
+ assert.equal(JSON.stringify(state),before,`${name}: refusal preserves the pure pre-state`);
+ assert.equal(core.view(state).tasks[state.act].verdict,null,`${name}: no result verdict before admission`);
 }
 async function mount(transform=(_u,s)=>s){
  const messages=[],timers=[];let worker;
@@ -34,8 +35,8 @@ async function mount(transform=(_u,s)=>s){
  };
  const loader=moduleLoader({document,Worker,innerWidth:1440,matchMedia:()=>({matches:false,addEventListener(){},removeEventListener(){}}),
   getComputedStyle:()=>({getPropertyValue:()=> '#333333'}),setTimeout:f=>{timers.push(f);return timers.length;},clearTimeout(){}},transform);
- await loader.evaluate(`${ORIGIN}/ZenoFCIS/factory.js`);
- return {root:document.getElementById('factory'),messages,timers,get worker(){return worker;},
+ const {namespace}=await loader.evaluate(`${ORIGIN}/ZenoFCIS/factory.js`);
+ return {root:document.getElementById('factory'),module:namespace,messages,timers,get worker(){return worker;},
   deliver(data,request=messages.findLast(m=>m.kind==='run')){worker.onmessage({data:{identity:request.identity,...data}});}};
 }
 function edit(ui,key,value,notify=true){const input=ui.root.querySelector(`input[data-money="${key}"]`);input.value=value;if(notify)input.dispatchEvent(new Event('input'));}
@@ -77,6 +78,87 @@ test('L6_mounted_rejected_payload_fails_closed_and_late_success_cannot_revive_it
   assert.equal(ui.worker.terminated,true);
   ui.deliver({result:native.search,elapsed:1},request);assert.equal(completions,0);
  }
+});
+
+// Re-review residual 2: an inventory payload whose cells, counts and ringed witness disagree
+// is refused before any state change. Each witness is the only one its named check refuses.
+const variant=(mutant,change)=>{const r=clone(native[`inventory/${mutant}`]);change(r);return r;};
+const INVENTORY_CONTRADICTIONS={
+ 'reviewer: every difference flag cleared':['m0002',r=>{for(const c of r.grid.cells)c.different=false;r.differences=0;}],
+ 'ringed cell unchanged':['m0002',r=>{r.grid.first_ordinal=r.grid.cells.findIndex(c=>!c.different);}],
+ 'changed class without a flag':['m0002',r=>{r.grid.cells.find((c,i)=>c.class!==c.mutant_class&&i!==r.grid.first_ordinal).different=false;r.differences--;}],
+ 'unknown decision class':['m0002',r=>{r.grid.cells[0].class=r.grid.cells[0].mutant_class='Unknown';}],
+ 'difference in the unchanged contract':['none',r=>{const c=r.grid.cells[0];c.different=true;r.differences=1;r.grid.first_ordinal=0;r.status='distinguished';
+  r.first_difference={input:c.input,original:{class:c.class,reason:null,laws:[]},mutant:{class:c.mutant_class,reason:200,laws:[]}};}],
+ 'passing count beside the grid':['m0018',r=>{r.mutant_passed=864;}],
+ 'differences without a witness':['m0002',r=>{r.first_difference=null;r.grid.first_ordinal=null;}],
+ 'witness without differences':['m0049',r=>{r.first_difference=native['inventory/m0002'].first_difference;}],
+ 'status beside the witness':['m0002',r=>{r.status='equivalent over the full domain';}],
+ 'witness decisions identical':['m0054',r=>{r.first_difference.mutant=clone(r.first_difference.original);}],
+ 'missing names':['m0002',r=>{delete r.names;}],
+};
+test('L6_rereview_contradictory_inventory_payloads_never_promote_a_verdict',()=>{
+ for(const mutant of ['none','m0002','m0018','m0040','m0049','m0054','m0061'])assert.equal(finish(start(`inventory/${mutant}`),native[`inventory/${mutant}`]).view.tasks.inventory.verdict,'finite checked',mutant);
+ for(const [name,[mutant,change]] of Object.entries(INVENTORY_CONTRADICTIONS))rejectResult(start(`inventory/${mutant}`),variant(mutant,change),name);
+});
+
+// Re-review residual 3: the reducer checks every field the page draws before a done state,
+// and the page fences a drawing failure so the run stops, settles and claims nothing.
+const altered=(act,change)=>{const r=clone(native[act]);change(r);return r;};
+const UNDRAWABLE={
+ 'reviewer: search without first_difference':['search',r=>{delete r.first_difference;}],
+ 'search witness on another input':['search',r=>{r.first_difference.ordinal=2;}],
+ 'search witness not refused':['search',r=>{r.first_difference.swapped=r.first_difference.original;}],
+ 'search without node counts':['search',r=>{delete r.after_nodes;}],
+ 'search record not plain data':['search',r=>{r.winner=1n;}],
+ 'reviewer: synthesis without names':['synthesis',r=>{delete r.names;}],
+ 'synthesis without reason names':['synthesis',r=>{r.names.reason_ranks={};}],
+ 'synthesis without input names':['synthesis',r=>{delete r.inputs;}],
+ 'money probe without steps':['money',r=>{delete r.overflow.steps;}],
+};
+test('L6_rereview_undrawable_results_are_refused_before_done',()=>{
+ for(const [name,[act,change]] of Object.entries(UNDRAWABLE))rejectResult(start(act),altered(act,change),name);
+});
+function stopped(ui,act,root=ui.root){
+ const output=root.querySelector(`[data-factory-act="${act}"] .factory-output`);
+ assert.match(root.querySelector(`[data-factory-act="${act}"] .factory-status`).textContent,/Stopped:.*No verdict/);
+ assert.equal(output.dataset.complete,undefined,'a failed run is never marked complete');
+ assert.equal(output.querySelector('.verdict'),null,'nothing partly drawn stays on the page');
+ assert.equal(ui.worker.terminated,true,'the worker is stopped');
+ for(const name of core.ACTS)assert.equal(root.querySelector(`button[data-act="${name}"]`).disabled,false,'controls are available again');
+}
+test('L6_rereview_mounted_undrawable_results_fail_closed',async()=>{
+ for(const name of ['reviewer: search without first_difference','reviewer: synthesis without names']){
+  const [act,change]=UNDRAWABLE[name],ui=await mount();let completions=0;ui.root.addEventListener('factory-result',()=>completions++);
+  button(ui,act).click();const request=ui.messages.at(-1);
+  ui.deliver({result:altered(act,change),elapsed:1},request);stopped(ui,act);
+  ui.deliver({result:native[act],elapsed:1},request);assert.equal(completions,0,'a late genuine reply cannot revive it');
+ }
+});
+const PAINT_FAILURES={search:['/factory.js','function render(output,data) {'],inventory:['/factory-grid.js','    finish(result) {']};
+async function paintFailureFailsClosed(act,transform=(_u,s)=>s){
+ const [file,site]=PAINT_FAILURES[act];
+ const ui=await mount((u,s)=>transform(u,u.endsWith(file)?s.replace(site,`${site}throw new Error('planted drawing failure');`):s));
+ const root=documentFrom(page).getElementById('factory'),factory=ui.module.mountFactory(root);
+ let completions=0,outcome='pending';root.addEventListener('factory-result',()=>completions++);
+ factory.run(act==='inventory'?'inventory/none':act).then(()=>{outcome='resolved';},error=>{outcome=`rejected: ${error.message}`;});
+ const request=ui.messages.at(-1);ui.deliver({result:native[act==='inventory'?'inventory/none':act],elapsed:1},request);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match(outcome,/^rejected: The page could not show this result/,'the run promise settles');assert.equal(completions,0);
+ stopped(ui,act,root);if(act==='inventory')assert.equal(root.querySelector('.inventory-grid'),null);
+ ui.deliver({result:native[act==='inventory'?'inventory/none':act],elapsed:1},request);assert.equal(completions,0);
+}
+test('L6_rereview_admitted_result_that_cannot_be_drawn_fails_the_run',async()=>{
+ for(const act of Object.keys(PAINT_FAILURES))await paintFailureFailsClosed(act);
+});
+test('L6_rereview_cell_decision_that_cannot_be_drawn_shows_a_refusal',async()=>{
+ const ui=await mount(),choice=ui.root.querySelector('.mutant-choice');choice.value='none';choice.dispatchEvent(new Event('change'));
+ button(ui,'inventory').click();ui.deliver({result:native['inventory/none'],elapsed:1});
+ const inspect=ui.messages.findLast(m=>m.kind==='inspect'),detail=clone(details[`none/${inspect.ordinal}`]);delete detail.original.laws;
+ ui.deliver({detail,ordinal:inspect.ordinal},inspect);
+ const panel=ui.root.querySelector('.cell-inspection');
+ assert.match(panel.textContent,/could not show this decision/);assert.equal(panel.dataset.ready,undefined);
+ assert.match(status(ui,'inventory'),/Done/,'a cell refusal leaves the checked run intact');
 });
 
 // P2: bound policy and returned values cannot change a fixed state's meaning.
@@ -170,12 +252,42 @@ test('L7_projection_missing_Release_capacity_has_22_violations_and_exact_omissio
  assert.deepEqual(witnesses,{Restock:[0,0,153,1,1],Release:[0,1,151,1,1],Ship:[0,1,152,1,1],Reserve:[1,0,150,1,1]});
 });
 
-// P2: source status never implies a published release archive.
-function releaseCopy(html){
- assert.doesNotMatch(html,/Coming in 2\.5|<span class="ver">2\.5<\/span><span class="chip dev">IN DEVELOPMENT/);
- assert.match(html,/2\.5\.0 is the current release source/);assert.match(html,/Final qualification and publication remain separate release gates/);
+// P2 and re-review: every version the page names comes from its source of truth, and
+// source status never implies a published release archive.
+function releaseFacts(workspace=text('../../Cargo.toml'),factory=text('../factory/Cargo.toml'),site=text('../Cargo.toml')){
+ const source=workspace.match(/^\[workspace\.package\]\nversion = "([0-9]+\.[0-9]+\.[0-9]+)"$/m)?.[1],patch=site.split('[patch.crates-io]')[1]??'';
+ const pins=[...factory.matchAll(/^(zeno-fcis-[a-z-]+) = "=([^"]+)"$/gm)];
+ assert.ok(source,'workspace release source version');assert.ok(pins.length>=3,'factory library pins');
+ for(const [,name,version] of pins){
+  assert.equal(version,source,`${name}: the factory pins the release source`);
+  assert.match(patch,new RegExp(`^${name} = \\{ path = "\\.\\./crates/${name}" \\}$`,'m'),`${name}: patched to this checkout`);
+  assert.match(text(`../../crates/${name}/Cargo.toml`),/^version\.workspace = true$/m,`${name}: carries the release source version`);
+ }
+ return {source,library:source};
 }
-test('review_public_copy_matches_current_release_source_and_keeps_publication_separate',()=>releaseCopy(page));
+function releaseCopy(html,{source,library}=releaseFacts()){
+ const words=html.replace(/<[^>]*>/g,' ').replace(/\s+/g,' '),order=v=>v.split('.').reduce((a,n)=>a*1000+Number(n),0),e=v=>v.replaceAll('.','\\.');
+ const released=[...words.matchAll(/ ([0-9]+\.[0-9]+\.[0-9]+) RELEASED /g)].map(m=>m[1]),planned=[...words.matchAll(/ ([0-9]+\.[0-9]+\.[0-9]+) PLANNED /g)].map(m=>m[1]);
+ assert.equal(released.length,1,'one published release');const [published]=released;
+ assert.ok(order(published)<=order(source),'publication never runs ahead of the release source');
+ assert.ok(planned.every(v=>order(v)>order(source)),'planned versions follow the release source');
+ const status=`${e(source)} is the current release source\\. Final qualification and publication remain separate release gates\\.`,factory=`Each act runs the library built from the ${e(library)} release source,`;
+ const claims=[status,factory,`ZenoFCIS ${e(source.replace(/\.[0-9]+$/,''))} source `,` ${e(source)} RELEASE SOURCE `,`The ${e(source)} source includes`,
+  ` ${e(published)} RELEASED `,`Get ${e(published)} `,`Limits in ${e(published)}:`,`Install ${e(published)} on Linux`,`VERSION=${e(published)} `,
+  ...planned.map(v=>` ${e(v)} PLANNED `),'Apache-2\\.0','[0-9]+\\.[0-9]+ billion'];
+ const covered=claims.flatMap(claim=>[...words.matchAll(new RegExp(claim,'g'))].map(m=>[m.index,m.index+m[0].length]));
+ const stale=[...words.matchAll(/[0-9]+(?:\.[0-9]+)+/g)].filter(m=>!covered.some(([a,b])=>a<=m.index&&m.index+m[0].length<=b)).map(m=>words.slice(Math.max(0,m.index-40),m.index+m[0].length+20));
+ assert.deepEqual(stale,[],'every version named in the page copy is explained by its source');
+ assert.match(words,new RegExp(status),'the page states the release source and its separate gates');
+ assert.match(words,new RegExp(factory),'the factory section names the library it runs');
+ for(const [,version] of html.matchAll(/releases\/(?:tag|download)\/v([^"/$]+)/g))assert.equal(version,published,'release links name the published release');
+ return {source,published};
+}
+test('review_public_copy_matches_current_release_source_and_keeps_publication_separate',()=>{
+ releaseCopy(page);
+ for(const file of readdirSync(new URL('../public/',import.meta.url),{recursive:true}).filter(f=>/\.(js|html)$/.test(f)&&f!=='index.html'))
+  assert.doesNotMatch(text(`../public/${file}`),/\b[0-9]+\.[0-9]+\.[0-9]+\b/,`${file}: page scripts name no release version`);
+});
 
 // Additional independent witnesses from the review, including negative controls.
 test('L1_review_missing_metrics_mount_is_caught',async()=>{
@@ -230,7 +342,8 @@ test('review_new_policy_and_preference_controls_are_killed',async()=>{
  assert.throws(()=>dynamicPreferences(width),assert.AssertionError);
  const selfDeclared=await mutant('const total=TOTALS[act];\n  if(r.domain!==total||task.evidence.total!==total)', 'const total=r.domain;\n  if(false)');
  const ignoresPasses=await mutant('if(r.passed!==total)', 'if(false)');
- for(const [module,result] of [[selfDeclared,{...native.search,domain:1,passed:1,table:native.search.table.slice(0,1)}],[ignoresPasses,{...native.search,passed:0}]]){
+ // The narrowed domain keeps the refused-proposal witness (input 2), so only the domain check refuses it.
+ for(const [module,result] of [[selfDeclared,{...native.search,domain:2,passed:2,table:native.search.table.slice(0,2)}],[ignoresPasses,{...native.search,passed:0}]]){
   const running=module.step(module.initial(),{type:'Start',act:'search'}).state;
   assert.throws(()=>assert.throws(()=>module.step(running,{type:'Result',identity:running.identity,result,elapsed:1})),assert.AssertionError,'review claim check kills the weakened validator');
  }
@@ -240,4 +353,47 @@ test('review_new_policy_and_preference_controls_are_killed',async()=>{
  const done=lostEdit.step(changed,{type:'Result',identity:changed.identity,result:native.search,elapsed:1});
  assert.throws(()=>assert.equal(done.view.actions.find(a=>a.act==='money').enabled,false),assert.AssertionError,'lost-edit control recreates the live enablement defect');
  assert.throws(()=>releaseCopy(page.replace('2.5.0 is the current release source','Coming in 2.5')),assert.AssertionError);
+});
+
+// Each re-review check is killed by its own witness, and the drawing fence by a planted failure.
+test('rereview_residual_controls_are_killed',async()=>{
+ async function disabled(from,to=`if(false)${from}`){assert.equal(source.split(from).length,2,`one mutation site: ${from}`);return import('data:text/javascript;base64,'+Buffer.from(source.replace(from,to)).toString('base64'));}
+ function admits(module,act,result){
+  const running=module.step(module.initial('7'),{type:'Start',act,draft:act==='money'?money:act.startsWith('inventory/')?{mutant:act.split('/')[1]}:{}}).state;
+  try{return module.step(running,{type:'Result',identity:running.identity,result,elapsed:1}).state.tasks[running.act].phase==='done';}catch{return false;}
+ }
+ const witness=name=>INVENTORY_CONTRADICTIONS[name]?[`inventory/${INVENTORY_CONTRADICTIONS[name][0]}`,variant(...INVENTORY_CONTRADICTIONS[name])]:[UNDRAWABLE[name][0],altered(...UNDRAWABLE[name])];
+ for(const [from,to,names] of [
+  ['if(cells.some(c=>!CLASSES',undefined,['unknown decision class']],
+  ['if(cells.some(c=>c.class!==c.mutant_class&&!c.different))',undefined,['changed class without a flag']],
+  ["||(r.mutant==='none'&&r.differences!==0)",'',['difference in the unchanged contract']],
+  ["if(cells.filter(c=>c.mutant_class!=='Refused')",undefined,['passing count beside the grid']],
+  ['if(r.differences===0?first!==null',undefined,['differences without a witness','witness without differences','status beside the witness']],
+  ['if(first!==null&&(',undefined,['ringed cell unchanged']],
+  ['||decision(w.original)===decision(w.mutant)','',['witness decisions identical']],
+  ['if(!sequence(names?.inputs,5)',undefined,['missing names']],
+  ['if(!integer(w?.ordinal,total-1)',undefined,['reviewer: search without first_difference','search witness on another input','search witness not refused']],
+  ['if(!integer(r.before_nodes)',undefined,['search without node counts']],
+  ['if(!plain(r))',undefined,['search record not plain data']],
+  ['if(!sequence(r.inputs,12)',undefined,['reviewer: synthesis without names','synthesis without reason names','synthesis without input names']],
+  ['if(!integer(r.overflow.steps))',undefined,['money probe without steps']],
+ ]){
+  const module=await disabled(from,to);
+  for(const name of names){const [act,result]=witness(name);assert.equal(admits(core,act,result),false,name);assert.equal(admits(module,act,result),true,`${name} kills ${from}`);}
+ }
+ const fence='try{paint(result.view,event);}\n    catch(error){',unfenced=(u,s)=>u.endsWith('/factory.js')?(assert.ok(s.includes(fence)),s.replace(fence,'paint(result.view,event);\n    if(false){const error=undefined;')):s;
+ for(const act of Object.keys(PAINT_FAILURES))await assert.rejects(paintFailureFailsClosed(act,unfenced),assert.AssertionError,`${act}: the fence is what fails the run`);
+ const {source:release,published}=releaseCopy(page);
+ for(const [from,to] of [
+  [`the library built from the ${release} release source`,`the ${published} library`],
+  [`built from the ${release} release source`,`built from the ${published} release source`],
+  [`${release} is the current release source`,'Coming in 2.5'],
+  [`<span class="ver">${release}</span><span class="chip dev">RELEASE SOURCE`,`<span class="ver">${release.replace(/\.[0-9]+$/,'')}</span><span class="chip dev">IN DEVELOPMENT`],
+  [`Install ${published} on Linux`,'Install 2.3.0 on Linux'],
+  [`releases/tag/v${published}`,'releases/tag/v2.3.0'],
+  ['nothing is sent to a server.',`nothing is sent to a server. It runs ZenoFCIS ${published}.`],
+ ]){assert.ok(page.includes(from),from);assert.throws(()=>releaseCopy(page.replace(from,to)),assert.AssertionError,to);}
+ assert.throws(()=>releaseFacts(undefined,text('../factory/Cargo.toml').replace(`"=${release}"`,`"=${published}"`)),assert.AssertionError,'a stale library pin');
+ const patched=text('../Cargo.toml'),unpatched=patched.replace(/^zeno-fcis-contract = \{ path = .*$/m,'');
+ assert.notEqual(unpatched,patched);assert.throws(()=>releaseFacts(undefined,undefined,unpatched),assert.AssertionError,'a library not built from this checkout');
 });

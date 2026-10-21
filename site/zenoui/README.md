@@ -33,8 +33,13 @@ contract checks 96 tuples; the advisory enablement contract checks eight. These
 are finite checks of predicates and control. Result admission is separately
 tested: fixed task domains, complete ordered search/grid coverage, consistent
 passing counts and candidates, and submitted input/variant binding precede any
-completed evidence. These structural checks trust the worker's computations;
-they do not authenticate or independently replay its payload.
+completed evidence. Every result field the page draws, including its technical
+record, is checked before a run is done, and an inventory result's cell
+decisions, difference flags, counts, status and ringed witness must agree. If drawing an admitted reply still fails, the page
+undoes that reply and fails the run or the selected cell: the worker stops, the
+run's promise is rejected and nothing is marked complete. These structural
+checks trust the worker's computations; they do not authenticate or
+independently replay its payload.
 
 The separate inventory prototype projection is compared with every one of the
 real Authority's 864 inputs, all tasks and busy/fault contexts (17,280
