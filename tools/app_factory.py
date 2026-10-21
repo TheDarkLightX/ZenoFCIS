@@ -127,7 +127,10 @@ def main():
             sample = next((s for s in samples if s["reply"]["class"] == "Accept" and all(s["input"][i] == f["initial"] for i,f in enumerate(fields) if f["source"] == "state")), None)
             if sample is None:
                 raise ValueError("AppNeedsGenesisJourney")
-            step = {"class":"Accept", "command":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "command"], "context":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "context"]}
+            step = {"class":"Accept", "command":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "command"], "context":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "context" and not f.get("clock")]}
+            for i, field in enumerate(fields):
+                if field["source"] == "context" and field.get("clock"):
+                    step["clock"] = sample["input"][i]
             (out / "app-checks/journey.json").write_text(json.dumps({"steps":[step],"deliveries":None}))
         # Reconcile only the copied lock, admitting no external identity outside it.
         admitted = (ROOT / "Cargo.lock").read_text()

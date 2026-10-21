@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and check the three supported app journeys and the multi-party escrow
+"""Build and check app journeys, the clock smoke case and the multi-party escrow
 example; TCP is an explicit host lane."""
 import argparse
 import hashlib
@@ -21,6 +21,9 @@ def main():
     parent.mkdir(parents=True,exist_ok=True)
     out=Path(tempfile.mkdtemp(prefix='run-',dir=parent))
     environment=os.environ.copy()
+    # Isolate PID-named test stores, including leftovers from a failed run.
+    test_temporary=tempfile.TemporaryDirectory(prefix='app-factory-tests-')
+    environment['TMPDIR']=test_temporary.name
     if args.tcp:
         environment.pop('INGRESS_TEST_MEMORY',None)
         environment['APP_JOURNEY_TCP']='1'
@@ -40,7 +43,7 @@ def main():
     cargo=['cargo','+1.97.1']
     run([*cargo,'build','--locked','--offline','-p','zeno-fcis-cli'])
     cli=target/'debug/zeno-fcis'
-    for template,source in [('wide-counter','site/zenoui/test-projects/wide-counter'),('inventory-reservation','crates/zeno-fcis-cli/templates/inventory-reservation'),('withdrawal-queue','crates/zeno-fcis-cli/templates/withdrawal-queue')]:
+    for template,source in [('wide-counter','site/zenoui/test-projects/wide-counter'),('inventory-reservation','crates/zeno-fcis-cli/templates/inventory-reservation'),('withdrawal-queue','crates/zeno-fcis-cli/templates/withdrawal-queue'),('clock-counter','site/zenoui/test-projects/clock-counter')]:
         app=out/template
         run([cli,'new',app,'--contract',ROOT/source/'project.zeno','--app'])
         receipt=json.loads((app/'app-manifest.json').read_text())
@@ -50,6 +53,11 @@ def main():
         run([*cargo,'test','--locked','--offline','--no-default-features'],cwd=app)
         local=environment.copy();local['APP_JOURNEY_OUT']=str(out/f'{template}.json')
         run([*cargo,'test','--locked','--offline','--all-features'],cwd=app,env=local)
+        if template == 'clock-counter':
+            fixture = json.loads((app/'app-checks/journey.json').read_text())
+            assert fixture['steps'][0]['clock'] == '7'
+            assert fixture['steps'][0]['context'] == ['130']
+            assert 'test public_origin_is_the_only_origin ... ok' in (out/checks[-1]['log']).read_text()
         run([*cargo,'clippy','--locked','--offline','--all-features','--all-targets','--','-D','warnings'],cwd=app)
         run(['node','--experimental-vm-modules',ROOT/'site/tests/app-durable.test.mjs',out/f'{template}.json'])
     # One server for three parties: buyer, seller and operator each act with their own credential.
@@ -71,6 +79,7 @@ def main():
         run(['python3','tools/check_admission_model.py','--cli',cli,'--app',app,'--server',server,'--out',out/'admission'])
     run([*cargo,'test','--locked','--offline','-p','zeno-fcis-ingress'])
     run(['python3','tools/check_ingress.py'])
+    test_temporary.cleanup()
     print(f'app-factory: PASS; {out}',flush=True)
 
 if __name__=='__main__':

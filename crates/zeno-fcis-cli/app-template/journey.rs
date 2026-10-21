@@ -164,6 +164,24 @@ fn received(receiver: &Path) -> usize {
 fn scalar(v: &Value) -> i128 {
     v.as_str().unwrap().parse().unwrap()
 }
+// The fixture records admission time separately from configured context.
+// Give every declared clock a file, keeping tests independent of wall time.
+fn fixture_clock(root: &Path, step: &Value) -> Option<application::app::ServerClock> {
+    let source = root.join("clock");
+    let clock = ok(application::app::ServerClock::declared(Some(
+        source.clone(),
+    )));
+    if clock.is_some() {
+        ok(std::fs::write(
+            source,
+            step["clock"]
+                .as_str()
+                .expect("a declared clock needs a fixture time"),
+        ));
+    }
+    clock
+}
+
 #[test]
 fn app_factory_journey() {
     let fixture: Value = ok(serde_json::from_slice(include_bytes!(
@@ -189,7 +207,12 @@ fn app_factory_journey() {
         let before = ok(application::current(&path));
         let mut input = before.state.clone();
         input.extend(step["command"].as_array().unwrap().iter().map(scalar));
-        input.extend(step_context(&fixture, step).iter().map(scalar));
+        let clock = fixture_clock(&root, step);
+        let mut context: Vec<i128> = step_context(&fixture, step).iter().map(scalar).collect();
+        if let Some(clock) = clock {
+            context.insert(clock.position(), scalar(&step["clock"]));
+        }
+        input.extend(context);
         let frames = ok(application::wire(&descriptor, &input));
         let input_strings: Vec<String> = input.iter().map(ToString::to_string).collect();
         let hash = RustCryptoSha256::hash(authority.identity());
@@ -217,9 +240,12 @@ fn app_factory_journey() {
                 Some(Clock::default()),
             ));
             let store = production.store();
-            let endpoint = ok(Application::new(
+            let mut endpoint = ok(Application::new(
                 &lineage, production, store, &path, principal, &frames[2],
             ));
+            if let Some(clock) = fixture_clock(&root, step) {
+                endpoint = ok(endpoint.with_clock(clock));
+            }
             let config = ok(Config::new(
                 [0xab; 32],
                 principal,
@@ -1087,13 +1113,7 @@ fn public_origin_is_the_only_origin() {
     let catalog = ok(v2_contract::checked_catalog(&descriptor));
     let catalogs = [&catalog];
     let lineage = ok(Lineage::bind(&catalogs, &[]));
-    let clock = ok(application::app::ServerClock::declared(Some(
-        root.join("clock"),
-    )));
-    ok(std::fs::write(
-        root.join("clock"),
-        step["clock"].as_str().unwrap_or("0"),
-    ));
+    let clock = fixture_clock(&root, step);
     // The request's inputs: the current state, the step's command and its context
     // with any server clock in place.
     let mut context: Vec<i128> = step_context(&fixture, step).iter().map(scalar).collect();
@@ -1127,9 +1147,7 @@ fn public_origin_is_the_only_origin() {
         let mut endpoint = ok(Application::new(
             &lineage, production, store, &path, principal, &frames[2],
         ));
-        if let Some(clock) =
-            application::app::ServerClock::declared(Some(root.join("clock"))).unwrap()
-        {
+        if let Some(clock) = fixture_clock(&root, step) {
             endpoint = ok(endpoint.with_clock(clock));
         }
         let config = ok(Config::new(
@@ -1147,7 +1165,7 @@ fn public_origin_is_the_only_origin() {
         &mut server,
         wire_origin("/preview", "http://127.0.0.1:8080", &preview),
     );
-    assert_eq!(status, 200);
+    assert_eq!(status, 200, "declared clock file was not used");
     let (status, _) = exchange_bytes(
         &mut server,
         wire_origin("/preview", "https://app.example.com", &preview),

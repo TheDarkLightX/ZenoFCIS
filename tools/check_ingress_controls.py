@@ -88,6 +88,9 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="ingress-controls-") as directory:
         source = Path(directory)/"source"
         shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "target", "node_modules", "__pycache__"))
+        temporary = Path(directory)/"test-tmp"
+        temporary.mkdir()
+        env["TMPDIR"] = str(temporary)
         for name, suite, test, marker, path, before, after in CONTROLS:
             code, log = check(source, suite, test, name+"-baseline-before")
             if code or (suite and "1 passed" not in log): raise RuntimeError(f"baseline failed: {name}")

@@ -17,6 +17,9 @@ import tempfile
 
 APP = "src/app.rs"
 CONTROLS = [
+    ("origin-clock-file", "public_origin_is_the_only_origin", "declared clock file was not used",
+     "application::app::ServerClock::declared(Some(\n        source.clone(),\n    ))",
+     "application::app::ServerClock::declared(None)", "tests/app_journey.rs"),
     ("pending-delivery-unreported", "committed_reply_marks_pending_delivery", "pending delivery not reported",
      'result["delivery"] = Value::from("pending");', ""),
     ("stale-preview-head", "preview_uses_the_latest_committed_head", "preview read a stale head after commit",
@@ -92,14 +95,18 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="app-controls-") as directory:
         app = Path(directory) / "app"
         shutil.copytree(args.app, app, ignore=shutil.ignore_patterns("target"))
-        for name, test, marker, before, after in CONTROLS:
+        # Failed tests can leave PID-named stores; PIDs repeat across sandboxes.
+        temporary = Path(directory) / "test-tmp"
+        temporary.mkdir()
+        env["TMPDIR"] = str(temporary)
+        for name, test, marker, before, after, *paths in CONTROLS:
             if args.only and name not in args.only:
                 continue
             check = cargo + [test, "--", "--exact", "--nocapture"]
             code, log = run(app, check, name + "-baseline-before")
             if code or "1 passed" not in log:
                 raise RuntimeError(f"baseline failed: {name}")
-            target = app / APP
+            target = app / (paths[0] if paths else APP)
             original = target.read_text()
             if original.count(before) != 1:
                 raise RuntimeError(f"nonunique mutation anchor: {name}")
