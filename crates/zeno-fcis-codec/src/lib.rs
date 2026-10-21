@@ -11,9 +11,7 @@
 extern crate alloc;
 
 mod artifact;
-mod collection_limits;
 mod providers;
-pub use collection_limits::CollectionLimits;
 #[cfg(feature = "libcrux")]
 pub use providers::LibcruxSha256;
 pub use providers::RustCryptoSha256;
