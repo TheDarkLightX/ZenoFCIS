@@ -1,0 +1,20 @@
+# Scenarios for the library loans table example, replayed by
+# `zeno-fcis contract scenario`. LLM-generated with the rules; each step's
+# pre-state is the one before it.
+#
+# Inputs: copies_0 .. copies_5 | action copy member | desk
+# Decision: class reason, then copies_0 .. copies_5 after | deliveries
+# scenario two-copies-then-the-limit
+0 0 0 0 0 0 | 150 0 1 | 130 | accept - 1 0 0 0 0 0 | -
+1 0 0 0 0 0 | 150 5 1 | 130 | accept - 1 0 0 0 0 1 | -
+1 0 0 0 0 1 | 150 3 1 | 130 | reject 202 1 0 0 0 0 1 | -
+1 0 0 0 0 1 | 150 3 2 | 130 | accept - 1 0 0 2 0 1 | -
+1 0 0 2 0 1 | 151 0 1 | 130 | accept - 0 0 0 2 0 1 | -
+0 0 0 2 0 1 | 150 2 1 | 130 | accept - 0 0 1 2 0 1 | -
+# scenario a-copy-on-loan-is-not-lent-again
+0 0 0 0 0 0 | 150 4 3 | 130 | accept - 0 0 0 0 3 0 | -
+0 0 0 0 3 0 | 150 4 2 | 130 | reject 201 0 0 0 0 3 0 | -
+0 0 0 0 3 0 | 151 4 2 | 130 | reject 203 0 0 0 0 3 0 | -
+0 0 0 0 3 0 | 151 4 3 | 130 | accept - 0 0 0 0 0 0 | -
+# scenario only-the-librarian-records-loans
+0 0 0 0 0 0 | 150 0 1 | 131 | reject 200 0 0 0 0 0 0 | -
