@@ -47,6 +47,11 @@
   "law_kinds": {
     "500": "StateInvariant",
     "501": "AssetConservation",
-    "502": "DebitCreditEffectEquality"
+    "502": "DebitCreditEffectEquality",
+    "520": "AuthoritySubjectRecipient",
+    "521": "AuthoritySubjectRecipient",
+    "540": "AuthoritySubjectRecipient",
+    "541": "AuthoritySubjectRecipient",
+    "542": "AuthoritySubjectRecipient"
   }
 }

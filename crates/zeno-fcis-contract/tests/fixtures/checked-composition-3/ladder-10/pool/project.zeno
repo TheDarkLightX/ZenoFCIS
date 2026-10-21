@@ -33,7 +33,16 @@ merge [400];
 law 500 capacity on commit, genesis = post.100.110 + post.100.111 <= 4;
 law 501 conservation on accept = ((command.101.120 == 150 || command.101.120 == 151) -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 152 -> post.100.110 + post.100.111 + command.101.121 == pre.100.110 + pre.100.111) && (command.101.120 == 153 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111 + command.101.121);
 law 502 exact_movement on accept = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 524 reason_204 on reject:204 = (true) && (pre.100.110 + pre.100.111 > 4);
+law 520 reason_200 on reject:200 = ((true) && !(pre.100.110 + pre.100.111 > 4)) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = (((true) && !(pre.100.110 + pre.100.111 > 4)) && !(context.102.130 == 0)) && (command.101.120 == 150 && command.101.121 > pre.100.110);
+law 522 reason_202 on reject:202 = ((((true) && !(pre.100.110 + pre.100.111 > 4)) && !(context.102.130 == 0)) && !(command.101.120 == 150 && command.101.121 > pre.100.110)) && ((command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111);
+law 523 reason_203 on reject:203 = (((((true) && !(pre.100.110 + pre.100.111 > 4)) && !(context.102.130 == 0)) && !(command.101.120 == 150 && command.101.121 > pre.100.110)) && !((command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111)) && (command.101.120 == 153 && pre.100.110 + pre.100.111 + command.101.121 > 4);
+law 540 legitimate_acceptance on reject = !((((((true) && !(pre.100.110 + pre.100.111 > 4)) && !(context.102.130 == 0)) && !(command.101.120 == 150 && command.101.121 > pre.100.110)) && !((command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111)) && !(command.101.120 == 153 && pre.100.110 + pre.100.111 + command.101.121 > 4));
+law 541 acceptance_eligibility on accept = (((((true) && !(pre.100.110 + pre.100.111 > 4)) && !(context.102.130 == 0)) && !(command.101.120 == 150 && command.101.121 > pre.100.110)) && !((command.101.120 == 151 || command.101.120 == 152) && command.101.121 > pre.100.111)) && !(command.101.120 == 153 && pre.100.110 + pre.100.111 + command.101.121 > 4);
+law 542 no_committed_failure on failure = false;
 // Core seed reservation-pool/1; parameters {"C": 4, "Q": 3}.
-// Instance source-set SHA256 d2eddbf724c85e626f47793e5c0da4a827dc8feda281b258902319da45fb313c.
+// Instance source-set SHA256 59cacaec2108ce9895064b1e5d2e20663c039c8afca9f823964e6be57d3ef9e2.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

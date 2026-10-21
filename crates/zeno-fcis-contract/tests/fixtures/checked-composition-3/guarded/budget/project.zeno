@@ -22,7 +22,13 @@ merge [400];
 law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3;
 law 501 conservation on accept = post.100.110 + command.101.120 == pre.100.110;
 law 502 authorized_nonincreasing_budget on accept = context.102.130 == 1 && post.100.110 <= pre.100.110;
+// Independent complete relation; ordered guards exclude earlier reasons.
+law 520 reason_200 on reject:200 = (true) && (context.102.130 == 0);
+law 521 reason_201 on reject:201 = ((true) && !(context.102.130 == 0)) && (command.101.120 > pre.100.110);
+law 540 legitimate_acceptance on reject = !(((true) && !(context.102.130 == 0)) && !(command.101.120 > pre.100.110));
+law 541 acceptance_eligibility on accept = ((true) && !(context.102.130 == 0)) && !(command.101.120 > pre.100.110);
+law 542 no_committed_failure on failure = false;
 // Core seed consumable-budget/1; parameters {"C": 3}.
-// Instance source-set SHA256 ed7df87b5d0678a7d7e8d3477a012cbaea39c782153d1d650d331d515011a776.
+// Instance source-set SHA256 bd58b7e438e9ba03fdcc6f70f871e490cdb87387d0e043ea10a6ff42a80d16d4.
 // Family proof reference: certificate construction; no stored proof reference; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

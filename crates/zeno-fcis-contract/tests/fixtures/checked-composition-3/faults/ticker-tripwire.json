@@ -49,9 +49,9 @@
       ],
       "participates": "op != 2",
       "path": "budget",
-      "policy_sha256": "3b182556d4492c35b0d0ed8cb979c43670ecbef742ebb3d8dfc8c8bc695cff51",
-      "program_sha256": "32d68e6c6cd04ee5c91ba8d289191ede63d961cd267320962e9f2cd7e8c5eb05",
-      "project_sha256": "4002c1198514628122b2aec3d776bf0cd0bcf2057e9fc6ccf5860f80fa07de38"
+      "policy_sha256": "72011d19e383254c119ca5a2cc447c5be80742b0d2927234c4f36441e786a846",
+      "program_sha256": "a91b3766106da3f635306a636eca9cd2f32b441a60bfba4dd5f57503e67b5037",
+      "project_sha256": "63c4f10550c9e6b2f0c35a5b5728f0af651fe4e3a516e696489f08f6910c4e1e"
     }
   ],
   "couplings": [

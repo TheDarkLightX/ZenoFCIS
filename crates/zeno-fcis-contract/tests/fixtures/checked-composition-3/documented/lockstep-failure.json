@@ -14,9 +14,9 @@
       ],
       "participates": "true",
       "path": "lockstep-a",
-      "policy_sha256": "02bf43eb28608b51c1d851f6041c03f196cb4b1bc102f61c760726f4cfb8c0ea",
-      "program_sha256": "d37e69a12b218afc789c5df9926501f2d0888f02900109e3df251a92cd61d733",
-      "project_sha256": "10f71127b689e33798ecee6fd55ee8980f282ef71142ca9298e113a4c86e9821"
+      "policy_sha256": "ab29bfcb5b000551ba239d133adbc63dc35f71d08adb6636925b4794497ef3d5",
+      "program_sha256": "159cb1249603ed6aaa2d6b25b701698abf1e5fb51aa9d7db320b7434fec26315",
+      "project_sha256": "da6cd66725f88a8165bc72d5b5d4295a2f696a1d2d7182a06da7fd035aef8f48"
     },
     {
       "assume": "true",
@@ -31,9 +31,9 @@
       ],
       "participates": "true",
       "path": "lockstep-b",
-      "policy_sha256": "02bf43eb28608b51c1d851f6041c03f196cb4b1bc102f61c760726f4cfb8c0ea",
-      "program_sha256": "d37e69a12b218afc789c5df9926501f2d0888f02900109e3df251a92cd61d733",
-      "project_sha256": "10f71127b689e33798ecee6fd55ee8980f282ef71142ca9298e113a4c86e9821"
+      "policy_sha256": "ab29bfcb5b000551ba239d133adbc63dc35f71d08adb6636925b4794497ef3d5",
+      "program_sha256": "159cb1249603ed6aaa2d6b25b701698abf1e5fb51aa9d7db320b7434fec26315",
+      "project_sha256": "da6cd66725f88a8165bc72d5b5d4295a2f696a1d2d7182a06da7fd035aef8f48"
     },
     {
       "assume": "true",
