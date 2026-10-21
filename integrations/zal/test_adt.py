@@ -4,6 +4,7 @@ import itertools
 import random
 import re
 import unittest
+from unittest.mock import patch
 
 import adt
 from adt import Decl, Refusal, Ty, Types, card_text, parse_decl
@@ -139,6 +140,23 @@ class CardinalityTests(unittest.TestCase):
         self.assertEqual(types.cardinality(Ty("ref", ("B",))), 6)
         print(f"ADT CARDINALITY: {compared} random types counted by enumeration")
 
+    def test_computed_counts_are_lossless(self):
+        types = types_of({"Blob": "bytes ..=64", "Maybe": "none | some(Blob)",
+                          "Pair": "{x: Maybe, y: Maybe}"})
+        blob = (256 ** 65 - 1) // 255
+        for name, expected in [("Blob", blob), ("Maybe", blob + 1), ("Pair", (blob + 1) ** 2)]:
+            with self.subTest(name=name):
+                report = types.explain(name)
+                self.assertEqual(report["cardinality"]["exact"], str(expected))
+                self.assertEqual(report["cardinality"]["text"], str(expected))
+                self.assertTrue(report["cardinality"]["within_exact_limit"])
+        self.assertEqual(adt.card_data(adt.LIMIT)["exact"], str(adt.LIMIT))
+        self.assertEqual(adt.card_data(None), {"text": "more than 2^4096", "exact": None,
+                                              "within_exact_limit": False})
+        self.assertEqual(adt.card_product([adt.LIMIT, 1]), adt.LIMIT)
+        self.assertIsNone(adt.card_product([adt.LIMIT, 2]))
+        self.assertIsNone(adt.card_sum([adt.LIMIT, 1]))
+
     def test_explanations_name_the_rule(self):
         types = types_of(SOURCE)
         explained = types.explain("Mode")
@@ -147,6 +165,44 @@ class CardinalityTests(unittest.TestCase):
         explained = types.explain("Pair")
         self.assertEqual(explained["rule"], "product of its fields: a (2) x b (2)")
         self.assertEqual(types.explain("Empty")["rule"], "an empty record has exactly one value")
+
+
+class SharedTypeTests(unittest.TestCase):
+    @staticmethod
+    def dag():
+        return {"T0": "bool", **{f"T{i}": "{" + ", ".join(f"f{j}: T{i - 1}" for j in range(32)) + "}"
+                                for i in range(1, 9)}}
+
+    def bounded_resolver(self):
+        original, visits = Types.resolve, []
+        def resolve(types, ty):
+            visits.append(ty)
+            self.assertLessEqual(len(visits), 128, "shared type nodes evaluated repeatedly")
+            return original(types, ty)
+        return visits, resolve
+
+    def test_shared_dag_depth_is_bounded(self):
+        visits, resolve = self.bounded_resolver()
+        with patch.object(Types, "resolve", resolve):
+            types = types_of(self.dag())
+            visits.clear()
+            self.assertEqual(types.depth(Ty("ref", ("T8",))), 8)
+            self.assertLessEqual(len(visits), 9)
+        too_deep = self.dag() | {"T9": "{x: T8}"}
+        with self.assertRaisesRegex(Refusal, "nests deeper than 8 levels"):
+            types_of(too_deep)
+
+    def test_shared_dag_cardinality_is_bounded_and_keeps_multiplicity(self):
+        # Isolate counting from the separately tested construction/depth walk.
+        with patch.object(Types, "depth", return_value=8):
+            types = types_of(self.dag())
+        visits, resolve = self.bounded_resolver()
+        with patch.object(Types, "resolve", resolve):
+            for level, expected in [(1, 2 ** 32), (2, 2 ** 1024), (8, None), (8, None)]:
+                visits.clear()
+                self.assertEqual(types.cardinality(Ty("ref", (f"T{level}",))), expected)
+                self.assertGreater(len(visits), 0)
+                self.assertLessEqual(len(visits), level + 1)
 
 
 class RefusalTests(unittest.TestCase):
@@ -170,6 +226,12 @@ class RefusalTests(unittest.TestCase):
         self.refused({"List": "nil | cons(List)"}, "Type List is recursive (List -> List)")
         self.refused({"A": "{b: B}", "B": "x | y(C)", "C": "list ..=2 of A"}, "is recursive (A -> B -> C -> A)")
         self.refused({"A": "B", "B": "A"}, "is recursive")
+
+    def test_mutable_builtins_refused(self):
+        with self.assertRaises(Refusal):
+            types_of({}, [Decl("Store", "opaque", (2, "two"))])
+        with self.assertRaisesRegex(Refusal, "Invalid opaque built-in Store"):
+            types_of({}, (Decl("Store", "opaque", [2, "two"]),))
 
     def test_bounds_and_names_refused(self):
         self.refused({"U": "Missing"}, "Type U refers to undeclared type Missing")

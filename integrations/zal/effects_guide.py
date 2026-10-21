@@ -226,7 +226,8 @@ def explain(model: effects.Signatures, topic: str) -> dict:
     kind, _, name = topic.partition(":")
     if kind == "type":
         return {**model.types.explain(name), "revision": model.revision}
-    if kind != "port" or model.lookup("operation", name) is None or model.lookup("footprint", name) is None:
+    if (kind != "port" or model.lookup("port", name) is None
+            or model.lookup("operation", name) is None or model.lookup("footprint", name) is None):
         raise Refusal("Explain a declared port as port:NAME or a type as type:NAME")
     types = model.types
     operation, footprint = model.lookup("operation", name), model.lookup("footprint", name)

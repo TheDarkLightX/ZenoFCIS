@@ -8,6 +8,7 @@ import random
 import re
 import subprocess
 import unittest
+from unittest.mock import patch
 
 import adt
 import effects
@@ -59,7 +60,8 @@ def edited(*edits):
 def declarations(model):
     """What the record bytes only number: names, tags, capability allowances, answer cases, codes and faults."""
     bits = {r.name: r.bit for r in model.resources}
-    cases = lambda name: [c for c, _ in model.types.by_name[name].body] if name in model.types.by_name else None
+    cases = lambda name: [[c, None if p is None else p.data()] for c, p in model.types.by_name[name].body] \
+        if name in model.types.by_name else None
     return {"ports": [[p.name, p.tag] for p in model.ports], "resources": [[r.name, r.bit] for r in model.resources],
             "capabilities": [[c.name, c.number, c.store, sum(bits[r] for r in c.reads), sum(bits[r] for r in c.writes)]
                              for c in model.capabilities],
@@ -71,7 +73,7 @@ def declarations(model):
 def rust_declarations(rust):
     return {"ports": rust["ports"], "resources": rust["resources"], "capabilities": rust["capabilities"],
             "answers": [[n, k, [[snake(c), p] for c, p in cases]] for n, k, cases in rust["answers"]],
-            "codes": [snake(c) for c in rust["codes"]], "faults": [snake(c) for c in rust["faults"]]}
+            "codes": [[snake(c), None] for c in rust["codes"]], "faults": [[snake(c), None] for c in rust["faults"]]}
 
 
 def first_difference(left, right):
@@ -84,7 +86,7 @@ def canonical_source(text):
 
 
 class ShellRegistryTests(unittest.TestCase):
-    """The headline: ZAL is the readable source of the Rust registry, and any drift fails here."""
+    """The shipped source matches the Rust registry's bytes and selected declaration metadata."""
 
     def test_shipped_ports_lower_byte_for_byte(self):
         model = effects.parse(EXAMPLE)
@@ -110,8 +112,80 @@ class ShellRegistryTests(unittest.TestCase):
             with self.subTest(declaration=key):
                 self.assertEqual(mine[key], theirs[key])
 
-    def test_any_drift_is_caught(self):
-        """Every single edit fails a check, lowers to other bytes, or declares other names than the Rust registry."""
+    def test_type_aliases_cannot_change_checked_behavior(self):
+        for name, body in [("Envelope", "bytes ..=1048575"), ("Status", "committed | replay | forged")]:
+            with self.subTest(type=name):
+                model = effects.parse(EXAMPLE)
+                types, lookup, decl = model.types, model.types.by_name, model.types.by_name[name]
+                before = (model.revision, model.render(), effects.lower(model), hash(types))
+                with self.assertRaises((AttributeError, TypeError)):
+                    lookup[name] = adt.parse_decl(name, body)
+                for field, value in [("decls", ()), ("prelude", ()), ("by_name", {})]:
+                    with self.assertRaises((AttributeError, TypeError)):
+                        setattr(types, field, value)
+                with self.assertRaises((AttributeError, TypeError)):
+                    decl.body = adt.parse_decl(name, body).body
+                self.assertEqual((model.revision, model.render(), effects.lower(model), hash(types)), before)
+                self.assertEqual(effects.check(model)["status"], "pass-with-scope")
+                self.assertEqual(types.cardinality(adt.Ty("ref", ("Status",))), 2)
+                with self.assertRaisesRegex(Refusal, "forged is not a case of Status"):
+                    types.parse_value(adt.Ty("ref", ("Status",)), "forged")
+                with self.assertRaises(TypeError):
+                    decl.body[0] = "changed"
+
+    def test_code_and_fault_payload_drift_is_caught(self):
+        baseline = effects.parse(EXAMPLE)
+        expected = rust_declarations(native())
+        for name, case, text in [("Code", "provider", "provider | schema"), ("Fault", "busy", "busy | full")]:
+            with self.subTest(type=name):
+                model = edited((text, text.replace(case, case + "(int 0..=1)", 1)))
+                self.assertEqual(effects.check(model)["status"], "pass-with-scope")
+                self.assertEqual(effects.lower(model), effects.lower(baseline))
+                self.assertEqual(model.types.cardinality(adt.Ty("ref", (name,))),
+                                 baseline.types.cardinality(adt.Ty("ref", (name,))) + 1)
+                key = "codes" if name == "Code" else "faults"
+                self.assertNotEqual(declarations(model)[key], expected[key])
+
+    def test_missing_port_control_reaches_registry_comparison(self):
+        import check_effects
+        control = next(c for c in check_effects.CONTROLS if c[0] == "source-port-missing-everywhere")
+        model = edited(*control[3])
+        self.assertEqual(effects.check(model)["status"], "pass-with-scope")
+        self.assertNotEqual(declarations(model)["ports"], rust_declarations(native())["ports"])
+
+    def test_port_coverage_control_has_no_unused_law(self):
+        with patch.object(CheckTests, "failed") as failed:
+            CheckTests().test_missing_port_fails()
+        model = failed.call_args_list[0].args[0]
+        used = {law for footprint in model.footprints for law in footprint.laws}
+        self.assertFalse({law.id for law in model.laws} - used,
+                         "an unused law masks the port coverage control")
+        self.assertIsNotNone(model.lookup("operation", "Acknowledge"))
+        self.assertIsNone(model.lookup("footprint", "Acknowledge"))
+
+    def test_unknown_law_control_has_no_unused_law(self):
+        # Inspect the actual named test's first witness, so an orphan cannot mask it.
+        with patch.object(CheckTests, "failed") as failed:
+            CheckTests().test_unknown_law_fails()
+        model = failed.call_args_list[0].args[0]
+        used = {law for footprint in model.footprints for law in footprint.laws}
+        declared = {law.id for law in model.laws}
+        self.assertEqual(used - declared, {99})
+        self.assertFalse(declared - used, "an unused law masks the unknown law control")
+
+    def test_drift_documentation_states_selected_scope(self):
+        text = (ROOT / "docs/zal/EFFECTS.md").read_text()
+        self.assertFalse("Any drift" in text, "documentation overstates the selected drift coverage")
+        self.assertIn("Sixteen selected single edits", text)
+        baseline = effects.parse(EXAMPLE)
+        frame_edit = edited(("refused unchanged", "refused applied"))
+        self.assertEqual(effects.check(frame_edit)["status"], "pass-with-scope")
+        self.assertEqual(effects.lower(frame_edit), effects.lower(baseline))
+        self.assertEqual(declarations(frame_edit), declarations(baseline))
+        self.assertIn("Frames are checked\n  for exhaustiveness only.", text)
+
+    def test_selected_drift_is_caught(self):
+        """The sixteen selected edits differ in checks, record bytes or compared declaration metadata."""
         rust = native()
         expected, theirs = bytes.fromhex(rust["canonical"]), rust_declarations(rust)
         drifts = [("type Envelope = bytes ..=1048576;", "type Envelope = bytes ..=1048575;"),
@@ -176,7 +250,10 @@ class ShellRegistryTests(unittest.TestCase):
 
 class CheckTests(unittest.TestCase):
     def failed(self, model, obligation, reason):
-        report = effects.check(model)
+        try:
+            report = effects.check(model)
+        except Exception as error:
+            self.fail(f"{obligation} not reported by name: {type(error).__name__}: {error}")
         self.assertEqual((report["status"], report.get("obligation")), ("fail", obligation), report.get("reason"))
         self.assertIn(reason, report["reason"])
         with self.assertRaises(Refusal):
@@ -184,8 +261,10 @@ class CheckTests(unittest.TestCase):
 
     def test_missing_port_fails(self):
         operation = [line for line in EXAMPLE.splitlines() if line.startswith(("operation Acknowledge", "footprint Acknowledge"))]
+        law = next(line for line in EXAMPLE.splitlines() if line.startswith("law 6 "))
+        self.failed(edited((operation[1] + "\n", ""), (law + "\n", "")),
+                    "port_coverage", "port Acknowledge has no footprint")
         self.failed(edited(*[(line + "\n", "") for line in operation]), "port_coverage", "port Acknowledge has no operation")
-        self.failed(edited((operation[1] + "\n", "")), "port_coverage", "port Acknowledge has no footprint")
         self.failed(edited(("Wait = 10;", "Wait = 10, Spare = 11;")), "port_coverage", "port Spare has no operation")
         model = effects.parse(EXAMPLE.replace("Clock = 8, ", ""))
         self.failed(model, "port_coverage", "operation Clock names no declared port")
@@ -214,7 +293,7 @@ class CheckTests(unittest.TestCase):
             edited(("reads {jitter}, writes {jitter}, laws [9]", "reads {entropy}, writes {jitter}, laws [9]"))
 
     def test_unknown_law_fails(self):
-        self.failed(edited(("laws [1, 2]", "laws [1, 99]")), "laws", "operation Commit names law 99, which does not exist")
+        self.failed(edited(("laws [1, 2]", "laws [1, 2, 99]")), "laws", "operation Commit names law 99, which does not exist")
         self.failed(edited(("laws [1, 2]", "laws [1, 1, 2]")), "laws", "operation Commit names law 1 twice")
         self.failed(edited(("laws [9]", "laws []")), "laws", "operation Random names no law")
         self.failed(edited(("laws [9]", "laws [8]")), "laws", "law 9 jitter-in-range is named by no operation")
@@ -377,6 +456,19 @@ class GuideTests(unittest.TestCase):
             with self.assertRaises(Refusal):
                 guide.guide(model, topic)
         self.assertEqual(guide.guide(model, "capability:Clock")["construct"], "capability")
+
+    def test_explain_requires_a_declared_port(self):
+        model = effects.parse(EXAMPLE.replace("Clock = 8, ", ""))
+        self.assertEqual(effects.check(model)["obligation"], "port_coverage")
+        with self.assertRaisesRegex(Refusal, "declared port"):
+            guide.explain(model, "port:Clock")
+
+    def test_human_counts_are_lossless(self):
+        model = effects.parse(EXAMPLE + "type Blob = bytes ..=64;\n"
+                              "type Maybe = none | some(Blob);\ntype Pair = {x: Maybe, y: Maybe};\n")
+        blob = (256 ** 65 - 1) // 255
+        for name, count in [("Blob", blob), ("Maybe", blob + 1), ("Pair", (blob + 1) ** 2)]:
+            self.assertIn(str(count), guide.human_text(guide.explain(model, "type:" + name)))
 
     def test_explain_port_and_type(self):
         model = effects.parse(EXAMPLE)

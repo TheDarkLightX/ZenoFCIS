@@ -172,11 +172,15 @@ involved.
   the lowered bytes with the record that a small Rust example prints from the
   shell library built from the same tree. It also compares the port, resource,
   capability, answer, refusal-code and fault names and numbers, and capability
-  allowances, which the record bytes do not carry. The printer reports the
-  SHA-256 of `registry.rs`, so a stale build is refused.
-- **Any drift fails a test.** Sixteen single edits of the source are each caught
-  by a check, by the bytes or by the declarations; a change to the Rust registry
-  fails the same comparison.
+  allowances, which the record bytes do not carry. Code and Fault case payload
+  schemas are compared too: the shipped cases must be nullary. The printer
+  reports the SHA-256 of `registry.rs`, so a stale build is refused.
+- **Sixteen selected single edits are detected.** They cover byte caps, integer
+  ranges, member/case/law order, V2 call names and mappings, law text, resource
+  bits, port tags, capability store flags and allowances, footprint resources,
+  answer shapes, and refusal and fault cases.
+  Each edit changes the lowered bytes or compared declaration metadata. These
+  comparisons do not cover every source edit or prove handler behavior.
 - **Laws are named, not checked.** The checks confirm that laws exist and are
   used; whether a handler satisfies a law is separate work. Frames are checked
   for exhaustiveness only.

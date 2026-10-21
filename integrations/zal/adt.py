@@ -9,6 +9,8 @@ fields and a variant adds the counts of its cases.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cache
+from types import MappingProxyType
 import itertools
 import re
 
@@ -320,7 +322,7 @@ def card_sequences(count, cap):
 
 
 def card_text(count) -> str:
-    """Exact count text: decimal below 2^64, else a short sum of powers of two, else bounds."""
+    """Lossless count text: decimal or a short sum of powers of two; a bound only above the limit."""
     if count is None:
         return f"more than 2^{EXACT_BITS}"
     if count < 1 << 64:
@@ -328,19 +330,29 @@ def card_text(count) -> str:
     powers = [bit for bit in range(count.bit_length()) if count >> bit & 1]
     if len(powers) <= 4:
         return " + ".join("1" if bit == 0 else f"2^{bit}" for bit in reversed(powers))
-    return f"between 2^{count.bit_length() - 1} and 2^{count.bit_length()}"
+    return str(count)
 
 
 def card_data(count):
-    return {"text": card_text(count), "exact": str(count) if count is not None and count.bit_length() <= 512 else None,
+    return {"text": card_text(count), "exact": str(count) if count is not None else None,
             "within_exact_limit": count is not None}
 
 
+@dataclass(frozen=True)
 class Types:
     """A checked set of declared types plus a profile's opaque built-ins, sorted by name."""
 
-    def __init__(self, decls: tuple, prelude: tuple = ()):
-        if (not isinstance(decls, tuple) or len(decls) > MAX_TYPES
+    decls: tuple
+    prelude: tuple = ()
+
+    @property
+    def by_name(self):
+        """A read-only lookup derived solely from the immutable declarations."""
+        return MappingProxyType({d.name: d for d in (*self.prelude, *self.decls)})
+
+    def __post_init__(self):
+        decls, prelude = self.decls, self.prelude
+        if (not isinstance(decls, tuple) or not isinstance(prelude, tuple) or len(decls) > MAX_TYPES
                 or any(not isinstance(d, Decl) for d in (*decls, *prelude))):
             raise Refusal(f"At most {MAX_TYPES} declared types")
         names = [d.name for d in decls]
@@ -350,8 +362,12 @@ class Types:
                 raise Refusal(f"Type {name} is declared twice")
         if names != sorted(names):
             raise Refusal("IR types must be sorted by name")
-        self.decls, self.prelude = decls, prelude
-        self.by_name = {d.name: d for d in (*prelude, *decls)}
+        for decl in prelude:
+            if (decl.form != "opaque" or not re.fullmatch(TYPE_NAME, decl.name)
+                    or not isinstance(decl.body, tuple) or len(decl.body) != 2
+                    or type(decl.body[0]) is not int or not 1 <= decl.body[0] <= LIMIT
+                    or not isinstance(decl.body[1], str)):
+                raise Refusal(f"Invalid opaque built-in {decl.name}")
         for decl in decls:
             self._validate(decl)
         verified = set()
@@ -427,33 +443,39 @@ class Types:
 
     def cardinality(self, ty: Ty):
         """The exact number of values, or None when it exceeds 2^EXACT_BITS."""
-        target = self.resolve(ty)
-        if isinstance(target, Decl):
-            if target.form == "opaque":
-                return target.body[0]
-            counts = [1 if t is None else self.cardinality(t) for _, t in target.body]
-            return card_product(counts) if target.form == "record" else card_sum(counts)
-        kind, args = target.kind, target.args
-        if kind == "unit":
-            return 1
-        if kind == "bool":
-            return 2
-        if kind == "int":
-            return args[1] - args[0] + 1
-        if kind == "bytes":
-            return 256 ** args[0] if 8 * args[0] <= EXACT_BITS else None
-        if kind == "bytes_max":
-            return card_sequences(256, args[0])
-        return card_sequences(self.cardinality(args[0]), args[1])
+        @cache
+        def count(node):
+            target = self.resolve(node)
+            if isinstance(target, Decl):
+                if target.form == "opaque":
+                    return target.body[0]
+                counts = [1 if t is None else count(t) for _, t in target.body]
+                return card_product(counts) if target.form == "record" else card_sum(counts)
+            kind, args = target.kind, target.args
+            if kind == "unit":
+                return 1
+            if kind == "bool":
+                return 2
+            if kind == "int":
+                return args[1] - args[0] + 1
+            if kind == "bytes":
+                return 256 ** args[0] if 8 * args[0] <= EXACT_BITS else None
+            if kind == "bytes_max":
+                return card_sequences(256, args[0])
+            return card_sequences(count(args[0]), args[1])
+        return count(ty)
 
     def depth(self, ty: Ty) -> int:
         """Composite nesting: a record, variant or list adds one level; aliases add none."""
-        target = self.resolve(ty)
-        if isinstance(target, Decl):
-            if target.form == "opaque":
-                return 0
-            return 1 + max([self.depth(t) for _, t in target.body if t is not None], default=0)
-        return 1 + self.depth(target.args[0]) if target.kind == "list" else 0
+        @cache
+        def levels(node):
+            target = self.resolve(node)
+            if isinstance(target, Decl):
+                if target.form == "opaque":
+                    return 0
+                return 1 + max([levels(t) for _, t in target.body if t is not None], default=0)
+            return 1 + levels(target.args[0]) if target.kind == "list" else 0
+        return levels(ty)
 
     def values(self, ty: Ty, cap: int) -> list:
         """Every value in canonical order; refuses a type with more than `cap` values by name."""

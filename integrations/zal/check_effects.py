@@ -26,6 +26,8 @@ HEADLINE = EFFECTS + "ShellRegistryTests.test_shipped_ports_lower_byte_for_byte"
 ACKNOWLEDGE = ("operation Acknowledge(store: Store, delivery_id: Hash, payload_sha256: Hash) -> Outcome unit;\n"
                "footprint Acknowledge: capability Relay, reads {durable, volatile}, writes {durable, volatile}, laws [6], "
                "v2 calls [V2SqliteShell::pending_by_id, Pending::relayed, Delivered::acknowledge];\n")
+ACKNOWLEDGE_LAW = ('law 6 acknowledge-exact: "a matching (id, hash) sets only that record\'s bit, atomically and '
+                   'monotonically; a wrong ID or hash refuses; repeating gives AlreadyAcknowledged";\n')
 # (label, named test, file, [(original, defect)])
 CONTROLS = [
     ("frame-misses-a-variant-case", EFFECTS + "CheckTests.test_frame_must_cover_every_case", "effects.py",
@@ -46,7 +48,7 @@ CONTROLS = [
     ("source-port-operation-missing", HEADLINE, "examples/shell_effects.zal", [(ACKNOWLEDGE, "")]),
     ("source-port-missing-everywhere", HEADLINE, "examples/shell_effects.zal",
      [(ACKNOWLEDGE, ""), (" Acknowledge = 6, Reopen = 7, Clock = 8, Random = 9, Wait = 10;",
-                          " Reopen = 7, Clock = 8, Random = 9, Wait = 10;")]),
+                          " Reopen = 7, Clock = 8, Random = 9, Wait = 10;"), (ACKNOWLEDGE_LAW, "")]),
     ("source-byte-cap-changed", HEADLINE, "examples/shell_effects.zal",
      [("type Envelope = bytes ..=1048576;", "type Envelope = bytes ..=1048575;")]),
     ("source-capability-allowance-changed", EFFECTS + "ShellRegistryTests.test_declarations_match_the_rust_registry",
