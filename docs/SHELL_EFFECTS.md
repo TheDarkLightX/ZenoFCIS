@@ -187,6 +187,101 @@ Disk-full and other I/O failures are qualified only in the simulation, by
 the `NotApplied` and `Unknown` branches they map to. No deterministic SQLite
 fixture produces them.
 
+## Authenticated local HTTP ingress
+
+`zeno-fcis-ingress` is an opt-in shell crate. It uses a hand-built current-thread
+runtime and HTTP/1, outside every purity-checked semantic crate. TLS terminates
+at a trusted proxy in front of the ingress. `Server::serve_one` requires a
+loopback listener and peer. `serve_connection` accepts a caller-protected local
+byte stream; its caller is responsible for transport and peer validation.
+Neither API supplies application decision authority.
+
+Configure one random 32-byte credential, its principal, the SHA-256 of the full
+Authority identity, one exact browser origin, and a nonzero deadline up to 60
+seconds. The credential header is exactly `Authorization: Bearer ` followed by
+64 lowercase hexadecimal digits. A full-width comparison checks the decoded
+credential. The source rule checks that comparison's form; it does not prove
+compiled-code or hardware timing independence. No credential enters a trace.
+
+Only `POST /command` is accepted. Its binary body is version byte 1, contract
+hash (32 bytes), caller-retained retry key (32 bytes), expected revision (8 bytes,
+big endian), then the exact canonical application command. `encode_command`
+constructs it. There is no actor field. Headers are bounded to 4096 bytes and 24
+entries; all repeated headers and non-ASCII values refuse. A bounded prefix
+guard rejects duplicate Content-Length and length-plus-transfer-encoding before
+hyper can normalize them. Body framing remains entirely with hyper. Bodies, including
+chunked bodies, are bounded to 65536 bytes while streaming. A present Origin
+must match exactly; cross-site Fetch Metadata also refuses. Missing Origin is
+allowed for native clients. The same total deadline covers header and body
+acquisition. Once entered, a synchronous core or SQLite call runs to completion;
+the deadline cannot roll back a committed transaction.
+
+`Durable` binds the principal to a defensively copied canonical application
+context. The application must express that principal's rights in its checked
+contract. Audited history recovers the original inputs, not a capability.
+Authority rebuilds every committing publication. Commit and delivery use the
+existing checked programs and production terminal, retaining the transaction's
+expected-version check and atomic state, receipt, replay and outbox publication.
+No SQL or schema order changes. A retry key is scoped by principal and contract;
+changed command bytes, context or expected revision under that key refuse.
+After uncertainty retain the exact body and original key. Never generate a new
+key just because a reply was lost.
+
+A successful response body (`ZFIP1`) contains request and scoped replay hashes,
+the original publication subject and poststate (each with an 8-byte big-endian
+length), then original commit version (8 bytes) and chain hash (32 bytes).
+Fresh commit and replay return identical packet bytes; the transient replay
+status and delivery progress are excluded. HTTP failure statuses distinguish
+malformed request (400), credential (401), origin/binding (403), size (413),
+replay/revision conflict (409), core refusal (422) and uncertainty (503). A 503
+may follow a successful commit. Delivery retries are bounded to two with the
+program's backoff and supplied time adapter. Exhaustion preserves the pending
+outbox. Send and acknowledgement still rely on the terminal's transport report,
+which is no proof of authenticated receipt or exactly-once external effects.
+
+`TraceSink` receives only a fixed event and optional request, replay, decision,
+commit and delivery hashes. Early parser/credential failures have no admitted
+request ID. Crashes may leave only a prefix. Sinks must preserve that prefix;
+they must not invent a commit event. No request bytes, context, payload, header,
+credential or arbitrary error text is passed to the sink.
+
+Ownership follows one serial path: configuration and admitted command own their
+bytes; Authority and its bound descriptor remain immutably borrowed; publication
+views cannot outlive their borrowed inputs. The server exclusively owns its
+terminal and sink. Its short RefCell borrow begins after body acquisition and
+ends before the next request. Program continuations and output packet buffers
+are invocation-local owned values, discarded on refusal or moved to the reply.
+Terminal storage state is effectful shell state, not a core cache. Per-handle
+abort controls exist only with `crash-injection`, preserve the original mode's
+revision/cap guards, and are consumed on the next commit.
+
+The ingress tests use real loopback by default. `INGRESS_TEST_MEMORY=1` explicitly
+selects a socket-free HTTP byte-stream adapter. It exercises the same parser,
+credential checks, programs and production SQLite calls, including actual child
+process aborts, but supplies no TCP or loopback evidence. The fault corpus covers
+each applicable stage-2 Fault choice individually, eight SQLite statement
+boundaries, a real busy transaction, duplicate/reordered deliveries and a lost
+reply. It is a targeted corpus, not the exhaustive stage-2 state space. Disk-full
+and other I/O faults remain simulation-only. There is no power-loss qualification
+or delivery-liveness claim.
+
+Run the ingress tests with the pinned locked toolchain. Run
+`python3 tools/check_ingress_controls.py --out <receipt.json>` for seven compiled
+negative controls and restored baselines; `--memory` selects only the explicit
+socket-free evidence lane. `tools/check_ingress.py` checks the source inventory,
+credential rule and dependency feature pins. `--base-lock <Cargo.lock>` also
+requires precisely the reviewed add-only dependency closure. Source-bound
+receipts must be refreshed after final edits. These checks are development
+evidence, not release authority.
+
+The root Cargo manifests belong to the evaluator's approved source closure.
+Workspace or dependency changes therefore require the sanctioned
+`tools/check_authority_v2.py --generate-sources` command with the approved
+`verification/verus/authority_v2_sources.json`, followed by `--check-sources`.
+This intentionally changes evaluator and Authority identity bytes. Requalify
+source-bound artifacts before adoption; opening an existing store under a
+changed identity requires the explicit library upgrade path.
+
 ## Checks
 
 `tools/check_shell_effects_controls.py` builds twenty-five mutants. Each must fail

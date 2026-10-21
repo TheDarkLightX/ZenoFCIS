@@ -116,6 +116,7 @@ publication uses the nominal authorization boundary instead.
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-shell-sqlite` | Crash-atomic, policy-pinned SQLite authorized publication and outbox delivery |
+| `zeno-fcis-ingress` | Bounded authenticated HTTP acquisition around the checked shell-effect programs and SQLite handler |
 | `zeno-fcis-adapter` | Callable and strict JSON-line mounted-runtime comparison |
 | `zeno-fcis-codegen` | Deterministic Rust/Python schema and vector generation |
 | `zeno-fcis-bootstrap` | Deterministic project starter generation from a reviewed catalog |

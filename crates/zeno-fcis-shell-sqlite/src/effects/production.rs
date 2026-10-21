@@ -106,6 +106,8 @@ pub struct Production<'a, 'p, T: Transport, C: Time = NoTime> {
     time: Option<C>,
     #[cfg(feature = "crash-injection")]
     interrupt: Option<crate::CrashPoint>,
+    #[cfg(feature = "crash-injection")]
+    abort: bool,
 }
 
 impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
@@ -137,6 +139,8 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
             time,
             #[cfg(feature = "crash-injection")]
             interrupt: None,
+            #[cfg(feature = "crash-injection")]
+            abort: false,
         })
     }
 
@@ -208,6 +212,14 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         self.interrupt = Some(point);
     }
 
+    /// Abort, without destructors, at the next commit's selected boundary.
+    /// Test-only, per-handle and consumed once; supplies no decision authority.
+    #[cfg(feature = "crash-injection")]
+    pub fn abort_next_commit_at(&mut self, point: crate::CrashPoint) {
+        self.interrupt = Some(point);
+        self.abort = true;
+    }
+
     /// Sets the handle's SQLite busy timeout, for busy tests.
     #[cfg(feature = "crash-injection")]
     pub fn set_test_busy_timeout(&mut self, timeout: std::time::Duration) -> Result<(), Error> {
@@ -245,18 +257,24 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         };
         #[cfg(feature = "crash-injection")]
         let interrupt = self.interrupt.take();
+        #[cfg(feature = "crash-injection")]
+        let abort = std::mem::take(&mut self.abort);
         let shell = match self.shell() {
             Ok(shell) => shell,
             Err(error) => return answer(Port::Commit, Err(error), true),
         };
         #[cfg(feature = "crash-injection")]
-        let result = match mode {
-            CommitMode::Unversioned => shell.commit_with_crash(key, publication, interrupt),
-            CommitMode::At(version) => {
-                shell.commit_with_crash_at(version, key, publication, interrupt)
-            }
-            CommitMode::BoundedAt(version, cap) => {
-                shell.commit_bounded_with_crash_at(version, key, publication, cap, interrupt)
+        let result = if abort {
+            shell.commit_effects_abort(mode, key, publication, interrupt)
+        } else {
+            match mode {
+                CommitMode::Unversioned => shell.commit_with_crash(key, publication, interrupt),
+                CommitMode::At(version) => {
+                    shell.commit_with_crash_at(version, key, publication, interrupt)
+                }
+                CommitMode::BoundedAt(version, cap) => {
+                    shell.commit_bounded_with_crash_at(version, key, publication, cap, interrupt)
+                }
             }
         };
         #[cfg(not(feature = "crash-injection"))]

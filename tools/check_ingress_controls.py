@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Build each ingress mutant, check its named failure, then rerun the baseline.
+
+Default execution uses real loopback. --memory selects the explicit byte-stream
+harness; that evidence does not qualify TCP or loopback operation.
+"""
+from __future__ import annotations
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+HTTP = "crates/zeno-fcis-ingress/src/http.rs"
+DURABLE = "crates/zeno-fcis-ingress/src/durable.rs"
+CONTROLS = [
+    ("body-actor", "http", "actor_from_credential", "actor came from body", HTTP,
+     "principal: config.principal,", "principal: Hash32::new(body[73..105].try_into().unwrap_or([0; 32])),"),
+    ("missing-size-limit", "http", "oversized_requests", "body size limit missing", HTTP,
+     "Limited::new(request.into_body(), MAX_BODY)", "Limited::new(request.into_body(), usize::MAX)"),
+    ("duplicate-header", "http", "duplicate_headers", "duplicate header accepted", HTTP,
+     "if headers.get_all(name).iter().count() != 1 {", "if false && headers.get_all(name).iter().count() != 1 {"),
+    ("cross-origin", "http", "cross_origin", "cross-origin accepted", HTTP,
+     "origin.as_bytes() != config.origin.as_bytes()", "false"),
+    ("changed-command", "journey", "durable_journey_and_changed_key", "changed command accepted under old key", DURABLE,
+     "entry.publication.command != command.bytes", "false"),
+    ("trace-secret", "http", "trace_redaction", "secret in trace", HTTP,
+     "let trace = Trace::request(&command);", "let trace = Trace { request: Some(Hash32::new(config.secret)), ..Trace::request(&command) };"),
+    ("credential-compare", None, "credential-constant-time", "credential-constant-time", HTTP,
+     "difference |= std::hint::black_box(candidate[index] ^ configured[index]);", "if candidate[index] != configured[index] { return false; } difference |= 0;"),
+]
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--memory", action="store_true")
+    parser.add_argument("--out", type=Path, required=True)
+    args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, CARGO_NET_OFFLINE="true")
+    if args.memory: env["INGRESS_TEST_MEMORY"] = "1"
+    else: env.pop("INGRESS_TEST_MEMORY", None)
+    cargo = ["cargo", "+1.97.1", "test", "--offline", "--locked", "-p", "zeno-fcis-ingress"]
+    rows = []
+    def run(root, command, label):
+        result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=600)
+        log = result.stdout+result.stderr
+        args.out.with_name(label+".log").write_text(log)
+        return result.returncode, log
+    def check(root, suite, name, label):
+        command = cargo+["--test", suite, name, "--", "--exact", "--nocapture"] if suite else ["python3", "tools/check_ingress.py"]
+        return run(root, command, label)
+    with tempfile.TemporaryDirectory(prefix="ingress-controls-") as directory:
+        source = Path(directory)/"source"
+        shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "target", "node_modules", "__pycache__"))
+        for name, suite, test, marker, path, before, after in CONTROLS:
+            code, log = check(source, suite, test, name+"-baseline-before")
+            if code or (suite and "1 passed" not in log): raise RuntimeError(f"baseline failed: {name}")
+            target = source/path
+            original = target.read_text()
+            if original.count(before) != 1: raise RuntimeError(f"nonunique mutation anchor: {name}")
+            target.write_text(original.replace(before, after))
+            build, _ = run(source, cargo+["--no-run"], name+"-build")
+            code, log = check(source, suite, test, name+"-mutant")
+            target.write_text(original)
+            restored, baseline_log = check(source, suite, test, name+"-baseline-after")
+            killed = code == (101 if suite else 1) and marker in log and (not suite or "test result: FAILED" in log)
+            row = dict(control=name, check=test, build=build, mutant=code, baseline=restored, killed=killed, transport="memory" if args.memory else "loopback")
+            rows.append(row)
+            args.out.write_text(json.dumps(rows, indent=2)+"\n")
+            print(json.dumps(row), flush=True)
+            if build or not killed or restored or (suite and "1 passed" not in baseline_log): raise RuntimeError(f"control did not meet build/fail/baseline obligation: {name}")
+    print("ingress controls: PASS (7 compiled mutants; named failures; restored baselines)")
+    return 0
+if __name__ == "__main__":
+    raise SystemExit(main())

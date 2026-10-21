@@ -780,6 +780,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_check_api_refusals.py"),
          ("python3", "tools/check_api_refusals.py")),
     ),
+    "authenticated-ingress": AcceptanceScenario(
+        "Authenticate HTTP commands and recover one durable SQLite connection",
+        (("python3", "tools/check_ingress.py", "--require-loopback"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-ingress", "--locked", "--offline")),
+    ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked",

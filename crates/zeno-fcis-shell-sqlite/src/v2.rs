@@ -999,6 +999,32 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             before_transaction,
         )
     }
+    // Preserve the production mode's version/cap guards during real abort tests.
+    #[cfg(feature = "crash-injection")]
+    pub(crate) fn commit_effects_abort(
+        &mut self,
+        mode: zeno_fcis_shell::effects::port::CommitMode,
+        replay_id: Hash32,
+        publication: Publication<'_>,
+        crash: Option<CrashPoint>,
+    ) -> Result<CommitReceipt, Error> {
+        use zeno_fcis_shell::effects::port::CommitMode;
+        let (expected, cap) = match mode {
+            CommitMode::Unversioned => (None, None),
+            CommitMode::At(version) => (Some(version), None),
+            CommitMode::BoundedAt(version, cap) => (Some(version), Some(cap)),
+        };
+        self.commit_controlled(
+            replay_id,
+            publication,
+            crash,
+            expected,
+            cap,
+            super::CrashMode::Abort,
+            || {},
+        )
+    }
+
     /// Set a connection-local wait limit for deterministic busy simulations.
     #[cfg(feature = "crash-injection")]
     pub fn set_test_busy_timeout(&mut self, timeout: std::time::Duration) -> Result<(), Error> {

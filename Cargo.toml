@@ -40,6 +40,7 @@ members = [
     "crates/zeno-fcis-contract",
     "crates/zeno-fcis-cli",
     "crates/zeno-fcis-shell-sqlite",
+    "crates/zeno-fcis-ingress",
     "crates/zeno-fcis-collections",
 ]
 

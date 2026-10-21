@@ -16,6 +16,7 @@ from typing import Iterator
 
 from resolved_purity import ResolvedChecker, ResolutionError
 from workflow_contexts import check_contexts
+from check_ingress import source_failures as ingress_source_failures
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-adapter": 3,
     "zeno-fcis-adapter-zenodex": 3,
     "zeno-fcis-shell-sqlite": 5,
+    "zeno-fcis-ingress": 6,
     "zeno-fcis-collections": 3,
 }
 
@@ -757,6 +759,7 @@ def main() -> int:
         failures.append("semantic source inspection not performed: actual resolver unavailable")
     failures.extend(check_decoder_allocation_guards())
     failures.extend(check_workflows())
+    failures.extend(ingress_source_failures(ROOT))
 
     if failures:
         for failure in failures:
