@@ -36,6 +36,7 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("src/paths.rs", include_bytes!("paths.rs")),
     ("src/source.rs", include_bytes!("source.rs")),
     ("src/substance.rs", include_bytes!("substance.rs")),
+    ("src/tables.rs", include_bytes!("tables.rs")),
     ("src/views.rs", include_bytes!("views.rs")),
 ];
 

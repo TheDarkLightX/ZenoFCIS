@@ -1982,7 +1982,7 @@ impl TemporalFormula {
     }
 }
 
-fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
+pub(crate) fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
     let mut stack = Vec::new();
     stack.push((value, 1usize));
     let mut nodes = 0usize;

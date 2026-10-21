@@ -1,32 +1,73 @@
 //! Recovering parser for language version 1.
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::format;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::ast::*;
 use crate::diagnostic::{
-    AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, text,
+    AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
 };
 use crate::lexer::{Token, TokenKind, lex};
-use crate::{MAX_FORMULA_DEPTH, SourceLimits, ZENO_DSL_VERSION};
+use crate::tables::{self, MAX_TABLE_ENTRIES, Rewrite, TableExpansion, TableInfo};
+use crate::{MAX_FORMULA_DEPTH, MAX_FORMULA_NODES, SourceLimits, ZENO_DSL_VERSION};
 
 /// Parses one bounded `.zeno` source file and accumulates deterministic diagnostics.
 pub fn parse_project(source: &str, limits: SourceLimits) -> Result<ParsedProject, DiagnosticSet> {
+    parse_with_tables(source, limits).map(|(parsed, _)| parsed)
+}
+
+/// Parses one source file and returns the exact expansion of its table forms:
+/// the source with each table declaration, index type and table formula
+/// replaced by what it expands to, as [`TableExpansion`] describes.
+pub fn expand_tables(source: &str, limits: SourceLimits) -> Result<TableExpansion, DiagnosticSet> {
+    let (_, parser) = parse_with_tables(source, limits)?;
+    let mut tables = parser.table_infos;
+    tables.sort_by_key(|table| table.id);
+    match tables::apply(source, parser.rewrites) {
+        Some(text) => Ok(TableExpansion { text, tables }),
+        None => Err(DiagnosticSet::from_vec(
+            vec![Diagnostic::new(
+                DiagnosticCode::InvalidDeclaration,
+                DiagnosticStage::Parse,
+                AstPath::new("table.expansion"),
+                SourceSpan::new(0, 0, 1, 1),
+                "disjoint table expansions",
+                "overlapping table expansions",
+                "report this expansion failure",
+            )],
+            limits.max_diagnostics(),
+        )),
+    }
+}
+
+fn parse_with_tables(
+    source: &str,
+    limits: SourceLimits,
+) -> Result<(ParsedProject, Parser), DiagnosticSet> {
     let (tokens, diagnostics) = lex(source, limits);
     let mut parser = Parser {
+        tables: tables::prescan(&tokens),
         tokens,
         index: 0,
         diagnostics,
         declarations: Vec::new(),
         merge_order: Vec::new(),
         nesting: 0,
+        declaration_start: SourceSpan::new(0, 0, 1, 1),
+        bound: Vec::new(),
+        table_depth: 0,
+        table_values: 0,
+        expanded: 0,
+        rewrites: Vec::new(),
+        table_infos: Vec::new(),
     };
     let parsed = parser.parse(limits.max_diagnostics());
     if parser.diagnostics.is_empty() {
-        Ok(parsed)
+        Ok((parsed, parser))
     } else {
         Err(DiagnosticSet::from_vec(
             parser.diagnostics,
@@ -42,6 +83,21 @@ struct Parser {
     declarations: Vec<SpannedDeclaration>,
     merge_order: Vec<StableId>,
     nesting: usize,
+    /// The first token of the declaration being parsed.
+    declaration_start: SourceSpan,
+    /// Table sizes by ID, from every table declaration in the file.
+    tables: BTreeMap<u32, u32>,
+    /// Bound formula variables, innermost last: a table index's value, or
+    /// `None` for a quantifier or sum variable, which shadows table indices.
+    bound: Vec<(Box<str>, Option<i128>)>,
+    /// Table forms being expanded; rewrites are recorded only outside them.
+    table_depth: usize,
+    /// Table value forms parsed so far, to find the atoms that contain one.
+    table_values: usize,
+    /// Expanded formula nodes, bounded by `MAX_FORMULA_NODES`.
+    expanded: usize,
+    rewrites: Vec<Rewrite>,
+    table_infos: Vec<TableInfo>,
 }
 
 impl Parser {
@@ -87,12 +143,16 @@ impl Parser {
         };
         while !matches!(self.current().kind, TokenKind::Eof) {
             let start = self.current().span;
+            self.declaration_start = start;
             let result = if self.take_keyword("namespace") {
                 self.parse_namespace().map(Declaration::Namespace)
             } else if self.take_keyword("type") {
                 self.parse_type().map(Declaration::Type)
             } else if self.take_keyword("field") {
                 self.parse_field().map(Declaration::Field)
+            } else if self.take_keyword("table") {
+                self.parse_table();
+                None
             } else if self.take_keyword("variant") {
                 self.parse_variant().map(Declaration::Variant)
             } else if self.take_keyword("reason") {
@@ -147,6 +207,9 @@ impl Parser {
     fn parse_type(&mut self) -> Option<TypeDecl> {
         let id = self.take_id("type.id")?;
         let kind_name = self.take_identifier("type.kind")?;
+        if kind_name.as_str() == "index" {
+            return self.parse_index_type(id);
+        }
         let kind = match kind_name.as_str() {
             "state" => TypeKind::State,
             "command" => TypeKind::Command,
@@ -341,6 +404,119 @@ impl Parser {
                 declared
             }
         }
+    }
+    /// Parses `type ID index Name of TABLE;`, the integer type `0..=N-1` of
+    /// a table of N entries.
+    fn parse_index_type(&mut self, id: StableId) -> Option<TypeDecl> {
+        let name = self.take_identifier("type.name")?;
+        self.expect_keyword("of", "type.index");
+        let table = self.take_id("type.index.table")?;
+        self.expect_symbol(TokenKind::Semicolon, "type");
+        let Some(size) = self.tables.get(&table.get()).copied() else {
+            self.error_at(
+                self.declaration_start,
+                DiagnosticCode::UnknownReference,
+                "type.index.table",
+                "a declared table",
+                text(table.get()),
+                "declare `table ID OWNER name TYPE size N;` or index a declared table",
+            );
+            return None;
+        };
+        let max = i128::from(size.max(1) - 1);
+        let declared =
+            TypeDecl::new(id, TypeKind::Int, name).with_range(IntRange::try_new(0, max)?)?;
+        self.rewrite_declaration(format!(
+            "type {} int {} in 0..={max};",
+            id.get(),
+            declared.name().as_str()
+        ));
+        Some(declared)
+    }
+    /// Parses `table ID OWNER name TYPE size N;` into the N fields
+    /// `ID + k` named `name_k`, each declared at the table's span.
+    fn parse_table(&mut self) {
+        let start = self.declaration_start;
+        let Some((id, owner, name, field_type, size)) = self.parse_table_header() else {
+            self.recover_top();
+            return;
+        };
+        if size == 0 || size > MAX_TABLE_ENTRIES {
+            self.error_at(
+                start,
+                if size == 0 {
+                    DiagnosticCode::InvalidDeclaration
+                } else {
+                    DiagnosticCode::ResourceLimit
+                },
+                "table.size",
+                format!("1..={MAX_TABLE_ENTRIES} entries"),
+                text(size),
+                "declare between one and 64 entries",
+            );
+            return;
+        }
+        let mut lines = Vec::new();
+        for k in 0..size {
+            let entry = id.get().checked_add(k).and_then(StableId::new);
+            let entry_name = Identifier::try_new(format!("{}_{k}", name.as_str()));
+            let (Some(entry), Some(entry_name)) = (entry, entry_name) else {
+                self.error_at(
+                    start,
+                    DiagnosticCode::InvalidDeclaration,
+                    "table.entry",
+                    "entry IDs within u32 and entry names of at most 128 bytes",
+                    format!("entry {k}"),
+                    "choose a smaller table ID or a shorter name",
+                );
+                return;
+            };
+            lines.push(format!(
+                "field {} {} {} {};",
+                entry.get(),
+                owner.get(),
+                entry_name.as_str(),
+                field_type.get()
+            ));
+            self.declarations.push(SpannedDeclaration {
+                declaration: Declaration::Field(FieldDecl::new(
+                    entry, owner, entry_name, field_type,
+                )),
+                span: start,
+            });
+        }
+        self.rewrite_declaration(lines.join("\n"));
+        self.table_infos.push(TableInfo {
+            id: id.get(),
+            owner: owner.get(),
+            name: name.as_str().into(),
+            field_type: field_type.get(),
+            size,
+        });
+    }
+    fn parse_table_header(&mut self) -> Option<(StableId, StableId, Identifier, StableId, u32)> {
+        let id = self.take_id("table.id")?;
+        let owner = self.take_id("table.owner")?;
+        let name = self.take_identifier("table.name")?;
+        let field_type = self.take_id("table.type")?;
+        self.expect_keyword("size", "table.size");
+        let size = self.take_u32("table.size")?;
+        self.expect_symbol(TokenKind::Semicolon, "table");
+        Some((id, owner, name, field_type, size))
+    }
+    /// Records that the declaration just parsed expands to `text`.
+    fn rewrite_declaration(&mut self, text: String) {
+        let start = self.declaration_start;
+        self.rewrite_from(start, text);
+    }
+    /// Records a rewrite from `start` to the last token consumed.
+    fn rewrite_from(&mut self, start: SourceSpan, text: String) {
+        let end = self.tokens[self.index.saturating_sub(1)].span.end();
+        self.rewrites.push(Rewrite {
+            start: start.start(),
+            end,
+            text,
+        });
     }
     fn parse_field(&mut self) -> Option<FieldDecl> {
         let id = self.take_id("field.id")?;
@@ -927,6 +1103,13 @@ impl Parser {
             self.expect_symbol(TokenKind::RParen, "formula");
             return value;
         }
+        if (self.peek_keyword("forall")
+            || self.peek_keyword("exists")
+            || self.peek_keyword("count"))
+            && self.table_form_ahead(1)
+        {
+            return self.parse_table_formula();
+        }
         if self.peek_keyword("forall") || self.peek_keyword("exists") {
             let universal = self.take_keyword("forall");
             if !universal {
@@ -940,9 +1123,11 @@ impl Parser {
             self.expect_symbol(TokenKind::Range, "quantifier");
             let end = self.take_i128("quantifier.end").unwrap_or(0);
             self.expect_symbol(TokenKind::LBrace, "quantifier");
+            self.bound.push((variable.as_str().into(), None));
             let body = self.nested("formula.quantifier", RelExpr::Bool(false), |parser| {
                 parser.parse_rel()
             });
+            self.bound.pop();
             self.expect_symbol(TokenKind::RBrace, "quantifier");
             return if universal {
                 RelExpr::ForAll {
@@ -960,6 +1145,16 @@ impl Parser {
                 }
             };
         }
+        let start = self.current().span;
+        let values = self.table_values;
+        let atom = self.parse_comparison();
+        if self.table_values != values && self.table_depth == 0 {
+            self.rewrite_from(start, tables::rel_text(&atom));
+        }
+        atom
+    }
+    /// A named predicate or a comparison of two values.
+    fn parse_comparison(&mut self) -> RelExpr {
         let named_predicate = matches!(
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
@@ -1035,7 +1230,20 @@ impl Parser {
         value
     }
     fn parse_term(&mut self) -> ValueExpr {
+        let sum_ahead = self.peek_keyword("sum") && self.table_form_ahead(1);
         let mut value = self.parse_value_atom();
+        if sum_ahead
+            && matches!(self.current().kind, TokenKind::Star)
+            && matches!(value, ValueExpr::Add(..))
+        {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "table.sum",
+                "a table sum after its factor",
+                "a table sum before `*`",
+                "write the factor first, as in `2 * sum i in table T { ... }`",
+            );
+        }
         let mut operators = 0usize;
         while matches!(self.current().kind, TokenKind::Star) {
             if !self.chain_available("value.multiplicative", operators) {
@@ -1172,6 +1380,21 @@ impl Parser {
             };
             return ValueExpr::Div(mode, Box::new(left), Box::new(right));
         }
+        if name.as_str() == "sum" && self.table_form_ahead(0) {
+            return self.parse_table_sum();
+        }
+        if name.as_str() == "count" && self.table_form_ahead(0) {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "table.count",
+                "`count i in table T { C } OP K` as a whole comparison",
+                "a table count inside a value",
+                "compare the count directly with an integer constant",
+            );
+            self.index -= 1;
+            self.parse_table_formula();
+            return ValueExpr::Int(0);
+        }
         if name.as_str() == "sum" {
             let variable = self
                 .take_identifier("sum.variable")
@@ -1181,9 +1404,11 @@ impl Parser {
             self.expect_symbol(TokenKind::Range, "sum");
             let end = self.take_i128("sum.end").unwrap_or(0);
             self.expect_symbol(TokenKind::LBrace, "sum");
+            self.bound.push((variable.as_str().into(), None));
             let body = self.nested("value.sum", ValueExpr::Int(0), |parser| {
                 parser.parse_value()
             });
+            self.bound.pop();
             self.expect_symbol(TokenKind::RBrace, "sum");
             return ValueExpr::Sum {
                 variable,
@@ -1199,11 +1424,309 @@ impl Parser {
                     segments.push(id)
                 }
             }
+            if matches!(self.current().kind, TokenKind::LBracket) {
+                self.table_entry(&mut segments);
+            }
             if let Some(path) = ProjectionPath::try_new(root, segments) {
                 return ValueExpr::Projection(path);
             }
         }
+        if let Some(value) = self.index_value(name.as_str()) {
+            return ValueExpr::Int(value);
+        }
         ValueExpr::Var(name)
+    }
+
+    /// True when `IDENT in table` starts `offset` tokens ahead.
+    fn table_form_ahead(&self, offset: usize) -> bool {
+        let word = |at: usize, expected: Option<&str>| {
+            matches!(self.tokens.get(self.index + offset + at).map(|t| &t.kind),
+                Some(TokenKind::Ident(value)) if expected.is_none_or(|e| value.as_ref() == e))
+        };
+        word(0, None) && word(1, Some("in")) && word(2, Some("table"))
+    }
+    /// The value of a bound table index variable, unless a quantifier or
+    /// sum variable of the same name shadows it.
+    fn index_value(&self, name: &str) -> Option<i128> {
+        self.bound
+            .iter()
+            .rev()
+            .find(|(bound, _)| bound.as_ref() == name)
+            .and_then(|(_, value)| *value)
+    }
+    /// Replaces the table ID ending `segments` with the ID of the entry the
+    /// following `[INDEX]` names: an integer literal or a table index.
+    fn table_entry(&mut self, segments: &mut [StableId]) {
+        let start = self.current().span;
+        self.take_symbol(&TokenKind::LBracket);
+        let index = match self.current().kind.clone() {
+            TokenKind::Number(value) => {
+                self.advance();
+                i128::try_from(value).ok()
+            }
+            TokenKind::Ident(name) => {
+                self.advance();
+                self.index_value(&name)
+            }
+            _ => None,
+        };
+        self.expect_symbol(TokenKind::RBracket, "table.entry");
+        self.table_values += 1;
+        let table = segments.last().map(|id| id.get());
+        let size = table.and_then(|table| self.tables.get(&table).copied());
+        let entry = match (table, size, index) {
+            (Some(table), Some(size), Some(index)) if (0..i128::from(size)).contains(&index) => {
+                u32::try_from(index)
+                    .ok()
+                    .and_then(|index| table.checked_add(index))
+                    .and_then(StableId::new)
+            }
+            _ => None,
+        };
+        match (entry, segments.last_mut()) {
+            (Some(entry), Some(last)) => *last = entry,
+            _ => self.error_at(
+                start,
+                DiagnosticCode::InvalidDeclaration,
+                "table.entry",
+                match size {
+                    Some(size) => format!(
+                        "an entry index 0..={} of table {}",
+                        size.max(1) - 1,
+                        table.unwrap_or(0)
+                    ),
+                    None => "a declared table ID before `[`".into(),
+                },
+                "invalid table entry",
+                "index a declared table with an integer literal or a table index variable",
+            ),
+        }
+    }
+    /// Reads `VAR in table T`, after the form's keyword. Returns the
+    /// variable and the table's size, or None after reporting why.
+    fn table_header(&mut self, start: SourceSpan) -> Option<(Identifier, u32)> {
+        let variable = self.take_identifier("table.variable")?;
+        self.expect_keyword("in", "table.variable");
+        self.expect_keyword("table", "table.variable");
+        let table = self.take_id("table.reference")?;
+        if projection_root(variable.as_str()).is_some()
+            || self
+                .bound
+                .iter()
+                .any(|(bound, _)| bound.as_ref() == variable.as_str())
+        {
+            self.error_at(
+                start,
+                DiagnosticCode::InvalidDeclaration,
+                "table.variable",
+                "a fresh variable name",
+                variable.as_str(),
+                "choose a name that no enclosing form binds and that is not a projection root",
+            );
+        }
+        match self.tables.get(&table.get()).copied() {
+            Some(size) if (1..=MAX_TABLE_ENTRIES).contains(&size) => Some((variable, size)),
+            _ => {
+                self.error_at(
+                    start,
+                    DiagnosticCode::UnknownReference,
+                    "table.reference",
+                    "a declared table",
+                    text(table.get()),
+                    "declare `table ID OWNER name TYPE size N;` for this ID",
+                );
+                Some((variable, 1))
+            }
+        }
+    }
+    /// Parses the tokens from here once per entry, with `variable` bound to
+    /// the entry's index, and leaves the parser after them.
+    fn per_entry<T>(
+        &mut self,
+        variable: &Identifier,
+        size: u32,
+        mut parse: impl FnMut(&mut Self) -> T,
+    ) -> Vec<T> {
+        let start = self.index;
+        let mut values = Vec::new();
+        for k in 0..size {
+            self.index = start;
+            self.bound
+                .push((variable.as_str().into(), Some(i128::from(k))));
+            values.push(parse(self));
+            self.bound.pop();
+        }
+        values
+    }
+    /// Charges expanded formula nodes; false, after reporting, when the
+    /// expansion would exceed the formula-node limit.
+    fn charge(&mut self, start: SourceSpan, nodes: usize) -> bool {
+        self.expanded = self.expanded.saturating_add(nodes);
+        if self.expanded <= MAX_FORMULA_NODES {
+            return true;
+        }
+        self.error_at(
+            start,
+            DiagnosticCode::ResourceLimit,
+            "table.expansion",
+            text(MAX_FORMULA_NODES),
+            "table expansion exceeds the formula-node limit",
+            "use a smaller table or bound; compact checking of large tables is not supported",
+        );
+        false
+    }
+    /// `forall|exists VAR in table T [where C] { F }` and
+    /// `count VAR in table T [{ C }] OP K`.
+    fn parse_table_formula(&mut self) -> RelExpr {
+        let start = self.current().span;
+        let keyword = self
+            .take_identifier("table.form")
+            .unwrap_or_else(fallback_identifier);
+        let Some((variable, size)) = self.table_header(start) else {
+            return RelExpr::Bool(false);
+        };
+        self.table_depth += 1;
+        let formula = if keyword.as_str() == "count" {
+            self.parse_table_count(start, &variable, size)
+        } else {
+            let universal = keyword.as_str() == "forall";
+            let entries: Vec<RelExpr> = self.per_entry(&variable, size, |parser| {
+                let condition = parser
+                    .take_keyword("where")
+                    .then(|| parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()));
+                parser.expect_symbol(TokenKind::LBrace, "table.body");
+                let body = parser.nested("table.body", RelExpr::Bool(false), |p| p.parse_rel());
+                parser.expect_symbol(TokenKind::RBrace, "table.body");
+                match (condition, universal) {
+                    (Some(c), true) => RelExpr::Implies(Box::new(c), Box::new(body)),
+                    (Some(c), false) => RelExpr::And(Box::new(c), Box::new(body)),
+                    (None, _) => body,
+                }
+            });
+            let nodes = entries.iter().map(|e| formula_shape_rel(e).0).sum();
+            if self.charge(start, nodes) {
+                tables::chain(
+                    entries,
+                    if universal { RelExpr::And } else { RelExpr::Or },
+                    universal,
+                )
+            } else {
+                RelExpr::Bool(false)
+            }
+        };
+        self.table_depth -= 1;
+        if self.table_depth == 0 {
+            self.rewrite_from(start, format!("({})", tables::rel_text(&formula)));
+        }
+        formula
+    }
+    fn parse_table_count(
+        &mut self,
+        start: SourceSpan,
+        variable: &Identifier,
+        size: u32,
+    ) -> RelExpr {
+        let conditions = if matches!(self.current().kind, TokenKind::LBrace) {
+            self.per_entry(variable, size, |parser| {
+                parser.expect_symbol(TokenKind::LBrace, "table.count");
+                let condition =
+                    parser.nested("table.count", RelExpr::Bool(false), |p| p.parse_rel());
+                parser.expect_symbol(TokenKind::RBrace, "table.count");
+                condition
+            })
+        } else {
+            vec![RelExpr::Bool(true); size as usize]
+        };
+        let op = [
+            (TokenKind::EqEq, CompareOp::Eq),
+            (TokenKind::NotEq, CompareOp::NotEq),
+            (TokenKind::LessEq, CompareOp::LessEq),
+            (TokenKind::Less, CompareOp::Less),
+            (TokenKind::GreaterEq, CompareOp::GreaterEq),
+            (TokenKind::Greater, CompareOp::Greater),
+        ]
+        .into_iter()
+        .find_map(|(token, op)| self.take_symbol(&token).then_some(op));
+        let Some(op) = op else {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "table.count",
+                "a comparison with an integer constant",
+                self.describe_current(),
+                "compare the count, as in `count i in table T { C } <= 2`",
+            );
+            return RelExpr::Bool(false);
+        };
+        let Some(bound) = self.take_i128("table.count.bound") else {
+            return RelExpr::Bool(false);
+        };
+        let statics: Option<Vec<bool>> = conditions.iter().map(tables::static_truth).collect();
+        if let Some(statics) = statics {
+            let held = statics.iter().filter(|held| **held).count() as i128;
+            return RelExpr::Bool(match op {
+                CompareOp::Eq => held == bound,
+                CompareOp::NotEq => held != bound,
+                CompareOp::Less => held < bound,
+                CompareOp::LessEq => held <= bound,
+                CompareOp::Greater => held > bound,
+                CompareOp::GreaterEq => held >= bound,
+            });
+        }
+        let largest = conditions
+            .iter()
+            .map(|c| formula_shape_rel(c).0)
+            .max()
+            .unwrap_or(1);
+        let copies = tables::count_copies(conditions.len(), op, bound);
+        let nodes =
+            usize::try_from(copies.saturating_mul(largest as u128 + 2)).unwrap_or(usize::MAX);
+        if !self.charge(start, nodes) {
+            return RelExpr::Bool(false);
+        }
+        tables::count(&conditions, op, bound)
+    }
+    /// `sum VAR in table T [where C] { V }`, after `sum`; C may read only
+    /// table indices and constants.
+    fn parse_table_sum(&mut self) -> ValueExpr {
+        let start = self.tokens[self.index.saturating_sub(1)].span;
+        let Some((variable, size)) = self.table_header(start) else {
+            return ValueExpr::Int(0);
+        };
+        self.table_depth += 1;
+        let entries = self.per_entry(&variable, size, |parser| {
+            let condition = parser
+                .take_keyword("where")
+                .then(|| parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()));
+            parser.expect_symbol(TokenKind::LBrace, "table.sum");
+            let body = parser.nested("table.sum", ValueExpr::Int(0), |p| p.parse_value());
+            parser.expect_symbol(TokenKind::RBrace, "table.sum");
+            (condition, body)
+        });
+        self.table_depth -= 1;
+        self.table_values += 1;
+        let mut kept = Vec::new();
+        for (condition, body) in entries {
+            match condition.as_ref().map(tables::static_truth) {
+                None | Some(Some(true)) => kept.push(body),
+                Some(Some(false)) => {}
+                Some(None) => {
+                    self.error_at(
+                        start,
+                        DiagnosticCode::InvalidDeclaration,
+                        "table.sum.where",
+                        "a condition on table indices and constants only",
+                        "a condition that reads an input",
+                        "move the condition into a forall or count; conditional sums over inputs are not supported",
+                    );
+                    return ValueExpr::Int(0);
+                }
+            }
+        }
+        let nodes = kept.iter().map(|v| formula_shape_value(v).0).sum();
+        if !self.charge(start, nodes) {
+            return ValueExpr::Int(0);
+        }
+        tables::total(kept)
     }
     fn parse_temporal(&mut self) -> TemporalFormula {
         self.parse_temporal_until()
@@ -1520,15 +2043,32 @@ impl Parser {
         actual: impl Into<Box<str>>,
         remediation: impl Into<Box<str>>,
     ) {
-        self.diagnostics.push(Diagnostic::new(
+        let span = self.current().span;
+        self.error_at(span, code, path, expected, actual, remediation);
+    }
+    /// Reports at `span`. A table body is parsed once per entry, so a
+    /// diagnostic already reported is not repeated.
+    fn error_at(
+        &mut self,
+        span: SourceSpan,
+        code: DiagnosticCode,
+        path: &str,
+        expected: impl Into<Box<str>>,
+        actual: impl Into<Box<str>>,
+        remediation: impl Into<Box<str>>,
+    ) {
+        let diagnostic = Diagnostic::new(
             code,
             DiagnosticStage::Parse,
             AstPath::new(path),
-            self.current().span,
+            span,
             expected,
             actual,
             remediation,
-        ));
+        );
+        if !self.diagnostics.contains(&diagnostic) {
+            self.diagnostics.push(diagnostic);
+        }
     }
     fn recover_top(&mut self) {
         while !matches!(

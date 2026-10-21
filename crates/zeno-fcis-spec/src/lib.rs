@@ -21,6 +21,7 @@ mod parser;
 mod paths;
 mod source;
 mod substance;
+mod tables;
 mod views;
 
 pub use ast::*;
@@ -35,7 +36,7 @@ pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
-pub use parser::parse_project;
+pub use parser::{expand_tables, parse_project};
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
 };
@@ -44,6 +45,7 @@ pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,
 };
+pub use tables::{MAX_TABLE_ENTRIES, TableExpansion, TableInfo};
 pub use views::{
     DerivedComposition, GeneratedProject, GraphFormat, ObligationKind, UnresolvedObligation,
     derive_composition, generate_project, render_graph,
