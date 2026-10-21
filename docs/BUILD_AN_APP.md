@@ -193,8 +193,8 @@ reply packet carries the complete successor state.
 
 The interface still shows every command to every party; the contract refuses
 the ones a party's context does not permit. Credentials are fixed at
-start-up, so adding or rotating one needs a restart. There is no rate limit
-or lockout. The all-entry comparison is a reviewed source form checked by
+start-up, so adding or rotating one needs a restart. There is no lockout;
+[the proxy recipe](#deploy-behind-a-tls-proxy) adds rate limits. The all-entry comparison is a reviewed source form checked by
 `tools/check_ingress.py`, not a timing proof of the compiled code.
 
 ## Deliver through a program
@@ -380,6 +380,11 @@ information, whitespace, more than one value, or bytes that are not text.
 Unset, nothing changes. For example, with nginx:
 
 ```nginx
+# In the http block: request rates and connections per client address.
+limit_req_zone  $binary_remote_addr zone=zeno_requests:10m rate=10r/s;
+limit_req_zone  $binary_remote_addr zone=zeno_core:10m rate=2r/s;
+limit_conn_zone $binary_remote_addr zone=zeno_connections:10m;
+
 server {
     listen 443 ssl;
     server_name app.example.com;
@@ -390,10 +395,26 @@ server {
     client_max_body_size 64k;
     client_header_buffer_size 4k;
     large_client_header_buffers 1 4k;
+    # Slow clients wait at the proxy, never at the serial server.
+    client_header_timeout 10s;
+    client_body_timeout 10s;
+    send_timeout 10s;
+    proxy_request_buffering on;
+    limit_conn zeno_connections 8;
+    limit_conn_status 429;
+    limit_req_status 429;
     location / {
+        limit_req zone=zeno_requests burst=20 nodelay;
         # TLS ends here; forward to the loopback address only.
         proxy_pass http://127.0.0.1:8080;
         # The ingress requires exactly one Host header; it does not compare it.
+        proxy_set_header Host 127.0.0.1:8080;
+        proxy_read_timeout 15s;
+    }
+    # Each state, preview and command reads and checks the whole store history.
+    location ~ ^/(state|preview|command)$ {
+        limit_req zone=zeno_core burst=5 nodelay;
+        proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host 127.0.0.1:8080;
         proxy_read_timeout 15s;
     }
@@ -425,8 +446,25 @@ the application over plain HTTP or cache its responses, which are all
 `no-store`. It must be the only route to the port: the server already
 accepts only loopback connections, so no other user or process on the host
 should be able to reach that port. The proxy and its host are trusted;
-whoever controls them sees credentials in transit. This recipe adds no rate
-limits, lockout or client certificates.
+whoever controls them sees credentials in transit. This recipe adds no
+lockout or client certificates.
+
+The server handles one connection at a time, and it waits up to 10 seconds
+for a request to arrive in full. The proxy reads each request completely
+before it connects (`proxy_request_buffering on`, nginx's default), so a
+slow or idle client ties up a proxy connection, not the server. Every
+`/state`, `/preview` and `/command` replays and checks the store's whole
+history, so its cost grows with the number of commits: measured on the wide
+counter, a preview took about 0.09 ms per commit in a release build and
+1.3 ms per commit in the debug build that `cargo run` gives without
+`--release`; a command cost two to three times as much. Build deployments
+with `--release`. The rate limits keep one address from monopolising the server:
+two state, preview or command requests a second, with a burst of five, and
+ten requests a second overall, with a burst of twenty, which loading the
+interface's files needs. They are per client address, so clients behind one
+address share them, and many addresses together can still keep the server
+busy; size the rates for the store you expect. Requests over a limit get
+status 429.
 
 ## The formal model
 
