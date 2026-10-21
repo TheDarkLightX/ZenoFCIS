@@ -9,16 +9,21 @@ use zenofcis_zusd_v1::{Failure, Q, application::*, ledger::Asset, liquidation, s
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
+/// Stable output name and observation kind for a replay step.
+struct ReplayLabel<'a> {
+    label: &'a str,
+    kind: &'a str,
+}
 fn record(
     p: &Policy,
     s: &mut State,
     mut r: Request,
-    label: &str,
-    kind: &str,
+    context: ReplayLabel<'_>,
     who: u8,
     amount: u128,
     expected: Result<(), Failure>,
 ) {
+    let ReplayLabel { label, kind } = context;
     let pre = s.clone();
     if matches!(
         r.command,
@@ -108,8 +113,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "upward-report",
-        "oracle_report",
+        ReplayLabel {
+            label: "upward-report",
+            kind: "oracle_report",
+        },
         1,
         300_000_000,
         Ok(()),
@@ -129,8 +136,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "upward-pending-borrow",
-        "mint_zusd",
+        ReplayLabel {
+            label: "upward-pending-borrow",
+            kind: "mint_zusd",
+        },
         1,
         Q,
         Ok(()),
@@ -140,8 +149,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "pending-drop",
-        "oracle_report",
+        ReplayLabel {
+            label: "pending-drop",
+            kind: "oracle_report",
+        },
         1,
         50_000_000,
         Ok(()),
@@ -156,8 +167,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "pending-seizure",
-        "liquidate",
+        ReplayLabel {
+            label: "pending-seizure",
+            kind: "liquidate",
+        },
         1,
         0,
         Err(Failure::Reject(1044)),
@@ -168,8 +181,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "pending-withdraw",
-        "withdraw_sp",
+        ReplayLabel {
+            label: "pending-withdraw",
+            kind: "withdraw_sp",
+        },
         1,
         Q,
         Err(Failure::Reject(1044)),
@@ -180,8 +195,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "insolvent-commit",
-        "oracle_commit",
+        ReplayLabel {
+            label: "insolvent-commit",
+            kind: "oracle_commit",
+        },
         1,
         0,
         Ok(()),
@@ -195,8 +212,10 @@ fn v1_departures_retain_exact_state_threaded_inputs_and_decisions() {
         &p,
         &mut s,
         r,
-        "recovery-redistribution",
-        "liquidate",
+        ReplayLabel {
+            label: "recovery-redistribution",
+            kind: "liquidate",
+        },
         1,
         0,
         Ok(()),

@@ -511,9 +511,8 @@ fn w4_compositional_liquidate_gain_to_vault_self_redeem_withdraw() {
     )
     .into_parts()
     .0
-    .map_err(|e| {
+    .inspect_err(|e| {
         println!("W4 redeem err {e:?}");
-        e
     })
     .unwrap();
     println!(

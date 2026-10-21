@@ -268,7 +268,8 @@ fn attempt(
     assert_eq!(*s, frozen);
     assert_eq!(*p.config(), policy_before);
     check(s);
-    let row = match &result {
+
+    match &result {
         Ok(out) => {
             counts[0] += 1;
             check(out.post());
@@ -285,8 +286,7 @@ fn attempt(
             }
             None
         }
-    };
-    row
+    }
 }
 fn perform(p: &Policy, s: &mut State, r: Request, log: &mut Option<File>, counts: &mut [usize; 2]) {
     *s = attempt(p, s, r, "prefix", log, counts).expect("admitted prefix");
@@ -516,7 +516,7 @@ fn alphabet(p: &Policy, s: &State) -> Vec<(u8, Command)> {
     cs
 }
 fn seeds(p: &Policy, log: &mut Option<File>, counts: &mut [usize; 2]) -> Vec<State> {
-    let mut s = genesis(&p);
+    let mut s = genesis(p);
     check(&s);
     let r = advance_request(p, &s, 2, 2);
     perform(p, &mut s, r, log, counts);
@@ -732,15 +732,14 @@ fn benefit(p: &Policy, s: &State, out: &Prepared, who: u8, c: &Command) -> holdi
         quantity,
         ..
     } = c
+        && *recipient == id(who)
     {
-        if *recipient == id(who) {
-            let i = match quantity {
-                Quantity::Agrs(_) => 0,
-                Quantity::Zusd(_) => 1,
-                Quantity::Zdex(_) => 2,
-            };
-            b[i] += quantity.atoms() as i128;
-        }
+        let i = match quantity {
+            Quantity::Agrs(_) => 0,
+            Quantity::Zusd(_) => 1,
+            Quantity::Zdex(_) => 2,
+        };
+        b[i] += quantity.atoms() as i128;
     }
     assert_eq!(p.config().accounts[0], id(90));
     b

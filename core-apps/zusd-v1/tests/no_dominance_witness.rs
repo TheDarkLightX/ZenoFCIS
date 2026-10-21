@@ -72,19 +72,19 @@ fn opened(p: &Policy, state: &mut State, actor: u8, collateral: u128, principal:
 
 fn fallen_price_state(p: &Policy) -> State {
     let mut state = genesis(p);
-    let request = advance_request(&p, &state, 2, 2);
-    let _ = execute(&p, &mut state, request);
+    let request = advance_request(p, &state, 2, 2);
+    let _ = execute(p, &mut state, request);
     let request = price_request(
-        &p,
+        p,
         &state,
         OracleAction::InitializeFirstMatured,
         1,
         200_000_000,
         110,
     );
-    let _ = execute(&p, &mut state, request);
-    opened(&p, &mut state, 1, 1200 * Q, 1000 * Q);
-    opened(&p, &mut state, 2, 10_000 * Q, 2000 * Q);
+    let _ = execute(p, &mut state, request);
+    opened(p, &mut state, 1, 1200 * Q, 1000 * Q);
+    opened(p, &mut state, 2, 10_000 * Q, 2000 * Q);
     let mut request = raw(
         &state,
         2,
@@ -94,15 +94,15 @@ fn fallen_price_state(p: &Policy) -> State {
         }),
     );
     drip(&mut request, 120, 0);
-    let _ = execute(&p, &mut state, request);
-    let request = advance_request(&p, &state, 20_160, 20_160);
-    let _ = execute(&p, &mut state, request);
-    let request = price_request(&p, &state, OracleAction::ImportPending, 2, 50_000_000, 111);
-    let _ = execute(&p, &mut state, request);
-    let request = advance_request(&p, &state, 20_162, 20_162);
-    let _ = execute(&p, &mut state, request);
-    let request = price_request(&p, &state, OracleAction::CommitMatured, 2, 50_000_000, 112);
-    let _ = execute(&p, &mut state, request);
+    let _ = execute(p, &mut state, request);
+    let request = advance_request(p, &state, 20_160, 20_160);
+    let _ = execute(p, &mut state, request);
+    let request = price_request(p, &state, OracleAction::ImportPending, 2, 50_000_000, 111);
+    let _ = execute(p, &mut state, request);
+    let request = advance_request(p, &state, 20_162, 20_162);
+    let _ = execute(p, &mut state, request);
+    let request = price_request(p, &state, OracleAction::CommitMatured, 2, 50_000_000, 112);
+    let _ = execute(p, &mut state, request);
     state
 }
 fn liquidate_then_redeem(p: &Policy, before: &State, keeper: u8) -> (State, u128, u128) {
@@ -110,11 +110,11 @@ fn liquidate_then_redeem(p: &Policy, before: &State, keeper: u8) -> (State, u128
     let mut request = raw(
         &state,
         keeper,
-        Command::Liquidate(liquidation::Command::Direct(vault_id(&p, id(1)))),
+        Command::Liquidate(liquidation::Command::Direct(vault_id(p, id(1)))),
     );
-    use_price(&p, &state, &mut request);
+    use_price(p, &state, &mut request);
     drip(&mut request, 121, 0);
-    let liquidation = execute(&p, &mut state, request);
+    let liquidation = execute(p, &mut state, request);
     let keeper_a = liquidation
         .movements()
         .iter()
@@ -142,8 +142,8 @@ fn liquidate_then_redeem(p: &Policy, before: &State, keeper: u8) -> (State, u128
             min_out: 1,
         }),
     );
-    use_price(&p, &state, &mut request);
-    let redemption = execute(&p, &mut state, request);
+    use_price(p, &state, &mut request);
+    let redemption = execute(p, &mut state, request);
     let fraction = 1000 * Q / 2060;
     let exact_fee = 2000 * (Q / 200 + fraction / 2);
     let expected_payout = 2000 * Q - exact_fee;

@@ -283,99 +283,6 @@ fn repair(book: &mut Book, w: &mut Work) -> Result<(), Failure> {
     Ok(())
 }
 /// D4: actual remaining backing. The keeper and surplus legs stay outside TCR.
-#[cfg(test)]
-mod repair_tests {
-    use super::*;
-    fn permutations(xs: &mut [Id], at: usize, out: &mut Vec<Vec<Id>>) {
-        if at == xs.len() {
-            out.push(xs.to_vec());
-            return;
-        }
-        for i in at..xs.len() {
-            xs.swap(at, i);
-            permutations(xs, at + 1, out);
-            xs.swap(at, i);
-        }
-    }
-    #[test]
-    fn d2_all_small_priority_histories_are_stable_and_framed() {
-        let limits = Limits {
-            steps: 1_000_000,
-            reads: 100_000,
-            bytes: 100_000,
-        };
-        let mut checked = 0;
-        for n in 0u32..=4 {
-            let mut ids: Vec<Id> = (0..n)
-                .map(|i| {
-                    let mut id = [0; 32];
-                    id[31] = i as u8;
-                    id
-                })
-                .collect();
-            let mut histories = Vec::new();
-            permutations(&mut ids, 0, &mut histories);
-            for values in 0..3u32.pow(n) {
-                let mut digits = values;
-                let mut vaults = Vec::new();
-                for id in &ids {
-                    let c = u128::from(digits % 3 + 1);
-                    digits /= 3;
-                    vaults.push(Vault {
-                        parameter_version: 1,
-                        id: *id,
-                        owner: *id,
-                        status: Status::Active,
-                        collateral: c,
-                        debt: 1,
-                        reserve: 0,
-                        stake: c,
-                        snapshot_c: Accumulator256::ZERO,
-                        snapshot_d: Accumulator256::ZERO,
-                    });
-                }
-                for history in &histories {
-                    let mut book = Book {
-                        vaults: vaults.clone(),
-                        order: history.clone(),
-                        priorities: Vec::new(),
-                        system: System {
-                            collateral: 0,
-                            debt: 0,
-                            active: n,
-                            stakes: 0,
-                            stakes_snapshot: 0,
-                            collateral_snapshot: 0,
-                            reward_c: Accumulator256::ZERO,
-                            reward_d: Accumulator256::ZERO,
-                        },
-                        default_collateral: 0,
-                        default_debt: 0,
-                        error_c: Accumulator256::ZERO,
-                        error_d: Accumulator256::ZERO,
-                        gas_balance: 0,
-                        surplus: Vec::new(),
-                        pool: stability::State::reference_genesis(stability::FUNDED_CAP).unwrap(),
-                    };
-                    let before = book.clone();
-                    let mut expected = history.clone();
-                    expected.sort_by_key(|id| {
-                        core::cmp::Reverse(vaults[usize::from(id[31])].collateral)
-                    });
-                    let mut work = Work::new(limits);
-                    repair(&mut book, &mut work).unwrap();
-                    assert_eq!(book.order, expected);
-                    assert_eq!(book.vaults, before.vaults);
-                    assert_eq!(book.system, before.system);
-                    assert_eq!(book.pool, before.pool);
-                    assert_eq!(book.surplus, before.surplus);
-                    checked += 1;
-                }
-            }
-        }
-        assert_eq!(checked, 2128);
-    }
-}
 pub fn remaining_backing(
     collateral: u128,
     debt: u128,
@@ -569,4 +476,98 @@ pub fn liquidate(
             redistributed_collateral: red_c,
         })
     })
+}
+
+#[cfg(test)]
+mod repair_tests {
+    use super::*;
+    fn permutations(xs: &mut [Id], at: usize, out: &mut Vec<Vec<Id>>) {
+        if at == xs.len() {
+            out.push(xs.to_vec());
+            return;
+        }
+        for i in at..xs.len() {
+            xs.swap(at, i);
+            permutations(xs, at + 1, out);
+            xs.swap(at, i);
+        }
+    }
+    #[test]
+    fn d2_all_small_priority_histories_are_stable_and_framed() {
+        let limits = Limits {
+            steps: 1_000_000,
+            reads: 100_000,
+            bytes: 100_000,
+        };
+        let mut checked = 0;
+        for n in 0u32..=4 {
+            let mut ids: Vec<Id> = (0..n)
+                .map(|i| {
+                    let mut id = [0; 32];
+                    id[31] = i as u8;
+                    id
+                })
+                .collect();
+            let mut histories = Vec::new();
+            permutations(&mut ids, 0, &mut histories);
+            for values in 0..3u32.pow(n) {
+                let mut digits = values;
+                let mut vaults = Vec::new();
+                for id in &ids {
+                    let c = u128::from(digits % 3 + 1);
+                    digits /= 3;
+                    vaults.push(Vault {
+                        parameter_version: 1,
+                        id: *id,
+                        owner: *id,
+                        status: Status::Active,
+                        collateral: c,
+                        debt: 1,
+                        reserve: 0,
+                        stake: c,
+                        snapshot_c: Accumulator256::ZERO,
+                        snapshot_d: Accumulator256::ZERO,
+                    });
+                }
+                for history in &histories {
+                    let mut book = Book {
+                        vaults: vaults.clone(),
+                        order: history.clone(),
+                        priorities: Vec::new(),
+                        system: System {
+                            collateral: 0,
+                            debt: 0,
+                            active: n,
+                            stakes: 0,
+                            stakes_snapshot: 0,
+                            collateral_snapshot: 0,
+                            reward_c: Accumulator256::ZERO,
+                            reward_d: Accumulator256::ZERO,
+                        },
+                        default_collateral: 0,
+                        default_debt: 0,
+                        error_c: Accumulator256::ZERO,
+                        error_d: Accumulator256::ZERO,
+                        gas_balance: 0,
+                        surplus: Vec::new(),
+                        pool: stability::State::reference_genesis(stability::FUNDED_CAP).unwrap(),
+                    };
+                    let before = book.clone();
+                    let mut expected = history.clone();
+                    expected.sort_by_key(|id| {
+                        core::cmp::Reverse(vaults[usize::from(id[31])].collateral)
+                    });
+                    let mut work = Work::new(limits);
+                    repair(&mut book, &mut work).unwrap();
+                    assert_eq!(book.order, expected);
+                    assert_eq!(book.vaults, before.vaults);
+                    assert_eq!(book.system, before.system);
+                    assert_eq!(book.pool, before.pool);
+                    assert_eq!(book.surplus, before.surplus);
+                    checked += 1;
+                }
+            }
+        }
+        assert_eq!(checked, 2128);
+    }
 }

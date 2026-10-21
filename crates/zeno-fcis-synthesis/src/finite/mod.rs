@@ -24,6 +24,9 @@ pub use execution_v2::numeric::{
     Failure as V2NumericFailure, MAX_NUMERIC_INPUTS, MAX_NUMERIC_NODES, MAX_NUMERIC_OUTPUTS,
     NumericProgram as V2NumericProgram, Outcome as V2NumericOutcome, execute as execute_numeric_v2,
 };
+/// Pure, nonpublishing oracle relations and checked full-width arithmetic.
+#[cfg(not(verus_keep_ghost))]
+pub use execution_v2::oracle as v2_oracle;
 #[cfg(test)]
 /// Unchanged emitted order fixture for complete-decision test comparisons.
 pub use execution_v2::order_fixture_transition as v2_order_fixture_transition;
@@ -983,7 +986,8 @@ mod semantic_source_tests {
     use std::fs;
     use std::path::Path;
 
-    /// The Authority publication route, including the owned native tables family.
+    /// Source-bound native relations and the Authority publication route.
+    /// Oracle plans are source-bound here but have no publication constructor.
     /// Legacy scalar program admission/evaluation does not reach these modules.
     /// Both identities bind them through the
     /// generated `EVALUATOR` digest of the approved source closure.
@@ -1049,6 +1053,32 @@ mod semantic_source_tests {
         "execution_v2/laws/predicate.rs",
         "execution_v2/laws/spec.rs",
         "execution_v2/laws/types.rs",
+        "execution_v2/oracle/account_law_tests.rs",
+        "execution_v2/oracle/aggregation.rs",
+        "execution_v2/oracle/arithmetic.rs",
+        "execution_v2/oracle/bond_laws.rs",
+        "execution_v2/oracle/bonds.rs",
+        "execution_v2/oracle/finite_account_tests.rs",
+        "execution_v2/oracle/finite_price_tests.rs",
+        "execution_v2/oracle/laws.rs",
+        "execution_v2/oracle/lifecycle.rs",
+        "execution_v2/oracle/lifecycle_ingress.rs",
+        "execution_v2/oracle/lifecycle_laws.rs",
+        "execution_v2/oracle/lifecycle_schema.rs",
+        "execution_v2/oracle/lifecycle_tests.rs",
+        "execution_v2/oracle/mod.rs",
+        "execution_v2/oracle/native_ports.rs",
+        "execution_v2/oracle/native_rewards.rs",
+        "execution_v2/oracle/prices.rs",
+        "execution_v2/oracle/quorum_laws.rs",
+        "execution_v2/oracle/reports.rs",
+        "execution_v2/oracle/read.rs",
+        "execution_v2/oracle/reward_laws.rs",
+        "execution_v2/oracle/rewards.rs",
+        "execution_v2/oracle/test_verifier.rs",
+        "execution_v2/oracle/types.rs",
+        "execution_v2/oracle/verification.rs",
+        "execution_v2/oracle/wire.rs",
         "execution_v2/tables/authority.rs",
         "execution_v2/tables/collection.rs",
         "execution_v2/tables/expression.rs",
@@ -1070,6 +1100,7 @@ mod semantic_source_tests {
         "laws",
         "output",
         "tables",
+        "oracle",
     ];
     /// The generated digest, which both identities include by value.
     const GENERATED: &[&str] = &["execution_v2/authority/evaluator.rs"];

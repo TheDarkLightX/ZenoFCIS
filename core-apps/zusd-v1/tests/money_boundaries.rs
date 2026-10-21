@@ -393,7 +393,7 @@ fn liquidation_rejects_each_malformed_inventory_and_partition_input() {
                 b.surplus = vec![(id(1), 1), (id(1), 2)];
                 expected = F::Canonical
             }
-            7 | 8 | 9 => {
+            7..=9 => {
                 let v = &mut b.vaults[0];
                 v.status = v::Status::ClosedOwner;
                 v.collateral = 0;

@@ -1,5 +1,5 @@
 // TEST ONLY: checked state-stepping helpers over the shared request fixtures.
-pub fn step(p: &Policy, s: &mut State, r: Request) -> Prepared {
+pub(crate) fn step(p: &Policy, s: &mut State, r: Request) -> Prepared {
     let frozen = s.clone();
     let r = sign(p, s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let checked = decide(p, s, &r, &TestVerifier, limits());
@@ -14,17 +14,24 @@ pub fn step(p: &Policy, s: &mut State, r: Request) -> Prepared {
     out
 }
 
-pub fn advance(p: &Policy, s: &mut State, epoch: u64, watermark: u64) {
+pub(crate) fn advance(p: &Policy, s: &mut State, epoch: u64, watermark: u64) {
     let r = advance_request(p, s, epoch, watermark);
     let _ = step(p, s, r);
 }
 
-pub fn price(p: &Policy, s: &mut State, action: OracleAction, round: u64, value: u128, event: u8) {
+pub(crate) fn price(
+    p: &Policy,
+    s: &mut State,
+    action: OracleAction,
+    round: u64,
+    value: u128,
+    event: u8,
+) {
     let r = price_request(p, s, action, round, value, event);
     let _ = step(p, s, r);
 }
 
-pub fn ready(p: &Policy) -> State {
+pub(crate) fn ready(p: &Policy) -> State {
     let mut s = genesis(p);
     advance(p, &mut s, 2, 2);
     price(
@@ -38,7 +45,7 @@ pub fn ready(p: &Policy) -> State {
     s
 }
 
-pub fn open(p: &Policy, s: &mut State, who: u8, coll: u128, principal: u128) {
+pub(crate) fn open(p: &Policy, s: &mut State, who: u8, coll: u128, principal: u128) {
     let mut r = raw(
         s,
         who,

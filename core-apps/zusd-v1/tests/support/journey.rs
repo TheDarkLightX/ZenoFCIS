@@ -833,7 +833,13 @@ fn atomic_publication_survives_all_six_crash_points() {
             std::env::current_exe()
                 .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
         )
-        .args(["--exact", "crash_worker", "--nocapture"])
+        .args([
+            "--exact",
+            concat!(module_path!(), "::crash_worker")
+                .split_once("::")
+                .map_or("crash_worker", |(_, name)| name),
+            "--nocapture",
+        ])
         .env("ZUSD_STEP4_CRASH", format!("{}:{index}", path.display()))
         .output()
         .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));

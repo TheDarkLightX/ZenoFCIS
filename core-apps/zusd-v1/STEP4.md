@@ -104,6 +104,32 @@ book, balances, claims and old vault versions/reserves untouched. Every existing
 reserve is later discharged from its recorded value exactly once. Other families
 and migrations refuse; there is no installed live change policy or generic mint.
 
+## Native oracle composition
+
+[decide_composed](src/application/oracle.rs) checks a native lifecycle transition
+and the complete zUSD decision against immutable pre-states. It returns one
+owned candidate containing both states and the zUSD Balance/exposure effects;
+refusal returns neither state. Publication of this tuple must compare both
+pre-roots and commit the entire tuple atomically. FileLedger alone does not
+publish this extended tuple; durable combined replay remains a separate gate.
+
+Both before and after price data come through native_consumer_read. The bridge
+pins AGRS/USD, E8 price units, chain, feed/query/profile/scheme/evaluator and clock
+rules. It compares every PriceView field and canonical source-state evidence.
+Commit timing comes from the accepted native pending record and exact commit
+invocation; historical timing comes from the retained checked consumer record.
+An arbitrary already-committed snapshot cannot bootstrap that history.
+Preparation can project a view for signing but cannot authorize it. The decision
+re-extracts it, charges completed native work even on refusal, and verifies the
+exact receipt request. Native limits remain independent; their logical counters
+also charge the consumer budget. These tariffs are not crypto CPU/RSS bounds.
+
+The existing economic relations retain both-price risk checks and committed-only
+liquidation/redemption. Synthetic BLS journeys cover buffered commitment, mint,
+pending restriction, redemption/exposure, dispute and stale Oracle proof refusal.
+Actor, finality, custody, shared allocation and the live owner profiles remain
+explicit verifier/adoption premises. No live policy or publication is supplied.
+
 ## One publication path
 
 [FileLedger](src/application/publication.rs), enabled only with `std`, is the

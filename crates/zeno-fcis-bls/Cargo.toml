@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+zeno-fcis-synthesis = { version = "=2.5.0", path = "../zeno-fcis-synthesis", default-features = false }
 blst = { version = "=0.3.17", default-features = false, features = ["portable", "no-threads"] }
 zenofcis-zusd-v1 = { path = "../../core-apps/zusd-v1" }
 

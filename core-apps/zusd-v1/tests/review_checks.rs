@@ -141,11 +141,9 @@ fn review_liquidation_threshold_atom_matrix() {
                                 (if rec && icr <= Q { 0 } else { d.min(available) }, c)
                             };
                             let keeper = cap / 200;
-                            let sp = if offset == 0 {
-                                0
-                            } else {
-                                (cap - keeper) / (d / offset)
-                            };
+                            let sp = d
+                                .checked_div(offset)
+                                .map_or(0, |denominator| (cap - keeper) / denominator);
                             assert_eq!(
                                 (a.offset, a.sp_collateral, a.keeper_collateral, a.surplus),
                                 (offset, sp, keeper, c - cap)
@@ -169,7 +167,7 @@ fn review_liquidation_threshold_atom_matrix() {
 }
 #[test]
 fn review_minimum_open_adjacent_atoms() {
-    let min_principal = (500 * Q * 200 + 200) / 201;
+    let min_principal = (500 * Q * 200).div_ceil(201);
     for rec in [false, true] {
         for delta in [-1i128, 0, 1] {
             let x = (if rec { 500 * Q } else { min_principal })

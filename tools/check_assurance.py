@@ -69,7 +69,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-evidence": 2,
     "zeno-fcis-authenticated": 2,
     "zeno-fcis-authenticated-authority": 5,
-    "zeno-fcis-synthesis": 2,
+    "zeno-fcis-synthesis": 2,  # oracle relations and installed verification port
     "zeno-fcis-program-search": 3,
     "zeno-fcis-loop-doors": 4,
     "zeno-fcis-contract": 3,
@@ -91,10 +91,15 @@ DEPENDENCY_RING = {
     "zeno-fcis-adapter-zenodex": 3,
     "zeno-fcis-shell-sqlite": 5,
     "zeno-fcis-ingress": 6,
-    "zeno-fcis-bls": 5,
-    "zenofcis-zusd-v1": 3,
+    "zeno-fcis-bls": 5,  # shell-only oracle and receipt verification
+    "zenofcis-zusd-v1": 3,  # exact native oracle composition, no shell crypto
     "zeno-fcis-collections": 3,
 }
+
+
+# Standalone applications also require manifest/unsafe boundary checks. Their
+# application shell is not classified as a pure semantic crate.
+EXTRA_CRATES = {"zenofcis-zusd-v1": ROOT / "core-apps/zusd-v1"}
 
 
 @dataclass(frozen=True)
@@ -766,7 +771,7 @@ def main() -> int:
     missing_semantic = sorted(set(SEMANTIC_CRATES) - member_names)
     failures.extend(f"semantic crate absent from workspace: {name}" for name in missing_semantic)
 
-    for member in members:
+    for member in [*members, *EXTRA_CRATES.values()]:
         failures.extend(check_unsafe_prohibition(member))
         manifest = member / "Cargo.toml"
         if not manifest.is_file():

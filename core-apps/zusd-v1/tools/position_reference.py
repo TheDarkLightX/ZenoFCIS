@@ -97,7 +97,7 @@ def sp_cases():
                 out,g,inp,wd,fe,mv=result
                 expected='Ok('+emit('sp::Outcome',dict(book=rb(out),gains=emit('sp::Gains',dict(zip(('principal','collateral','depositor_zdex','front_end_zdex'),g))),principal_in=inp,principal_out=wd,front_end='Some('+rid(fe)+')' if fe else 'None',gain_to_vault=str(mv).lower()))+')'
             rows.append('('+','.join((rb(b),rid(actor),command,str(wallet),'None' if i is None else f'Some({i})',expected))+')')
-    return 'fn sp_cases()->Vec<(sp::Book,Id,sp::Command,u128,Option<u128>,Result<sp::Outcome,Failure>)> { vec!['+',\n'.join(rows)+'] }\n',len(rows)
+    return 'type SpPositionCase=(sp::Book,Id,sp::Command,u128,Option<u128>,Result<sp::Outcome,Failure>);\nfn sp_cases()->Vec<SpPositionCase> { vec!['+',\n'.join(rows)+'] }\n',len(rows)
 
 def staking_cases():
     rows=[]
@@ -119,7 +119,7 @@ def staking_cases():
         expected=f'Err(Failure::Reject({reason}))' if reason else 'Ok('+emit('st::Outcome',dict(state=state(post),stake_in=inp,stake_out=wd,zusd_gain=z,agrs_gain=a))+')'
         command='st::Command::Claim' if op=='Claim' else f'st::Command::{op}({amount})'
         rows.append('('+','.join((state(pre),rid(actor),command,str(wallet),expected))+')')
-    return 'fn staking_cases()->Vec<(st::State,Id,st::Command,u128,Result<st::Outcome,Failure>)> {vec!['+',\n'.join(rows)+']}\n',len(rows)
+    return 'type StakingPositionCase=(st::State,Id,st::Command,u128,Result<st::Outcome,Failure>);\nfn staking_cases()->Vec<StakingPositionCase> {vec!['+',\n'.join(rows)+']}\n',len(rows)
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--check',action='store_true');args=p.parse_args()

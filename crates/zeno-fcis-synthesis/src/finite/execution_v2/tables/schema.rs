@@ -211,7 +211,18 @@ impl Descriptor {
                     bytes: 1 << 20,
                     types: 256,
                     fields: 256,
-                    variants: if self.ordered() { 2 } else { 0 },
+                    // Each Maybe contributes its two declared alternatives.
+                    // A fixed global limit of two refused a second independent
+                    // optional field even though the schema binds both types.
+                    variants: u32::try_from(
+                        self.types
+                            .iter()
+                            .filter(|t| matches!(t.shape, Shape::Maybe(_)))
+                            .count(),
+                    )
+                    .ok()
+                    .and_then(|n| n.checked_mul(2))
+                    .ok_or(Failure::Schema)?,
                 },
             )
             .map(|_| ())
@@ -282,6 +293,7 @@ impl Descriptor {
                     }
                     Ok(())
                 }
+                Shape::Maybe(inner) if !key => plain(d, *inner, depth + 1, false),
                 _ => Err(Failure::Descriptor),
             }
         }

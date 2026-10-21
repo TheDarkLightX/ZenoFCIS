@@ -7,6 +7,7 @@ use blst::{
     min_pk::{AggregatePublicKey, PublicKey, Signature},
 };
 
+pub mod oracle;
 pub mod receipt;
 
 pub const BASIC_DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";

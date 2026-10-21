@@ -7,23 +7,23 @@ use zenofcis_zusd_v1::{
     ledger::{self, Quantity},
     vaults,
 };
-pub fn id(n: u8) -> [u8; 32] {
+pub(crate) fn id(n: u8) -> [u8; 32] {
     let mut b = [0; 32];
     b[31] = n;
     b
 }
-pub fn limits() -> Limits {
+pub(crate) fn limits() -> Limits {
     Limits {
         steps: 500_000_000,
         reads: 100_000_000,
         bytes: 500_000_000,
     }
 }
-pub fn hash(b: &[u8]) -> [u8; 32] {
+pub(crate) fn hash(b: &[u8]) -> [u8; 32] {
     *RustCryptoSha256::hash(b).as_bytes()
 }
 pub(crate) use super::issuer::{TestVerifier, issue};
-pub fn policy(change: bool) -> Policy {
+pub(crate) fn policy(change: bool) -> Policy {
     Policy::bind(Config {
         chain: id(60),
         actor_registry: id(61),
@@ -84,7 +84,7 @@ pub fn policy(change: bool) -> Policy {
     })
     .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
-pub fn genesis(p: &Policy) -> State {
+pub(crate) fn genesis(p: &Policy) -> State {
     let mut balances = Vec::new();
     for user in 1..=6 {
         balances.push(ledger::Balance {
@@ -139,7 +139,7 @@ pub fn genesis(p: &Policy) -> State {
         .0
         .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
-pub fn raw(s: &State, actor: u8, command: Command) -> Request {
+pub(crate) fn raw(s: &State, actor: u8, command: Command) -> Request {
     Request {
         actor: id(actor),
         nonce: s.nonce(id(actor)),
@@ -152,7 +152,7 @@ pub fn raw(s: &State, actor: u8, command: Command) -> Request {
         proofs: vec![],
     }
 }
-pub fn sign(p: &Policy, s: &State, mut r: Request) -> Result<Request, Failure> {
+pub(crate) fn sign(p: &Policy, s: &State, mut r: Request) -> Result<Request, Failure> {
     r.proofs = receipt_messages(p, s, &r)?
         .into_iter()
         .map(|m| Proof {
@@ -162,7 +162,7 @@ pub fn sign(p: &Policy, s: &State, mut r: Request) -> Result<Request, Failure> {
         .collect();
     Ok(r)
 }
-pub fn use_price(p: &Policy, s: &State, r: &mut Request) {
+pub(crate) fn use_price(p: &Policy, s: &State, r: &mut Request) {
     let view = s
         .oracle()
         .unwrap_or_else(|| panic!("missing test fixture value"))
@@ -180,7 +180,7 @@ pub fn use_price(p: &Policy, s: &State, r: &mut Request) {
     });
     assert!(p.config().oracle.max_age > 0)
 }
-pub fn drip(r: &mut Request, event: u8, amount: u128) {
+pub(crate) fn drip(r: &mut Request, event: u8, amount: u128) {
     r.drip = Some(Drip {
         event: id(event),
         amount,
@@ -188,7 +188,7 @@ pub fn drip(r: &mut Request, event: u8, amount: u128) {
     })
 }
 
-pub fn advance_request(_p: &Policy, s: &State, epoch: u64, watermark: u64) -> Request {
+pub(crate) fn advance_request(_p: &Policy, s: &State, epoch: u64, watermark: u64) -> Request {
     let mut r = raw(s, 6, Command::AdvanceClock);
     r.clock.epoch = epoch;
     r.clock.watermark = watermark;
@@ -197,7 +197,7 @@ pub fn advance_request(_p: &Policy, s: &State, epoch: u64, watermark: u64) -> Re
     r
 }
 
-pub fn price_request(
+pub(crate) fn price_request(
     _p: &Policy,
     s: &State,
     action: OracleAction,
@@ -266,7 +266,7 @@ pub fn price_request(
     r
 }
 
-pub fn balance(s: &State, who: u8, asset: ledger::Asset) -> u128 {
+pub(crate) fn balance(s: &State, who: u8, asset: ledger::Asset) -> u128 {
     s.ledger()
         .balances
         .iter()

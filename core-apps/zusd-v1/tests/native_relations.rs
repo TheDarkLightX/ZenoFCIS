@@ -395,7 +395,9 @@ fn d4_exact_backing_exhaustion_and_strict_witness() {
         l::remaining_backing(150, 100, p, limits()).result(),
         Ok(&(149, 100))
     );
-    assert!(149 * Q / 100 < v::CCR);
+    const {
+        assert!(149 * Q / 100 < v::CCR);
+    }
     assert_eq!(150 * Q / 100, v::CCR);
 }
 #[test]
@@ -704,7 +706,9 @@ fn d4_native_batch_does_not_switch_to_normal_on_keeper_backing() {
     }
     // Pinned tracker retains the first keeper atom: 300/200 is falsely Normal.
     assert_eq!((509 - 209) * Q / (400 - 200), v::CCR);
-    assert!((509 - 209 - 1) * Q / (400 - 200) < v::CCR);
+    const {
+        assert!((509 - 209 - 1) * Q / (400 - 200) < v::CCR);
+    }
 }
 #[test]
 fn d1_native_redemption_checks_each_floor_tie_and_full_first_prefix() {

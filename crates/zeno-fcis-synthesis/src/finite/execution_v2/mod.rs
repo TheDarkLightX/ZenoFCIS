@@ -19,6 +19,9 @@ mod meter;
 #[cfg(verus_keep_ghost)]
 pub(crate) mod nonbinding_step;
 pub(crate) mod numeric;
+/// Nonpublishing native oracle relations; authenticated integration is separately gated.
+#[cfg(not(verus_keep_ghost))]
+pub mod oracle;
 #[cfg(verus_keep_ghost)]
 mod spec;
 #[cfg(not(verus_keep_ghost))]

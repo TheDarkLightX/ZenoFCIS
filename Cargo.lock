@@ -1439,6 +1439,7 @@ version = "2.5.0"
 dependencies = [
  "blst",
  "zeno-fcis-codec",
+ "zeno-fcis-synthesis",
  "zenofcis-zusd-v1",
 ]
 
@@ -1832,6 +1833,7 @@ dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-collections",
  "zeno-fcis-schema",
+ "zeno-fcis-synthesis",
  "zeno-fcis-value",
 ]
 

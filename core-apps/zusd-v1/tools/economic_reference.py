@@ -115,7 +115,7 @@ def owner_cases():
         s=system();wallet=(10000*Q,10000*Q);res=owner_out(pre,s,0,10**8,None,'Usable',op,cx,dx,wallet,Q)
         expected=f'Err(Failure::Reject({res}))' if isinstance(res,int) else 'Ok('+emit('v::Outcome',res)+')'
         rows.append('('+','.join(('Some('+rv(pre)+')',emit('v::System',s),emit('fees::State',dict(base=0,last_epoch=0)),emit('v::Prices',dict(committed=10**8,pending='None',status='v::PriceStatus::Usable',pending_blocked='false')),f'({wallet[0]},{wallet[1]})',str(Q),operation,expected))+')')
-    return 'fn owner_cases()->Vec<(Option<v::Vault>,v::System,fees::State,v::Prices,(u128,u128),u128,OwnerCommand,Result<v::Outcome,Failure>)>{vec!['+',\n'.join(rows)+']}\n',len(rows)
+    return 'type OwnerReferenceCase=(Option<v::Vault>,v::System,fees::State,v::Prices,(u128,u128),u128,OwnerCommand,Result<v::Outcome,Failure>);\nfn owner_cases()->Vec<OwnerReferenceCase>{vec!['+',\n'.join(rows)+']}\n',len(rows)
 
 def book(vs,default_c=0,default_d=0):
     s=system(sum(v['collateral'] for v in vs)+default_c,sum(v['debt'] for v in vs)+default_d,len(vs));s['stakes']=sum(v['stake'] for v in vs)
@@ -192,7 +192,7 @@ def liquidation_cases():
             expected='Err(Failure::UnboundProfile)' if result=='unbound' else f'Err(Failure::Reject({result}))' if isinstance(result,int) else 'Ok('+emit('l::Outcome',result)+')'
             command=f'l::Command::{op}('+('vec!['+','.join(rid(i) for i in arg)+']' if op=='Batch' else rid(arg) if op=='Direct' else str(arg))+')'
             rows.append('('+','.join((rbk(pre),command,'None' if issuance is None else f'Some({issuance})',expected))+')')
-    return 'fn liquidation_cases()->Vec<(l::Book,l::Command,Option<u128>,Result<l::Outcome,Failure>)>{vec!['+',\n'.join(rows)+']}\n',len(rows)
+    return 'type LiquidationReferenceCase=(l::Book,l::Command,Option<u128>,Result<l::Outcome,Failure>);\nfn liquidation_cases()->Vec<LiquidationReferenceCase>{vec!['+',\n'.join(rows)+']}\n',len(rows)
 
 
 def insert_cut(b,i,priority,upper,lower):
@@ -287,7 +287,7 @@ def redemption_cases():
     for upper,lower in [(None,None),(1,None),(None,1),(None,2),(1,2),(99,99),(3,3)]:append(eq,{**partial,'upper':upper,'lower':lower})
     single=book([vault(1,1500*Q,1000*Q,50*Q)]);append(single,partial)
     eq['system']['stakes_snapshot']=2000*Q;eq['system']['collateral_snapshot']=4000*Q;append(eq,partial)
-    return 'fn redemption_cases()->Vec<(l::Book,r::Command,u128,u128,u128,Option<u64>,bool,Result<r::Outcome,Failure>)>{vec!['+',\n'.join(rows)+']}\n',len(rows)
+    return 'type RedemptionReferenceCase=(l::Book,r::Command,u128,u128,u128,Option<u64>,bool,Result<r::Outcome,Failure>);\nfn redemption_cases()->Vec<RedemptionReferenceCase>{vec!['+',\n'.join(rows)+']}\n',len(rows)
 
 
 def main():

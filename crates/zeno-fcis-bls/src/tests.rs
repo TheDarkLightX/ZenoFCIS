@@ -84,3 +84,10 @@ fn errors_are_precise() {
         Err(Refusal::EmptyAggregate)
     );
 }
+
+#[test]
+fn round4_key_validate_rejects_order3() {
+    let v = data::named("verify-neg-torsion-pk-order3");
+    assert!(PublicKey::from_bytes(&v.a[0]).is_ok());
+    assert!(validate_key(&v.a[0]).is_err(), "MISSING_KEY_VALIDATE");
+}

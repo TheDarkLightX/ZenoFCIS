@@ -39,6 +39,40 @@ pub struct CollectionLimits {
 pub const PROFILE: &str = "tables/1";
 pub const POLICY_VERSION: i128 = 3;
 
+/// Internal schema-only ingress for a closed native component. The caller is
+/// library code, never an application descriptor/evaluator. This performs the
+/// ordinary charged canonical/schema/table checks and grants no decision or
+/// publication authority; the owning native relation checks its own laws.
+pub(super) fn admit_native_snapshot(
+    descriptor: &Descriptor,
+    bytes: &[u8],
+    meter: &mut super::meter::Meter,
+) -> Result<Value, Failure> {
+    admit_native_value(descriptor, descriptor.roots[0], bytes, meter)
+}
+/// A closed native codec may select only one of its compiled type IDs. This
+/// preparation function validates canonical bytes, nominal schema and every
+/// nested bounded table; it cannot return a decision or publication witness.
+pub(super) fn admit_native_value(
+    descriptor: &Descriptor,
+    root: u32,
+    bytes: &[u8],
+    meter: &mut super::meter::Meter,
+) -> Result<Value, Failure> {
+    descriptor.schema_bytes()?;
+    let value = collection::decode(descriptor, root, bytes, meter)?;
+    descriptor.check_value(root, &value, meter)?;
+    collection::check_literal(descriptor, root, &value, meter, 0)?;
+    if (bytes.len() as u64)
+        .checked_add(48)
+        .ok_or(Failure::Arithmetic)?
+        > descriptor.frame_bytes[0]
+    {
+        return Err(Failure::Wire);
+    }
+    Ok(value)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
     Descriptor,

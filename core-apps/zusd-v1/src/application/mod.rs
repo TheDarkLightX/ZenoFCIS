@@ -1,6 +1,7 @@
 //! Step-4 composition, authenticated given ReceiptVerifierV1. No live backend
 //! or owner-selected clock, drip, custody, exposure or change policy is supplied.
 mod encoding;
+pub mod oracle;
 #[cfg(feature = "std")]
 pub mod publication;
 pub mod receipts;

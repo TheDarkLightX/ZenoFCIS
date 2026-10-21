@@ -105,3 +105,17 @@ unchanged. Portable's non-ADX runtime path and other CPUs/toolchains are unteste
 here. Build qualification must exclude prebuilt libblst.a and overriding CFLAGS
 (e.g. __ADX__), retain the compiler/assembly provenance and recheck upstream
 advisories manually when changing the pin. No network or release is part of this work.
+
+## Native oracle verification
+
+OracleVerifier implements the semantic oracle's installed immutable BlsVerifier
+port. Every key reaches the same key_validate helper; signature shapes also
+reject infinity and wrong subgroups. PoP admission uses PopKey::admit. The raw
+PoP-domain signature check authenticates registration/rotation before their
+separate mandatory possession check, preserving ordered refusal reasons.
+It cannot retain or admit a key. There is no oracle aggregation path; each of
+the three distinct reporters signs its own complete report. Basic aggregate
+message uniqueness and both group checks retain their existing enforcement.
+The semantic crates have no BLS dependency, including in tests. Core lifecycle
+tests use an explicit test double; independent unchanged py_ecc vectors and
+public lifecycle/composition journeys exercise this shell implementation.

@@ -21,7 +21,7 @@ fn authority(domain: Domain) -> [u8; 32] {
         Domain::ExposureRelease => 67,
     })
 }
-pub fn backend() -> &'static BlsReceiptVerifier {
+pub(crate) fn backend() -> &'static BlsReceiptVerifier {
     static BACKEND: OnceLock<BlsReceiptVerifier> = OnceLock::new();
     BACKEND.get_or_init(|| {
         let members = (0..3)
@@ -58,7 +58,7 @@ pub fn backend() -> &'static BlsReceiptVerifier {
             .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
     })
 }
-pub struct TestVerifier;
+pub(crate) struct TestVerifier;
 impl ReceiptVerifierV1 for TestVerifier {
     fn verify(
         &self,
@@ -71,7 +71,7 @@ impl ReceiptVerifierV1 for TestVerifier {
     }
 }
 // The shared journey substitutes only test issuance.
-pub fn issue(message: &[u8]) -> Vec<u8> {
+pub(crate) fn issue(message: &[u8]) -> Vec<u8> {
     let domain = message[b"zusd.ReceiptVerifierV1/1\0".len()];
     let mut proof;
     let sig;
