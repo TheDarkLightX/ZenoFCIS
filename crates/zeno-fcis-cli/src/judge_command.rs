@@ -47,6 +47,11 @@ pub(super) struct Common {
 
 #[derive(Subcommand)]
 pub(super) enum Command {
+    /// Check keyed collections by data independence: every admissible view of the named entries, with alias merges and summary deltas. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
+    Collections {
+        #[command(flatten)]
+        common: Common,
+    },
     /// Check finite distribution laws exactly, given uniform independent random bits. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
     Distribution {
         /// Invocations plus outcome projection/fold operations; a stop is UNKNOWN.
@@ -148,6 +153,32 @@ pub(super) enum ProbeCommand {
 
 pub(super) fn run(command: Command) -> u8 {
     match command {
+        Command::Collections { common } => judge(
+            &common,
+            "zeno-fcis/collections-check/1",
+            None,
+            true,
+            |sources| {
+                use zeno_fcis_contract::collections::{self, Limits, Verdict};
+                let result = collections::check(
+                    sources.project,
+                    sources.rules,
+                    Limits {
+                        max_tuples: common.max_tuples,
+                    },
+                )?;
+                let exit = match result.verdict() {
+                    Verdict::Checked => OK,
+                    Verdict::Refuted => INVALID,
+                    Verdict::Unknown => BLOCKED,
+                };
+                Ok(Judged::Done(
+                    result.packet().clone(),
+                    exit,
+                    result.verdict().name(),
+                ))
+            },
+        ),
         Command::Distribution { max_work, common } => judge(
             &common,
             "zeno-fcis/distribution-laws/1",

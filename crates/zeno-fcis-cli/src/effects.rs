@@ -824,6 +824,12 @@ effects! { crate::loop_command::doors::capture::Command {
 
 effects! { crate::judge_command::Command {
     leaves {
+        "collections" => Self::Collections { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
         "distribution" => Self::Distribution { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],

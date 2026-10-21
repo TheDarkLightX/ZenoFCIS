@@ -1,0 +1,60 @@
+zeno 1;
+project 1 library;
+namespace 2 library;
+// A library with any number of members and copies, each keyed by an opaque
+// identifier. A member holds at most two copies, kept as a per-member loan
+// counter, and a copy records whether it is on loan and its holder.
+type 100 state Library;
+type 101 command LoanCommand;
+type 102 context Desk;
+type 103 key MemberId;
+type 104 key CopyId;
+type 105 data Member;
+type 106 data Copy;
+type 107 int Loans in 0..=2;
+type 108 int Flag in 0..=1;
+type 109 data Action;
+field 140 105 loans 107;
+field 145 106 on_loan 108;
+field 146 106 holder 103;
+map 110 100 members 103 105 capacity 1048576;
+map 115 100 copies 104 106 capacity 1048576;
+field 130 101 action 109;
+field 131 101 member 103;
+field 132 101 copy 104;
+variant 150 109 Join none;
+variant 151 109 AddCopy none;
+variant 152 109 Borrow none;
+variant 153 109 Return none;
+variant 180 102 Librarian none;
+variant 181 102 Visitor none;
+// The member and the copy a command names. In the view, 160 is 1 when the
+// member exists and 161 is its loan count; 170 is 1 when the copy exists,
+// 171 says whether it is on loan and 172 is its holder's key class.
+entry 160 member of 110 at command.101.131;
+entry 170 copy of 115 at command.101.132;
+reason 200 librarian_required precedence 0;
+reason 201 already_registered precedence 1;
+reason 202 not_a_member precedence 2;
+reason 203 no_such_copy precedence 3;
+reason 204 copy_on_loan precedence 4;
+reason 205 loan_limit precedence 5;
+reason 206 not_the_holder precedence 6;
+component 400 desk {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 librarian_only on commit = context.102 == 180;
+// A member that does not exist holds nothing.
+law 501 absent_members_hold_nothing on commit, genesis =
+  forall m in entries 110 { post.100.m == 1 || post.100.m.140 == 0 };
+// A copy goes on loan only to the member who borrows it, and comes back
+// only from its holder.
+law 502 borrow_records_the_holder on commit =
+  command.101.130 == 152 -> post.100.171 == 1 && post.100.172 == command.101.131;
+law 503 only_the_holder_returns on commit =
+  command.101.130 == 153 -> pre.100.172 == command.101.131 && post.100.171 == 0;

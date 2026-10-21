@@ -1,0 +1,156 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "escrow-deals",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.130",
+    "amount": "command.101.133",
+    "held": "pre.100.120",
+    "exists": "pre.100.160",
+    "stage": "pre.100.161",
+    "deal_amount": "pre.100.162",
+    "escrowed": "pre.100.163",
+    "caller_is_buyer": "context.102.135 == pre.100.164",
+    "caller_is_seller": "context.102.135 == pre.100.165",
+    "seller_is_caller": "command.101.132 == context.102.135"
+  },
+  "cases": [
+    {
+      "rule": "a deal is opened once",
+      "when": "action == 155 && exists == 1",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a buyer cannot sell to itself",
+      "when": "action == 155 && seller_is_caller",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "open a deal",
+      "when": "action == 155",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "160": "1",
+        "161": "150",
+        "162": "amount",
+        "163": "0",
+        "164": "context.102.135",
+        "165": "command.101.132"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "the deal must exist",
+      "when": "exists == 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only the buyer funds and releases",
+      "when": "(action == 156 || action == 158) && !caller_is_buyer",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only the seller ships and refunds",
+      "when": "(action == 157 || action == 159) && !caller_is_seller",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "fund an open deal",
+      "when": "action == 156 && stage == 150 && held + deal_amount <= 4",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "151",
+        "163": "deal_amount",
+        "120": "held + deal_amount"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "the escrow has room",
+      "when": "action == 156 && stage == 150",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "ship a funded deal",
+      "when": "action == 157 && stage == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "152"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "release a shipped deal",
+      "when": "action == 158 && stage == 152",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "153",
+        "163": "0",
+        "120": "held - escrowed"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "refund a funded or shipped deal",
+      "when": "action == 159 && (stage == 151 || stage == 152)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "161": "154",
+        "163": "0",
+        "120": "held - escrowed"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "anything else is the wrong stage",
+      "when": "true",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "120": 0,
+    "160": 0,
+    "161": 150,
+    "162": 1,
+    "163": 0,
+    "164": 0,
+    "165": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "StateInvariant",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient"
+  }
+}

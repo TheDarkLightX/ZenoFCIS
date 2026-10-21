@@ -1,0 +1,70 @@
+zeno 1;
+project 1 escrow_deals;
+namespace 2 escrow;
+// Escrow for any number of deals, keyed by opaque deal IDs. The caller is a
+// party key in the context. A buyer opens a deal with a seller and funds it;
+// the seller ships, then the buyer releases or the seller refunds. The funds
+// held over all deals are a summary.
+type 100 state Escrow;
+type 101 command DealCommand;
+type 102 context Caller;
+type 103 key DealId;
+type 104 key PartyId;
+type 105 data Deal;
+type 106 int Held in 0..=4;
+type 107 int Amount in 1..=2;
+type 108 data Stage;
+type 109 data Action;
+type 111 int Escrowed in 0..=2;
+field 140 105 stage 108;
+field 141 105 amount 107;
+field 142 105 escrowed 111;
+field 143 105 buyer 104;
+field 144 105 seller 104;
+map 110 100 deals 103 105 capacity 1048576;
+summary 120 100 held 106 sum 110.142;
+field 130 101 action 109;
+field 131 101 deal 103;
+field 132 101 seller 104;
+field 133 101 amount 107;
+field 135 102 caller 104;
+variant 150 108 Open none;
+variant 151 108 Funded none;
+variant 152 108 Shipped none;
+variant 153 108 Released none;
+variant 154 108 Refunded none;
+variant 155 109 OpenDeal none;
+variant 156 109 Fund none;
+variant 157 109 Ship none;
+variant 158 109 Release none;
+variant 159 109 Refund none;
+// The deal a command names: 160 is 1 when it exists, then 161 stage,
+// 162 amount, 163 escrowed, 164 buyer and 165 seller.
+entry 160 deal of 110 at command.101.131;
+reason 200 deal_exists precedence 0;
+reason 201 no_such_deal precedence 1;
+reason 202 wrong_party precedence 2;
+reason 203 wrong_stage precedence 3;
+reason 204 over_capacity precedence 4;
+component 400 escrow {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+// A deal holds its amount exactly while it is funded or shipped.
+law 500 escrow_matches_stage on commit, genesis = forall d in entries 110 {
+  post.100.d == 0
+    || ((post.100.d.140 == 151 || post.100.d.140 == 152) -> post.100.d.142 == post.100.d.141)
+      && (post.100.d.140 != 151 && post.100.d.140 != 152 -> post.100.d.142 == 0)
+};
+// The buyer and the seller of a deal are different parties.
+law 501 two_parties on commit, genesis =
+  forall d in entries 110 { post.100.d == 0 || post.100.d.143 != post.100.d.144 };
+// Only the buyer funds and releases; only the seller ships and refunds.
+law 502 buyer_acts on commit =
+  command.101.130 == 156 || command.101.130 == 158 -> context.102.135 == pre.100.164;
+law 503 seller_acts on commit =
+  command.101.130 == 157 || command.101.130 == 159 -> context.102.135 == pre.100.165;

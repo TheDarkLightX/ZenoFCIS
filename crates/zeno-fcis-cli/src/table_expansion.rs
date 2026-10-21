@@ -1,11 +1,12 @@
-//! `zeno-fcis check --expand`: the exact expansion of a project's tables.
+//! `zeno-fcis check --expand`: the exact expansion of a project's tables and
+//! collections.
 //!
 //! The command prints the source with every table form replaced by the
-//! declarations and formulas it expands to. It parses that text again and
-//! refuses to print it unless its canonical project is the original's, so the
-//! printed text is the project every check of the original sees. It also
-//! reports the size of the expanded input domain, which the finite checks
-//! enumerate.
+//! declarations and formulas it expands to, and every collection declaration
+//! by its view. It parses that text again and refuses to print it unless its
+//! canonical project is the original's view, so the printed text is the
+//! project every check of the original decides. It also reports the size of
+//! the expanded input domain, which the finite checks enumerate.
 
 use std::fs;
 use std::path::Path;
@@ -46,7 +47,7 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
         }
     };
     let same = elaborated(&expansion.text).ok().and_then(|expanded| {
-        Some(expanded.canonical_bytes().ok()? == original.canonical_bytes().ok()?)
+        Some(expanded.canonical_bytes().ok()? == original.view().canonical_bytes().ok()?)
     });
     if same != Some(true) {
         let message = "the expanded text does not parse to the same project; nothing printed";
