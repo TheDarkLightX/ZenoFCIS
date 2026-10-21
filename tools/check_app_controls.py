@@ -53,6 +53,11 @@ CONTROLS = [
      ".and_then(|text| text.trim().parse::<i128>().ok())"),
     ("connector-input-blocks", "program_connector_acknowledges_only_success", "time limit with unread input",
      "std::thread::spawn(move || stdin.write_all(&input));", "let _ = stdin.write_all(&input);"),
+    ("unknown-setting-ignored", "unknown_settings_refuse_start_up", "an unknown or conflicting setting started the server",
+     'if name.starts_with("ZENO_APP_") && !SETTINGS.contains(&name.as_ref()) {',
+     'if false && name.starts_with("ZENO_APP_") && !SETTINGS.contains(&name.as_ref()) {'),
+    ("connector-and-receiver", "unknown_settings_refuse_start_up", "an unknown or conflicting setting started the server",
+     '&& std::env::var_os("ZENO_APP_RECEIVER").is_some()', "&& false"),
 ]
 
 

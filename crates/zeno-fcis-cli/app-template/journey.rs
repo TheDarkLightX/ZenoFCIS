@@ -1648,3 +1648,67 @@ fn clock_file_is_read_strictly() {
         assert_eq!(status, expected, "clock file {text:?} read loosely");
     }
 }
+
+#[test]
+fn unknown_settings_refuse_start_up() {
+    let root = std::env::temp_dir().join(format!("app-settings-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    ok(std::fs::write(
+        root.join("credential"),
+        "ab".repeat(32) + "\n",
+    ));
+    let store = root.join("never.sqlite");
+    for (variables, expected) in [
+        (
+            vec![("ZENO_APP_CONECTOR", "connector.json")],
+            "ZENO_APP_CONECTOR",
+        ),
+        (
+            vec![("ZENO_APP_ORIGN", "https://app.example.com")],
+            "ZENO_APP_ORIGN",
+        ),
+        (
+            vec![("ZENO_APP_clock_file", "clock")],
+            "ZENO_APP_clock_file",
+        ),
+        (
+            vec![
+                ("ZENO_APP_CONNECTOR", "connector.json"),
+                ("ZENO_APP_RECEIVER", "received"),
+            ],
+            "set one",
+        ),
+    ] {
+        let mut child = ok(std::process::Command::new(env!("CARGO_BIN_EXE_app-server"))
+            .current_dir(&root)
+            .env_clear()
+            .env("ZENO_APP_SECRET_FILE", root.join("credential"))
+            .env(
+                "ZENO_APP_CONTEXT",
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("context.json"),
+            )
+            .env("ZENO_APP_ADDRESS", "127.0.0.1:0")
+            .env("ZENO_APP_STORE", &store)
+            .envs(variables)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn());
+        // A server that starts anyway is stopped and reported.
+        let started = std::time::Instant::now();
+        while ok(child.try_wait()).is_none() && started.elapsed() < Duration::from_secs(10) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let running = ok(child.try_wait()).is_none();
+        if running {
+            ok(child.kill());
+        }
+        let output = ok(child.wait_with_output());
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !running && output.status.code() == Some(1) && message.contains(expected),
+            "an unknown or conflicting setting started the server: {expected}"
+        );
+        assert!(!store.exists(), "a store was opened");
+    }
+    ok(std::fs::remove_dir_all(root));
+}

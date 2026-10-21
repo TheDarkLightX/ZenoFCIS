@@ -124,7 +124,9 @@ so `history` lists and decides again every request the server committed. `ZENO_A
 `ZENO_APP_CONTEXT` and `ZENO_APP_ADDRESS` select the database, local file
 receiver, context file and loopback address. Unset, each takes its default;
 set but empty or not text, the server refuses to start and names it, rather
-than open a default store. The receiver stores each exact
+than open a default store. Any other variable whose name starts with
+`ZENO_APP_`, such as a misspelt `ZENO_APP_CONECTOR`, also refuses start-up
+and is named, so a typing mistake never leaves a default silently in force. The receiver stores each exact
 payload under its delivery ID, with `ID.json` beside it: an envelope naming
 the commit, lane, ordinal and destination. It acknowledges the delivery after
 syncing both. It is a local example receiver. Other services require a reviewed transport and

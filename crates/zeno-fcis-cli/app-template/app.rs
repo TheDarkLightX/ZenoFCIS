@@ -1071,6 +1071,38 @@ pub fn public_origin(text: &str) -> AppResult<String> {
     }
     Ok(text.to_owned())
 }
+/// Every setting the server reads. Another `ZENO_APP_` variable refuses
+/// start-up, so a misspelt setting never leaves its default silently in force.
+pub const SETTINGS: [&str; 10] = [
+    "ZENO_APP_ADDRESS",
+    "ZENO_APP_CLOCK_FILE",
+    "ZENO_APP_CONNECTOR",
+    "ZENO_APP_CONTEXT",
+    "ZENO_APP_ORIGIN",
+    "ZENO_APP_PARTIES",
+    "ZENO_APP_PRINCIPAL",
+    "ZENO_APP_RECEIVER",
+    "ZENO_APP_SECRET_FILE",
+    "ZENO_APP_STORE",
+];
+fn known_settings() -> AppResult<()> {
+    for (name, _) in std::env::vars_os() {
+        let name = name.to_string_lossy();
+        if name.starts_with("ZENO_APP_") && !SETTINGS.contains(&name.as_ref()) {
+            return Err(format!(
+                "{name:?} is not a setting; the settings are {}",
+                SETTINGS.join(", ")
+            ));
+        }
+    }
+    // Deliveries go to one place; the receiver would be ignored silently.
+    if std::env::var_os("ZENO_APP_CONNECTOR").is_some()
+        && std::env::var_os("ZENO_APP_RECEIVER").is_some()
+    {
+        return Err("ZENO_APP_CONNECTOR replaces ZENO_APP_RECEIVER; set one".into());
+    }
+    Ok(())
+}
 // An optional setting: unset is `None`, so its default applies; a value that is
 // set must be nonempty text, never silently replaced by the default.
 fn setting(name: &str) -> AppResult<Option<String>> {
@@ -1115,6 +1147,7 @@ fn configured_parties() -> AppResult<Vec<Party>> {
 /// Start the loopback application. A private credential file, or a parties file,
 /// is required. The existing store is reopened; a new store receives checked genesis.
 pub fn run() -> AppResult<()> {
+    known_settings()?;
     let parties = configured_parties()?;
     let path = PathBuf::from(setting("ZENO_APP_STORE")?.unwrap_or_else(|| "app.sqlite".into()));
     let receiver =
