@@ -39,6 +39,10 @@ CONTROLS = [
     ("party-replay-key", "journey", "parties_cannot_replay_each_other", "another party replayed a request", DURABLE,
      "let key = command.replay_key();",
      "let key = crate::Command { principal: self.parties[0].0, contract: command.contract, key: command.key, expected: command.expected, bytes: Vec::new() }.replay_key();"),
+    # A second party's credential in a trace passes every single-secret trace test.
+    ("party-secret-in-trace", "journey", "party_traces_hold_no_credential", "party credential in trace", HTTP,
+     "let trace = Trace::request(&command);",
+     "let trace = match config.parties.get(1) { Some((leak, _)) => Trace { request: Some(Hash32::new(*leak)), ..Trace::request(&command) }, None => Trace::request(&command) };"),
 ]
 
 def main() -> int:

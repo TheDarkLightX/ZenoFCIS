@@ -1049,3 +1049,140 @@ fn party_tables_refuse_ambiguity() {
         }
     });
 }
+
+fn raw_exchange<B: Endpoint>(server: &mut Server<B, Sink>, request: Vec<u8>) -> Vec<u8> {
+    let rt = ok(runtime());
+    if std::env::var_os("INGRESS_TEST_MEMORY").is_some() {
+        return support::exchange(server, request, false);
+    }
+    let listener = ok(rt.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")));
+    let address = ok(listener.local_addr());
+    let thread = std::thread::spawn(move || client(address, request, false));
+    let _ = rt.block_on(server.serve_one(&listener));
+    ok(thread.join())
+}
+fn party_http(method: &str, path: &str, credential: u8, origin: &str, body: &[u8]) -> Vec<u8> {
+    let mut bytes = format!(
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {}\r\nOrigin: {origin}\r\nContent-Length: {}\r\n\r\n",
+        format!("{credential:02x}").repeat(32),
+        body.len()
+    )
+    .into_bytes();
+    bytes.extend_from_slice(body);
+    bytes
+}
+// An application's authenticated view and preview around the durable shell.
+struct Viewing<B>(B);
+impl<B: Endpoint> Endpoint for Viewing<B> {
+    fn snapshot(&mut self, principal: Hash32) -> Result<Vec<u8>, Refusal> {
+        Ok(principal.as_bytes().to_vec())
+    }
+    fn preview(&mut self, command: &Command) -> Result<Vec<u8>, Refusal> {
+        Ok(command.id().as_bytes().to_vec())
+    }
+    fn execute(&mut self, command: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
+        self.0.execute(command, sink)
+    }
+}
+
+#[test]
+fn party_traces_hold_no_credential() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = open_production(&files, &lineage, 0);
+        let store = production.store();
+        let parties = [(0xc1, 51, true), (0xc2, 52, false), (0xc3, 53, true)];
+        let durable = ok(Durable::with_parties(
+            authority,
+            production,
+            store,
+            parties
+                .iter()
+                .map(|(_, principal, allow)| (party(*principal), permission(*allow)))
+                .collect(),
+        ));
+        let credentials: Vec<(u8, u8)> = parties.iter().map(|(c, p, _)| (*c, *p)).collect();
+        let mut server = Server::new(
+            party_config(contract, &credentials),
+            Viewing(durable),
+            Sink::default(),
+        );
+        let origin = "https://app.example";
+        let mut revision = 0;
+        // Each party's view, preview, command and refusals.
+        for (index, (credential, _, allow)) in parties.iter().enumerate() {
+            let retry = 20 + index as u64;
+            let request = body(contract, 120, retry, revision);
+            let call = |server: &mut Server<_, Sink>, method, path, origin, body: &[u8]| {
+                status(&raw_exchange(
+                    server,
+                    party_http(method, path, *credential, origin, body),
+                ))
+            };
+            assert_eq!(call(&mut server, "GET", "/state", origin, &[]), 200);
+            assert_eq!(call(&mut server, "POST", "/preview", origin, &request), 200);
+            let decided = call(&mut server, "POST", "/command", origin, &request);
+            assert_eq!(decided, if *allow { 200 } else { 422 });
+            if *allow {
+                revision += 1;
+            }
+            let stale = body(contract, 121, retry, revision + 5);
+            assert_eq!(
+                call(
+                    &mut server,
+                    "POST",
+                    "/command",
+                    "https://evil.example",
+                    &request
+                ),
+                403
+            );
+            assert_eq!(call(&mut server, "POST", "/command", origin, &stale), 409);
+            assert_eq!(
+                call(&mut server, "POST", "/preview", origin, &[1, 2, 3]),
+                400
+            );
+        }
+        let unknown = raw_exchange(&mut server, party_http("GET", "/state", 0xc4, origin, &[]));
+        assert_eq!(status(&unknown), 401);
+        let (_, sink) = server.into_parts();
+        assert!(sink.records.iter().any(|t| t.event == Event::Acknowledge));
+        let text = sink
+            .records
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        // No configured credential appears in any trace, as hexadecimal or bytes.
+        for (credential, _) in credentials.iter().chain([&(0xc4, 0)]) {
+            let hex = format!("{credential:02x}").repeat(32);
+            assert!(
+                !text.contains(&hex) && !text.contains(&hex.to_uppercase()),
+                "party credential in trace"
+            );
+            for trace in &sink.records {
+                for id in [
+                    trace.request,
+                    trace.replay,
+                    trace.decision,
+                    trace.commit,
+                    trace.delivery,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    assert_ne!(
+                        id.as_bytes(),
+                        &[*credential; 32],
+                        "party credential in trace"
+                    );
+                }
+            }
+        }
+        sink.save("party-traces");
+    });
+}
