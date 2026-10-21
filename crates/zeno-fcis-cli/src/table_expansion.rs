@@ -69,9 +69,15 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
                 domain.map_or("unknown (an input has no declared range)".to_owned(), |n| n
                     .to_string()),
             );
+            for count in &expansion.counts {
+                eprintln!(
+                    "count at line {} column {}: {} clauses per expansion, expanded {} times",
+                    count.line, count.column, count.clauses, count.expansions
+                );
+            }
             if domain.is_some_and(|n| n > FINITE_CHECK_CAP) {
                 eprintln!(
-                    "note: the finite contract checks enumerate at most {FINITE_CHECK_CAP} input tuples by default and stop with UNKNOWN beyond it"
+                    "note: the finite contract checks enumerate at most {FINITE_CHECK_CAP} input tuples by default; beyond it review reports bounded probes and the judges are inconclusive"
                 );
             }
         }
@@ -85,6 +91,10 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
             })).collect::<Vec<_>>(),
             "inputs": inputs.iter().map(|(name, size)| json!({
                 "input": name, "values": size.map(|n| n.to_string()),
+            })).collect::<Vec<_>>(),
+            "counts": expansion.counts.iter().map(|count| json!({
+                "line": count.line, "column": count.column,
+                "clauses": count.clauses.to_string(), "expansions": count.expansions,
             })).collect::<Vec<_>>(),
             "domain_size": domain.map(|n| n.to_string()),
             "finite_check_cap": FINITE_CHECK_CAP.to_string(),

@@ -329,32 +329,77 @@ law 502 c on commit = post.100.120[0] == 0;\n"
         "{HEADER}table 110 100 slot 105 size 5;\nlaw 500 a on commit = forall i in table 110 {{ post.100.110[i] == }};\n"
     );
     assert_eq!(errors(&source).len(), 1);
-    // A duplicate entry ID is reported at the table that declares it.
-    let source = format!("{HEADER}field 111 100 spare 105;\ntable 110 100 slot 105 size 3;\n");
-    let refused = elaborate_project(
-        parse_project(&source, SourceLimits::default()).unwrap(),
-        ProjectLimits::default(),
-    )
-    .unwrap_err();
-    assert!(
-        refused
-            .diagnostics()
-            .iter()
-            .any(|d| d.code() == DiagnosticCode::DuplicateId
-                && d.span().start() == at(&source, "table 110"))
-    );
-    // A count too large to expand stops at the resource limit.
+    // A count too large to expand stops at the resource limit and says how
+    // many clauses it would need: C(64, 32).
     let source = format!(
-        "{HEADER}table 110 100 slot 106 size 64;\nlaw 500 a on commit = count j in table 110 {{ post.100.110[j] == 1 }} <= 31;\n"
+        "{HEADER}table 1000 100 slot 106 size 64;\nlaw 500 a on commit = count j in table 1000 {{ post.100.1000[j] == 1 }} <= 31;\n"
     );
     assert_eq!(
         errors(&source),
         [(
             DiagnosticCode::ResourceLimit,
             at(&source, "count"),
-            "table.expansion".to_owned()
+            "table.count".to_owned()
         )]
     );
+    let refused = parse_project(&source, SourceLimits::default()).expect_err("refused");
+    assert_eq!(
+        refused.diagnostics()[0].actual(),
+        "1832624140942590534 clauses of 32 entries each, per expansion"
+    );
+}
+
+#[test]
+fn tables_refuse_entry_ids_that_meet_any_other_declaration() {
+    let at = |source: &str, needle: &str| source.find(needle).unwrap() as u32;
+    // Entry IDs 110..=115 against a field, a type, a variant, a reason, a
+    // law and another table: each is refused at the table.
+    for (other, kind) in [
+        ("field 113 100 spare 105;", "field 113"),
+        ("type 112 int Spare in 0..=1;", "type 112"),
+        ("variant 115 102 Spare none;", "variant 115"),
+        ("reason 111 spare precedence 0;", "reason 111"),
+        ("law 114 spare on commit = true;", "law 114"),
+        ("table 115 100 other 105 size 2;", "field 115"),
+    ] {
+        let source = format!("{HEADER}table 110 100 slot 105 size 6;\n{other}\n");
+        let refused = parse_project(&source, SourceLimits::default()).expect_err(other);
+        let found: Vec<_> = refused
+            .diagnostics()
+            .iter()
+            .filter(|d| d.code() == DiagnosticCode::DuplicateId)
+            .map(|d| {
+                (
+                    d.span().start(),
+                    d.path().as_str().to_owned(),
+                    d.actual().to_owned(),
+                )
+            })
+            .collect();
+        assert!(
+            found.contains(&(
+                at(&source, "table 110"),
+                "table.id".to_owned(),
+                kind.to_owned()
+            )),
+            "{other}: {found:?}"
+        );
+    }
+    // The IDs just outside the range, and the table's own entries, are free.
+    let source = format!(
+        "{HEADER}type 109 int Below in 0..=1;\ntable 110 100 slot 105 size 6;\nlaw 116 above on commit = true;\n"
+    );
+    assert!(parse_project(&source, SourceLimits::default()).is_ok());
+}
+
+#[test]
+fn tables_report_each_count_with_its_clauses() {
+    let expansion = expand_tables(LIBRARY, SourceLimits::default()).unwrap();
+    let line = LIBRARY[..LIBRARY.find("count j").unwrap()].lines().count() as u32;
+    assert_eq!(expansion.counts.len(), 1);
+    let count = &expansion.counts[0];
+    // C(6, 3) clauses, once per copy of the enclosing forall.
+    assert_eq!((count.line, count.clauses, count.expansions), (line, 20, 6));
 }
 
 #[test]

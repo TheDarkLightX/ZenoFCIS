@@ -40,6 +40,10 @@ fn contract_tables_expand_prints_the_checked_project() {
         summary.contains("tables=1 entries=6 inputs=10 domain=294912"),
         "{summary}"
     );
+    assert!(
+        summary.contains("20 clauses per expansion, expanded 6 times"),
+        "{summary}"
+    );
     assert!(text.contains("field 110 100 copies_0 105;\nfield 111 100 copies_1 105;"));
     assert!(!text.contains("table 110"));
     // The printed expansion checks as the same program.
@@ -64,6 +68,8 @@ fn contract_tables_expand_prints_the_checked_project() {
     assert_eq!(value["expansion"], text);
     assert_eq!(value["domain_size"], "294912");
     assert_eq!(value["canonical_match"], true);
+    assert_eq!(value["counts"][0]["clauses"], "20");
+    assert_eq!(value["counts"][0]["expansions"], 6);
     assert_eq!(value["tables"][0]["fields"], serde_json::json!([110, 115]));
     // A table error is a diagnostic at the table source, not printed text.
     let bad = dir.join("bad.zeno");

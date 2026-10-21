@@ -50,6 +50,20 @@ pub struct TableInfo {
     pub size: u32,
 }
 
+/// One `count` form as written, with the clauses it expands to.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountInfo {
+    /// One-based source line of the `count` keyword.
+    pub line: u32,
+    /// One-based source column of the `count` keyword.
+    pub column: u32,
+    /// Clauses in one expansion, C(N, K+1) for `count <= K`.
+    pub clauses: u128,
+    /// Times the form is expanded: once, or once per entry of each
+    /// enclosing table form.
+    pub expansions: u64,
+}
+
 /// The exact expansion of a project's table forms.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TableExpansion {
@@ -58,6 +72,8 @@ pub struct TableExpansion {
     pub text: String,
     /// Every table, in stable-ID order.
     pub tables: Vec<TableInfo>,
+    /// Every `count` whose conditions read an input, in source order.
+    pub counts: Vec<CountInfo>,
 }
 
 /// One replaced byte range of the source.
@@ -187,11 +203,12 @@ pub(crate) fn subsets(n: usize, k: usize) -> u128 {
     value
 }
 
-/// The number of condition copies `count OP k` expands to over `n` entries.
-pub(crate) fn count_copies(n: usize, op: CompareOp, k: i128) -> u128 {
+/// The clauses and condition copies `count OP k` expands to over `n`
+/// entries: C(n, k+1) clauses of k+1 copies for `count <= k`.
+pub(crate) fn count_size(n: usize, op: CompareOp, k: i128) -> (u128, u128) {
     let at_least = |m: i128| match usize::try_from(m) {
-        Ok(m) if m >= 1 && m <= n => subsets(n, m).saturating_mul(m as u128),
-        _ => 0,
+        Ok(m) if m >= 1 && m <= n => (subsets(n, m), subsets(n, m).saturating_mul(m as u128)),
+        _ => (0, 0),
     };
     let at_most = |m: i128| at_least(m.saturating_add(1));
     match op {
@@ -199,7 +216,10 @@ pub(crate) fn count_copies(n: usize, op: CompareOp, k: i128) -> u128 {
         CompareOp::Less => at_most(k.saturating_sub(1)),
         CompareOp::GreaterEq => at_least(k),
         CompareOp::Greater => at_least(k.saturating_add(1)),
-        CompareOp::Eq | CompareOp::NotEq => at_least(k).saturating_add(at_most(k)),
+        CompareOp::Eq | CompareOp::NotEq => {
+            let ((a, b), (c, d)) = (at_least(k), at_most(k));
+            (a.saturating_add(c), b.saturating_add(d))
+        }
     }
 }
 

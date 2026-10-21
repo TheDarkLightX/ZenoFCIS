@@ -50,7 +50,9 @@ the same identity and the same checks. The rules are:
 - `table ID OWNER name TYPE size N;` declares, for each entry k from 0 to N-1,
   the field `ID + k` of record OWNER, named `name_k`, of type TYPE. N is 1 to
   64. Entry IDs follow from the table's ID alone, not from the order of the
-  declarations.
+  declarations. The IDs `ID` to `ID + N - 1` must be free: a table is refused
+  when any of them is the ID of another declaration of any kind, or of the
+  project.
 - `type ID index Name of T;` is `type ID int Name in 0..=N-1;` for a table T
   of N entries.
 - `ROOT.OWNER.T[k]` is `ROOT.OWNER.(T + k)`. The index k is an integer literal
@@ -78,9 +80,29 @@ So the example's law 500 is six implications, one per copy k: when field
 
 Errors point at the table source: at the `table` declaration, the `[` of an
 entry, or the start of a table form. A diagnostic inside a form's body is
-reported once, not once per entry. An expansion that would exceed the
-formula-node limit of 1,000,000 stops with the resource-limit diagnostic
-`ZENO-E0207` at the form; a table of more than 64 entries does too.
+reported once, not once per entry. A table of more than 64 entries, or an
+expansion that would exceed the formula-node limit of 1,000,000, stops with
+the resource-limit diagnostic `ZENO-E0207` at the form; for a `count`, the
+diagnostic gives the number of clauses it would need.
+
+### What a count costs
+
+`count i in table T { C } <= K` is C(N, K+1) clauses of K+1 copies of C,
+over a table of N entries; a count inside a `forall` is expanded once per
+entry of the `forall`. `check --expand` prints each count's clauses and how
+many times it is expanded, so the cost is visible before it reaches the limit:
+
+| N | K | Clauses for `<= K` |
+|---|---|---|
+| 6 | 1 | 15 |
+| 6 | 2 | 20 |
+| 16 | 2 | 560 |
+| 32 | 2 | 4,960 |
+| 64 | 1 | 2,016 |
+| 64 | 2 | 41,664 |
+| 64 | 3 | 635,376 |
+
+`>= K` costs C(N, K) clauses of K copies, and `==` and `!=` cost both.
 
 ## Difference
 
@@ -107,6 +129,10 @@ existing meaning: exhaustively checked over the declared finite domain.
   `where i == command...`, as in the example.
 - `v2/policy.json` and `ui.json` have no table forms; they use entry IDs,
   and the generated interface shows each entry as its own field.
-- Checking large tables without enumerating every combination, compact
-  counting, conditional sums over inputs and table forms in the rules are
-  future work for 2.7.
+- `.zeno` law formulas have no if-then-else value, so a sum whose condition
+  reads an input, and a count compared with anything but a constant, have no
+  exact expansion into today's formulas.
+- Future work for 2.7: checking large tables without enumerating every
+  combination; a `choose` value form in laws, which would make counts and
+  conditional sums linear in N; conditional sums and non-constant counts; and
+  table forms in the rules.

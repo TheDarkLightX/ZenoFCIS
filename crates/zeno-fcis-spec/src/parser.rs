@@ -12,7 +12,7 @@ use crate::diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
 };
 use crate::lexer::{Token, TokenKind, lex};
-use crate::tables::{self, MAX_TABLE_ENTRIES, Rewrite, TableExpansion, TableInfo};
+use crate::tables::{self, CountInfo, MAX_TABLE_ENTRIES, Rewrite, TableExpansion, TableInfo};
 use crate::{MAX_FORMULA_DEPTH, MAX_FORMULA_NODES, SourceLimits, ZENO_DSL_VERSION};
 
 /// Parses one bounded `.zeno` source file and accumulates deterministic diagnostics.
@@ -27,8 +27,13 @@ pub fn expand_tables(source: &str, limits: SourceLimits) -> Result<TableExpansio
     let (_, parser) = parse_with_tables(source, limits)?;
     let mut tables = parser.table_infos;
     tables.sort_by_key(|table| table.id);
+    let counts = parser.counts.into_values().collect();
     match tables::apply(source, parser.rewrites) {
-        Some(text) => Ok(TableExpansion { text, tables }),
+        Some(text) => Ok(TableExpansion {
+            text,
+            tables,
+            counts,
+        }),
         None => Err(DiagnosticSet::from_vec(
             vec![Diagnostic::new(
                 DiagnosticCode::InvalidDeclaration,
@@ -64,6 +69,8 @@ fn parse_with_tables(
         expanded: 0,
         rewrites: Vec::new(),
         table_infos: Vec::new(),
+        table_spans: Vec::new(),
+        counts: BTreeMap::new(),
     };
     let parsed = parser.parse(limits.max_diagnostics());
     if parser.diagnostics.is_empty() {
@@ -98,6 +105,10 @@ struct Parser {
     expanded: usize,
     rewrites: Vec<Rewrite>,
     table_infos: Vec<TableInfo>,
+    /// Each table's ID, size and declaration span.
+    table_spans: Vec<(u32, u32, SourceSpan)>,
+    /// Count forms by source offset.
+    counts: BTreeMap<u32, CountInfo>,
 }
 
 impl Parser {
@@ -188,6 +199,7 @@ impl Parser {
                 });
             }
         }
+        self.refuse_table_collisions(project_id);
         ParsedProject {
             version,
             project_id,
@@ -486,6 +498,7 @@ impl Parser {
             });
         }
         self.rewrite_declaration(lines.join("\n"));
+        self.table_spans.push((id.get(), size, start));
         self.table_infos.push(TableInfo {
             id: id.get(),
             owner: owner.get(),
@@ -503,6 +516,35 @@ impl Parser {
         let size = self.take_u32("table.size")?;
         self.expect_symbol(TokenKind::Semicolon, "table");
         Some((id, owner, name, field_type, size))
+    }
+    /// Refuses a table whose entry IDs, `ID` to `ID + N - 1`, meet the ID of
+    /// any other declaration, of any kind, or of the project.
+    fn refuse_table_collisions(&mut self, project: StableId) {
+        let mut owners = vec![(project.get(), "project", None)];
+        for spanned in &self.declarations {
+            for (id, kind) in declaration_ids(&spanned.declaration) {
+                owners.push((id, kind, Some(spanned.span)));
+            }
+        }
+        for (table, size, span) in self.table_spans.clone() {
+            let entries = table..table.saturating_add(size);
+            let clash = owners.iter().find(|(id, kind, at)| {
+                entries.contains(id) && !(*kind == "field" && *at == Some(span))
+            });
+            if let Some((id, kind, _)) = clash {
+                self.error_at(
+                    span,
+                    DiagnosticCode::DuplicateId,
+                    "table.id",
+                    format!(
+                        "entry IDs {table}..={} that no other declaration uses",
+                        entries.end - 1
+                    ),
+                    format!("{kind} {id}"),
+                    "choose a table ID whose entry IDs are all free",
+                );
+            }
+        }
     }
     /// Records that the declaration just parsed expands to `text`.
     fn rewrite_declaration(&mut self, text: String) {
@@ -1677,10 +1719,29 @@ impl Parser {
             .map(|c| formula_shape_rel(c).0)
             .max()
             .unwrap_or(1);
-        let copies = tables::count_copies(conditions.len(), op, bound);
+        let (clauses, copies) = tables::count_size(conditions.len(), op, bound);
+        let info = self.counts.entry(start.start()).or_insert(CountInfo {
+            line: start.line(),
+            column: start.column(),
+            clauses,
+            expansions: 0,
+        });
+        info.expansions += 1;
         let nodes =
             usize::try_from(copies.saturating_mul(largest as u128 + 2)).unwrap_or(usize::MAX);
-        if !self.charge(start, nodes) {
+        self.expanded = self.expanded.saturating_add(nodes);
+        if self.expanded > MAX_FORMULA_NODES {
+            self.error_at(
+                start,
+                DiagnosticCode::ResourceLimit,
+                "table.count",
+                format!("at most {MAX_FORMULA_NODES} expanded formula nodes"),
+                format!(
+                    "{clauses} clauses of {} entries each, per expansion",
+                    copies.checked_div(clauses).unwrap_or(0)
+                ),
+                "count over fewer entries or with a smaller bound; compact counting is future work",
+            );
             return RelExpr::Bool(false);
         }
         tables::count(&conditions, op, bound)
@@ -2092,6 +2153,25 @@ impl Parser {
             self.advance();
         }
         if self.take_symbol(&TokenKind::Semicolon) {}
+    }
+}
+
+/// The stable IDs a declaration introduces, with its kind.
+fn declaration_ids(declaration: &Declaration) -> Vec<(u32, &'static str)> {
+    match declaration {
+        Declaration::Namespace(d) => vec![(d.id().get(), "namespace")],
+        Declaration::Type(d) => vec![(d.id().get(), "type")],
+        Declaration::Field(d) => vec![(d.id().get(), "field")],
+        Declaration::Variant(d) => vec![(d.id().get(), "variant")],
+        Declaration::Reason(d) => vec![(d.id().get(), "reason")],
+        Declaration::Effect(d) => vec![(d.id().get(), "effect")],
+        Declaration::Channel(d) => vec![(d.id().get(), "channel")],
+        Declaration::Component(d) => core::iter::once((d.id().get(), "component"))
+            .chain(d.ports().iter().map(|port| (port.id().get(), "port")))
+            .collect(),
+        Declaration::Wiring(_) => Vec::new(),
+        Declaration::Law(d) => vec![(d.id().get(), "law")],
+        Declaration::Claim(d) => vec![(d.id().get(), "claim")],
     }
 }
 

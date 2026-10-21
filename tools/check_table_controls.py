@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build four isolated contract-table mutants and require named test failures."""
+"""Build five isolated contract-table mutants and require named test failures."""
 
 import argparse
 import hashlib
@@ -32,6 +32,10 @@ CONTROLS = (
      "let entry = id.get().checked_add(k).and_then(StableId::new);",
      "let entry = id.get().checked_add(k + self.table_infos.len() as u32).and_then(StableId::new);",
      "tables_entry_ids_do_not_depend_on_declaration_order"),
+    ("collision-check-removed", PARSER,
+     "if let Some((id, kind, _)) = clash {",
+     "if let Some((id, kind, _)) = clash.filter(|_| false) {",
+     "tables_refuse_entry_ids_that_meet_any_other_declaration"),
 )
 
 

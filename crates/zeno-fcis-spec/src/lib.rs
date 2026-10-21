@@ -45,7 +45,7 @@ pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,
 };
-pub use tables::{MAX_TABLE_ENTRIES, TableExpansion, TableInfo};
+pub use tables::{CountInfo, MAX_TABLE_ENTRIES, TableExpansion, TableInfo};
 pub use views::{
     DerivedComposition, GeneratedProject, GraphFormat, ObligationKind, UnresolvedObligation,
     derive_composition, generate_project, render_graph,
