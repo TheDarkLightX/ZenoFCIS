@@ -499,3 +499,19 @@ fn a_source_tree_that_cannot_bind_the_application_is_refused_writing_nothing() {
     );
     assert!(read(named.join("Cargo.toml")) == read(default.join("Cargo.toml")));
 }
+
+#[test]
+fn contract_application_preserves_ui_metadata_exactly() {
+    let root = TempRoot::new("ui-metadata");
+    let source = template("inventory-reservation");
+    let app = root.path().join("app");
+    let created = new_application(&app, &source, &[]);
+    assert_eq!(
+        created.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    assert_eq!(read(app.join("ui.json")), read(source.join("ui.json")));
+    assert_eq!(contract_check(&app), Some(0));
+}

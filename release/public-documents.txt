@@ -326,6 +326,8 @@ security/reviews/v1/opus-release-issues-result.md
 site/ABI.md
 site/README.md
 site/public/index.html
+site/tests/SOCKET_FREE.md
+site/zenoui/README.md
 skills/fixed-spec-proof-review/SKILL.md
 skills/handoff-completion-gate/SKILL.md
 skills/rust-typestate-newtype/SKILL.md

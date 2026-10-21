@@ -10,6 +10,10 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         include_bytes!("../templates/withdrawal-queue/tests/shell_effects.rs"),
     ),
     (
+        "ui.json",
+        include_bytes!("../templates/withdrawal-queue/ui.json"),
+    ),
+    (
         "src/v2_contract.rs",
         include_bytes!("../templates/withdrawal-queue/src/v2_contract.rs"),
     ),

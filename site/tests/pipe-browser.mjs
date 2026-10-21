@@ -5,10 +5,11 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {loadAssets,ORIGIN} from './asset-manifest.mjs';
+import {failureDetails} from './browser-checks.mjs';
 const [chrome,profile,root,manifestPath,nativePath,reportPath]=process.argv.slice(2);
 if(!reportPath)throw new Error('usage: pipe-browser.mjs CHROME PROFILE PUBLIC MANIFEST NATIVE REPORT');
 const manifest=JSON.parse(await readFile(manifestPath,'utf8')),assets=await loadAssets(root,manifest);
-const expected=JSON.parse(await readFile(nativePath,'utf8')).search;
+const expected=nativePath==='-'?null:JSON.parse(await readFile(nativePath,'utf8')).search;
 const args=['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-background-networking','--disable-component-update','--disable-sync','--remote-debugging-pipe',`--user-data-dir=${profile}`];
 if(process.getuid?.()===0||process.env.SITE_CHROME_NO_SANDBOX==='1')args.push('--no-sandbox');
 // The exec boundary closes inherited descriptors above 4, including non-CLOEXEC handles.
@@ -43,7 +44,7 @@ async function event(message){
  }
 }
 browser.stdio[4].setEncoding('utf8');browser.stdio[4].on('data',data=>{buffer+=data;let end;while((end=buffer.indexOf('\0'))>=0){const raw=buffer.slice(0,end);buffer=buffer.slice(end+1);try{const message=JSON.parse(raw);if(message.id){const p=pending.get(message.id);pending.delete(message.id);if(p){if(message.error)p.reject(new Error(JSON.stringify(message.error)));else p.resolve(message.result);}}else event(message).catch(stop);}catch(error){stop(error);}}});
-let parity=false,errorText=null;
+let parity=false,errorText=null,matrix=null,failure=null;
 try{
  await command('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:true,flatten:true});
  const {targetId}=await command('Target.createTarget',{url:'about:blank'});
@@ -51,6 +52,7 @@ try{
  while(!targetSessions.has(targetId)){if(stopped)throw stopped;if(Date.now()>attachmentDeadline)throw new Error('Page auto-attachment missing');await delay(20);}
  const sessionId=targetSessions.get(targetId);await sessions.get(sessionId);
  await command('Page.enable',{},sessionId);
+ if(nativePath==='-'){const {runMatrix}=await import('./zenoui-matrix.mjs');matrix=await runMatrix({command,sessionId,assets,root,reportPath});assert.ok(workerAttached>0,'shared module worker attached');parity=true;}else{
  await command('Page.navigate',{url:`${ORIGIN}/ZenoFCIS/index.html`},sessionId);
  const deadline=Date.now()+20000;
  while(true){
@@ -68,9 +70,10 @@ try{
  assert.ok(fulfilled.some(x=>x.url.endsWith('/factory.wasm')),'Wasm fulfilled from hashed manifest');
  const negative=await command('Runtime.evaluate',{returnByValue:true,awaitPromise:true,expression:`Promise.all(['${ORIGIN}/unknown-asset','https://external.invalid/no'].map(url=>fetch(url).then(()=>false,()=>true)))`},sessionId);
  assert.deepEqual(negative.result.value,[true,true],'unknown and external routes refused');parity=true;
-}catch(error){errorText=error.message;process.exitCode=1;console.error(errorText);}
+ }
+}catch(error){errorText=error.message;failure=failureDetails(error);matrix=error.matrix??matrix;process.exitCode=1;console.error(errorText);}
 finally{
  await command('Browser.close',{},undefined,1000).catch(()=>{});const timer=setTimeout(()=>browser.kill('SIGKILL'),1000);await closed;clearTimeout(timer);
- const report={arguments:args,format:'zenoui/browser-spike/1',manifest:manifest.sha256,parity,workerAttached,fulfilled,denied,error:errorText,stderr};await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');
+ const report={arguments:args,format:'zenoui/browser-spike/1',manifest:manifest.sha256,parity,matrix,workerAttached,fulfilled,denied,error:errorText,failure,stderr};await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');
  console.log(JSON.stringify({parity,workerAttached,fulfilled:fulfilled.length,denied:denied.length,report:reportPath}));
 }

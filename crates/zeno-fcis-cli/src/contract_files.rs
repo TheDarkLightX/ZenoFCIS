@@ -406,7 +406,7 @@ pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// `zeno-fcis new <dir> --contract <contract>`: an application built from
 /// `project.zeno`, `v2/policy.json`, the adoptions and evolutions it lists
 /// and, when
-/// present, `tests/decision-examples.txt` in `contract`, and bound to the
+/// present, `tests/decision-examples.txt` and `ui.json` in `contract`, and bound to the
 /// ZenoFCIS source tree `source`, or the tree this CLI was built from. `dir`
 /// exists and is empty.
 pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
@@ -422,6 +422,13 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             Ok(bytes) => text(EXAMPLES, bytes)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => NO_EXAMPLES.to_owned(),
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
+        };
+        // UI metadata is shipped verbatim. The UI generator validates its closed
+        // schema against the generated contract before emitting an interface.
+        let ui_metadata = match read_input(&contract.join("ui.json")) {
+            Ok(bytes) => Some(bytes),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(Failure::Read(format!("read ui.json: {error}"))),
         };
         let generated = inputs.generate()?;
         // The contract version is part of the package name, so two versions
@@ -470,6 +477,9 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
             (EXAMPLES.to_owned(), examples.into_bytes()),
         ];
+        if let Some(metadata) = ui_metadata {
+            files.push(("ui.json".to_owned(), metadata));
+        }
         files.extend(inputs.retained());
         files.extend(
             outputs(&generated)

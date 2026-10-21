@@ -1,22 +1,8 @@
+import { node as element, metrics } from './zenoui/components.js';
 import { mountInventoryGrid } from "./factory-grid.js";
 import { human, inventoryInput, inventoryDecision, synthesisInput, yesNo, amount } from "./factory-format.js";
 
 import { ACTS, initial, step, view, count, descriptor } from "./zenoui/presentation.js";
-
-function element(tag, className, ...children) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.append(...children.filter((child) => child !== null && child !== undefined));
-  return node;
-}
-// A row of headline figures: the number first, then what it counts.
-function metrics(...items) {
-  const list = element("dl","metrics");
-  for (const [value,label,tone] of items) {
-    list.append(element("div",tone ? `metric ${tone}` : "metric",element("dt",null,label),element("dd",null,value)));
-  }
-  return list;
-}
 
 // The three pairs of checks whose order the synthesis chooses (the sketch's holes).
 const PAIRS = [

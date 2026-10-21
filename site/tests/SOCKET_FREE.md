@@ -1,80 +1,68 @@
-# Socket-free browser spike
+# Browser checks without an HTTP listener
 
-`socket_free_check.py` builds a SHA-256 manifest of the exact public artifact.
-The Node runner launches Chrome through DevTools pipe file descriptors 3/4,
-pauses new page and module-worker targets, and fulfils requests from a checked
-in-memory asset snapshot at `https://zenoui.test`. Unknown routes, external
-origins and methods other than GET are refused. It opens no HTTP listener.
-The intended positive check runs the real factory page's search act, requires
-a module worker and Wasm fetch, compares the complete result with the native
-oracle, then checks unknown and external fetch refusals.
+The browser runner checks the built public artifact through Chrome's DevTools
+pipe. `socket_free_check.py` builds a SHA-256 manifest, and the runner fulfils
+requests from a checked in-memory snapshot at `https://zenoui.test`. Unknown
+routes, external origins and methods other than GET are refused. No HTTP
+listener is opened. Chrome still needs permission for its own internal IPC.
 
-Run after the module and native build stages:
+Run after the site's module and native build stages:
 
 ```sh
 python3 site/tests/socket_free_check.py --out "$TMPDIR/zenoui-browser"
 ```
 
-The output contains `assets.json` (every file hash) and `browser.json` (the
-observed result and Chrome stderr). `node site/tests/asset-manifest.test.mjs`
-checks snapshot ownership, hash tampering, unknown routes, external origins,
-path escape and changes after load without needing Chrome.
+The factory check runs the real page's search action, requires a module worker
+and Wasm fetch, compares the complete result with the native oracle, and checks
+unknown and external fetch refusals. Outputs include `assets.json` (file hashes)
+and `browser.json` (results, fulfilled and denied requests, and Chrome stderr).
+On failure, `failure` retains the assertion's expected and actual values. The
+generated-app matrix also records its current configuration, predicate, focus,
+invalid controls and confirmation text when those observations are available.
 
-The restricted-environment spike could not reach DevTools. The first launch
-failed in Crashpad with `setsockopt: Operation not permitted`. Disabling
-Crashpad using Chrome's `--disable-crashpad-for-testing` reached
-`content/browser/sandbox_host_linux.cc:41`, then failed at `shutdown` with
-`Operation not permitted`. An additional run with Chrome's internal sandbox
-disabled reached the same refusal. These are observed socket operations;
-tracing their address families was unavailable because `PTRACE_TRACEME` and
-`PTRACE_SETOPTIONS` were also denied. No module-worker, Wasm or browser parity
-pass is claimed. The lead must run the spike and existing browser checks on a
-host that allows Chrome's internal IPC. `SITE_CHROME_NO_SANDBOX=1` reproduces
-the additional diagnostic only; it is not required by the normal runner.
-
-
-The launcher now execs Chrome through `exec_chrome.py`. It preserves only
-standard IO and the DevTools channels 3/4, closes every higher inherited
-descriptor and keeps the same process ID for shutdown. The profile is created
-directly under `/tmp`, independently of `TMPDIR`. The normal Chrome launch
-also drops the earlier Crashpad testing flag to match the regular browser
-runner. Whether these changes resolve the host's FD ownership crash requires
-the lead's rerun; no successful Chrome run is claimed here.
-
-Offline regressions:
+The generated-app matrix consumes the checked generator's evidence directory:
 
 ```sh
+python3 tools/check_zenoui_browser.py --root "$TMPDIR/zenoui-checks" --out "$TMPDIR/zenoui-matrix"
+```
+
+It checks three templates at two widths, two themes and two motion settings,
+plus 320-pixel reflow and 200% CSS zoom. Keyboard submission uses DevTools key
+events, including Enter's character data, rather than scripted DOM clicks.
+Keyboard and pointer journeys, consent invalidation, accessible names, state
+parity, error recovery, screenshots and performance budgets are separate from
+the generator's finite-domain checks. CSS zoom does not replace a manual
+browser-menu zoom or screen-reader audit.
+
+The launcher preserves standard IO and DevTools channels 3/4 and closes higher
+inherited descriptors before executing Chrome. It uses a short temporary
+profile path independently of `TMPDIR`. Only page sessions enable Fetch;
+flattened auto-attachment resumes module workers while the page intercepts
+requests. A host restricting Chrome's internal sockets can fail before
+DevTools starts, for example with `setsockopt: Operation not permitted`. Such a
+failure supplies no browser layout, interaction or parity evidence. Run on a
+host that permits Chrome's internal IPC; disabling the browser sandbox does
+not establish that permission.
+
+Offline checks:
+
+```sh
+node site/tests/asset-manifest.test.mjs
 node --experimental-vm-modules site/tests/factory-readiness.test.mjs
 node site/tests/browser-launcher.test.mjs
 python3 -B -m unittest discover -s site/tests -p test_socket_free_launcher.py
-```
-
-The readiness test executes the shipped page module, worker and actual Wasm
-with a small DOM adapter. It requires completion after rendering and native
-parity, kills a missing-event control, checks the served module paths and
-checks that an import error produces failed harness output. It does not
-establish Chrome layout, raster or keyboard behavior. The geometry oracle
-receives the artifact's geometry through the declared deployment base; a
-filesystem-relative public import is never used as a served URL.
-
-The lead's next host run reached the page and attached its module worker, but
-stopped because dedicated-worker sessions do not provide `Fetch.enable`.
-Fetch is now enabled only on page sessions; flattened auto-attach resumes the
-worker while the page handles manifest requests. `pipe-browser.test.mjs` drives
-the actual pipe runner with a scripted protocol peer that rejects worker Fetch,
-checks manifest hashes/refusals, and supplies a full result with a planted
-nested-witness mismatch. This tests routing and parity enforcement, not Chrome
-interception or execution. Those still require the lead's host run.
-
-```sh
+node site/tests/browser-checks.test.mjs
 node site/tests/pipe-browser.test.mjs
 node site/tests/factory-width.test.mjs
 ```
 
-The width check computes each declared region's minimum against 350 CSS pixels
-at a 390-pixel viewport, from the same datum that generates
-`factory-layout.css`. Regenerate it with the width test's `--write` option.
-Intrinsic ledger columns and oversized-region controls must fail. The canvas
-retains its exact geometry and scroll container; ledger and comparison text
-wrap instead of forcing the page wider. This is a structural check, not browser
-font, layout, raster or reflow evidence.
+The manifest test covers ownership, hash tampering, route refusal and changes
+after load. Readiness executes the shipped page, worker and Wasm with a small
+DOM adapter. The pipe-runner test uses a scripted protocol peer, checks routing
+and manifest fulfilment, and plants a nested native-result mismatch. These
+checks do not establish real Chrome execution or keyboard activation.
+
+The width check computes region minimums against the same geometry data that
+generates `factory-layout.css`. Its `--write` option regenerates that file.
+Oversized regions and intrinsic ledger columns must fail. This structural check
+does not establish browser font metrics, layout, raster or reflow.

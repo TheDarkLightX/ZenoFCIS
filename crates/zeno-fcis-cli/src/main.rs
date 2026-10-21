@@ -237,7 +237,7 @@ enum Command {
         dir: PathBuf,
         #[arg(long, value_enum, default_value_t = Template::Minimal)]
         template: Template,
-        /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt.
+        /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt and ui.json.
         #[arg(long, conflicts_with = "template")]
         contract: Option<PathBuf>,
         /// ZenoFCIS source tree a Cargo application's ZenoFCIS packages resolve to. Default: the tree this CLI was built from, while it exists.

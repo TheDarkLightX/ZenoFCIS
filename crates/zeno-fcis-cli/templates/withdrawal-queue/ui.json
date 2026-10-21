@@ -1,0 +1,93 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Withdrawal queue",
+  "action": "command.101.130",
+  "fields": {
+    "pre.100.120": {
+      "label": "Balance",
+      "unit": "credits"
+    },
+    "pre.100.121": {
+      "label": "Lane A status",
+      "unit": "unitless"
+    },
+    "pre.100.122": {
+      "label": "Lane A reserved",
+      "unit": "credits"
+    },
+    "pre.100.123": {
+      "label": "Lane B status",
+      "unit": "unitless"
+    },
+    "pre.100.124": {
+      "label": "Lane B reserved",
+      "unit": "credits"
+    },
+    "pre.100.125": {
+      "label": "Pause remaining",
+      "unit": "ticks"
+    },
+    "pre.100.126": {
+      "label": "Must serve",
+      "unit": "unitless"
+    },
+    "pre.100.127": {
+      "label": "First lane",
+      "unit": "unitless"
+    },
+    "command.101.130": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "command.101.131": {
+      "label": "Lane",
+      "unit": "unitless"
+    },
+    "command.101.132": {
+      "label": "Amount",
+      "unit": "credits"
+    },
+    "context.102.140": {
+      "label": "Caller",
+      "unit": "unitless"
+    },
+    "context.102.141": {
+      "label": "Alarm raised",
+      "unit": "unitless"
+    }
+  },
+  "variants": {
+    "160": "Deposit",
+    "161": "Request a withdrawal",
+    "162": "Advance the queue",
+    "170": "Lane A",
+    "171": "Lane B",
+    "180": "Empty",
+    "181": "Arrived",
+    "182": "Pending",
+    "190": "Operator",
+    "191": "Owner of lane A",
+    "192": "Owner of lane B",
+    "193": "Keeper"
+  },
+  "commands": {
+    "160": {
+      "label": "Deposit",
+      "consequential": true
+    },
+    "161": {
+      "label": "Request a withdrawal",
+      "consequential": true
+    },
+    "162": {
+      "label": "Advance the queue",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "This caller cannot perform this command. Choose the caller responsible for it.",
+    "201": "This lane already has a withdrawal. Wait until it is paid.",
+    "202": "There is not enough unreserved balance. Deposit funds or choose a smaller amount.",
+    "203": "This deposit would exceed the capacity of 4 credits. Choose a smaller amount."
+  }
+}

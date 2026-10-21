@@ -19,6 +19,7 @@ async function run(corrupt=false,workerFetch=false){
       runner=path.join(dir,'runner.mjs');
       let source=await readFile(path.join(here,'pipe-browser.mjs'),'utf8');
       source=source.replace("if(p.targetInfo.type==='page'){","if(true){");
+      source=source.replace("'./browser-checks.mjs'",JSON.stringify(new URL('./browser-checks.mjs',import.meta.url).href));
       source=source.replace("'./asset-manifest.mjs'",JSON.stringify(new URL('./asset-manifest.mjs',import.meta.url).href));
       source=source.replace("new URL('./exec_chrome.py',import.meta.url)",JSON.stringify(new URL('./exec_chrome.py',import.meta.url).href));
       await writeFile(runner,source);
@@ -40,6 +41,9 @@ test('actual_pipe_runner_uses_page_fetch_resumes_flattened_worker_and_refuses_ro
 test('full_result_parity_catches_a_nested_witness_mismatch',async()=>{
   const {code,report}=await run(true);assert.equal(code,1);assert.equal(report.parity,false);
   assert.match(report.error,/browser worker \/ Wasm \/ native parity/);
+  assert.equal(report.failure.name,'AssertionError');
+  assert.equal(report.failure.operator,'deepStrictEqual');
+  assert.equal(report.failure.actual.first_difference.ordinal,report.failure.expected.first_difference.ordinal+1);
 });
 test('planted_worker_fetch_domain_call_is_rejected',async()=>{
   const {code,report}=await run(false,true);assert.equal(code,1);assert.equal(report.parity,false);

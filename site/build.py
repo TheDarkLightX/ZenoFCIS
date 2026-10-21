@@ -65,7 +65,7 @@ PUBLIC = SITE / "public"
 COMMON_CRATE = "zeno-fcis-site-common"
 TEMPLATES = ("account-lockout", "order-fulfillment", "inventory-reservation", "compliance-gateway",
              "withdrawal-queue", "agent-treasury-guard")
-STAGES = ("generate", "lock", "check", "module", "native", "replay", "scripts", "browser")
+STAGES = ("generate", "lock", "check", "module", "native", "replay", "scripts", "zenoui", "browser")
 TARGET = "wasm32-unknown-unknown"
 
 sys.path.insert(0, str(ROOT / "tools"))
@@ -246,7 +246,7 @@ def main() -> None:
     environment = dict(os.environ)
     environment.setdefault("CARGO_INCREMENTAL", "0")
     environment["CARGO_NET_OFFLINE"] = "true"
-    environment["CARGO_BUILD_JOBS"] = "2"
+    environment.setdefault("CARGO_BUILD_JOBS", "2")
     environment["CARGO_PROFILE_DEV_DEBUG"] = "0"
     environment["CARGO_PROFILE_TEST_DEBUG"] = "0"
     # The CLI and site are separate Cargo workspaces. Give both one absolute
@@ -271,6 +271,7 @@ def main() -> None:
         run(["node", str(SITE / "tests" / "factory-width.test.mjs")], ROOT, environment)
         run(["python3", str(SITE / "tests" / "factory_check.py")], ROOT, environment)
         run(["python3", str(SITE / "tests" / "presentation_check.py")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "browser-checks.test.mjs")], ROOT, environment)
         run(["node", str(SITE / "tests" / "pipe-browser.test.mjs")], ROOT, environment)
         run(["node", "--experimental-vm-modules", str(SITE / "tests" / "factory-readiness.test.mjs")], ROOT, environment)
         run(["node", str(SITE / "tests" / "browser-launcher.test.mjs")], ROOT, environment)
@@ -285,6 +286,11 @@ def main() -> None:
         scripts = [*PUBLIC.glob("**/*.js"), *(SITE / "tests").glob("**/*.js"), *(SITE / "tests").glob("*.mjs")]
         for script in sorted(scripts):
             run(["node", "--check", str(script)], ROOT, environment)
+    if "zenoui" in stages:
+        run(["cargo", "+1.97.1", "build", "--release", "--locked", "--offline", "-p",
+             "zeno-fcis-site-factory", "--bin", "ui_contract"], SITE, environment)
+        run(["python3", str(ROOT / "tools/check_zenoui.py"), "--out",
+             str(target_dir(environment) / "zenoui-check")], ROOT, environment)
     if "browser" in stages:
         if args.no_browser:
             print("site: the browser check was skipped")

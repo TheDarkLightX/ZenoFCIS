@@ -3,6 +3,9 @@ use serde_json::{Value, json};
 use zeno_fcis_site_common::{DemoInstance, Refusal, Stage};
 use zeno_fcis_synthesis::finite::{self as f, Domain, Op, Program, Slot};
 
+/// Shared descriptor compiler and decision boundary.
+pub mod ui;
+
 mod inventory;
 mod money;
 mod names;
@@ -210,10 +213,36 @@ pub fn run(request: &Value) -> Result<Value> {
         _ => Err("unknown factory act".into()),
     }
 }
-struct Factory;
+struct Factory {
+    // Exclusive bounded preparation bytes. These are never decisions or publication state.
+    prepared: String,
+}
 impl DemoInstance for Factory {
     fn step(&mut self, input: &str) -> std::result::Result<Value, Refusal> {
-        let result = checked(serde_json::from_str(input)).and_then(|v| run(&v));
+        let result =
+            checked(serde_json::from_str::<Value>(input)).and_then(|v| match v["act"].as_str() {
+                Some("ui_append") => {
+                    if v.as_object().is_none_or(|o| o.len() != 2) {
+                        return Err("UiPreparationFields".into());
+                    }
+                    let chunk = v["chunk"].as_str().ok_or("UiPreparationChunk")?;
+                    if self.prepared.len() + chunk.len() > 65_536 {
+                        return Err("UiPreparationLimit".into());
+                    }
+                    self.prepared.push_str(chunk);
+                    Ok(json!({"prepared_bytes":self.prepared.len()}))
+                }
+                Some("ui_decide") => {
+                    if v.as_object().is_none_or(|o| o.len() != 2) {
+                        return Err("UiDecisionFields".into());
+                    }
+                    ui::decide(
+                        &checked(serde_json::from_str::<Value>(&self.prepared))?,
+                        &v["input"],
+                    )
+                }
+                _ => run(&v),
+            });
         result.map_err(|e| Refusal::new(Stage::Input, e))
     }
     fn state(&self) -> std::result::Result<Value, Refusal> {
@@ -224,5 +253,9 @@ impl DemoInstance for Factory {
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn demo_reset() -> u32 {
-    zeno_fcis_site_common::abi::reset_instance(|| Ok(Box::new(Factory)))
+    zeno_fcis_site_common::abi::reset_instance(|| {
+        Ok(Box::new(Factory {
+            prepared: String::new(),
+        }))
+    })
 }

@@ -54,7 +54,7 @@ code, .hash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .hash { overflow-wrap: anywhere; }
 
 a { color: var(--link); }
-a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -71,7 +71,8 @@ h3 { font-size: 1.1rem; margin: 0 0 0.5rem; }
 .prose p, .prose li { max-width: 70ch; }
 .prose ul { padding-left: 1.25rem; }
 details { margin: 0.75rem 0; }
-summary { cursor: pointer; font-weight: 600; }
+/* Every disclosure keeps a 24 px minimum target (WCAG 2.2 SC 2.5.8), even in small type. */
+summary { cursor: pointer; font-weight: 600; min-height: 1.5rem; padding-block: 0.25rem; }
 
 /* One example per section; its panel is built when the section opens. */
 details.example { margin: 2rem 0 0; padding-top: 0.75rem; border-top: 1px solid var(--line); }
@@ -92,7 +93,7 @@ details.example > summary h2 { display: inline; margin: 0; }
 .field label { display: grid; gap: 0.3rem; font-size: 0.82rem; font-weight: 600; color: var(--muted); }
 .field label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 0.4rem; color: var(--ink); font-size: 0.92rem; }
 .field input, .field select { font-size: 0.95rem; font-weight: 400; color: var(--ink); }
-.field input[type="number"], .field select { padding: 0.5rem 0.6rem; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.field input[type="number"], .field input[type="text"], .field select { padding: 0.5rem 0.6rem; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); }
 .field input[type="number"] { width: 9rem; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .field input[type="checkbox"] { width: 1.1rem; height: 1.1rem; vertical-align: -0.15rem; margin-right: 0.35rem; }
 .context { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: end; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line); }
@@ -391,3 +392,9 @@ footer p.foot { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-conten
   .candidate-bar > span { transition: width 160ms ease-out; }
   .run { transition: background-color 120ms ease, border-color 120ms ease; }
 }
+
+/* Shared native form and record bounds, including exact decimal strings. */
+.field { min-width: 0; }
+.field input[type="text"], .field select { width: 100%; min-width: 0; max-width: 100%; }
+.panel, .controls, .technical-record, .decision-comparison { min-width: 0; overflow-wrap: anywhere; }
+.technical-record pre { white-space: pre-wrap; overflow-wrap: anywhere; }

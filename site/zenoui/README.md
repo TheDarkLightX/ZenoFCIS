@@ -1,11 +1,12 @@
 # ZenoUI presentation core
 
-The LLM-generated interface has three boundaries: the application Authority
+The interface has three boundaries: the application Authority
 makes domain decisions; a pure presentation core emits owned view data and
 request intents; the browser carries out those intents and draws the view. The
 finite contracts use the existing `.zeno` and V2 policy compiler.
 
-`public/zenoui/semantic.js` and `inventory.semantic.json` retain the
+`site/public/zenoui/semantic.js` and
+`site/public/zenoui/inventory.semantic.json` retain the
 `zenoui/semantic-contract/1` projection. Reserve and release add receiving-field
 capacity guards found by full-domain comparison with the actual 2.5 Authority.
 Restock retains the prototype's conservative total-stock guard. Accepted
@@ -14,7 +15,7 @@ are omitted (41 of the 244 accepted inventory inputs). The check retains a
 positive witness for every action. This prototype projection is a separate
 subject; the factory page does not expose these four inventory command buttons.
 
-`public/zenoui/presentation.js` owns phase, draft, run identity, progress,
+`site/public/zenoui/presentation.js` owns phase, draft, run identity, progress,
 selection and received evidence. Start, Progress, Result, Select, CellResult,
 Fail, Cancel and PreferencesChanged are explicit events; DraftChanged captures
 form edits in every phase. The current draft governs button eligibility and
@@ -72,3 +73,33 @@ prototype projection and tested mounted factory controls. The finite predicates
 alone do not establish the corresponding payload or form behavior. Browser
 raster, interaction and accessibility checks remain separate from this pure and
 finite evidence.
+
+## Generated contract applications
+
+`tools/zenoui.py` builds an interface from `project.zeno`, `v2/policy.json` and
+`ui.json`. The native compiler supplies exact fields, finite domains, commands
+and state. Strict metadata supplies labels, units and refusal messages; missing
+metadata fails with a named error. Wide integers remain decimal strings.
+
+The checked builder supports flat finite standalone V2 contracts with an enum
+command discriminator and at most 2,000,000 input tuples. Unsupported or evolved
+contracts fail closed. It checks laws and the real native core over the declared
+domain, then checks the mounted worker and Wasm before emitting shared modules,
+components, styles and data. Each command gets a form; the core rechecks a
+confirmed request before deciding. Consent binds the command, fields, units,
+principal, contract and revision, and an edit voids it. The local principal and
+context values are not authenticated credentials. Session state is not durable.
+
+After building the native `ui_contract` executable and the site's Wasm module:
+
+```sh
+python3 tools/zenoui.py CONTRACT --out "$TMPDIR/zenoui-app" --evidence "$TMPDIR/zenoui-evidence"
+python3 tools/check_zenoui.py --out "$TMPDIR/zenoui-checks"
+```
+
+The three-template check compares withdrawal-queue, inventory-reservation and
+wide-counter against their real native decisions and checks byte-for-byte
+regeneration. This is separate from the older prototype projection above.
+[Browser checks](../tests/SOCKET_FREE.md) cover actual keyboard, pointer,
+accessibility and layout behavior when run on a host that can launch Chrome.
+Finite and DOM-adapter checks alone do not establish those browser properties.
