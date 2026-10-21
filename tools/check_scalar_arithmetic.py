@@ -183,7 +183,11 @@ def main()->int:
     return 0 if report["status"]=="passed" else 1
 
 if __name__ == "__main__":
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         raise SystemExit(main())
     run_cli(_entrypoint)

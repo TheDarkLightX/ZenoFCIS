@@ -3,7 +3,8 @@
 Set `ZENO_FCIS_TELEMETRY` to an append-only JSON-lines file. Each normal CLI
 invocation and Python check-tool entrypoint attempts one record with schema
 `zeno-fcis/telemetry/1`. An unset or empty variable disables the observer.
-An observation failure leaves the command's result and output unchanged.
+Standalone Python copies without the optional helper retain their original
+behavior and omit telemetry. An observation failure leaves the command's result and output unchanged.
 
 Records contain UTC `timestamp`, `actor` (from `ZENO_FCIS_COMMONS_ACTOR`, else
 `unknown`), a command-word array, input names and SHA-256 digests, the digest

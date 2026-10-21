@@ -52,6 +52,12 @@ class TelemetryTests(unittest.TestCase):
         self.assertEqual(write.call_count, 1)
         self.assertEqual(json.loads(self.log.read_text())["schema"], telemetry.SCHEMA)
 
+    def test_reported_measured_work_is_observed_without_result_data(self):
+        import io
+        observer = telemetry.ObservationStream(io.StringIO())
+        observer.write(json.dumps({"measured": {"work": 17, "source": "private"}}) + "\n")
+        self.assertEqual(observer.work, {"measured.work": 17})
+
     def test_python_concurrent_lines(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             results = list(pool.map(lambda _: self.invoke_python(self.log), range(16)))
@@ -83,6 +89,16 @@ class CliTelemetryTests(TelemetryTests):
         self.assertEqual(row["inputs"][0]["sha256"], hashlib.sha256(self.file.read_bytes()).hexdigest())
         self.assertNotIn(self.file.read_text().strip(), self.log.read_text())
         self.assertNotIn(str(self.file), self.log.read_text())
+
+    def test_cli_distribution_preserves_reported_work(self):
+        source = Path(__file__).resolve().parents[1] / "examples/distribution-laws/modulo-bias"
+        result = self.cli(["contract", "distribution", str(source), "--max-work", "1", "--format", "json"], self.log)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        report = json.loads(result.stdout)
+        row = json.loads(self.log.read_text())
+        self.assertEqual(row["verdict"], "unknown")
+        self.assertIsInstance(row["work_units"], dict)
+        self.assertEqual(row["work_units"]["measured.work"], report["measured"]["work"])
 
     def test_cli_concurrent_lines(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:

@@ -70,7 +70,11 @@ def main():
     if original!={name:sha(ROOT/BASE/name) for name in original}:raise RuntimeError('source restoration mismatch')
     (a.out/'results.json').write_text(json.dumps(dict(status='passed',rows=rows,source_restored=True,source_sha256=original,authority='none'),indent=2)+'\n')
 if __name__ == "__main__":
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         main()
     run_cli(_entrypoint)

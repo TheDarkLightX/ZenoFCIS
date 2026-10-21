@@ -55,7 +55,11 @@ def main():
     after={x:hashlib.sha256((root/x).read_bytes()).hexdigest() for x in files};assert original==after,'caller source changed during controls'
     (a.out/'result.json').write_text(json.dumps({'status':'passed','defects':rows,'caller_source_unchanged':True,'authority':'none'},indent=2)+'\n')
 if __name__ == "__main__":
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         main()
     run_cli(_entrypoint)

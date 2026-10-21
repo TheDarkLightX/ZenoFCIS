@@ -84,7 +84,11 @@ def main():
 
 if __name__ == "__main__":
     from commons_hook import failure, report
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         try:
             main()

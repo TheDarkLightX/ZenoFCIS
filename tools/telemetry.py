@@ -13,7 +13,7 @@ import time
 
 SCHEMA = "zeno-fcis/telemetry/1"
 WORK_KEYS = frozenset(("work", "work_units", "search_work", "check_work", "session_work", "used_work", "reserved_work", "steps"))
-CONTAINERS = frozenset(("accounting", "usage", "detail", "report", "result", "session", "totals", "spent"))
+CONTAINERS = frozenset(("accounting", "usage", "detail", "report", "result", "session", "totals", "spent", "measured"))
 
 
 class ObservationStream:

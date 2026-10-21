@@ -27,7 +27,11 @@ def check(package_roots: dict[str, Path] | None = None) -> dict:
 
 
 if __name__ == "__main__":
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         result = check()
         print(f'V1 compatibility: {len(result['files'])} pinned source files unchanged')

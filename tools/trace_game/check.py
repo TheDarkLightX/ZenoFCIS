@@ -419,7 +419,11 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         main()
     run_cli(_entrypoint)

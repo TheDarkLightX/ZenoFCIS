@@ -254,6 +254,7 @@ pub(crate) fn observe(value: &Value) {
                         | "session"
                         | "totals"
                         | "spent"
+                        | "measured"
                 ) && child.is_object()
                 {
                     numbers(child, &name, found);

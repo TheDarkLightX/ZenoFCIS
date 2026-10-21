@@ -51,13 +51,35 @@ class Certificate(unittest.TestCase):
         p['certificate']['W']=list(range(6))
         with self.assertRaisesRegex(ValueError,'non-vacuity.*UNKNOWN'): check(p,self.tables)
 
-    def test_checker_has_only_standard_library_imports(self):
+    def test_checker_core_has_only_standard_library_imports(self):
         import ast
         from pathlib import Path
         tree=ast.parse(Path(__file__).with_name('certificate_check.py').read_text())
+        # Optional help and telemetry belong only to the command-line shell.
+        core=ast.Module(body=[node for node in tree.body
+            if not (isinstance(node,ast.FunctionDef) and node.name=='main')
+            and not isinstance(node,ast.If)], type_ignores=[])
         imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
-                 for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
+                 for node in ast.walk(core) if isinstance(node,(ast.Import,ast.ImportFrom))}
         self.assertLessEqual(imports,{'argparse','hashlib','itertools','json','pathlib','subprocess'})
+
+    def test_standalone_checker_does_not_require_optional_helpers(self):
+        import os
+        from pathlib import Path
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/'certificate_check.py'
+            shutil.copyfile(Path(__file__).with_name('certificate_check.py'),path)
+            env={**os.environ, 'PYTHONPATH':'', 'ZENO_FCIS_TELEMETRY':temporary}
+            help_result=subprocess.run([sys.executable,'-I',str(path),'--help'],env=env,capture_output=True)
+            self.assertEqual(help_result.returncode,0,help_result.stderr)
+            refusal=subprocess.run([sys.executable,'-I',str(path),temporary,'absent.json'],env=env,capture_output=True)
+            self.assertEqual(refusal.returncode,2,refusal.stderr)
+            self.assertIn(b'certificate refused:',refusal.stderr)
+            self.assertNotIn(b'ModuleNotFoundError',refusal.stderr)
 
     def test_solver_budgets_are_unknown(self):
         from unittest.mock import patch

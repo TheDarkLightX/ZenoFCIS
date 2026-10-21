@@ -324,7 +324,10 @@ def load_bound(directory):
 
 
 def main():
-    from guide_help import example_help
+    try:
+        from guide_help import example_help
+    except ImportError:
+        example_help = lambda _: ""
     parser=argparse.ArgumentParser(description=__doc__, epilog=example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter); parser.add_argument('directory',type=Path)
     parser.add_argument('certificate'); args=parser.parse_args()
     try:
@@ -341,7 +344,11 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from telemetry import run_cli
+    try:
+        from telemetry import run_cli
+    except ImportError:
+        # Reporting is optional, including for a standalone copy of this tool.
+        run_cli = lambda function: function()
     def _entrypoint():
         main()
     run_cli(_entrypoint)

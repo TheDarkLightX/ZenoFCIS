@@ -274,6 +274,11 @@ fn review_directory(
             }
         }
         None => {
+            if std::env::var_os("ZENO_FCIS_TELEMETRY").is_some()
+                && let Ok(packet) = serde_json::from_str(review.packet())
+            {
+                crate::telemetry::observe(&packet);
+            }
             print!("{}", review.packet());
             for line in lines(&review, status)
                 .into_iter()

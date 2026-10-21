@@ -465,6 +465,7 @@ fn judge(
             packet.entry(key).or_insert(value);
         }
     }
+    crate::telemetry::observe(&packet);
     let text = crate::transform::canonical_json(&packet);
     let premise = packet.get("premise");
     let line = match premise.and_then(Value::as_str) {
