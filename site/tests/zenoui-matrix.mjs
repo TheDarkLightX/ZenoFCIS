@@ -55,7 +55,8 @@ export async function runMatrix({command,sessionId,assets,root,reportPath}) {
    await evaluate('document.querySelector("[data-region=confirmation] button").focus()');await key('Enter');
    await wait('document.querySelector("#app").dataset.revision==="1"',`${label}: keyboard dispatch`);
    const visible=await evaluate('document.querySelector("[data-region=state]").textContent');
-   for(let i=0;i<stateFields.length;i++){const f=stateFields[i],value=f.options.find(o=>o.value===sample.reply.post[i])?.label??sample.reply.post[i];assert.ok(visible.includes(`${f.label}: ${value} ${f.unit}`),'native state parity and exact strings');}
+   // A state line reads `Label: value unit.`; a named value stands alone and "unitless" is never shown.
+   for(let i=0;i<stateFields.length;i++){const f=stateFields[i],raw=sample.reply.post[i],named=f.options.find(o=>o.value===raw)?.label??(f.values&&Object.hasOwn(f.values,raw)?f.values[raw]:undefined),value=named??(f.unit==='unitless'?raw:`${raw} ${f.unit}`);assert.ok(visible.includes(`${f.label}: ${value}.`),'native state parity and exact strings');}
    // Pointer journey through an available command on the new state.
    await wait('[...document.querySelectorAll("form button")].some(b=>!b.disabled)',`${label}: next command`);
    const pointerButton=await evaluate('(()=>{const b=[...document.querySelectorAll("form button")].find(b=>!b.disabled);return `button[data-command="${b.dataset.command}"]`;})()');
