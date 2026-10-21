@@ -12,6 +12,41 @@ separate checker verifies the certificate. The workflow can select one guard
 before execution, certify a reactive strategy, or show why no controller in a
 declared class can meet a requirement. These are different evidence kinds.
 
+## A journey
+
+**The ask, in one line:** "Can anyone in this withdrawal policy move money without permission, or block my exit
+past its deadline?"
+
+1. **Say what is allowed.** The fixture declares who acts (two accounts and their coalitions, plus at most one
+   compromised signer), what they may send (the move alphabet), and the rules every history must respect: no
+   unauthorized movement, and an approved exit completes within its deadline.
+2. **Try to break it within a bound.** The bounded trace search explores every history up to K moves. It answers
+   "checked up to K", or returns a replayable counterexample: the exact moves, the state after each move, and the
+   rule broken.
+3. **Ask for a certificate.** When the model is small enough to enumerate completely, the runner builds the whole
+   product graph. It then returns one of four things:
+   - a safety certificate ("safe on every finite history of the declared model");
+   - a guard chosen before execution;
+   - a reactive strategy;
+   - an unrealizability certificate showing that no controller in the declared class can meet the rule.
+4. **Check it independently.** `certificate_check.py` verifies the certificate with the Python standard library
+   only. It does not rerun the search, and it refuses a certificate whose bindings (revision, sources, lockfile,
+   binary, inputs) changed.
+5. **Read the scope line** that comes with every result. It names the model, the alphabet and the limits. A
+   certificate covers that model, not the deployed application.
+
+## How this differs from bounded search
+| | Bounded trace search | Trace-game certificate |
+|---|---|---|
+| Question | Is there a bad history of at most K moves? | Is every history safe, of any length, in this finite model? |
+| "No problem found" means | Nothing found up to K | Safe for every length, within the declared model |
+| Evidence | A counterexample, or "checked up to K" | A fixed-point certificate, checked by a separate small checker |
+| Can it show a rule cannot be met? | No | Yes, for a declared controller class (unrealizability) |
+| Cost | Grows with K | Grows with the number of product states; UNKNOWN when over budget |
+
+Both answer only for the declared model: its accounts, its alphabet and its argument domains. Neither says
+anything about extra accounts, real schedulers, markets or the deployed shell.
+
 ## Formal model
 
 The product state contains the native state, independent reference state,
