@@ -441,7 +441,17 @@ python3 integrations/zal/oracles/explanation_oracle.py
 ```
 
 They derive expected outcomes from explicit transition tables and integer truth
-masks, then compare the exact hashed implementation. Each prints its case counts
+masks, then compare the exact hashed implementation. Profile 2 has its own
+oracle and planted-defect run, both also in `zal-dialogue`:
+
+```sh
+python3 integrations/zal/oracles/temporal_oracle.py
+python3 -B integrations/zal/check_behavior2.py planted
+```
+
+The temporal oracle judges small machines by brute-force lasso enumeration
+and finite words by the ZAL-T macro expansion, without the checker's search.
+Each planted defect must fail its named test before the baseline passes. Each prints its case counts
 and bounded scope. They cover named finite families, not all admitted programs,
 human intent, external context truth, factory lowering or browser behavior.
 Run without Python `-O`; the loader refuses disabled assertions.
@@ -478,6 +488,35 @@ http://127.0.0.1:8765/ /tmp/zal-browser`. `CHROMIUM` can select an existing brow
 `NODE_PATH` can locate an existing Playwright installation. This command neither
 installs them nor establishes a complete accessibility audit. Final repository
 checks are those in [CONTRIBUTING.md](../../CONTRIBUTING.md), not just these suites.
+
+## Profile 2: integers, requirements and temporal properties
+
+A source that starts with `zal 2;` or `ZAL version 2.` uses
+`zal/finite-fsm/2` ([grammar](GRAMMAR.md#profile-zalfinite-fsm2),
+[semantics](SPECIFICATION.md#profile-zalfinite-fsm2-integers-requirements-and-temporal-properties)).
+The file-level commands select the profile from that header:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/withdrawal2.zal
+python3 integrations/zal/run.py render --to english integrations/zal/examples/keeper2.zal
+python3 integrations/zal/run.py diff integrations/zal/examples/order2.zal candidate.zal
+python3 integrations/zal/run.py qualify integrations/zal/examples/order2.zal
+```
+
+`withdrawal2.zal` is a one-lane abstraction of the withdrawal-queue
+template's alarm controller: "an alarm can delay a withdrawal but never
+freeze it" is a liveness property under the fairness assumption that the
+keeper keeps ticking. `keeper2.zal` is the keeper's tick-only view, where
+"every request is paid within four ticks" is a bounded `within` property.
+Both are review abstractions, not bindings to the template's contract, and
+their properties are finite checked over the declared machine only.
+`order2.zal` adds "approve only if authorized" as a transition requirement.
+Weakening its approval guard to `true` now fails with a requirement
+counterexample.
+
+`export` and `qualify` refuse a model with temporal properties or fairness as
+unsupported lowering. The review terminal, MCP tools and browser workspace
+still use profile 1; `run.py ui` refuses a profile 2 model.
 
 ## Experimental progression ladders
 

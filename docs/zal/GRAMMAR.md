@@ -4,7 +4,9 @@ This is the implemented Boolean control-FSM dialect in
 [`behavior.py`](../../integrations/zal/behavior.py), not the earlier numerical
 ZAL/0 or ZAL 0.1 designs. See the [specification](SPECIFICATION.md) for semantics
 and the [README](README.md) for commands. The parser and live legend share the
-statement registry; parsing never invokes an LLM.
+statement registry; parsing never invokes an LLM. Profile `zal/finite-fsm/2`,
+with integers, requirements and temporal properties, is
+[described at the end](#profile-zalfinite-fsm2).
 
 ## Lexical rules
 
@@ -230,3 +232,140 @@ not retained. A rename can change both revision and typed IDs; graph layout
 does not. The checker source identity is separate from the model revision.
 Hashes are identities, not proofs, signatures, human attestations or factory
 publication capabilities.
+
+## Profile `zal/finite-fsm/2`
+
+Profile 2 is implemented in
+[`behavior2.py`](../../integrations/zal/behavior2.py); its semantics are in
+the [specification](SPECIFICATION.md#profile-zalfinite-fsm2-integers-requirements-and-temporal-properties).
+The lexical rules above apply. The header selects the profile, and the
+singleton declarations are those of profile 1 with a new header and frame.
+
+### Paired example
+
+Each block is one complete model with one canonical revision. It is
+[`order2.zal`](../../integrations/zal/examples/order2.zal) in canonical order.
+
+```zal
+zal 2;
+machine order_dialogue;
+states approved, cancelled, draft, pending;
+events approve, cancel, submit;
+context authorized;
+initial draft;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule approve_order: pending + approve [authorized] -> accept approved;
+rule cancel_order: pending + cancel [true] -> accept cancelled;
+rule submit_order: draft + submit [true] -> accept pending;
+require approve_only_if_authorized: ((accepted & event == approve & state' == approved) => authorized);
+```
+
+```text
+ZAL version 2.
+The machine is order_dialogue.
+The states are approved, cancelled, draft, pending.
+The events are approve, cancel, submit.
+The context observations are authorized.
+Initially the state is draft.
+Each step is atomic. Only the control state and the declared variables may change.
+Otherwise reject because not_enabled and keep the state unchanged.
+Rule approve_order: when the state is pending and the event is approve, if authorized, move to approved.
+Rule cancel_order: when the state is pending and the event is cancel, if true, move to cancelled.
+Rule submit_order: when the state is draft and the event is submit, if true, move to pending.
+Requirement approve_only_if_authorized: (if (accepted and event is approve and state after this event is approved), then authorized).
+```
+
+[`withdrawal2.zal`](../../integrations/zal/examples/withdrawal2.zal) and
+[`keeper2.zal`](../../integrations/zal/examples/keeper2.zal) add variables,
+an input, fairness and every temporal operator.
+
+### Statement forms
+
+| Symbolic | Controlled English |
+| --- | --- |
+| `zal 2;` | `ZAL version 2.` |
+| `input NAME in LOW..=HIGH;` | `The input NAME is an integer from LOW to HIGH inclusive.` |
+| `var NAME in LOW..=HIGH initially VALUE;` | `The variable NAME is an integer from LOW to HIGH inclusive, initially VALUE.` |
+| `step atomic; frame control_and_variables;` | `Each step is atomic. Only the control state and the declared variables may change.` |
+| `rule ID: STATE + EVENT [GUARD] -> accept TARGET, UPDATE, UPDATE;` | `Rule ID: when the state is STATE and the event is EVENT, if GUARD, move to TARGET with UPDATE and UPDATE.` |
+| `VARIABLE = TERM` | `VARIABLE set to TERM` |
+| `VARIABLE += TERM` | `VARIABLE increased by TERM` |
+| `VARIABLE -= TERM` | `VARIABLE decreased by TERM` |
+| `invariant ID: STATE_FORMULA;` | `Invariant ID: STATE_FORMULA.` |
+| `require ID: STEP_FORMULA;` | `Requirement ID: STEP_FORMULA.` |
+| `fairness ID: infinitely often (STEP_FORMULA);` | `Fairness ID: assume (STEP_FORMULA) happens infinitely often.` |
+| `property ID: TEMPORAL_FORMULA;` | `Property ID: TEMPORAL_FORMULA.` |
+
+The `machine`, `states`, `events`, `context`, `initial`, `default`, reject
+rule and `unresolved` forms are unchanged from profile 1. An Accept rule
+without updates is written as in profile 1. `TERM` in an update is an integer
+literal, a variable or an input. A rule updates each variable at most once.
+Inputs and variables are each listed in name order in the canonical
+rendering. Context facts, inputs and variables share one namespace.
+
+### Formulas
+
+```ebnf
+formula     = implication, [ "<=>", implication ] ;
+implication = disjunction, [ "=>", disjunction ] ;
+disjunction = conjunction, { "|", conjunction } ;
+conjunction = unary, { "&", unary } ;
+unary       = "!", unary | atom ;
+atom        = "(", formula, ")" | "true" | "false" | "accepted" | FACT
+            | "state", [ "'" ], "==", STATE | "event", "==", EVENT
+            | term, ( "==" | "!=" | "<" | "<=" | ">" | ">=" ), term
+            | temporal ;
+term        = value, { ( "+" | "-" ), value } ;
+value       = INTEGER | VARIABLE, [ "'" ] | INPUT ;
+temporal    = ( "always" | "never" | "eventually" | "next" ), "(", formula, ")"
+            | "within", "(", BOUND, ",", formula, ")"
+            | "until", "(", formula, ",", formula, ")" ;
+```
+
+`=>` and `<=>` do not chain: group a second one with parentheses. A negative
+literal is written `-5`. Which atoms a formula may use depends on where it
+appears:
+
+| Position | May read |
+| --- | --- |
+| Guard | facts, inputs, `state == S`, variables |
+| Invariant | `state == S`, variables |
+| Requirement, fairness and property operands | everything above, plus `event == E`, `accepted`, `state'` and `x'` |
+| Property | one supported temporal shape over step formulas |
+
+The English surface uses these words for the symbolic operators:
+
+| Symbolic | Controlled English |
+| --- | --- |
+| `!A`, `A & B`, `A \| B` | `not A`, `A and B`, `A or B` |
+| `(A => B)` | `(if A, then B)` |
+| `(A <=> B)` | `(A if and only if B)` |
+| `state == S`, `state' == S`, `event == E` | `state is S`, `state after this event is S`, `event is E` |
+| `x'` | `x after this event` |
+| `==`, `!=` | `equals`, `does not equal` |
+| `<`, `<=`, `>`, `>=` | `is less than`, `is at most`, `is greater than`, `is at least` |
+| `+`, `-` | `plus`, `minus` |
+| `always(P)`, `never(P)`, `eventually(P)` | `always (P)`, `never (P)`, `eventually (P)` |
+| `next(P)` | `at the next event, which must exist, (P)` |
+| `within(k, P)` | `now or within the next k events, (P)` |
+| `until(P, Q)` | `(P) holds until (Q) happens, and that must happen` |
+
+The temporal phrases are the intuitive-rung templates of the
+[temporal ladder](ladder/TEMPORAL.md), so one statement reads the same in
+both. Profile 2 reserves every word of these phrases, and the update words
+`with`, `set`, `to`, `by`, `increased` and `decreased`, as names. The
+complete list is in the legend.
+
+### Property shapes and refusals
+
+A property is `always(P)`, `never(P)`, `always(P => T)`, `always(T)` or `T`,
+where `T` is `next(Q)`, `within(k, Q)`, `eventually(Q)` or `until(P, Q)`,
+and P and Q are step formulas without temporal operators. The bound k is a
+literal from 0 to 64. A model with `eventually` or `until` and no fairness
+declaration is refused with "liveness needs a fairness declaration". Other
+named refusals include an unsupported temporal shape, a construct outside its
+position, a Boolean observation used as an integer, a chained implication, an
+update outside a declared variable or repeated on one, a range or domain
+above the limits in the specification, and a variable that starts outside its
+range.

@@ -102,6 +102,22 @@ correspondence. No specification result is an agreement, Authority, Publication,
 replacement receipt or deployment approval. The generated test obtains its
 Authority through the existing library route. See [usage](zal/README.md).
 
+Profile `zal/finite-fsm/2` (2.6) is a separate module, `behavior2.py`;
+`behavior.py` and profile 1 results are unchanged. It adds bounded integer
+variables and inputs with range traps, transition requirements over pre-state,
+event, outcome and post-state, implication and equivalence, and temporal
+properties: always, never, inclusive within k and strong next checked exactly
+over every execution, and eventually and strong until only under declared
+fairness, with fair lasso counterexamples. `behavior2.py:check`, `:explain`,
+`:trace_properties` and `:semantic_diff` are deterministic and use no
+language model. `run.py` selects the profile by its header. `factory.py`
+lowers variables, inputs, invariants and requirements to state and context
+fields, cases and laws over the admissible reference domain; temporal
+properties and fairness refuse as unsupported lowering.
+`oracles/temporal_oracle.py` compares machine verdicts with brute-force lassos
+and finite words; `check_behavior2.py planted` runs nine planted defects. The
+checker identity `zal/checker/3` includes `behavior2.py`.
+
 The factory-qualified subset requires at least two states to satisfy the
 unchanged scaffold's independent rejected-genesis check. The language itself
 still admits and checks one-state models. Factory node/shape limits are separate.
