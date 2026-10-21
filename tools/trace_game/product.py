@@ -4,6 +4,7 @@ import time
 from check import core, composition, starts, moves, advance
 
 GUARDS = ('true', 'actor == 0', 'false')
+ORACLE_RESPONSES = ('wait','settle','cancel')
 FULL = dict(accounts=3, signers=1, oracle_choices=3, approval_ages=3, arbitrary_order=True)
 
 
@@ -37,13 +38,18 @@ class Graph:
 
 
 def description(model, guard='actor == 0', reactive=False, empty=False):
+    if model=='oracle-withholding':
+        guard='wait'; reactive=True
     return dict(model=model, guard=guard, reactive=reactive, empty=empty,
                 powers=dict(FULL), unfair_delay=False, only_objective=None,
                 disabled_objective=None, move_order='environment first, controller responds',
-                observations=['actor', 'request'], strategy_grammar=list(GUARDS))
+                observations=['oracle','remaining','request'] if model=='oracle-withholding' else ['actor','request'],
+                strategy_grammar=list(ORACLE_RESPONSES if model=='oracle-withholding' else GUARDS))
 
 
 def roots(spec):
+    if spec['model']=='oracle-withholding':
+        return (State((0,0),(0,0),1,1,2),)
     if spec['model']=='quantifier':
         return tuple(State((0,h),(0,h),1) for h in (0,1))
     return tuple(State(tuple(s), tuple(s), c) for s in starts(spec['model']) for c in (1, 2, 3))
@@ -58,18 +64,19 @@ def snapshot(state):
 
 
 def terminal(spec, state):
-    return state.bad or (spec['model']=='quantifier' and state.native[0]==1)
+    return state.bad or (spec['model'] in ('quantifier','oracle-withholding') and state.native[0]==1)
 
 
 def events(spec, state):
     if terminal(spec, state) or spec['empty']:
         return []
-    if spec['model']=='quantifier':
+    if spec['model'] in ('quantifier','oracle-withholding'):
         return [dict(actor=0,request=[0]),dict(actor=0,request=[1])]
     return moves(spec, snapshot(state), state.coalition)
 
 
 def responses(spec):
+    if spec['model']=='oracle-withholding': return ORACLE_RESPONSES
     return GUARDS if spec['reactive'] else (spec['guard'],)
 
 
@@ -81,6 +88,13 @@ def table_name(model, guard):
 
 def step(spec, tables, state, event, guard):
     action = events(spec, state)[event]
+    if spec['model']=='oracle-withholding':
+        available=int(bool(state.native[1] or event==0))
+        settled=guard=='settle' and available
+        remaining=0 if settled else state.remaining-1
+        bad=guard=='cancel' or (guard=='settle' and not available) or (not settled and remaining==0)
+        after=(int(bool(settled)),available)
+        return State(after,after,1,0 if settled else 1,remaining,bad=bool(bad))
     if spec['model']=='quantifier':
         value = guard in ('true','actor == 0')  # actor is 0 for BOTH events
         after = (1,state.native[1])

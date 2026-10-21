@@ -48,3 +48,25 @@ def fixed_guard(spec,tables,**budgets):
         attempts.append(dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=candidate,graph=graph.wire(),
                              certificate=dict(kind='counterexample',**counterexample(graph))))
     return dict(schema='zeno-fcis/trace-game-guard-exhaustion/1.1',grammar=list(GUARDS),attempts=attempts)
+
+
+def unrealizable(spec,tables,**budgets):
+    graph=build(spec,tables,**budgets)
+    if graph.status!='complete': return dict(status='UNKNOWN',stop=graph.stop)
+    rank={i:0 for i,s in enumerate(graph.states) if s.bad}
+    strategy={}
+    while True:
+        following={}
+        for i,row in enumerate(graph.edges):
+            if i in rank: continue
+            for event in sorted({e for e,_,_ in row}):
+                targets=[t for e,_,t in row if e==event]
+                if targets and all(t in rank for t in targets):
+                    following[i]=(1+max(rank[t] for t in targets),event); break
+        if not following: break
+        for i,(r,event) in following.items(): rank[i]=r; strategy[i]=event
+    initial=next((i for i in graph.roots if i in rank),None)
+    if initial is None: return dict(status='not established',stop='initial state outside environment attractor')
+    return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
+                certificate=dict(kind='unrealizability',root=initial,
+                                 ranks=[[i,rank[i],strategy.get(i)] for i in sorted(rank)]))

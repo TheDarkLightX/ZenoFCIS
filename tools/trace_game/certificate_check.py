@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 
 GRAMMAR = ('true', 'actor == 0', 'false')
+ORACLE_RESPONSES = ('wait','settle','cancel')
 POWERS = dict(accounts=3, signers=1, oracle_choices=3, approval_ages=3, arbitrary_order=True)
 COMPOSITION = ((0,1,0,0,0),(0,1,1,0,0),(1,1,0,1,0),(1,2,0,0,0),
                (2,0,0,0,0),(2,0,0,0,1),(3,0,0,0,0),(4,0,0,0,0),(5,0,0,0,0))
@@ -101,29 +102,33 @@ def validate_tables(packets):
 
 
 def validate_spec(spec):
-    need(spec['model'] in ('withdrawal','composition','quantifier'),'unsupported model')
-    need(spec['guard'] in GRAMMAR,'guard outside grammar')
+    need(spec['model'] in ('withdrawal','composition','quantifier','oracle-withholding'),'unsupported model')
+    oracle=spec['model']=='oracle-withholding'
+    need(spec['guard'] in (ORACLE_RESPONSES if oracle else GRAMMAR),'guard outside grammar')
+    if oracle: need(spec['reactive'] is True,'declared controller class')
     need(type(spec['reactive']) is bool and type(spec['empty']) is bool,'model flags')
     need(spec['powers']==POWERS and spec['unfair_delay'] is False and spec['only_objective'] is None
          and spec['disabled_objective'] is None,'frozen capabilities/objectives/environment')
     need(spec['move_order']=='environment first, controller responds','observation order')
-    need(spec['observations']==['actor','request'] and spec['strategy_grammar']==list(GRAMMAR),'observation/strategy grammar')
+    need(spec['observations']==(['oracle','remaining','request'] if oracle else ['actor','request'])
+         and spec['strategy_grammar']==list(ORACLE_RESPONSES if oracle else GRAMMAR),'observation/strategy grammar')
 
 
 def initial_states(spec):
+    if spec['model']=='oracle-withholding': return [[[0,0],[0,0],1,1,2,0,False]]
     if spec['model']=='quantifier': return [[[0,h],[0,h],1,0,0,0,False] for h in (0,1)]
     starts=([1,0,0,0],[2,0,0,0]) if spec['model']=='withdrawal' else ([0,0,0,2,0,0],)
     return [[s[:],s[:],c,0,0,0,False] for s in starts for c in (1,2,3)]
 
 
 def is_terminal(spec,s):
-    return s[-1] or (spec['model']=='quantifier' and s[0][0]==1)
+    return s[-1] or (spec['model'] in ('quantifier','oracle-withholding') and s[0][0]==1)
 
 
 def permitted(spec, s):
     native,ref,coalition,pending,left,stage,bad=s
     if is_terminal(spec,s) or spec['empty']: return []
-    if spec['model']=='quantifier': return [(0,[0]),(0,[1])]
+    if spec['model'] in ('quantifier','oracle-withholding'): return [(0,[0]),(0,[1])]
     if spec['model']=='withdrawal':
         if pending and left==1: return [(0,[1,0,0,1])]
         return [(a,[op,a,age,1]) for op in range(5) for a in (0,1)
@@ -133,6 +138,13 @@ def permitted(spec, s):
 
 def successor(spec,tables,s,event,guard):
     n,ref,c,p,left,stage,bad=s; actor,r=permitted(spec,s)[event]; op=r[0]
+    if spec['model']=='oracle-withholding':
+        available=int(bool(n[1] or r[0]==0))
+        settled=guard=='settle' and available
+        remaining=0 if settled else left-1
+        bad=guard=='cancel' or (guard=='settle' and not available) or (not settled and remaining==0)
+        post=[int(bool(settled)),available]
+        return [post,post[:],1,0 if settled else 1,remaining,0,bool(bad)]
     if spec['model']=='quantifier':
         post=[1,n[1]]
         value=guard=='true' or (guard=='actor == 0' and actor==0)
@@ -172,9 +184,10 @@ def checked_graph(packet,tables):
     for i,s in enumerate(states):
         need(type(s) is list and len(s)==7 and type(s[-1]) is bool,'product state encoding')
         need(all(type(v) is int for v in s[0]+s[1]+s[2:6]),'product integer encoding')
+        need(permitted(spec,s) or is_terminal(spec,s),'non-vacuity: empty environment gives UNKNOWN')
         expected=[]
         for event in range(len(permitted(spec,s))):
-            for guard in (GRAMMAR if spec['reactive'] else (spec['guard'],)):
+            for guard in (tuple(spec['strategy_grammar']) if spec['reactive'] else (spec['guard'],)):
                 target=index.get(key(successor(spec,tables,s,event,guard)))
                 need(target is not None,'missing product successor')
                 expected.append([event,guard,target])
@@ -202,6 +215,26 @@ def check(packet,tables):
         return dict(evidence='exhausted fixed grammar',claim='no guard in G',grammar=list(GRAMMAR),model=subject['model'])
     need(packet['schema']=='zeno-fcis/trace-game-certificate/1.1','certificate schema')
     spec,states,edges=checked_graph(packet,tables); cert=packet['certificate']
+    if cert['kind']=='unrealizability':
+        rows=cert['ranks']; rank={}; strategy={}
+        for i,r,event in rows:
+            need(type(i) is int and 0<=i<len(states) and i not in rank,'ranked state encoding')
+            need(type(r) is int and r>=0,'rank encoding')
+            rank[i]=r; strategy[i]=event
+        need(cert['root'] in packet['graph']['roots'] and cert['root'] in rank,'ranked initial state')
+        for i,r in rank.items():
+            if r==0:
+                need(states[i][-1] and strategy[i] is None,'rank zero must be Bad')
+            else:
+                need(not states[i][-1],'Bad must have rank zero')
+                event=strategy[i]
+                need(type(event) is int and 0<=event<len(permitted(spec,states[i])),'permitted environment strategy')
+                targets=[t for e,_,t in edges[i] if e==event]
+                need(targets and all(t in rank and rank[t]<r for t in targets),'rank step does not decrease for every response')
+        return dict(evidence='certified unrealizability',
+                    claim='no controller in the declared class satisfies the requirement under the declared model',
+                    controller_class=spec['strategy_grammar'] if spec['reactive'] else [spec['guard']],
+                    model=spec['model'],initial_rank=rank[cert['root']])
     if cert['kind']=='counterexample':
         need(not spec['reactive'] and cert['root'] in packet['graph']['roots'],'fixed counterexample root')
         at=cert['root']
