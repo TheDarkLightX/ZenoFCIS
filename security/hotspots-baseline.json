@@ -5712,9 +5712,9 @@
         {
           "id": "cryptographic-verification",
           "lines": [
-            378,
-            379,
-            380
+            380,
+            381,
+            382
           ]
         },
         {
@@ -5752,7 +5752,7 @@
             221,
             245,
             253,
-            408
+            410
           ]
         }
       ],
@@ -6094,9 +6094,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 12907549,
+    "admitted_bytes": 12907710,
     "admitted_files": 798,
-    "inventory_sha256": "9e34a921a57c92018c11f933bb3f19cfaf33934493047cf296ca142ad426a11b",
+    "inventory_sha256": "d34e09bbe3e9e1cd1f3f740169d02aac4addec912b816d04c5967afad1260f1f",
     "ranked_above_minimum": 694,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

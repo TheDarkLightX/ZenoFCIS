@@ -321,12 +321,14 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// i128 evaluator, checker-work/4 and loop-acquisition/1. The complete journey
 /// was replayed through every existing status assertion before these three
 /// source/profile-bound digests were refreshed; no field is filtered.
+/// The transcript includes recorded, explicitly unreplayed historical feedback;
+/// that diagnostic change leaves the ledger, head and checker identity intact.
 const METERED_LEDGER_SHA256: &str =
     "2d8eb1414430127a07cc511cb2f287bcfabb1ccec5d3ea5c28f7d7fe0039ec64";
 const METERED_HEAD_SHA256: &str =
     "82540dc845d77cde61452e4ddfecab98da8dde0f6c05c5e1cf7a9f1ce2e18323";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "d6f5ca04e4c046fc032e57c1385d0c46c815c01ec1ab7a03bcba9ad55281e3a0";
+    "b4527efd6e4a213c0c058646ac05f4154062a836765ab26727c14ee37cad6510";
 
 #[test]
 fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
