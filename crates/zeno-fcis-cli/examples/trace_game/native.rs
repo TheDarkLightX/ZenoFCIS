@@ -143,9 +143,10 @@ pub(crate) fn authority_table(source: &LeafSources) -> Result<Table, String> {
     policy::with_authority(&contract, &schema, |authority| {
         let framer = evaluate::Framer::new(&positions, &contract);
         let genesis=rules.genesis.values().map(|value|match value{
-            zeno_fcis_contract::internals::rules::Constant::Bool(v)=>i128::from(*v),
-            zeno_fcis_contract::internals::rules::Constant::Int(v)=>*v,
-        }).collect::<Vec<_>>();
+            zeno_fcis_contract::internals::rules::Constant::Bool(v)=>Ok(i128::from(*v)),
+            zeno_fcis_contract::internals::rules::Constant::Int(v)=>Ok(*v),
+            zeno_fcis_contract::internals::rules::Constant::U128(_)=>Err("unsigned genesis is outside the trace-game model".to_owned()),
+        }).collect::<Result<Vec<_>,String>>()?;
         if genesis.len()!=width{return Err("genesis-state-arity".into());}
         let mut genesis_tuple=domains.iter().map(|d|d[0]).collect::<Vec<_>>();
         genesis_tuple[..width].copy_from_slice(&genesis);
