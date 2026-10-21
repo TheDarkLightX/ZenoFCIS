@@ -56,8 +56,27 @@ nice -n 19 ionice -c3 env ZENO_APP_SECRET_FILE=credential \
   cargo +1.97.1 run --locked --offline --bin app-server
 ```
 
-Open `http://127.0.0.1:8080`, enter the credential and connect. The UI reads
-an authenticated snapshot, shows the configured principal and permission
+Open `http://127.0.0.1:8080` and sign in with that credential. Until sign-in
+succeeds the page says that sign-in is required and offers no commands.
+An empty or invalid credential leaves a visible refusal on the sign-in form.
+The browser clears the password field as soon as it captures the credential.
+It holds the credential only in the transport's private memory, never in
+static assets, a URL, cookies, localStorage or sessionStorage. Reloading
+requires sign-in again. An unresolved request's recovery record contains
+request bytes and identity, without the credential.
+
+Sign-in first authenticates `/state`, then loads `/app.json` using that same
+credential. Only after both succeed does the UI mount command controls.
+The HTML, scripts, Wasm and descriptor are public, immutable assets; none
+contains deployment credentials or private application state. This design
+uses explicit Bearer authentication rather than creating a cookie session.
+Every `/state`, `/preview` and `/command` call carries one Authorization
+header. The ingress derives the principal from its configured credential
+binding, retains its cross-origin refusals and request limits, and the
+browser cannot select a principal. A failed sign-in erases the transport's
+credential and leaves the sign-in form visible.
+
+The UI shows the configured principal and permission
 context, and asks the native core to preview each command. A command is
 offered only after an accepting preview for those exact inputs and revision.
 Review and confirm its details. The server authenticates again, rechecks the
@@ -65,7 +84,7 @@ core and atomically commits state, receipt, replay record and outbox. The UI
 shows a completed decision only after the commit and delivery run complete.
 
 The browser saves the exact request before sending. An interrupted request
-leaves a recovery record. Reload, connect with the same credential and use
+leaves a recovery record. Reload, sign in with the same credential and use
 “Recover original request”. The request retains its command bytes, revision
 and original key. The server rebuilds the original publication from audited
 history and returns the original packet. Do not delete an unresolved record
@@ -124,9 +143,13 @@ reviewed refusal and delivery journey before adoption.
 
 Run `python3 tools/check_app_factory.py` from the checkout for generated
 applications with features off and on, their socket-free HTTP/SQLite
-journeys, presentation checks and the ingress fault corpus. Add `--tcp` on a
+journeys, the shipped sign-in bootstrap, empty/wrong-credential refusals,
+presentation checks and the ingress fault corpus. Add `--tcp` on a
 host that permits loopback for the same journeys over TCP. A separate host
-Chrome run checks actual browser interaction. Simulation, finite checks and
+Chrome run enters credentials through the form, checks signed-out refusal,
+loses a reply and signs in again before original-key recovery. Its report
+records response statuses and page errors without credential values.
+Simulation, finite checks and
 browser tests have separate evidence scopes. No whole-application proof,
 power-loss guarantee, exactly-once external delivery, multi-writer support
 or release qualification is claimed.

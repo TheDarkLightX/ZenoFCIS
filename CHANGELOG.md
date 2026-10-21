@@ -12,6 +12,8 @@ embedded in ZenoFCIS values.
 - Add durable UI previews and original-key recovery, checked journeys for
   withdrawal queue, inventory reservation and the wide counter, and an
   expanded ingress fault corpus including time, disk-full and I/O responses.
+- Authenticate browser sign-in before mounting commands; hold credentials
+  only in private transport memory and check empty/wrong-credential refusals.
 - Add [Build an app with ZenoFCIS](docs/BUILD_AN_APP.md). Browser, TCP and
   release qualification remain separate gates.
 

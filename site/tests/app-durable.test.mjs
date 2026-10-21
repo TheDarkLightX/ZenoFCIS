@@ -10,6 +10,54 @@ import {DurableTransport,pendingKey,hex,unhex,envelope} from '../public/zenoui/d
 const report=JSON.parse(await readFile(process.argv[2],'utf8'));
 const plain=v=>JSON.parse(JSON.stringify(v));
 const settle=async predicate=>{const deadline=Date.now()+5000;while(!predicate()){assert.ok(Date.now()<deadline,'mounted journey deadline');await delay(5);}};
+// Execute the shipped startup module, including refused and successful sign-in.
+// The endpoint replies below come from this template's native HTTP journey.
+{
+ const observation=report.observations[0],{bundle}=report,d=bundle.description;
+ const stateFields=d.fields.filter(f=>f.source==='state'),contextFields=d.fields.filter(f=>f.source==='context');
+ const session={contract:observation.contract,principal:observation.principal,revision:observation.revision,values:observation.before.slice(0,stateFields.length),context:contextFields.map(f=>observation.before[f.index])};
+ const credential=hex(webcrypto.getRandomValues(new Uint8Array(32))),requests=[];let descriptionUnavailable=false;
+ const storage=new Map();storage.getItem=k=>storage.get(k)??null;storage.setItem=(k,v)=>storage.set(k,v);storage.removeItem=k=>storage.delete(k);
+ const fetcher=async(path,options)=>{
+  requests.push(path);assert.equal(options.cache,'no-store');assert.deepEqual(Object.keys(options.headers),['Authorization']);
+  if(options.headers.Authorization!=='Bearer '+credential)return {ok:false,status:401};
+  if(path==='/state')return {ok:true,json:async()=>plain(session)};
+  if(path==='/app.json')return descriptionUnavailable?{ok:false,status:503}:{ok:true,json:async()=>plain(bundle)};
+  if(path==='/preview'){
+   const input=JSON.parse(new TextDecoder().decode(options.body.slice(73)));
+   return {ok:true,json:async()=>({reply:JSON.stringify(input)===JSON.stringify(observation.before)?observation.preview:{input,class:'Refused',reason:null,post:[],checked:'1',total:'1'},command:observation.command})};
+  }
+  assert.equal(path,'/command');assert.equal(hex(options.body.slice(73)),observation.command);
+  return {ok:true,json:async()=>plain(observation.response)};
+ };
+ const open=async()=>{
+  const doc=documentFrom('<div id="app"></div>');
+  const loader=moduleLoader({document:doc,fetch:fetcher,localStorage:storage,crypto:webcrypto,AbortController,innerWidth:390,addEventListener:()=>{},matchMedia:()=>({matches:false,addEventListener:()=>{}})});
+  await loader.evaluate('https://zenoui.test/ZenoFCIS/zenoui/durable-bootstrap.js');return doc.getElementById('app');
+ };
+ const root=await open(),submit=value=>{root.querySelector('#credential').value=value;root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));};
+ assert.match(root.textContent,/Sign in required/);assert.equal(root.querySelector('[data-region="commands"]'),null);assert.equal(requests.length,0);
+ submit('');await settle(()=>root.textContent.includes('Sign-in refused'));
+ assert.equal(root.querySelector('[data-region="commands"]'),null);assert.equal(requests.length,0,'empty credential never sends');
+ submit('00'.repeat(32));await settle(()=>root.textContent.includes('Check your application credential'));
+ assert.equal(root.querySelector('[data-region="commands"]'),null);assert.deepEqual(requests,['/state']);assert.equal(root.querySelector('#credential').value,'');
+ descriptionUnavailable=true;submit(credential);await settle(()=>root.textContent.includes('Request refused (503)'));
+ assert.equal(root.querySelector('[data-region="commands"]'),null);assert.ok(root.querySelector('[data-region="signin"]'),'startup errors remain visible on the form');
+ descriptionUnavailable=false;
+ submit(credential);await settle(()=>root.querySelector('[data-region="commands"]'));
+ assert.deepEqual(requests.slice(1,5),['/state','/app.json','/state','/app.json'],'authenticate before description and previews');
+ assert.equal(root.querySelector('#credential'),null);assert.equal(storage.size,0,'no stored credential');
+ // Reload asks again even when original-key recovery is available.
+ const binding={contract:session.contract,principal:session.principal,revision:session.revision,input:observation.before};
+ const saved=JSON.stringify({contract:session.contract,principal:session.principal,binding,body:hex(envelope(session.contract,observation.key,session.revision,unhex(observation.command)))});
+ storage.setItem(pendingKey,saved);assert.ok(!saved.includes(credential));
+ const reopened=await open();assert.match(reopened.textContent,/Sign in required/);assert.equal(reopened.querySelector('[data-region="commands"]'),null);
+ reopened.querySelector('#credential').value=credential;reopened.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));
+ await settle(()=>reopened.textContent.includes('A request is unresolved'));assert.equal(reopened.querySelector('[data-region="commands"]'),null);
+ reopened.querySelector('button').click();await settle(()=>reopened.textContent.includes('Original request committed at revision'));
+ assert.equal(storage.size,0);assert.ok(requests.includes('/command'));
+ console.log('durable sign-in: empty/wrong credential refused without commands; authenticated startup, memory-only credential and reload recovery passed');
+}
 for(const observation of report.observations){
  const {bundle}=report,d=bundle.description;
  const stateFields=d.fields.filter(f=>f.source==='state'),contextFields=d.fields.filter(f=>f.source==='context');
@@ -65,6 +113,6 @@ for(const observation of report.observations){
    const bad=new DurableTransport(bundle,'ab'.repeat(32),session,{storage,fetcher:async()=>({ok:true,json:async()=>invalid})});
    await assert.rejects(()=>bad.recover());assert.equal(storage.getItem(pendingKey),saved);
  }
- storage.clear();transport.terminate();
+ storage.clear();transport.terminate();await assert.rejects(()=>transport.call('/state'),/Sign in again/);
 }
 console.log(`durable UI: ${report.observations.length} native commits, mounted forms, consent, immutable context and original-key recovery passed`);

@@ -10,6 +10,12 @@ retains an unresolved request's original bytes and key for recovery after
 restart. See [Build an app with ZenoFCIS](BUILD_AN_APP.md) for the journey,
 formal model, deployment configuration and scope.
 
+Browser users sign in through a credential form before commands appear.
+The credential remains in private transport memory, outside assets, URLs
+and browser storage. Every state, preview and command request authenticates
+again; reload requires sign-in before original-key recovery. Empty and wrong
+credentials leave a visible refusal and offer no commands.
+
 Withdrawal, inventory and wide-counter fixtures exercise HTTP, durable
 publication, refusal and original-key replay. The wide counter has an empty
 outbox. The socket-free transport supplies no TCP or browser evidence;

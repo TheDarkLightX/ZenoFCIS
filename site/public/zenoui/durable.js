@@ -28,13 +28,16 @@ export async function checkPacket(result,saved,description){
   if(offset+40!==packet.length||new DataView(packet.buffer,packet.byteOffset+offset,8).getBigUint64(0).toString()!==result.revision)throw Error('Original packet revision differs.');
 }
 export class DurableTransport {
+  #credential;
   constructor(bundle,credential,session,{fetcher=fetch,storage=localStorage,random=bytes=>crypto.getRandomValues(bytes)}={}){
-    this.bundle=bundle;this.credential=credential;this.session=structuredClone(session);this.fetcher=fetcher;this.storage=storage;this.random=random;this.retired=false;
+    this.bundle=bundle;this.#credential=credential;this.session=structuredClone(session);this.fetcher=fetcher;this.storage=storage;this.random=random;this.retired=false;
   }
   async call(path,body){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),9000);
     try{
-      const response=await this.fetcher(path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${this.credential}`},body,cache:'no-store',signal:controller.signal});
+      if(this.retired)throw Error('Sign in again to continue.');
+      const response=await this.fetcher(path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${this.#credential}`},body,cache:'no-store',signal:controller.signal});
+      if(response.status===401)throw Error('Sign-in refused. Check your application credential and try again. Keep any original request for recovery.');
       if(!response.ok)throw Error(`Request refused (${response.status}). Keep the original request for recovery.`);
       return await response.json();
     }finally{clearTimeout(timer);}
@@ -66,5 +69,5 @@ export class DurableTransport {
       if(!this.retired)this.onmessage?.({data:{kind:data.kind,binding:b,reply}});
     })().catch(()=>{if(!this.retired)this.onmessage?.({data:{kind:'error',binding:data.binding}});});
   }
-  terminate(){this.retired=true;this.credential='';}
+  terminate(){this.retired=true;this.#credential='';}
 }

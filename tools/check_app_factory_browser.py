@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Host-only Chrome and TCP journey against each generated Rust application."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
+import secrets
 import shutil
 import signal
 import subprocess
@@ -27,10 +29,21 @@ def main():
     secret=out/'credential'
     fd=os.open(secret,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
     with os.fdopen(fd,'w') as stream:
-        stream.write('ab'*32+'\n')
+        stream.write(secrets.token_hex(32)+'\n')
     results=[]
     for index,name in enumerate(['withdrawal-queue','inventory-reservation','wide-counter']):
         app=(args.apps/name).resolve()
+        manifest=json.loads((app/'app-manifest.json').read_text())
+        for relative,digest in manifest['files'].items():
+            if hashlib.sha256((app/relative).read_bytes()).hexdigest()!=digest:
+                raise RuntimeError(f'app manifest drift: {name}/{relative}')
+        # A host run must exercise the current sign-in sources, never stale assets.
+        for relative,digest in manifest['generator_sources'].items():
+            if hashlib.sha256((ROOT/relative).read_bytes()).hexdigest()!=digest:
+                raise RuntimeError(f'app generator drift: {name}/{relative}; regenerate applications')
+        for asset in (app/'www').rglob('*'):
+            if asset.is_file() and secret.read_bytes().strip() in asset.read_bytes():
+                raise RuntimeError('credential in public asset')
         fixture=json.loads((app/'app-checks/journey.json').read_text())
         context=out/f'{name}-context.json';context.write_text(json.dumps(fixture['steps'][0]['context'])+'\n')
         address=f'127.0.0.1:{18260+index}';url=f'http://{address}'
@@ -43,10 +56,11 @@ def main():
                     if process.poll() is not None:
                         raise RuntimeError('server stopped before listening')
                     try:
-                        urllib.request.urlopen(url+'/state',timeout=1)
-                    except urllib.error.HTTPError as error:
-                        if error.code==401:
-                            break
+                        with urllib.request.urlopen(url+'/',timeout=1) as response:
+                            if response.status==200:
+                                break
+                    except urllib.error.HTTPError:
+                        pass
                     except OSError:
                         pass
                     if time.monotonic()>deadline:
@@ -54,6 +68,7 @@ def main():
                     time.sleep(.1)
                 result=subprocess.run(['nice','-n','19','ionice','-c3','node',str(ROOT/'site/tests/app-factory-browser.mjs'),args.chrome,str(out/f'{name}-profile'),url,str(secret),str(app/'app-checks/journey.json'),str(out/f'{name}.json')])
                 results.append({'template':name,'exit':result.returncode})
+                (out/'results.json').write_text(json.dumps(results,indent=2)+'\n')
                 if result.returncode:
                     raise RuntimeError(f'{name}: browser journey failed')
             finally:
