@@ -1,7 +1,7 @@
 // TEST ONLY: checked state-stepping helpers over the shared request fixtures.
 pub fn step(p: &Policy, s: &mut State, r: Request) -> Prepared {
     let frozen = s.clone();
-    let r = sign(p, s, r).unwrap();
+    let r = sign(p, s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let checked = decide(p, s, &r, &TestVerifier, limits());
     let used = checked.usage();
     let out = checked

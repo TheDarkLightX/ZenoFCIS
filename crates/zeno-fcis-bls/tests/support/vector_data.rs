@@ -1,9 +1,14 @@
 #![allow(dead_code, unreachable_pub)]
 pub fn hex(s: &str) -> Vec<u8> {
-    let s = s.strip_prefix("0x").unwrap();
+    let s = s
+        .strip_prefix("0x")
+        .unwrap_or_else(|| panic!("missing test fixture value"));
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+        .map(|i| {
+            u8::from_str_radix(&s[i..i + 2], 16)
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+        })
         .collect()
 }
 pub fn list(s: &str) -> Vec<Vec<u8>> {
@@ -42,5 +47,8 @@ pub fn vectors() -> Vec<Vector> {
         .collect()
 }
 pub fn named(name: &str) -> Vector {
-    vectors().into_iter().find(|v| v.name == name).unwrap()
+    vectors()
+        .into_iter()
+        .find(|v| v.name == name)
+        .unwrap_or_else(|| panic!("missing test fixture value"))
 }

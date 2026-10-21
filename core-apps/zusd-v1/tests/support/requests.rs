@@ -82,7 +82,7 @@ pub fn policy(change: bool) -> Policy {
         },
         accounts: core::array::from_fn(|i| id(90 + i as u8)),
     })
-    .unwrap()
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
 pub fn genesis(p: &Policy) -> State {
     let mut balances = Vec::new();
@@ -127,7 +127,7 @@ pub fn genesis(p: &Policy) -> State {
         proofs: vec![],
     };
     g.proofs = genesis_messages(p, &g)
-        .unwrap()
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
         .into_iter()
         .map(|m| Proof {
             domain: m.domain,
@@ -137,7 +137,7 @@ pub fn genesis(p: &Policy) -> State {
     initialize(p, &g, &TestVerifier, limits())
         .into_parts()
         .0
-        .unwrap()
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
 pub fn raw(s: &State, actor: u8, command: Command) -> Request {
     Request {
@@ -163,7 +163,10 @@ pub fn sign(p: &Policy, s: &State, mut r: Request) -> Result<Request, Failure> {
     Ok(r)
 }
 pub fn use_price(p: &Policy, s: &State, r: &mut Request) {
-    let view = s.oracle().unwrap().clone();
+    let view = s
+        .oracle()
+        .unwrap_or_else(|| panic!("missing test fixture value"))
+        .clone();
     r.allocation = Some(Allocation {
         root: view.capacity_root,
         capacity: view.capacity,
@@ -225,7 +228,11 @@ pub fn price_request(
         }
         OracleAction::ImportPending => (old.as_ref().and_then(|v| v.committed), Some(record)),
         OracleAction::CommitMatured => {
-            let mut rec = old.as_ref().unwrap().pending.unwrap();
+            let mut rec = old
+                .as_ref()
+                .unwrap_or_else(|| panic!("missing test fixture value"))
+                .pending
+                .unwrap_or_else(|| panic!("missing test fixture value"));
             rec.committed_epoch = s.clock().epoch;
             (Some(rec), None)
         }

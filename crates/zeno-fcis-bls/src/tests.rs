@@ -7,11 +7,12 @@ fn compare(name: &str) -> bool {
 #[test]
 fn pk_flag_rejects_torsion() {
     let v = data::named("verify-neg-torsion-pk-order3");
-    let pk = PublicKey::from_bytes(&v.a[0]).unwrap();
+    let pk = PublicKey::from_bytes(&v.a[0])
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let result = verify_parsed(
         &pk,
         &v.b[0],
-        &signature(&v.c[0]).unwrap(),
+        &signature(&v.c[0]).unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
         BASIC_DST,
         Stage::Verification,
     );
@@ -28,7 +29,10 @@ fn sig_flag_rejects_torsion() {
     if compare("sig") {
         // The supplied torsion signature also fails the raw pairing with the
         // check disabled. Independently enforce the mandatory call flag.
-        assert!(SIGNATURE_GROUP_CHECK, "SIG_GROUPCHECK_DISABLED");
+        assert!(
+            core::hint::black_box(SIGNATURE_GROUP_CHECK),
+            "SIG_GROUPCHECK_DISABLED"
+        );
         assert!(result.is_err(), "TORSION_SIGNATURE_ACCEPTED");
     }
 }

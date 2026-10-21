@@ -42,7 +42,8 @@ impl Journey {
     fn new(p: Policy) -> Self {
         let g = genesis(&p);
         let path = directory("journey");
-        let store = FileLedger::create(&path, &p, &g).unwrap();
+        let store = FileLedger::create(&path, &p, &g)
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         println!("retained step4 journey ledger: {}", path.display());
         Self {
             p,
@@ -53,7 +54,8 @@ impl Journey {
     }
     fn step(&mut self, r: Request) -> StepOutput {
         let frozen = self.s.clone();
-        let r = sign(&self.p, &self.s, r).unwrap();
+        let r = sign(&self.p, &self.s, r)
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         let e = decide(&self.p, &self.s, &r, &TestVerifier, limits());
         let used = e.usage();
         let out = e
@@ -68,7 +70,7 @@ impl Journey {
         let count = self
             .store
             .bundles(&self.p, &self.g, &TestVerifier, limits())
-            .unwrap()
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             .len();
         let competing = critical.then(|| prepared(&self.p, &frozen, 4));
         let out = if critical {
@@ -86,26 +88,26 @@ impl Journey {
             assert_eq!(
                 self.store
                     .load(&self.p, &self.g, &TestVerifier, limits())
-                    .unwrap(),
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
                 frozen
             );
             decide(&self.p, &frozen, &r, &TestVerifier, limits())
                 .into_parts()
                 .0
-                .unwrap()
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
         } else {
             out
         };
         assert_eq!(
             self.store
                 .publish(&self.p, &self.g, &TestVerifier, out, limits())
-                .unwrap(),
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
             Publication::Committed
         );
         self.s = self
             .store
             .load(&self.p, &self.g, &TestVerifier, limits())
-            .unwrap();
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         assert_eq!(self.s, post);
         if let Some(competing) = competing {
             assert!(matches!(
@@ -116,18 +118,18 @@ impl Journey {
             let duplicate = decide(&self.p, &frozen, &r, &TestVerifier, limits())
                 .into_parts()
                 .0
-                .unwrap();
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
             assert_eq!(
                 self.store
                     .publish(&self.p, &self.g, &TestVerifier, duplicate, limits())
-                    .unwrap(),
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
                 Publication::Duplicate
             );
         }
         assert_eq!(
             self.store
                 .bundles(&self.p, &self.g, &TestVerifier, limits())
-                .unwrap()
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
                 .len(),
             count + 1
         );
@@ -138,20 +140,20 @@ impl Journey {
         let before = self
             .store
             .bundles(&self.p, &self.g, &TestVerifier, limits())
-            .unwrap();
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         let e = decide(&self.p, &self.s, request, &TestVerifier, limits());
         assert_eq!(e.result().err(), Some(expected));
         assert_eq!(
             self.store
                 .load(&self.p, &self.g, &TestVerifier, limits())
-                .unwrap()
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
                 .root(),
             root
         );
         assert_eq!(
             self.store
                 .bundles(&self.p, &self.g, &TestVerifier, limits())
-                .unwrap(),
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
             before
         );
     }
@@ -221,7 +223,7 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
         },
     );
     use_price(&p, &j.s, &mut r);
-    let r = sign(&p, &j.s, r).unwrap();
+    let r = sign(&p, &j.s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &j.s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Reject(1043))
@@ -230,7 +232,7 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
     let mut r = raw(&j.s, 1, AppCommand::Pool(stability::Command::Withdraw(Q)));
     use_price(&p, &j.s, &mut r);
     drip(&mut r, 122, 0);
-    let r = sign(&p, &j.s, r).unwrap();
+    let r = sign(&p, &j.s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &j.s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Reject(1044))
@@ -244,7 +246,8 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
         ))),
     );
     use_price(&p, &j.s, &mut pending_only);
-    let pending_only = sign(&p, &j.s, pending_only).unwrap();
+    let pending_only = sign(&p, &j.s, pending_only)
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     j.reject(&pending_only, Failure::Reject(1044));
     j.advance(4, 4);
     j.price(OracleAction::CommitMatured, 3, 150_000_000, 113);
@@ -273,10 +276,15 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
     assert!(balance(&j.s, 5, Asset::Zdex) > 1000 * Q);
     assert!(balance(&j.s, 1, Asset::Agrs) > 18_800 * Q);
     j.advance(20_160, 20_160);
-    let a = j.s.book().vaults.iter().find(|v| v.owner == id(1)).unwrap();
+    let a =
+        j.s.book()
+            .vaults
+            .iter()
+            .find(|v| v.owner == id(1))
+            .unwrap_or_else(|| panic!("missing test fixture value"));
     let entire = *vaults::apply_pending(*a, j.s.book().system, limits())
         .result()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let net = entire.debt - entire.reserve;
     let command = redemption::Command {
         maximum: net,
@@ -309,9 +317,12 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
         &j.s,
         raw(&j.s, 1, AppCommand::Stake(staking::Command::Claim)),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let mut dispute = raw(&j.s, 6, AppCommand::ObserveOracle);
-    let mut view = j.s.oracle().unwrap().clone();
+    let mut view =
+        j.s.oracle()
+            .unwrap_or_else(|| panic!("missing test fixture value"))
+            .clone();
     view.status = vaults::PriceStatus::Disputed;
     dispute.oracle = Some(OracleReceipt {
         before: j.s.oracle_root(),
@@ -335,7 +346,7 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
         },
     );
     use_price(&p, &j.s, &mut r);
-    let r = sign(&p, &j.s, r).unwrap();
+    let r = sign(&p, &j.s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &j.s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Reject(1022))
@@ -381,7 +392,8 @@ fn multi_user_pending_commit_liquidation_redemption_claims_halt_recovery() {
     assert_eq!(j.s.exposure().len(), 2);
     let events = j.s.exposure().iter().map(|e| e.id).collect();
     let r = raw(&j.s, 6, AppCommand::ReleaseExposure { events });
-    let early = sign(&p, &j.s, r.clone()).unwrap();
+    let early =
+        sign(&p, &j.s, r.clone()).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     j.reject(&early, Failure::Canonical);
     j.advance(20_170, 1_000_009);
     let r = raw(&j.s, 6, r.command);
@@ -397,11 +409,11 @@ fn prepared(p: &Policy, s: &State, who: u8) -> Prepared {
         s,
         raw(s, who, AppCommand::Stake(staking::Command::Stake(Q))),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     decide(p, s, &r, &TestVerifier, limits())
         .into_parts()
         .0
-        .unwrap()
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
 fn comparison(name: &str) -> bool {
     std::env::var("ZUSD_DISABLE_COMPARISON").ok().as_deref() != Some(name)
@@ -422,7 +434,7 @@ fn receipt_bad_tag_refuses_each_required_domain() {
         },
     );
     use_price(&p, &s, &mut r);
-    let r = sign(&p, &s, r).unwrap();
+    let r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert!(decide(&p, &s, &r, &TestVerifier, limits()).result().is_ok());
     for i in 0..r.proofs.len() {
         let mut bad = r.clone();
@@ -455,7 +467,7 @@ fn price_view_without_oracle_receipt_never_authorizes() {
         },
     );
     use_price(&p, &s, &mut r);
-    let mut r = sign(&p, &s, r).unwrap();
+    let mut r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     r.proofs.retain(|p| p.domain != Domain::Oracle);
     let e = decide(&p, &s, &r, &TestVerifier, limits());
     if comparison("price-view") {
@@ -471,10 +483,13 @@ fn stale_borrowed_replayed_receipts_and_backend_failures_refuse() {
         &s,
         raw(&s, 1, AppCommand::Stake(staking::Command::Stake(Q))),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let frozen = s.clone();
     let ok = decide(&p, &s, &signed, &TestVerifier, limits());
-    let out = ok.into_parts().0.unwrap();
+    let out = ok
+        .into_parts()
+        .0
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     s = out.post().clone();
     assert_eq!(
         decide(&p, &s, &signed, &TestVerifier, limits())
@@ -484,7 +499,8 @@ fn stale_borrowed_replayed_receipts_and_backend_failures_refuse() {
     );
     let mut replay = signed.clone();
     replay.proofs.clear();
-    let replay = sign(&p, &s, replay).unwrap();
+    let replay =
+        sign(&p, &s, replay).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &replay, &TestVerifier, limits())
             .result()
@@ -583,7 +599,7 @@ fn approved_change_preserves_live_reserves_and_closes_each_once() {
             .vaults
             .iter()
             .find(|v| v.owner == id(4))
-            .unwrap()
+            .unwrap_or_else(|| panic!("missing test fixture value"))
             .reserve,
         25 * Q
     );
@@ -595,7 +611,7 @@ fn approved_change_preserves_live_reserves_and_closes_each_once() {
     assert_eq!(s.book().gas_balance, 125 * Q);
     let mut r = raw(&s, 1, AppCommand::Close);
     use_price(&p, &s, &mut r);
-    let r = sign(&p, &s, r).unwrap();
+    let r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Reject(1011))
@@ -621,7 +637,7 @@ fn funding_is_authenticated_asset_specific_and_single_use() {
     r.nonce = s.nonce(id(2));
     r.backing = s.backing();
     r.backing.agrs += 7 * Q;
-    let r = sign(&p, &s, r).unwrap();
+    let r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Reject(1001))
@@ -639,7 +655,7 @@ fn funding_is_authenticated_asset_specific_and_single_use() {
             },
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::Domain)
@@ -654,7 +670,7 @@ fn funding_is_authenticated_asset_specific_and_single_use() {
         },
     );
     bad.backing.zdex += 2 * Q;
-    let bad = sign(&p, &s, bad).unwrap();
+    let bad = sign(&p, &s, bad).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &bad, &TestVerifier, limits()).result().err(),
         Some(Failure::Conservation)
@@ -670,7 +686,7 @@ fn exhausted_budget_and_retained_inputs_have_no_successor() {
         &s,
         raw(&s, 1, AppCommand::Stake(staking::Command::Stake(Q))),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let e = decide(
         &p,
         &s,
@@ -688,7 +704,7 @@ fn exhausted_budget_and_retained_inputs_have_no_successor() {
     let out = decide(&p, &s, &r, &TestVerifier, limits())
         .into_parts()
         .0
-        .unwrap();
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let bytes = out.canonical_bytes().to_vec();
     r.proofs[0].bytes[0] ^= 1;
     r.command = AppCommand::ClaimSurplus;
@@ -700,7 +716,8 @@ fn cas_conflict_retry_and_cold_replay_never_duplicate_economics() {
     let p = policy(false);
     let g = genesis(&p);
     let path = directory("cas");
-    let store = FileLedger::create(&path, &p, &g).unwrap();
+    let store = FileLedger::create(&path, &p, &g)
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let first = prepared(&p, &g, 1);
     let duplicate = prepared(&p, &g, 1);
     let conflict = prepared(&p, &g, 2);
@@ -708,7 +725,7 @@ fn cas_conflict_retry_and_cold_replay_never_duplicate_economics() {
     assert_eq!(
         store
             .publish(&p, &g, &TestVerifier, first, limits())
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
         Publication::Committed
     );
     assert!(matches!(
@@ -718,16 +735,20 @@ fn cas_conflict_retry_and_cold_replay_never_duplicate_economics() {
     assert_eq!(
         store
             .publish(&p, &g, &TestVerifier, duplicate, limits())
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
         Publication::Duplicate
     );
     let cold = FileLedger::open(&path);
     assert_eq!(
-        cold.load(&p, &g, &TestVerifier, limits()).unwrap().root(),
+        cold.load(&p, &g, &TestVerifier, limits())
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+            .root(),
         root
     );
     assert_eq!(
-        cold.bundles(&p, &g, &TestVerifier, limits()).unwrap().len(),
+        cold.bundles(&p, &g, &TestVerifier, limits())
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+            .len(),
         1
     );
 }
@@ -737,7 +758,8 @@ fn concurrent_publishers_share_one_cas_lock() {
     let p = policy(false);
     let g = genesis(&p);
     let path = directory("concurrent");
-    let store = FileLedger::create(&path, &p, &g).unwrap();
+    let store = FileLedger::create(&path, &p, &g)
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let barrier = Arc::new(Barrier::new(2));
     let threads: Vec<_> = (1..=2)
         .map(|who| {
@@ -752,7 +774,10 @@ fn concurrent_publishers_share_one_cas_lock() {
     let mut committed = 0;
     let mut conflicts = 0;
     for t in threads {
-        match t.join().unwrap() {
+        match t
+            .join()
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+        {
             Ok(Publication::Committed) => committed += 1,
             Err(StoreError::Conflict) => conflicts += 1,
             other => panic!("{other:?}"),
@@ -762,7 +787,7 @@ fn concurrent_publishers_share_one_cas_lock() {
     assert_eq!(
         store
             .bundles(&p, &g, &TestVerifier, limits())
-            .unwrap()
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             .len(),
         1
     );
@@ -772,8 +797,12 @@ fn crash_worker() {
     let Ok(value) = std::env::var("ZUSD_STEP4_CRASH") else {
         return;
     };
-    let (path, index) = value.rsplit_once(':').unwrap();
-    let index: usize = index.parse().unwrap();
+    let (path, index) = value
+        .rsplit_once(':')
+        .unwrap_or_else(|| panic!("missing test fixture value"));
+    let index: usize = index
+        .parse()
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let point = [
         CrashPoint::BeforeWrite,
         CrashPoint::DuringWrite,
@@ -797,13 +826,17 @@ fn atomic_publication_survives_all_six_crash_points() {
         let p = policy(false);
         let g = genesis(&p);
         let path = directory("crash");
-        let store = FileLedger::create(&path, &p, &g).unwrap();
+        let store = FileLedger::create(&path, &p, &g)
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         let root = prepared(&p, &g, 1).post().root();
-        let child = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "crash_worker", "--nocapture"])
-            .env("ZUSD_STEP4_CRASH", format!("{}:{index}", path.display()))
-            .output()
-            .unwrap();
+        let child = std::process::Command::new(
+            std::env::current_exe()
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
+        )
+        .args(["--exact", "crash_worker", "--nocapture"])
+        .env("ZUSD_STEP4_CRASH", format!("{}:{index}", path.display()))
+        .output()
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
         assert_eq!(
             child.status.code(),
             Some(77),
@@ -831,7 +864,7 @@ fn atomic_publication_survives_all_six_crash_points() {
         assert_eq!(
             store
                 .publish(&p, &g, &TestVerifier, prepared(&p, &g, 1), limits())
-                .unwrap(),
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}")),
             if committed {
                 Publication::Duplicate
             } else {
@@ -839,13 +872,16 @@ fn atomic_publication_survives_all_six_crash_points() {
             }
         );
         assert_eq!(
-            store.load(&p, &g, &TestVerifier, limits()).unwrap().root(),
+            store
+                .load(&p, &g, &TestVerifier, limits())
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
+                .root(),
             root
         );
         assert_eq!(
             store
                 .bundles(&p, &g, &TestVerifier, limits())
-                .unwrap()
+                .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
                 .len(),
             1
         );
@@ -856,10 +892,11 @@ fn cold_replay_rechecks_verifier_and_rejects_corrupt_bytes() {
     let p = policy(false);
     let g = genesis(&p);
     let path = directory("tamper");
-    let store = FileLedger::create(&path, &p, &g).unwrap();
+    let store = FileLedger::create(&path, &p, &g)
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     store
         .publish(&p, &g, &TestVerifier, prepared(&p, &g, 1), limits())
-        .unwrap();
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     struct Invalid;
     impl ReceiptVerifierV1 for Invalid {
         fn verify(&self, _: Domain, _: Id, _: &[u8], _: &[u8]) -> Result<(), VerificationFailure> {
@@ -868,10 +905,11 @@ fn cold_replay_rechecks_verifier_and_rejects_corrupt_bytes() {
     }
     assert!(store.load(&p, &g, &Invalid, limits()).is_err());
     let ledger = path.join("ledger");
-    let mut bytes = std::fs::read(&ledger).unwrap();
+    let mut bytes =
+        std::fs::read(&ledger).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let last = bytes.len() - 1;
     bytes[last] ^= 1;
-    std::fs::write(ledger, bytes).unwrap();
+    std::fs::write(ledger, bytes).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert!(store.load(&p, &g, &TestVerifier, limits()).is_err());
 }
 #[test]
@@ -893,7 +931,7 @@ fn stale_price_freezes_risk_but_not_repayment_or_evidence() {
         },
     );
     use_price(&p, &s, &mut risk);
-    let risk = sign(&p, &s, risk).unwrap();
+    let risk = sign(&p, &s, risk).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &risk, &TestVerifier, limits())
             .result()
@@ -924,7 +962,7 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
         &s,
         price_request(&p, &s, OracleAction::CommitMatured, 2, 100_000_000, 162),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &early, &TestVerifier, limits())
             .result()
@@ -932,7 +970,10 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
         Some(Failure::Canonical)
     );
     let mut block = raw(&s, 6, AppCommand::ObserveOracle);
-    let mut view = s.oracle().unwrap().clone();
+    let mut view = s
+        .oracle()
+        .unwrap_or_else(|| panic!("missing test fixture value"))
+        .clone();
     view.pending_blocked = true;
     block.oracle = Some(OracleReceipt {
         before: s.oracle_root(),
@@ -943,7 +984,10 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
     });
     let _ = step(&p, &mut s, block);
     let mut clear = raw(&s, 6, AppCommand::ObserveOracle);
-    let mut view = s.oracle().unwrap().clone();
+    let mut view = s
+        .oracle()
+        .unwrap_or_else(|| panic!("missing test fixture value"))
+        .clone();
     view.pending_blocked = false;
     clear.oracle = Some(OracleReceipt {
         before: s.oracle_root(),
@@ -952,7 +996,8 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
         action: OracleAction::RefreshStatus,
         view,
     });
-    let clear = sign(&p, &s, clear).unwrap();
+    let clear =
+        sign(&p, &s, clear).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &clear, &TestVerifier, limits())
             .result()
@@ -960,7 +1005,10 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
         Some(Failure::Canonical)
     );
     let mut shock = raw(&s, 6, AppCommand::ObserveOracle);
-    let mut view = s.oracle().unwrap().clone();
+    let mut view = s
+        .oracle()
+        .unwrap_or_else(|| panic!("missing test fixture value"))
+        .clone();
     view.capacity = 0;
     shock.oracle = Some(OracleReceipt {
         before: s.oracle_root(),
@@ -984,7 +1032,7 @@ fn pending_restrictions_buffer_and_exposure_shocks_are_preserved() {
         },
     );
     use_price(&p, &s, &mut risk);
-    let risk = sign(&p, &s, risk).unwrap();
+    let risk = sign(&p, &s, risk).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &risk, &TestVerifier, limits())
             .result()
@@ -998,7 +1046,7 @@ fn unbound_clock_and_drip_do_not_acquire_defaults() {
     let mut config = original.config().clone();
     config.clock = None;
     config.drip = None;
-    let p = Policy::bind(config).unwrap();
+    let p = Policy::bind(config).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let mut s = ready(&p);
     let mut r = raw(
         &s,
@@ -1012,7 +1060,7 @@ fn unbound_clock_and_drip_do_not_acquire_defaults() {
         },
     );
     use_price(&p, &s, &mut r);
-    let r = sign(&p, &s, r).unwrap();
+    let r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::UnboundProfile)
@@ -1021,7 +1069,7 @@ fn unbound_clock_and_drip_do_not_acquire_defaults() {
     let _ = step(&p, &mut s, r);
     let mut r = raw(&s, 1, AppCommand::Pool(stability::Command::Claim));
     drip(&mut r, 170, 0);
-    let r = sign(&p, &s, r).unwrap();
+    let r = sign(&p, &s, r).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     assert_eq!(
         decide(&p, &s, &r, &TestVerifier, limits()).result().err(),
         Some(Failure::UnboundProfile)
@@ -1036,7 +1084,7 @@ fn reference_minutes_are_derived_from_certified_epoch_differences() {
         epochs: 10,
         minutes: 1,
     });
-    let p = Policy::bind(config).unwrap();
+    let p = Policy::bind(config).unwrap_or_else(|error| panic!("test fixture result: {error:?}"));
     let mut s = ready(&p);
     open(&p, &mut s, 1, 2000 * Q, 1000 * Q);
     open(&p, &mut s, 2, 2000 * Q, 1000 * Q);

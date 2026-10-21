@@ -5,7 +5,8 @@ use std::sync::OnceLock;
 use zeno_fcis_bls::{receipt::*, *};
 use zenofcis_zusd_v1::application::*;
 fn sk(index: usize) -> SecretKey {
-    SecretKey::key_gen(&[0x71 + index as u8; 32], &[]).unwrap()
+    SecretKey::key_gen(&[0x71 + index as u8; 32], &[])
+        .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
 }
 fn authority(domain: Domain) -> [u8; 32] {
     id(match domain {
@@ -27,7 +28,8 @@ pub fn backend() -> &'static BlsReceiptVerifier {
             .map(|i| {
                 let sk = sk(i);
                 let pk = sk.sk_to_pk().to_bytes();
-                PopKey::admit(&pk, &sk.sign(&pk, POP_PROOF_DST, &[]).to_bytes()).unwrap()
+                PopKey::admit(&pk, &sk.sign(&pk, POP_PROOF_DST, &[]).to_bytes())
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             })
             .collect::<Vec<_>>();
         let authorities = [
@@ -44,13 +46,16 @@ pub fn backend() -> &'static BlsReceiptVerifier {
         .into_iter()
         .map(|d| {
             if d == Domain::Oracle {
-                Authority::quorum(d, authority(d), members.clone(), 2).unwrap()
+                Authority::quorum(d, authority(d), members.clone(), 2)
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             } else {
-                Authority::basic(d, authority(d), sk(3).sk_to_pk().to_bytes()).unwrap()
+                Authority::basic(d, authority(d), sk(3).sk_to_pk().to_bytes())
+                    .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             }
         })
         .collect();
-        BlsReceiptVerifier::new(authorities, 131_072).unwrap()
+        BlsReceiptVerifier::new(authorities, 131_072)
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
     })
 }
 pub struct TestVerifier;
@@ -76,7 +81,7 @@ pub fn issue(message: &[u8]) -> Vec<u8> {
             .map(|i| sk(i).sign(message, POP_DST, &[]))
             .collect::<Vec<_>>();
         sig = AggregateSignature::aggregate(&sigs.iter().collect::<Vec<_>>(), true)
-            .unwrap()
+            .unwrap_or_else(|error| panic!("test fixture result: {error:?}"))
             .to_signature()
             .to_bytes();
     } else {
