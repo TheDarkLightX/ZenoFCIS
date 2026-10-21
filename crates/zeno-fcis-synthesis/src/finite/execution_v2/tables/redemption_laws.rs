@@ -206,31 +206,42 @@ fn expected(
 ) -> Result<Result<(State, Trace), Reason>, Failure> {
     m.charge(Resource::Step, 64)?;
     m.charge(Resource::Byte, 1024)?;
-    macro_rules! refuse {
-        ($bad:expr,$why:ident) => {
-            if $bad {
-                return Ok(Err(Reason::$why));
-            }
-        };
+    if c.actor != pre.holder || x.actor != c.actor {
+        return Ok(Err(Reason::Unauthorized));
     }
-    refuse!(c.actor != pre.holder || x.actor != c.actor, Unauthorized);
-    refuse!(c.nonce != pre.nonce, Replay);
-    refuse!(pre.nonce == u64::MAX, NonceExhausted);
-    refuse!(
-        pre.price_e8 == 0
-            || pre.oracle_profile != p.oracle_profile
-            || x.epoch < pre.price_epoch
-            || x.epoch - pre.price_epoch > p.max_price_age,
-        Oracle
-    );
-    refuse!(c.maximum > p.redemption_capacity, Capacity);
-    refuse!(c.max_fee < Q / 200 || c.max_fee > Q, FeeDomain);
-    refuse!(x.epoch < p.bootstrap_epoch, Bootstrap);
+    if c.nonce != pre.nonce {
+        return Ok(Err(Reason::Replay));
+    }
+    if pre.nonce == u64::MAX {
+        return Ok(Err(Reason::NonceExhausted));
+    }
+    if pre.price_e8 == 0
+        || pre.oracle_profile != p.oracle_profile
+        || x.epoch < pre.price_epoch
+        || x.epoch - pre.price_epoch > p.max_price_age
+    {
+        return Ok(Err(Reason::Oracle));
+    }
+    if c.maximum > p.redemption_capacity {
+        return Ok(Err(Reason::Capacity));
+    }
+    if c.max_fee < Q / 200 || c.max_fee > Q {
+        return Ok(Err(Reason::FeeDomain));
+    }
+    if x.epoch < p.bootstrap_epoch {
+        return Ok(Err(Reason::Bootstrap));
+    }
     let backing = r::add(pre.active_collateral, pre.default_collateral, m)?;
     let debt = r::add(pre.active_debt, pre.default_debt, m)?;
-    refuse!(!r::eligible(backing, debt, pre.price_e8, m)?, Tcr);
-    refuse!(c.maximum == 0, Amount);
-    refuse!(pre.holder_balance < c.maximum, Balance);
+    if !r::eligible(backing, debt, pre.price_e8, m)? {
+        return Ok(Err(Reason::Tcr));
+    }
+    if c.maximum == 0 {
+        return Ok(Err(Reason::Amount));
+    }
+    if pre.holder_balance < c.maximum {
+        return Ok(Err(Reason::Balance));
+    }
     m.charge(Resource::Byte, (pre.order.len() as u64 + 1) * 128)?;
     let mut first = None;
     let mut at = pre.order.len();
@@ -300,7 +311,9 @@ fn expected(
             let nd = r::sub(debt, lot, m)?;
             let close = lot == net;
             if close {
-                refuse!(remaining_active <= 1, LastVault);
+                if remaining_active <= 1 {
+                    return Ok(Err(Reason::LastVault));
+                }
                 remaining_active -= 1;
                 tr.closed.push(id);
                 tr.reserve_burn = r::add(tr.reserve_burn, p.reserve, m)?;
@@ -342,10 +355,9 @@ fn expected(
             }
         }
     }
-    refuse!(
-        tr.executed == 0 || tr.gross_collateral == 0,
-        NoPositiveExecution
-    );
+    if tr.executed == 0 || tr.gross_collateral == 0 {
+        return Ok(Err(Reason::NoPositiveExecution));
+    }
     // Fee arithmetic is a source-bound primitive; traversal and state equations
     // are independent. The separate arbitrary-integer oracle checks the primitive.
     let seconds = x
@@ -366,11 +378,12 @@ fn expected(
         return Err(Failure::Arithmetic);
     }
     tr.fee = r::muldiv(tr.gross_collateral, r::add(Q / 200, base, m)?.min(Q), Q, m)?;
-    refuse!(tr.fee >= tr.gross_collateral, FeeConsumesAll);
-    refuse!(
-        r::muldiv(tr.fee, Q, tr.gross_collateral, m)? > c.max_fee,
-        FeeExceeded
-    );
+    if tr.fee >= tr.gross_collateral {
+        return Ok(Err(Reason::FeeConsumesAll));
+    }
+    if r::muldiv(tr.fee, Q, tr.gross_collateral, m)? > c.max_fee {
+        return Ok(Err(Reason::FeeExceeded));
+    }
     r::charge_state(pre, m)?;
     let mut post = pre.clone();
     let mut settled_c = 0;

@@ -6,16 +6,7 @@ use zeno_fcis_value::{Value, ValueError, ValueLimits};
 
 const HEADER: u64 = 29;
 
-/// Resource policy included in every snapshot. Limits count encoded bytes, not RAM.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CollectionLimits {
-    /// Maximum retained items.
-    pub max_entries: u32,
-    /// Maximum encoded item, including framing (map: both keys and values).
-    pub max_item_bytes: u64,
-    /// Maximum complete snapshot, including version, kind, policy and count.
-    pub max_snapshot_bytes: u64,
-}
+pub use zeno_fcis_codec::CollectionLimits;
 
 /// Deterministic refusal; the original collection is never modified.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -22,7 +22,7 @@ pub use authority::{
     Authority, Decision, Evaluation, OrderedQuery, Publication, PublicationOutcome,
 };
 pub use expression::{LawReport, check_laws};
-pub use zeno_fcis_collections::bounded::CollectionLimits;
+pub use zeno_fcis_codec::CollectionLimits;
 pub use zeno_fcis_value::{Field, MapEntry, Value, ValueRef};
 
 pub const PROFILE: &str = "tables/1";

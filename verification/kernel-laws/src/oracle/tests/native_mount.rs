@@ -35,6 +35,10 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let arguments = Arguments::parse()?;
+    run_arguments(arguments)
+}
+
+fn run_arguments(arguments: Arguments) -> Result<(), String> {
     verify_source(&arguments.zenodex_root)?;
     fs::create_dir_all(&arguments.output_dir)
         .map_err(|error| format!("create output directory: {error}"))?;
@@ -110,6 +114,25 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("case {index} Python normalize: {error}"))?;
         let rust_decision = normalize_zusd_native_decision_v1(&input, &rust_native)
             .map_err(|error| format!("case {index} Rust normalize: {error}"))?;
+        for (suffix, bytes) in [
+            ("request.jsonl", request.clone()),
+            ("python.jsonl", python_output.clone()),
+            ("native.jsonl", rust_output.clone()),
+            (
+                "python-normalized.txt",
+                format!("{python_decision:#?}\n").into_bytes(),
+            ),
+            (
+                "native-normalized.txt",
+                format!("{rust_decision:#?}\n").into_bytes(),
+            ),
+        ] {
+            fs::write(
+                arguments.output_dir.join(format!("{index:03}-{suffix}")),
+                bytes,
+            )
+            .map_err(|error| format!("retain complete decision: {error}"))?;
+        }
         let case_id = zusd_mount_case_id_v1(&input).map_err(|error| error.to_string())?;
         let compared = compare_case(case_id, &request, &python_decision, &rust_decision)
             .map_err(|error| format!("case {index} compare: {error}"))?;
@@ -163,7 +186,7 @@ fn run() -> Result<(), String> {
         zenodex_commit: PINNED_ZENODEX_COMMIT,
         python_entrypoint: PINNED_PYTHON_ENTRYPOINT,
         rust_subcommand: PINNED_RUST_SUBCOMMAND,
-        rust_toolchain: "1.89.0",
+        rust_toolchain: "1.97.1",
         zeno_fcis_toolchain: "1.97.1",
         profile_hash: fixed.profile_hash().to_string(),
         schema_hash: fixed.schema_hash().to_string(),
@@ -194,6 +217,20 @@ fn run() -> Result<(), String> {
         rejected
     );
     Ok(())
+}
+
+#[test]
+fn pinned_state_threaded_mount_retains_complete_normalized_decisions() {
+    let Some(root) = env::var_os("ZUSD_MOUNT_ROOT") else {
+        return;
+    };
+    run_arguments(Arguments {
+        zenodex_root: PathBuf::from(root),
+        rust_binary: PathBuf::from(env::var_os("ZUSD_MOUNT_BINARY").expect("native binary")),
+        python_binary: PathBuf::from("python3"),
+        output_dir: PathBuf::from(env::var_os("ZUSD_MOUNT_EVIDENCE").expect("evidence directory")),
+    })
+    .expect("pinned mount replay");
 }
 
 fn corpus() -> [ZusdCommandV1; 17] {

@@ -31,6 +31,7 @@ pub(super) const FILES: &[(&str, &[u8])] = &[
     ("core-apps/zusd-v1/src/wire.rs", include_bytes!("../wire.rs")),
     ("crates/zeno-fcis-codec/Cargo.toml", include_bytes!("../../../../crates/zeno-fcis-codec/Cargo.toml")),
     ("crates/zeno-fcis-codec/src/artifact.rs", include_bytes!("../../../../crates/zeno-fcis-codec/src/artifact.rs")),
+    ("crates/zeno-fcis-codec/src/collection_limits.rs", include_bytes!("../../../../crates/zeno-fcis-codec/src/collection_limits.rs")),
     ("crates/zeno-fcis-codec/src/domains.rs", include_bytes!("../../../../crates/zeno-fcis-codec/src/domains.rs")),
     ("crates/zeno-fcis-codec/src/lib.rs", include_bytes!("../../../../crates/zeno-fcis-codec/src/lib.rs")),
     ("crates/zeno-fcis-codec/src/providers.rs", include_bytes!("../../../../crates/zeno-fcis-codec/src/providers.rs")),

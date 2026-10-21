@@ -1,0 +1,90 @@
+{
+  "authority": "none",
+  "candidate": {
+    "bytes": 2811,
+    "nodes": 40,
+    "sha256": "1675ce46f94b0f3909a706ccc19637c7e4a2ee21ae08548fb9b44630df8f378a"
+  },
+  "checker": {
+    "evaluator_identity": "a804392542e48819908353022e5585beeb7e341df82b9298c9549e556db1bd05",
+    "semantics": "zeno-fcis/transform-check/4"
+  },
+  "claim": "Functionally equal on the full declared input domain: every tuple gives identical outputs or identical failures. The Step limit never binds: no tuple needs more Steps than the limit in either program.",
+  "domain": {
+    "enumeration": "ordered-product-last-input-fastest-v1",
+    "inputs": [
+      {
+        "kind": "int",
+        "max": "6",
+        "min": "0"
+      },
+      {
+        "kind": "int",
+        "max": "2",
+        "min": "0"
+      }
+    ],
+    "size": 21
+  },
+  "inputs_checked": 21,
+  "limits": {
+    "input_tuples": 100000000,
+    "steps": 256
+  },
+  "original": {
+    "bytes": 11105,
+    "nodes": 162,
+    "sha256": "72e5d8b63625cb5406b50c9f1522b546db31fa87241f6f0e4b7cfbb2baf1ac14"
+  },
+  "outputs": [
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    },
+    {
+      "kind": "int",
+      "max": "8000000000000000000",
+      "min": "0"
+    }
+  ],
+  "profile": {
+    "execution": "zeno-fcis/finite-instruction-meter/2",
+    "program": "zeno-fcis/finite-i128/1"
+  },
+  "schema": "zeno-fcis/transform-receipt/1",
+  "usage": {
+    "candidate_uses_more": 0,
+    "max_steps": {
+      "candidate": 40,
+      "original": 162
+    },
+    "usage_preserved": false
+  },
+  "verdict": "equivalent"
+}

@@ -1,4 +1,4 @@
-//! Independent integer reference, exhaustive table domains and tested balance journeys.
+// Independent integer reference, exhaustive table domains and tested balance journeys.
 use std::{collections::BTreeMap, path::PathBuf, sync::OnceLock};
 use t::{Value, ValueRef};
 use zeno_fcis_contract::internals::{tables, tables_review};

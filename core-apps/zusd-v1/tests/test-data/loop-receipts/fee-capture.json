@@ -1,0 +1,40 @@
+{
+  "acquisition": {
+    "accounting_complete": false,
+    "exhausted": false,
+    "leftover_checker_staging": 0,
+    "observed_intake": null,
+    "policy": "zeno-fcis/loop-acquisition/1",
+    "reserved_units": 245781616,
+    "separate_from_session_check_work": true
+  },
+  "authority": "none",
+  "backend": "posix",
+  "containment": {
+    "backend": "posix",
+    "evidence": "inline-unqualified-refusal",
+    "final": {
+      "absence_verified": false,
+      "application_work_started": false,
+      "cleanup": "unknown",
+      "reason": "capture-containment-unavailable",
+      "termination": "stopped"
+    },
+    "required_profile": "python-reference/1",
+    "schema": "zeno-fcis/containment-result/1",
+    "selection_source": "flag",
+    "startup": {
+      "admitted": false,
+      "guarantees": []
+    }
+  },
+  "detail": {
+    "accounting_complete": false,
+    "attempt_spent": false,
+    "reason": "capture-containment-unavailable"
+  },
+  "door": "capture",
+  "required_profile": "python-reference/1",
+  "schema": "zeno-fcis/black-box-capture/1",
+  "status": "refused"
+}

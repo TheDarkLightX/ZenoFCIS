@@ -20,7 +20,6 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-collections = { version = "=2.5.0", path = "../zeno-fcis-collections", default-features = false }
 zeno-fcis-core = { version = "=2.5.0", path = "../zeno-fcis-core", default-features = false }
 zeno-fcis-codec = { version = "=2.5.0", path = "../zeno-fcis-codec", default-features = false }
 zeno-fcis-crypto = { version = "=2.5.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }

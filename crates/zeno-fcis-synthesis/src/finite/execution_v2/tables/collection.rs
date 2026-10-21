@@ -2,12 +2,105 @@ use super::super::meter::Meter;
 use super::schema::record_field;
 use super::*;
 use zeno_fcis_codec::{CanonicalEncode, DecodeLimits};
-use zeno_fcis_collections::{
-    BTreeMapBackend, LogicalEntry,
-    bounded::{BoundedError, BoundedMap},
-};
+use zeno_fcis_value::ValueLimits;
 
-type Map = BoundedMap<BTreeMapBackend>;
+// Invocation-owned canonical entries. Execution has no dependency on a storage
+// backend or its persistent-map protocol. Keep ZBC1 framing and refusal order.
+pub(crate) struct Map {
+    entries: Vec<MapEntry>,
+    limits: CollectionLimits,
+    bytes: u64,
+}
+enum BoundedError {
+    Wire,
+    ArithmeticOverflow,
+    ItemTooLarge,
+    Full,
+    SnapshotTooLarge,
+}
+impl Map {
+    fn empty(limits: CollectionLimits) -> Result<Self, BoundedError> {
+        if limits.max_snapshot_bytes < 29 {
+            return Err(BoundedError::Wire);
+        }
+        Ok(Self {
+            entries: Vec::new(),
+            limits,
+            bytes: 29,
+        })
+    }
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+    fn snapshot_len(&self) -> u64 {
+        self.bytes
+    }
+    fn item_size(entry: &MapEntry) -> Result<u64, BoundedError> {
+        entry
+            .value()
+            .validate_limits(ValueLimits::default())
+            .map_err(|_| BoundedError::Wire)?;
+        let value = u64::try_from(
+            entry
+                .value()
+                .encoded_length()
+                .map_err(|_| BoundedError::Wire)?,
+        )
+        .map_err(|_| BoundedError::ArithmeticOverflow)?;
+        let key = u64::try_from(entry.encoded_key().len())
+            .map_err(|_| BoundedError::ArithmeticOverflow)?;
+        key.checked_add(16)
+            .and_then(|n| n.checked_add(value))
+            .ok_or(BoundedError::ArithmeticOverflow)
+    }
+    fn insert(mut self, entry: MapEntry) -> Result<Self, BoundedError> {
+        let size = Self::item_size(&entry)?;
+        let at = self
+            .entries
+            .binary_search_by(|e| e.encoded_key().cmp(entry.encoded_key()));
+        let old_size = match at {
+            Ok(i) => Self::item_size(&self.entries[i])?,
+            Err(_) => 0,
+        };
+        let count = self
+            .len()
+            .checked_add(usize::from(at.is_err()))
+            .ok_or(BoundedError::ArithmeticOverflow)?;
+        let bytes = self
+            .bytes
+            .checked_sub(old_size)
+            .and_then(|n| n.checked_add(size))
+            .ok_or(BoundedError::ArithmeticOverflow)?;
+        if size > self.limits.max_item_bytes {
+            return Err(BoundedError::ItemTooLarge);
+        }
+        if count > self.limits.max_entries as usize {
+            return Err(BoundedError::Full);
+        }
+        if bytes > self.limits.max_snapshot_bytes {
+            return Err(BoundedError::SnapshotTooLarge);
+        }
+        match at {
+            Ok(i) => self.entries[i] = entry,
+            Err(i) => self.entries.insert(i, entry),
+        }
+        self.bytes = bytes;
+        Ok(self)
+    }
+    fn remove(mut self, key: &[u8]) -> Result<Self, BoundedError> {
+        if let Ok(i) = self.entries.binary_search_by(|e| e.encoded_key().cmp(key)) {
+            self.bytes = self
+                .bytes
+                .checked_sub(Self::item_size(&self.entries[i])?)
+                .ok_or(BoundedError::ArithmeticOverflow)?;
+            self.entries.remove(i);
+        }
+        Ok(self)
+    }
+    fn try_to_value_map(self) -> Result<Value, Failure> {
+        Value::map_canonical(self.entries).map_err(|_| Failure::Wire)
+    }
+}
 pub(crate) fn step(m: &mut Meter) -> Result<(), Failure> {
     m.charge(Resource::Step, 1).map_err(Into::into)
 }
@@ -175,8 +268,11 @@ pub(crate) fn reconstruct(
         }
         reserve(entry.key(), m)?;
         let key = encode(entry.key(), m)?;
-        let item = LogicalEntry::try_new(key, copy(entry.key(), m)?, copy(entry.value(), m)?)
+        let item = MapEntry::try_new(copy(entry.key(), m)?, copy(entry.value(), m)?)
             .map_err(|_| Failure::Wire)?;
+        if item.encoded_key() != key {
+            return Err(Failure::Wire);
+        }
         map = map.insert(item).map_err(bounded)?;
     }
     Ok(map)
@@ -323,8 +419,10 @@ pub(crate) fn edit(
         charge_copy(v, m)?;
         reserve(key, m)?;
         reserve(new, m)?;
-        let entry = LogicalEntry::try_new(key_bytes, copy(key, m)?, copy(new, m)?)
-            .map_err(|_| Failure::Wire)?;
+        let entry = MapEntry::try_new(copy(key, m)?, copy(new, m)?).map_err(|_| Failure::Wire)?;
+        if entry.encoded_key() != key_bytes {
+            return Err(Failure::Wire);
+        }
         map.insert(entry)
     };
     map = match next {
