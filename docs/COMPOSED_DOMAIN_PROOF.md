@@ -38,13 +38,13 @@ verification. The loop has a decreasing finite bound.
 it frames skipped, later and read-only components and rolls back the whole
 state on Reject or Refused. The abstract joint step uses both shared specs.
 
-The resolver takes `Fn`, allowing an immutable pure table lookup. The caller
-recovers payloads by repeating pure lookups within the visited prefix; later
-components are never evaluated. This avoids a mutable closure capture, which
-the pinned verifier does not support. Application uses the concrete state
-representation because an arbitrary user-defined `Clone` need not preserve its
-value. These choices preserve results, with extra bounded lookup work; they
-make no performance improvement claim.
+The resolver takes `FnMut`. Its production callback reads immutable tables and
+pre-state, and records payloads in fresh, exclusively owned invocation scratch.
+Each visited component is evaluated once; later components never run. The
+scratch and callback cannot escape the invocation. Application uses the concrete
+state representation because arbitrary user-defined `Clone` need not preserve
+its value or ownership. The shared-source application proof covers nested
+integer vectors; the abstract application specification is generic.
 
 ## Bridges and trust
 
@@ -63,7 +63,7 @@ The trusted proof tools are the pinned Verus translation and erasure, its
 bundled vstd specifications and solver, the Rust compilers, and the reviewed
 mathematical specification and coverage profile. No new assumed specification,
 unfinished proof or external body is used on the proved path. The runtime
-closure captures immutable inputs; application returns fresh owned vectors and
+closure borrows immutable inputs and exclusive local scratch; application returns fresh owned vectors and
 exposes no mutable aliases. Source-bound checker identities intentionally change
 when these implementation files change.
 

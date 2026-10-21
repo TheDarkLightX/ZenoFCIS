@@ -57,6 +57,7 @@ def source_paths():
         Path('tools/test_check_composed_domain.py'), Path('tools/check_verus.py'),
         Path('tools/check_checked_assembly.py'), Path('tools/verus_coverage.py'),
         Path('tools/v2_proof_sources.py'), Path('tools/test_composed_domain_runtime_controls.py'),
+        Path('crates/zeno-fcis-contract/src/checked_composition.rs'),
         Path('Cargo.toml'), Path('Cargo.lock'), Path('rust-toolchain.toml')}
     paths.update(p.relative_to(ROOT) for p in (ROOT / SUBJECT.parent).glob('*.rs'))
     return tuple(sorted(paths))

@@ -1,7 +1,7 @@
 //! Shared ordered outcome resolution and ownership-aware state application.
 //!
-//! The callback is immutable: a local table lookup is a pure decision. The
-//! caller recovers payloads for the visited prefix after resolving its kinds.
+//! The caller may collect payloads in exclusively owned invocation scratch.
+//! Callback purity depends on its captures and callers, not the callable trait.
 use std::vec::Vec;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
@@ -49,7 +49,7 @@ pub(crate) mod model;
 ))]
 pub(crate) fn resolve(
     n: usize,
-    decide: impl Fn(usize) -> Local,
+    mut decide: impl FnMut(usize) -> Local,
     #[cfg(verus_keep_ghost)] decisions: Ghost<Seq<Local>>,
 ) -> Resolution {
     #[cfg(verus_keep_ghost)]

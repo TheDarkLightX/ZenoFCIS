@@ -37,10 +37,17 @@ def main():
     target_root = Path(os.environ.get('CARGO_TARGET_DIR', logs / 'target')).resolve()
     environment = dict(os.environ, CARGO_PROFILE_DEV_DEBUG='0',
         CARGO_TARGET_DIR=str(target_root / 'composed-domain-controls' / logs.name))
-    command = ['cargo', '+1.97.1', 'test', '-p', 'zeno-fcis-contract', '--locked', '-j', '2', '--lib']
+    command = ['cargo', '+1.97.1', 'test', '-p', 'zeno-fcis-contract', '--locked', '--offline', '-j', '2', '--lib']
     results = []
 
     def run(label, args):
+        if args[0] == 'cargo':
+            disk = subprocess.run(['df', '-B1G', '/'], capture_output=True, text=True, check=True)
+            (logs / (label + '.disk')).write_text(disk.stdout)
+            available = shutil.disk_usage('/').free
+            if available < 6 * 1024**3:
+                raise RuntimeError('root disk below 6 GiB; build stopped')
+        (logs / (label + '.command.json')).write_text(json.dumps(args) + '\n')
         process = subprocess.run(args, cwd=specimen, env=environment,
             capture_output=True, text=True, timeout=600)
         (logs / (label + '.stdout')).write_text(process.stdout)
@@ -70,7 +77,7 @@ def main():
                     'test_exit': tested.returncode, 'killed': True}
                 if name == 'own_successor_only':
                     built_cli = run(name + '-cli-build', ['cargo', '+1.97.1', 'build', '-p',
-                        'zeno-fcis-cli', '--locked', '-j', '2'])
+                        'zeno-fcis-cli', '--locked', '--offline', '-j', '2'])
                     if built_cli.returncode != 0:
                         raise RuntimeError('mutated runtime CLI did not build')
                     target_dir = Path(environment.get('CARGO_TARGET_DIR', specimen / 'target'))

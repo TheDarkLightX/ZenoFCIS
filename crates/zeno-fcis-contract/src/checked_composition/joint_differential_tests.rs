@@ -97,13 +97,13 @@ fn documented_committed_failure_reaches_the_shared_step() {
 fn resolver_never_calls_after_any_terminating_kind() {
     use super::super::resolve::{self, Local as Kind};
     for kind in [Kind::Reject, Kind::Refused, Kind::CommitFailure] {
-        let calls = std::cell::RefCell::new(Vec::new());
+        let mut calls = Vec::new();
         let result = resolve::resolve(4, |at| {
-            calls.borrow_mut().push(at);
+            calls.push(at);
             assert!(at <= 1, "callback ran after the terminal component");
             if at == 1 { kind } else { Kind::Commit }
         });
-        assert_eq!(*calls.borrow(), vec![0, 1]);
+        assert_eq!(calls, vec![0, 1]);
         assert_eq!(
             result.committed,
             if kind == Kind::CommitFailure { 2 } else { 0 }

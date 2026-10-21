@@ -766,5 +766,365 @@ pub(crate) fn step(
     pre: &[Vec<i128>],
     request: &[i128],
 ) -> (Ended, Vec<Vec<i128>>) {
-    use super::resolve::{self, End};
+    use super::resolve;
+    // Both captures are fresh, exclusive scratch for this invocation. Only
+    // immutable pre-state and tables reach local(); nothing is retained by
+    // resolve after it returns, including on Reject or Refused.
+    let mut posts = vec![None; composition.components.len()];
+    let mut ended = Ended::Accept;
     let resolution = resolve::resolve(composition.components.len(), |at| {
+        match local(composition, tables, at, pre, request) {
+            Local::Skip => resolve::Local::Skip,
+            Local::Reject(reason) => {
+                ended = Ended::Reject(at, reason);
+                resolve::Local::Reject
+            }
+            Local::Refused(class) => {
+                ended = Ended::Refused(at, class);
+                resolve::Local::Refused
+            }
+            Local::Commit {
+                failure,
+                reason,
+                post,
+            } => {
+                posts[at] = Some(post);
+                if failure {
+                    ended = Ended::CommittedFailure(at, reason);
+                    resolve::Local::CommitFailure
+                } else {
+                    resolve::Local::Commit
+                }
+            }
+        }
+    });
+    let owns: Vec<bool> = composition
+        .components
+        .iter()
+        .map(|component| component.owns)
+        .collect();
+    (ended, resolve::apply(pre, &posts, &owns, &resolution))
+}
+
+#[cfg(test)]
+#[path = "joint_differential_tests.rs"]
+mod differential_tests;
+
+/// Every request in enumeration order, the last field fastest, one at a
+/// time: a request domain is never collected.
+struct Odometer<'a> {
+    slots: &'a [RequestSlot],
+    offsets: Vec<u128>,
+    done: bool,
+}
+
+impl<'a> Odometer<'a> {
+    fn new(slots: &'a [RequestSlot]) -> Self {
+        Self {
+            slots,
+            offsets: vec![0; slots.len()],
+            done: false,
+        }
+    }
+
+    fn next_tuple(&mut self) -> Option<Vec<i128>> {
+        if self.done {
+            return None;
+        }
+        let tuple = self
+            .slots
+            .iter()
+            .zip(&self.offsets)
+            .map(|(slot, offset)| slot.domain.nth(*offset))
+            .collect();
+        self.done = true;
+        for (slot, offset) in self.slots.iter().zip(&mut self.offsets).rev() {
+            *offset += 1;
+            if *offset < slot.domain.size() {
+                self.done = false;
+                break;
+            }
+            *offset = 0;
+        }
+        Some(tuple)
+    }
+}
+
+/// A validated composed-domain composition with every decision its
+/// components' bound Authorities make, ready to step.
+///
+/// Built from in-memory sources: the `zeno-fcis/checked-composition/3`
+/// manifest and each component's `project.zeno` and `v2/policy.json`, in
+/// merge order. It checks no obligation; [`super::check_domain`] does.
+///
+/// ```
+/// use zeno_fcis_contract::checked_composition::{
+///     DomainSources, JointComposition, LeafSources, OutcomeKind,
+/// };
+/// macro_rules! fixture {
+///     ($path:literal) => {
+///         include_str!(concat!(
+///             env!("CARGO_MANIFEST_DIR"),
+///             "/tests/fixtures/checked-composition-3/guarded/",
+///             $path
+///         ))
+///         .to_owned()
+///     };
+/// }
+/// // In merge order: the guard decides first.
+/// let components = [
+///     LeafSources {
+///         project: fixture!("guard/project.zeno"),
+///         rules: fixture!("guard/v2/policy.json"),
+///     },
+///     LeafSources {
+///         project: fixture!("budget/project.zeno"),
+///         rules: fixture!("budget/v2/policy.json"),
+///     },
+/// ];
+/// let manifest = fixture!("composition.json");
+/// let joint = JointComposition::from_sources(&DomainSources {
+///     manifest: &manifest,
+///     components: &components,
+/// })
+/// .unwrap();
+/// // The guard owns no state: the global state is the budget's alone.
+/// assert_eq!(joint.state_layout().len(), 1);
+/// let genesis = joint.genesis().to_vec();
+/// // Spend 1 with authorization: both accept and the budget goes down.
+/// let step = joint.joint_step(&genesis, &[1, 1]).unwrap();
+/// assert_eq!(step.kind, OutcomeKind::Accept);
+/// assert_eq!(step.successor, vec![genesis[0] - 1]);
+/// // Without authorization the guard rejects and nothing changes.
+/// let step = joint.joint_step(&genesis, &[1, 0]).unwrap();
+/// assert!(matches!(step.kind, OutcomeKind::Reject { ref component, .. } if component == "guard"));
+/// assert_eq!(step.successor, genesis);
+/// ```
+#[derive(Debug)]
+pub struct JointComposition {
+    composition: Composition,
+    tables: Tables,
+    layout: Vec<StateSlot>,
+    request: Vec<RequestSlot>,
+    genesis: Vec<i128>,
+}
+
+impl JointComposition {
+    /// Validates the manifest, binds every component's Authority once and
+    /// decides every input of each component's local domain with it. Every
+    /// table's size is planned first: a table over 2^22 cells, or all of them
+    /// over 2^25, is refused before anything is built.
+    ///
+    /// # Errors
+    /// The manifest's or a component's refusal, or a table over a ceiling.
+    pub fn from_sources(sources: &DomainSources<'_>) -> Result<Self, Refusal> {
+        let composition = Composition::bind(sources.manifest, sources.components)?;
+        // Every table's size is planned before anything is built.
+        if let Err((place, size, limit)) = tables_fit(
+            &composition,
+            super::domain::MAX_OBLIGATION,
+            super::domain::MAX_TOTAL,
+        ) {
+            return Err(Refusal::new(
+                Stage::Local,
+                Obligation::CompleteEnumeration,
+                place,
+                format!(
+                    "{} cells exceed the limit of {limit}; refused before anything is built",
+                    size.map_or_else(|| "more than 2^128".to_owned(), |size| size.to_string())
+                ),
+            ));
+        }
+        let tables = Tables::build(&composition, &Work::default())?;
+        let mut layout = Vec::new();
+        let mut genesis = Vec::new();
+        for component in composition
+            .components
+            .iter()
+            .filter(|component| component.owns)
+        {
+            for (field, value) in component.state_fields().iter().zip(&component.genesis) {
+                layout.push(StateSlot {
+                    component: component.name.clone(),
+                    field: field.name.clone(),
+                    domain: field.domain.clone(),
+                });
+                genesis.push(*value);
+            }
+        }
+        let request = composition
+            .manifest
+            .request
+            .iter()
+            .map(|field| RequestSlot {
+                name: field.name.clone(),
+                domain: field.domain.clone(),
+            })
+            .collect();
+        Ok(Self {
+            composition,
+            tables,
+            layout,
+            request,
+            genesis,
+        })
+    }
+
+    /// The components' names, in merge order.
+    #[must_use]
+    pub fn components(&self) -> Vec<&str> {
+        self.composition
+            .components
+            .iter()
+            .map(|component| component.name.as_str())
+            .collect()
+    }
+
+    /// The global state's slots: each owning component's state fields, in
+    /// merge order, then field order. A read-only component has none.
+    #[must_use]
+    pub fn state_layout(&self) -> &[StateSlot] {
+        &self.layout
+    }
+
+    /// The request's fields, in manifest order.
+    #[must_use]
+    pub fn request_layout(&self) -> &[RequestSlot] {
+        &self.request
+    }
+
+    /// The global genesis state: each owning component's declared genesis.
+    #[must_use]
+    pub fn genesis(&self) -> &[i128] {
+        &self.genesis
+    }
+
+    /// One joint step. Pure and deterministic.
+    ///
+    /// # Errors
+    /// A global state or request of the wrong length, or with a value
+    /// outside its slot's domain.
+    pub fn joint_step(
+        &self,
+        global_state: &[i128],
+        request: &[i128],
+    ) -> Result<JointOutcome, JointInputError> {
+        let pre = self.split(global_state, request)?;
+        let (ended, after) = step(&self.composition, &self.tables, &pre, request);
+        Ok(self.outcome(&ended, &after))
+    }
+
+    /// Every reachable (global state, request) pair from genesis, breadth
+    /// first, with its joint step: states in discovery order, requests in
+    /// enumeration order, the last field fastest.
+    ///
+    /// # Errors
+    /// More than `max_pairs` pairs: the exploration is refused, not cut.
+    pub fn reachable(&self, max_pairs: u64) -> Result<Vec<JointRow>, u64> {
+        let mut seen: BTreeSet<Vec<i128>> = BTreeSet::new();
+        seen.insert(self.genesis.clone());
+        let mut frontier = vec![self.genesis.clone()];
+        let mut rows = Vec::new();
+        let mut pairs = 0u64;
+        while !frontier.is_empty() {
+            let mut next = Vec::new();
+            for state in &frontier {
+                // Requests are enumerated as they are used, never collected.
+                let mut requests = Odometer::new(&self.request);
+                while let Some(request) = requests.next_tuple() {
+                    pairs += 1;
+                    if pairs > max_pairs {
+                        return Err(max_pairs);
+                    }
+                    let Ok(outcome) = self.joint_step(state, &request) else {
+                        return Err(pairs);
+                    };
+                    if seen.insert(outcome.successor.clone()) {
+                        next.push(outcome.successor.clone());
+                    }
+                    rows.push(JointRow {
+                        state: state.clone(),
+                        request,
+                        outcome,
+                    });
+                }
+            }
+            frontier = next;
+        }
+        Ok(rows)
+    }
+
+    fn split(
+        &self,
+        global_state: &[i128],
+        request: &[i128],
+    ) -> Result<Vec<Vec<i128>>, JointInputError> {
+        let error = |reason: String| JointInputError { reason };
+        if global_state.len() != self.layout.len() {
+            return Err(error(format!(
+                "the global state has {} values; the layout has {} slots",
+                global_state.len(),
+                self.layout.len()
+            )));
+        }
+        if request.len() != self.request.len() {
+            return Err(error(format!(
+                "the request has {} values; it has {} fields",
+                request.len(),
+                self.request.len()
+            )));
+        }
+        for (slot, value) in self.layout.iter().zip(global_state) {
+            if !slot.domain.contains(*value) {
+                return Err(error(format!(
+                    "{}.{} = {value} lies outside its domain",
+                    slot.component, slot.field
+                )));
+            }
+        }
+        for (slot, value) in self.request.iter().zip(request) {
+            if !slot.domain.contains(*value) {
+                return Err(error(format!(
+                    "request field {} = {value} lies outside its domain",
+                    slot.name
+                )));
+            }
+        }
+        let mut pre = Vec::with_capacity(self.composition.components.len());
+        let mut rest = global_state;
+        for component in &self.composition.components {
+            let width = if component.owns {
+                component.state_width
+            } else {
+                0
+            };
+            let (own, tail) = rest.split_at(width);
+            pre.push(own.to_vec());
+            rest = tail;
+        }
+        Ok(pre)
+    }
+
+    fn outcome(&self, ended: &Ended, after: &[Vec<i128>]) -> JointOutcome {
+        let name = |at: usize| self.composition.components[at].name.clone();
+        let kind = match *ended {
+            Ended::Accept => OutcomeKind::Accept,
+            Ended::Reject(at, reason) => OutcomeKind::Reject {
+                component: name(at),
+                reason,
+            },
+            Ended::Refused(at, class) => OutcomeKind::Refused {
+                component: name(at),
+                class,
+            },
+            Ended::CommittedFailure(at, reason) => OutcomeKind::CommittedFailure {
+                component: name(at),
+                reason,
+            },
+        };
+        JointOutcome {
+            kind,
+            successor: after.iter().flatten().copied().collect(),
+        }
+    }
+}
