@@ -723,6 +723,9 @@ impl<'c, 'p> Lineage<'c, 'p> {
 }
 
 /// A store, by the schema version it has.
+// Keep the open handle owned directly. Boxing would add allocation and
+// indirection solely to accommodate the handle's external-write policy flag.
+#[allow(clippy::large_enum_variant)]
 pub enum Opened<'a, 'p> {
     /// Schema v10: it runs the lineage's last version or an earlier one.
     V10(Store<'a, 'p>),
@@ -845,6 +848,7 @@ impl<'a, 'p> Superseded<'a, 'p> {
             genesis,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         };
         inject(crash, CrashPoint::AfterCommit)?;
         Ok((shell, receipt))
@@ -1223,6 +1227,7 @@ impl<'a, 'p> V9Store<'a, 'p> {
             genesis,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         };
         inject(crash, CrashPoint::AfterCommit)?;
         Ok(lineage.store(shell, position))

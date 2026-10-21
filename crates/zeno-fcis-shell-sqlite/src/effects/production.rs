@@ -104,6 +104,8 @@ pub struct Production<'a, 'p, T: Transport, C: Time = NoTime> {
     shell: Option<V2SqliteShell<'a, 'p>>,
     transport: T,
     time: Option<C>,
+    exclusive: Option<std::fs::File>,
+    invalidated: bool,
     #[cfg(feature = "crash-injection")]
     interrupt: Option<crate::CrashPoint>,
     #[cfg(feature = "crash-injection")]
@@ -137,11 +139,37 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
             shell: Some(shell),
             transport,
             time,
+            exclusive: None,
+            invalidated: false,
             #[cfg(feature = "crash-injection")]
             interrupt: None,
             #[cfg(feature = "crash-injection")]
             abort: false,
         })
+    }
+
+    /// Open a server-local store under an exclusive advisory file lock. Every
+    /// operation checks for another SQLite connection's writes and refuses
+    /// until a full audit/restart; it never adopts an external tail silently.
+    /// Other writers must respect the lock; physical file tampering is outside
+    /// SQLite's change-counter guarantee.
+    pub fn open_exclusive(
+        path: impl AsRef<Path>,
+        lineage: &'a Lineage<'a, 'p>,
+        handle: u32,
+        transport: T,
+        time: Option<C>,
+    ) -> Result<Self, Error> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path.as_ref())
+            .map_err(|_| Error::History)?;
+        file.try_lock().map_err(|_| Error::Concurrent)?;
+        let mut terminal = Self::open(path, lineage, handle, transport, time)?;
+        terminal.shell()?.effects_exclusive();
+        terminal.exclusive = Some(file);
+        Ok(terminal)
     }
 
     /// Binds the terminal and both caller adapters before private recording.
@@ -180,6 +208,10 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         manifest
             .configuration
             .extend_from_slice(&self.store.handle.to_be_bytes());
+        manifest.configuration.extend_from_slice(&[
+            u8::from(self.exclusive.is_some()),
+            u8::from(self.invalidated),
+        ]);
         for adapter in [transport, time] {
             codec::bytes(&mut manifest.configuration, &adapter.configuration);
             manifest
@@ -299,7 +331,7 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
     fn settle(&mut self, port: Port, result: Result<Response, Error>, writes: bool) -> Handled {
         #[cfg(feature = "crash-injection")]
         if let Err(Error::InjectedCrash(_)) = result {
-            self.shell = None;
+            self.discard_shell();
             return Handled::Crash;
         }
         answer(port, result, writes)
@@ -345,6 +377,10 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         if shell.effects_identity()? != self.store.identity {
             return Err(Error::Identity);
         }
+        let mut shell = shell;
+        if self.exclusive.is_some() {
+            shell.effects_exclusive();
+        }
         Ok(shell)
     }
 
@@ -358,8 +394,13 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         C: core::fmt::Debug,
     {
         let mut bytes = format!(
-            "{:?}|{:?}|{:?}|{:?}",
-            self.store, self.time, self.transport, self.interrupt
+            "{:?}|{:?}|{:?}|{:?}|{}|{}",
+            self.store,
+            self.time,
+            self.transport,
+            self.interrupt,
+            self.exclusive.is_some(),
+            self.invalidated
         )
         .into_bytes();
         match &self.shell {
@@ -372,11 +413,45 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         Ok(bytes)
     }
 
+    fn external_change(&self) -> bool {
+        if self.exclusive.is_none() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let same_file = self
+                .exclusive
+                .as_ref()
+                .and_then(|file| file.metadata().ok())
+                .zip(std::fs::metadata(&self.path).ok())
+                .is_some_and(|(held, path)| held.dev() == path.dev() && held.ino() == path.ino());
+            if !same_file {
+                return true;
+            }
+        }
+        self.shell
+            .as_ref()
+            .is_some_and(|shell| shell.effects_unchanged().is_err())
+    }
+
+    fn discard_shell(&mut self) {
+        // The exclusive server retains the old connection solely as a change
+        // monitor across recovery. A reopened handle still audits independently.
+        // Dropping that monitor would hide external writes during the gap.
+        if self.exclusive.is_none() {
+            self.shell = None;
+        }
+    }
+
     fn reopen(&mut self) -> Result<Snapshot, Error> {
-        self.shell = None;
         let mut shell = self.open_bound()?;
         shell.audit()?;
         let head = snapshot(&shell.snapshot()?);
+        if self.external_change() {
+            self.invalidated = true;
+            return Err(Error::History);
+        }
         self.shell = Some(shell);
         Ok(head)
     }
@@ -397,6 +472,13 @@ impl<T: Transport, C: Time> Terminal for Production<'_, '_, T, C> {
             || operation.store().is_some_and(|store| store != self.store)
         {
             return Handled::Answer(Response::refused(port, Code::Identity));
+        }
+        if self.invalidated {
+            return Handled::Answer(Response::refused(port, Code::History));
+        }
+        if self.external_change() {
+            self.invalidated = true;
+            return Handled::Answer(Response::refused(port, Code::History));
         }
         match operation {
             Operation::ReadState(_) => {
@@ -450,7 +532,7 @@ impl<T: Transport, C: Time> Terminal for Production<'_, '_, T, C> {
     }
 
     fn crash(&mut self, _: &Binding) {
-        self.shell = None;
+        self.discard_shell();
     }
 }
 

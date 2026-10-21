@@ -280,8 +280,7 @@ fn masked(view: Option<&[bool]>, mut reply: Value) -> Value {
 pub struct Application<'a, 'p, H> {
     durable: Durable<'a, 'p, H>,
     authority: &'a Authority<'p>,
-    lineage: &'a Lineage<'a, 'p>,
-    path: PathBuf,
+    journal: Option<Journal>,
     clock: Option<ServerClock>,
     last: Option<i128>,
     views: Vec<(Hash32, Vec<bool>)>,
@@ -313,11 +312,14 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
         parties: Vec<(Hash32, Vec<u8>)>,
     ) -> Result<Self, Refusal> {
         let authority = lineage.authorities().last().ok_or(Refusal::Binding)?;
+        let mut durable = Durable::with_parties(authority, terminal, store, parties)?;
+        // All history and journal reconciliation happens before serving.
+        let head = durable.verified_snapshot()?;
+        let journal = Journal::open(path, head.version).map_err(failed)?;
         Ok(Self {
-            durable: Durable::with_parties(authority, terminal, store, parties)?,
+            durable,
             authority,
-            lineage,
-            path: path.to_owned(),
+            journal,
             clock: None,
             last: None,
             views: Vec::new(),
@@ -327,12 +329,8 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
     /// from the store's audited history, is the earliest time admitted after a
     /// restart.
     pub fn with_clock(mut self, clock: ServerClock) -> Result<Self, Refusal> {
-        let history = self
-            .lineage
-            .audit_history_read_only(&self.path)
-            .map_err(failed)?;
-        for commit in &history.commits {
-            let time = clock_of(self.authority, &clock, &commit.context)?;
+        for commit in self.durable.commits() {
+            let time = clock_of(self.authority, &clock, &commit.publication.context)?;
             self.last = Some(self.last.map_or(time, |last| last.max(time)));
         }
         self.clock = Some(clock);
@@ -359,22 +357,18 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
 }
 impl<H: Terminal> Endpoint for Application<'_, '_, H> {
     fn snapshot(&mut self, principal: Hash32) -> Result<Vec<u8>, Refusal> {
+        let head = self.durable.verified_snapshot()?;
+        let pending = self.durable.pending()?;
         let configured = self.durable.context(principal).ok_or(Refusal::Binding)?;
         let context = admit(self.authority, self.clock.as_ref(), self.last, configured)?;
-        let history = self
-            .lineage
-            .audit_history_read_only(&self.path)
+
+        let values = crate::session::root_numbers(self.authority.descriptor().state, &head.state)
             .map_err(failed)?;
-        let values = crate::session::root_numbers(
-            self.authority.descriptor().state,
-            history.snapshot.state(),
-        )
-        .map_err(failed)?;
         let context = context_numbers(self.authority, &context)?;
         let mut values: Vec<Value> = strings(&values).into_iter().map(Value::from).collect();
         hide(self.view(principal), &mut values);
         encoded(
-            json!({"contract":hex(RustCryptoSha256::hash(self.authority.identity()).as_bytes()),"principal":hex(principal.as_bytes()),"revision":history.snapshot.version().to_string(),"values":values,"context":strings(&context),"pending":history.snapshot.pending().to_string()}),
+            json!({"contract":hex(RustCryptoSha256::hash(self.authority.identity()).as_bytes()),"principal":hex(principal.as_bytes()),"revision":head.version.to_string(),"values":values,"context":strings(&context),"pending":pending.to_string()}),
         )
     }
     fn preview(&mut self, request: &Command) -> Result<Vec<u8>, Refusal> {
@@ -383,22 +377,16 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
             .context(request.principal())
             .ok_or(Refusal::Binding)?
             .to_vec();
-        let history = self
-            .lineage
-            .audit_history_read_only(&self.path)
-            .map_err(failed)?;
-        if request.expected() != history.snapshot.version() {
+        let head = self.durable.verified_snapshot()?;
+        if request.expected() != head.version {
             return Err(Refusal::Conflict);
         }
         let mut values: Value =
             serde_json::from_slice(request.bytes()).map_err(|_| Refusal::Malformed)?;
         let view = self.view(request.principal());
         // The server supplies hidden state values, whatever the request holds there.
-        let state = crate::session::root_numbers(
-            self.authority.descriptor().state,
-            history.snapshot.state(),
-        )
-        .map_err(failed)?;
+        let state = crate::session::root_numbers(self.authority.descriptor().state, &head.state)
+            .map_err(failed)?;
         let items = values.as_array_mut().ok_or(Refusal::Malformed)?;
         if let Some(view) = view {
             for ((item, seen), actual) in items.iter_mut().zip(view).zip(&state) {
@@ -411,9 +399,7 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
         let mut frames =
             crate::wire(self.authority.descriptor(), &inputs).map_err(|_| Refusal::Malformed)?;
         let clock = self.clock.as_ref();
-        if frames[0] != history.snapshot.state()
-            || !same_party(self.authority, clock, &configured, &frames[2])
-        {
+        if frames[0] != head.state || !same_party(self.authority, clock, &configured, &frames[2]) {
             return Err(Refusal::Binding);
         }
         // The server, not the request, sets the clock.
@@ -426,7 +412,7 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
     }
     fn execute(&mut self, request: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
         let (authority, clock, last) = (self.authority, self.clock.as_ref(), self.last);
-        let path = self.path.as_path();
+        let journal = &mut self.journal;
         let mut journaled = None;
         let result = self.durable.execute_admitted(
             request,
@@ -442,30 +428,35 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
                     .map_err(|_| Refusal::Malformed)?,
                     context: context_numbers(authority, &context)?,
                 };
-                journaled = journal(path, request.expected(), &line).map_err(failed)?;
+                if let Some(journal) = journal {
+                    let kept = journal.append(&line).map_err(failed)?;
+                    journaled = Some((kept, line.sequence));
+                }
                 Ok(context)
             },
             &|configured, stored| same_party(authority, clock, configured, stored),
             sink,
         );
-        let history = self
-            .lineage
-            .audit_history_read_only(&self.path)
-            .map_err(failed)?;
-        // A line whose commit did not happen is removed again.
-        if let Some((file, kept, sequence)) = journaled
-            && history.snapshot.version() < sequence
+        let head = self.durable.verified_snapshot();
+        // Release the journal lock on every outcome. An uncertain head keeps
+        // the line for startup reconciliation rather than erasing a commit.
+        if let Some((kept, sequence)) = journaled
+            && let Some(journal) = &mut self.journal
         {
-            file.set_len(kept)
-                .and_then(|()| file.sync_all())
+            journal
+                .finish(
+                    kept,
+                    head.as_ref().is_ok_and(|head| head.version < sequence),
+                )
                 .map_err(failed)?;
         }
+        head?;
         let packet = result?;
-        let original = history
-            .commits
-            .iter()
-            .find(|entry| entry.replay_id == request.replay_key())
+        let entry = self
+            .durable
+            .committed(request.replay_key())?
             .ok_or(Refusal::Binding)?;
+        let original = &entry.publication;
         if let Some(clock) = &self.clock {
             let time = clock_of(self.authority, clock, &original.context)?;
             self.last = Some(self.last.map_or(time, |last| last.max(time)));
@@ -479,9 +470,7 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
                 &original.context,
             )?,
         );
-        encoded(
-            json!({"packet":hex(&packet),"revision":original.sequence.to_string(),"reply":reply}),
-        )
+        encoded(json!({"packet":hex(&packet),"revision":entry.version.to_string(),"reply":reply}))
     }
 }
 // One line of the submission journal that the generated command line's
@@ -503,60 +492,101 @@ impl Submission {
         )
     }
 }
-// Under the journal's exclusive lock, held until the commit's outcome: remove
+// Reconcile once under the journal's lock. Each later append holds the lock
+// through its commit outcome, permitting read-only history between requests. Remove
 // any line past the store's head, left by a stop before a commit, then append
 // and synchronize this submission. A store with commits but no journal keeps
 // none, since its earlier commits cannot be recorded.
-fn journal(
-    store: &Path,
-    head: u64,
-    submission: &Submission,
-) -> std::io::Result<Option<(fs::File, u64, u64)>> {
-    use std::io::Seek as _;
-    let path = crate::journal_path(store);
-    let open = || fs::OpenOptions::new().read(true).append(true).open(&path);
-    let mut file = match open() {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound && head == 0 => {
-            fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)?
+struct Journal {
+    file: fs::File,
+    position: u64,
+}
+impl Journal {
+    fn open(store: &Path, head: u64) -> std::io::Result<Option<Self>> {
+        use std::io::Seek as _;
+        let path = crate::journal_path(store);
+        let open = || fs::OpenOptions::new().read(true).append(true).open(&path);
+        let mut file = match open() {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound && head == 0 => {
+                fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)?
+                    .sync_all()?;
+                fs::File::open(
+                    path.parent()
+                        .filter(|p| !p.as_os_str().is_empty())
+                        .unwrap_or(Path::new(".")),
+                )?
                 .sync_all()?;
-            fs::File::open(
-                path.parent()
-                    .filter(|p| !p.as_os_str().is_empty())
-                    .unwrap_or(Path::new(".")),
-            )?
-            .sync_all()?;
-            open()?
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        other => other?,
-    };
-    file.lock()?;
-    let mut text = String::new();
-    file.seek(std::io::SeekFrom::Start(0))?;
-    file.read_to_string(&mut text)?;
-    let mut kept = 0;
-    for line in text.split_inclusive('\n') {
-        let Some(complete) = line.strip_suffix('\n') else {
-            break;
+                open()?
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            other => other?,
         };
-        let sequence: u64 = complete
-            .split_whitespace()
-            .next()
-            .and_then(|word| word.parse().ok())
-            .ok_or_else(|| std::io::Error::other("malformed submission journal"))?;
-        if sequence > head {
-            break;
+        file.lock()?;
+        let mut text = String::new();
+        file.seek(std::io::SeekFrom::Start(0))?;
+        file.read_to_string(&mut text)?;
+        let mut kept = 0;
+        for line in text.split_inclusive('\n') {
+            let Some(complete) = line.strip_suffix('\n') else {
+                break;
+            };
+            let sequence: u64 = complete
+                .split_whitespace()
+                .next()
+                .and_then(|word| word.parse().ok())
+                .ok_or_else(|| std::io::Error::other("malformed submission journal"))?;
+            if sequence > head {
+                break;
+            }
+            kept += line.len();
         }
-        kept += line.len();
+        let kept = u64::try_from(kept).map_err(std::io::Error::other)?;
+        file.set_len(kept)?;
+        file.sync_all()?;
+        file.unlock()?;
+        Ok(Some(Self {
+            file,
+            position: kept,
+        }))
     }
-    let kept = u64::try_from(kept).map_err(std::io::Error::other)?;
-    file.set_len(kept)?;
-    file.write_all(submission.line().as_bytes())?;
-    file.sync_all()?;
-    Ok(Some((file, kept, submission.sequence)))
+    fn append(&mut self, submission: &Submission) -> std::io::Result<u64> {
+        self.file.lock()?;
+        let kept = self.position;
+        let result = (|| {
+            if self.file.metadata()?.len() != kept {
+                return Err(std::io::Error::other(
+                    "submission journal changed outside server",
+                ));
+            }
+            let line = submission.line();
+            let position = kept
+                .checked_add(u64::try_from(line.len()).map_err(std::io::Error::other)?)
+                .ok_or_else(|| std::io::Error::other("submission journal exhausted"))?;
+            self.file.write_all(line.as_bytes())?;
+            self.file.sync_all()?;
+            self.position = position;
+            Ok(kept)
+        })();
+        if result.is_err() {
+            self.file.unlock()?;
+        }
+        result
+    }
+    fn finish(&mut self, kept: u64, rollback: bool) -> std::io::Result<()> {
+        let result = if rollback {
+            self.file
+                .set_len(kept)
+                .and_then(|()| self.file.sync_all())
+                .map(|()| self.position = kept)
+        } else {
+            Ok(())
+        };
+        let unlocked = self.file.unlock();
+        result.and(unlocked)
+    }
 }
 /// Supplied real time for the checked bounded retry programs, in milliseconds.
 pub struct Clock(Instant);
@@ -1173,7 +1203,7 @@ pub fn run() -> AppResult<()> {
         }
         let clock = ServerClock::declared(clock_file)?;
         let table = party_contexts(authority, &parties, clock.as_ref())?;
-        let production = Production::open(
+        let production = Production::open_exclusive(
             &path,
             lineage,
             1,

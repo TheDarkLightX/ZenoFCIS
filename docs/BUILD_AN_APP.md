@@ -113,8 +113,8 @@ shows a completed decision only after the commit and delivery run complete.
 The browser saves the exact request before sending. An interrupted request
 leaves a recovery record. Reload, sign in with the same credential and use
 “Recover original request”. The request retains its command bytes, revision
-and original key. The server rebuilds the original publication from audited
-history and returns the original packet. Do not delete an unresolved record
+and original key. The server looks up the original inputs in its verified replay index,
+rebuilds the publication through Authority and returns the original packet. Do not delete an unresolved record
 or invent another key because a reply was lost.
 
 Restart with the same start command and configuration. SQLite keeps the
@@ -411,7 +411,7 @@ server {
         proxy_set_header Host 127.0.0.1:8080;
         proxy_read_timeout 15s;
     }
-    # Each state, preview and command reads and checks the whole store history.
+    # State uses the verified head; preview and command also run the core.
     # A burst waits its turn; only a longer flood is refused.
     location ~ ^/(state|preview|command)$ {
         limit_req zone=zeno_core burst=20;
@@ -453,13 +453,31 @@ lockout or client certificates.
 The server handles one connection at a time, and it waits up to 10 seconds
 for a request to arrive in full. The proxy reads each request completely
 before it connects (`proxy_request_buffering on`, nginx's default), so a
-slow or idle client ties up a proxy connection, not the server. Every
-`/state`, `/preview` and `/command` replays and checks the store's whole
-history, so its cost grows with the number of commits: measured on the wide
-counter, a preview took about 0.09 ms per commit in a release build and
-1.3 ms per commit in the debug build that `cargo run` gives without
-`--release`; a command cost two to three times as much. Build deployments
-with `--release`. The rate limits keep one address from monopolising the
+slow or idle client ties up a proxy connection, not the server. The server checks the complete stored history at startup and retains an
+owned verified head and an index from replay key to original commit. It also
+reconciles the submission journal once, then retains its append position and locks each append through its commit outcome.
+`/state` and `/preview` check the SQLite change counter and current tip against
+that head; they do not replay the verified prefix. `/command` runs Authority
+on the new inputs and SQLite independently binds the publication and checks
+the expected head before atomically committing. A replay uses the indexed
+original inputs, compares the command, party context and expected revision
+exactly, then rebinds that publication through Authority. Pending outbox work
+depends on pending deliveries, rather than acknowledged history. Build
+deployments with `--release`.
+
+The server holds an exclusive advisory lock on its local database file.
+Other writers must respect that lock. A write by another SQLite connection,
+including a changed tail row with an unchanged head, invalidates the server
+handle: requests refuse rather than adopt that write, even if it would pass
+audit. Stop the server and perform a full audit before restarting. Ordinary
+requests recheck the cached tip and change counter; exact prefix publication,
+certificate and acknowledged-delivery replay is startup evidence. This relies
+on SQLite's change tracking and the server's exclusive ownership: raw file
+writes that bypass SQLite, physical media corruption and hostile host control
+are outside that detection guarantee. Commit uncertainty retains the bounded
+reopen and full-audit recovery path; it is not the ordinary request path.
+
+The rate limits keep one address from monopolising the
 server: five state, preview or command requests a second, and twenty
 requests a second overall for the interface's files. The interface previews
 every command after each edit, so bursts are normal: up to twenty core

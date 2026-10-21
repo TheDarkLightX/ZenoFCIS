@@ -209,7 +209,7 @@ fn app_factory_journey() {
             let catalog = ok(v2_contract::checked_catalog(&descriptor));
             let catalogs = [&catalog];
             let lineage = ok(Lineage::bind(&catalogs, &[]));
-            let production = ok(Production::open(
+            let production = ok(Production::open_exclusive(
                 &path,
                 &lineage,
                 1,
@@ -692,7 +692,7 @@ fn serve<'a, 'p>(
         &journey.parties,
         journey.clock().as_ref(),
     ));
-    let production = ok(Production::open(
+    let production = ok(Production::open_exclusive(
         &journey.path,
         lineage,
         1,
@@ -1116,7 +1116,7 @@ fn public_origin_is_the_only_origin() {
     );
     let command = encode_command(hash, Hash32::new([1; 32]), before.head.commits, &frames[1]);
     let serve = |origin: String| {
-        let production = ok(Production::open(
+        let production = ok(Production::open_exclusive(
             &path,
             &lineage,
             1,
@@ -1299,7 +1299,7 @@ fn mutated_requests_refuse_or_decide() {
     ];
     let principal = Hash32::new([7; 32]);
     let serve = |configured: &[u8]| {
-        let production = ok(Production::open(
+        let production = ok(Production::open_exclusive(
             &path,
             &lineage,
             1,
@@ -1710,5 +1710,86 @@ fn unknown_settings_refuse_start_up() {
         );
         assert!(!store.exists(), "a store was opened");
     }
+    ok(std::fs::remove_dir_all(root));
+}
+
+#[test]
+fn preview_uses_the_latest_committed_head() {
+    let root = std::env::temp_dir().join(format!("app-fresh-preview-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let path = root.join("app.sqlite");
+    ok(application::init(&path));
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    let step = &fixture["steps"][0];
+    ok(std::fs::write(
+        root.join("clock"),
+        step["clock"].as_str().unwrap_or("0"),
+    ));
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let clock = ok(application::app::ServerClock::declared(Some(
+        root.join("clock"),
+    )));
+    let mut context: Vec<i128> = step_context(&fixture, step).iter().map(scalar).collect();
+    if let Some(clock) = &clock {
+        context.insert(clock.position(), scalar(&step["clock"]));
+    }
+    let mut input = ok(application::current(&path)).state;
+    input.extend(step["command"].as_array().unwrap().iter().map(scalar));
+    input.extend(context);
+    let frames = ok(application::wire(&descriptor, &input));
+    let production = ok(Production::open_exclusive(
+        &path,
+        &lineage,
+        1,
+        ok(FileReceiver::new(&root.join("received"))),
+        Some(Clock::default()),
+    ));
+    let store = production.store();
+    let principal = Hash32::new([7; 32]);
+    let hash = RustCryptoSha256::hash(authority.identity());
+    let mut endpoint = ok(Application::new(
+        &lineage, production, store, &path, principal, &frames[2],
+    ));
+    if let Some(clock) = clock {
+        endpoint = ok(endpoint.with_clock(clock));
+    }
+    let config = ok(Config::new(
+        [0xab; 32],
+        principal,
+        hash,
+        "http://localhost".into(),
+        Duration::from_secs(10),
+    ));
+    let mut server = Server::new(config, endpoint, Sink::default());
+    let request = encode_command(hash, Hash32::new([1; 32]), 0, &frames[1]);
+    assert_eq!(exchange(&mut server, "/command", &request).0, 200);
+    let (status, bytes) = exchange(&mut server, "/state", &[]);
+    assert_eq!(status, 200);
+    let state: Value = ok(serde_json::from_slice(&bytes));
+    let mut values = state["values"].as_array().unwrap().clone();
+    values.extend(step["command"].as_array().unwrap().iter().cloned());
+    values.extend(state["context"].as_array().unwrap().iter().cloned());
+    let request = encode_command(
+        hash,
+        Hash32::new([2; 32]),
+        1,
+        &ok(serde_json::to_vec(&values)),
+    );
+    let (status, bytes) = exchange(&mut server, "/preview", &request);
+    assert_eq!(status, 200, "preview read a stale head after commit");
+    let preview: Value = ok(serde_json::from_slice(&bytes));
+    assert_eq!(
+        preview["reply"]["input"],
+        json!(values),
+        "preview read a stale head after commit"
+    );
+    drop(server);
     ok(std::fs::remove_dir_all(root));
 }

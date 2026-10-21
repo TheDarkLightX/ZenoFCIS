@@ -1,12 +1,12 @@
 //! One durable store: replay from audited inputs, then checked commit and delivery.
 use crate::{Command, Endpoint, Event, Refusal, Trace, TraceSink, digest};
-use std::num::NonZeroU64;
+use std::{collections::BTreeMap, num::NonZeroU64};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_shell::effects::{
     codec,
     driver::{Binding, Driver, Reply},
     handler::{self, Handled, Terminal},
-    port::{Code, CommitMode, OpId, Operation, Outcome, Response, Store},
+    port::{Code, CommitMode, HistoryEntry, OpId, Operation, Outcome, Response, Snapshot, Store},
     program::{
         CommitInvocation, CommitPolicy, CommitProgram, DeliveryInvocation, DeliveryPolicy,
         DeliveryProgram, Program, Step,
@@ -31,6 +31,8 @@ pub struct Durable<'a, 'p, H> {
     terminal: H,
     store: Store,
     parties: Vec<(Hash32, Vec<u8>)>,
+    head: Option<Snapshot>,
+    commits: BTreeMap<Hash32, HistoryEntry>,
 }
 impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
     /// Bind the terminal's store and copy the principal's immutable core context.
@@ -73,6 +75,8 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
             terminal,
             store,
             parties,
+            head: None,
+            commits: BTreeMap::new(),
         })
     }
     /// The canonical context configured for an authenticated principal, if any.
@@ -85,6 +89,78 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
     /// Return the exclusively owned shell handler after use.
     pub fn into_terminal(self) -> H {
         self.terminal
+    }
+
+    // Reporting data only. Each entry owns its bytes; it must still be rebound
+    // through Authority before a commit. A failed commit drops the cache so an
+    // uncertain result is recovered through the original audited history path.
+    fn load(&mut self, trace: Trace, sink: &mut dyn TraceSink) -> Result<(), Refusal> {
+        if self.head.is_some() {
+            return Ok(());
+        }
+        let history = match self.call(Operation::ReadHistory(self.store), trace, sink)? {
+            Response::ReadHistory(Outcome::Ok(history)) => history,
+            _ => return Err(Refusal::Unavailable),
+        };
+        let mut commits = BTreeMap::new();
+        for (index, entry) in history.commits.into_iter().enumerate() {
+            if Some(entry.version) != u64::try_from(index).ok().and_then(|n| n.checked_add(1))
+                || commits.insert(entry.key, entry).is_some()
+            {
+                return Err(Refusal::Binding);
+            }
+        }
+        if u64::try_from(commits.len()).ok() != Some(history.head.version) {
+            return Err(Refusal::Binding);
+        }
+        self.commits = commits;
+        self.head = Some(history.head);
+        Ok(())
+    }
+    /// Validate the terminal's tip against the retained verified head. This is
+    /// reporting state, never a publication capability. Unexpected movement
+    /// refuses; an exclusive production terminal also refuses external writes.
+    pub fn verified_snapshot(&mut self) -> Result<Snapshot, Refusal> {
+        self.verified_head(Trace::empty(Event::Request), &mut Ignore)
+    }
+    fn verified_head(
+        &mut self,
+        trace: Trace,
+        sink: &mut dyn TraceSink,
+    ) -> Result<Snapshot, Refusal> {
+        self.load(trace, sink)?;
+        let actual = match self.call(Operation::ReadState(self.store), trace, sink)? {
+            Response::ReadState(Outcome::Ok(head)) => head,
+            _ => return Err(Refusal::Unavailable),
+        };
+        if self.head.as_ref() != Some(&actual) {
+            return Err(Refusal::Unavailable);
+        }
+        Ok(actual)
+    }
+    /// Original audited or successfully committed inputs, indexed by scoped key.
+    /// The explicit key comparison prevents a misdirected index from serving an
+    /// unrelated entry. No mutable alias escapes.
+    pub fn committed(&self, key: Hash32) -> Result<Option<&HistoryEntry>, Refusal> {
+        match self.commits.get(&key) {
+            Some(entry) if entry.key != key => Err(Refusal::Binding),
+            entry => Ok(entry),
+        }
+    }
+    /// Retained original inputs for startup clock reconstruction only.
+    pub fn commits(&self) -> impl Iterator<Item = &HistoryEntry> {
+        self.commits.values()
+    }
+    /// Checked pending deliveries; work is proportional to pending records.
+    pub fn pending(&mut self) -> Result<usize, Refusal> {
+        match self.call(
+            Operation::ReadOutbox(self.store),
+            Trace::empty(Event::Request),
+            &mut Ignore,
+        )? {
+            Response::ReadOutbox(Outcome::Ok(pending)) => Ok(pending.len()),
+            _ => Err(Refusal::Unavailable),
+        }
     }
 
     fn call(
@@ -128,13 +204,9 @@ impl<H: Terminal> Durable<'_, '_, H> {
         };
         let mut trace = Trace::request(command);
         let key = command.replay_key();
-        // Audited history is reporting data, never a committing capability.
-        let history = match self.call(Operation::ReadHistory(self.store), trace, sink)? {
-            Response::ReadHistory(Outcome::Ok(history)) => history,
-            _ => return Err(Refusal::Unavailable),
-        };
-        let original = history.commits.iter().find(|entry| entry.key == key);
-        let data = if let Some(entry) = original {
+        let head = self.verified_head(trace, sink)?;
+        let original = self.committed(key)?.cloned();
+        let data = if let Some(entry) = &original {
             if entry.publication.command != command.bytes
                 || !replays(&configured, &entry.publication.context)
                 || Some(entry.version) != command.expected.checked_add(1)
@@ -143,10 +215,6 @@ impl<H: Terminal> Durable<'_, '_, H> {
             }
             entry.publication.clone()
         } else {
-            let head = match self.call(Operation::ReadState(self.store), trace, sink)? {
-                Response::ReadState(Outcome::Ok(head)) => head,
-                _ => return Err(Refusal::Unavailable),
-            };
             if head.version != command.expected {
                 return Err(Refusal::Conflict);
             }
@@ -174,20 +242,57 @@ impl<H: Terminal> Durable<'_, '_, H> {
             epoch: 1,
             store: self.store,
             key,
-            publication: data,
-            mode: CommitMode::At(command.expected),
+            publication: data.clone(),
+            mode: if original.is_some() {
+                CommitMode::Unversioned
+            } else {
+                CommitMode::At(command.expected)
+            },
         };
-        let first = if original.is_some() {
-            CommitProgram::recover(invocation, CommitPolicy { retries: 2 })
-        } else {
-            CommitProgram::start(invocation, CommitPolicy { retries: 2 })
+        // A known replay has already matched the original key and all inputs.
+        // SQLite independently checks that exact publication again. Unknown
+        // commit outcomes retain CommitProgram's reopen/history recovery path.
+        let first = CommitProgram::start(invocation, CommitPolicy { retries: 2 });
+        let committed = run::<CommitProgram>(&mut self.terminal, first, trace, sink);
+        let receipt = match committed {
+            Ok(Outcome::Ok(receipt)) => receipt,
+            other => {
+                self.head = None;
+                return Err(match other {
+                    Ok(Outcome::Refused(Code::Replay)) => Refusal::Replay,
+                    Ok(Outcome::Refused(_)) => Refusal::Conflict,
+                    _ => Refusal::Unavailable,
+                });
+            }
         };
-        let receipt = match run::<CommitProgram>(&mut self.terminal, first, trace, sink)? {
-            Outcome::Ok(receipt) => receipt,
-            Outcome::Refused(Code::Replay) => return Err(Refusal::Replay),
-            Outcome::Refused(_) => return Err(Refusal::Conflict),
-            _ => return Err(Refusal::Unavailable),
+        let actual = match self.call(Operation::ReadState(self.store), trace, sink) {
+            Ok(Response::ReadState(Outcome::Ok(head))) => head,
+            _ => {
+                self.head = None;
+                return Err(Refusal::Unavailable);
+            }
         };
+        if original.is_none() {
+            if Some(actual.version) != head.version.checked_add(1)
+                || actual.version != receipt.version
+                || actual.chain != receipt.chain
+                || actual.state != publication.poststate()
+            {
+                self.head = None;
+                return Err(Refusal::Unavailable);
+            }
+            self.commits.insert(
+                key,
+                HistoryEntry {
+                    key,
+                    version: receipt.version,
+                    publication: data,
+                },
+            );
+        } else if actual != head {
+            return Err(Refusal::Unavailable);
+        }
+        self.head = Some(actual);
         packet.extend_from_slice(&receipt.version.to_be_bytes());
         codec::hash(&mut packet, receipt.chain);
         trace.event = Event::Commit;
@@ -303,4 +408,9 @@ fn response_failed(response: &Response) -> bool {
         Response::Random(v) => v.is_err(),
         Response::Wait(v) => v.is_err(),
     }
+}
+
+struct Ignore;
+impl TraceSink for Ignore {
+    fn record(&mut self, _: Trace) {}
 }

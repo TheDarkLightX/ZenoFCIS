@@ -17,6 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 HTTP = "crates/zeno-fcis-ingress/src/http.rs"
 DURABLE = "crates/zeno-fcis-ingress/src/durable.rs"
 CONTROLS = [
+    ("external-tail-served", "journey", "external_tail_is_never_served", "external tail was served", DURABLE,
+     "self.load(trace, sink)?;\n        let actual = match self.call(Operation::ReadState(self.store), trace, sink)? {",
+     "self.load(trace, sink)?;\n        if let Some(head) = &self.head { return Ok(head.clone()); }\n        let actual = match self.call(Operation::ReadState(self.store), trace, sink)? {"),
+    ("wrong-replay-index", "journey", "replay_index_keeps_distinct_keys", "replay index returned another key", DURABLE,
+     "match self.commits.get(&key) {", "match self.commits.values().next() {"),
     ("body-actor", "http", "actor_from_credential", "actor came from body", HTTP,
      "principal: authenticated,", "principal: Hash32::new(body[73..105].try_into().unwrap_or([0; 32])),"),
     ("missing-size-limit", "http", "oversized_requests", "body size limit missing", HTTP,

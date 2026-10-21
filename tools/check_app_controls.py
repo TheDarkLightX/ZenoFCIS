@@ -17,11 +17,14 @@ import tempfile
 
 APP = "src/app.rs"
 CONTROLS = [
+    ("stale-preview-head", "preview_uses_the_latest_committed_head", "preview read a stale head after commit",
+     "let head = self.durable.verified_snapshot()?;\n        if request.expected() != head.version {",
+     "let mut head = self.durable.verified_snapshot()?;\n        head.version = 0;\n        head.state = crate::genesis().map_err(failed)?;\n        if request.expected() != head.version {"),
     ("clock-read-at-replay", "server_clock_journey", "clock read again at replay",
      "&|configured, stored| same_party(authority, clock, configured, stored),",
      "&|configured, stored| admit(authority, clock, last, configured).is_ok_and(|now| now == stored),"),
     ("clock-backward-after-restart", "server_clock_journey", "clock went backward after a restart",
-     "for commit in &history.commits {", "for commit in history.commits.iter().take(0) {"),
+     "for commit in self.durable.commits() {", "for commit in self.durable.commits().take(0) {"),
     ("clock-clamped", "server_clock_journey", "out-of-range clock clamped",
      "if time < self.range.0 || time > self.range.1 {",
      "let time = time.clamp(self.range.0, self.range.1);\n        if false {"),
@@ -33,7 +36,8 @@ CONTROLS = [
      ".and_then(|v| v.as_array().map(|a| a.iter().map(|x| !x.is_null()).collect())).unwrap_or_default();"
      "\n        let view = Some(shown.as_slice());"),
     ("journal-drops-request", "parties_journey", "an admitted request is missing from the journal",
-     "file.write_all(submission.line().as_bytes())?;", ""),
+     "self.file.write_all(line.as_bytes())?;\n            self.file.sync_all()?;\n            self.position = position;",
+     "self.file.sync_all()?;\n            let _ = position;\n            self.position = kept;"),
     ("connector-acknowledges-failure", "program_connector_acknowledges_only_success", "a non-zero exit is acknowledged",
      "return Ok(status.success());", "return Ok(true);"),
     ("connector-drops-delivery-id", "program_connector_acknowledges_only_success", "the delivery ID is missing from the envelope",

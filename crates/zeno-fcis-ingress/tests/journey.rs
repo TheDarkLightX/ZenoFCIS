@@ -1186,3 +1186,190 @@ fn party_traces_hold_no_credential() {
         sink.save("party-traces");
     });
 }
+
+#[test]
+fn external_tail_is_never_served() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = ok(Production::open_exclusive(
+            &files.store,
+            &lineage,
+            1,
+            Wire {
+                receiver: Receiver::open(&files.receiver),
+                mode: 0,
+                queued: Vec::new(),
+                abort: false,
+            },
+            Some(Ticks::default()),
+        ));
+        let store = production.store();
+        let mut durable = ok(Durable::new(
+            authority,
+            production,
+            store,
+            principal(),
+            &fixture::context(),
+        ));
+        ok(durable.verified_snapshot());
+        // The exclusive opener refuses another cooperating server.
+        assert!(
+            Production::open_exclusive(
+                &files.store,
+                &lineage,
+                2,
+                Wire {
+                    receiver: Receiver::open(&files.receiver),
+                    mode: 0,
+                    queued: Vec::new(),
+                    abort: false
+                },
+                Some(Ticks::default())
+            )
+            .is_err()
+        );
+        let mut server = Server::new(config(contract), durable, Sink::default());
+        assert_eq!(
+            status(&exchange(&mut server, &body(contract, 120, 1, 0), false)),
+            200
+        );
+        let (mut durable, _) = server.into_parts();
+        assert_eq!(ok(durable.verified_snapshot()).version, 1);
+        // Bypass the advisory lock with a separate SQLite writer. A tail change
+        // must invalidate even cached reporting state before anything is served.
+        let connection = ok(rusqlite::Connection::open(&files.store));
+        ok(connection.execute("UPDATE v2_commits SET command=x'00' WHERE sequence=1", []));
+        assert!(
+            durable.verified_snapshot().is_err(),
+            "external tail was served"
+        );
+        // Reverting the bytes does not clear the invalidation.
+        ok(connection.execute(
+            "UPDATE v2_commits SET command=?1 WHERE sequence=1",
+            [fixture::command(120)],
+        ));
+        assert!(
+            durable.verified_snapshot().is_err(),
+            "external tail was served after reversal"
+        );
+        let mut server = Server::new(config(contract), durable, Sink::default());
+        assert_eq!(
+            status(&exchange(&mut server, &body(contract, 120, 1, 0), false)),
+            503,
+            "external tail was served on replay"
+        );
+    });
+}
+
+#[test]
+fn replay_index_keeps_distinct_keys() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = open_production(&files, &lineage, 0);
+        let store = production.store();
+        let durable = ok(Durable::new(
+            authority,
+            production,
+            store,
+            principal(),
+            &fixture::context(),
+        ));
+        let mut server = Server::new(config(contract), durable, Sink::default());
+        let one = exchange(&mut server, &body(contract, 120, 1, 0), false);
+        let two = exchange(&mut server, &body(contract, 121, 2, 1), false);
+        assert_eq!(status(&one), 200);
+        assert_eq!(status(&two), 200, "replay index returned another key");
+        for (request, original) in [
+            (body(contract, 120, 1, 0), one),
+            (body(contract, 121, 2, 1), two),
+        ] {
+            let reply = exchange(&mut server, &request, false);
+            assert_eq!(status(&reply), 200, "replay index returned another key");
+            assert_eq!(
+                packet(&reply),
+                packet(&original),
+                "replay index returned another key"
+            );
+        }
+    });
+}
+
+#[test]
+fn exclusive_recovery_does_not_adopt_external_changes() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let files = Files::new();
+        create(&files, authority);
+        let mut production = ok(Production::open_exclusive(
+            &files.store,
+            &lineage,
+            1,
+            Wire {
+                receiver: Receiver::open(&files.receiver),
+                mode: 0,
+                queued: Vec::new(),
+                abort: false,
+            },
+            Some(Ticks::default()),
+        ));
+        let operation = Operation::Reopen(production.store());
+        let binding = Binding::of(port::OpId::first(1), &operation);
+        production.crash(&binding);
+        let connection = ok(rusqlite::Connection::open(&files.store));
+        ok(connection.execute("UPDATE v2_state SET state=state", []));
+        assert!(
+            matches!(
+                production.handle(&binding, &operation),
+                Handled::Answer(port::Response::Reopen(port::Outcome::Refused(
+                    port::Code::History
+                )))
+            ),
+            "recovery adopted an external change"
+        );
+    });
+}
+
+#[test]
+fn startup_audit_refuses_nonpositive_commit_rows() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = open_production(&files, &lineage, 0);
+        let store = production.store();
+        let durable = ok(Durable::new(
+            authority,
+            production,
+            store,
+            principal(),
+            &fixture::context(),
+        ));
+        let mut server = Server::new(config(contract), durable, Sink::default());
+        assert_eq!(
+            status(&exchange(&mut server, &body(contract, 120, 1, 0), false)),
+            200
+        );
+        drop(server);
+        let connection = ok(rusqlite::Connection::open(&files.store));
+        ok(connection.execute_batch("PRAGMA ignore_check_constraints=ON; INSERT INTO v2_commits SELECT 0,zeroblob(32),pre_root,post_root,previous_chain,zeroblob(32),command,context,post,publication,certificate FROM v2_commits WHERE sequence=1"));
+        assert!(
+            lineage.audit_history_read_only(&files.store).is_err(),
+            "startup audit accepted a hidden commit row"
+        );
+        assert!(
+            V2SqliteShell::open(&files.store, authority).is_err(),
+            "startup audit accepted a hidden commit row"
+        );
+    });
+}

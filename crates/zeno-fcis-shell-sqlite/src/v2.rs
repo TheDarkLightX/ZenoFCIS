@@ -569,6 +569,7 @@ pub struct V2SqliteShell<'a, 'p, D: DescriptorData<'p> + 'p = Descriptor<'p>> {
     genesis: Hash32,
     delivery_interpreter: Hash32,
     data_version: i64,
+    reject_external_changes: bool,
 }
 
 impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
@@ -659,6 +660,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             genesis: chain,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         })
     }
     /// Re-admit genesis and recompute every complete decision and delivery on
@@ -743,6 +745,7 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             genesis,
             delivery_interpreter,
             data_version,
+            reject_external_changes: false,
         };
         Ok((shell, position))
     }
@@ -758,19 +761,33 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         ))
     }
 
+    pub(crate) fn effects_exclusive(&mut self) {
+        self.reject_external_changes = true;
+    }
+
+    // Refuse even a valid externally appended commit until an explicit audit.
+    // This check is also made inside each operation's immediate transaction.
+    pub(crate) fn effects_unchanged(&self) -> Result<(), Error> {
+        if data_version(&self.connection)? != self.data_version {
+            return Err(Error::History);
+        }
+        Ok(())
+    }
+
     pub(crate) fn effects_configuration(&self) -> Result<Vec<u8>, Error> {
         let timeout: i64 = self
             .connection
             .query_row("PRAGMA busy_timeout", [], |r| r.get(0))?;
         Ok(format!(
-            "{:?}|{:?}|{:?}|{}|{}|{}|{}",
+            "{:?}|{:?}|{:?}|{}|{}|{}|{}|{}",
             self.anchor,
             self.genesis,
             self.delivery_interpreter,
             self.data_version,
             data_version(&self.connection)?,
             timeout,
-            self.connection.is_autocommit()
+            self.connection.is_autocommit(),
+            self.reject_external_changes
         )
         .into_bytes())
     }
@@ -823,6 +840,9 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
     // another connection invalidates this cache and forces a coherent full audit.
     fn synchronize(&mut self) -> Result<(), Error> {
         if data_version(&self.connection)? != self.data_version {
+            if self.reject_external_changes {
+                return Err(Error::History);
+            }
             self.audit()?;
         }
         Ok(())
@@ -865,11 +885,11 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
             self.members.authorities(),
         )?;
         let binding = segments.identity(segments.current()).to_vec();
-        let (bundles, replays): (i64, i64) = tx.query_row(
-            "SELECT count(*),count(DISTINCT replay_id) FROM v2_commits",
-            [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )?;
+        // Full admission established gap-free positions and the schema makes
+        // replay_id unique. Our transactions append exactly one row; the
+        // data-version/tip guard excludes intervening external writes.
+        let bundles = self.anchor.sequence;
+        let replays = bundles;
         let pending: i64 = tx.query_row(
             "SELECT count(*) FROM v2_deliveries WHERE acknowledged=0",
             [],
@@ -1921,6 +1941,14 @@ fn audit_tail_with_inputs<'p, D: DescriptorData<'p> + 'p>(
     if consumed != segments.upgrades.len() || read_anchor(connection)? != anchor {
         return Err(Error::History);
     }
+    // Establish the cardinality invariant at admission, including rows whose
+    // nonpositive positions a hostile writer inserted with CHECKs disabled.
+    // Cached operations preserve it rather than recounting the prefix.
+    let retained: i64 =
+        connection.query_row("SELECT count(*) FROM v2_commits", [], |r| r.get(0))?;
+    if retained != anchor.sequence {
+        return Err(Error::History);
+    }
     let orphan: i64 = connection.query_row("SELECT count(*) FROM v2_deliveries d LEFT JOIN v2_commits c ON d.sequence=c.sequence WHERE c.sequence IS NULL", [], |r| r.get(0))?;
     if orphan != 0 {
         return Err(Error::History);
@@ -2054,12 +2082,15 @@ fn previous_state(connection: &Connection, sequence: i64) -> Result<Vec<u8>, Err
     }
 }
 fn check_tip(connection: &Connection, segments: &Segments, anchor: &Anchor) -> Result<(), Error> {
-    let (count, max): (i64, i64) = connection.query_row(
-        "SELECT count(*),coalesce(max(sequence),0) FROM v2_commits",
+    // Gaps were rejected by audit_tail at admission. Between audits the
+    // data-version guard rejects any other connection's write; library writes
+    // preserve contiguity. The indexed maximum detects an unexpected tail.
+    let max: i64 = connection.query_row(
+        "SELECT coalesce(max(sequence),0) FROM v2_commits",
         [],
-        |r| Ok((r.get(0)?, r.get(1)?)),
+        |r| r.get(0),
     )?;
-    if count != anchor.sequence || max != anchor.sequence {
+    if max != anchor.sequence {
         return Err(Error::History);
     }
     match moved_state(connection, anchor.sequence, None)? {
