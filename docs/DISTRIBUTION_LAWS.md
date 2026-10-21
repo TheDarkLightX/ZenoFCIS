@@ -19,7 +19,10 @@ distribution 601 reporters on post.100.110 = uniform over {0, 1, 2, 3};
 
 Stable IDs and names follow the existing law conventions. An explicit target is
 `distribution 601 reporters on post.100.110 = {0: 1/2, 1: 1/2};`.
-Targets must have distinct integer outcomes, nonnegative rational weights and
+The outcome `committed-failure` declares the mass of committed failures, as in
+`{0: 1/4, 1: 1/4, 2: 1/4, committed-failure: 1/4}` or
+`uniform over {0, 1, 2, committed-failure}`.
+Targets must have distinct outcomes, nonnegative rational weights and
 total mass exactly one. Zero-mass entries are removed. Rational components and
 intermediate reduced sums must fit 64 bits. No floating point is used.
 
@@ -28,9 +31,14 @@ intermediate reduced sums must fit 64 bits. No floating point is used.
 Fix every non-random input to a tuple x. For random input widths b1 through bm,
 the declared random domain is the Cartesian product R, of size N = 2^(sum bi).
 The external premise is that these bits are uniform and mutually independent,
-and independent of x. For each declared outcome projection f, compute
-P_x(y) = sum over r in R of [f(Authority(x,r)) = y] / N.
+and independent of x. For each declared outcome projection f, the outcome
+o_f(d) of a decision d is f of its successor state when d accepts, and the
+single outcome `committed-failure` when d is a committed failure, whatever
+successor value it writes. A reject has no outcome. Compute
+P_x(y) = sum over r in R of [o_f(Authority(x,r)) = y] / N.
 Compare this rational distribution exactly with the declared target for every x.
+A target that omits `committed-failure` is therefore refuted whenever some
+random value commits a failure at x.
 
 Each tuple is evaluated once through the ordinary bound library Authority,
 including its invocation laws and resource limits. A single histogram fold per
@@ -42,7 +50,11 @@ An excess outcome of target weight p requires floor(N*p)+1 preimages to prove
 excess. The packet selects the excess outcome with the smallest such witness,
 then the least outcome and lexicographically first random assignments. No
 smaller positive set of preimages can exceed its target mass. Expected and
-actual distributions and the fixed input tuple accompany the witness.
+actual distributions and the fixed input tuple accompany the witness. The
+packet's `decision_mass` gives the exact mass of Accept, Reject and
+CommittedFailure decisions at the refuted tuple; Reject is always zero there.
+For a checked result it is the mass at every tuple, since each target fixes
+the `committed-failure` mass, zero when omitted.
 
 ## Difference
 
@@ -52,7 +64,10 @@ distribution laws are inert declarations until this separate checker runs;
 they do not add entropy acquisition or a runtime invocation law family.
 Existing projects retain their canonical bytes. Projects with these declarations
 use project-spec encoding version 4, which commits to the premise, widths,
-projections and normalized targets. Packets bind both source files and the
+projections and normalized targets, each outcome tagged as a value or
+`committed-failure`. Version 4 takes precedence over the version 2 and 3
+markers; it keeps the version 2 quantity flag, and every type, including an
+unsigned one, remains fully encoded. Packets bind both source files and the
 source identities of the checker, compiler and evaluator.
 
 ## Scope
@@ -61,7 +76,8 @@ Random inputs are scalar command or context fields. An integer bit input must
 have precisely domain 0 through 2^b-1, including the zero-bit singleton for
 b=0; a Boolean requires b=1. Outcome projections currently name a scalar field
 of the successor state, `post.100.FIELD`; integer, Boolean and payload-free
-variant values use the contract's numeric scalar representation. Targets are
+variant values use the contract's numeric scalar representation. Accept and
+committed-failure outcomes are counted, and a Reject is UNKNOWN. Targets are
 fixed finite sets, independent of the non-random tuple. Multiple projections
 check their marginal distributions, not their joint distribution.
 

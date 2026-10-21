@@ -1,7 +1,9 @@
 //! Random-bit declarations, canonical identities and exact rational arithmetic.
 #![allow(clippy::unwrap_used)]
 
-use zeno_fcis_spec::{Probability, ProjectLimits, SourceLimits, elaborate_project, parse_project};
+use zeno_fcis_spec::{
+    DistributionOutcome, Probability, ProjectLimits, SourceLimits, elaborate_project, parse_project,
+};
 
 const PROJECT: &str =
     include_str!("../../../examples/distribution-laws/reporter-choice/project.zeno");
@@ -34,6 +36,41 @@ fn distribution_syntax_and_canonical_identity_retain_the_premise_and_target() {
         assert_ne!(
             original.canonical_bytes().unwrap(),
             spec(&changed).canonical_bytes().unwrap()
+        );
+    }
+}
+
+#[test]
+fn distribution_targets_may_declare_committed_failure_mass() {
+    let declared = |target: &str| spec(&PROJECT.replace("uniform over {0, 1, 2, 3}", target));
+    let explicit = declared("{committed-failure: 1/4, 0: 1/4, 1: 1/4, 2: 1/4}");
+    assert_eq!(
+        explicit.distributions()[0].target()[3],
+        (
+            DistributionOutcome::CommittedFailure,
+            Probability::try_new(1, 4).unwrap()
+        )
+    );
+    assert_eq!(
+        explicit.canonical_bytes().unwrap(),
+        declared("uniform over {0, 1, 2, committed-failure}")
+            .canonical_bytes()
+            .unwrap()
+    );
+    // The failure outcome is distinct from any value it might write.
+    assert_ne!(
+        explicit.canonical_bytes().unwrap(),
+        spec(PROJECT).canonical_bytes().unwrap()
+    );
+    for target in [
+        "{committed-failure: 1/2, committed-failure: 1/2}",
+        "{0: 1/2, committed-failure: 1/4}",
+        "uniform over {committed-failure, committed-failure}",
+    ] {
+        let source = PROJECT.replace("uniform over {0, 1, 2, 3}", target);
+        assert!(
+            parse_project(&source, SourceLimits::default()).is_err(),
+            "{target}"
         );
     }
 }

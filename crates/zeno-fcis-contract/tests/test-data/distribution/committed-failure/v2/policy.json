@@ -1,0 +1,44 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "probe",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "101": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": "context.102.130 == 3",
+      "class": "CommittedFailure",
+      "reason": 200,
+      "post": {
+        "110": "3"
+      },
+      "outbox": []
+    },
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "context.102.130"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "502": "CommittedFailureEffects"
+  }
+}

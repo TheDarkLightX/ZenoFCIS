@@ -1,15 +1,20 @@
 //! Exact finite distribution laws, conditional on uniform independent bits.
 //!
 //! Each non-random tuple is a separate fiber. One fold visits every random
-//! assignment with exact weight `1/N`, retaining counts and preimages. No
-//! sampling, conditioning on acceptance, or retry normalization is performed.
+//! assignment with exact weight `1/N`, retaining counts and preimages. An
+//! accepted decision's outcome is its projected successor value; every
+//! committed failure is the one outcome `committed-failure`. A reject has no
+//! outcome, so its fiber is UNKNOWN. No sampling, conditioning on acceptance,
+//! or retry normalization is performed.
 //! The histogram fold is the future extension point for other weight algebras;
 //! this version implements only nonnegative exact rational probabilities.
 
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
-use zeno_fcis_spec::{DistributionDecl, Probability, ProjectionPath, ProjectionRoot};
+use zeno_fcis_spec::{
+    DistributionDecl, DistributionOutcome, Probability, ProjectionPath, ProjectionRoot,
+};
 
 use crate::ContractError;
 use crate::internals::{
@@ -18,9 +23,9 @@ use crate::internals::{
     policy,
     review::{
         domain::{self, LeafDomain, Position},
-        evaluate::{self, Framer, Outcome},
+        evaluate::{self, Fields, Framer, Outcome},
     },
-    rules::Rules,
+    rules::{Class, Rules},
     schema, schema_commitment,
 };
 
@@ -233,8 +238,10 @@ pub fn check(
         .collect();
     let work_cap = limits.max_work.min(MAX_WORK);
     policy::with_authority(&contract, &schema, |authority| {
+        // Committed failures in the current fiber.
+        let mut failures = 0u64;
         loop {
-            let mut bins: Vec<BTreeMap<i128, Bin>> = spec
+            let mut bins: Vec<BTreeMap<DistributionOutcome, Bin>> = spec
                 .distributions()
                 .iter()
                 .map(|_| BTreeMap::new())
@@ -253,20 +260,21 @@ pub fn check(
                     Outcome::Decision(d) => d,
                     Outcome::Refused(r) => return progress.finish(Verdict::Unknown, json!({"reason":"Authority refused","refusal":r.to_string(),"input":input_json(&positions,&tuple)})),
                 };
+                failures += u64::from(decision.class == Class::CommittedFailure);
                 for (field, histogram) in projections.iter().zip(&mut bins) {
                     if progress.work >= work_cap {
                         return progress.finish(Verdict::Unknown, json!({"reason":"work budget exceeded","partial_random_values":visited}));
                     }
                     progress.work += 1;
-                    let Some(value) = decision
-                        .post
-                        .iter()
-                        .find(|(id, _)| id == field)
-                        .and_then(|(_, v)| v.number())
-                    else {
-                        return progress.finish(Verdict::Unknown, json!({"reason":"undefined outcome projection","input":input_json(&positions,&tuple)}));
+                    let outcome = match decision.class {
+                        Class::Accept => projected(&decision.post, *field),
+                        Class::CommittedFailure => Some(DistributionOutcome::CommittedFailure),
+                        Class::Reject => None,
                     };
-                    let bin = histogram.entry(value).or_insert_with(Bin::zero);
+                    let Some(outcome) = outcome else {
+                        return progress.finish(Verdict::Unknown, json!({"reason":"undefined outcome projection","decision_kind":decision.class.name(),"input":input_json(&positions,&tuple)}));
+                    };
+                    let bin = histogram.entry(outcome).or_insert_with(Bin::zero);
                     let Some(mass) = bin.mass.checked_add(weight) else {
                         return progress.finish(
                             Verdict::Unknown,
@@ -306,6 +314,7 @@ pub fn check(
                             "expected":distribution_json(law.target().iter().copied()),
                             "actual":distribution_json(actual.into_iter()),
                             "witness":minimal_witness(law,&histogram,random_size),
+                            "decision_mass":decision_mass(failures,random_size),
                         }),
                     );
                 }
@@ -313,6 +322,7 @@ pub fn check(
             if !advance(&positions, &fixed_indices, &mut tuple) {
                 break;
             }
+            failures = 0;
         }
         if Some(u128::from(progress.tuples)) != size {
             return progress.finish(
@@ -320,7 +330,12 @@ pub fn check(
                 json!({"reason":"incomplete input domain"}),
             );
         }
-        progress.finish(Verdict::Checked, json!({"all_fibers_compared":true}))
+        // Every law compares the committed-failure mass and a reject stops the
+        // fold, so every compared fiber has the last fiber's decision mass.
+        progress.finish(
+            Verdict::Checked,
+            json!({"all_fibers_compared":true,"decision_mass":decision_mass(failures,random_size)}),
+        )
     })
 }
 
@@ -340,7 +355,11 @@ impl Bin {
 // A cardinality-minimal positive witness: m assignments producing one outcome
 // certify excess when m/N > p. Thus m=floor(N*p)+1. Minimize m over excess
 // outcomes, breaking ties by outcome then by enumeration order of assignments.
-fn minimal_witness(law: &DistributionDecl, bins: &BTreeMap<i128, Bin>, n: u64) -> Value {
+fn minimal_witness(
+    law: &DistributionDecl,
+    bins: &BTreeMap<DistributionOutcome, Bin>,
+    n: u64,
+) -> Value {
     let witness = bins
         .iter()
         .filter_map(|(value, bin)| {
@@ -357,7 +376,7 @@ fn minimal_witness(law: &DistributionDecl, bins: &BTreeMap<i128, Bin>, n: u64) -
         .min_by_key(|(needed, value, _)| (*needed, *value));
     match witness {
         Some((needed, value, bin)) => {
-            json!({"kind":"minimal-single-outcome-excess","outcome":value.to_string(),"size":needed,"random_values":bin.preimages[..needed].iter().map(|v|v.iter().map(ToString::to_string).collect::<Vec<_>>()).collect::<Vec<_>>(),"random_domain_size":n})
+            json!({"kind":"minimal-single-outcome-excess","outcome":outcome_name(value),"size":needed,"random_values":bin.preimages[..needed].iter().map(|v|v.iter().map(ToString::to_string).collect::<Vec<_>>()).collect::<Vec<_>>(),"random_domain_size":n})
         }
         None => json!({"kind":"no-positive-witness"}),
     }
@@ -380,8 +399,33 @@ fn path_name(path: &ProjectionPath) -> String {
             .join(".")
     )
 }
-fn distribution_json(values: impl Iterator<Item = (i128, Probability)>) -> Value {
-    json!(values.map(|(value,p)|json!({"value":value.to_string(),"numerator":p.numerator().to_string(),"denominator":p.denominator().to_string()})).collect::<Vec<_>>())
+fn projected(post: &Fields, field: u16) -> Option<DistributionOutcome> {
+    post.iter()
+        .find(|(id, _)| *id == field)
+        .and_then(|(_, v)| v.number())
+        .map(DistributionOutcome::Value)
+}
+fn outcome_name(outcome: DistributionOutcome) -> String {
+    match outcome {
+        DistributionOutcome::Value(value) => value.to_string(),
+        DistributionOutcome::CommittedFailure => "committed-failure".to_owned(),
+    }
+}
+fn distribution_json(values: impl Iterator<Item = (DistributionOutcome, Probability)>) -> Value {
+    json!(values.map(|(value,p)|json!({"value":outcome_name(value),"numerator":p.numerator().to_string(),"denominator":p.denominator().to_string()})).collect::<Vec<_>>())
+}
+// The mass of each decision kind at one complete fiber of n assignments. A
+// complete fiber has no reject, which has no outcome and stops the fold.
+fn decision_mass(failures: u64, n: u64) -> Value {
+    json!(Class::ALL.iter().map(|class| {
+        let count = match class {
+            Class::Accept => n - failures,
+            Class::CommittedFailure => failures,
+            Class::Reject => 0,
+        };
+        let p = Probability::try_new(count.into(), n.into()).unwrap_or(Probability::ZERO);
+        json!({"kind":class.name(),"numerator":p.numerator().to_string(),"denominator":p.denominator().to_string()})
+    }).collect::<Vec<_>>())
 }
 fn input_json(positions: &[Position], tuple: &[i128]) -> Value {
     json!(

@@ -1,0 +1,19 @@
+zeno 1;
+project 1 probe;
+namespace 2 p;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 103 int R in 0..=3;
+field 110 100 x 103;
+field 130 102 e 103;
+component 400 c {
+ owns 100; reads pre.100; writes post.100; contexts context.102;
+ budget steps 128;
+}
+merge [400];
+law 500 range on commit, genesis = post.100.110 >= 0;
+random 600 e on context.102.130 bits 2 independent uniform;
+distribution 601 d on post.100.110 = uniform over {0, 1, 2, 3};
+law 502 failure on failure = post.100.110 >= 0;
+reason 200 busy precedence 0;

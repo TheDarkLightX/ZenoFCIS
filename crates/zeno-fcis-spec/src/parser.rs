@@ -630,7 +630,11 @@ impl Parser {
         self.expect_symbol(TokenKind::LBrace, "distribution");
         let mut target = Vec::new();
         while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::Eof) {
-            let value = self.take_i128("distribution.value")?;
+            let value = if self.take_keyword("committed-failure") {
+                crate::DistributionOutcome::CommittedFailure
+            } else {
+                crate::DistributionOutcome::Value(self.take_i128("distribution.value")?)
+            };
             let probability = if uniform {
                 crate::Probability::try_new(1, 1)?
             } else {

@@ -5,6 +5,7 @@ Feature: Exact finite distributions
     When every random value is folded for every non-random tuple within the work limits
     Then exact rational targets are compared without sampling or retry conditioning
     And modulo bias has a minimal excess witness
+    And a committed failure is one distinct outcome and a reject is UNKNOWN
     And invalid widths and weights are refused
     And every result retains its randomness premise
     And an incomplete fold is UNKNOWN

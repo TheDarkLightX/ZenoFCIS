@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build five isolated finite-distribution mutants and require named test failures."""
+"""Build six isolated finite-distribution mutants and require named test failures."""
 
 import argparse
 import hashlib
@@ -33,6 +33,10 @@ CONTROLS = (
     ("dropped-premise", "crates/zeno-fcis-contract/src/distribution.rs",
      '"premise": PREMISE,', '"missing_premise": PREMISE,',
      "distribution_every_verdict_retains_the_randomness_premise"),
+    ("failure-distinction", "crates/zeno-fcis-contract/src/distribution.rs",
+     "Class::CommittedFailure => Some(DistributionOutcome::CommittedFailure),",
+     "Class::CommittedFailure => projected(&decision.post, *field),",
+     "distribution_committed_failure_is_one_distinct_outcome"),
 )
 
 
@@ -46,6 +50,8 @@ def run(command, cwd, log):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--remove-targets", action="store_true",
+                        help="delete each mutant's Cargo target once its result is recorded")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     results = []
@@ -78,9 +84,11 @@ def main():
             "schema": "zeno-fcis/distribution-controls/1", "results": results,
             "target_dir_is_external": bool(os.environ.get("CARGO_TARGET_DIR")),
         }, indent=2) + "\n")
+        if args.remove_targets:
+            shutil.rmtree(target, ignore_errors=True)
         if not killed:
             raise RuntimeError(f"{name}: control did not build and fail its named test")
-    print("distribution-controls: PASS (5 built mutants, 5 named failures)")
+    print(f"distribution-controls: PASS ({len(CONTROLS)} built mutants, {len(CONTROLS)} named failures)")
 
 
 if __name__ == "__main__":

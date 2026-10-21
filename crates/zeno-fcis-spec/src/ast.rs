@@ -1486,8 +1486,14 @@ impl ProjectSpec {
                 law.name.encode_to(output)?;
                 encode_path(&law.outcome, output)?;
                 put_length(output, law.target.len())?;
-                for (value, p) in &law.target {
-                    output.extend_from_slice(&value.to_be_bytes());
+                for (outcome, p) in &law.target {
+                    match outcome {
+                        crate::DistributionOutcome::Value(value) => {
+                            output.push(0);
+                            output.extend_from_slice(&value.to_be_bytes());
+                        }
+                        crate::DistributionOutcome::CommittedFailure => output.push(1),
+                    }
                     output.extend_from_slice(&p.numerator().to_be_bytes());
                     output.extend_from_slice(&p.denominator().to_be_bytes());
                 }

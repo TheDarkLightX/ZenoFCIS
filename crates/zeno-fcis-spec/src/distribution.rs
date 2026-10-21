@@ -90,13 +90,24 @@ impl RandomInputDecl {
     }
 }
 
+/// One outcome of a distribution law. An accepted decision is its projected
+/// successor value. Every committed failure is the single outcome
+/// `committed-failure`, whatever successor value it writes.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum DistributionOutcome {
+    /// An accepted decision with this projected value.
+    Value(i128),
+    /// Any committed failure; its projected value is ignored.
+    CommittedFailure,
+}
+
 /// A finite output-distribution law, checked separately from invocation laws.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DistributionDecl {
     pub(crate) id: StableId,
     pub(crate) name: Identifier,
     pub(crate) outcome: ProjectionPath,
-    pub(crate) target: Box<[(i128, Probability)]>,
+    pub(crate) target: Box<[(DistributionOutcome, Probability)]>,
 }
 
 impl DistributionDecl {
@@ -112,14 +123,15 @@ impl DistributionDecl {
     pub const fn outcome(&self) -> &ProjectionPath {
         &self.outcome
     }
-    /// Sorted distinct outcomes with positive exact mass summing to one.
-    pub const fn target(&self) -> &[(i128, Probability)] {
+    /// Sorted distinct outcomes with positive exact mass summing to one;
+    /// accepted values precede `committed-failure`.
+    pub const fn target(&self) -> &[(DistributionOutcome, Probability)] {
         &self.target
     }
 
     pub(crate) fn normalized_target(
-        mut target: Vec<(i128, Probability)>,
-    ) -> Option<Box<[(i128, Probability)]>> {
+        mut target: Vec<(DistributionOutcome, Probability)>,
+    ) -> Option<Box<[(DistributionOutcome, Probability)]>> {
         target.sort_by_key(|(value, _)| *value);
         if target.windows(2).any(|w| w[0].0 == w[1].0) {
             return None;

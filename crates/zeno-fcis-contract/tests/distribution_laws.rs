@@ -13,6 +13,14 @@ const BIAS_POLICY: &str =
 const PAYOUT: &str = include_str!("../../../examples/distribution-laws/payout-tie/project.zeno");
 const PAYOUT_POLICY: &str =
     include_str!("../../../examples/distribution-laws/payout-tie/v2/policy.json");
+// Review witness: r == 3 commits a failure that writes x = 3; other r accept x = r.
+const FAILURE: &str = include_str!("test-data/distribution/committed-failure/project.zeno");
+const FAILURE_POLICY: &str =
+    include_str!("test-data/distribution/committed-failure/v2/policy.json");
+
+fn mass(kind: &str, numerator: &str, denominator: &str) -> serde_json::Value {
+    serde_json::json!({"kind": kind, "numerator": numerator, "denominator": denominator})
+}
 
 #[test]
 fn distribution_examples_check_exactly_with_their_premise() {
@@ -25,7 +33,65 @@ fn distribution_examples_check_exactly_with_their_premise() {
         assert_eq!(result.packet()["measured"]["tuples"], tuples);
         assert_eq!(result.packet()["measured"]["work"], work);
         assert_eq!(result.packet()["authority"], "none");
+        assert_eq!(
+            result.packet()["result"]["decision_mass"],
+            serde_json::json!([
+                mass("Accept", "1", "1"),
+                mass("Reject", "0", "1"),
+                mass("CommittedFailure", "0", "1")
+            ])
+        );
     }
+}
+
+#[test]
+fn distribution_committed_failure_is_one_distinct_outcome() {
+    // Counting the failure's written value would make this target hold.
+    let result = check(FAILURE, FAILURE_POLICY, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
+    let r = &result.packet()["result"];
+    assert_eq!(r["non_random_input"][0]["value"], "0");
+    assert_eq!(r["actual"][3]["value"], "committed-failure");
+    assert_eq!(r["actual"][3]["denominator"], "4");
+    assert_eq!(r["witness"]["outcome"], "committed-failure");
+    assert_eq!(r["witness"]["random_values"], serde_json::json!([["3"]]));
+    assert_eq!(
+        r["decision_mass"],
+        serde_json::json!([
+            mass("Accept", "3", "4"),
+            mass("Reject", "0", "1"),
+            mass("CommittedFailure", "1", "4")
+        ])
+    );
+    // Declared failure mass, explicitly or as a uniform member, is checked.
+    for target in [
+        "{0: 1/4, 1: 1/4, 2: 1/4, committed-failure: 1/4}",
+        "uniform over {committed-failure, 2, 1, 0}",
+    ] {
+        let project = FAILURE.replace("uniform over {0, 1, 2, 3}", target);
+        let result = check(&project, FAILURE_POLICY, Limits::default()).unwrap();
+        assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
+        assert_eq!(result.packet()["measured"]["complete_fibers"], 4);
+        assert_eq!(
+            result.packet()["laws"][0]["expected"][3]["value"],
+            "committed-failure"
+        );
+        assert_eq!(
+            result.packet()["result"]["decision_mass"][2],
+            mass("CommittedFailure", "1", "4")
+        );
+    }
+    // Failure mass is not interchangeable with the value the failure writes.
+    let wrong = FAILURE.replace(
+        "uniform over {0, 1, 2, 3}",
+        "{0: 1/4, 1: 1/4, 2: 1/4, 3: 1/8, committed-failure: 1/8}",
+    );
+    let result = check(&wrong, FAILURE_POLICY, Limits::default()).unwrap();
+    assert_eq!(result.verdict(), Verdict::Refuted, "{:?}", result.packet());
+    assert_eq!(
+        result.packet()["result"]["witness"]["outcome"],
+        "committed-failure"
+    );
 }
 
 #[test]
@@ -222,6 +288,7 @@ fn distribution_refusals_and_undefined_projections_are_unknown() {
         result.packet()["result"]["reason"],
         "undefined outcome projection"
     );
+    assert_eq!(result.packet()["result"]["decision_kind"], "Reject");
     let refused = POLICY.replace(
         "\"110\": \"context.102.130\"",
         "\"110\": \"context.102.130 + 4\"",
