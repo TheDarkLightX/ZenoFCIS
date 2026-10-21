@@ -28,7 +28,7 @@ class SynthesisToolsTest(unittest.IsolatedAsyncioTestCase):
                                      "transform_request", "transform_candidate",
                                      "transform_replay", "contract_draft_start", "contract_draft_propose",
                                      "contract_draft_questions", "contract_draft_label",
-                                     "contract_draft_check", "contract_draft_finalize", "kb_advise", "kb_plan", "kb_explain"})
+                                     "contract_draft_check", "contract_draft_finalize", "kb_advise", "kb_plan", "kb_explain", "guide_list", "guide_show", "guide_find"})
             problem = str(ORDER / "synthesis.json")
             output = str(ORDER / "synthesized")
             assessed = (await client.call_tool("assess_finite_problem",

@@ -2818,3 +2818,48 @@ remain text. Completion result `/2` declares the same encoding for failure `inpu
 and `state` tuples, including optional invalid-plan states. Small coordinates keep
 their numeric form. Completion source documents and canonical plan bytes retain
 their existing formats; a replayed failure case still fails and supplies no plan.
+
+## Offline task guide
+
+```sh
+zeno-fcis guide list
+zeno-fcis guide find "check a probability distribution"
+zeno-fcis guide show contract-distribution
+```
+
+`guide` reads embedded public cards, without a workspace or private knowledge
+layer. List and find return `zeno-fcis/guide/1`, with `authority: none`; show
+prints the complete Markdown card. Find ranks the best task-phrase token
+overlap, with full phrase matches first and card names breaking ties. The
+ranking is deterministic. Retrieval supplies no checker acceptance.
+
+Start with [project checks](loops/check.md), [contract review](loops/contract-review.md),
+[invariants](loops/contract-lemma.md), [scenarios](loops/contract-scenario.md),
+[specification gaps](loops/contract-gaps.md), [collection availability](loops/contract-collections.md)
+or [finite distribution laws](loops/contract-distribution.md).
+For program changes, distinguish [automatic e-graph search](loops/program-search.md),
+[checked proposal sessions](loops/loop-workspace.md) and [equivalence evidence](loops/transform.md).
+[Trace games](loops/trace-game.md) and the [adversarial synthesis duel](loops/adversarial-synthesis-duel.md)
+state the finite attacker model and certificate/bound/budget stop rules.
+The remaining cards cover [new projects](loops/new.md), [generation](loops/generate.md),
+[formal backends](loops/prove.md), [ZAL](loops/zal.md), [usage advice](loops/knowledge.md)
+and [finite synthesis](loops/synth.md).
+
+Cards state exact command contracts and mark unverified fields `unknown`.
+Their examples also supply command help. `tools/check_guide_cards.py --write`
+regenerates the embedded copies; its `--run --cli FILE --evidence DIR` mode
+executes every Steps and Worked example command and checks the declared result.
+Trace evidence needs committed source and a fresh directory outside the tree.
+Optional [telemetry](TELEMETRY.md) observes invocation results without granting
+checker, resource-accounting or publication authority.
+
+The read-only MCP tools are `guide_list`, `guide_show(name)` and
+`guide_find(task)`. They share the CLI's embedded cards. The standard-library
+Commons bridge advertises them alongside its coordination tools:
+
+```sh
+python3 -I integrations/commons/mcp.py --store COMMONS_DIR --actor NAME
+```
+
+The optional synthesis MCP server exposes the same handlers. Guide lookups do
+not append Commons events, consult a private knowledge layer or read a project.

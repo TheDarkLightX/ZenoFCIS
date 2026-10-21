@@ -14,6 +14,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from commons import AGENT_STATES, LINK_RELATIONS, RECORD_STATUSES, RECORD_TYPES, Commons, CommonsError  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "mcp"))
+from zeno_fcis_guide import TOOLS as GUIDE_TOOLS, ANNOTATIONS as GUIDE_ANNOTATIONS
+GUIDE_HANDLERS = {handler.__name__: handler for handler in GUIDE_TOOLS}
+
 TEXT = {"type": "string", "maxLength": 65536}
 NAMES = {"type": "array", "items": {"type": "string", "maxLength": 128}, "maxItems": 32}
 REFS = {"type": "array", "items": {"type": "string", "maxLength": 4096}, "maxItems": 64}
@@ -65,11 +69,19 @@ TOOLS = [
 ]
 
 
+TOOLS.extend([
+    ("guide_list", "List embedded public checker cards without reading a project.", schema({}, [])),
+    ("guide_show", "Read one complete public command card.", schema({"name": {"type": "string", "maxLength": 80}}, ["name"])),
+    ("guide_find", "Rank public task phrases deterministically.", schema({"task": {"type": "string", "maxLength": 4096}}, ["task"])),
+])
+
 class Bridge:
     def __init__(self, store: Commons):
         self.store = store
 
     def call(self, name: str, a: dict):
+        if name in GUIDE_HANDLERS:
+            return GUIDE_HANDLERS[name](**a)
         s = self.store
         table = {
             "commons_register": lambda: s.register("", a.get("kind", "agent"), a.get("role", "")),
@@ -115,7 +127,7 @@ class Bridge:
         if method == "ping":
             return {}
         if method == "tools/list":
-            return {"tools": [{"name": n, "description": d, "inputSchema": sch} for n, d, sch in TOOLS]}
+            return {"tools": [{"name": n, "description": d, "inputSchema": sch, **({"annotations": GUIDE_ANNOTATIONS} if n in GUIDE_HANDLERS else {})} for n, d, sch in TOOLS]}
         if method == "tools/call":
             try:
                 args = params.get("arguments", {}) or {}

@@ -157,6 +157,24 @@ REQUIRED_SECURITY_WORKFLOW_MARKERS = (
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
+def prose(text: str) -> str:
+    """Exclude fenced blocks and inline code before checking prose links."""
+    lines = []
+    fence = None
+    for line in text.splitlines(keepends=True):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+        if marker:
+            token = marker.group(1)
+            if fence is None:
+                fence = token
+            elif token[0] == fence[0] and len(token) >= len(fence):
+                fence = None
+            continue
+        if fence is None:
+            lines.append(line)
+    return re.sub(r"(?<!`)(`+)(?!`)(.*?)(?<!`)\1(?!`)", "", "".join(lines), flags=re.S)
+
+
 def workspace_version() -> str:
     manifest = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))
     value = manifest["workspace"]["package"]["version"]
@@ -237,7 +255,7 @@ def check_markdown_links(failures: list[str]) -> None:
     files = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
     for source in files:
         text = source.read_text(encoding="utf-8")
-        for target in MARKDOWN_LINK.findall(text):
+        for target in MARKDOWN_LINK.findall(prose(text)):
             if "://" in target or target.startswith("#"):
                 continue
             local = target.split("#", 1)[0]

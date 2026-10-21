@@ -77,7 +77,9 @@ def worker(out):
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--out',type=Path,required=True)
+    from guide_help import example_help
+    parser=argparse.ArgumentParser(description=__doc__, epilog=example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter); parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--certificates-only', action='store_true', help='Build and check native fixture certificates and tests; omit repository-wide documentation/style checks, not release qualification')
     parser.add_argument('--worker',action='store_true'); args=parser.parse_args(); out=args.out.resolve()
     if args.worker: worker(out); return
     subprocess.run(['df','-B1G','/'],check=True)
@@ -101,7 +103,7 @@ def main():
     artifacts={str(p.relative_to(out)):sha(p) for p in out.rglob('*.json')}
     write(out/'binding.json',dict(schema='zeno-fcis/trace-game-binding/1.1',revision=revision,sources=before,
                                  binary=dict(path=str(binary),sha256=sha(binary)),artifacts=artifacts,
-                                 profile=dict(toolchain='1.97.1',locked=True,offline=True,debug=0,jobs=2)))
+                                 profile=dict(toolchain='1.97.1',locked=True,offline=True,debug=0,jobs=2,repository_checks='not-run' if args.certificates_only else 'required')))
     results={}
     for name in CERTIFICATES:
         measure([sys.executable,'-B','tools/trace_game/certificate_check.py',out,f'{name}.json'],out,f'check-{name}',env)
@@ -111,12 +113,13 @@ def main():
     measure([sys.executable,'-B','-m','unittest','-v',*tests],out,'tests',env)
     measure(['cargo','+1.97.1','test','--locked','--offline','-p','zeno-fcis-cli','--example','trace_game','-j','2'],
             out,'rust-tests',env,cap=3072,timeout=600)
-    for tool in ('check_public_docs.py','check_library_docs.py'):
-        measure([sys.executable,'-B',f'tools/{tool}'],out,tool[:-3],env)
-    measure([sys.executable,'-B','tools/check_release_privacy.py','check','docs/TRACE_GAME.md','tools/trace_game',
-             'crates/zeno-fcis-cli/examples/trace_game.rs'],out,'privacy',env)
-    measure(['cargo','+1.97.1','fmt','--check','-p','zeno-fcis-cli'],out,'format',env)
-    measure(['git','diff','--check'],out,'diff-check',env)
+    if not args.certificates_only:
+        for tool in ('check_public_docs.py','check_library_docs.py'):
+            measure([sys.executable,'-B',f'tools/{tool}'],out,tool[:-3],env)
+        measure([sys.executable,'-B','tools/check_release_privacy.py','check','docs/TRACE_GAME.md','tools/trace_game',
+                 'crates/zeno-fcis-cli/examples/trace_game.rs'],out,'privacy',env)
+        measure(['cargo','+1.97.1','fmt','--check','-p','zeno-fcis-cli'],out,'format',env)
+        measure(['git','diff','--check'],out,'diff-check',env)
     if sources()!=before: raise ValueError('source drift during final checks')
     write(out/'results.json',results)
     print(json.dumps(results,indent=2))

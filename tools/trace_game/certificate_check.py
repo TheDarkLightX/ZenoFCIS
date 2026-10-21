@@ -324,7 +324,8 @@ def load_bound(directory):
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('directory',type=Path)
+    from guide_help import example_help
+    parser=argparse.ArgumentParser(description=__doc__, epilog=example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter); parser.add_argument('directory',type=Path)
     parser.add_argument('certificate'); args=parser.parse_args()
     try:
         tables=load_bound(args.directory)

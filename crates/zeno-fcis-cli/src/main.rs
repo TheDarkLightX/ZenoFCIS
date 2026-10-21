@@ -20,6 +20,7 @@ mod contract_files;
 mod draft_command;
 mod durable_counter;
 mod effects;
+mod guide;
 mod inventory_reservation;
 mod judge_command;
 mod knowledge_command;
@@ -55,7 +56,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
@@ -218,22 +219,28 @@ enum Command {
         #[arg(value_name = "COMMAND")]
         command: Vec<String>,
     },
+    /// Look up an offline public command card for the task.
+    Guide {
+        #[command(subcommand)]
+        command: guide::Command,
+    },
     /// Synthesize language-neutral finite contracts and check target conformance.
     Synth {
         #[command(subcommand)]
         command: synth::Command,
     },
-    /// Check a supplied replacement for a finite scalar program on every input tuple.
+    /// Exact program equivalence and evidence: compare a supplied replacement on every input, replay receipts, or independently recheck symbolic certificates. See also: guide show transform.
     Transform {
         #[command(subcommand)]
         command: transform_command::Command,
     },
-    /// Search for a smaller equivalent finite scalar program; every candidate is checked on every input tuple.
+    /// E-graph equality saturation with exact per-class tables and a default portfolio of three strategies; transform checking alone accepts results. Supplied candidates can be fused with --with-candidate. See also: guide show program-search.
     Optimize {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
     },
-    /// Run the bounded optimization loop: proposers suggest, the transform checker judges.
+    /// Propose programs, sketches, rules or restated laws; exact checkers return typed feedback. Covers capture and learning from examples, repair pipelines, rules, transfer, questions, teach-back, decomposition and optimization. See also: guide show loop-workspace.
+    #[command(help_template = guide::LOOP_HELP)]
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
@@ -436,7 +443,10 @@ fn execute() -> u8 {
     if let Some(code) = checker_process::bootstrap() {
         return code;
     }
-    match Cli::try_parse() {
+    match cli_command()
+        .try_get_matches()
+        .and_then(|matches| Cli::from_arg_matches(&matches))
+    {
         Ok(cli) => {
             if let Command::Kb { operation } = cli.command {
                 return knowledge_command::execute(&cli.kb, operation);
@@ -545,12 +555,17 @@ fn execute() -> u8 {
     }
 }
 
+fn cli_command() -> clap::Command {
+    guide::with_help(Cli::command())
+}
+
 fn clap_error_exit(error: &clap::Error) -> u8 {
     if error.exit_code() == 0 { OK } else { USAGE }
 }
 
 fn run(command: Command) -> u8 {
     match command {
+        Command::Guide { command } => guide::run(command),
         Command::Construct(args) => construction::construct(args),
         Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),
@@ -657,7 +672,7 @@ fn run(command: Command) -> u8 {
 }
 
 fn describe(path: &[String]) -> u8 {
-    let mut root = Cli::command();
+    let mut root = cli_command();
     root.build();
     let mut selected = &root;
     for name in path {
@@ -1897,7 +1912,7 @@ mod tests {
                 visit(child);
             }
         }
-        let mut root = Cli::command();
+        let mut root = cli_command();
         root.build();
         visit(&describe_tree(&root, &[]));
         for arguments in [
@@ -1969,7 +1984,7 @@ mod tests {
             line.extend(positionals.into_iter().map(|(_, value)| value));
             found.push((line, command["effects"].clone()));
         }
-        let mut root = Cli::command();
+        let mut root = cli_command();
         root.build();
         let tree = describe_tree(&root, &[]);
         let mut found = Vec::new();

@@ -347,7 +347,8 @@ def capabilities():
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',required=True,type=Path);p.add_argument('--replay-only',action='store_true');a=p.parse_args()
+    from guide_help import example_help
+    p=argparse.ArgumentParser(description=__doc__, epilog=example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter);p.add_argument('--out',required=True,type=Path);p.add_argument('--replay-only',action='store_true');a=p.parse_args()
     out=a.out.resolve()
     if not a.replay_only and out.exists() and any(out.iterdir()):raise ValueError('retain prior attempts; choose a new empty output directory')
     out.mkdir(parents=True,exist_ok=True);checks=out/'checks';checks.mkdir(exist_ok=True)

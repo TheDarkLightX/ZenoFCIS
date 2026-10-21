@@ -107,6 +107,7 @@ effects! { crate::Command {
         "purity" => Self::Purity { .. } => declared((&["rust-source"], &[], false, None));
     }
     groups {
+        "guide" => Self::Guide { command } => command: crate::guide::Command;
         "synth" => Self::Synth { command } => command: crate::synth::Command;
         "transform" => Self::Transform { command } => command: crate::transform_command::Command;
         "loop" => Self::Loop { command } => command: crate::loop_command::Command;
@@ -967,5 +968,16 @@ effects! { crate::knowledge_command::Operation {
     flat {
 
     }
+    optional {}
+}}
+
+effects! { crate::guide::Command {
+    leaves {
+        "list" => Self::List => declared((&[], &[], false, None));
+        "show" => Self::Show { .. } => declared((&[], &[], false, None));
+        "find" => Self::Find { .. } => declared((&[], &[], false, None));
+    }
+    groups {}
+    flat {}
     optional {}
 }}

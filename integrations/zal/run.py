@@ -14,11 +14,13 @@ from workflow import checker_identity
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    from guide_help import example_help
+    parser = argparse.ArgumentParser(description=__doc__, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if",
                     "lower", "explain", "guide"]:
-        p = sub.add_parser(command)
+        p = sub.add_parser(command, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
         p.add_argument("--syntax", choices=["symbolic", "english"], default="symbolic")

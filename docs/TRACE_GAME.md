@@ -153,6 +153,13 @@ python3 -B tools/trace_game/run_v11.py --out ../trace-game-evidence
 python3 -B tools/trace_game/certificate_check.py ../trace-game-evidence withdrawal-safety.json
 ```
 
+For fixture certificates without repository-wide documentation and style gates,
+use `run_v11.py --certificates-only --out OUT`. This mode still builds native
+tables, independently checks every certificate, runs the fixture tests and checks
+source stability. Its binding records `profile.repository_checks: "not-run"`.
+It is not release qualification. The default workflow retains those repository
+checks as well.
+
 Use a committed source tree and a fresh output directory outside it. The runner
 keeps native tables, certificates, UNKNOWN attempts, command logs and peak RSS.
 It binds the exact revision, source bytes, lockfile, native binary and input
