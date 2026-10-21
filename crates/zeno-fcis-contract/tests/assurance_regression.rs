@@ -1,6 +1,6 @@
 //! Exact before/after observations for the table dependency boundary.
 mod tables {
-    include!("tables.rs");
+    include!("support/table_cases.rs");
 
     #[test]
     fn capture_table_decisions_and_usage() {
