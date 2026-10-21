@@ -313,7 +313,10 @@ use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
 [Contract tables](CONTRACT_TABLES.md) expand while `project.zeno` is parsed,
 so a law written with `forall i in table T`, `count` or `sum` over a table
 reaches generation as the ordinary formula it stands for; the rules here name
-each table entry by its field ID.
+each table entry by its field ID. [Keyed collections](COLLECTIONS.md) lower
+the same way: the rules read and write a named entry through its view
+fields, by ID, compare keys only with `==` and `!=`, and may write a key into
+a stored key field.
 Signed law multiplication/division retains its existing checked i128 meaning.
 Product predicates explicitly convert nonnegative values to U128 and use the
 existing exact wide comparison, including the constant-one factors of a

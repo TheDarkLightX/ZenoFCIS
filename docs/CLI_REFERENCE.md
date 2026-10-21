@@ -54,7 +54,14 @@ zeno-fcis contract check-composition MANIFEST [--aggregate DIR | --write-aggrega
 expands to, after checking that the printed text parses to the same canonical
 project, and reports the tables, the inputs and the input domain size on
 stderr (with `--format json`, in one document). It prints nothing for a
-project with errors and exits 1.
+project with errors and exits 1. For a project with
+[keyed collections](COLLECTIONS.md) it prints the view, and the check
+compares it with the project's view.
+`zeno-fcis contract collections [<app-dir>] [--max-tuples N] [--out FILE]`
+checks a collections contract over every admissible view: exit 0 checked, 1
+refuted with a counterexample view and the obligation it breaks, 2 when the
+view domain exceeds the tuple limit. The packet,
+`zeno-fcis/collections-check/1`, lists its premises and grants no authority.
 A field name must be unique within its record; other declaration names are
 unique in the project. The summary line's `unresolved_obligations=N` counts
 evidence that the check does not establish and generated code cannot

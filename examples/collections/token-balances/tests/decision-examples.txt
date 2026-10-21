@@ -1,0 +1,16 @@
+# Decision examples for the token balances view. LLM-generated with the
+# rules, so they are not an independent oracle.
+#
+# Inputs: supply, sender present, sender balance, receiver present, receiver
+# balance | action (150 Mint, 151 Transfer), from class, to class, amount |
+# desk (180 Issuer, 181 Holder). The classes say which keys are equal: to 0
+# is the sender's account, to 1 another one.
+# Decision: class reason, then the five state fields after | deliveries
+0 0 0 0 0 | 150 0 1 2 | 180 | accept - 2 0 0 1 2 | -
+0 0 0 0 0 | 150 0 1 2 | 181 | reject 200 0 0 0 0 0 | -
+6 0 0 0 0 | 150 0 1 1 | 180 | reject 203 6 0 0 0 0 | -
+2 1 2 0 0 | 151 0 1 1 | 181 | accept - 2 1 1 1 1 | -
+2 1 1 0 0 | 151 0 1 2 | 181 | reject 202 2 1 1 0 0 | -
+0 0 0 0 0 | 151 0 1 1 | 181 | reject 201 0 0 0 0 0 | -
+3 1 3 1 3 | 151 0 0 2 | 181 | accept - 3 1 3 1 3 | -
+5 1 2 1 3 | 151 0 1 1 | 181 | reject 203 5 1 2 1 3 | -

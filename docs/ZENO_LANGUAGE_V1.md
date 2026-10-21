@@ -14,9 +14,11 @@ ASCII hyphens. Commitments accepted by tool manifests are lowercase hexadecimal.
 The language has no import, include, macro, interpolation, filesystem path,
 embedded command, implicit stable-ID allocation, or recursion construct.
 Shell syntax and traversal text are either invalid tokens or ordinary inert
-identifier data. [Contract tables](CONTRACT_TABLES.md) are the one expanding
-form: a table's entries take the IDs that follow its explicit stable ID, by a
-fixed rule, and its formulas expand to ordinary ones while the file is parsed.
+identifier data. [Contract tables](CONTRACT_TABLES.md) and
+[keyed collections](COLLECTIONS.md) are the expanding forms: a table's
+entries and a named entry's fields take the IDs that follow an explicit
+stable ID, by a fixed rule, and their formulas expand to ordinary ones while
+the file is parsed.
 
 ## Resource limits
 
@@ -39,6 +41,11 @@ type ID int name in MIN..=MAX;
 field ID OWNER_TYPE name FIELD_TYPE;
 table ID OWNER_TYPE name FIELD_TYPE size N;
 type ID index name of TABLE;
+type ID key name;
+map ID OWNER_TYPE name KEY_TYPE VALUE_TYPE capacity N;
+entry ID name of MAP at ROOT.TYPE.FIELD;
+summary ID OWNER_TYPE name TYPE sum MAP.FIELD;
+summary ID OWNER_TYPE name TYPE count MAP;
 variant ID OWNER_TYPE name PAYLOAD_TYPE|none;
 reason ID name precedence RANK;
 effect ID name destination TYPE payload TYPE;
@@ -137,7 +144,11 @@ Table forms range over a table's entries instead: `ROOT.OWNER.T[k]`,
 { FORMULA }`, `sum i in table T [where C] { VALUE }` and
 `count i in table T { FORMULA } OP K`. They expand exactly into the forms
 above while the file is parsed; [contract tables](CONTRACT_TABLES.md) gives
-the rule.
+the rule. `ROOT.OWNER.ENTRY.FIELD` and `forall e in entries MAP [where C]
+{ FORMULA }` range over the named entries of a map, and keys compare only
+with `==` and `!=`; [keyed collections](COLLECTIONS.md) gives the view.
+A project with collections encodes as project-spec format 5, which adds the
+key types, maps, entries and summaries after any format-4 sections.
 
 ## Diagnostics
 
