@@ -113,7 +113,25 @@ def run(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog=(
         'Example: nice -n 19 ionice -c3 python3 -B tools/trace_game/game.py certify --game '
-        'test-data/trace-games/escrow-safe.json --out ../escrow-game-evidence. '+SCOPE))
+        'test-data/trace-games/escrow-safe.json --out ../escrow-game-evidence\n\n'
+        'Input: schema="zeno-fcis/game/1"; contract=directory relative to the game file.\n'
+        'actors[] = {id:string, compromised:boolean, command:{position:[integer,...]},\n'
+        '            context:{position:[integer,...]}}; specify every input position.\n'
+        'coalition_bound and compromised_actor_bound bound active actor subsets.\n'
+        'objective = {kind:"safety"|"reachability", formula:law-expression,\n'
+        '             on?:["Accept","Reject","CommittedFailure","Refused","Blocked"]}.\n'
+        'Safety forbids the formula; reachability must force it against every event.\n'
+        'All actor events are environment choices. Optional guards are a finite list\n'
+        'of pre/command/context law expressions: false blocks into a stutter.\n'
+        'certify/check fix guard 0; select-guard chooses a fixed guard before play.\n'
+        'pre/post include rejection/refusal stutters; decision_reason is 0 if absent.\n'
+        'Optional K=0..1000 bounds check (default 6); observation must be "perfect".\n'
+        'Limits: 64 KiB input; 16 actors; 32 guards; 10000 product states; 100000\n'
+        'edges; 30 s construction; 1000000 solver work units and 30 s across guards.\n'
+        'Retained lineages and unsigned scalars return UNKNOWN. Evidence directories\n'
+        'must be fresh and outside the repository. Check evidence independently:\n'
+        'nice -n 19 ionice -c3 python3 -B tools/trace_game/certificate_check.py '
+        '../escrow-game-evidence certificate.json\n\n'+SCOPE))
     parser.add_argument('mode',choices=('check','certify','select-guard'))
     parser.add_argument('--game',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True,help='new evidence directory')

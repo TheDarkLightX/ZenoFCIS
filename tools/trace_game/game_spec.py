@@ -116,7 +116,12 @@ def description(game, native, guard=0, horizon=None):
 
 
 def native_numbers(packet):
-    """Decode the driver's decimal strings without narrowing signed 128-bit values."""
+    """Consume a fresh, exclusively owned JSON decode as advisory preparation.
+
+    Only acquisition/replay callers pass their private json.loads result here.
+    Mutation cannot reach Authority inputs or any retained contract snapshot.
+    Decimal strings preserve signed 128-bit values without narrowing.
+    """
     packet['genesis']=[int(v) for v in packet['genesis']]
     for row in packet.get('rows',[]):
         row['pre']=[int(v) for v in row['pre']]
