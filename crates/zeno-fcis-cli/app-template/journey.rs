@@ -79,13 +79,29 @@ fn exchange_as<B: zeno_fcis_ingress::Endpoint>(
     credential: &str,
     body: &[u8],
 ) -> (u16, Vec<u8>) {
+    exchange_bytes(server, wire_as(path, credential, body))
+}
+// A browser request: the same, with an Origin header.
+fn wire_origin(path: &str, origin: &str, body: &[u8]) -> Vec<u8> {
+    let mut bytes = format!(
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nAuthorization: Bearer {}\r\nOrigin: {origin}\r\nContent-Length: {}\r\n\r\n",
+        "ab".repeat(32),
+        body.len()
+    )
+    .into_bytes();
+    bytes.extend_from_slice(body);
+    bytes
+}
+fn exchange_bytes<B: zeno_fcis_ingress::Endpoint>(
+    server: &mut Server<B, Sink>,
+    bytes: Vec<u8>,
+) -> (u16, Vec<u8>) {
     let output = Rc::new(RefCell::new(Vec::new()));
     let runtime = ok(zeno_fcis_ingress::runtime());
     if std::env::var_os("APP_JOURNEY_TCP").is_some() {
         use std::io::{Read, Write};
         let listener = ok(runtime.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")));
         let address = ok(listener.local_addr());
-        let bytes = wire_as(path, credential, body);
         let client = std::thread::spawn(move || {
             let mut stream = ok(std::net::TcpStream::connect(address));
             ok(stream.set_read_timeout(Some(Duration::from_secs(15))));
@@ -99,7 +115,7 @@ fn exchange_as<B: zeno_fcis_ingress::Endpoint>(
         *output.borrow_mut() = ok(client.join());
     } else {
         let stream = Memory {
-            input: wire_as(path, credential, body),
+            input: bytes,
             at: 0,
             output: Rc::clone(&output),
         };
@@ -485,6 +501,13 @@ fn parties_file_start_up_refusals() {
         "https://app.example.com:08443",
         "https://",
         "app.example.com",
+        "https://app.example.com https://b.example.com",
+        "https://app.example.com,https://b.example.com",
+        "https://app.example.com?x=1",
+        "https://app.example.com#top",
+        " https://app.example.com",
+        "https://app.example.com\n",
+        "",
     ] {
         assert!(application::app::public_origin(origin).is_err(), "{origin}");
     }
@@ -533,6 +556,25 @@ fn parties_file_start_up_refusals() {
             String::from_utf8_lossy(&output.stderr).contains(expected),
             "{expected}"
         );
+        assert!(!root.join("never.sqlite").exists());
+    }
+    // A value that is set but empty or not Unicode refuses; it never means unset.
+    #[cfg(unix)]
+    for value in [
+        std::ffi::OsString::new(),
+        std::os::unix::ffi::OsStringExt::from_vec(b"https://app.example.com\xff".to_vec()),
+    ] {
+        let output = ok(std::process::Command::new(env!("CARGO_BIN_EXE_app-server"))
+            .env_remove("ZENO_APP_PARTIES")
+            .env_remove("ZENO_APP_PRINCIPAL")
+            .env_remove("ZENO_APP_CONTEXT")
+            .env("ZENO_APP_SECRET_FILE", &credential)
+            .env("ZENO_APP_ORIGIN", value)
+            .env("ZENO_APP_ADDRESS", "127.0.0.1:0")
+            .env("ZENO_APP_STORE", root.join("never.sqlite"))
+            .output());
+        assert_eq!(output.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("ZENO_APP_ORIGIN"));
         assert!(!root.join("never.sqlite").exists());
     }
     ok(std::fs::remove_dir_all(root));
@@ -971,5 +1013,118 @@ fn program_connector_acknowledges_only_success() {
             "connector configuration accepted"
         );
     }
+    ok(std::fs::remove_dir_all(root));
+}
+
+#[test]
+fn public_origin_is_the_only_origin() {
+    let root = std::env::temp_dir().join(format!("app-origin-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let path = root.join("app.sqlite");
+    ok(application::init(&path));
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    let step = &fixture["steps"][0];
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let hash = RustCryptoSha256::hash(authority.identity());
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let clock = ok(application::app::ServerClock::declared(Some(
+        root.join("clock"),
+    )));
+    ok(std::fs::write(
+        root.join("clock"),
+        step["clock"].as_str().unwrap_or("0"),
+    ));
+    // The request's inputs: the current state, the step's command and its context
+    // with any server clock in place.
+    let mut context: Vec<i128> = step_context(&fixture, step).iter().map(scalar).collect();
+    if let Some(clock) = &clock {
+        context.insert(clock.position(), scalar(&step["clock"]));
+    }
+    let before = ok(application::current(&path));
+    let mut input = before.state.clone();
+    input.extend(step["command"].as_array().unwrap().iter().map(scalar));
+    input.extend(&context);
+    let frames = ok(application::wire(&descriptor, &input));
+    let principal = Hash32::new([7; 32]);
+    let preview = encode_command(
+        hash,
+        Hash32::new([1; 32]),
+        before.head.commits,
+        &ok(serde_json::to_vec(
+            &input.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        )),
+    );
+    let command = encode_command(hash, Hash32::new([1; 32]), before.head.commits, &frames[1]);
+    let serve = |origin: String| {
+        let production = ok(Production::open(
+            &path,
+            &lineage,
+            1,
+            ok(FileReceiver::new(&root.join("received"))),
+            Some(Clock::default()),
+        ));
+        let store = production.store();
+        let mut endpoint = ok(Application::new(
+            &lineage, production, store, &path, principal, &frames[2],
+        ));
+        if let Some(clock) =
+            application::app::ServerClock::declared(Some(root.join("clock"))).unwrap()
+        {
+            endpoint = ok(endpoint.with_clock(clock));
+        }
+        let config = ok(Config::new(
+            [0xab; 32],
+            principal,
+            hash,
+            origin,
+            Duration::from_secs(10),
+        ));
+        Server::new(config, endpoint, Sink::default())
+    };
+    // Unset, the loopback origin is the only one, as before.
+    let mut server = serve("http://127.0.0.1:8080".into());
+    let (status, _) = exchange_bytes(
+        &mut server,
+        wire_origin("/preview", "http://127.0.0.1:8080", &preview),
+    );
+    assert_eq!(status, 200);
+    let (status, _) = exchange_bytes(
+        &mut server,
+        wire_origin("/preview", "https://app.example.com", &preview),
+    );
+    assert_eq!(status, 403);
+    drop(server);
+    // With ZENO_APP_ORIGIN in force, only that exact origin is accepted.
+    let origin = ok(application::app::public_origin("https://app.example.com"));
+    let mut server = serve(origin);
+    for route in ["/preview", "/command"] {
+        let body = if route == "/preview" {
+            &preview
+        } else {
+            &command
+        };
+        for other in [
+            "http://127.0.0.1:8080",
+            "https://evil.example",
+            "https://app.example.com.evil.example",
+            "https://APP.example.com",
+        ] {
+            let (status, _) = exchange_bytes(&mut server, wire_origin(route, other, body));
+            assert_eq!(status, 403, "configured origin not exact: {other}");
+        }
+        assert_eq!(ok(application::current(&path)), before);
+        let (status, bytes) = exchange_bytes(
+            &mut server,
+            wire_origin(route, "https://app.example.com", body),
+        );
+        assert_eq!(status, 200, "{}", String::from_utf8_lossy(&bytes));
+    }
+    drop(server);
     ok(std::fs::remove_dir_all(root));
 }

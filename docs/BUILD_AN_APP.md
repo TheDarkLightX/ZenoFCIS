@@ -347,11 +347,14 @@ own computers.”
 
 The server listens only on loopback and speaks cleartext HTTP, so a trusted
 reverse proxy on the same host terminates TLS and forwards to it. Set
-`ZENO_APP_ORIGIN` to the public origin exactly as browsers send it, such as
-`https://app.example.com`: lowercase, with a port only when it is not 443,
-and no path. The ingress then accepts only that `Origin`, as it otherwise
-accepts only `http://ADDRESS`; the server refuses to start with any other
-form. For example, with nginx:
+`ZENO_APP_ORIGIN` to the public origin in the form browsers send:
+`https://`, a lowercase host, a port only when it is not 443, and nothing
+else, such as `https://app.example.com`. The ingress then accepts exactly
+that `Origin` and no other, including `http://ADDRESS`. The server refuses
+to start when the value is set but is not one such origin: `http://`, an
+explicit `:443`, uppercase, a path or trailing slash, a query, user
+information, whitespace, more than one value, or bytes that are not text.
+Unset, nothing changes. For example, with nginx:
 
 ```nginx
 server {
@@ -360,9 +363,15 @@ server {
     ssl_certificate     /etc/ssl/app.example.com/fullchain.pem;
     ssl_certificate_key /etc/ssl/app.example.com/privkey.pem;
     add_header Strict-Transport-Security "max-age=31536000" always;
+    # No larger than the server's limits: 64 KiB of body, 4 KiB of headers.
     client_max_body_size 64k;
+    client_header_buffer_size 4k;
+    large_client_header_buffers 1 4k;
     location / {
+        # TLS ends here; forward to the loopback address only.
         proxy_pass http://127.0.0.1:8080;
+        # The ingress requires exactly one Host header; it does not compare it.
+        proxy_set_header Host 127.0.0.1:8080;
         proxy_read_timeout 15s;
     }
 }
@@ -378,15 +387,22 @@ ZENO_APP_ORIGIN=https://app.example.com ZENO_APP_PARTIES=run/parties.json \
   cargo +1.97.1 run --locked --offline --bin app-server
 ```
 
-The proxy must terminate TLS with a certificate for the public name,
-forward only to the loopback address, and pass the `Authorization`,
-`Origin` and `Sec-Fetch-Site` headers unchanged. It must keep each request
-to one upstream connection, which nginx's default HTTP/1.0 upstream does,
-and may limit bodies to the server's 64 KiB. It must not add, rewrite or
-remove `Origin` or `Authorization`, serve the application over plain HTTP,
-cache responses, which are all `no-store`, log `Authorization` headers, or
-expose the loopback port. The proxy and its host are trusted: whoever
-controls them sees credentials in transit. This recipe does not add rate
+The proxy terminates TLS with a certificate for the public name and
+forwards to the loopback address only. It passes `Origin` and
+`Sec-Fetch-Site` unchanged: the ingress, not the proxy, refuses other
+origins. It must not add, strip or log the `Authorization` header; nginx's
+default access log does not record request headers. It sends one request
+per upstream connection, as nginx's default HTTP/1.0 upstream does. It keeps
+its body and header limits at or below the server's 64 KiB body and 4 KiB of
+headers in at most 24 fields; the server refuses anything larger in any
+case. The ingress requires exactly one `Host` header and refuses a missing
+or repeated one, but does not compare its value, which is why the block sets
+it to the loopback address the server listens on. The proxy must not serve
+the application over plain HTTP or cache its responses, which are all
+`no-store`. It must be the only route to the port: the server already
+accepts only loopback connections, so no other user or process on the host
+should be able to reach that port. The proxy and its host are trusted;
+whoever controls them sees credentials in transit. This recipe adds no rate
 limits, lockout or client certificates.
 
 ## The formal model

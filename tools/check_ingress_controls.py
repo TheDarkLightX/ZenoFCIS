@@ -39,6 +39,11 @@ CONTROLS = [
     ("party-replay-key", "journey", "parties_cannot_replay_each_other", "another party replayed a request", DURABLE,
      "let key = command.replay_key();",
      "let key = crate::Command { principal: self.parties[0].0, contract: command.contract, key: command.key, expected: command.expected, bytes: Vec::new() }.replay_key();"),
+    # A public origin from ZENO_APP_ORIGIN must match exactly.
+    ("origin-prefix", "http", "configured_https_origin_is_exact", "configured origin not exact", HTTP,
+     "origin.as_bytes() != config.origin.as_bytes()", "!origin.as_bytes().starts_with(config.origin.as_bytes())"),
+    ("origin-ignore-case", "http", "configured_https_origin_is_exact", "configured origin not exact", HTTP,
+     "origin.as_bytes() != config.origin.as_bytes()", "!origin.as_bytes().eq_ignore_ascii_case(config.origin.as_bytes())"),
     # A second party's credential in a trace passes every single-secret trace test.
     ("party-secret-in-trace", "journey", "party_traces_hold_no_credential", "party credential in trace", HTTP,
      "let trace = Trace::request(&command);",

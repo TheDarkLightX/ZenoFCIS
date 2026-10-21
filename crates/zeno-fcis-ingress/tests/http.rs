@@ -365,3 +365,77 @@ fn party_configuration_refusals() {
         ([2; 32], Hash32::new([2; 32]))
     ]));
 }
+// A preview-capable endpoint, as an application serves one.
+struct Previewing;
+impl Endpoint for Previewing {
+    fn preview(&mut self, command: &Command) -> Result<Vec<u8>, Refusal> {
+        Ok(command.principal().as_bytes().to_vec())
+    }
+    fn execute(&mut self, command: &Command, _: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
+        Ok(command.principal().as_bytes().to_vec())
+    }
+}
+#[test]
+fn configured_https_origin_is_exact() {
+    // The public origin a TLS proxy serves replaces the loopback origin.
+    let server = || {
+        Server::new(
+            ok(Config::new(
+                [0xab; 32],
+                Hash32::new([7; 32]),
+                Hash32::new([8; 32]),
+                "https://app.example.com".into(),
+                Duration::from_millis(80),
+            )),
+            Previewing,
+            Sink::default(),
+        )
+    };
+    let send = |path: &str, origin: &str| {
+        let body = body();
+        let mut bytes = format!(
+            "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nAuthorization: Bearer {}\r\nOrigin: {origin}\r\nContent-Length: {}\r\n\r\n",
+            "ab".repeat(32),
+            body.len()
+        )
+        .into_bytes();
+        bytes.extend_from_slice(&body);
+        status(&exchange_with(&mut server(), bytes))
+    };
+    for path in ["/preview", "/command"] {
+        assert_eq!(send(path, "https://app.example.com"), 200, "{path}");
+        for other in [
+            "http://127.0.0.1:8080",
+            "https://evil.example",
+            "https://app.example.com.evil.example",
+            "https://APP.example.com",
+            "https://app.example.co",
+            "http://app.example.com",
+        ] {
+            assert_eq!(
+                send(path, other),
+                403,
+                "configured origin not exact: {other}"
+            );
+        }
+    }
+}
+fn exchange_with(server: &mut Server<Previewing, Sink>, request: Vec<u8>) -> Vec<u8> {
+    let rt = ok(runtime());
+    if std::env::var_os("INGRESS_TEST_MEMORY").is_some() {
+        return support::exchange(server, request, false);
+    }
+    let listener = ok(rt.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")));
+    let address = ok(listener.local_addr());
+    let child = std::thread::spawn(move || {
+        let mut client = ok(TcpStream::connect(address));
+        ok(client.set_read_timeout(Some(Duration::from_secs(3))));
+        let _ = client.write_all(&request);
+        let _ = client.shutdown(Shutdown::Write);
+        let mut out = Vec::new();
+        let _ = client.read_to_end(&mut out);
+        out
+    });
+    let _ = rt.block_on(server.serve_one(&listener));
+    ok(child.join())
+}

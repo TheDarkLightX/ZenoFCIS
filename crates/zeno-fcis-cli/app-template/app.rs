@@ -1074,9 +1074,10 @@ pub fn run() -> AppResult<()> {
         &std::env::var("ZENO_APP_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8080".into()),
     )?;
     // Behind a trusted TLS proxy, the browser's origin is the proxy's.
-    let origin = match std::env::var("ZENO_APP_ORIGIN") {
-        Ok(text) => public_origin(&text)?,
-        Err(_) => format!("http://{address}"),
+    // Unset keeps the loopback origin; a value that is set must be a valid origin.
+    let origin = match std::env::var_os("ZENO_APP_ORIGIN") {
+        None => format!("http://{address}"),
+        Some(text) => public_origin(text.to_str().unwrap_or_default())?,
     };
     crate::session::with_lineage(|lineage| {
         let authority = lineage.authorities().last().ok_or("empty lineage")?;
