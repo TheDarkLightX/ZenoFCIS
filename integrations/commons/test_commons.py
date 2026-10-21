@@ -235,6 +235,13 @@ class InterfaceTests(unittest.TestCase):
             run("register", "--role", "test")
         return run(*args)
 
+    def test_cli_brief_advice_is_one_line_per_item(self):
+        self.cli("lead", "add", "lesson", "Lease folders before cleanup", "--tag", "cleanup")
+        out = json.loads(self.cli("builder", "advise", "cleanup of old folders", "--tag", "cleanup", "--brief").stdout)
+        self.assertEqual(len(out["advice"]), 1)
+        self.assertRegex(out["advice"][0], r"^les-[0-9a-f]{12} lesson score=\d+ Lease folders before cleanup$")
+        self.assertIsInstance(out["unread"], int)
+
     def test_cli_register_and_whoami(self):
         first = self.cli("builder", "register", "--kind", "builder", "--role", "collections")
         self.assertEqual(first.returncode, 0)

@@ -33,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tag", action="append", default=[])
     p.add_argument("--text", default="")
     p.add_argument("--limit", type=int, default=10)
+    p.add_argument("--brief", action="store_true", help="one line per item: id, type, score and title")
 
     lease = sub.add_parser("lease", help="take, renew, release, check or list leases").add_subparsers(dest="op", required=True)
     p = lease.add_parser("take"); p.add_argument("resource"); p.add_argument("--ttl", type=float, default=3600); p.add_argument("--note", default="")
@@ -95,7 +96,13 @@ def run(args) -> tuple[int, object]:
             out = c.verify()
             return (0 if out["ok"] else 2), out
         if cmd == "advise":
-            return 0, c.advise(args.action, args.tag, args.text, args.limit)
+            out = c.advise(args.action, args.tag, args.text, args.limit)
+            if args.brief:
+                out = {"action": out["action"],
+                       "advice": [f"{a['id']} {a['type']} score={a['score']} {a['title']}" for a in out["advice"]],
+                       "leases": [f"{l['resource']} leased by {l['owner']} until {l['expires']}" for l in out["leases"]],
+                       "unread": len(out["unread"])}
+            return 0, out
         if cmd == "lease":
             if args.op == "take":
                 return 0, c.lease_take(args.resource, args.ttl, args.note)
