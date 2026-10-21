@@ -386,6 +386,17 @@ class CommonsTests(unittest.TestCase):
         with self.assertRaises(CommonsError):
             first.link(canonical, "duplicates", duplicate)  # no folding into a closed record
 
+    def test_an_imported_gap_counts_its_original_reporter_not_the_importer(self):
+        s = self.open("lead")
+        log = Path(self.tmp.name) / "gaps.jsonl"
+        log.write_text(json.dumps({"agent": "sec-review", "severity": "high", "need": "Lemmas cannot see deliveries"}) + "\n")
+        s.import_gaps(log)
+        [gap] = s.gaps()
+        self.assertEqual(gap["reporters"], ["sec-review"])
+        events = len(s.events(limit=1000))
+        s.import_gaps(log)
+        self.assertEqual(len(s.events(limit=1000)), events)  # reimport writes nothing
+
     def test_gaps_rank_by_severity_then_reporters_then_age(self):
         a, b = self.open("agent-a"), self.open("agent-b")
         low = a.record_add("gap", "Low one", tags=["severity-low"])["id"]

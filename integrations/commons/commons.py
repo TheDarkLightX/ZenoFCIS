@@ -589,13 +589,16 @@ class Commons:
         cursor.execute("UPDATE records SET status='superseded', updated_seq=? WHERE id=?", (seq, src))
 
     def _reporters(self, record_id: str) -> list[str]:
-        """Distinct authors of a record and of every duplicate folded into it, directly or transitively."""
+        """Distinct reporters of a record and of every duplicate folded into it, directly or transitively.
+
+        A record's reporter is its author, or the reporter-<name> tag of a record imported on someone's behalf."""
         seen, authors, frontier = {record_id}, set(), [record_id]
         while frontier:
             rid = frontier.pop()
-            row = self.db.execute("SELECT author FROM records WHERE id=?", (rid,)).fetchone()
+            row = self.db.execute("SELECT author, tags FROM records WHERE id=?", (rid,)).fetchone()
             if row:
-                authors.add(row[0])
+                named = [t[9:] for t in json.loads(row[1]) if t.startswith("reporter-")]
+                authors.update(named or [row[0]])  # an imported gap names its original reporter
             for (src,) in self.db.execute("SELECT src FROM links WHERE rel='duplicates' AND dst=?", (rid,)):
                 if src not in seen:
                     seen.add(src)
@@ -968,9 +971,13 @@ class Commons:
             title = str(row.get("need") or row.get("task") or "gap")[:300]
             body = "\n".join(f"{k}: {row[k]}" for k in ("task", "what_zenofcis_lacks", "workaround", "evidence") if row.get(k))
             clean = lambda v: re.sub(r"[^a-z0-9._:@/-]+", "-", str(v).lower()).strip("-._:@/")[:100] or "unknown"
-            tags = [clean(row.get("agent", "unknown")), "severity-" + clean(row.get("severity", "unknown")), "feature-gap"]
+            agent = clean(row.get("agent", "unknown"))
+            tags = [agent, "severity-" + clean(row.get("severity", "unknown")), "feature-gap"]
             out = self.record_add("gap", title, body, tags=tags)
             added, existing = added + (not out["existing"]), existing + out["existing"]
+            # The importer is not the reporter. The tag is added after creation, so record IDs stay content-derived.
+            if f"reporter-{agent}" not in self.record(out["id"])["tags"]:
+                self.record_update(out["id"], tags=[f"reporter-{agent}"])
         return {"added": added, "existing": existing}
 
 
