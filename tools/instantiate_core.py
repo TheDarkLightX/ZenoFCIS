@@ -164,7 +164,11 @@ def main():
             parameters[key] = int(value)
         print(json.dumps(instantiate(args.family, parameters, args.output), sort_keys=True))
     except (ValueError, OSError, KeyError) as error:
-        parser.exit(1, f"core instantiation refused: {error}\n")
+        next_step = ("Use the ready examples/guide-counter directory for the contract-judge walkthrough; "
+                     "a stale source-bound family certificate still requires independent regeneration and checking."
+                     if "source" in str(error).lower() or "stale" in str(error).lower()
+                     else "Check the family, parameters and fresh output directory; inspect --show before retrying.")
+        parser.exit(1, f"core instantiation refused: {error}\nnext: {next_step}\n")
 
 
 if __name__ == "__main__":

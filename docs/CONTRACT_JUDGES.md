@@ -58,11 +58,10 @@ The judges enumerate the whole declared domain, so they suit contracts with
 small field ranges, such as the [core components](../core-components/README.md).
 A bounded counter of capacity 2 has 12 inputs: a value from 0 to 2, an action,
 `Inc` (150) or `Dec` (151), and whether the operator is authorized. From a
-pristine source checkout, as the core-components README describes:
-
-```text
-python3 tools/instantiate_core.py bounded-counter counter --param C=2
-```
+source checkout, use the ready [counter example](../examples/guide-counter/project.zeno),
+which carries no family-certificate qualification. Run the commands below from
+the repository root; no instantiation is required. Family installation still
+requires fresh source-bound evidence as the core-components README describes.
 
 Its laws say that the value stays within 0 and 2 (law 500), that an accept is
 authorized and in range (law 501), and that an accepted `Inc` adds one and an
@@ -71,10 +70,10 @@ accepted `Dec` subtracts one (law 502).
 ## Do the laws pin the contract down?
 
 ```text
-zeno-fcis contract review counter --gaps --out review.json
+zeno-fcis contract review examples/guide-counter --gaps --out review.json
 ```
 
-The summary gains one line:
+The base summary gains one line:
 
 ```text
 gaps: 0 of 12 tuples determined by the declared laws (0 of 12 on valid pre-states); mutants admitted 9, caught 28; inactive laws []; reject-everything core admitted where the contract decides: true
@@ -105,12 +104,14 @@ law 9000 rejects_only_when_needed on reject = context.102.130 == 0 || (command.1
 ```
 
 ```text
-zeno-fcis contract review counter --gaps --gaps-laws proposed.zeno --out review.json
+zeno-fcis contract review examples/guide-counter --gaps --gaps-laws proposed.zeno --out review.json
 ```
 
 The judge first requires that the proposal holds on the contract's own
 decision wherever it applies: it applies on the 8 rejects and holds on each.
-Then it repeats every measure with it. Determined inputs rise from 0 to 4, the
+Then it repeats every measure with it. The JSON summary retains the original
+counts and adds `summary.gaps.with_proposals`; the terminal prints a second
+`gaps with proposals: 4 of 12 tuples determined` line with 3 mutants admitted. Determined inputs rise from 0 to 4, the
 admitted mutants fall from 9 to 3, and `m0043` is now caught. The reject
 reasons stay free: no declared or proposed law says which reason a reject
 gives. A proposal that fails on the contract's decision is a false alarm,
@@ -120,7 +121,7 @@ owner's edit.
 ## Which states matter?
 
 ```text
-zeno-fcis contract profile counter
+zeno-fcis contract profile examples/guide-counter
 ```
 
 reports, for the counter, 3 declared states, all 3 satisfying the state law,
@@ -133,7 +134,7 @@ persists and exposes its state, so the judge proposes no change.
 ## Does an invariant hold?
 
 ```text
-zeno-fcis contract lemma counter --lemma 'post.100.110 <= 1'
+zeno-fcis contract lemma examples/guide-counter --lemma 'post.100.110 <= 1'
 ```
 
 A lemma is written as a state law. The judge answers by induction over the
@@ -159,7 +160,7 @@ NAME` comments:
 0 | 151 | 0 | reject 200 0 | -
 ```
 
-`zeno-fcis contract scenario counter` replays each run through the contract
+`zeno-fcis contract scenario examples/guide-counter` replays each run through the contract
 and reports the first step whose decision, or written pre-state, differs. When
 every run passes, it replays them through every mutant and through the
 reject-everything core too. `count-up` expects a commit, so it kills that
@@ -172,7 +173,7 @@ the same reason.
 `contract probe` answers one exact question between edits:
 
 ```text
-zeno-fcis contract probe explain counter --input '2 150 1'
+zeno-fcis contract probe explain examples/guide-counter --input '2 150 1'
 ```
 
 names case 1, `(action == 150) && (value == 2)`, as the case that decides, case

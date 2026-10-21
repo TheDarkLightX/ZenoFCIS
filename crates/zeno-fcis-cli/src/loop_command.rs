@@ -552,7 +552,54 @@ fn open_acquired(
 fn encode_command(program: &Path, out: &Path) -> (u8, Value) {
     let mut acquisition = Acquisition::reserve(AcquisitionMode::Encode);
     let outcome = encode_command_acquired(program, out, &mut acquisition);
-    acquisition_outcome(outcome, &acquisition)
+    let mut outcome = acquisition_outcome(outcome, &acquisition);
+    if outcome.0 != crate::OK {
+        let next = match outcome.1["status"].as_str() {
+            Some("output-exists") => {
+                "Choose a fresh --out path; an existing file is never overwritten."
+            }
+            Some("io-error") => {
+                "Check the input file and output parent permissions, then retry with a fresh --out path."
+            }
+            Some("inconclusive") => {
+                "Inspect acquisition usage; reduce the input to the declared intake limits before retrying."
+            }
+            _ => match outcome.1["detail"]["reason"].as_str() {
+                Some("program-json-too-large") => {
+                    "Reduce the JSON below max_bytes; splitting a program does not establish equivalence."
+                }
+                Some("program-json-unreadable") => {
+                    "Fix the JSON syntax, then rerun loop encode with a fresh --out path."
+                }
+                Some("program-json-shape") => {
+                    "Use an object with exactly inputs, outputs, nodes and roots arrays; see guide show loop-workspace."
+                }
+                Some("program-json-domain") => {
+                    "Use Bool domains or Int domains with canonical decimal min and max strings."
+                }
+                Some("program-json-decimal") => {
+                    "Encode integers as canonical decimal strings: no plus, leading zeros or negative zero."
+                }
+                Some("program-json-node") => {
+                    "Use an admitted opcode with its documented arity and integer node references; see docs/benchmarks/DESIGN.md."
+                }
+                Some("program-json-root") => {
+                    "Use JSON integer node indices in roots, one per output."
+                }
+                Some("program-not-admitted") => {
+                    "Repair the reported admission code, types and node references; retry encoding before submitting a candidate."
+                }
+                Some("U128SubjectUnsupported") => {
+                    "Use a supported signed-scalar subject, or a checker that supports the original unsigned domain; do not narrow its meaning."
+                }
+                _ => {
+                    "Retain the input and diagnostic, inspect guide show loop-workspace, and report the encoding failure."
+                }
+            },
+        };
+        outcome.1["detail"]["next_step"] = json!(next);
+    }
+    outcome
 }
 
 fn encode_command_acquired(

@@ -264,6 +264,97 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
 }
 
 #[test]
+fn proposal_summary_retains_both_measures_and_prints_the_effect() {
+    let root = TempRoot::new("proposal-summary");
+    let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/guide-counter");
+    let project_before = fs::read(app.join("project.zeno")).unwrap();
+    let policy_before = fs::read(app.join("v2/policy.json")).unwrap();
+    let laws = root.path().join("proposed.zeno");
+    fs::write(&laws, "law 9000 rejects_only_when_needed on reject = context.102.130 == 0 || (command.101.120 == 150 && pre.100.110 == 2) || (command.101.120 == 151 && pre.100.110 == 0);\n").unwrap();
+    let out = root.path().join("review.json");
+    let args = [
+        "contract",
+        "review",
+        text(&app),
+        "--gaps",
+        "--gaps-laws",
+        text(&laws),
+        "--out",
+        text(&out),
+    ];
+    let human = zeno(&args);
+    assert_eq!(human.status.code(), Some(0));
+    let terminal = String::from_utf8_lossy(&human.stdout);
+    assert!(
+        terminal.contains("gaps: 0 of 12 tuples determined"),
+        "{terminal}"
+    );
+    assert!(
+        terminal.contains("gaps with proposals: 4 of 12 tuples determined"),
+        "assertion failed: missing proposal effect\n{terminal}"
+    );
+    let mut json_args = args.to_vec();
+    json_args.extend(["--format", "json"]);
+    let summary = run(&json_args, 0);
+    let packet: Value = serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    let base = &summary["summary"]["gaps"];
+    let after = &base["with_proposals"];
+    assert_eq!(base["full"]["determined"], 0);
+    assert_eq!(base["full"]["mutants_admitted"], 9);
+    assert_eq!(after["full"]["determined"], 4);
+    assert_eq!(after["full"]["mutants_admitted"], 3);
+    for (counts, measure) in [
+        (base, &packet["gaps"]),
+        (after, &packet["gaps"]["proposals"]["after"]),
+    ] {
+        for domain in ["full", "valid"] {
+            assert_eq!(
+                counts[domain]["tuples"],
+                measure["admissible"][domain]["tuples"]
+            );
+            assert_eq!(
+                counts[domain]["determined"],
+                measure["admissible"][domain]["determined"]
+            );
+            assert_eq!(
+                counts[domain]["mutants_admitted"],
+                measure["mutation"][domain]["admitted"]
+            );
+            assert_eq!(
+                counts[domain]["mutants_caught"],
+                measure["mutation"][domain]["caught"]
+            );
+        }
+        assert_eq!(counts["inactive_laws"], measure["activation"]["inactive"]);
+        assert_eq!(
+            counts["reject_everything_admitted"],
+            measure["reject_everything"]["admitted_where_the_contract_decides"]
+        );
+    }
+    assert_eq!(packet["authority"], "none");
+    assert_eq!(project_before, fs::read(app.join("project.zeno")).unwrap());
+    assert_eq!(policy_before, fs::read(app.join("v2/policy.json")).unwrap());
+    let plain = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--out",
+            text(&out),
+            "--format",
+            "json",
+        ],
+        0,
+    );
+    assert!(plain["summary"]["gaps"].get("with_proposals").is_none());
+    fs::write(&laws, "law 9000 false_proposal on any = false;\n").unwrap();
+    let alarm = run(&json_args, 1);
+    assert_eq!(alarm["summary"]["gaps"]["status"], "proposal-false-alarm");
+    assert!(alarm["summary"]["gaps"].get("with_proposals").is_none());
+}
+
+#[test]
 fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
     let root = TempRoot::new("judges");
     let app = counter(&root);

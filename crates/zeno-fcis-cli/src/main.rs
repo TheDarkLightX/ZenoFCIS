@@ -550,6 +550,15 @@ fn execute() -> u8 {
         Err(error) => {
             let exit = clap_error_exit(&error);
             let _ = error.print();
+            if std::env::args_os()
+                .collect::<Vec<_>>()
+                .windows(2)
+                .any(|pair| pair[0] == "kb" && pair[1] == "assess")
+            {
+                eprintln!(
+                    "next: kb assess is unavailable in this build; run zeno-fcis kb --help for supported operations and zeno-fcis guide show knowledge for the assessment boundary"
+                );
+            }
             exit
         }
     }
@@ -1400,19 +1409,28 @@ fn prove(
 ) -> u8 {
     let spec = match project_or_report(path, OutputFormat::Human) {
         Ok(value) => value,
-        Err(code) => return code,
+        Err(code) => {
+            eprintln!(
+                "next: run zeno-fcis check PROJECT --format json and repair its diagnostics before retrying prove"
+            );
+            return code;
+        }
     };
     let claims = match select_claims(&spec, selector) {
         Ok(values) => values,
         Err(message) => {
-            eprintln!("{message}");
+            eprintln!(
+                "{message}; next: select a declared claim ID from PROJECT, or use --claim all"
+            );
             return INVALID;
         }
     };
     let manifest = match load_tools_manifest(tools) {
         Ok(value) => value,
         Err(error) => {
-            eprintln!("tools manifest blocked: {error:?}");
+            eprintln!(
+                "tools manifest blocked: {error:?}; next: supply a readable --tools manifest, then run zeno-fcis doctor --tools FILE"
+            );
             return BLOCKED;
         }
     };
@@ -1440,7 +1458,7 @@ fn prove(
             if !compatible {
                 if !matches!(choice, BackendChoice::All) {
                     eprintln!(
-                        "claim {} does not select compatible {}",
+                        "claim {} does not select compatible {}; next: select a backend declared by this claim; unbounded proofs require Lean, finite and relational claims require an SMT backend",
                         claim.id().get(),
                         backend_name(tool_backend)
                     );
@@ -1451,7 +1469,7 @@ fn prove(
             ran += 1;
             let Some(config) = manifest.tool(tool_backend) else {
                 eprintln!(
-                    "{} is absent from tools manifest",
+                    "{} is absent from tools manifest; next: configure this backend in --tools FILE, then run zeno-fcis doctor --tools FILE",
                     backend_name(tool_backend)
                 );
                 exit = exit.max(BLOCKED);
@@ -1468,7 +1486,10 @@ fn prove(
             let obligation = match obligation {
                 Ok(value) => value,
                 Err(error) => {
-                    eprintln!("claim {} export blocked: {error:?}", claim.id().get());
+                    eprintln!(
+                        "claim {} export blocked: {error:?}; next: use a claim in the backend's supported fragment; inspect zeno-fcis guide show prove",
+                        claim.id().get()
+                    );
                     exit = exit.max(BLOCKED);
                     continue;
                 }
@@ -1478,16 +1499,19 @@ fn prove(
                 Ok(value) => value,
                 Err(error) => {
                     eprintln!(
-                        "{} claim {} blocked: {error:?}",
+                        "{} claim {} blocked: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(&error)
                     );
                     exit = exit.max(failure_exit(&error));
                     continue;
                 }
             };
             if let Err(error) = retain_run(&evidence, &run) {
-                eprintln!("retain run failed: {error:?}");
+                eprintln!(
+                    "retain run failed: {error:?}; next: preserve existing evidence, check evidence-directory permissions and available space, then retry in a fresh project copy"
+                );
                 exit = exit.max(FAILURE);
                 continue;
             }
@@ -1511,7 +1535,7 @@ fn prove(
                 }
                 ToolRunStatus::KernelChecked if counterexample => {
                     eprintln!(
-                        "{} claim {}: kernel-checked theorem does not provide a counterexample",
+                        "{} claim {}: kernel-checked theorem does not provide a counterexample; next: use an SMT backend on a compatible claim to request a replayable counterexample",
                         backend_name(tool_backend),
                         claim.id().get()
                     );
@@ -1544,23 +1568,25 @@ fn prove(
                 }
                 ToolRunStatus::Blocked(error) => {
                     eprintln!(
-                        "{} claim {} blocked: {error:?}",
+                        "{} claim {} blocked: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(error)
                     );
                     tool_run_exit(run.status(), counterexample)
                 }
                 ToolRunStatus::Failed(error) => {
                     eprintln!(
-                        "{} claim {} failed: {error:?}",
+                        "{} claim {} failed: {error:?}; next: {}",
                         backend_name(tool_backend),
-                        claim.id().get()
+                        claim.id().get(),
+                        formal_next_step(error)
                     );
                     tool_run_exit(run.status(), counterexample)
                 }
                 _ => {
                     eprintln!(
-                        "claim {} blocked: unsupported formal outcome",
+                        "claim {} blocked: unsupported formal outcome; next: retain the tool output and inspect guide show prove before retrying",
                         claim.id().get()
                     );
                     BLOCKED
@@ -1595,10 +1621,53 @@ fn prove(
         }
     }
     if ran == 0 {
-        eprintln!("no compatible claim/backend pair was selected");
+        eprintln!(
+            "no compatible claim/backend pair was selected; next: select a declared claim and one of its compatible backends; inspect guide show prove"
+        );
         BLOCKED
     } else {
         exit
+    }
+}
+
+fn formal_next_step(error: &ToolFailure) -> &'static str {
+    match error {
+        ToolFailure::Missing | ToolFailure::NotFile | ToolFailure::Io(_) => {
+            "Check the configured executable and file permissions, then run zeno-fcis doctor --tools FILE."
+        }
+        ToolFailure::HashMismatch
+        | ToolFailure::VersionMismatch
+        | ToolFailure::ToolchainHashMismatch
+        | ToolFailure::ToolchainIncomplete
+        | ToolFailure::ToolchainUnsupported => {
+            "Restore the qualified toolchain matching the manifest and run doctor; do not weaken the pinned identity."
+        }
+        ToolFailure::BinaryTooLarge | ToolFailure::ToolchainTooLarge => {
+            "Use a qualified runtime within the declared size limits; inspect doctor before retrying."
+        }
+        ToolFailure::Timeout | ToolFailure::OutputLimit | ToolFailure::Unknown => {
+            "Inspect retained output and declared limits; simplify the obligation or choose a compatible backend. No proof was established."
+        }
+        ToolFailure::ProcessContainmentUnavailable | ToolFailure::ProcessContainmentFailed => {
+            "Restore the documented process-containment prerequisites and run doctor before retrying."
+        }
+        ToolFailure::Crash(_) => {
+            "Retain the tool log, run doctor, and reproduce the crash on the smallest obligation before retrying."
+        }
+        ToolFailure::RetentionConflict => {
+            "Preserve existing evidence and retry from a fresh project copy after checking its identity."
+        }
+        ToolFailure::ModelReplayFailed | ToolFailure::InconsistentResult => {
+            "Retain the model and replay diagnostic; repair the mismatch before treating it as a counterexample."
+        }
+        ToolFailure::UnsupportedEvidence
+        | ToolFailure::LeanAxiomReport
+        | ToolFailure::DisallowedLeanAxiom(_) => {
+            "Inspect the retained proof and axiom report; provide supported independently checkable evidence without widening the axiom policy."
+        }
+        _ => {
+            "Retain the tool diagnostic and inspect guide show prove before retrying an unsupported formal result."
+        }
     }
 }
 
@@ -1896,6 +1965,42 @@ fn io_error(context: &str, error: std::io::Error) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formal_refusals_have_specific_recovery_steps() {
+        for (failure, action) in [
+            (ToolFailure::Missing, "executable"),
+            (ToolFailure::NotFile, "permissions"),
+            (ToolFailure::Io("unreadable".into()), "doctor"),
+            (ToolFailure::HashMismatch, "do not weaken"),
+            (ToolFailure::VersionMismatch, "qualified toolchain"),
+            (ToolFailure::ToolchainHashMismatch, "pinned identity"),
+            (ToolFailure::ToolchainIncomplete, "Restore"),
+            (ToolFailure::ToolchainUnsupported, "doctor"),
+            (ToolFailure::BinaryTooLarge, "size limits"),
+            (ToolFailure::ToolchainTooLarge, "size limits"),
+            (ToolFailure::Timeout, "No proof was established"),
+            (ToolFailure::OutputLimit, "declared limits"),
+            (ToolFailure::Unknown, "compatible backend"),
+            (
+                ToolFailure::ProcessContainmentUnavailable,
+                "process-containment",
+            ),
+            (ToolFailure::ProcessContainmentFailed, "prerequisites"),
+            (ToolFailure::Crash(Some(1)), "smallest obligation"),
+            (ToolFailure::RetentionConflict, "Preserve existing evidence"),
+            (ToolFailure::ModelReplayFailed, "repair the mismatch"),
+            (ToolFailure::InconsistentResult, "replay diagnostic"),
+            (ToolFailure::UnsupportedEvidence, "independently checkable"),
+            (ToolFailure::LeanAxiomReport, "axiom report"),
+            (
+                ToolFailure::DisallowedLeanAxiom("Classical.choice".into()),
+                "without widening",
+            ),
+        ] {
+            assert!(formal_next_step(&failure).contains(action), "{failure:?}");
+        }
+    }
 
     #[test]
     fn every_described_command_has_explicit_effect_metadata() {

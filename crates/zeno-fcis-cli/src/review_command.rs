@@ -414,21 +414,32 @@ fn text(name: &str, bytes: Vec<u8>) -> Result<String, Failure> {
     String::from_utf8(bytes).map_err(|error| Failure::Read(format!("read {name}: {error}")))
 }
 
-/// One line on the specification-gap judge.
+fn measured_gaps_line(label: &str, summary: &Value) -> String {
+    format!(
+        "{label}: {} of {} tuples determined by the declared laws ({} of {} on valid pre-states); mutants admitted {}, caught {}; inactive laws {}; reject-everything core admitted where the contract decides: {}",
+        summary["full"]["determined"],
+        summary["full"]["tuples"],
+        summary["valid"]["determined"],
+        summary["valid"]["tuples"],
+        summary["full"]["mutants_admitted"],
+        summary["full"]["mutants_caught"],
+        summary["inactive_laws"],
+        summary["reject_everything_admitted"],
+    )
+}
+
+/// Report both checked measures when a proposal was measured.
 fn gaps_line(gaps: &gaps::Gaps) -> String {
     let summary = gaps.summary();
     match gaps {
-        gaps::Gaps::Measured(_) => format!(
-            "gaps: {} of {} tuples determined by the declared laws ({} of {} on valid pre-states); mutants admitted {}, caught {}; inactive laws {}; reject-everything core admitted where the contract decides: {}",
-            summary["full"]["determined"],
-            summary["full"]["tuples"],
-            summary["valid"]["determined"],
-            summary["valid"]["tuples"],
-            summary["full"]["mutants_admitted"],
-            summary["full"]["mutants_caught"],
-            summary["inactive_laws"],
-            summary["reject_everything_admitted"],
-        ),
+        gaps::Gaps::Measured(_) => {
+            let mut line = measured_gaps_line("gaps", &summary);
+            if let Some(after) = summary.get("with_proposals") {
+                line.push('\n');
+                line.push_str(&measured_gaps_line("gaps with proposals", after));
+            }
+            line
+        }
         gaps::Gaps::FalseAlarm(value) => format!(
             "gaps: proposed law {} fails on the contract's decision at input {}",
             value["false_alarm"]["law"], value["false_alarm"]["input"]

@@ -121,20 +121,30 @@ impl Gaps {
     pub(crate) fn summary(&self) -> Value {
         let mut summary = json!({"status": self.status()});
         if let Self::Measured(value) = self {
-            for domain in ["full", "valid"] {
-                summary[domain] = json!({
-                    "tuples": value["admissible"][domain]["tuples"],
-                    "determined": value["admissible"][domain]["determined"],
-                    "mutants_admitted": value["mutation"][domain]["admitted"],
-                    "mutants_caught": value["mutation"][domain]["caught"],
-                });
+            summary = measured_summary(value);
+            if let Some(after) = value["proposals"].get("after").filter(|v| v.is_object()) {
+                summary["with_proposals"] = measured_summary(after);
             }
-            summary["inactive_laws"] = value["activation"]["inactive"].clone();
-            summary["reject_everything_admitted"] =
-                value["reject_everything"]["admitted_where_the_contract_decides"].clone();
         }
         summary
     }
+}
+
+/// Project measured counts without changing either checked measure.
+fn measured_summary(value: &Value) -> Value {
+    let mut summary = json!({"status": "measured"});
+    for domain in ["full", "valid"] {
+        summary[domain] = json!({
+            "tuples": value["admissible"][domain]["tuples"],
+            "determined": value["admissible"][domain]["determined"],
+            "mutants_admitted": value["mutation"][domain]["admitted"],
+            "mutants_caught": value["mutation"][domain]["caught"],
+        });
+    }
+    summary["inactive_laws"] = value["activation"]["inactive"].clone();
+    summary["reject_everything_admitted"] =
+        value["reject_everything"]["admitted_where_the_contract_decides"].clone();
+    summary
 }
 
 /// Runs the judge on a contract.
