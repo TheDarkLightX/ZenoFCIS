@@ -369,3 +369,55 @@ position, a Boolean observation used as an integer, a chained implication, an
 update outside a declared variable or repeated on one, a range or domain
 above the limits in the specification, and a variable that starts outside its
 range.
+
+## Profiles `zal/finite-types/1`, `zal/effects/1` and `zal/typed-fsm/1`
+
+These profiles are implemented in [`adt.py`](../../integrations/zal/adt.py),
+[`effects.py`](../../integrations/zal/effects.py) and
+[`typed2.py`](../../integrations/zal/typed2.py); their meaning, checks and
+scope are in [types and effects](EFFECTS.md). One statement per line; `#`
+starts a comment line. Type, port, capability and answer names are a capital
+letter followed by letters and digits; field, case and resource names follow
+the lowercase name rule above. Both surfaces parse to one value, and the
+canonical rendering of either surface parses back to it.
+
+```text
+type     := "type" TypeName "=" (ty | "{" [field ":" ty {"," field ":" ty}] "}" | case {"|" case}) ";"
+case     := name ["(" ty ")"]
+ty       := "unit" | "bool" | "int" INT "..=" INT | "bytes" "..=" CAP | "bytes" CAP
+          | "list" "..=" CAP "of" ty | TypeName
+English  := "The type" TypeName "is" (ty-en | "a record with fields" name "(" ty-en ")" {"," ...}
+          | "a record with no fields" | "one of" name ["(" ty-en ")"] {"," ...}) "."
+ty-en    := "nothing" | "a Boolean" | "an integer from" INT "to" INT "inclusive" | "at most" CAP "bytes"
+          | "exactly" CAP "bytes" | "a list of at most" CAP "items of" ty-en | TypeName
+```
+
+`zal/effects/1` statements, symbolic first:
+
+| Concept | Symbolic | English |
+| --- | --- | --- |
+| header | `zal effects 1;` | `ZAL effects version 1.` |
+| name | `effects NAME;` | `The effect signature is NAME.` |
+| schema | `schema SCHEMA;` | `It lowers to the record schema SCHEMA.` |
+| resource | `resource NAME = BIT;` | `Resource NAME has bit value BIT.` |
+| capability | `capability C = N: store, reads {R, R}, writes {R};` | `Capability C, number N, is a store capability that allows reading R and R and writing R.` |
+| answer | `answer A = N: ok(T) \| refused(Code);` | `Answer A, number N, is one of ok (the result), refused (Code).` |
+| frame | `frame A: ok applied, refused unchanged;` | `For answer A, ok means the operation took effect, refused means nothing changed.` |
+| ports | `ports P = 1, Q = 2;` | `The ports are P (1), Q (2).` |
+| law | `law ID name-with-hyphens: "STATEMENT";` | `Law ID name-with-hyphens: "STATEMENT".` |
+| operation | `operation P(field: TYPE) -> A TYPE;` | `Operation P takes field (TYPE) and answers A of TYPE.` |
+| footprint | `footprint P: capability C, reads {R}, writes {}, laws [ID], v2 calls [CALL];` | `Operation P needs capability C, reads R, writes nothing, obeys law ID, and maps to the V2 call CALL.` |
+
+A footprint's V2 mapping is also `v2 external CALL` ("maps to the external CALL
+outside the store") or `v2 opt_in` ("has no default V2 call"). English lists use
+"a, b and c" and "nothing" for an empty list. A statement text is printable
+ASCII without `"`, at most 512 characters. Limits: 160 statements, 64 types,
+32 fields or cases per type, 64 items of each other kind, 64 KiB per surface.
+
+`zal/typed-fsm/1` is profile 2 with the header `zal typed 1;`, `type`
+statements after the context declaration, and two more statement forms:
+`var NAME: TYPE initially VALUE;` ("The variable NAME holds TYPE, initially
+VALUE.") and `input NAME: TYPE;` ("The input NAME holds TYPE."). Inside
+formulas and updates, a typed name appears as `NAME == VALUE`, `NAME != VALUE`,
+`NAME' == VALUE` or `NAME = VALUE` ("NAME equals VALUE", "NAME does not equal
+VALUE", "NAME after this event equals VALUE", "NAME set to VALUE").

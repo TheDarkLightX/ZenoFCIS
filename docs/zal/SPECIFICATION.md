@@ -313,9 +313,10 @@ The checker identity version `zal/checker/3` hashes `behavior.py`,
 `behavior2.py`, `workflow.py`, `factory.py`, `shared.py`, `terminal.py`,
 `mcp.py`, `workspace.py`, `server.py`, `workspace.html`, `explain.py`, `explain2.py`,
 `constructs.py`, `ladder_tools.py`, `ladder.py`, `ladder_en.json`,
-`temporal_lowering.py`, and the withdrawal pilot's checker `withdrawal_pilot.py`
+`temporal_lowering.py`, the withdrawal pilot's checker `withdrawal_pilot.py`
 with its Lean templates `withdrawal_pilot.lean` and
-`withdrawal_pilot_refutation.lean`.
+`withdrawal_pilot_refutation.lean`, and the finite types, typed-machine and
+effects modules `adt.py`, `typed2.py`, `effects.py` and `effects_guide.py`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no
@@ -618,6 +619,35 @@ configuration. Pre-states that break an invariant are excluded, because the
 contract's genesis and commit laws keep every state it holds admissible. The
 correspondence is a tested correspondence, not a theorem: qualification runs
 the actual generated Authority on that table.
+
+## Finite types, typed machines and effect signatures
+
+Three 2.6 profiles are separate modules with their own profile IDs:
+`zal/finite-types/1` (`adt.py`), `zal/typed-fsm/1` (`typed2.py`) and
+`zal/effects/1` (`effects.py`, with `effects_guide.py` for help and
+explanations). Profiles 1 and 2 keep their parsers, revisions, verdicts and
+renderings. [Types and effects](EFFECTS.md) has the forms, the checks and the
+evidence; the grammar is in [GRAMMAR.md](GRAMMAR.md#profiles-zalfinite-types1-zaleffects1-and-zaltyped-fsm1).
+
+A type is an alias, a record or a variant over bounded integers, Booleans,
+byte-capped and exact bytes and bounded lists. Recursion is refused, so every
+type is finite. Each type's count of values is exact: records multiply,
+variants add. A typed machine elaborates exactly to a `zal/finite-fsm/2`
+machine. A name of a non-integer type holds the index of its value in the
+type's canonical enumeration, which must have at most 64 values, and is used
+only with `==`, `!=` and assignment. Verdicts are profile 2 verdicts on the
+elaborated machine, with values decoded in witnesses.
+
+An effect signature source declares resources, capabilities, answer shapes
+and their frames, the port list, types, laws and one operation and footprint
+per port. `effects.check` runs the named checks `record_schema`,
+`port_coverage`, `frames`, `footprints`, `laws`, `v2_mapping` and
+`record_kinds`. `effects.lower` emits the `zeno-fcis/shell-effects/1` record's
+canonical bytes. The shipped source `examples/shell_effects.zal` lowers to the
+shell registry's bytes and identity; this is a tested correspondence against
+the built library, not a proof. Laws are named and checked for existence and
+use, not against any handler. These profiles have no review-terminal, MCP or
+browser surface yet; `run.py` selects them by header.
 
 ## Future profiles and release gates
 

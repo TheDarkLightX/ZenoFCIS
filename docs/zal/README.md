@@ -541,6 +541,22 @@ on, including every step of the repeating cycle, so it never happens." In
 other, and `want` can name `Trap` to find the nearest input whose update
 leaves a range. The same commands accept profile 1 models without `variables`.
 
+## Types and effect signatures
+
+`zal/effects/1` writes the shell's effect ports in ZAL, and `zal/typed-fsm/1`
+gives profile 2 variables and inputs finite types. See
+[types and effects](EFFECTS.md):
+
+```sh
+python3 integrations/zal/check_effects.py native-build
+python3 integrations/zal/run.py check integrations/zal/examples/shell_effects.zal
+python3 integrations/zal/run.py explain integrations/zal/examples/shell_effects.zal --topic port:Commit --human
+python3 integrations/zal/run.py check integrations/zal/examples/relay_typed.zal
+```
+
+The first command builds the small Rust printer that the byte-for-byte test
+compares against.
+
 ## Experimental progression ladders
 
 The [ladder prototype](ladder/README.md) presents a statement through seven

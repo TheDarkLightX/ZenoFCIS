@@ -44,6 +44,12 @@ and footprint, the IDs of its handler laws, and its default V2 calls.
   tick, `Interrupted` or a fault; an interrupted delivery run leaves the record
   pending. It ends `Refused(Interrupted)` before any possible send and `Unknown(Io)` afterward.
 
+The same ten signatures are written in ZAL as
+`integrations/zal/examples/shell_effects.zal` ([types and effects](zal/EFFECTS.md)).
+Lowering that source gives these canonical bytes exactly; a test compares
+them, and the names the bytes only number, with the registry built from the
+same tree.
+
 ## Programs and the driver
 
 A program is `start(invocation, policy)` and `resume(continuation, response)`:

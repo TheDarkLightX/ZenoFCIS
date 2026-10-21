@@ -124,9 +124,11 @@ three packages: `behavior.py`, `behavior2.py`, `workflow.py`, `factory.py`,
 `shared.py`, `terminal.py`, `mcp.py`, `workspace.py`, `server.py` and
 `workspace.html`; the explanation and ladder tool modules `explain.py`,
 `explain2.py`, `constructs.py`, `ladder_tools.py`, `ladder.py`, `ladder_en.json` and
-`temporal_lowering.py`; and the withdrawal pilot's `withdrawal_pilot.py`,
-`withdrawal_pilot.lean` and `withdrawal_pilot_refutation.lean`. Changing any
-of them changes the identity and makes earlier evidence stale.
+`temporal_lowering.py`; the withdrawal pilot's `withdrawal_pilot.py`,
+`withdrawal_pilot.lean` and `withdrawal_pilot_refutation.lean`; and the finite
+types, typed-machine and effects modules `adt.py`, `typed2.py`, `effects.py` and
+`effects_guide.py`. Changing any of them changes the identity and makes earlier
+evidence stale.
 
 The factory-qualified subset requires at least two states to satisfy the
 unchanged scaffold's independent rejected-genesis check. The language itself
@@ -206,6 +208,26 @@ The [withdrawal pilot](zal/ladder/WITHDRAWAL_PILOT.md) binds two
 | `crates/zeno-fcis-formal-tools/src/translation_tests.rs` | `ladder_claim_lean_export_from_environment` applies the existing Lean exporter to the lowered consequent |
 | `integrations/zal/withdrawal_pilot.lean`, `withdrawal_pilot_refutation.lean` | Controller model, response theorem and the planted-defect refutation; in the `zal/checker` identity |
 | `integrations/zal/test_withdrawal_pilot.py`, `check_withdrawal_pilot.py` | Named checks, the length-12 run and the planted defects |
+
+## Finite types, typed machines and effect signatures
+
+Three 2.6 profiles share one type language. `zal/finite-types/1` declares
+aliases, records and variants of bounded integers, Booleans, byte-capped and
+exact bytes and bounded lists; recursion is refused and each type reports its
+exact count of values. `zal/typed-fsm/1` elaborates typed variables and inputs
+exactly to an unchanged `zal/finite-fsm/2` machine. `zal/effects/1` declares the
+shell's effect ports and lowers them to the `zeno-fcis/shell-effects/1` record.
+See [types and effects](zal/EFFECTS.md).
+
+| Source | Role |
+| --- | --- |
+| `integrations/zal/adt.py` | Type declarations in both surfaces, exact counts, enumeration and values; in the `zal/checker` identity |
+| `integrations/zal/typed2.py` | Typed variables and inputs, elaboration to profile 2, decoded verdicts and explanations; in the `zal/checker` identity |
+| `integrations/zal/effects.py` | Effect signatures, the named structural checks and the record lowering; in the `zal/checker` identity |
+| `integrations/zal/effects_guide.py` | Construct registry, `zal/help/2` guide, port and type explanations; in the `zal/checker` identity |
+| `integrations/zal/examples/shell_effects.zal`, `relay_typed.zal` | The ten shipped ports in ZAL; a typed relay over the transport's answer |
+| `crates/zeno-fcis-shell/examples/shell_effects_registry.rs` | Prints the built-in registry, its identity, its names and the SHA-256 of `registry.rs` for the drift test |
+| `integrations/zal/test_adt.py`, `test_typed2.py`, `test_effects.py`, `check_effects.py` | Round trips, counts against enumeration, the byte-for-byte lowering and drift tests, help drift and the planted defects |
 
 ## Definition of done for the prototype
 
