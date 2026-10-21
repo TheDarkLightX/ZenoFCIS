@@ -744,7 +744,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "checked-upgrade": AcceptanceScenario(
         "Adopt a checked candidate and upgrade a live store under its lineage",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+        (("python3", "tools/check_historical_24_copy.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--locked", "--offline",
+          "--test", "historical_i64", "--test", "historical_copy"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-contract", "--locked", "--offline",
+          "--test", "historical_24"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_adopt", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",

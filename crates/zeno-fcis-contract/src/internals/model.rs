@@ -208,6 +208,41 @@ fn bounded_arithmetic(declarations: &Declarations, rules: &Rules) -> bool {
 }
 
 impl<'d> Contract<'d> {
+    /// Reconstructs the released policy/2 representation for retained evidence.
+    /// The caller must compare the complete policy with its adoption binding.
+    /// This compiler result grants no historical invocation authority.
+    pub fn build_released_24(
+        declarations: &'d Declarations,
+        rules: &Rules,
+        commitment: [u8; 32],
+    ) -> Result<Self, ContractError> {
+        if rules.unsigned || rules.quantities {
+            return Err(rules_error("schema", "requires the released policy/2 revision"));
+        }
+        let mut compiled = Self::build(declarations, rules, commitment)?;
+        // The released compiler widened computed signed outputs to i64.
+        // Declared input domains, graph order, laws and budgets stay intact.
+        for leaf in &mut compiled.output_types {
+            if matches!(leaf, InputLeaf::I128 { min: i128::MIN, max: i128::MAX }) {
+                *leaf = InputLeaf::I128 {
+                    min: i128::from(i64::MIN), max: i128::from(i64::MAX),
+                };
+            }
+        }
+        for domain in &mut compiled.output_domains {
+            if matches!(domain, ScalarDomain::Int { min: i128::MIN, max: i128::MAX }) {
+                *domain = ScalarDomain::Int {
+                    min: i128::from(i64::MIN), max: i128::from(i64::MAX),
+                };
+            }
+        }
+        // Admission is closed to the released scalar range and instructions.
+        let program = compiled.program()?;
+        zeno_fcis_synthesis::finite_runtime::i64_program_value(&program)
+            .map_err(|error| rules_error("", format!("not a released scalar program: {error}")))?;
+        Ok(compiled)
+    }
+
     pub fn build(
         declarations: &'d Declarations,
         rules: &Rules,

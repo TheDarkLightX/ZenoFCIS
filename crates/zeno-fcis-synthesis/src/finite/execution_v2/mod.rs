@@ -7,6 +7,9 @@ use meter::Meter;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+#[path = "../evaluation/historical_i64.rs"]
+pub mod historical_i64;
+
 pub mod authority;
 pub mod catalog;
 pub mod composition;

@@ -15,6 +15,8 @@ mod value;
 
 pub use evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
 pub use evaluation::typed::NumericOp as V2NumericOp;
+#[doc(hidden)]
+pub use execution_v2::historical_i64;
 pub use execution_v2::composition as v2_composition;
 /// Immutable original-schema value witness; only checked ingress constructs it.
 pub use execution_v2::compound::Value as V2CanonicalValue;
