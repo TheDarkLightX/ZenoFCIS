@@ -118,7 +118,7 @@ class LadderToolTests(unittest.TestCase):
         different = self.call("zal_ladder_same", statement=VAULT, revision=vault, rung="typed",
                               text="forall sigma in Traces: forall a in Assets: always(Loss(a))")
         self.assertEqual(different["status"], "different-normal-forms")
-        self.assertEqual(different["evidence"]["first_difference"]["path"], "root/2/3/1")
+        self.assertEqual(different["evidence"]["first_difference"]["path"], "root/2/2/1")
         self.assertIn("does not show the meanings differ", different["summary"])
         crossed = self.call("zal_ladder_same", statement=VAULT, revision=vault, other_statement=DEX, other_revision=dex)
         self.assertEqual((crossed["status"], crossed["same"]), ("not-compared", None))
