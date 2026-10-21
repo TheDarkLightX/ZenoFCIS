@@ -840,7 +840,7 @@ impl<'a, 'p> Superseded<'a, 'p> {
             })?;
         let shell = V2SqliteShell {
             members,
-            connection: connection.into(),
+            connection,
             anchor,
             genesis,
             delivery_interpreter,
