@@ -1020,17 +1020,21 @@ fn vault_scalar_domain_and_representability_guards() {
                 F::Reject(1010)
             }
             1 => {
+                let mut wrong_id = row.id;
+                wrong_id[0] ^= 1;
                 existing = Some(v::Vault {
                     status: v::Status::ClosedOwner,
-                    id: id(1),
+                    id: wrong_id,
                     ..row
                 });
                 F::Domain
             }
             2 => {
+                let mut wrong_owner = row.owner;
+                wrong_owner[0] ^= 1;
                 existing = Some(v::Vault {
                     status: v::Status::ClosedOwner,
-                    owner: id(1),
+                    owner: wrong_owner,
                     ..row
                 });
                 F::Domain

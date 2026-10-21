@@ -153,3 +153,22 @@ The original schema dispatcher/application-wide A63 gate, full finite atlas,
 V1/EVM/C1 differential replay, 100% money-branch coverage and conservation/No free
 value/all-history proofs are separate qualification, not supplied by this step.
 No new V1 economic departure is introduced; the inherited D1-D4 obligations remain.
+
+## Borrower and depositor risk
+
+Borrowing is non-recourse, as in [Liquity V1](https://github.com/liquity/dev/blob/main/packages/contracts/contracts/TroveManager.sol):
+the vault collateral is the protocol's only claim on a borrower. The borrower
+keeps the borrowed zUSD after liquidation. A vault counts in the No free value
+law at max(0, its floored collateral value at the committed price minus its
+composite debt); debt is never a liability beyond that collateral. The law
+places this equity in zUSD, with escrow and floored individual claims counted
+once. See [the complete valuation](NO_FREE_VALUE.md).
+
+Pool depositors absorb offset debt and receive liquidation collateral. After
+a large price fall the collateral may be worth less than the debt absorbed;
+the shortfall is a disclosed pool risk. For example, 1,055 zUSD of debt offset
+for 1,194 AGRS at $0.50 produces a pool loss of exactly 458 zUSD of committed
+value. The remaining 6 AGRS and 50 zUSD reserve pay the keeper. Another keeper
+liquidating the same vault leaves the borrower in the same position except
+for who receives that compensation. Redistribution instead passes unoffset
+debt and collateral to surviving vaults; it does not erase system debt.

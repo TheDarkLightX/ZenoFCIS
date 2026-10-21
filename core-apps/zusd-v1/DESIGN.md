@@ -5,9 +5,9 @@ Step 4 now has a separate conditional composition/publication API described in
 there is no live backend or selected owner policy. The older unmounted component
 boundaries described below remain available as pure mathematical subjects.
 
-Frozen RELATION revision 2 and ROUND2 in the private build folder are the
-specification. This no_std standalone workspace has no authentication or
-publication authority. Its local lock does not modify the library workspace.
+The public economic-law definition is [No free value](NO_FREE_VALUE.md).
+This no_std standalone workspace exposes conditional mathematical relations;
+its local lock does not modify the library workspace.
 Live clock, drip, funding, oracle, exposure and migration profiles remain unbound.
 
 The native component subjects cover owner vaults, fees, liquidation/redemption

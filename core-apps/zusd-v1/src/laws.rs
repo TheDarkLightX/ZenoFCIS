@@ -1,3 +1,7 @@
+//! No free value measures each active vault as non-recourse zUSD equity:
+//! max(0, floor(effective collateral * committed price / 1e8) - composite debt).
+//! Wallets, owned escrow and floored individual claims are counted once.
+//! See ../NO_FREE_VALUE.md for asset placement, exact benefits and scope.
 //! Independent complete relations for native scalar/record subjects. These
 //! check all outcomes, not producer-selected cases or a conformance law 991.
 //! The full collection/effect A63 binding remains a separate integration gate.

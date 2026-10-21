@@ -1,5 +1,7 @@
 //! Exhaustive seed-state/command products; independent integer replay is in tools/.
 #![cfg(feature = "std")]
+#[path = "support/holdings.rs"]
+mod holdings;
 #[path = "support/hmac.rs"]
 mod issuer;
 #[allow(dead_code)]
@@ -513,51 +515,47 @@ fn alphabet(p: &Policy, s: &State) -> Vec<(u8, Command)> {
     }
     cs
 }
-#[test]
-fn every_admitted_seed_command_refines_accounting() {
-    let mut log = std::env::var_os("ZUSD_REFINEMENT_OUT").map(|p| File::create(p).unwrap());
-    let mut counts = [0; 2];
-    let p = policy(false);
+fn seeds(p: &Policy, log: &mut Option<File>, counts: &mut [usize; 2]) -> Vec<State> {
     let mut s = genesis(&p);
     check(&s);
-    let r = advance_request(&p, &s, 2, 2);
-    perform(&p, &mut s, r, &mut log, &mut counts);
+    let r = advance_request(p, &s, 2, 2);
+    perform(p, &mut s, r, log, counts);
     let r = price_request(
-        &p,
+        p,
         &s,
         OracleAction::InitializeFirstMatured,
         1,
         200_000_000,
         110,
     );
-    perform(&p, &mut s, r, &mut log, &mut counts);
+    perform(p, &mut s, r, log, counts);
     let mut seeds = vec![s.clone()];
     let r = raw(&s, 1, Command::Stake(staking::Command::Stake(3 * Q)));
-    perform(&p, &mut s, r, &mut log, &mut counts);
-    opened(&p, &mut s, 1, 1200 * Q, 1000 * Q, &mut log, &mut counts);
-    opened(&p, &mut s, 2, 700 * Q, 1000 * Q, &mut log, &mut counts);
-    opened(&p, &mut s, 3, 3000 * Q, 2000 * Q, &mut log, &mut counts);
+    perform(p, &mut s, r, log, counts);
+    opened(p, &mut s, 1, 1200 * Q, 1000 * Q, log, counts);
+    opened(p, &mut s, 2, 700 * Q, 1000 * Q, log, counts);
+    opened(p, &mut s, 3, 3000 * Q, 2000 * Q, log, counts);
     issued(
-        &p,
+        p,
         &mut s,
         5,
         stability::Command::RegisterFrontEnd(Q / 2),
         120,
-        &mut log,
-        &mut counts,
+        log,
+        counts,
     ); // registration does not trigger issuance
     seeds.push(s.clone());
     let mut claimed = s.clone();
     let r = raw(&claimed, 1, Command::Stake(staking::Command::Claim));
-    perform(&p, &mut claimed, r, &mut log, &mut counts);
+    perform(p, &mut claimed, r, log, counts);
     seeds.push(claimed);
     let mut bare = s.clone();
-    drop_price(&p, &mut bare, 150_000_000, 160, &mut log, &mut counts);
+    drop_price(p, &mut bare, 150_000_000, 160, log, counts);
     seeds.push(bare);
     for (tag, event) in [(None, 121), (Some(id(5)), 122)] {
         let mut pool = s.clone();
         issued(
-            &p,
+            p,
             &mut pool,
             1,
             stability::Command::Deposit {
@@ -565,26 +563,26 @@ fn every_admitted_seed_command_refines_accounting() {
                 tag,
             },
             event,
-            &mut log,
-            &mut counts,
+            log,
+            counts,
         );
-        let r = advance_request(&p, &pool, 20_160, 20_160);
-        perform(&p, &mut pool, r, &mut log, &mut counts);
+        let r = advance_request(p, &pool, 20_160, 20_160);
+        perform(p, &mut pool, r, log, counts);
         seeds.push(pool.clone());
         for (price, event) in [(150_000_000, 130), (50_000_000, 140)] {
             let mut low = pool.clone();
-            drop_price(&p, &mut low, price, event, &mut log, &mut counts);
+            drop_price(p, &mut low, price, event, log, counts);
             seeds.push(low.clone());
             let mut r = raw(
                 &low,
                 6,
-                Command::Liquidate(liquidation::Command::Direct(vault_id(&p, id(2)))),
+                Command::Liquidate(liquidation::Command::Direct(vault_id(p, id(2)))),
             );
-            use_price(&p, &low, &mut r);
+            use_price(p, &low, &mut r);
             if price == 150_000_000 {
                 drip(&mut r, event + 2, 3 * Q);
             }
-            perform(&p, &mut low, r, &mut log, &mut counts);
+            perform(p, &mut low, r, log, counts);
             seeds.push(low);
         }
         // Full redemption and its surplus/fee claims are in the state domain.
@@ -602,14 +600,14 @@ fn every_admitted_seed_command_refines_accounting() {
                 min_out: 1,
             }),
         );
-        use_price(&p, &pool, &mut r);
-        perform(&p, &mut pool, r, &mut log, &mut counts);
+        use_price(p, &pool, &mut r);
+        perform(p, &mut pool, r, log, counts);
         seeds.push(pool);
     }
     // Recovery with a fully funded capped liquidation, including surplus.
     let mut capped = s.clone();
     issued(
-        &p,
+        p,
         &mut capped,
         3,
         stability::Command::Deposit {
@@ -617,11 +615,19 @@ fn every_admitted_seed_command_refines_accounting() {
             tag: None,
         },
         123,
-        &mut log,
-        &mut counts,
+        log,
+        counts,
     );
-    drop_price(&p, &mut capped, 120_000_000, 150, &mut log, &mut counts);
+    drop_price(p, &mut capped, 120_000_000, 150, log, counts);
     seeds.push(capped);
+    seeds
+}
+#[test]
+fn every_admitted_seed_command_refines_accounting() {
+    let mut log = std::env::var_os("ZUSD_REFINEMENT_OUT").map(|p| File::create(p).unwrap());
+    let mut counts = [0; 2];
+    let p = policy(false);
+    let seeds = seeds(&p, &mut log, &mut counts);
     let seed_count = seeds.len();
     let mut pairs = 0;
     for (i, s) in seeds.iter().enumerate() {
@@ -658,4 +664,234 @@ fn every_admitted_seed_command_refines_accounting() {
     );
     assert!(counts[0] > 100);
     assert!(counts[1] > 100);
+}
+
+fn sequence_request(p: &Policy, s: &State, who: u8, c: Command, depth: u8) -> Request {
+    let mut r = raw(s, who, c.clone());
+    if priced(&c) {
+        use_price(p, s, &mut r);
+    }
+    if matches!(
+        c,
+        Command::Pool(
+            stability::Command::Deposit { .. }
+                | stability::Command::Withdraw(_)
+                | stability::Command::Claim
+        ) | Command::MoveGain { .. }
+    ) || matches!(c, Command::Liquidate(_)) && s.pool().pool.total > 0
+    {
+        drip(&mut r, 230 + depth, 0);
+    }
+    if let Command::Fund { quantity, .. } = c {
+        r.command = Command::Fund {
+            event: id(240 + depth),
+            recipient: id(1),
+            quantity,
+        };
+        match quantity {
+            Quantity::Agrs(n) => r.backing.agrs += n,
+            Quantity::Zdex(n) => r.backing.zdex += n,
+            _ => (),
+        }
+    }
+    sign(p, s, r).unwrap()
+}
+fn benefit(p: &Policy, s: &State, out: &Prepared, who: u8, c: &Command) -> holdings::Vector {
+    let mut b = [0; 3];
+    if matches!(c, Command::Liquidate(_)) {
+        for m in out.movements().iter().filter(|m| m.to == Some(id(who))) {
+            match m.quantity {
+                Quantity::Agrs(n) => b[0] += n as i128,
+                Quantity::Zusd(n) => b[1] += n as i128,
+                _ => (),
+            }
+        }
+        let pre = holdings::rewards(s, who);
+        let post = holdings::rewards(out.post(), who);
+        for i in [0, 2] {
+            b[i] += (post[i] - pre[i]).max(0);
+        }
+    }
+    if matches!(
+        c,
+        Command::Open { .. }
+            | Command::Adjust {
+                debt: vaults::Delta::Add(_),
+                ..
+            }
+            | Command::Redeem(_)
+    ) {
+        let pre = holdings::rewards(s, who);
+        let post = holdings::rewards(out.post(), who);
+        for i in 0..3 {
+            b[i] += (post[i] - pre[i]).max(0);
+        }
+    }
+    if let Command::Fund {
+        recipient,
+        quantity,
+        ..
+    } = c
+    {
+        if *recipient == id(who) {
+            let i = match quantity {
+                Quantity::Agrs(_) => 0,
+                Quantity::Zusd(_) => 1,
+                Quantity::Zdex(_) => 2,
+            };
+            b[i] += quantity.atoms() as i128;
+        }
+    }
+    assert_eq!(p.config().accounts[0], id(90));
+    b
+}
+struct SequenceLog {
+    nodes: File,
+    edges: File,
+    next: usize,
+}
+fn node(log: &mut Option<SequenceLog>, s: &State, who: u8) -> usize {
+    if let Some(l) = log {
+        let n = l.next;
+        l.next += 1;
+        writeln!(
+            l.nodes,
+            r#"{{"node":{n},"who":{who},"root":{},"holdings":{:?},"state":{}}}"#,
+            hex(s.root()),
+            holdings::holdings(s, who),
+            state(s)
+        )
+        .unwrap();
+        n
+    } else {
+        0
+    }
+}
+#[test]
+fn every_own_command_sequence_through_two_from_the_finite_seed_domain() {
+    let p = policy(false);
+    let seeds = seeds(&p, &mut None, &mut [0; 2]);
+    assert_eq!(seeds.len(), 17);
+    let mut log = std::env::var_os("ZUSD_SEQUENCE_OUT").map(|path| {
+        let path = std::path::PathBuf::from(path);
+        std::fs::create_dir_all(&path).unwrap();
+        SequenceLog {
+            nodes: File::create(path.join("nodes.jsonl")).unwrap(),
+            edges: File::create(path.join("edges.jsonl")).unwrap(),
+            next: 0,
+        }
+    });
+    let mut attempts = [0usize; 2];
+    let mut admitted = [0usize; 2];
+    let mut prefixes = 0;
+    for (seed, initial) in seeds.iter().enumerate() {
+        for who in 1..=6 {
+            let start = holdings::holdings(initial, who);
+            let initial_id = node(&mut log, initial, who);
+            // Identical state and benefit prefixes have identical continuations.
+            // Multiplicity retains every rejected/duplicate command in the denominator.
+            let mut frontier = vec![(initial.clone(), [0; 3], 1usize, initial_id)];
+            for depth in 0..2u8 {
+                let mut next = std::collections::BTreeMap::new();
+                for (s, benefits, multiplicity, pre_id) in frontier {
+                    prefixes += 1;
+                    let frozen = s.clone();
+                    let frozen_policy = p.config().clone();
+                    for (_, c) in alphabet(&p, &s)
+                        .into_iter()
+                        .filter(|(actor, _)| *actor == who)
+                    {
+                        attempts[depth as usize] += multiplicity;
+                        let r = sequence_request(&p, &s, who, c.clone(), depth);
+                        let result = decide(&p, &s, &r, &TestVerifier, limits()).into_parts().0;
+                        assert_eq!(s, frozen);
+                        assert_eq!(*p.config(), frozen_policy);
+                        let (post, delta, post_id, legs, error) = match result {
+                            Ok(out) => {
+                                admitted[depth as usize] += multiplicity;
+                                check(out.post());
+                                assert_eq!(out.post().clock(), initial.clock());
+                                assert_eq!(out.post().oracle(), initial.oracle());
+                                let delta = benefit(&p, &s, &out, who, &c);
+                                let post_id = node(&mut log, out.post(), who);
+                                let legs = array(out.movements().iter().map(|m| {
+                                    format!(
+                                        "[{},{},{},{}]",
+                                        m.from.map(hex).unwrap_or("null".into()),
+                                        m.to.map(hex).unwrap_or("null".into()),
+                                        m.quantity.asset() as u8,
+                                        m.quantity.atoms()
+                                    )
+                                }));
+                                (out.post().clone(), delta, post_id, legs, "null".to_string())
+                            }
+                            Err(e) => {
+                                (s.clone(), [0; 3], pre_id, "[]".into(), format!("\"{e:?}\""))
+                            }
+                        };
+                        let total = core::array::from_fn(|i| benefits[i] + delta[i]);
+                        let end = holdings::holdings(&post, who);
+                        let adjusted = core::array::from_fn(|i| end[i] - total[i]);
+                        assert!(
+                            !holdings::dominates(adjusted, start),
+                            "seed={seed} who={who} depth={} command={c:?} before={start:?} after={end:?} benefits={total:?}",
+                            depth + 1
+                        );
+                        if let Some(l) = &mut log {
+                            writeln!(l.edges,r#"{{"seed":{seed},"who":{who},"depth":{},"multiplicity":{multiplicity},"pre":{pre_id},"post":{post_id},"command":{},"benefits_before":{benefits:?},"benefit":{delta:?},"legs":{legs},"error":{error}}}"#,depth+1,command(&c)).unwrap();
+                        }
+                        if depth == 0 {
+                            let key = (post.canonical_bytes(), total);
+                            let entry = next.entry(key).or_insert((post, total, 0usize, post_id));
+                            entry.2 += multiplicity;
+                        }
+                    }
+                }
+                frontier = next.into_values().collect();
+            }
+        }
+    }
+    println!(
+        "SEQUENCE finite checked length=2 seeds=17 users=6 attempts={attempts:?} admitted={admitted:?} evaluated_prefixes={prefixes}"
+    );
+    assert_eq!(attempts[0], 17 * 316);
+    assert!(admitted[1] > admitted[0]);
+}
+
+#[test]
+fn floored_equity_requires_a_rounding_residual_in_the_potential() {
+    let p = policy(false);
+    let mut s = seeds(&p, &mut None, &mut [0; 2]).remove(0);
+    opened(
+        &p,
+        &mut s,
+        1,
+        1200 * Q + 1,
+        1000 * Q,
+        &mut None,
+        &mut [0; 2],
+    );
+    opened(&p, &mut s, 2, 10000 * Q, 2000 * Q, &mut None, &mut [0; 2]);
+    drop_price(&p, &mut s, 150_000_000, 160, &mut None, &mut [0; 2]);
+    let before = holdings::holdings(&s, 1);
+    let r = raw(
+        &s,
+        1,
+        Command::Adjust {
+            collateral: vaults::Delta::Add(1),
+            debt: vaults::Delta::None,
+            max_fee: Q,
+            upper: None,
+            lower: None,
+        },
+    );
+    perform(&p, &mut s, r, &mut None, &mut [0; 2]);
+    let after = holdings::holdings(&s, 1);
+    assert_eq!(after, [before[0] - 1, before[1] + 2, before[2]]);
+    let delta = 150_000_000 * (after[0] - before[0]) + 100_000_000 * (after[1] - before[1]);
+    assert_eq!(delta, 50_000_000);
+    assert!(!holdings::dominates(after, before));
+    println!(
+        "POTENTIAL_FLOOR_OBSTRUCTION before={before:?} after={after:?} weighted_increase={delta} price_e8=150000000"
+    );
 }

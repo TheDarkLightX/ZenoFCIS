@@ -361,3 +361,10 @@ docs/zal/ladder/REVIEW.md
 docs/zal/ladder/TEMPORAL.md
 docs/zal/ladder/VALIDATION.md
 docs/zal/ladder/EXAMPLES.md
+
+# Conditional zUSD interfaces, arithmetic evidence and economic-law scope.
+core-apps/zusd-v1/ACCUMULATORS.md
+core-apps/zusd-v1/DESIGN.md
+core-apps/zusd-v1/STEP4.md
+core-apps/zusd-v1/NO_FREE_VALUE.md
+core-apps/zusd-v1/tests/test-data/loop-receipts/README.md
