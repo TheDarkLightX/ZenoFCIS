@@ -9,6 +9,9 @@
 /// Durable consumer of the mandatory library-owned V2 publication capability.
 pub mod v2;
 
+/// Binds shell-effects publication data to the V2 Authority.
+pub mod effects;
+
 /// How an explicitly selected simulation crash point interrupts a commit.
 #[cfg(feature = "crash-injection")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
