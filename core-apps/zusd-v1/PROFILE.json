@@ -1,6 +1,6 @@
 {
   "schema_id": "zenofcis.zusd.v1.native-review.1",
-  "status": "DECLARATION FOR REVIEW; complete original-wire admission, nominal lowering and generated-application binding are unfinished",
+  "status": "Executable closed schema and scoped native/wire review candidate; complete application dispatch/law binding is not mounted",
   "authority": "No activation, funding, mint, authentication, usage receipt or publication authority",
   "nominal_ids": {
     "Account": "bytes32; distinct nominal role",
@@ -506,13 +506,36 @@
   ],
   "implemented_law_subjects": [
     "pending reward Vault record",
-    "liquidation Partition record"
+    "liquidation Partition record",
+    "canonical collection patches and exact ordered monetary movement observations"
   ],
   "pending_law_subjects": [
-    "complete state and all tables",
-    "canonical patch",
-    "ordered economic legs and outbox",
-    "all other native subjects under the full reason catalogue"
+    "all-input complete application/economic-leg/outbox binding",
+    "full native schema-to-economic-command dispatch and global state invariants",
+    "parametric/all-history proof and runtime/source refinement"
   ],
-  "instance_bounds": "all capacities and byte/work bounds are explicit instance inputs; complete schema limits are not yet admitted by this native crate"
+  "instance_bounds": "Wire/observation instance bounds are explicit in wire::Bounds. Native component bounds are separately passed and are not yet one bound full application instance.",
+  "executable_schema": {
+    "generator": "tools/schema.py",
+    "definitions": "src/schema_generated.rs",
+    "stable_ids": "schema-ids.json",
+    "types": 118,
+    "old_state_type": 57,
+    "old_command_type": 83
+  },
+  "codec_structural_limits": {
+    "max_depth": 64,
+    "max_nodes": 1000000,
+    "max_payload_bytes": 67108864,
+    "max_collection_len": 1000000,
+    "owner_parameter": false
+  },
+  "finite_reference_subjects": {
+    "owner": 471,
+    "liquidation": 240,
+    "redemption": 116,
+    "sp_positions": 153,
+    "staking": 432,
+    "domain_note": "Witness rows are component domains; unbound rows are excluded from lawful decision counts; not the step-5 atlas or an all-input proof"
+  }
 }

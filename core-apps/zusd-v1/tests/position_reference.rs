@@ -57,49 +57,9 @@ fn vault(x: u8) -> v::Vault {
 }
 include!("test-data/sp_positions.rs");
 include!("test-data/staking_positions.rs");
-/// Finite row relation: all ordered F_i, legitimate acceptance, failure
-/// prohibition and exact complete outcomes. Reference rows come solely from
-/// the Python integer relation, never from a producer case or law 991.
-fn lawful<T: PartialEq>(candidate: &Result<T, Failure>, reference: &Result<T, Failure>) -> bool {
-    match candidate {
-        Err(Failure::Reject(id)) => {
-            common::REASONS.contains(id) && reference.as_ref().err() == Some(&Failure::Reject(*id))
-        }
-        Ok(value) => reference.as_ref().ok() == Some(value),
-        Err(other) => {
-            matches!(reference, Err(Failure::UnboundProfile)) && *other == Failure::UnboundProfile
-        }
-    }
-}
-fn row<T: PartialEq + std::fmt::Debug>(
-    candidate: Result<T, Failure>,
-    reference: Result<T, Failure>,
-) {
-    assert!(
-        lawful(&candidate, &reference),
-        "candidate={candidate:?}\nreference={reference:?}"
-    );
-    let mut legal = usize::from(reference.is_ok());
-    if reference == Err(Failure::UnboundProfile) {
-        legal += 1;
-    }
-    for id in common::REASONS {
-        let alternative = Err(Failure::Reject(*id));
-        let allowed = lawful(&alternative, &reference);
-        assert_eq!(
-            allowed,
-            reference.as_ref().err() == Some(&Failure::Reject(*id))
-        );
-        legal += usize::from(allowed);
-    }
-    assert_eq!(
-        legal, 1,
-        "zero/reject-all/multiple lawful complete outcomes"
-    );
-    if reference.is_ok() {
-        assert!(!lawful(&Err(Failure::UnboundProfile), &reference));
-    }
-}
+#[path = "support/reference.rs"]
+mod complete;
+use complete::{lawful, row};
 #[test]
 fn sp_complete_record_relation_all_rows_and_exact_frame_control() {
     let cases = sp_cases();

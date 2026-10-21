@@ -1737,4 +1737,34 @@ fn gain_to_vault_is_one_pure_successor_and_late_refusal_discards_both() {
         assert_eq!(a.usage(), b.usage());
         assert_eq!((pre.clone(), pool.clone()), frozen);
     }
+    let frozen_prices = v::Prices {
+        status: v::PriceStatus::Disputed,
+        ..prices()
+    };
+    let freeze = composition::move_gain_to_vault(
+        &pre,
+        &pool,
+        id(1),
+        v::Parameters::v1(),
+        fee(),
+        frozen_prices,
+        Some(0),
+        None,
+        None,
+        2,
+        bounds(),
+        limits(),
+    );
+    assert_eq!(freeze.result(), out.result());
+    for divisor in [4, 2] {
+        let budget = Limits {
+            steps: out.usage().steps() / divisor,
+            ..limits()
+        };
+        let denied = invoke(v::Parameters::v1(), budget);
+        assert!(
+            matches!(denied.result(),Err(Failure::Budget{lane:0,limit,attempted}) if limit==budget.steps&&attempted>limit)
+        );
+        assert_eq!((pre.clone(), pool.clone()), frozen);
+    }
 }

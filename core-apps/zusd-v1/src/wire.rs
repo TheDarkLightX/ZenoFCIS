@@ -16,7 +16,7 @@ use zeno_fcis_schema::{
 use zeno_fcis_value::{Value, ValueRef};
 #[path = "schema_generated.rs"]
 mod generated;
-pub use generated::{COMMAND, STATE};
+pub use generated::{COMMAND, MAYBE_ACCOUNT, MOVEMENT, OBSERVATION, PATCH, QUANTITY, STATE};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Bounds {
@@ -35,6 +35,11 @@ pub struct Policy {
 }
 impl Policy {
     pub fn prepare(bounds: Bounds) -> Result<Self, Failure> {
+        if bounds.tables[0].max_entries != bounds.tables[1].max_entries
+            || bounds.tables[0].max_entries != bounds.tables[2].max_entries
+        {
+            return Err(Failure::Domain);
+        }
         if bounds.tables.iter().any(|l| l.max_snapshot_bytes < 29) || bounds.frame_bytes < 48 {
             return Err(Failure::Domain);
         }
@@ -262,7 +267,7 @@ impl Policy {
                     map.len() as u64,
                     current
                         .checked_mul(4)
-                        .and_then(|n| n.checked_add(nb * 4))
+                        .and_then(|n| nb.checked_mul(4).and_then(|b| n.checked_add(b)))
                         .ok_or(Failure::Arithmetic)?,
                 )?;
                 if ordering == core::cmp::Ordering::Less {

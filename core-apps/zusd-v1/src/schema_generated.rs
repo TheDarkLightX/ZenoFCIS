@@ -2,6 +2,11 @@
 use super::*;
 pub const STATE: u32 = 57;
 pub const COMMAND: u32 = 83;
+pub const OBSERVATION: u32 = 118;
+pub const PATCH: u32 = 115;
+pub const MOVEMENT: u32 = 84;
+pub const QUANTITY: u32 = 28;
+pub const MAYBE_ACCOUNT: u32 = 31;
 pub fn build(b: Bounds) -> Result<Schema, SchemaError> {
     let limits = SchemaLimits::default();
     let mut types = Vec::new();
@@ -1020,6 +1025,453 @@ pub fn build(b: Bounds) -> Result<Schema, SchemaError> {
                 FieldDef::try_new(FieldId::new(3), "pre_root", TypeId::new(8))?,
                 FieldDef::try_new(FieldId::new(4), "profile_root", TypeId::new(8))?,
                 FieldDef::try_new(FieldId::new(5), "operation", TypeId::new(82))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(84),
+        "Movement",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "source", TypeId::new(31))?,
+                FieldDef::try_new(FieldId::new(2), "destination", TypeId::new(31))?,
+                FieldDef::try_new(FieldId::new(3), "quantity", TypeId::new(28))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(85),
+        "Maybe_Header_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(40)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(86),
+        "Patch_Header",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(1))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(85))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(85))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(87),
+        "Maybe_Vault_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(29)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(88),
+        "Patch_Vaults",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(6))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(87))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(87))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(89),
+        "Maybe_OrderEntry_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(30)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(90),
+        "Patch_OrderMap",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(6))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(89))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(89))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(91),
+        "Maybe_Vector_VaultID__",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(43)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(92),
+        "Patch_Order",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(1))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(91))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(91))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(93),
+        "Maybe_Quantity_Z_A_T__",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(28)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(94),
+        "Patch_Balances",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(44))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(93))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(93))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(95),
+        "Maybe_SPDeposit_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(32)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(96),
+        "Patch_SPDeposits",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(5))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(95))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(95))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(97),
+        "Maybe_FrontEnd_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(33)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(98),
+        "Patch_FrontEnds",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(5))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(97))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(97))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(99),
+        "Maybe_SPHistory_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(34)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(100),
+        "Patch_SPHistory",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(48))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(99))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(99))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(101),
+        "Maybe_SPEpoch_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(35)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(102),
+        "Patch_SPEpochs",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(3))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(101))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(101))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(103),
+        "Maybe_Staker_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(36)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(104),
+        "Patch_Stakers",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(5))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(103))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(103))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(105),
+        "Maybe_A_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(10)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(106),
+        "Patch_Surplus",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(5))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(105))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(105))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(107),
+        "Maybe_RailClaim_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(37)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(108),
+        "Patch_RailClaims",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(44))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(107))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(107))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(109),
+        "Maybe_u64_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(3)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(110),
+        "Patch_Nonces",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(5))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(109))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(109))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(111),
+        "Maybe_Unit_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(1)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(112),
+        "Patch_Seen",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(8))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(111))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(111))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(113),
+        "Maybe_Parameters_",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(0), "None", None)?,
+                Sum::try_new(VariantId::new(1), "Some", Some(TypeId::new(39)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(114),
+        "Patch_Params",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "key", TypeId::new(3))?,
+                FieldDef::try_new(FieldId::new(2), "before", TypeId::new(113))?,
+                FieldDef::try_new(FieldId::new(3), "after", TypeId::new(113))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(115),
+        "Patch",
+        Kind::Sum {
+            variants: vec![
+                Sum::try_new(VariantId::new(1), "Header", Some(TypeId::new(86)))?,
+                Sum::try_new(VariantId::new(2), "Vaults", Some(TypeId::new(88)))?,
+                Sum::try_new(VariantId::new(3), "OrderMap", Some(TypeId::new(90)))?,
+                Sum::try_new(VariantId::new(4), "Order", Some(TypeId::new(92)))?,
+                Sum::try_new(VariantId::new(5), "Balances", Some(TypeId::new(94)))?,
+                Sum::try_new(VariantId::new(6), "SPDeposits", Some(TypeId::new(96)))?,
+                Sum::try_new(VariantId::new(7), "FrontEnds", Some(TypeId::new(98)))?,
+                Sum::try_new(VariantId::new(8), "SPHistory", Some(TypeId::new(100)))?,
+                Sum::try_new(VariantId::new(9), "SPEpochs", Some(TypeId::new(102)))?,
+                Sum::try_new(VariantId::new(10), "Stakers", Some(TypeId::new(104)))?,
+                Sum::try_new(VariantId::new(11), "Surplus", Some(TypeId::new(106)))?,
+                Sum::try_new(VariantId::new(12), "RailClaims", Some(TypeId::new(108)))?,
+                Sum::try_new(VariantId::new(13), "Nonces", Some(TypeId::new(110)))?,
+                Sum::try_new(VariantId::new(14), "Seen", Some(TypeId::new(112)))?,
+                Sum::try_new(VariantId::new(15), "Params", Some(TypeId::new(114)))?,
+            ]
+            .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(116),
+        "Patches",
+        Kind::Vector {
+            element: TypeId::new(115),
+            min_len: 0,
+            max_len: u32::MAX,
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(117),
+        "Movements",
+        Kind::Vector {
+            element: TypeId::new(84),
+            min_len: 0,
+            max_len: u32::MAX,
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(118),
+        "Observation",
+        Kind::Record {
+            fields: vec![
+                FieldDef::try_new(FieldId::new(1), "before", TypeId::new(57))?,
+                FieldDef::try_new(FieldId::new(2), "after", TypeId::new(57))?,
+                FieldDef::try_new(FieldId::new(3), "patches", TypeId::new(116))?,
+                FieldDef::try_new(FieldId::new(4), "movements", TypeId::new(117))?,
             ]
             .into_boxed_slice(),
         },

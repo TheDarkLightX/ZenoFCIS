@@ -294,3 +294,244 @@ fn selected_parameter_record_checks_every_v1_constant_and_keeps_profiles_unbound
         Some(Failure::Domain)
     );
 }
+
+#[test]
+fn conditional_genesis_preserves_existing_assets_and_complete_metadata_without_activation() {
+    use ledger::{Balance, Quantity, Sheet};
+    let mut b = bounds();
+    b.tables[3].max_entries = 3;
+    let p = Policy::prepare(b).unwrap();
+    let id = |x: u8| {
+        let mut id = [0; 32];
+        id[31] = x;
+        id
+    };
+    let type_id = p
+        .schema()
+        .types()
+        .iter()
+        .find(|t| t.name().as_str() == "Parameters")
+        .unwrap()
+        .id();
+    let mut params = minimal(p.schema(), type_id);
+    let values = [
+        500 * Q,
+        50 * Q,
+        1_100_000_000_000_000_000,
+        1_500_000_000_000_000_000,
+        200,
+        5_000_000_000_000_000,
+        5_000_000_000_000_000,
+        Q / 20,
+        2,
+        999_037_758_833_783_000,
+        525600000,
+        20160,
+        1_000_000_000,
+        35_000_000 * Q,
+    ];
+    for (i, n) in values.into_iter().enumerate() {
+        params = replace(&params, i as u16 + 1, Value::unsigned(n));
+    }
+    let sheet = Sheet {
+        balances: vec![
+            Balance {
+                account: id(1),
+                quantity: Quantity::Agrs(u128::MAX),
+            },
+            Balance {
+                account: id(2),
+                quantity: Quantity::Agrs(u128::MAX),
+            },
+            Balance {
+                account: id(16),
+                quantity: Quantity::Zdex(sp_cap()),
+            },
+        ],
+        supply: 0,
+        active_debt: 0,
+        default_debt: 0,
+    };
+    let funding = genesis::FundingAssumption {
+        pool_accounts: core::array::from_fn(|i| id(i as u8 + 10)),
+        amount: sp_cap(),
+    };
+    let invoke = |balances: &Sheet, funding| {
+        genesis::reference(
+            &p,
+            genesis::Input {
+                balances,
+                assets: [id(40), id(41), id(42)],
+                roots: [[0; 32]; 9],
+                deployment_epoch: 10,
+                last_trigger_epoch: 10,
+                parameter_version: 1,
+                parameters: &params,
+                funding,
+            },
+            limits(),
+        )
+    };
+    let frozen = sheet.clone();
+    let out = invoke(&sheet, Some(funding));
+    let reference = out.result().unwrap();
+    assert_eq!(sheet, frozen);
+    let v = reference.state();
+    let encoded = p.frame(STATE, v, limits());
+    assert_eq!(
+        p.admit(STATE, encoded.result().unwrap(), limits()).result(),
+        Ok(v)
+    );
+    let f = |v: &Value, i: u16| match v.view() {
+        ValueRef::Record(fs) => fs.iter().find(|f| f.id() == i).unwrap().value().clone(),
+        _ => panic!(),
+    };
+    let header = f(v, 1);
+    assert_eq!(f(&header, 27), Value::unsigned(Q));
+    assert_eq!(f(&header, 36), Value::unsigned(sp_cap()));
+    assert_eq!(f(&header, 11), Value::unsigned(10));
+    assert_eq!(f(&header, 13), Value::unsigned(0));
+    for i in [2, 3, 6, 7, 10, 11, 12, 13, 14] {
+        assert_eq!(f(v, i), Value::map_canonical(vec![]).unwrap());
+    }
+    assert_eq!(f(v, 4), Value::vector(vec![]).unwrap());
+    let bound = parameters::bind(&p, v, limits());
+    assert_eq!(bound.result().unwrap().profiles(), &[None; 5]);
+    assert_eq!(
+        invoke(&sheet, None).result().err(),
+        Some(Failure::UnboundProfile)
+    );
+    let mut wrong = sheet.clone();
+    wrong.balances[2].quantity = Quantity::Zdex(sp_cap() - 1);
+    assert_eq!(
+        invoke(&wrong, Some(funding)).result().err(),
+        Some(Failure::Conservation)
+    );
+    let mut alias = funding;
+    alias.pool_accounts[1] = alias.pool_accounts[0];
+    assert_eq!(
+        invoke(&sheet, Some(alias)).result().err(),
+        Some(Failure::Domain)
+    );
+    fn sp_cap() -> u128 {
+        35_000_000 * Q
+    }
+}
+
+#[test]
+fn complete_collection_and_ordered_movement_observations_reject_deleted_extra_and_wrong_asset_frames()
+ {
+    use ledger::{Movement, Quantity};
+    let p = Policy::prepare(bounds()).unwrap();
+    let before = state(&p);
+    let after = nonce(&before, u64::MAX as u128);
+    let legs = [
+        Movement {
+            from: Some([1; 32]),
+            to: Some([2; 32]),
+            quantity: Quantity::Agrs(u128::MAX),
+        },
+        Movement {
+            from: None,
+            to: Some([1; 32]),
+            quantity: Quantity::Zusd(1),
+        },
+    ];
+    let out = observations::observe(&p, &before, &after, &legs, limits());
+    let observed = out.result().unwrap();
+    assert_eq!(
+        observations::check(&p, &before, &after, &legs, observed, limits()).result(),
+        Ok(&())
+    );
+    let bytes = p.frame(OBSERVATION, observed, limits());
+    assert_eq!(
+        p.admit(OBSERVATION, bytes.result().unwrap(), limits())
+            .result(),
+        Ok(observed)
+    );
+    let c = match observed.view() {
+        ValueRef::Record(fs) => fs,
+        _ => panic!(),
+    };
+    let patches = match c[2].value().view() {
+        ValueRef::Vector(xs) => xs,
+        _ => panic!(),
+    };
+    assert_eq!(patches.len(), 1);
+    let (variant, payload) = match patches[0].view() {
+        ValueRef::Sum {
+            variant,
+            payload: Some(v),
+            ..
+        } => (variant, v),
+        _ => panic!(),
+    };
+    assert_eq!(variant, 13);
+    let fs = match payload.view() {
+        ValueRef::Record(fs) => fs,
+        _ => panic!(),
+    };
+    assert!(matches!(
+        fs[1].value().view(),
+        ValueRef::Sum {
+            variant: 0,
+            payload: None,
+            ..
+        }
+    ));
+    assert!(
+        matches!(fs[2].value().view(),ValueRef::Sum{variant:1,payload:Some(v),..} if v==&Value::unsigned(u64::MAX as u128))
+    );
+    let missing = replace(observed, 3, Value::vector(vec![]).unwrap());
+    assert_eq!(
+        observations::check(&p, &before, &after, &legs, &missing, limits()).result(),
+        Err(Failure::Law(2101))
+    );
+    let extra = replace(
+        observed,
+        3,
+        Value::vector(vec![patches[0].clone(), patches[0].clone()]).unwrap(),
+    );
+    assert_eq!(
+        observations::check(&p, &before, &after, &legs, &extra, limits()).result(),
+        Err(Failure::Law(2101))
+    );
+    let swapped = [legs[1], legs[0]];
+    assert_eq!(
+        observations::check(&p, &before, &after, &swapped, observed, limits()).result(),
+        Err(Failure::Law(2100))
+    );
+    let mut asset = legs;
+    asset[0].quantity = Quantity::Zdex(u128::MAX);
+    assert_eq!(
+        observations::check(&p, &before, &after, &asset, observed, limits()).result(),
+        Err(Failure::Law(2100))
+    );
+    let mut recipient = legs;
+    recipient[0].to = Some([99; 32]);
+    assert_eq!(
+        observations::check(&p, &before, &after, &recipient, observed, limits()).result(),
+        Err(Failure::Law(2100))
+    );
+    // Deleted versus retained-zero is a tagged lookup distinction.
+    let zero = nonce(&before, 0);
+    let deletion = observations::observe(&p, &zero, &before, &[], limits());
+    assert_eq!(
+        observations::check(
+            &p,
+            &zero,
+            &before,
+            &[],
+            deletion.result().unwrap(),
+            limits()
+        )
+        .result(),
+        Ok(&())
+    );
+    let mut tiny = limits();
+    tiny.steps = out.usage().steps() - 1;
+    let a = observations::observe(&p, &before, &after, &legs, tiny);
+    let b = observations::observe(&p, &before, &after, &legs, tiny);
+    assert!(matches!(a.result(), Err(Failure::Budget { .. })));
+    assert_eq!(a.usage(), b.usage());
+}
