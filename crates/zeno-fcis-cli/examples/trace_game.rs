@@ -428,6 +428,8 @@ fn main() {
             fs::create_dir_all(&args[1]).map_err(|e| e.to_string())?;
             for (name, fixture) in [
                 ("lawful", models::core("lawful")?),
+                ("guard-true", models::core_guard_control("true", "unauthorized")?),
+                ("guard-false", models::core_guard_control("false", "deny-withdraw")?),
                 ("refusal", models::core("refusal")?),
                 ("arithmetic", models::core("arithmetic")?),
                 ("vulnerable-composition", models::composition("vulnerable")?),
