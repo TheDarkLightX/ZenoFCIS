@@ -67,6 +67,7 @@ impl Drop for Directory {
 
 const ORIGINAL: &[u8] =
     include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-original.zcve");
+#[cfg(target_os = "linux")]
 const CANDIDATE: &[u8] =
     include_bytes!("../tests/fixtures/i128-programs/boolean-kernel-candidate.zcve");
 #[cfg(target_os = "linux")]

@@ -12,6 +12,7 @@ pub(crate) enum Profile {
 }
 
 impl Profile {
+    #[cfg(any(target_os = "linux", test))]
     pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::FiniteData => "finite-data/1",
@@ -58,6 +59,7 @@ impl Backend {
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Control {
@@ -94,6 +96,7 @@ pub(crate) enum Control {
     Files,
     Network,
 }
+#[cfg(any(target_os = "linux", test))]
 impl Control {
     pub(crate) fn name(self) -> String {
         // This encoding is shared by typed refusals and evidence.
@@ -104,6 +107,7 @@ impl Control {
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Scope {
@@ -112,6 +116,7 @@ pub(crate) enum Scope {
     Group,
     PythonLeaf,
 }
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum State {
@@ -119,6 +124,7 @@ pub(crate) enum State {
     Weaker,
     Absent,
 }
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Unit {
@@ -127,12 +133,14 @@ pub(crate) enum Unit {
     Count,
 }
 
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Quantity {
     pub(crate) value: u64,
     pub(crate) unit: Unit,
 }
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Guarantee {
@@ -145,6 +153,7 @@ pub(crate) struct Guarantee {
     pub(crate) effective: Option<Quantity>,
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn requirement(control: Control, scope: Scope, limit: Option<(u64, Unit)>) -> Guarantee {
     let quantity = limit.map(|(value, unit)| Quantity { value, unit });
     Guarantee {
@@ -156,6 +165,7 @@ fn requirement(control: Control, scope: Scope, limit: Option<(u64, Unit)>) -> Gu
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 pub(crate) fn requirements(profile: Profile, linux: bool) -> Vec<Guarantee> {
     use Control::*;
     use Scope::*;
@@ -248,6 +258,7 @@ impl std::fmt::Display for Unavailable {
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 /// Unknown, duplicate, wrong-scope, wrong-unit and unbounded controls all fail.
 /// No mutation, environment or backend probing occurs at this decision boundary.
 pub(crate) fn compare(
@@ -280,13 +291,16 @@ pub(crate) fn compare(
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn required_nullable<'de, D: serde::Deserializer<'de>, T: serde::Deserialize<'de>>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error> {
     Option::<T>::deserialize(deserializer)
 }
 
+#[cfg(any(target_os = "linux", test))]
 pub(crate) const EVIDENCE_SCHEMA: &str = "zeno-fcis/containment-run/1";
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Termination {
@@ -294,6 +308,7 @@ pub(crate) enum Termination {
     Exited,
     Stopped,
 }
+#[cfg(any(target_os = "linux", test))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Cleanup {
@@ -302,6 +317,7 @@ pub(crate) enum Cleanup {
     Unknown,
 }
 
+#[cfg(any(target_os = "linux", test))]
 /// Supervisor-owned provenance. All fields are required, including explicit
 /// unknown identities/limits; it is never inserted in transform-receipt/1.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -332,6 +348,7 @@ pub(crate) struct RunEvidence {
     pub(crate) absence_verified: bool,
 }
 
+#[cfg(any(target_os = "linux", test))]
 impl RunEvidence {
     pub(crate) fn validate_posix_identity(
         &self,

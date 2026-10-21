@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# Keep test executables within the checked evidence-reader's 128 MiB input bound.
+# Debug assertions and overflow checks remain enabled.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
 concurrency:
   group: zeno-fcis-ci-${{ github.ref }}
   cancel-in-progress: true

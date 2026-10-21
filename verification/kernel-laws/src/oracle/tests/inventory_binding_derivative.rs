@@ -186,3 +186,35 @@ fn current_private_inventory_binding_has_only_derived_hash_changes(){
     let active=stock::bindings::GeneratedProject::try_new::<RustCryptoSha256>().unwrap();
     assert_eq!(active.catalog(),&catalog,"same canonical full catalog and all constructor/registry/profile equalities");
 }
+
+#[test]
+fn current_inventory_program_changes_only_profile_and_preserves_all_original_inputs() {
+    use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, decode_value};
+    use zeno_fcis_synthesis::finite_runtime::{import_i64_program, import_program};
+    use zeno_fcis_value::{Value, ValueRef};
+    let original = include_bytes!("../templates/inventory-reservation/original/synthesized/program.zcve");
+    let current = include_bytes!("../templates/inventory-reservation/generated/program-current.zcve");
+    let decoded = decode_value(original, DecodeLimits::default()).expect("frozen canonical program");
+    let ValueRef::Tuple(parts) = decoded.view() else { panic!("program tuple") };
+    let mut parts = parts.to_vec();
+    assert_eq!(parts[0].view(), ValueRef::Text("zeno-fcis/finite-i64/1"));
+    parts[0] = Value::text_ascii("zeno-fcis/finite-i128/1".into()).expect("current profile");
+    assert_eq!(Value::tuple(parts).expect("program tuple").canonical_bytes().unwrap(), current);
+    let old = import_i64_program(original).expect("historical checked-i64 route");
+    let new = import_program(current).expect("current checked-i128 route");
+    let mut row: Vec<i128> = new.inputs().iter().map(|domain| domain.bounds().0).collect();
+    let mut checked = 0;
+    loop {
+        let narrow: Vec<i64> = row.iter().map(|value| i64::try_from(*value).unwrap()).collect();
+        let expected = old.evaluate(&narrow).unwrap().into_iter().map(i128::from).collect::<Vec<_>>();
+        assert_eq!(new.evaluate(&row).unwrap(), expected, "input {row:?}");
+        checked += 1;
+        let mut carry = true;
+        for (value, domain) in row.iter_mut().zip(new.inputs()).rev() {
+            if *value < domain.bounds().1 { *value += 1; carry = false; break; }
+            *value = domain.bounds().0;
+        }
+        if carry { break; }
+    }
+    assert_eq!(checked, 864);
+}

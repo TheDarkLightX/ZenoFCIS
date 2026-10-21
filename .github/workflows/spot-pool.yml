@@ -23,11 +23,12 @@ jobs:
       CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_NET_OFFLINE: "true"
       PYTHONDONTWRITEBYTECODE: "1"
-      SPOT_ACCEPTANCE_ROOT: ${{ github.workspace }}/target/spot-acceptance
+      # Generated projects must sit outside Cargo's ignored build-output tree.
+      SPOT_ACCEPTANCE_ROOT: ${{ runner.temp }}/spot-acceptance
       ZENO_FCIS_CLI: ${{ github.workspace }}/target/debug/zeno-fcis
-      SPOT_MOUNT_BINARY: ${{ github.workspace }}/target/spot-acceptance/binaries/spot
-      SPOT_FIXTURE_MOUNT_BINARY: ${{ github.workspace }}/target/spot-acceptance/binaries/fixture
-      COUNTER_MOUNT_BINARY: ${{ github.workspace }}/target/spot-acceptance/binaries/counter
+      SPOT_MOUNT_BINARY: ${{ runner.temp }}/spot-acceptance/binaries/spot
+      SPOT_FIXTURE_MOUNT_BINARY: ${{ runner.temp }}/spot-acceptance/binaries/fixture
+      COUNTER_MOUNT_BINARY: ${{ runner.temp }}/spot-acceptance/binaries/counter
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
