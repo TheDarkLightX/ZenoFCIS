@@ -12,7 +12,9 @@ mod tables {
             for capacity in 0..=3 {
                 let compiled = compile(&format!("{kind}-{capacity}"));
                 let a = authority(&compiled);
-                let states = tables_review::values(&compiled.descriptor, 100, 1000).unwrap();
+                let states = tables_review::values(&compiled.descriptor, 100, 1000).unwrap_or_else(
+                    |error| panic!("required regression operation failed: {error:?}"),
+                );
                 for pre in states {
                     for op in 0..=7 {
                         for key in 0..=3 {
@@ -29,6 +31,7 @@ mod tables {
                 }
             }
         }
-        std::fs::write(path, rows).unwrap();
+        std::fs::write(path, rows)
+            .unwrap_or_else(|error| panic!("required regression operation failed: {error:?}"));
     }
 }
