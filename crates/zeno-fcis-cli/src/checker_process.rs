@@ -1856,6 +1856,9 @@ mod linux {
         // Acceptance/publication is final. An output transport failure cannot
         // change it into an inconclusive result after a receipt was linked.
         let diagnostic = std::io::stderr().write_all(&stderr.bytes);
+        if let Ok(value) = serde_json::from_slice(&stdout.bytes) {
+            crate::telemetry::observe(&value);
+        }
         let output = std::io::stdout().write_all(&stdout.bytes);
         if let Err(error) = diagnostic.and(output) {
             let _ = writeln!(

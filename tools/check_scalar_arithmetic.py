@@ -182,4 +182,8 @@ def main()->int:
     print(json.dumps({k:report[k] for k in ("status","authority")}))
     return 0 if report["status"]=="passed" else 1
 
-if __name__=="__main__":raise SystemExit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

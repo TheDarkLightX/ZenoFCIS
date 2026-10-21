@@ -157,7 +157,10 @@ def check(out):
     print(json.dumps(result))
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--out', required=True, type=Path)
-    check(parser.parse_args().out)
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument('--out', required=True, type=Path)
+        check(parser.parse_args().out)
+    run_cli(_entrypoint)

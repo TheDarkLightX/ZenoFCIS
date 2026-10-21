@@ -109,4 +109,8 @@ def main():
     (out/'receipt.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
     print(json.dumps({'status':'passed','retained_subject_sha256':retained}))
 
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

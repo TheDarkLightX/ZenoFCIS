@@ -80,5 +80,8 @@ def main():
     (out/'results.json').write_text(json.dumps(results,indent=2)+'\n')
     print(f'app-browser: PASS; {out}')
 
-if __name__=='__main__':
-    main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

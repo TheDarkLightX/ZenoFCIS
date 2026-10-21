@@ -532,8 +532,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"generated application: FAIL: {error}", file=sys.stderr)
-        sys.exit(1)
+    from telemetry import run_cli
+    def _entrypoint():
+        try:
+            main()
+        except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+            print(f'generated application: FAIL: {error}', file=sys.stderr)
+            sys.exit(1)
+    run_cli(_entrypoint)

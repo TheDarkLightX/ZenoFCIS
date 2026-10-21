@@ -636,5 +636,8 @@ def main() -> int:
     return 0 if receipt['status'] in ('passed', 'passed-positive-only') else 1
 
 
-if __name__ == '__main__':
-    raise SystemExit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

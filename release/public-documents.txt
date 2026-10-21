@@ -386,6 +386,7 @@ examples/distribution-laws/modulo-bias/README.md
 examples/distribution-laws/payout-tie/README.md
 docs/COLLECTIONS.md
 docs/CONTRACT_TABLES.md
+docs/TELEMETRY.md
 examples/collections/README.md
 examples/collections/escrow/README.md
 examples/collections/library/README.md

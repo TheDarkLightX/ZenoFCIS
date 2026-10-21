@@ -40,4 +40,8 @@ def main():
   finally:file.write_text(before)
  assert original=={x:hashlib.sha256((root/x).read_bytes()).hexdigest() for x in files},'caller source changed during campaign'
  (a.out/'result.json').write_text(json.dumps(dict(status='passed',defects=rows,caller_source_unchanged=True,authority='none'),indent=2)+'\n')
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

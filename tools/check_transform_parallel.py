@@ -461,5 +461,8 @@ def main():
     print('transform-parallel-parity: PASS')
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

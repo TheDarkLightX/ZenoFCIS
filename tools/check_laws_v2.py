@@ -261,4 +261,8 @@ def main():
     args.out.write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n');print(f"laws: {receipt['status']}; {args.out}")
     if receipt['status']!='passed':print(receipt['error']);return 1
     return 0
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

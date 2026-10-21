@@ -82,11 +82,14 @@ def main():
     test_temporary.cleanup()
     print(f'app-factory: PASS; {out}',flush=True)
 
-if __name__=='__main__':
+if __name__ == "__main__":
     from commons_hook import failure, report
-    try:
-        main()
-    except BaseException as error:
-        report('app-factory', 'check-failed', 'check_app_factory', failure(error))
-        raise
-    report('app-factory', 'check-passed', 'check_app_factory', {})
+    from telemetry import run_cli
+    def _entrypoint():
+        try:
+            main()
+        except BaseException as error:
+            report('app-factory', 'check-failed', 'check_app_factory', failure(error))
+            raise
+        report('app-factory', 'check-passed', 'check_app_factory', {})
+    run_cli(_entrypoint)

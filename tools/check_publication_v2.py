@@ -297,5 +297,8 @@ def main() -> int:
     if receipt['status']=='failed':print(receipt['error'])
     return int(receipt['status']=='failed')
 
-if __name__=='__main__':
-    raise SystemExit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

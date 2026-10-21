@@ -40,4 +40,7 @@ def check() -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(check()))
+    from telemetry import run_cli
+    def _entrypoint():
+        print(json.dumps(check()))
+    run_cli(_entrypoint)

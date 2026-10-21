@@ -122,4 +122,11 @@ def main():
     print(json.dumps(results,indent=2))
 
 
-if __name__=='__main__': main()
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

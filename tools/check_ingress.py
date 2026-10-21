@@ -114,4 +114,7 @@ def main() -> int:
     return int(bool(failures))
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

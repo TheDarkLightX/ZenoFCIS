@@ -371,4 +371,11 @@ def main():
     print('checked up to K under the declared capabilities: core K=4, composition K=4, Spot oracle K=3; core deadlines L=2 for submissions through K-2, later requests open; blind spots: extra identities/keys, normalized argument exclusions, real scheduler/markets, external funding, native recipient/delivery and composition caller authority, no-value unauthorized Accepts, unbounded safety/progress. Generic drain objectives use no path hint; ordered-drain encodes the path. Both native models hit a retained resource stop at K=5. Earlier K=6 results apply only to the separately retained narrow alphabet excluding actor-1 Process, Alarm, Tick and stale Withdraw.')
 
 
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

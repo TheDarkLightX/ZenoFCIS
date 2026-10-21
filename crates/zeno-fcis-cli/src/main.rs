@@ -42,6 +42,7 @@ mod symbolic_command;
 mod synth;
 mod table_expansion;
 mod tau_command;
+mod telemetry;
 mod transform;
 mod transform_command;
 mod transform_parallel;
@@ -423,19 +424,28 @@ enum SmtBackend {
 }
 
 fn main() -> ExitCode {
+    let telemetry = telemetry::Invocation::start();
+    let code = execute();
+    if let Some(telemetry) = telemetry {
+        telemetry.finish(code);
+    }
+    ExitCode::from(code)
+}
+
+fn execute() -> u8 {
     if let Some(code) = checker_process::bootstrap() {
-        return ExitCode::from(code);
+        return code;
     }
     match Cli::try_parse() {
         Ok(cli) => {
             if let Command::Kb { operation } = cli.command {
-                return ExitCode::from(knowledge_command::execute(&cli.kb, operation));
+                return knowledge_command::execute(&cli.kb, operation);
             }
             let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {
                 Ok(admission) => admission,
                 Err(failure) => {
-                    return ExitCode::from(checker_process::refuse(&cli.command, failure));
+                    return checker_process::refuse(&cli.command, failure);
                 }
             };
             let resolved_kb =
@@ -444,7 +454,7 @@ fn main() -> ExitCode {
                         Ok(paths) => Some(paths),
                         Err(report) => {
                             print_json(&report);
-                            return ExitCode::from(INVALID);
+                            return INVALID;
                         }
                     }
                 } else {
@@ -464,7 +474,7 @@ fn main() -> ExitCode {
                     print_json(
                         &json!({"authority":"none","status":"inconclusive","reason":"kb-snapshot-changed"}),
                     );
-                    return ExitCode::from(BLOCKED);
+                    return BLOCKED;
                 }
                 Err(_) => {
                     eprintln!(
@@ -525,12 +535,12 @@ fn main() -> ExitCode {
                 code
             };
             checker_process::shutdown(code);
-            ExitCode::from(code)
+            code
         }
         Err(error) => {
             let exit = clap_error_exit(&error);
             let _ = error.print();
-            ExitCode::from(exit)
+            exit
         }
     }
 }
@@ -1791,6 +1801,7 @@ fn diagnostic_json(path: &Path, diagnostics: &[&Diagnostic], truncated: bool) ->
 }
 
 fn print_json(value: &Value) {
+    telemetry::observe(value);
     let mut value = value.clone();
     checker_process::label_public_result(&mut value);
     match serde_json::to_string(&value) {

@@ -41,4 +41,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

@@ -25,4 +25,8 @@ def main():
  for mode in range(3):
   review=json.loads(run([cli,'contract','review',a.out/'test-projects'/f'ordered-{mode}-1','--gaps','--max-tuples','10000','--max-work','10000000','--format','json']));assert review['status']=='finite-checked' and review['gaps']['determined']==review['tuples'];reviews.append(review)
  (a.out/'result.json').write_text(json.dumps(dict(status='passed',generated_applications=results,reviews=reviews,authority='none'),indent=2)+'\n');print('\n'.join(results));print('CLI B review/gaps/lemma: passed')
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

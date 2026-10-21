@@ -40,4 +40,8 @@ def main():
     assert review['status']=='finite-checked' and review['gaps']['determined']==review['tuples']
     (a.out/'result.json').write_text(json.dumps({'status':'passed','generated_applications':results,'cli_review':review,'authority':'none'},indent=2)+'\n')
     print('\n'.join(results));print('CLI finite review/gaps/lemma: passed')
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

@@ -54,4 +54,8 @@ def main():
         finally:file.write_text(before)
     after={x:hashlib.sha256((root/x).read_bytes()).hexdigest() for x in files};assert original==after,'caller source changed during controls'
     (a.out/'result.json').write_text(json.dumps({'status':'passed','defects':rows,'caller_source_unchanged':True,'authority':'none'},indent=2)+'\n')
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

@@ -66,4 +66,8 @@ def main():
     report={'schema':'zeno-fcis/u128-native-controls/1','comparison_enabled':not a.disable_comparison,'passed':all(r['semantic_kill'] and r['bypass_survives'] and r['same_mutant_binary'] for r in rows),'rows':rows,'authority':'none','verus':'deferred to freeze','test_source_sha256':sha(ROOT/'crates/zeno-fcis-contract/tests/u128_contract.rs')}
     (a.out/'results.json').write_text(json.dumps(report,indent=2)+'\n')
     return 0 if report['passed'] else 1
-if __name__=='__main__': raise SystemExit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

@@ -22,6 +22,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--actor", default=os.environ.get("ZENO_FCIS_COMMONS_ACTOR", ""))
     sub = parser.add_subparsers(dest="command", required=True)
 
+    p = sub.add_parser("import-telemetry", help="import optional CLI observations, idempotent by line hash")
+    p.add_argument("path")
+    sub.add_parser("loops", help="summarize consecutive actor and input-digest episodes")
+
     sub.add_parser("init", help="create the store if needed and print its dashboard")
     p = sub.add_parser("register", help="register an identity: a unique name and a hash ID (defaults to your actor name)")
     p.add_argument("--name", default=""); p.add_argument("--kind", default="agent"); p.add_argument("--role", default="")
@@ -207,6 +211,12 @@ def run(args) -> tuple[int, object]:
             return 0, {"seq": c.emit(args.part, args.event, args.subject, json.loads(args.body))}
         if cmd == "events":
             return 0, c.events(args.after, args.kind, args.limit)
+        if cmd == "import-telemetry":
+            from telemetry import import_telemetry
+            return 0, import_telemetry(c, args.path)
+        if cmd == "loops":
+            from telemetry import loops
+            return 0, loops(c)
         if cmd == "import-gaps":
             return 0, c.import_gaps(args.path)
         raise CommonsError(f"unknown command {cmd}")

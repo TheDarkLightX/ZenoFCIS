@@ -111,4 +111,7 @@ def main() -> int:
     print(f"ingress controls: PASS ({len(CONTROLS)} compiled mutants; named failures; restored baselines)")
     return 0
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from telemetry import run_cli
+    def _entrypoint():
+        raise SystemExit(main())
+    run_cli(_entrypoint)

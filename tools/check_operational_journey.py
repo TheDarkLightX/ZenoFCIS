@@ -348,4 +348,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    from telemetry import run_cli
+    def _entrypoint():
+        sys.exit(main())
+    run_cli(_entrypoint)

@@ -27,5 +27,8 @@ def check(package_roots: dict[str, Path] | None = None) -> dict:
 
 
 if __name__ == "__main__":
-    result = check()
-    print(f"V1 compatibility: {len(result['files'])} pinned source files unchanged")
+    from telemetry import run_cli
+    def _entrypoint():
+        result = check()
+        print(f'V1 compatibility: {len(result['files'])} pinned source files unchanged')
+    run_cli(_entrypoint)

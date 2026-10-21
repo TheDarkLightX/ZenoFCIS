@@ -69,4 +69,8 @@ def main():
         (a.out/'results.json').write_text(json.dumps(dict(status='running',rows=rows),indent=2)+'\n')
     if original!={name:sha(ROOT/BASE/name) for name in original}:raise RuntimeError('source restoration mismatch')
     (a.out/'results.json').write_text(json.dumps(dict(status='passed',rows=rows,source_restored=True,source_sha256=original,authority='none'),indent=2)+'\n')
-if __name__=='__main__':main()
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        main()
+    run_cli(_entrypoint)

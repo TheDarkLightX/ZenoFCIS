@@ -233,8 +233,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except (OSError, RuntimeError, subprocess.CalledProcessError, KeyError, ValueError) as error:
-        print(f"payload migrate: FAIL: {error}", file=sys.stderr)
-        sys.exit(1)
+    from telemetry import run_cli
+    def _entrypoint():
+        try:
+            sys.exit(main())
+        except (OSError, RuntimeError, subprocess.CalledProcessError, KeyError, ValueError) as error:
+            print(f'payload migrate: FAIL: {error}', file=sys.stderr)
+            sys.exit(1)
+    run_cli(_entrypoint)

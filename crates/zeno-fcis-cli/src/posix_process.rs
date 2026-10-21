@@ -1513,6 +1513,7 @@ mod runtime {
         // capture packet's four fields and canonical receipt remain intact.
         let mut public: serde_json::Value = serde_json::from_slice(&stdout.bytes)
             .map_err(|_| "contained-result-json".to_string())?;
+        crate::telemetry::observe(&public);
         super::super::label_public_result(&mut public);
         stdout.bytes = serde_json::to_vec(&public).map_err(|e| e.to_string())?;
         stdout.bytes.push(b'\n');

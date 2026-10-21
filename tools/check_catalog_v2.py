@@ -315,5 +315,8 @@ def main() -> int:
     print(json.dumps({"status":receipt["status"],"receipt":str(args.out),"failure":receipt.get("failure")}))
     return 0 if receipt["status"] in ("passed","development_positive_unfrozen_coverage") else 1
 
-if __name__=="__main__":
-    sys.exit(main())
+if __name__ == "__main__":
+    from telemetry import run_cli
+    def _entrypoint():
+        sys.exit(main())
+    run_cli(_entrypoint)
