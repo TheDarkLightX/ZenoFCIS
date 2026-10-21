@@ -195,3 +195,33 @@ fn collections_keep_keys_out_of_scalar_state_and_values_out_of_nested_records() 
             .any(|(_, path, _)| path == "map.value")
     );
 }
+
+#[test]
+fn collections_state_laws_read_one_named_entry_or_only_scalars() {
+    // Assumed on every pre-view, a state law must survive while unnamed
+    // entries keep their values: a pair of entries, or an entry with scalar
+    // state, could be false at keys no decision named.
+    for extra in [
+        "law 503 pair on commit, genesis = post.100.161 + post.100.171 <= 3;",
+        "law 503 under_supply on commit, genesis = post.100.161 <= post.100.120;",
+    ] {
+        assert!(
+            refusals(extra)
+                .iter()
+                .any(|(_, path, _)| path == "law.entries"),
+            "{extra}"
+        );
+    }
+    // Separate conjuncts, each on one entry or on scalars, are fine, and so
+    // is a step law over both entries.
+    for extra in [
+        "law 503 each on commit, genesis = post.100.161 <= 3 && post.100.171 <= 3 && post.100.120 <= 6;",
+        "law 503 step on commit = post.100.161 + post.100.171 <= 6;",
+    ] {
+        let source = format!("{TOKENS}{extra}\n");
+        assert!(
+            parse_project(&source, SourceLimits::default()).is_ok(),
+            "{extra}"
+        );
+    }
+}

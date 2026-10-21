@@ -431,3 +431,68 @@ pub(crate) fn encode(
     }
     Ok(())
 }
+
+/// The top-level conjuncts of a formula.
+pub(crate) fn conjuncts<'a>(formula: &'a RelExpr, out: &mut Vec<&'a RelExpr>) {
+    match formula {
+        RelExpr::And(a, b) => {
+            conjuncts(a, out);
+            conjuncts(b, out);
+        }
+        other => out.push(other),
+    }
+}
+
+/// The state fields of record `owner` a formula reads, before or after.
+pub(crate) fn state_reads(formula: &RelExpr, owner: u32, out: &mut BTreeSet<u32>) {
+    fn value(v: &ValueExpr, owner: u32, out: &mut BTreeSet<u32>) {
+        match v {
+            ValueExpr::Projection(path) => {
+                if matches!(path.root(), ProjectionRoot::Pre | ProjectionRoot::Post)
+                    && path.segments().len() >= 2
+                    && path.segments()[0].get() == owner
+                {
+                    out.insert(path.segments()[1].get());
+                }
+            }
+            ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => {}
+            ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {
+                value(a, owner, out)
+            }
+            ValueExpr::Add(a, b)
+            | ValueExpr::Sub(a, b)
+            | ValueExpr::Mul(a, b)
+            | ValueExpr::Div(_, a, b) => {
+                value(a, owner, out);
+                value(b, owner, out);
+            }
+            ValueExpr::MulDiv(_, a, b, c)
+            | ValueExpr::SignedMulDivFloor(a, b, c)
+            | ValueExpr::ScaledMulDiv(_, _, a, b, c, _)
+            | ValueExpr::RepeatMulDiv(_, a, b, c, _) => {
+                value(a, owner, out);
+                value(b, owner, out);
+                value(c, owner, out);
+            }
+        }
+    }
+    match formula {
+        RelExpr::Bool(_) => {}
+        RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
+            state_reads(a, owner, out)
+        }
+        RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
+            state_reads(a, owner, out);
+            state_reads(b, owner, out);
+        }
+        RelExpr::Compare(_, a, b) => {
+            value(a, owner, out);
+            value(b, owner, out);
+        }
+        RelExpr::Predicate { arguments, .. } => {
+            for argument in arguments.iter() {
+                value(argument, owner, out);
+            }
+        }
+    }
+}

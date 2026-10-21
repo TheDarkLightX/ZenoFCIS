@@ -28,7 +28,7 @@ use zeno_fcis_spec::{ProjectionPath, ProjectionRoot, SummaryKind, TypeKind};
 
 use crate::ContractError;
 use crate::internals::{
-    declarations::Declarations,
+    declarations::{Declarations, Source},
     expr::{self, Ast, Binary},
     model::Contract,
     policy,
@@ -335,6 +335,26 @@ pub fn check(
         let state_laws = evaluate::state_laws(authority.descriptor());
         let laws = LawSet::new(authority.descriptor(), &state_laws);
         let mut measured = Measured::default();
+        // Genesis: every map empty, so every view at every choice of keys is
+        // this one, and every state law must hold on it.
+        let start: Vec<i128> = positions
+            .iter()
+            .enumerate()
+            .map(|(i, p)| match p.source {
+                Source::State => genesis(i).unwrap_or(values[i][0]),
+                _ => values[i][0],
+            })
+            .collect();
+        if !laws.on_state(&framer, &start) {
+            return (
+                measured,
+                Some(json!({
+                    "obligation": "state laws at genesis",
+                    "detail": "the genesis state breaks a state law",
+                    "view": shape.view_json(&start),
+                })),
+            );
+        }
         let mut tuple: Vec<i128> = values.iter().map(|v| v[0]).collect();
         let mut digits = vec![0usize; values.len()];
         loop {

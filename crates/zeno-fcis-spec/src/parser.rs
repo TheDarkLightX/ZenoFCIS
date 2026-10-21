@@ -846,6 +846,49 @@ impl Parser {
             }
         }
 
+        // A state law, which the checker assumes on every pre-view, must stay
+        // true while unnamed entries keep their values: each conjunct reads
+        // one named entry, or only scalar state.
+        let entry_of: BTreeMap<u32, u32> = entries
+            .iter()
+            .flat_map(|entry| {
+                let width = maps
+                    .iter()
+                    .find(|m| m.id == entry.map)
+                    .map_or(0, |m| m.value_fields.len() as u32);
+                (0..=width).map(move |j| (entry.id.get() + j, entry.id.get()))
+            })
+            .collect();
+        let state_owner = state.unwrap_or(0);
+        for spanned in &self.declarations {
+            let Declaration::Law(law) = &spanned.declaration else {
+                continue;
+            };
+            if !law.applicability().is_some_and(|a| a.genesis()) {
+                continue;
+            }
+            let mut conjuncts = Vec::new();
+            crate::collections::conjuncts(law.formula(), &mut conjuncts);
+            let mixed = conjuncts.iter().any(|conjunct| {
+                let mut reads = BTreeSet::new();
+                crate::collections::state_reads(conjunct, state_owner, &mut reads);
+                let named: BTreeSet<u32> = reads
+                    .iter()
+                    .filter_map(|f| entry_of.get(f))
+                    .copied()
+                    .collect();
+                named.len() > 1
+                    || (named.len() == 1 && reads.iter().any(|f| !entry_of.contains_key(f)))
+            });
+            if !entry_of.is_empty() && mixed {
+                problems.push((
+                    spanned.span,
+                    "law.entries",
+                    "a state law whose conjuncts each read one named entry or only scalar state",
+                    text(law.id().get()).into(),
+                ));
+            }
+        }
         // Formulas compare keys only with keys, by equality, and read maps
         // only through named entries.
         for spanned in &self.declarations {
