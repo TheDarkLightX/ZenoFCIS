@@ -254,7 +254,7 @@ pub(crate) fn implementation() -> String {
         include_str!("loop_capture_whole.rs"),
         include_str!("../source-snapshots/zeno-fcis-spec/src/ast.rs.txt"),
         include_str!("../source-snapshots/zeno-fcis-spec/src/parser.rs.txt"),
-        include_str!("../source-snapshots/zeno-fcis-spec/src/tables.rs.txt"),
+        include_str!("../../zeno-fcis-spec/src/tables.rs"),
         include_str!("../source-snapshots/zeno-fcis-contract/src/internals/expr.rs.txt"),
         include_str!("loop_version_space.rs"),
         include_str!("loop_search_limits.rs"),
