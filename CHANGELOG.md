@@ -29,6 +29,13 @@ embedded in ZenoFCIS values.
   counterexample and inconclusive checking. Reports confer no application,
   migration, publication or resource authority.
 
+- Restore upgrades of contracts adopted with the released ZenoFCIS 2.4.0 CLI.
+  Retained policies, receipts and store history are checked with the copied
+  released evaluator. Genesis and non-genesis version 1 stores upgrade to
+  version 2 while preserving pending delivery IDs. The upgrade checks the current state laws, and all
+  subsequent decisions use the current evaluator. Compatibility covers the
+  2.4.0 release only; edited superseded versions still refuse.
+
 ## 2.5.0 - 2026-10-18
 
 - **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,
@@ -36,7 +43,7 @@ embedded in ZenoFCIS values.
   encoding. Use the 2.4.0 CLI and matching 2.4 runtime, or re-adopt the original
   pre-adoption contract with a newly checked 2.5 candidate and receipt and
   start a new store. Re-adoption does not migrate existing stores.
-  Compatibility is planned for 2.5.1.
+  Compatibility for the 2.4.0 release is restored in 2.6.
 
 - **Tested and finite checked:** extend loop doors, exact transform checks,
   replay and point evaluation to the main signed 128-bit arithmetic route.

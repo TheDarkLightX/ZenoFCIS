@@ -345,11 +345,16 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertEqual(len(isolated), 9)
         # Each isolated name is one real library unit test, so CI cannot be
         # first to discover a misspelt selector.
-        sources = "\n".join(path.read_text() for path in
-                            (atdd.ROOT / "crates/zeno-fcis-synthesis/src").rglob("*.rs"))
+        listed = subprocess.run(
+            ["cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--lib", "--locked", "--offline",
+             "--", "--list", "--color", "never"],
+            cwd=atdd.ROOT, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        ).stdout
+        inventory = collections.Counter(line.removesuffix(": test")
+                                        for line in listed.splitlines() if line.endswith(": test"))
         for name in isolated:
-            leaf = name.rsplit("::", 1)[1]
-            self.assertEqual(len(re.findall(r"#\[test\]\s+fn " + leaf + r"\(", sources)), 1, name)
+            self.assertEqual(inventory[name], 1, name)
+            self.assertEqual(inventory[name.replace("finite::", "missing::", 1)], 0, name)
         graphs = [row["test"] for row in rows if row.get("target") == "--test completion" and "test" in row]
         inventories = {"--lib": sorted(isolated + ["finite::common::first", "finite::common::second"]),
                        "--test completion": sorted(graphs + ["common_completion"])}

@@ -468,6 +468,35 @@ fn receipt_is_canonical_and_deterministic() {
 }
 
 #[test]
+fn every_receipt_field_is_bound() {
+    let original = include_bytes!("../tests/fixtures/transform-check/3/program-3.zcve");
+    let candidate = include_bytes!("../tests/fixtures/transform-check/3/program-4.zcve");
+    let receipt = include_bytes!("../tests/fixtures/transform-check/3/equivalent-usage-differs.receipt.json");
+    let cap = DEFAULT_MAX_INPUT_TUPLES;
+    assert_eq!(replay(receipt, original, candidate, cap), Replay::Matched);
+    let value = parse(receipt);
+    for field in value.as_object().unwrap_or_else(|| panic!("receipt object")).keys() {
+        let mut changed = value.clone();
+        changed[field] = Value::Null;
+        assert_ne!(replay(&reencode(&changed), original, candidate, cap), Replay::Matched, "{field}");
+    }
+    for pointer in ["/checker/evaluator_identity", "/checker/semantics",
+        "/usage/max_steps/candidate", "/usage/max_steps/original", "/usage/usage_preserved",
+        "/usage/candidate_uses_more", "/original/sha256", "/candidate/sha256",
+        "/profile/execution", "/profile/program", "/domain/enumeration", "/domain/inputs"] {
+        let mut changed = value.clone();
+        *changed.pointer_mut(pointer).unwrap_or_else(|| panic!("missing {pointer}")) = Value::Null;
+        assert_ne!(replay(&reencode(&changed), original, candidate, cap), Replay::Matched, "{pointer}");
+    }
+    for pointer in ["/limits/steps", "/limits/input_tuples"] {
+        let mut changed = value.clone();
+        *changed.pointer_mut(pointer).unwrap_or_else(|| panic!("missing {pointer}")) = json!(0);
+        assert_ne!(replay(&reencode(&changed), original, candidate, cap), Replay::Matched, "{pointer}");
+    }
+    assert_eq!(replay(receipt, original, candidate, cap), Replay::Matched);
+}
+
+#[test]
 fn replay_matches_only_the_exact_recomputed_receipt() {
     let (original, candidate) = (
         artifact("boolean-kernel-original"),

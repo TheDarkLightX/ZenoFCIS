@@ -44,6 +44,7 @@ jobs:
           {"group": "synthesis-oracle-prices", "packages": "-p zeno-fcis-synthesis", "target": "--test oracle_prices"},
           {"group": "synthesis-historical-copy", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_copy"},
           {"group": "synthesis-historical-i64", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_i64"},
+          {"group": "synthesis-historical-context", "packages": "-p zeno-fcis-synthesis", "target": "--test historical_context"},
           {"group": "synthesis-scalar-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_arithmetic"},
           {"group": "synthesis-scalar-routes", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_routes"},
           {"group": "synthesis-signed-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test signed_arithmetic"},

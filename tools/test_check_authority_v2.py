@@ -13,6 +13,24 @@ import check_authority_v2 as gate
 
 
 class GateTests(unittest.TestCase):
+    def test_released_extension_preserves_approved_paths_and_build_pins(self):
+        raw = {'schema': 'zeno-fcis/authority-source-closure/1', 'paths': ['retained.rs'],
+               'pins': [{'path': '@pin/runtime-toolchain', 'bytes': 'fixed\n'}]}
+        copies = {'tag': 'v2.4.0', 'subject': '8c444487f96d6acd14c9f7fa55d9ba88ca780fb6',
+                  'files': [{'copy': 'historical.rs'}], 'binding_sources': [{'path': 'binding.rs'}]}
+        before = copy.deepcopy(raw)
+        extended = gate.released_24_source_extension(raw, copies)
+        self.assertEqual(raw, before)
+        self.assertEqual(extended['pins'], before['pins'])
+        self.assertTrue(set(before['paths']) <= set(extended['paths']))
+        self.assertIn('historical.rs', extended['paths'])
+        self.assertIn('binding.rs', extended['paths'])
+        for field in ('tag', 'subject'):
+            forged = {**copies, field: 'arbitrary'}
+            with self.assertRaises(ValueError): gate.released_24_source_extension(raw, forged)
+        copies['files'] = [{'copy': '../omitted.rs'}]
+        with self.assertRaises(ValueError): gate.released_24_source_extension(raw, copies)
+
     def test_before_loop_invariant_keeps_source_and_resource_guards(self):
         pin=json.loads((gate.ROOT/gate.verifier.PIN).read_text())
         report={'verus':{'version':pin['version'],'commit':pin['commit'],
@@ -112,7 +130,7 @@ class GateTests(unittest.TestCase):
 
     def test_evaluator_matches_complete_approved_generation(self):
         result = gate.check_generated_sources()
-        self.assertEqual(result['paths'], 135)
+        self.assertEqual(result['paths'], 260)
         self.assertIn('crates/zeno-fcis-synthesis/src/finite/value/scalar.rs', gate.source_manifest(gate.ROOT / gate.SOURCE_MANIFEST)['paths'])
         self.assertEqual(result['pins'], 3)
         self.assertEqual(result['approved_manifest_sha256'], gate.APPROVED_SOURCE_CLOSURE_SHA256)

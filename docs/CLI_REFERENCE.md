@@ -1696,16 +1696,21 @@ and also writes the message to stderr.
 
 ## Contract adoption and store upgrades
 
-**2.5 breaking change.** ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
-2.4.x, their i64 transform receipts, and stores created by 2.4 applications
-are incompatible with 2.5. Use the ZenoFCIS 2.4.0 CLI and matching 2.4
-runtime for those applications and stores.
+**Restored in 2.6.** Contracts adopted with the released ZenoFCIS 2.4.0 CLI
+can be generated and their existing stores upgraded with the current CLI.
+This restores the compatibility broken by 2.5's integer encoding change.
+Support covers the 2.4.0 release only.
 
-To start a separate 2.5 lineage, return to the original pre-adoption
-declarations and rules, check the candidate with the 2.5 CLI, and use
-`contract adopt` under 2.5 with the new receipt. Start a new store;
-re-adoption does not migrate a 2.4 store. Keep the retained policies,
-digests and receipts unchanged. Compatibility is planned for 2.5.1.
+Keep the adopted contract's declarations, rules, policies, candidate bytes,
+receipts and digests unchanged. Generation reconstructs each superseded
+policy and replays every retained receipt field with the released evaluator.
+An edited superseded version still refuses. The generated application's
+`--audit` checks the original history; `--upgrade` explicitly carries a
+genesis or non-genesis version 1 store to version 2, preserving pending delivery IDs.
+The `released-24-adoption` record binds the retained adoption comparison
+and checks the current state laws at the store's head. Every decision after
+the upgrade uses the current evaluator. Historical verification grants no
+new historical publication capability.
 
 
 `contract adopt DIR --candidate C.zcve --receipt R.json --usage

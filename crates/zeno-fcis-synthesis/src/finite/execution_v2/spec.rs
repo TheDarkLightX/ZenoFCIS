@@ -10,7 +10,7 @@ pub use crate::resource::resource_index;
 
 verus! {
 
-pub(super) open spec fn charge(
+pub(crate) open spec fn charge(
     limits: Seq<u64>, used: Seq<u64>, resource: Resource, amount: u64,
 ) -> (Result<(), MeterFailure>, Seq<u64>)
     recommends limits.len() == 8, used.len() == 8,

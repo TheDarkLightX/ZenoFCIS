@@ -249,6 +249,36 @@ pub fn checked_authority<'a>(
 }
 ";
 
+/// The second declaration block uses only the frozen released data types.
+/// It exposes a checked replay context, never a released publication constructor.
+pub(super) fn attach_released_24(text: &mut String) {
+    let metadata = text.replace("zeno_fcis_synthesis::finite::", "zeno_fcis_synthesis::finite::historical_i64::")
+        .replace("v2_authority as authority,", "")
+        .replace(BINDING, "");
+    text.push_str("\n/// Released declaration data for exact retained-evidence verification.\npub mod released_24_data {\n");
+    text.push_str(&metadata);
+    text.push_str("\n}\n\
+/// Bind the closed released context through its complete original catalog.\n\
+pub fn with_released_24<R>(f: impl FnOnce(&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>) -> R) -> Result<R, catalog::Failure> {\n\
+    let contract = released_24_data::Contract::new();\n\
+    let descriptor = contract.descriptor();\n\
+    let catalog = released_24_data::checked_catalog(&descriptor).map_err(|_| catalog::Failure::Policy)?;\n\
+    let context = zeno_fcis_synthesis::finite::historical::bind_released_24(&catalog).map_err(|_| catalog::Failure::Policy)?;\n\
+    Ok(f(&context))\n}\n");
+}
+
+pub(super) fn released_24_lineage(text: &mut String, versions: &[u32], current: u32) {
+    let members = (1..=current).map(|version| if versions.contains(&version) {
+        format!("Some(h{version})")
+    } else { "None".to_owned() }).collect::<Vec<_>>().join(", ");
+    let mut expression = format!("Ok(f(&[{members}]))");
+    for version in versions.iter().rev() {
+        expression = format!("v{version}::with_released_24(|h{version}| {expression})?");
+    }
+    let _ = writeln!(text, "\n/// Checked released predecessor contexts, in lineage order.\n\
+pub fn with_released_24_lineage<R>(f: impl FnOnce(&[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>]) -> R) -> Result<R, catalog::Failure> {{\n    {expression}\n}}");
+}
+
 pub(super) fn source(
     contract: &Contract<'_>,
     options: Options<'_>,

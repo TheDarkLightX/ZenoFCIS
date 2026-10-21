@@ -321,6 +321,8 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// i128 evaluator, checker-work/4 and loop-acquisition/1. The complete journey
 /// was replayed through every existing status assertion before these three
 /// source/profile-bound digests were refreshed; no field is filtered.
+const METERED_EVALUATOR_IDENTITY: &str =
+    "b04918d93dfc61306751d5679ccc632d24375b4022161d91bce1f9412749c812";
 const METERED_LEDGER_SHA256: &str =
     "fdb2c35f93730e5b769ac8d376cc20b20d631c427ee5d29487993bac206816f8";
 const METERED_HEAD_SHA256: &str =
@@ -328,13 +330,7 @@ const METERED_HEAD_SHA256: &str =
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
     "46c19007a7838e848e6cee25046f2af336e66cf929cb51d18de5c336c9c4ee84";
 
-#[test]
-fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
-    assert_eq!(
-        crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
-        "b04918d93dfc61306751d5679ccc632d24375b4022161d91bce1f9412749c812",
-        "checker identity changed: replay the recorded metered journey before refreshing its digests"
-    );
+fn metered_journey_bytes() -> [Vec<u8>; 3] {
     let scratch = Scratch::new();
     let session = scratch.session();
     let (exit, report) = open(
@@ -374,20 +370,60 @@ fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcrip
         transcript.extend_from_slice(&canonical_json(value));
     }
     let (ledger, head) = durable_bytes(&session);
-    let found = [
-        sha256_hex(&ledger),
-        sha256_hex(&head),
-        sha256_hex(&transcript),
-    ];
-    eprintln!("uninterrupted scenario digests: {found:?}");
+    [ledger, head, transcript]
+}
+
+#[test]
+fn an_uninterrupted_resume_preserves_the_metered_identity_and_complete_transcript() {
     assert_eq!(
-        found,
-        [
-            METERED_LEDGER_SHA256,
-            METERED_HEAD_SHA256,
-            METERED_DIRECT_OUTPUTS_SHA256
-        ]
+        crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
+        METERED_EVALUATOR_IDENTITY,
+        "checker identity changed: replay the recorded metered journey before refreshing its digests"
     );
+    let found = metered_journey_bytes().map(|bytes| sha256_hex(&bytes));
+    assert_eq!(found, [
+        METERED_LEDGER_SHA256,
+        METERED_HEAD_SHA256,
+        METERED_DIRECT_OUTPUTS_SHA256,
+    ]);
+}
+
+// Like the scalar source-manifest generator, this is an explicit maintenance
+// operation. Every existing journey/status assertion runs before any pin changes.
+#[test]
+#[ignore = "regenerates the source-bound metered journey fixture"]
+fn regenerate_metered_journey_fixture() {
+    let bytes = metered_journey_bytes();
+    let digests = bytes.each_ref().map(|bytes| sha256_hex(bytes));
+    let evaluator = crate::neural_loop::request::CheckerIdentity::current().evaluator_identity;
+    let evidence = std::path::PathBuf::from(
+        std::env::var_os("ZENO_METERED_FIXTURE_EVIDENCE").unwrap_or_else(|| panic!("retain the complete journey bytes"))
+    );
+    fs::create_dir_all(&evidence).unwrap_or_else(|error| panic!("fixture directory: {error}"));
+    for (name, bytes) in ["ledger.bin", "head.bin", "transcript.bin"].into_iter().zip(&bytes) {
+        fs::write(evidence.join(name), bytes).unwrap_or_else(|error| panic!("fixture bytes: {error}"));
+    }
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/loop_command_resume_tests.rs");
+    let before = fs::read_to_string(&path).unwrap_or_else(|error| panic!("fixture source: {error}"));
+    let mut source = before.clone();
+    for (name, digest) in [
+        ("METERED_EVALUATOR_IDENTITY", evaluator.as_str()),
+        ("METERED_LEDGER_SHA256", digests[0].as_str()),
+        ("METERED_HEAD_SHA256", digests[1].as_str()),
+        ("METERED_DIRECT_OUTPUTS_SHA256", digests[2].as_str()),
+    ] {
+        assert!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()));
+        let anchor = format!("const {name}: &str =\n    \"");
+        assert_eq!(source.matches(&anchor).count(), 1);
+        let start = source.find(&anchor).unwrap_or_else(|| panic!("fixture anchor")) + anchor.len();
+        let end = source[start..].find('"').unwrap_or_else(|| panic!("fixture quote")) + start;
+        assert_eq!(end - start, 64);
+        source.replace_range(start..end, digest);
+    }
+    fs::write(evidence.join("source-before.rs"), &before).unwrap_or_else(|error| panic!("fixture preimage: {error}"));
+    fs::write(evidence.join("source-after.rs"), &source).unwrap_or_else(|error| panic!("fixture postimage: {error}"));
+    fs::write(&path, source).unwrap_or_else(|error| panic!("fixture install: {error}"));
 }
 
 #[test]

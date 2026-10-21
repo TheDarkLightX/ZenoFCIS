@@ -494,6 +494,9 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             }
             .iter()
             .map(|(name, source)| {
+                let source = if *name == "src/session.rs" && generated.source().contains("pub fn with_released_24_lineage") {
+                    source.replace("    f(&[]) // released predecessor contexts", "    v2_contract::with_released_24_lineage(f).map_err(|error| format!(\"catalog: {error:?}\"))?")
+                } else { (*source).to_owned() };
                 (
                     (*name).to_owned(),
                     source

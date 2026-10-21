@@ -179,6 +179,14 @@ pub fn import_i64_program(bytes: &[u8]) -> Result<LegacyProgram, Error> {
     LegacyProgram::try_from_program(program)
 }
 
+/// Decode released scalar data for current authoring and metadata comparison.
+/// This data-only conversion grants no historical execution or replay authority.
+pub fn import_i64_program_data(bytes: &[u8]) -> Result<Program, Error> {
+    let (program, _) = decode_program(bytes, Some(ScalarWidth::Signed64), false)?;
+    LegacyProgram::try_from_program(program.clone())?;
+    Ok(program)
+}
+
 #[cfg(test)]
 pub(crate) fn import_released_profile_one_for_test(
     bytes: &[u8],

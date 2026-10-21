@@ -16,7 +16,11 @@ mod value;
 pub use evaluation::admission::AdmissionFailure as V2NumericAdmissionFailure;
 pub use evaluation::typed::NumericOp as V2NumericOp;
 #[doc(hidden)]
-pub use execution_v2::historical_i64;
+#[path = "evaluation/historical_i64.rs"]
+pub mod historical_i64;
+/// Closed released-evidence verification, separate from current invocation authority.
+#[path = "execution_v2/historical.rs"]
+pub mod historical;
 pub use execution_v2::composition as v2_composition;
 /// Immutable original-schema value witness; only checked ingress constructs it.
 pub use execution_v2::compound::Value as V2CanonicalValue;
@@ -192,8 +196,9 @@ const SEMANTIC_SOURCES: &[(&str, &[u8])] = &[
     ("value/wide.rs", include_bytes!("value/wide.rs") as &[u8]),
 ];
 
-/// The row count, then each path and its bytes, each preceded by its u64
-/// big-endian length, so distinct source lists cannot frame the same bytes.
+/// Two source sets: the current scalar route, then the closed released verifier.
+/// Each starts with its row count, followed by paths and bytes with u64
+/// big-endian lengths, so distinct source lists cannot frame the same bytes.
 pub(crate) fn semantic_source_bytes() -> Vec<u8> {
     let mut framed = Vec::new();
     framed.extend_from_slice(&(SEMANTIC_SOURCES.len() as u64).to_be_bytes());
@@ -203,6 +208,7 @@ pub(crate) fn semantic_source_bytes() -> Vec<u8> {
         framed.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
         framed.extend_from_slice(bytes);
     }
+    framed.extend_from_slice(&historical::source_bytes());
     framed
 }
 
@@ -1173,6 +1179,11 @@ mod semantic_source_tests {
                 reviewed.insert((*path).to_owned()),
                 "{path} is listed twice"
             );
+        }
+        let prefix = "crates/zeno-fcis-synthesis/src/finite/";
+        for path in super::historical::source_paths().filter_map(|path| path.strip_prefix(prefix)) {
+            assert!(reviewed.insert(path.to_owned()) || path == "execution_v2/meter.rs",
+                "{path} is listed twice");
         }
         let unreviewed: Vec<_> = tree.difference(&reviewed).collect();
         let missing: Vec<_> = reviewed.difference(&tree).collect();

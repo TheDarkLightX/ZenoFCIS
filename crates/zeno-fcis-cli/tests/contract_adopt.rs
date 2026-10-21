@@ -148,8 +148,17 @@ fn snapshot(dir: &Path) -> BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
-fn refuses_2_4_adopted_contract_without_changing_its_files() {
-    let historical = manifest("tests/fixtures/withdrawal-queue-adopted");
+fn edited_2_4_adopted_contract_refuses_without_changing_its_files() {
+    let root = TempRoot::new("edited-released-24");
+    let historical = root.path().join("app");
+    for (name, bytes) in snapshot(&manifest("tests/fixtures/withdrawal-queue-adopted")) {
+        write(historical.join(name), &bytes);
+    }
+    let project = String::from_utf8(read(historical.join("project.zeno")))
+        .unwrap_or_else(|error| panic!("fixture project UTF-8: {error}"));
+    let anchor = "= post.100.120 <= 4 &&";
+    assert_eq!(project.matches(anchor).count(), 1);
+    write(historical.join("project.zeno"), project.replace(anchor, "= post.100.120 <= 5 &&").as_bytes());
     let before = snapshot(&historical);
     let output = zeno(&[
         "generate".as_ref(),
@@ -167,11 +176,8 @@ fn refuses_2_4_adopted_contract_without_changing_its_files() {
     );
     for text in [
         "superseded_policy_sha256",
-        "version 1 was edited after adoption, or",
-        "adopted by ZenoFCIS 2.4.x, whose integer encoding changed in 2.5",
-        "ZenoFCIS 2.4.0 CLI",
-        "re-adopt it under 2.5",
-        "Compatibility is planned for 2.5.1",
+        "version 1 was edited after adoption",
+        "Restore the original declarations and rules",
     ] {
         assert!(message.contains(text), "missing {text}: {message}");
     }
@@ -714,10 +720,29 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
             report["error"]["message"]
                 .as_str()
                 .unwrap_or_default()
-                .contains("version 1 was edited after adoption, or"),
+                .contains("version 1 was edited after adoption"),
             "{report}"
         );
         // Version 1 keeps its source and policy, so its identity.
         assert_eq!(snapshot(&dir), before);
     }
+}
+
+
+/// Retained release evidence must replay without rewriting its bindings.
+#[test]
+fn replays_released_24_receipt() {
+    let root = TempRoot::new("released-24");
+    let dir = root.path().join("app");
+    let released = manifest("tests/fixtures/withdrawal-queue-adopted");
+    for (name, bytes) in snapshot(&released) {
+        write(dir.join(name), &bytes);
+    }
+    let receipt = read(dir.join("v2/adoptions/1/receipt.json"));
+    let policy = read(dir.join("v2/policy_v1.zcve"));
+    let output = generate(&dir, false);
+    assert!(output.status.success(), "released 2.4 receipt refused: {} {}",
+        String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert_eq!(read(dir.join("v2/adoptions/1/receipt.json")), receipt);
+    assert_eq!(read(dir.join("v2/policy_v1.zcve")), policy);
 }

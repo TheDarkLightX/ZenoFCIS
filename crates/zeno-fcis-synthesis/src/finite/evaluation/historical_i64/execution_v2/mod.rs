@@ -7,11 +7,26 @@ use meter::Meter;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
-use super::super::meter;
-pub(super) use super::super::{compound, util};
+pub(crate) mod authority;
+pub mod catalog;
+pub mod composition;
+pub(super) mod compound;
+pub mod continuation;
+mod decision;
+mod input_view;
+pub mod laws;
+use crate::finite::execution_v2::meter;
+#[cfg(verus_keep_ghost)]
+pub(crate) mod nonbinding_step;
 pub(crate) mod numeric;
 #[cfg(verus_keep_ghost)]
 mod spec;
+pub(crate) mod util;
+
+pub use input_view::{
+    AccessAttempt, Failure as RecordFailure, Field as InputField, Leaf as InputLeaf,
+    Projection as RecordProjection, Variant as InputVariant, project as project_record,
+};
 pub use meter::{Limits, MeterFailure, Resource, Usage, zero_limits};
 /// Borrowed eager scalar graph used by the library-owned producer.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -229,7 +244,6 @@ pub fn execute(
         usage: meter.used,
     }
 }
-
 
 #[cfg(test)]
 #[path = "../order_fixture.rs"]

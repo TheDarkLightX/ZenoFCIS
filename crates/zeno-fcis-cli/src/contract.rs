@@ -50,6 +50,7 @@ mod u128_tests;
 // The compiler core lives in the `zeno-fcis-contract` library; these
 // re-exports keep its modules at their former paths for this module's files.
 pub(crate) use zeno_fcis_contract::ContractError;
+use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_contract::internals::{
     declarations, expr, graph, model, policy, program_bytes, rules, schema, schema_commitment,
 };
@@ -1184,6 +1185,12 @@ fn generate_era(
     let mut previous = Vec::new();
     let mut adoptions = Vec::new();
     let mut replays = Vec::new();
+    let mut historical_versions = placement.previous.iter().enumerate()
+        .filter(|(_, previous)| previous.source.contains("pub fn with_released_24<R>"))
+        .map(|(index, _)| u32::try_from(index + 1)
+            .map_err(|_| ContractError::new("lineage", "too many historical versions")))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut released_compilation = false;
     for (index, (adoption, files)) in rules.adoptions.iter().zip(sources.adoptions).enumerate() {
         let version = index + 1;
         let place = format!("v2/policy.json adoptions[{index}]");
@@ -1201,23 +1208,35 @@ fn generate_era(
         // Stores may run the superseded version, so it is retained exactly:
         // its policy, regenerated from these declarations and rules, must be
         // the one this adoption superseded.
-        let policy = policy::encode(&contract, &schema)?;
+        let released_receipt = serde_json::from_slice::<serde_json::Value>(files.receipt)
+            .is_ok_and(|value| transform::is_released_24_receipt(&value));
+        let mut policy = policy::encode(&contract, &schema)?;
+        if index == 0 && released_receipt {
+            let released = Contract::build_released_24(&declarations, &rules, commitment)?;
+            let retained = policy::encode(&released, &schema)?;
+            if transform::sha256_hex(&retained) == adoption.superseded_policy_sha256 {
+                contract = released;
+                policy = retained;
+                released_compilation = true;
+            }
+        }
         if transform::sha256_hex(&policy) != adoption.superseded_policy_sha256 {
             return Err(ContractError::new(
                 format!("{place}.superseded_policy_sha256"),
                 format!(
                     "differs from version {version}'s policy as these declarations and rules \
-                     produce it: version {version} was edited after adoption, or this contract \
-                     was adopted by ZenoFCIS 2.4.x, whose integer encoding changed in 2.5. \
-                     Restore any edits to superseded versions. For a 2.4-adopted contract, \
-                     operate the app with the ZenoFCIS 2.4.0 CLI, or re-adopt it under 2.5 \
-                     from the original pre-adoption contract with a newly checked candidate \
-                     and receipt. Compatibility is planned for 2.5.1"
+                     produce it: version {version} was edited after adoption. Restore the \
+                     original declarations and rules of superseded versions and retain their \
+                     adoption evidence unchanged"
                 ),
             ));
         }
         let current = contract.program()?;
-        let current_bytes = program_bytes(&current)?;
+        let current_bytes = if released_compilation && released_receipt {
+            zeno_fcis_synthesis::finite_runtime::i64_program_value(&current)
+                .map_err(|e| ContractError::new(&place, format!("released program: {e}")))?
+                .canonical_bytes().map_err(|e| ContractError::new(&place, format!("released encoding: {e}")))?
+        } else { program_bytes(&current)? };
         if files.candidate == current_bytes.as_slice() {
             return Err(unchanged(&place, &directory, version));
         }
@@ -1282,8 +1301,7 @@ fn generate_era(
         replays.push(replayed);
         let version_number = u32::try_from(offset + version)
             .map_err(|_| ContractError::new("v2/policy.json adoptions", "too many adoptions"))?;
-        previous.push(PreviousContract {
-            source: render::source(
+        let mut retained_source = render::source(
                 &contract,
                 render::Options {
                     schema: &schema_file(version_number),
@@ -1292,12 +1310,20 @@ fn generate_era(
                     receipts: &[],
                     evolutions: &[],
                 },
-            )?,
+            )?;
+        if released_compilation && released_receipt {
+            render::attach_released_24(&mut retained_source);
+            historical_versions.push(version_number);
+        }
+        previous.push(PreviousContract {
+            source: retained_source,
             policy,
             schema: own_schema.then(|| schema.clone()),
         });
         // Replay admitted the candidate; this import gives its nodes.
-        let candidate = import_program(files.candidate).map_err(|error| {
+        let candidate = if released_compilation && released_receipt {
+            zeno_fcis_synthesis::finite_runtime::import_i64_program_data(files.candidate)
+        } else { import_program(files.candidate) }.map_err(|error| {
             ContractError::new(
                 &place,
                 format!("the library refuses the candidate: {error}"),
@@ -1352,7 +1378,7 @@ fn generate_era(
         .collect();
     let leaf = format!("../v2/policy_v{version}.zcve");
     let leaf_schema = schema_file(version);
-    let source = render::source(
+    let mut source = render::source(
         &contract,
         if placement.superseded {
             render::Options {
@@ -1372,6 +1398,9 @@ fn generate_era(
             }
         },
     )?;
+    if !historical_versions.is_empty() && !placement.superseded {
+        render::released_24_lineage(&mut source, &historical_versions, version);
+    }
     let policy = policy::encode(&contract, &schema)?;
     // An identity binds the policy, so a repeated policy is a repeated
     // identity, which no store could tell apart from the earlier version.

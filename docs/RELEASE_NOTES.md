@@ -36,7 +36,21 @@ acceptance depends on the stated check, domain and assumptions. The
 [installation guide](INSTALLATION.md) describes how to verify published assets
 once they are available.
 
-## Breaking change
+## Restored 2.4.0 adoption upgrades
+
+Upgrades of contracts adopted with the released ZenoFCIS 2.4.0 CLI are
+restored. Generation rechecks the unchanged declarations, canonical policies
+and retained receipts. The copied released evaluator verifies the original
+store history, including non-genesis states and pending deliveries. An
+explicit version 1 to version 2 upgrade checks the current state laws and
+carries the store forward without changing pending delivery IDs. Every later decision uses the current
+evaluator.
+
+This compatibility route covers the 2.4.0 release only. Keep its retained
+policies, receipts and digests unchanged; an edited superseded version still
+refuses. See [contract adoption and store upgrades](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+
+## The 2.5 breaking change
 
 ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
 2.4.x, their i64 transform receipts, and stores created by 2.4 applications
@@ -47,7 +61,8 @@ To start a separate 2.5 lineage, return to the original pre-adoption
 declarations and rules, check the candidate with the 2.5 CLI, and use
 `contract adopt` under 2.5 with the new receipt. Start a new store;
 re-adoption does not migrate a 2.4 store. Keep the retained policies,
-digests and receipts unchanged. Compatibility is planned for 2.5.1.
+digests and receipts unchanged. The 2.4.0 compatibility route above restores
+upgrades in 2.6.
 
 ## Arithmetic loops
 
