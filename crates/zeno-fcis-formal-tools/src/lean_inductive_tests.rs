@@ -528,7 +528,7 @@ fn pinned_lean_operator_truth_and_strict_definedness() {
         };
         let proposition = satisfied(&rendered);
         examples.push_str(&format!(
-            "example : {}({proposition}) := by decide\n",
+            "example : {}({proposition}) := by\n  try unfold inI128\n  all_goals decide\n",
             if expected { "" } else { "¬ " }
         ));
         assert!(source_is_bound(&obligation));
