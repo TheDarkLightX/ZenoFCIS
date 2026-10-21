@@ -68,7 +68,9 @@ statements to revisions for the `zal_ladder_*` tools. `mcp.py` adds four
 explanation tools and six ladder tools after the existing ones, and `terminal.py`
 adds `whynot`, `whatif`, `story`, `guide` and `ladder`. `check_zal_tools.py`
 runs their planted-defect controls on an isolated copy. `behavior.py` is
-unchanged by these additions.
+unchanged by these additions. `explain2.py` gives profile 2 the same
+explanations, with schemas `zal/why-not/2`, `zal/what-if/2` and
+`zal/narrative/2`, through `run.py story`, `why-not` and `what-if`.
 
 The browser's visible help controls and pointer/focus previews resolve canonical
 typed objects or grammar topics. Local `Explain next input` and
@@ -115,8 +117,16 @@ lowers variables, inputs, invariants and requirements to state and context
 fields, cases and laws over the admissible reference domain; temporal
 properties and fairness refuse as unsupported lowering.
 `oracles/temporal_oracle.py` compares machine verdicts with brute-force lassos
-and finite words; `check_behavior2.py planted` runs nine planted defects. The
-checker identity `zal/checker/3` includes `behavior2.py`.
+and finite words; `check_behavior2.py planted` runs nine planted defects.
+
+The 2.6 checker identity `zal/checker/3` hashes one source closure for all
+three packages: `behavior.py`, `behavior2.py`, `workflow.py`, `factory.py`,
+`shared.py`, `terminal.py`, `mcp.py`, `workspace.py`, `server.py` and
+`workspace.html`; the explanation and ladder tool modules `explain.py`,
+`explain2.py`, `constructs.py`, `ladder_tools.py`, `ladder.py`, `ladder_en.json` and
+`temporal_lowering.py`; and the withdrawal pilot's `withdrawal_pilot.py`,
+`withdrawal_pilot.lean` and `withdrawal_pilot_refutation.lean`. Changing any
+of them changes the identity and makes earlier evidence stale.
 
 The factory-qualified subset requires at least two states to satisfy the
 unchanged scaffold's independent rejected-genesis check. The language itself

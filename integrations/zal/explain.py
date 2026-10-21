@@ -401,6 +401,9 @@ def step_parts(model, rows, prefix, keys):
 
 def narrate_check(model, report, checker_identity="unbound"):
     """Tell one checker counterexample as a short numbered story."""
+    if getattr(model, "data", None) and model.data()["profile"] != PROFILE:
+        import explain2
+        return explain2.narrate_check(model, report, checker_identity)
     if report.get("status") != "counterexample":
         return bounded({"kind": "narrative", "schema": NARRATIVE, "profile": PROFILE, "revision": model.revision,
                         "checker": checker_identity, "source": "check", "status": "no-counterexample",
@@ -438,6 +441,9 @@ def narrate_check(model, report, checker_identity="unbound"):
 
 def narrate_trace(model, inputs, checker_identity="unbound"):
     """Replay assumed inputs from the initial state and tell them as a story."""
+    if model.data()["profile"] != PROFILE:
+        import explain2
+        return explain2.narrate_trace(model, inputs, checker_identity)
     rows = replay(model, inputs)
     root = {"initial": model.initial, "trace": rows}
     final = ["trace", len(rows) - 1, "outcome", "state"] if rows else ["initial"]

@@ -19,6 +19,14 @@ BACKED = "test_explain.NarrativeTests.test_narrative_sentences_are_backed_by_the
 REAL = "test_explain.RegistryHelpTests.test_every_help_topic_names_a_real_construct"
 COVERED = "test_explain.RegistryHelpTests.test_every_construct_has_help"
 STALE = "test_ladder_tools.LadderToolTests.test_stale_ladder_revision_is_refused"
+MINIMAL2 = "test_explain2.WhyNot2Tests.test_why_not_minimal_against_brute_force"
+APPLIED2 = "test_explain2.WhatIf2Tests.test_what_if_applies_every_named_change"
+BACKED2 = "test_explain2.Narrative2Tests.test_narrative_sentences_are_backed_by_the_witness"
+CYCLE = '''    parts += step_parts(model, report, [*W, "cycle"], "cycle")'''
+TRAP = '''trap = sentence(model, "trap", {key: witness[key] for key in ("rule", "variable", "value", "range")},'''
+WRAPPED = TRAP.replace('{key: witness[key] for key in ("rule", "variable", "value", "range")}',
+                       '{**{key: witness[key] for key in ("rule", "variable", "range")}, "value": (witness["value"] - witness["range"][0])'
+                       ' % (witness["range"][1] - witness["range"][0] + 1) + witness["range"][0]}')
 VIOLATES = '''parts.append(sentence(model, "violates", {"invariant": report["invariant"], "state": witness["state"]},'''
 VERIFIER = '''    if problems:
         raise Refusal("Narrative sentence not backed by the witness: " + problems[0])'''
@@ -45,6 +53,16 @@ CONTROLS = [
     ("construct-without-help", COVERED, "constructs.py", [(FRAME, "")]),
     ("stale-ladder-revision-accepted", STALE, "ladder_tools.py",
      [("    if revision != current:\n        raise l.Refusal(STALE)", "    if False:\n        raise l.Refusal(STALE)")]),
+    ("profile2-why-not-not-minimal", MINIMAL2, "explain2.py",
+     [("    minimal = [item for item in found if item[0] == distance]", "    minimal = found[:1]")]),
+    ("profile2-what-if-ignores-a-variable", APPLIED2, "explain2.py",
+     [("    after_values = {name: stored.get(name, value) for name, value in variables.items()}", "    after_values = dict(variables)"),
+      ('[("variable:" + v.name, variables.get(v.name), stored[v.name]) for v in model.variables if v.name in stored]', "[]")]),
+    ("lasso-without-its-cycle-runtime-check", BACKED2, "explain2.py", [(CYCLE, CYCLE + "[:-1]")]),
+    ("lasso-without-its-cycle-independent-oracle", BACKED2, "explain2.py",
+     [(CYCLE, CYCLE + "[:-1]"), (VERIFIER, VERIFIER.replace("if problems:", "if False:"))]),
+    ("range-story-wraps-around", BACKED2, "explain2.py",
+     [(TRAP, WRAPPED), (VERIFIER, VERIFIER.replace("if problems:", "if False:"))]),
 ]
 
 

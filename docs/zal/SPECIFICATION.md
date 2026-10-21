@@ -232,6 +232,31 @@ mark and unsupported kind. A drift test requires that coverage, and requires
 the live parser to accept every registry form as that construct. `zal/help/1`
 output is unchanged.
 
+Profile 2 has its own schemas, from `explain2.py`: `zal/why-not/2`,
+`zal/what-if/2` and `zal/narrative/2`. An input adds `variables`, and context
+values include integer inputs. Why-not counts the state, the event, each
+variable, each fact and each integer input as one change each. A wanted
+outcome may name `class` `Trap`, the trapped `variable` and post-state
+`variables`. Each witness reports configuration reachability and
+admissibility. What-if applies variable and integer changes and compares rule
+updates, requirement values and admissibility. Its outcome may be a Trap.
+Narratives cover determinism, range, invariant, invariant-preservation,
+requirement and property counterexamples:
+- A range story ends with the update that would leave its range, and a
+  requirement story names the failing step. When the requirement is an
+  implication, it says that the condition holds and the conclusion does not.
+- Safety, next and within-k stories name the triggering step and the steps
+  where the goal fails.
+- A liveness story is a lasso: the prefix, the cycle that repeats forever,
+  where each fairness declaration holds on the cycle, and the trigger whose
+  goal never happens, or the step at which an until breaks first.
+
+The verifier re-derives continuity through the cycle, the cycle's return to
+its first configuration, each fairness position, the trigger and every goal
+judgment from the model. `explain.narrate_check` and `narrate_trace` dispatch
+to profile 2 by model type. `run.py story`, `why-not` and `what-if` expose
+both profiles for a model file.
+
 ## Ladder statements in the tools
 
 `ladder_tools.py` exposes the shipped ladder examples and optional
@@ -284,11 +309,13 @@ It requires successful rendering of that exact model/checker/event cursor and
 no pending proposal. The cursor is captured with the displayed snapshot under
 the same workspace lock; an intervening event requires another display.
 Agreement records bind the candidate revision, canonical English and checker.
-The checker identity version `zal/checker/3` hashes `behavior.py`, `behavior2.py`, `workflow.py`,
-`factory.py`, `shared.py`, `terminal.py`, `mcp.py`, `workspace.py`, `server.py`,
-`workspace.html`, `explain.py`, `constructs.py`, `ladder_tools.py`, `ladder.py`,
-`ladder_en.json`, `temporal_lowering.py`, `withdrawal_pilot.py`,
-`withdrawal_pilot.lean` and `withdrawal_pilot_refutation.lean`.
+The checker identity version `zal/checker/3` hashes `behavior.py`,
+`behavior2.py`, `workflow.py`, `factory.py`, `shared.py`, `terminal.py`,
+`mcp.py`, `workspace.py`, `server.py`, `workspace.html`, `explain.py`, `explain2.py`,
+`constructs.py`, `ladder_tools.py`, `ladder.py`, `ladder_en.json`,
+`temporal_lowering.py`, and the withdrawal pilot's checker `withdrawal_pilot.py`
+with its Lean templates `withdrawal_pilot.lean` and
+`withdrawal_pilot_refutation.lean`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no

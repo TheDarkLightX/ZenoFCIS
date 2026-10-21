@@ -518,6 +518,29 @@ counterexample.
 unsupported lowering. The review terminal, MCP tools and browser workspace
 still use profile 1; `run.py ui` refuses a profile 2 model.
 
+The explanations work on profile 2 models from a file, through `run.py`:
+
+```sh
+python3 integrations/zal/run.py story MODEL.zal
+python3 integrations/zal/run.py story MODEL.zal --trace INPUTS.json
+python3 integrations/zal/run.py why-not integrations/zal/examples/withdrawal2.zal --scope input \
+  --input '{"state": "idle", "variables": {"balance": 0, "must_serve": 0, "pause": 0, "reserved": 0}, "event": "request", "context": {"alarm": false, "amount": 1}}' \
+  --want '{"class": "Accept"}'
+python3 integrations/zal/run.py what-if MODEL.zal --input '{...}' --change '{"variables": {"balance": 2}}'
+```
+
+`story` tells the check's counterexample. Range traps, requirement failures,
+safety, strong-next and within-k violations and fair lassos each get their own
+sentences. For example, removing `must_serve = 1` from the lane's `wait_last`
+rule gives a lasso. After two steps, "From here the next 3 steps repeat
+forever." lists the alarm cycle, and "Fairness keeper_ticks (event is tick)
+holds at cycle step 1" shows that the cycle is fair. The story ends: "state is
+waiting and state after this event is idle is false at every step from step 2
+on, including every step of the repeating cycle, so it never happens." In
+`why-not` and `what-if`, variables and integer inputs are inputs like any
+other, and `want` can name `Trap` to find the nearest input whose update
+leaves a range. The same commands accept profile 1 models without `variables`.
+
 ## Experimental progression ladders
 
 The [ladder prototype](ladder/README.md) presents a statement through seven

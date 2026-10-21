@@ -16,7 +16,7 @@ from workflow import checker_identity
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["legend", "check", "render", "export", "qualify", "diff", "ui"]:
+    for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if"]:
         p = sub.add_parser(command)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
@@ -32,6 +32,15 @@ def main():
         if command == "diff":
             p.add_argument("candidate", type=Path)
             p.add_argument("--candidate-syntax", choices=["symbolic", "english"], default="symbolic")
+        if command == "story":
+            p.add_argument("--trace", type=Path, help="JSON array of {event, context} inputs to tell instead of the check counterexample")
+        if command in {"why-not", "what-if"}:
+            p.add_argument("--input", required=True, help="JSON object: state, event, context and, in profile 2, variables")
+        if command == "why-not":
+            p.add_argument("--want", required=True, help="JSON object naming the wanted outcome")
+            p.add_argument("--scope", choices=["context", "input"], default="context")
+        if command == "what-if":
+            p.add_argument("--change", required=True, help="JSON object of named input changes")
         if command == "ui":
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
@@ -53,6 +62,25 @@ def main():
             if type(candidate) is not type(model):
                 raise behavior.Refusal("Comparison needs two models of the same profile")
             result = profile.semantic_diff(model, candidate)
+        elif options.command == "story":
+            import explain
+            if options.trace:
+                result = explain.narrate_trace(model, json.loads(options.trace.read_text(encoding="ascii")), checker_identity())
+            else:
+                result = explain.narrate_check(model, profile.check(model, checker_identity()), checker_identity())
+        elif options.command in {"why-not", "what-if"}:
+            import explain
+            import explain2
+            given = json.loads(options.input)
+            keys = {"state", "event", "context"} | ({"variables"} if profile is behavior2 else set())
+            if not isinstance(given, dict) or set(given) != keys:
+                raise behavior.Refusal("The input names exactly " + ", ".join(sorted(keys)))
+            module = explain2 if profile is behavior2 else explain
+            head = [given["state"], *([given["variables"]] if profile is behavior2 else []), given["event"], given["context"]]
+            if options.command == "why-not":
+                result = module.why_not(model, *head, json.loads(options.want), options.scope, checker_identity())
+            else:
+                result = module.what_if(model, *head, json.loads(options.change), checker_identity())
         elif options.command == "export":
             write_new(lower(model), options.out)
             result = {"status": "exported", "revision": model.revision, "authority": "none"}
