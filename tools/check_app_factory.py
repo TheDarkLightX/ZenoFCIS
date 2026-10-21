@@ -62,6 +62,11 @@ def main():
     run([*cargo,'test','--locked','--offline','--all-features','--test','app_journey'],cwd=app)
     if 'test parties_journey ... ok' not in (out/checks[-1]['log']).read_text():
         raise SystemExit('parties journey did not run')
+    if args.tcp:
+        # Hostile raw HTTP against the escrow server itself, on loopback only.
+        built=subprocess.run([*cargo,'build','--locked','--offline','--bin','app-server','--message-format','json'],cwd=app,env=environment,capture_output=True,text=True,check=True)
+        server=[m['executable'] for m in map(json.loads,built.stdout.splitlines()) if m.get('reason')=='compiler-artifact' and m['target']['name']=='app-server'][0]
+        run(['python3','tools/check_http_wire.py','--app',app,'--server',server,'--out',out/'http-wire.json'])
     run([*cargo,'test','--locked','--offline','-p','zeno-fcis-ingress'])
     run(['python3','tools/check_ingress.py'])
     print(f'app-factory: PASS; {out}',flush=True)
