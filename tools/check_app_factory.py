@@ -67,6 +67,8 @@ def main():
         built=subprocess.run([*cargo,'build','--locked','--offline','--bin','app-server','--message-format','json'],cwd=app,env=environment,capture_output=True,text=True,check=True)
         server=[m['executable'] for m in map(json.loads,built.stdout.splitlines()) if m.get('reason')=='compiler-artifact' and m['target']['name']=='app-server'][0]
         run(['python3','tools/check_http_wire.py','--app',app,'--server',server,'--out',out/'http-wire.json'])
+        # The admission rules as a contract: every input reviewed, then sent to this server.
+        run(['python3','tools/check_admission_model.py','--cli',cli,'--app',app,'--server',server,'--out',out/'admission'])
     run([*cargo,'test','--locked','--offline','-p','zeno-fcis-ingress'])
     run(['python3','tools/check_ingress.py'])
     print(f'app-factory: PASS; {out}',flush=True)

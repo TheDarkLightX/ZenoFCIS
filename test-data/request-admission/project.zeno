@@ -1,0 +1,95 @@
+zeno 1;
+project 1 request_admission;
+namespace 2 ingress;
+// The ingress's admission rules for one HTTP request (crates/zeno-fcis-ingress
+// src/http.rs), abstracted to the features they read: method, route, target
+// form, Host count, Origin, Sec-Fetch-Site, credential, body framing and body
+// layout. An accept means the request reaches its handler: the snapshot, a
+// public asset, or the core. A reject names the refusal, and so its status.
+// The ingress keeps no state; the field below is never written.
+type 100 state Ingress;
+type 101 command Request;
+type 102 context Deployment;
+type 105 int Unused in 0..=0;
+type 106 int Hosts in 0..=2;
+type 107 data Method;
+type 108 data Route;
+type 109 data Target;
+type 111 data Origin;
+type 112 data FetchSite;
+type 113 data Credential;
+type 114 data Framing;
+type 115 data Body;
+type 116 data Profile;
+field 110 100 unused 105;
+field 120 101 method 107;
+field 121 101 route 108;
+field 122 101 target 109;
+field 123 101 hosts 106;
+field 124 101 origin 111;
+field 125 101 fetch_site 112;
+field 126 101 credential 113;
+field 127 101 framing 114;
+field 128 101 body 115;
+field 130 102 profile 116;
+variant 150 107 Get none;
+variant 151 107 Post none;
+variant 152 107 OtherMethod none;
+variant 155 108 State none;
+variant 156 108 Preview none;
+variant 157 108 Command none;
+variant 158 108 Asset none;
+variant 159 108 Unknown none;
+variant 160 109 Plain none;
+variant 161 109 WithQuery none;
+variant 162 109 AbsoluteForm none;
+variant 165 111 NoOrigin none;
+variant 166 111 Exact none;
+variant 167 111 OtherOrigin none;
+variant 168 111 RepeatedOrigin none;
+variant 170 112 NotCrossSite none;
+variant 171 112 CrossSite none;
+variant 175 113 NoCredential none;
+variant 176 113 MalformedCredential none;
+variant 177 113 UnknownCredential none;
+variant 178 113 ValidCredential none;
+variant 180 114 NoBody none;
+variant 181 114 Length none;
+variant 182 114 Chunked none;
+variant 183 114 LengthAndChunked none;
+variant 184 114 OtherCoding none;
+variant 185 115 Empty none;
+variant 186 115 Short none;
+variant 187 115 BadVersion none;
+variant 188 115 OtherContract none;
+variant 189 115 Fits none;
+variant 190 115 Oversized none;
+variant 195 116 Loopback none;
+reason 200 ambiguous_framing precedence 0;
+reason 201 malformed precedence 1;
+reason 202 credential precedence 2;
+reason 203 origin precedence 3;
+reason 204 size precedence 4;
+reason 205 binding precedence 5;
+component 400 admission {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+// The ingress keeps no state of its own; the store does.
+law 500 no_ingress_state on commit, genesis = post.100.110 == 0;
+// Nothing is admitted with two lengths, a length and chunked, or a coding
+// before chunked.
+law 501 one_framing on commit = command.101.127 != 183 && command.101.127 != 184;
+// An admitted request has one Host, an origin-form target without a query,
+// no repeated or foreign Origin and no cross-site fetch.
+law 502 one_host_and_own_origin on commit = command.101.123 == 1 && command.101.122 == 160 && (command.101.124 == 165 || command.101.124 == 166) && command.101.125 == 170;
+// Only a public asset is served without a valid credential.
+law 503 credential_or_public_asset on commit = command.101.126 == 178 || (command.101.120 == 150 && command.101.121 == 158);
+// A GET carries no body and reads the state or an asset; a POST goes only to
+// preview or command, with a framed body that fits the layout and names this
+// contract; no other method is admitted.
+law 504 bodies_by_method on commit = (command.101.120 == 150 -> (command.101.121 == 155 || command.101.121 == 158) && (command.101.127 == 180 || (command.101.127 == 181 && command.101.128 == 185))) && (command.101.120 == 151 -> (command.101.121 == 156 || command.101.121 == 157) && command.101.128 == 189 && (command.101.127 == 181 || command.101.127 == 182)) && command.101.120 != 152;
