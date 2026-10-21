@@ -33,7 +33,7 @@ def _disk_checker_identity():
                  "terminal.py", "mcp.py", "workspace.py", "server.py", "workspace.html",
                  "explain.py", "explain2.py", "constructs.py", "ladder_tools.py", "ladder.py", "ladder_en.json", "temporal_lowering.py",
                  "withdrawal_pilot.py", "withdrawal_pilot.lean", "withdrawal_pilot_refutation.lean",
-                 "adt.py", "typed2.py"]:
+                 "adt.py", "typed2.py", "effects.py", "effects_guide.py"]:
         path = here / name
         digest.update(name.encode() + b"\0")
         digest.update(path.read_bytes())

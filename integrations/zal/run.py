@@ -16,7 +16,8 @@ from workflow import checker_identity
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if"]:
+    for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if",
+                    "lower", "explain", "guide"]:
         p = sub.add_parser(command)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
@@ -41,6 +42,11 @@ def main():
             p.add_argument("--scope", choices=["context", "input"], default="context")
         if command == "what-if":
             p.add_argument("--change", required=True, help="JSON object of named input changes")
+        if command in {"explain", "guide"}:
+            p.add_argument("--topic", default="", help="port:NAME or type:NAME to explain; a construct or object ID for guide")
+            p.add_argument("--human", action="store_true", help="Print plain text instead of JSON")
+        if command == "explain":
+            p.add_argument("--input", help="Typed machines: JSON object of state, variables, event and context")
         if command == "ui":
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
@@ -48,6 +54,11 @@ def main():
     try:
         with options.source.open(encoding="ascii") as stream:
             source = stream.read(MAX_SOURCE + 1)
+        first = next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
+        if first in {"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."}:
+            return typed_or_effects(options, source, first)
+        if options.command in {"lower", "explain", "guide"}:
+            raise behavior.Refusal(f"The {options.command} command supports zal/effects/1 and zal/typed-fsm/1 sources")
         model = behavior2.parse_any(source, options.syntax)
         profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
         if options.command == "render":
@@ -102,6 +113,44 @@ def main():
     except (ValueError, OSError) as error:
         print(json.dumps({"status": "refused", "diagnostic": str(error), "authority": "none"}), file=sys.stderr)
         return 2
+
+
+def typed_or_effects(options, source, first):
+    """Render, check, lower, explain and guide for effect signatures and typed machines."""
+    import effects
+    import effects_guide
+    import typed2
+    module = effects if first in {"zal effects 1;", "ZAL effects version 1."} else typed2
+    model = module.parse(source, options.syntax)
+    signatures = isinstance(model, effects.Signatures)
+    if options.command == "render":
+        print(model.render(options.to == "english"), end="")
+        return 0
+    if options.command == "check":
+        result = (effects if signatures else typed2).check(model, checker_identity())
+    elif options.command == "legend":
+        result = effects_guide.legend(model)
+    elif options.command == "lower" and signatures:
+        record = effects.lower(model)
+        result = {"status": "lowered", "revision": model.revision, "schema": model.schema, "bytes": len(record),
+                  "identity": effects.identity(model), "canonical": record.hex(), "authority": "none"}
+    elif options.command == "guide":
+        result = effects_guide.guide(model, options.topic, checker_identity())
+    elif options.command == "explain" and signatures:
+        result = effects_guide.explain(model, options.topic)
+    elif options.command == "explain" and options.input:
+        given = json.loads(options.input)
+        if not isinstance(given, dict) or set(given) != {"state", "variables", "event", "context"}:
+            raise behavior.Refusal("The input names exactly context, event, state, variables")
+        result = typed2.explain(model, given["state"], given["variables"], given["event"], given["context"],
+                                checker_identity())
+    else:
+        raise behavior.Refusal(f"The {options.command} command does not support {model.data()['profile']} sources")
+    if getattr(options, "human", False) and result.get("kind") in {"language-help", "type-explanation", "effect-explanation"}:
+        print(effects_guide.human_text(result))
+    else:
+        print(json.dumps(result, indent=2))
+    return 1 if result.get("status") in {"counterexample", "fail"} else 3 if result.get("status") == "unsupported" else 0
 
 
 if __name__ == "__main__":

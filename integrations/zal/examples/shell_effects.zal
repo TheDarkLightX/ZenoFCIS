@@ -1,0 +1,78 @@
+# The shell's effect ports, written in ZAL profile zal/effects/1.
+# Lowering this source gives the zeno-fcis/shell-effects/1 record byte for byte,
+# with the same registry identity as the shell library's built-in registry.
+zal effects 1;
+effects shell;
+schema zeno-fcis/shell-effects/1;
+# Logical resources a port may read or write: D, V, X, T and J.
+resource durable = 1;
+resource volatile = 2;
+resource transport = 4;
+resource clock = 8;
+resource jitter = 16;
+# What each capability allows; a store capability must map to V2 calls.
+capability ReadStore = 0: store, reads {durable, volatile}, writes {volatile};
+capability WriteStore = 1: store, reads {durable, volatile}, writes {durable, volatile};
+capability Relay = 2: store, reads {durable, volatile}, writes {durable, volatile};
+capability OpenStore = 3: store, reads {durable}, writes {volatile};
+capability Transport = 4: reads {transport}, writes {transport};
+capability Clock = 5: reads {clock}, writes {};
+capability Jitter = 6: reads {jitter}, writes {jitter};
+# Result shapes; T is the operation's success payload.
+answer Outcome = 0: ok(T) | refused(Code) | not_applied(Fault) | unknown(Fault);
+answer Transport = 1: sent(T) | not_sent(Code) | unknown(Code);
+answer Fallible = 2: ok(T) | err(Fault);
+# What each case says about the effect: NotApplied needs evidence of rollback or
+# non-execution; an ambiguous commit or a lost reply is Unknown.
+frame Fallible: ok applied, err unchanged;
+frame Outcome: ok applied, refused unchanged, not_applied unchanged, unknown either;
+frame Transport: sent applied, not_sent unchanged, unknown either;
+ports ReadState = 1, Commit = 2, ReadHistory = 3, ReadOutbox = 4, Send = 5, Acknowledge = 6, Reopen = 7, Clock = 8, Random = 9, Wait = 10;
+type Any = int 0..=18446744073709551615;
+type Bounded = {version: Version, cap: Any};
+type Code = provider | schema | identity | authority | lineage | checkpoint | invocation_kind | history | range | pre_state | replay | concurrent | delivery | interpreter | unknown_delivery | already_acknowledged | payload_mismatch | capacity | upgrade | succession | unsettled | protocol;
+type CommitReceipt = {version: Version, chain: Hash, status: Status};
+type Delivery = {id: Hash, version: Sequence, lane: int 0..=1, ordinal: int 0..=4294967295, destination: Envelope, payload: Envelope, payload_sha256: Hash};
+type Entry = {key: Hash, version: Sequence, publication: Publication};
+type Envelope = bytes ..=1048576;
+type Fault = busy | full | io;
+type Hash = bytes 32;
+type History = {head: Snapshot, commits: list ..=1048576 of Entry};
+type Mode = unversioned | at(Version) | bounded_at(Bounded);
+type Publication = {prestate: Envelope, command: Envelope, context: Envelope, identity: Envelope, subject: Envelope};
+type Purpose = retry_jitter;
+type Report = {delivery_id: Hash, payload_sha256: Hash};
+type Sequence = int 1..=9223372036854775807;
+type Snapshot = {version: Version, identity: Envelope, state: Envelope, root: Hash, chain: Hash};
+type Status = committed | replay;
+type Tick = {epoch: Any, tick: Any};
+type Version = int 0..=9223372036854775807;
+law 1 commit-once: "Commit(k,p); Commit(k,p) applies once and the second answers Replay with the original receipt; changed bytes under k refuse with D unchanged";
+law 2 commit-atomic: "a success changes state, sequence, root, chain, replay record and every required outbox row together; after a crash D is the pre-state or the complete post-state; NotApplied and Refused leave D unchanged";
+law 3 read-state: "one consistent snapshot; after a successful commit it sees the post-state or a validated descendant; a failure is never an empty state";
+law 4 read-exact: "consistent and exact; repeated reads with no write between agree; reads consume nothing; history proves nothing about later commits";
+law 5 send-exact: "sender D is unchanged and copies are exact; a report proves neither receipt nor authentication; duplicates may duplicate external effects";
+law 6 acknowledge-exact: "a matching (id, hash) sets only that record's bit, atomically and monotonically; a wrong ID or hash refuses; repeating gives AlreadyAcknowledged";
+law 7 reopen-audits: "recovers and audits D and drops V, or refuses; never resets, silently repairs or substitutes a store";
+law 8 time-monotone: "ticks are monotonic within an epoch; Wait returns a tick at or after its deadline or an explicit interruption; neither changes D";
+law 9 jitter-in-range: "a draw is below its bound; identical generator state gives an identical draw in simulation; no independence or cryptographic claim";
+operation ReadState(store: Store) -> Outcome Snapshot;
+footprint ReadState: capability ReadStore, reads {durable, volatile}, writes {volatile}, laws [3], v2 calls [V2SqliteShell::snapshot];
+operation Commit(store: Store, key: Hash, publication: Publication, mode: Mode) -> Outcome CommitReceipt;
+footprint Commit: capability WriteStore, reads {durable, volatile}, writes {durable, volatile}, laws [1, 2], v2 calls [V2SqliteShell::commit, V2SqliteShell::commit_at, V2SqliteShell::commit_bounded_at];
+operation ReadHistory(store: Store) -> Outcome History;
+footprint ReadHistory: capability ReadStore, reads {durable, volatile}, writes {volatile}, laws [4], v2 calls [Lineage::audit_history_read_only];
+operation ReadOutbox(store: Store) -> Outcome list ..=1048576 of Delivery;
+footprint ReadOutbox: capability ReadStore, reads {durable, volatile}, writes {volatile}, laws [4], v2 calls [V2SqliteShell::export_pending];
+operation Send(store: Store, delivery: Delivery) -> Transport Report;
+footprint Send: capability Transport, reads {transport}, writes {transport}, laws [5], v2 external relay::export_line;
+operation Acknowledge(store: Store, delivery_id: Hash, payload_sha256: Hash) -> Outcome unit;
+footprint Acknowledge: capability Relay, reads {durable, volatile}, writes {durable, volatile}, laws [6], v2 calls [V2SqliteShell::pending_by_id, Pending::relayed, Delivered::acknowledge];
+operation Reopen(store: Store) -> Outcome Snapshot;
+footprint Reopen: capability OpenStore, reads {durable}, writes {volatile}, laws [7], v2 calls [V2SqliteShell::open, V2SqliteShell::audit];
+operation Clock() -> Fallible Tick;
+footprint Clock: capability Clock, reads {clock}, writes {}, laws [8], v2 opt_in;
+operation Random(purpose: Purpose, bound: int 1..=18446744073709551615) -> Fallible int 0..=18446744073709551614;
+footprint Random: capability Jitter, reads {jitter}, writes {jitter}, laws [9], v2 opt_in;
+operation Wait(deadline: Tick) -> Fallible Tick;
+footprint Wait: capability Clock, reads {clock}, writes {}, laws [8], v2 opt_in;
