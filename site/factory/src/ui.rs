@@ -105,6 +105,7 @@ pub fn describe(source: &Value) -> Result<Value> {
             {
                 Constant::Int(v) => *v,
                 Constant::Bool(v) => i128::from(*v),
+                Constant::U128(_) => return Err("UiUnsupportedUnsignedGenesis".into()),
             };
         }
         let frame = framer.frame(&initial);
