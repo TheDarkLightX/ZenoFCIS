@@ -99,10 +99,10 @@ impl Policy {
         } else {
             None
         };
-        if let Some(v) = profile {
-            if !matches!(v.view(),ValueRef::Bytes(b) if b==self.identity.as_bytes()) {
-                return Err(Failure::Domain);
-            }
+        if let Some(v) = profile
+            && (!matches!(v.view(),ValueRef::Bytes(b) if b==self.identity.as_bytes()))
+        {
+            return Err(Failure::Domain);
         }
         Ok(())
     }

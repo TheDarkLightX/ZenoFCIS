@@ -71,15 +71,17 @@ fn sp_complete_record_relation_all_rows_and_exact_frame_control() {
     for (pre, actor, cmd, wallet, issuance, reference) in cases {
         let frozen = pre.clone();
         let out = sp::change(
-            &pre,
-            actor,
-            cmd,
-            wallet,
-            issuance,
-            prices(),
-            &[vault(1), vault(2)],
-            system(),
-            bounds(),
+            sp::ChangeInputs {
+                pre: &pre,
+                actor,
+                command: cmd,
+                wallet_zusd: wallet,
+                issuance,
+                prices: prices(),
+                inventory: &[vault(1), vault(2)],
+                system: system(),
+                bounds: bounds(),
+            },
             limits(),
         );
         assert_eq!(pre, frozen);

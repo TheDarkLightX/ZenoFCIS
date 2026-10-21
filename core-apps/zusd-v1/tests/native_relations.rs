@@ -221,18 +221,20 @@ fn liquidation_exact_partition_corpus() {
 #[test]
 fn vault_minimum_fee_pending_and_freeze_relations() {
     let opened = v::open(
-        None,
-        id(1),
-        id(1),
-        1200 * Q,
-        498 * Q,
-        (1200 * Q, 0),
-        system(),
-        v::Parameters::v1(),
-        fee(),
-        prices(),
-        Q,
-        time(),
+        v::OpenInputs {
+            existing: None,
+            id: id(1),
+            owner: id(1),
+            collateral: 1200 * Q,
+            principal: 498 * Q,
+            balances: (1200 * Q, 0),
+            system: system(),
+            parameters: v::Parameters::v1(),
+            fee: fee(),
+            prices: prices(),
+            max_fee: Q,
+            time: time(),
+        },
         limits(),
     );
     let o = *opened.result().unwrap();
@@ -245,18 +247,20 @@ fn vault_minimum_fee_pending_and_freeze_relations() {
     };
     assert_eq!(
         v::open(
-            None,
-            id(1),
-            id(1),
-            1200 * Q,
-            498 * Q,
-            (1200 * Q, 0),
-            system(),
-            v::Parameters::v1(),
-            fee(),
-            pending,
-            Q,
-            time(),
+            v::OpenInputs {
+                existing: None,
+                id: id(1),
+                owner: id(1),
+                collateral: 1200 * Q,
+                principal: 498 * Q,
+                balances: (1200 * Q, 0),
+                system: system(),
+                parameters: v::Parameters::v1(),
+                fee: fee(),
+                prices: pending,
+                max_fee: Q,
+                time: time(),
+            },
             limits()
         )
         .result(),
@@ -267,31 +271,35 @@ fn vault_minimum_fee_pending_and_freeze_relations() {
         ..prices()
     };
     let reduced = v::adjust(
-        o.vault,
-        o.system,
-        v::Parameters::v1(),
-        o.fee,
-        frozen,
-        v::Delta::Add(Q),
-        v::Delta::None,
-        (Q, 0),
-        Q,
-        None,
+        v::AdjustInputs {
+            vault: o.vault,
+            system: o.system,
+            parameters: v::Parameters::v1(),
+            fee: o.fee,
+            prices: frozen,
+            collateral_delta: v::Delta::Add(Q),
+            debt_delta: v::Delta::None,
+            wallet: (Q, 0),
+            max_fee: Q,
+            time: None,
+        },
         limits(),
     );
     assert!(reduced.result().is_ok());
     assert_eq!(
         v::adjust(
-            o.vault,
-            o.system,
-            v::Parameters::v1(),
-            o.fee,
-            frozen,
-            v::Delta::Remove(Q),
-            v::Delta::None,
-            (0, 0),
-            Q,
-            None,
+            v::AdjustInputs {
+                vault: o.vault,
+                system: o.system,
+                parameters: v::Parameters::v1(),
+                fee: o.fee,
+                prices: frozen,
+                collateral_delta: v::Delta::Remove(Q),
+                debt_delta: v::Delta::None,
+                wallet: (0, 0),
+                max_fee: Q,
+                time: None,
+            },
             limits()
         )
         .result(),
@@ -434,46 +442,52 @@ fn stability_snapshot_loss_reward_host_and_claim_flow() {
         front_ends: vec![],
     };
     let fe = sp::change(
-        &pre,
-        id(9),
-        sp::Command::RegisterFrontEnd(Q / 2),
-        0,
-        None,
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pre,
+            actor: id(9),
+            command: sp::Command::RegisterFrontEnd(Q / 2),
+            wallet_zusd: 0,
+            issuance: None,
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     let b = fe.result().unwrap().book.clone();
     let deposited = sp::change(
-        &b,
-        id(1),
-        sp::Command::Deposit {
-            amount: 100 * Q,
-            tag: Some(id(9)),
+        sp::ChangeInputs {
+            pre: &b,
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: 100 * Q,
+                tag: Some(id(9)),
+            },
+            wallet_zusd: 100 * Q,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
         },
-        100 * Q,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
         limits(),
     );
     let mut b = deposited.result().unwrap().book.clone();
     let offset = sp::offset(&b.pool, 50 * Q, 60 * Q, Some(10 * Q), bounds(), limits());
     b.pool = offset.result().unwrap().clone();
     let claim = sp::change(
-        &b,
-        id(1),
-        sp::Command::Claim,
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &b,
+            actor: id(1),
+            command: sp::Command::Claim,
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     let o = claim.result().unwrap();
@@ -484,29 +498,33 @@ fn stability_snapshot_loss_reward_host_and_claim_flow() {
     assert_eq!(o.book.pool.total, 50 * Q);
     assert_eq!(o.book.pool.stock.paid, 10 * Q);
     let again = sp::change(
-        &o.book,
-        id(1),
-        sp::Command::Claim,
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &o.book,
+            actor: id(1),
+            command: sp::Command::Claim,
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     assert_eq!(again.result().unwrap().gains.collateral, 0);
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::Claim,
-            0,
-            None,
-            prices(),
-            &[],
-            system(),
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::Claim,
+                wallet_zusd: 0,
+                issuance: None,
+                prices: prices(),
+                inventory: &[],
+                system: system(),
+                bounds: bounds(),
+            },
             limits()
         )
         .result(),
@@ -521,18 +539,20 @@ fn stability_both_price_principal_guard_and_history_integrity() {
         front_ends: vec![],
     };
     let dep = sp::change(
-        &b,
-        id(1),
-        sp::Command::Deposit {
-            amount: 10,
-            tag: None,
+        sp::ChangeInputs {
+            pre: &b,
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: 10,
+                tag: None,
+            },
+            wallet_zusd: 10,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
         },
-        10,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
         limits(),
     );
     let b = dep.result().unwrap().book.clone();
@@ -550,15 +570,17 @@ fn stability_both_price_principal_guard_and_history_integrity() {
     };
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::Withdraw(1),
-            0,
-            Some(0),
-            p,
-            &[v],
-            inventory_system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::Withdraw(1),
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: p,
+                inventory: &[v],
+                system: inventory_system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result(),
@@ -566,15 +588,17 @@ fn stability_both_price_principal_guard_and_history_integrity() {
     );
     assert!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::Claim,
-            0,
-            Some(0),
-            p,
-            &[v],
-            inventory_system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::Claim,
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: p,
+                inventory: &[v],
+                system: inventory_system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -720,15 +744,17 @@ fn d1_native_redemption_checks_each_floor_tie_and_full_first_prefix() {
         ..v::Parameters::v1()
     };
     let result = r::redeem(
-        &pre,
-        holder,
-        command,
-        p,
-        time(),
-        Some(20160),
-        params,
-        3,
-        bounds(),
+        r::RedeemInputs {
+            pre: &pre,
+            holder,
+            command,
+            prices: p,
+            time: time(),
+            bootstrap_minutes: Some(20160),
+            parameters: params,
+            capacity: 3,
+            bounds: bounds(),
+        },
         limits(),
     );
     let o = result.result().unwrap();
@@ -846,24 +872,26 @@ fn d1_all_four_vault_eligibility_patterns_preserve_ineligible_frames() {
             },
         };
         let result = r::redeem(
-            &pre,
-            holder,
-            command,
-            v::Prices {
-                committed: 300_000_000,
-                ..prices()
-            },
-            time(),
-            Some(20160),
-            v::Parameters {
-                minimum_net: 1,
-                reserve: 1,
-                ..v::Parameters::v1()
-            },
-            5,
-            sp::Bounds {
-                vaults: 5,
-                ..bounds()
+            r::RedeemInputs {
+                pre: &pre,
+                holder,
+                command,
+                prices: v::Prices {
+                    committed: 300_000_000,
+                    ..prices()
+                },
+                time: time(),
+                bootstrap_minutes: Some(20160),
+                parameters: v::Parameters {
+                    minimum_net: 1,
+                    reserve: 1,
+                    ..v::Parameters::v1()
+                },
+                capacity: 5,
+                bounds: sp::Bounds {
+                    vaults: 5,
+                    ..bounds()
+                },
             },
             limits(),
         );
@@ -922,31 +950,35 @@ fn owner_adjust_close_recovery_and_floor_cases() {
     assert_eq!(c.vault.status, v::Status::ClosedOwner);
     assert_eq!(c.vault.parameter_version, 1);
     let repaid = v::adjust(
-        vault,
-        s,
-        v::Parameters::v1(),
-        fee(),
-        prices(),
-        v::Delta::None,
-        v::Delta::Remove(450 * Q),
-        (0, 450 * Q),
-        Q,
-        None,
+        v::AdjustInputs {
+            vault,
+            system: s,
+            parameters: v::Parameters::v1(),
+            fee: fee(),
+            prices: prices(),
+            collateral_delta: v::Delta::None,
+            debt_delta: v::Delta::Remove(450 * Q),
+            wallet: (0, 450 * Q),
+            max_fee: Q,
+            time: None,
+        },
         limits(),
     );
     assert_eq!(repaid.result().unwrap().vault.debt, 550 * Q);
     assert_eq!(
         v::adjust(
-            vault,
-            s,
-            v::Parameters::v1(),
-            fee(),
-            prices(),
-            v::Delta::None,
-            v::Delta::Remove(450 * Q + 1),
-            (0, 1000 * Q),
-            Q,
-            None,
+            v::AdjustInputs {
+                vault,
+                system: s,
+                parameters: v::Parameters::v1(),
+                fee: fee(),
+                prices: prices(),
+                collateral_delta: v::Delta::None,
+                debt_delta: v::Delta::Remove(450 * Q + 1),
+                wallet: (0, 1000 * Q),
+                max_fee: Q,
+                time: None,
+            },
             limits()
         )
         .result(),
@@ -954,18 +986,20 @@ fn owner_adjust_close_recovery_and_floor_cases() {
     );
     assert_eq!(
         v::open(
-            Some(vault),
-            id(1),
-            id(1),
-            2000 * Q,
-            500 * Q,
-            (2000 * Q, 0),
-            s,
-            v::Parameters::v1(),
-            fee(),
-            prices(),
-            Q,
-            time(),
+            v::OpenInputs {
+                existing: Some(vault),
+                id: id(1),
+                owner: id(1),
+                collateral: 2000 * Q,
+                principal: 500 * Q,
+                balances: (2000 * Q, 0),
+                system: s,
+                parameters: v::Parameters::v1(),
+                fee: fee(),
+                prices: prices(),
+                max_fee: Q,
+                time: time(),
+            },
             limits()
         )
         .result(),
@@ -976,16 +1010,18 @@ fn owner_adjust_close_recovery_and_floor_cases() {
         ..s
     };
     let recovered = v::adjust(
-        vault,
-        s,
-        v::Parameters::v1(),
-        fee(),
-        prices(),
-        v::Delta::Add(500 * Q),
-        v::Delta::Add(100 * Q),
-        (500 * Q, 0),
-        0,
-        None,
+        v::AdjustInputs {
+            vault,
+            system: s,
+            parameters: v::Parameters::v1(),
+            fee: fee(),
+            prices: prices(),
+            collateral_delta: v::Delta::Add(500 * Q),
+            debt_delta: v::Delta::Add(100 * Q),
+            wallet: (500 * Q, 0),
+            max_fee: 0,
+            time: None,
+        },
         limits(),
     );
     let o = recovered.result().unwrap();
@@ -994,16 +1030,18 @@ fn owner_adjust_close_recovery_and_floor_cases() {
     assert_eq!(o.vault.debt, 1100 * Q);
     assert_eq!(
         v::adjust(
-            vault,
-            s,
-            v::Parameters::v1(),
-            fee(),
-            prices(),
-            v::Delta::None,
-            v::Delta::Add(100 * Q),
-            (0, 0),
-            0,
-            None,
+            v::AdjustInputs {
+                vault,
+                system: s,
+                parameters: v::Parameters::v1(),
+                fee: fee(),
+                prices: prices(),
+                collateral_delta: v::Delta::None,
+                debt_delta: v::Delta::Add(100 * Q),
+                wallet: (0, 0),
+                max_fee: 0,
+                time: None,
+            },
             limits()
         )
         .result(),
@@ -1018,18 +1056,20 @@ fn sp_scale_residual_only_empty_claim_and_funded_issuance_bound() {
         front_ends: vec![],
     };
     let dep = sp::change(
-        &b,
-        id(1),
-        sp::Command::Deposit {
-            amount: 1000 * Q,
-            tag: None,
+        sp::ChangeInputs {
+            pre: &b,
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: 1000 * Q,
+                tag: None,
+            },
+            wallet_zusd: 1000 * Q,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
         },
-        1000 * Q,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
         limits(),
     );
     let mut b = dep.result().unwrap().book.clone();
@@ -1040,15 +1080,17 @@ fn sp_scale_residual_only_empty_claim_and_funded_issuance_bound() {
     let liabilities = sp::liabilities(&b, bounds(), limits());
     assert_eq!(liabilities.result().unwrap().residual_only, 2000);
     let claim = sp::change(
-        &b,
-        id(1),
-        sp::Command::Withdraw(u128::MAX),
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &b,
+            actor: id(1),
+            command: sp::Command::Withdraw(u128::MAX),
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     let o = claim.result().unwrap();
@@ -1182,15 +1224,17 @@ fn redemption_full_partial_prefix_caps_and_last_vault() {
         min_out: 0,
     };
     let result = r::redeem(
-        &pre,
-        holder,
-        command,
-        prices(),
-        time(),
-        Some(20160),
-        v::Parameters::v1(),
-        3,
-        bounds(),
+        r::RedeemInputs {
+            pre: &pre,
+            holder,
+            command,
+            prices: prices(),
+            time: time(),
+            bootstrap_minutes: Some(20160),
+            parameters: v::Parameters::v1(),
+            capacity: 3,
+            bounds: bounds(),
+        },
         limits(),
     );
     let o = result.result().unwrap();
@@ -1207,15 +1251,17 @@ fn redemption_full_partial_prefix_caps_and_last_vault() {
     };
     assert_eq!(
         r::redeem(
-            &pre,
-            holder,
-            all,
-            prices(),
-            time(),
-            Some(20160),
-            v::Parameters::v1(),
-            3,
-            bounds(),
+            r::RedeemInputs {
+                pre: &pre,
+                holder,
+                command: all,
+                prices: prices(),
+                time: time(),
+                bootstrap_minutes: Some(20160),
+                parameters: v::Parameters::v1(),
+                capacity: 3,
+                bounds: bounds(),
+            },
             limits()
         )
         .result(),
@@ -1227,15 +1273,17 @@ fn redemption_full_partial_prefix_caps_and_last_vault() {
     };
     assert_eq!(
         r::redeem(
-            &pre,
-            holder,
-            limited,
-            prices(),
-            time(),
-            Some(20160),
-            v::Parameters::v1(),
-            3,
-            bounds(),
+            r::RedeemInputs {
+                pre: &pre,
+                holder,
+                command: limited,
+                prices: prices(),
+                time: time(),
+                bootstrap_minutes: Some(20160),
+                parameters: v::Parameters::v1(),
+                capacity: 3,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -1246,15 +1294,17 @@ fn redemption_full_partial_prefix_caps_and_last_vault() {
     );
     assert_eq!(
         r::redeem(
-            &pre,
-            holder,
-            command,
-            prices(),
-            None,
-            None,
-            v::Parameters::v1(),
-            3,
-            bounds(),
+            r::RedeemInputs {
+                pre: &pre,
+                holder,
+                command,
+                prices: prices(),
+                time: None,
+                bootstrap_minutes: None,
+                parameters: v::Parameters::v1(),
+                capacity: 3,
+                bounds: bounds(),
+            },
             limits()
         )
         .result(),
@@ -1275,18 +1325,20 @@ fn common_reason_precedence_and_exact_pending_owner_outcome() {
     };
     let open = |collateral, principal, wallet, max_fee| {
         v::open(
-            None,
-            id(1),
-            id(1),
-            collateral,
-            principal,
-            (wallet, 0),
-            system(),
-            params,
-            high_fee,
-            prices(),
-            max_fee,
-            time(),
+            v::OpenInputs {
+                existing: None,
+                id: id(1),
+                owner: id(1),
+                collateral,
+                principal,
+                balances: (wallet, 0),
+                system: system(),
+                parameters: params,
+                fee: high_fee,
+                prices: prices(),
+                max_fee,
+                time: time(),
+            },
             limits(),
         )
     };
@@ -1313,16 +1365,18 @@ fn common_reason_precedence_and_exact_pending_owner_outcome() {
         ..system()
     };
     let out = v::adjust(
-        old,
-        s,
-        params,
-        fee(),
-        prices(),
-        v::Delta::None,
-        v::Delta::Remove(50 * Q),
-        (0, 50 * Q),
-        0,
-        None,
+        v::AdjustInputs {
+            vault: old,
+            system: s,
+            parameters: params,
+            fee: fee(),
+            prices: prices(),
+            collateral_delta: v::Delta::None,
+            debt_delta: v::Delta::Remove(50 * Q),
+            wallet: (0, 50 * Q),
+            max_fee: 0,
+            time: None,
+        },
         limits(),
     );
     assert_eq!(
@@ -1356,16 +1410,18 @@ fn common_reason_precedence_and_exact_pending_owner_outcome() {
     );
     assert_eq!(
         v::adjust(
-            old,
-            s,
-            params,
-            fee(),
-            prices(),
-            v::Delta::Remove(2000 * Q),
-            v::Delta::None,
-            (0, 0),
-            0,
-            None,
+            v::AdjustInputs {
+                vault: old,
+                system: s,
+                parameters: params,
+                fee: fee(),
+                prices: prices(),
+                collateral_delta: v::Delta::Remove(2000 * Q),
+                debt_delta: v::Delta::None,
+                wallet: (0, 0),
+                max_fee: 0,
+                time: None,
+            },
             limits()
         )
         .result(),
@@ -1438,18 +1494,20 @@ fn withdrawal_requires_complete_inventory_and_redemption_guard_witnesses() {
         front_ends: vec![],
     };
     let dep = sp::change(
-        &pre,
-        id(1),
-        sp::Command::Deposit {
-            amount: 10,
-            tag: None,
+        sp::ChangeInputs {
+            pre: &pre,
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: 10,
+                tag: None,
+            },
+            wallet_zusd: 10,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
         },
-        10,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
         limits(),
     );
     let pre = &dep.result().unwrap().book;
@@ -1462,15 +1520,17 @@ fn withdrawal_requires_complete_inventory_and_redemption_guard_witnesses() {
     };
     assert_eq!(
         sp::change(
-            pre,
-            id(1),
-            sp::Command::Withdraw(1),
-            0,
-            Some(0),
-            prices(),
-            &[],
-            omitted,
-            bounds(),
+            sp::ChangeInputs {
+                pre,
+                actor: id(1),
+                command: sp::Command::Withdraw(1),
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: prices(),
+                inventory: &[],
+                system: omitted,
+                bounds: bounds(),
+            },
             limits()
         )
         .result(),
@@ -1478,18 +1538,20 @@ fn withdrawal_requires_complete_inventory_and_redemption_guard_witnesses() {
     );
     assert_eq!(
         sp::change(
-            pre,
-            id(1),
-            sp::Command::Deposit {
-                amount: 1,
-                tag: Some(id(99))
+            sp::ChangeInputs {
+                pre,
+                actor: id(1),
+                command: sp::Command::Deposit {
+                    amount: 1,
+                    tag: Some(id(99))
+                },
+                wallet_zusd: 1,
+                issuance: None,
+                prices: prices(),
+                inventory: &[],
+                system: system(),
+                bounds: bounds(),
             },
-            1,
-            None,
-            prices(),
-            &[],
-            system(),
-            bounds(),
             limits()
         )
         .result(),
@@ -1520,15 +1582,17 @@ fn withdrawal_requires_complete_inventory_and_redemption_guard_witnesses() {
     };
     let invoke = |holder, command, price, age| {
         r::redeem(
-            &book,
-            holder,
-            command,
-            price,
-            time(),
-            age,
-            v::Parameters::v1(),
-            2,
-            bounds(),
+            r::RedeemInputs {
+                pre: &book,
+                holder,
+                command,
+                prices: price,
+                time: time(),
+                bootstrap_minutes: age,
+                parameters: v::Parameters::v1(),
+                capacity: 2,
+                bounds: bounds(),
+            },
             limits(),
         )
     };
@@ -1669,18 +1733,20 @@ fn gain_to_vault_is_one_pure_successor_and_late_refusal_discards_both() {
         front_ends: vec![],
     };
     let d = sp::change(
-        &pool,
-        id(1),
-        sp::Command::Deposit {
-            amount: 10 * Q,
-            tag: None,
+        sp::ChangeInputs {
+            pre: &pool,
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: 10 * Q,
+                tag: None,
+            },
+            wallet_zusd: 10 * Q,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
         },
-        10 * Q,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
         limits(),
     );
     let mut pool = d.result().unwrap().book.clone();
@@ -1699,17 +1765,19 @@ fn gain_to_vault_is_one_pure_successor_and_late_refusal_discards_both() {
     let frozen = (pre.clone(), pool.clone());
     let invoke = |params, lim| {
         composition::move_gain_to_vault(
-            &pre,
-            &pool,
-            id(1),
-            params,
-            fee(),
-            prices(),
-            Some(0),
-            None,
-            None,
-            2,
-            bounds(),
+            composition::GainToVaultInputs {
+                pre: &pre,
+                pool: &pool,
+                actor: id(1),
+                parameters: params,
+                fee: fee(),
+                prices: prices(),
+                issuance: Some(0),
+                upper: None,
+                lower: None,
+                capacity: 2,
+                bounds: bounds(),
+            },
             lim,
         )
     };
@@ -1759,17 +1827,19 @@ fn gain_to_vault_is_one_pure_successor_and_late_refusal_discards_both() {
         ..prices()
     };
     let freeze = composition::move_gain_to_vault(
-        &pre,
-        &pool,
-        id(1),
-        v::Parameters::v1(),
-        fee(),
-        frozen_prices,
-        Some(0),
-        None,
-        None,
-        2,
-        bounds(),
+        composition::GainToVaultInputs {
+            pre: &pre,
+            pool: &pool,
+            actor: id(1),
+            parameters: v::Parameters::v1(),
+            fee: fee(),
+            prices: frozen_prices,
+            issuance: Some(0),
+            upper: None,
+            lower: None,
+            capacity: 2,
+            bounds: bounds(),
+        },
         limits(),
     );
     assert_eq!(freeze.result(), out.result());

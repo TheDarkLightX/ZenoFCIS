@@ -197,10 +197,10 @@ pub fn check_pending(
 ) -> Evaluation<()> {
     run(limits, |w| {
         let reference = expected_pending(v, s, w);
-        if let Err(e) = reference {
-            if !matches!(e, Failure::Reject(_)) {
-                return Err(e);
-            }
+        if let Err(e) = reference
+            && (!matches!(e, Failure::Reject(_)))
+        {
+            return Err(e);
         }
         if reference != candidate {
             return Err(Failure::Law(2000));
@@ -218,10 +218,10 @@ pub fn check_quote(
 ) -> Evaluation<()> {
     run(limits, |w| {
         let reference = expected_quote(v, s, p, available, w);
-        if let Err(e) = reference {
-            if !matches!(e, Failure::Reject(_)) {
-                return Err(e);
-            }
+        if let Err(e) = reference
+            && (!matches!(e, Failure::Reject(_)))
+        {
+            return Err(e);
         }
         if reference != candidate {
             return Err(Failure::Law(2001));

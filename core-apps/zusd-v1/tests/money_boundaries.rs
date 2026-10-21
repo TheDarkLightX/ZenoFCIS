@@ -38,18 +38,20 @@ fn deposited() -> sp::Book {
     let p = policy(false);
     let s = ready(&p);
     sp::change(
-        &empty(),
-        id(1),
-        sp::Command::Deposit {
-            amount: Q,
-            tag: None,
+        sp::ChangeInputs {
+            pre: &empty(),
+            actor: id(1),
+            command: sp::Command::Deposit {
+                amount: Q,
+                tag: None,
+            },
+            wallet_zusd: Q,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: s.book().system,
+            bounds: bounds(),
         },
-        Q,
-        Some(0),
-        prices(),
-        &[],
-        s.book().system,
-        bounds(),
         limits(),
     )
     .into_parts()
@@ -852,15 +854,17 @@ fn small_money_limits_and_public_inventory_refusals() {
         };
         assert_eq!(
             sp::change(
-                &b,
-                id(1),
-                sp::Command::Withdraw(1),
-                0,
-                Some(0),
-                prices(),
-                &rows,
-                sys,
-                bounds(),
+                sp::ChangeInputs {
+                    pre: &b,
+                    actor: id(1),
+                    command: sp::Command::Withdraw(1),
+                    wallet_zusd: 0,
+                    issuance: Some(0),
+                    prices: prices(),
+                    inventory: &rows,
+                    system: sys,
+                    bounds: bounds(),
+                },
                 limits()
             )
             .result()
@@ -873,15 +877,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     blocked.pending_blocked = true;
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::Withdraw(1),
-            0,
-            Some(0),
-            blocked,
-            &rows.vaults,
-            rows.system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::Withdraw(1),
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: blocked,
+                inventory: &rows.vaults,
+                system: rows.system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -890,15 +896,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     );
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::MoveGainToVault,
-            0,
-            Some(0),
-            prices(),
-            &[],
-            s.book().system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::MoveGainToVault,
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: prices(),
+                inventory: &[],
+                system: s.book().system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -907,15 +915,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     );
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::RegisterFrontEnd(Q),
-            0,
-            None,
-            prices(),
-            &[],
-            s.book().system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::RegisterFrontEnd(Q),
+                wallet_zusd: 0,
+                issuance: None,
+                prices: prices(),
+                inventory: &[],
+                system: s.book().system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -924,15 +934,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     );
     assert_eq!(
         sp::change(
-            &b,
-            id(1),
-            sp::Command::Claim,
-            0,
-            Some(0),
-            prices(),
-            &vec![rows.vaults[0]; 9],
-            rows.system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &b,
+                actor: id(1),
+                command: sp::Command::Claim,
+                wallet_zusd: 0,
+                issuance: Some(0),
+                prices: prices(),
+                inventory: &vec![rows.vaults[0]; 9],
+                system: rows.system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -942,15 +954,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     let mut front = empty();
     for actor in 1..=8 {
         front = sp::change(
-            &front,
-            id(actor),
-            sp::Command::RegisterFrontEnd(Q),
-            0,
-            None,
-            prices(),
-            &[],
-            s.book().system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &front,
+                actor: id(actor),
+                command: sp::Command::RegisterFrontEnd(Q),
+                wallet_zusd: 0,
+                issuance: None,
+                prices: prices(),
+                inventory: &[],
+                system: s.book().system,
+                bounds: bounds(),
+            },
             limits(),
         )
         .into_parts()
@@ -960,15 +974,17 @@ fn small_money_limits_and_public_inventory_refusals() {
     }
     assert_eq!(
         sp::change(
-            &front,
-            id(9),
-            sp::Command::RegisterFrontEnd(Q),
-            0,
-            None,
-            prices(),
-            &[],
-            s.book().system,
-            bounds(),
+            sp::ChangeInputs {
+                pre: &front,
+                actor: id(9),
+                command: sp::Command::RegisterFrontEnd(Q),
+                wallet_zusd: 0,
+                issuance: None,
+                prices: prices(),
+                inventory: &[],
+                system: s.book().system,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -979,17 +995,19 @@ fn small_money_limits_and_public_inventory_refusals() {
     other.pool.total = 1;
     assert_eq!(
         zenofcis_zusd_v1::composition::move_gain_to_vault(
-            &rows,
-            &other,
-            id(1),
-            v::Parameters::v1(),
-            s.fee_state(),
-            prices(),
-            Some(0),
-            None,
-            None,
-            8,
-            bounds(),
+            composition::GainToVaultInputs {
+                pre: &rows,
+                pool: &other,
+                actor: id(1),
+                parameters: v::Parameters::v1(),
+                fee: s.fee_state(),
+                prices: prices(),
+                issuance: Some(0),
+                upper: None,
+                lower: None,
+                capacity: 8,
+                bounds: bounds(),
+            },
             limits()
         )
         .result()
@@ -1058,18 +1076,20 @@ fn vault_scalar_domain_and_representability_guards() {
         };
         assert_eq!(
             v::open(
-                existing,
-                row.id,
-                row.owner,
-                1200 * Q,
-                principal,
-                (1200 * Q, 0),
-                book().system,
-                params,
-                f,
-                price,
-                Q,
-                time,
+                v::OpenInputs {
+                    existing,
+                    id: row.id,
+                    owner: row.owner,
+                    collateral: 1200 * Q,
+                    principal,
+                    balances: (1200 * Q, 0),
+                    system: book().system,
+                    parameters: params,
+                    fee: f,
+                    prices: price,
+                    max_fee: Q,
+                    time,
+                },
                 limits()
             )
             .result()
@@ -1081,18 +1101,20 @@ fn vault_scalar_domain_and_representability_guards() {
     blocked.pending_blocked = true;
     assert_eq!(
         v::open(
-            None,
-            id(1),
-            id(1),
-            1200 * Q,
-            1000 * Q,
-            (1200 * Q, 0),
-            book().system,
-            v::Parameters::v1(),
-            f,
-            blocked,
-            Q,
-            time,
+            v::OpenInputs {
+                existing: None,
+                id: id(1),
+                owner: id(1),
+                collateral: 1200 * Q,
+                principal: 1000 * Q,
+                balances: (1200 * Q, 0),
+                system: book().system,
+                parameters: v::Parameters::v1(),
+                fee: f,
+                prices: blocked,
+                max_fee: Q,
+                time,
+            },
             limits()
         )
         .result()
@@ -1101,16 +1123,18 @@ fn vault_scalar_domain_and_representability_guards() {
     );
     assert_eq!(
         v::adjust(
-            row,
-            b.system,
-            v::Parameters::v1(),
-            f,
-            blocked,
-            v::Delta::Remove(1),
-            v::Delta::None,
-            (0, 0),
-            Q,
-            None,
+            v::AdjustInputs {
+                vault: row,
+                system: b.system,
+                parameters: v::Parameters::v1(),
+                fee: f,
+                prices: blocked,
+                collateral_delta: v::Delta::Remove(1),
+                debt_delta: v::Delta::None,
+                wallet: (0, 0),
+                max_fee: Q,
+                time: None,
+            },
             limits()
         )
         .result()
@@ -1136,18 +1160,20 @@ fn vault_scalar_domain_and_representability_guards() {
     };
     assert_eq!(
         v::open(
-            None,
-            id(1),
-            id(1),
-            1,
-            500 * Q,
-            (1, 0),
-            sys,
-            v::Parameters::v1(),
-            f,
-            huge,
-            Q,
-            time,
+            v::OpenInputs {
+                existing: None,
+                id: id(1),
+                owner: id(1),
+                collateral: 1,
+                principal: 500 * Q,
+                balances: (1, 0),
+                system: sys,
+                parameters: v::Parameters::v1(),
+                fee: f,
+                prices: huge,
+                max_fee: Q,
+                time,
+            },
             limits()
         )
         .result()
@@ -1170,16 +1196,18 @@ fn vault_scalar_domain_and_representability_guards() {
     };
     assert_eq!(
         v::adjust(
-            row,
-            sys,
-            v::Parameters::v1(),
-            f,
-            huge,
-            v::Delta::Remove(9),
-            v::Delta::None,
-            (0, 0),
-            Q,
-            None,
+            v::AdjustInputs {
+                vault: row,
+                system: sys,
+                parameters: v::Parameters::v1(),
+                fee: f,
+                prices: huge,
+                collateral_delta: v::Delta::Remove(9),
+                debt_delta: v::Delta::None,
+                wallet: (0, 0),
+                max_fee: Q,
+                time: None,
+            },
             limits()
         )
         .result()
@@ -1438,19 +1466,21 @@ fn all_small_hint_pairs_preserve_owner_money() {
     };
     assert_eq!(
         v::adjust(
-            row,
-            b.system,
-            v::Parameters::v1(),
-            f,
-            prices(),
-            v::Delta::None,
-            v::Delta::Add(Q),
-            (0, 0),
-            Q / 200,
-            Some(zenofcis_zusd_v1::fees::LogicalTime {
-                epoch: 0,
-                elapsed_minutes: 0
-            }),
+            v::AdjustInputs {
+                vault: row,
+                system: b.system,
+                parameters: v::Parameters::v1(),
+                fee: f,
+                prices: prices(),
+                collateral_delta: v::Delta::None,
+                debt_delta: v::Delta::Add(Q),
+                wallet: (0, 0),
+                max_fee: Q / 200,
+                time: Some(zenofcis_zusd_v1::fees::LogicalTime {
+                    epoch: 0,
+                    elapsed_minutes: 0
+                }),
+            },
             limits()
         )
         .result()

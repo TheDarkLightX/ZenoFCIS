@@ -187,18 +187,20 @@ fn review_minimum_open_adjacent_atoms() {
                 system()
             };
             let actual = v::open(
-                None,
-                id(3),
-                id(3),
-                2000 * Q,
-                x,
-                (2000 * Q, 0),
-                s,
-                v::Parameters::v1(),
-                fee(),
-                prices(),
-                Q,
-                time(),
+                v::OpenInputs {
+                    existing: None,
+                    id: id(3),
+                    owner: id(3),
+                    collateral: 2000 * Q,
+                    principal: x,
+                    balances: (2000 * Q, 0),
+                    system: s,
+                    parameters: v::Parameters::v1(),
+                    fee: fee(),
+                    prices: prices(),
+                    max_fee: Q,
+                    time: time(),
+                },
                 limits(),
             );
             if delta < 0 {
@@ -243,20 +245,22 @@ fn review_redemption_tcr_adjacent_atoms() {
             min_out: 0,
         };
         let out = r::redeem(
-            &pre,
-            r::Holder {
-                zusd: 100 * Q,
-                agrs: 0,
-                staking_agrs: 0,
-                fee: fee(),
+            r::RedeemInputs {
+                pre: &pre,
+                holder: r::Holder {
+                    zusd: 100 * Q,
+                    agrs: 0,
+                    staking_agrs: 0,
+                    fee: fee(),
+                },
+                command: cmd,
+                prices: prices(),
+                time: time(),
+                bootstrap_minutes: Some(20160),
+                parameters: v::Parameters::v1(),
+                capacity: 4,
+                bounds: bounds(),
             },
-            cmd,
-            prices(),
-            time(),
-            Some(20160),
-            v::Parameters::v1(),
-            4,
-            bounds(),
             limits(),
         );
         if delta < 0 {

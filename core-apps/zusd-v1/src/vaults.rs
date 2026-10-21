@@ -201,17 +201,28 @@ pub struct Outcome {
     pub pending_debt: u128,
     pub nicr: u128,
 }
-fn risk(
-    v: Vault,
+/// Immutable inputs for risk.
+struct RiskInputs {
+    vault: Vault,
     old: Option<Vault>,
-    s: System,
-    post: System,
-    p: u128,
-    withdraw: bool,
-    borrow: bool,
-    open: bool,
-    w: &mut Work,
-) -> Result<(), Failure> {
+    system: System,
+    post_system: System,
+    price: u128,
+    withdrawing: bool,
+    borrowing: bool,
+    opening: bool,
+}
+fn risk(input: RiskInputs, w: &mut Work) -> Result<(), Failure> {
+    let RiskInputs {
+        vault: v,
+        old,
+        system: s,
+        post_system: post,
+        price: p,
+        withdrawing: withdraw,
+        borrowing: borrow,
+        opening: open,
+    } = input;
     let icr = ratio(v.collateral, v.debt, p, w)?;
     if recovery(s, p, w)? {
         if withdraw {
@@ -221,10 +232,10 @@ fn risk(
             if icr < CCR {
                 return Err(Failure::Reject(1043));
             }
-            if let Some(o) = old {
-                if icr < ratio(o.collateral, o.debt, p, w)? {
-                    return Err(Failure::Reject(1043));
-                }
+            if let Some(o) = old
+                && (icr < ratio(o.collateral, o.debt, p, w)?)
+            {
+                return Err(Failure::Reject(1043));
             }
         }
     } else if icr < MCR || ratio(post.collateral, post.debt, p, w)? < CCR {
@@ -232,21 +243,36 @@ fn risk(
     }
     Ok(())
 }
-pub fn open(
-    existing: Option<Vault>,
-    id: Id,
-    owner: Id,
-    collateral: u128,
-    principal: u128,
-    balances: (u128, u128),
-    s: System,
-    params: Parameters,
-    fee: fees::State,
-    prices: Prices,
-    max_fee: u128,
-    time: Option<fees::LogicalTime>,
-    limits: Limits,
-) -> Evaluation<Outcome> {
+/// Immutable inputs for open.
+pub struct OpenInputs {
+    pub existing: Option<Vault>,
+    pub id: Id,
+    pub owner: Id,
+    pub collateral: u128,
+    pub principal: u128,
+    pub balances: (u128, u128),
+    pub system: System,
+    pub parameters: Parameters,
+    pub fee: fees::State,
+    pub prices: Prices,
+    pub max_fee: u128,
+    pub time: Option<fees::LogicalTime>,
+}
+pub fn open(input: OpenInputs, limits: Limits) -> Evaluation<Outcome> {
+    let OpenInputs {
+        existing,
+        id,
+        owner,
+        collateral,
+        principal,
+        balances,
+        system: s,
+        parameters: params,
+        fee,
+        prices,
+        max_fee,
+        time,
+    } = input;
     run(limits, |w| {
         w.charge(1, 1, 288)?;
         if collateral == 0 || principal == 0 {
@@ -295,9 +321,33 @@ pub fn open(
             stakes: add(s.stakes, v.stake, w)?,
             ..s
         };
-        risk(v, None, s, post, prices.committed, false, true, true, w)?;
+        risk(
+            RiskInputs {
+                vault: v,
+                old: None,
+                system: s,
+                post_system: post,
+                price: prices.committed,
+                withdrawing: false,
+                borrowing: true,
+                opening: true,
+            },
+            w,
+        )?;
         if let Some(p) = prices.pending {
-            risk(v, None, s, post, p, false, true, true, w)?;
+            risk(
+                RiskInputs {
+                    vault: v,
+                    old: None,
+                    system: s,
+                    post_system: post,
+                    price: p,
+                    withdrawing: false,
+                    borrowing: true,
+                    opening: true,
+                },
+                w,
+            )?;
         }
         if muldiv(f.amount, Q, principal, w)? > max_fee {
             return Err(Failure::Reject(1052));
@@ -323,19 +373,32 @@ pub fn open(
         })
     })
 }
-pub fn adjust(
-    v: Vault,
-    s: System,
-    params: Parameters,
-    fee: fees::State,
-    prices: Prices,
-    coll: Delta,
-    debt: Delta,
-    wallet: (u128, u128),
-    max_fee: u128,
-    time: Option<fees::LogicalTime>,
-    limits: Limits,
-) -> Evaluation<Outcome> {
+/// Immutable inputs for adjust.
+pub struct AdjustInputs {
+    pub vault: Vault,
+    pub system: System,
+    pub parameters: Parameters,
+    pub fee: fees::State,
+    pub prices: Prices,
+    pub collateral_delta: Delta,
+    pub debt_delta: Delta,
+    pub wallet: (u128, u128),
+    pub max_fee: u128,
+    pub time: Option<fees::LogicalTime>,
+}
+pub fn adjust(input: AdjustInputs, limits: Limits) -> Evaluation<Outcome> {
+    let AdjustInputs {
+        vault: v,
+        system: s,
+        parameters: params,
+        fee,
+        prices,
+        collateral_delta: coll,
+        debt_delta: debt,
+        wallet,
+        max_fee,
+        time,
+    } = input;
     run(limits, |w| {
         w.charge(1, 1, 288)?;
         if coll == Delta::None && debt == Delta::None
@@ -419,30 +482,34 @@ pub fn adjust(
         };
         if !frozen {
             risk(
-                post_v,
-                Some(old),
-                s,
-                post,
-                prices.committed,
-                withdrawing,
-                borrowing,
-                false,
+                RiskInputs {
+                    vault: post_v,
+                    old: Some(old),
+                    system: s,
+                    post_system: post,
+                    price: prices.committed,
+                    withdrawing,
+                    borrowing,
+                    opening: false,
+                },
                 w,
             )?;
-            if let Some(p) = prices.pending {
-                if borrowing || withdrawing {
-                    risk(
-                        post_v,
-                        Some(old),
-                        s,
-                        post,
-                        p,
+            if let Some(p) = prices.pending
+                && (borrowing || withdrawing)
+            {
+                risk(
+                    RiskInputs {
+                        vault: post_v,
+                        old: Some(old),
+                        system: s,
+                        post_system: post,
+                        price: p,
                         withdrawing,
                         borrowing,
-                        false,
-                        w,
-                    )?;
-                }
+                        opening: false,
+                    },
+                    w,
+                )?;
             }
         }
         if borrowing && muldiv(f.amount, Q, mint, w)? > max_fee {

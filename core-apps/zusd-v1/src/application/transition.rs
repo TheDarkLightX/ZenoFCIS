@@ -682,16 +682,27 @@ fn use_drip(
     }
     Ok(())
 }
-fn effective_fund(
-    p: &Policy,
-    s: &mut State,
-    r: &Request,
+/// Immutable inputs for effective fund.
+struct FundInputs<'a> {
+    policy: &'a Policy,
+    request: &'a Request,
     event: Id,
     recipient: Id,
-    q: Quantity,
+    quantity: Quantity,
+}
+fn effective_fund(
+    input: FundInputs<'_>,
+    s: &mut State,
     legs: &mut Vec<Movement>,
     w: &mut Work,
 ) -> Result<(), Failure> {
+    let FundInputs {
+        policy: p,
+        request: r,
+        event,
+        recipient,
+        quantity: q,
+    } = input;
     if q.atoms() == 0 || q.asset() == Asset::Zusd || p.config.accounts.contains(&recipient) {
         return Err(Failure::Domain);
     }
@@ -761,7 +772,7 @@ fn oracle_update(p: &Policy, s: &mut State, r: &Request, w: &mut Work) -> Result
         return Err(Failure::Canonical);
     }
     if let Some(pending) = o.view.pending {
-        if pending.committed_epoch != 0
+        if (pending.committed_epoch != 0
             || pending.published_epoch != s.clock.epoch
             || pending.earliest_commit_epoch
                 != pending
@@ -772,11 +783,10 @@ fn oracle_update(p: &Policy, s: &mut State, r: &Request, w: &mut Work) -> Result
                 != pending
                     .published_epoch
                     .checked_add(rules.dispute_open)
-                    .ok_or(Failure::Arithmetic)?
+                    .ok_or(Failure::Arithmetic)?)
+            && (o.action != OracleAction::RefreshStatus)
         {
-            if o.action != OracleAction::RefreshStatus {
-                return Err(Failure::Canonical);
-            }
+            return Err(Failure::Canonical);
         }
         if old
             .and_then(|v| v.committed)
@@ -789,16 +799,15 @@ fn oracle_update(p: &Policy, s: &mut State, r: &Request, w: &mut Work) -> Result
             return Err(Failure::Canonical);
         }
     }
-    if let Some(c) = o.view.committed {
-        if c.earliest_commit_epoch > c.committed_epoch
+    if let Some(c) = o.view.committed
+        && (c.earliest_commit_epoch > c.committed_epoch
             || c.committed_epoch > s.clock.epoch
             || c.earliest_commit_epoch
                 < c.published_epoch
                     .checked_add(rules.confirmation.max(rules.dispute_open))
-                    .ok_or(Failure::Arithmetic)?
-        {
-            return Err(Failure::Canonical);
-        }
+                    .ok_or(Failure::Arithmetic)?)
+    {
+        return Err(Failure::Canonical);
     }
     match o.action {
         OracleAction::Use => return Err(Failure::Canonical),
@@ -842,15 +851,14 @@ fn oracle_update(p: &Policy, s: &mut State, r: &Request, w: &mut Work) -> Result
             }
         }
     }
-    if let (Some(a), Some(b)) = (old.and_then(|v| v.committed), o.view.committed) {
-        if a.aggregate != b.aggregate
+    if let (Some(a), Some(b)) = (old.and_then(|v| v.committed), o.view.committed)
+        && (a.aggregate != b.aggregate
             && (b.round <= a.round
                 || b.observed_epoch < a.observed_epoch
                 || b.median_seconds < a.median_seconds
-                || b.committed_epoch < a.committed_epoch)
-        {
-            return Err(Failure::Canonical);
-        }
+                || b.committed_epoch < a.committed_epoch))
+    {
+        return Err(Failure::Canonical);
     }
     seen(s, o.event.ok_or(Failure::Canonical)?, p, w)?;
     s.oracle_root = o.after;
@@ -885,7 +893,7 @@ fn exposure(
     let at = s
         .events
         .binary_search_by_key(&event, |v| v.id)
-        .map_or_else(|i| Ok(i), |_| Err(Failure::Reject(1001)))?;
+        .map_or_else(Ok, |_| Err(Failure::Reject(1001)))?;
     s.events.insert(
         at,
         ExposureEvent {
@@ -943,18 +951,20 @@ fn apply(
             };
             let out = w.invoke(|l| {
                 vaults::open(
-                    index.map(|i| pre.book.vaults[i]),
-                    vault_id(p, actor),
-                    actor,
-                    *collateral,
-                    *principal,
-                    (wc, wz),
-                    pre.book.system,
-                    params,
-                    pre.fee,
-                    prices,
-                    *max_fee,
-                    t,
+                    vaults::OpenInputs {
+                        existing: index.map(|i| pre.book.vaults[i]),
+                        id: vault_id(p, actor),
+                        owner: actor,
+                        collateral: *collateral,
+                        principal: *principal,
+                        balances: (wc, wz),
+                        system: pre.book.system,
+                        parameters: params,
+                        fee: pre.fee,
+                        prices,
+                        max_fee: *max_fee,
+                        time: t,
+                    },
                     l,
                 )
             })?;
@@ -977,16 +987,18 @@ fn apply(
             };
             let out = w.invoke(|l| {
                 vaults::adjust(
-                    v,
-                    pre.book.system,
-                    params,
-                    pre.fee,
-                    prices,
-                    *collateral,
-                    *debt,
-                    (wc, wz),
-                    *max_fee,
-                    t,
+                    vaults::AdjustInputs {
+                        vault: v,
+                        system: pre.book.system,
+                        parameters: params,
+                        fee: pre.fee,
+                        prices,
+                        collateral_delta: *collateral,
+                        debt_delta: *debt,
+                        wallet: (wc, wz),
+                        max_fee: *max_fee,
+                        time: t,
+                    },
                     l,
                 )
             })?;
@@ -1011,15 +1023,17 @@ fn apply(
             let amount = drip(p, s, r)?;
             let out = w.invoke(|l| {
                 stability::change(
-                    &pre.pool,
-                    actor,
-                    *c,
-                    wz,
-                    amount,
-                    prices,
-                    &pre.book.vaults,
-                    pre.book.system,
-                    bounds,
+                    stability::ChangeInputs {
+                        pre: &pre.pool,
+                        actor,
+                        command: *c,
+                        wallet_zusd: wz,
+                        issuance: amount,
+                        prices,
+                        inventory: &pre.book.vaults,
+                        system: pre.book.system,
+                        bounds,
+                    },
                     l,
                 )
             })?;
@@ -1049,17 +1063,19 @@ fn apply(
             let amount = drip(p, s, r)?;
             let out = w.invoke(|l| {
                 composition::move_gain_to_vault(
-                    &pre.book,
-                    &pre.pool,
-                    actor,
-                    params,
-                    pre.fee,
-                    prices,
-                    amount,
-                    *upper,
-                    *lower,
-                    p.config.bounds.vaults,
-                    bounds,
+                    composition::GainToVaultInputs {
+                        pre: &pre.book,
+                        pool: &pre.pool,
+                        actor,
+                        parameters: params,
+                        fee: pre.fee,
+                        prices,
+                        issuance: amount,
+                        upper: *upper,
+                        lower: *lower,
+                        capacity: p.config.bounds.vaults,
+                        bounds,
+                    },
                     l,
                 )
             })?;
@@ -1186,15 +1202,17 @@ fn apply(
             };
             let out = w.invoke(|l| {
                 redemption::redeem(
-                    &pre.book,
-                    holder,
-                    *c,
-                    prices,
-                    t,
-                    boot,
-                    params,
-                    p.config.bounds.vaults,
-                    bounds,
+                    redemption::RedeemInputs {
+                        pre: &pre.book,
+                        holder,
+                        command: *c,
+                        prices,
+                        time: t,
+                        bootstrap_minutes: boot,
+                        parameters: params,
+                        capacity: p.config.bounds.vaults,
+                        bounds,
+                    },
                     l,
                 )
             })?;
@@ -1281,7 +1299,18 @@ fn apply(
             event,
             recipient,
             quantity,
-        } => effective_fund(p, s, r, *event, *recipient, *quantity, legs, w)?,
+        } => effective_fund(
+            FundInputs {
+                policy: p,
+                request: r,
+                event: *event,
+                recipient: *recipient,
+                quantity: *quantity,
+            },
+            s,
+            legs,
+            w,
+        )?,
         Command::ChangeParameters {
             policy,
             version,

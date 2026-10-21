@@ -185,7 +185,7 @@ impl FileLedger {
     ) -> Result<Publication, Error> {
         let _guard = self.lock()?;
         let mut current = self.read(p, g, v, limits)?;
-        if current.rows.iter().any(|row| *row == prepared.bytes) {
+        if current.rows.contains(&prepared.bytes) {
             return Ok(Publication::Duplicate);
         }
         if current.state.root() != prepared.pre

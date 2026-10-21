@@ -119,15 +119,17 @@ fn deposit(
     issuance: u128,
 ) -> Result<sp::Outcome, Failure> {
     sp::change(
-        b,
-        id(who),
-        sp::Command::Deposit { amount, tag },
-        amount,
-        Some(issuance),
-        prices(),
-        &[],
-        system0(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: b,
+            actor: id(who),
+            command: sp::Command::Deposit { amount, tag },
+            wallet_zusd: amount,
+            issuance: Some(issuance),
+            prices: prices(),
+            inventory: &[],
+            system: system0(),
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -135,15 +137,17 @@ fn deposit(
 }
 fn withdraw(b: &sp::Book, who: u8, x: u128, issuance: u128) -> Result<sp::Outcome, Failure> {
     sp::change(
-        b,
-        id(who),
-        sp::Command::Withdraw(x),
-        0,
-        Some(issuance),
-        prices(),
-        &[],
-        system0(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: b,
+            actor: id(who),
+            command: sp::Command::Withdraw(x),
+            wallet_zusd: 0,
+            issuance: Some(issuance),
+            prices: prices(),
+            inventory: &[],
+            system: system0(),
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -342,15 +346,17 @@ fn w2b_precise_pump_then_400_honest_fee_events_accept() {
 #[test]
 fn w3_front_end_aggregate_retains_v1_rounding_refusal() {
     let fe = sp::change(
-        &genesis_pool(),
-        id(9),
-        sp::Command::RegisterFrontEnd(Q / 2),
-        0,
-        None,
-        prices(),
-        &[],
-        system0(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &genesis_pool(),
+            actor: id(9),
+            command: sp::Command::RegisterFrontEnd(Q / 2),
+            wallet_zusd: 0,
+            issuance: None,
+            prices: prices(),
+            inventory: &[],
+            system: system0(),
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -433,17 +439,19 @@ fn w4_compositional_liquidate_gain_to_vault_self_redeem_withdraw() {
     println!("W4 s1 SP liabilities {:?}", lb);
     // 2. attacker moves its SP collateral gain into its vault.
     let g = composition::move_gain_to_vault(
-        &liq.book,
-        &pool,
-        id(2),
-        v::Parameters::v1(),
-        fee(),
-        prices(),
-        Some(0),
-        None,
-        None,
-        3,
-        bounds(),
+        composition::GainToVaultInputs {
+            pre: &liq.book,
+            pool: &pool,
+            actor: id(2),
+            parameters: v::Parameters::v1(),
+            fee: fee(),
+            prices: prices(),
+            issuance: Some(0),
+            upper: None,
+            lower: None,
+            capacity: 3,
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -488,15 +496,17 @@ fn w4_compositional_liquidate_gain_to_vault_self_redeem_withdraw() {
         min_out: 0,
     };
     let red = r::redeem(
-        &g.vaults,
-        holder,
-        cmd,
-        prices(),
-        time(),
-        Some(20160),
-        v::Parameters::v1(),
-        3,
-        bounds(),
+        r::RedeemInputs {
+            pre: &g.vaults,
+            holder,
+            command: cmd,
+            prices: prices(),
+            time: time(),
+            bootstrap_minutes: Some(20160),
+            parameters: v::Parameters::v1(),
+            capacity: 3,
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -523,15 +533,17 @@ fn w4_compositional_liquidate_gain_to_vault_self_redeem_withdraw() {
     let mut pool3 = pool2.clone();
     pool3.pool = red.book.pool.clone();
     let wd = sp::change(
-        &pool3,
-        id(2),
-        sp::Command::Withdraw(u128::MAX),
-        0,
-        Some(0),
-        prices(),
-        &red.book.vaults,
-        red.book.system,
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pool3,
+            actor: id(2),
+            command: sp::Command::Withdraw(u128::MAX),
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &red.book.vaults,
+            system: red.book.system,
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()
@@ -705,15 +717,17 @@ fn maximum_u128_amounts_use_wide_per_unit_and_checked_final_payouts() {
         .0
         .unwrap();
     let out = sp::change(
-        &pool,
-        id(1),
-        sp::Command::Claim,
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system0(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pool,
+            actor: id(1),
+            command: sp::Command::Claim,
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system0(),
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()

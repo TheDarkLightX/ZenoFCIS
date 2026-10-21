@@ -409,10 +409,10 @@ pub fn liquidate(
         {
             return Err(Failure::Reject(1010));
         }
-        if let Command::Batch(ids) = command {
-            if ids.len() > capacity as usize {
-                return Err(Failure::Capacity);
-            }
+        if let Command::Batch(ids) = command
+            && (ids.len() > capacity as usize)
+        {
+            return Err(Failure::Capacity);
         }
         if let Command::Direct(id) = command {
             let i = index(pre, *id, w)?.ok_or(Failure::Reject(1011))?;
@@ -421,10 +421,8 @@ pub fn liquidate(
             }
         }
         prices.usable()?;
-        if matches!(command, Command::Direct(_)) {
-            if pre.system.active <= 1 {
-                return Err(Failure::Reject(1041));
-            }
+        if (matches!(command, Command::Direct(_))) && (pre.system.active <= 1) {
+            return Err(Failure::Reject(1041));
         }
         w.charge(
             1,

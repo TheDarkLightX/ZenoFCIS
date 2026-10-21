@@ -538,18 +538,30 @@ pub enum Command {
     MoveGainToVault,
     RegisterFrontEnd(u128),
 }
-pub fn change(
-    pre: &Book,
-    actor: Id,
-    command: Command,
-    wallet_zusd: u128,
-    issuance: Option<u128>,
-    prices: vaults::Prices,
-    inventory: &[vaults::Vault],
-    system: vaults::System,
-    b: Bounds,
-    limits: Limits,
-) -> Evaluation<Outcome> {
+/// Immutable inputs for change.
+pub struct ChangeInputs<'a> {
+    pub pre: &'a Book,
+    pub actor: Id,
+    pub command: Command,
+    pub wallet_zusd: u128,
+    pub issuance: Option<u128>,
+    pub prices: vaults::Prices,
+    pub inventory: &'a [vaults::Vault],
+    pub system: vaults::System,
+    pub bounds: Bounds,
+}
+pub fn change(input: ChangeInputs<'_>, limits: Limits) -> Evaluation<Outcome> {
+    let ChangeInputs {
+        pre,
+        actor,
+        command,
+        wallet_zusd,
+        issuance,
+        prices,
+        inventory,
+        system,
+        bounds: b,
+    } = input;
     run(limits, |w| {
         validate_book(pre, b, w)?;
         if inventory.len() > b.vaults as usize {

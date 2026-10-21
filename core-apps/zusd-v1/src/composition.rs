@@ -15,20 +15,34 @@ pub struct GainToVault {
 /// Settles SP entitlement, applies BOTH pending rewards, adds the earned gain,
 /// updates stake, and reinserts through the exact committed V1 cut, or returns
 /// no paired successor. The pool custody and vault backing cannot diverge.
-pub fn move_gain_to_vault(
-    pre: &l::Book,
-    pool: &sp::Book,
-    actor: Id,
-    params: v::Parameters,
-    fee: fees::State,
-    prices: v::Prices,
-    issuance: Option<u128>,
-    upper: Option<Id>,
-    lower: Option<Id>,
-    capacity: u32,
-    bounds: sp::Bounds,
-    limits: Limits,
-) -> Evaluation<GainToVault> {
+/// Immutable inputs for move gain to vault.
+pub struct GainToVaultInputs<'a> {
+    pub pre: &'a l::Book,
+    pub pool: &'a sp::Book,
+    pub actor: Id,
+    pub parameters: v::Parameters,
+    pub fee: fees::State,
+    pub prices: v::Prices,
+    pub issuance: Option<u128>,
+    pub upper: Option<Id>,
+    pub lower: Option<Id>,
+    pub capacity: u32,
+    pub bounds: sp::Bounds,
+}
+pub fn move_gain_to_vault(input: GainToVaultInputs<'_>, limits: Limits) -> Evaluation<GainToVault> {
+    let GainToVaultInputs {
+        pre,
+        pool,
+        actor,
+        parameters: params,
+        fee,
+        prices,
+        issuance,
+        upper,
+        lower,
+        capacity,
+        bounds,
+    } = input;
     run(limits, |w| {
         l::validate(pre, capacity, bounds, w)?;
         w.charge(1, 1, 0)?;
@@ -37,15 +51,17 @@ pub fn move_gain_to_vault(
         }
         let claim = w.invoke(|limits| {
             sp::change(
-                pool,
-                actor,
-                sp::Command::MoveGainToVault,
-                0,
-                issuance,
-                prices,
-                &pre.vaults,
-                pre.system,
-                bounds,
+                sp::ChangeInputs {
+                    pre: pool,
+                    actor,
+                    command: sp::Command::MoveGainToVault,
+                    wallet_zusd: 0,
+                    issuance,
+                    prices,
+                    inventory: &pre.vaults,
+                    system: pre.system,
+                    bounds,
+                },
                 limits,
             )
         })?;
@@ -58,16 +74,18 @@ pub fn move_gain_to_vault(
         let gain = claim.gains.collateral;
         let owner = w.invoke(|limits| {
             v::adjust(
-                pre.vaults[at],
-                pre.system,
-                params,
-                fee,
-                prices,
-                v::Delta::Add(gain),
-                v::Delta::None,
-                (gain, 0),
-                0,
-                None,
+                v::AdjustInputs {
+                    vault: pre.vaults[at],
+                    system: pre.system,
+                    parameters: params,
+                    fee,
+                    prices,
+                    collateral_delta: v::Delta::Add(gain),
+                    debt_delta: v::Delta::None,
+                    wallet: (gain, 0),
+                    max_fee: 0,
+                    time: None,
+                },
                 limits,
             )
         })?;

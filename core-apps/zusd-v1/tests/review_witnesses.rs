@@ -121,20 +121,22 @@ fn review_cut_self_hint_keeps_v1_tie_direction() {
         min_out: 0,
     };
     let out = r::redeem(
-        &pre,
-        r::Holder {
-            zusd: 100 * Q,
-            agrs: 0,
-            staking_agrs: 0,
-            fee: fee(),
+        r::RedeemInputs {
+            pre: &pre,
+            holder: r::Holder {
+                zusd: 100 * Q,
+                agrs: 0,
+                staking_agrs: 0,
+                fee: fee(),
+            },
+            command,
+            prices: prices(),
+            time: time(),
+            bootstrap_minutes: Some(20160),
+            parameters: v::Parameters::v1(),
+            capacity: 4,
+            bounds: bounds(),
         },
-        command,
-        prices(),
-        time(),
-        Some(20160),
-        v::Parameters::v1(),
-        4,
-        bounds(),
         limits(),
     );
     let out = out.result().unwrap();
@@ -157,15 +159,17 @@ fn review_zero_front_end_native_snapshot_normalization() {
         front_ends: vec![],
     };
     let out = sp::change(
-        &pre,
-        id(1),
-        sp::Command::RegisterFrontEnd(Q / 2),
-        0,
-        None,
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pre,
+            actor: id(1),
+            command: sp::Command::RegisterFrontEnd(Q / 2),
+            wallet_zusd: 0,
+            issuance: None,
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     let out = out.result().unwrap();
@@ -224,15 +228,17 @@ fn review_two_scale_gain_uses_wide_sum() {
     // Pinned SP:675 sums the two portions before division. The sum is 2^128,
     // but the final gain is floor(2^128 / 10^36) = 340, and custody is exactly 340.
     let out = sp::change(
-        &pre,
-        id(1),
-        sp::Command::Claim,
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pre,
+            actor: id(1),
+            command: sp::Command::Claim,
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     );
     println!("two_scale_claim={:?}", out.result());
@@ -294,15 +300,17 @@ fn review_two_scale_rewards_keep_wide_depositor_and_front_end_sums() {
         }],
     };
     let out = sp::change(
-        &pre,
-        id(1),
-        sp::Command::Claim,
-        0,
-        Some(0),
-        prices(),
-        &[],
-        system(),
-        bounds(),
+        sp::ChangeInputs {
+            pre: &pre,
+            actor: id(1),
+            command: sp::Command::Claim,
+            wallet_zusd: 0,
+            issuance: Some(0),
+            prices: prices(),
+            inventory: &[],
+            system: system(),
+            bounds: bounds(),
+        },
         limits(),
     )
     .into_parts()

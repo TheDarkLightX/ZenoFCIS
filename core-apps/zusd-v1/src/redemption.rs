@@ -103,15 +103,15 @@ pub(crate) fn cut(
         book.order.insert(at, id);
         return Ok(());
     }
-    if let Some(i) = u {
-        if priority > liquidation::fresh(book, book.order[i], w)? {
-            u = None;
-        }
+    if let Some(i) = u
+        && (priority > liquidation::fresh(book, book.order[i], w)?)
+    {
+        u = None;
     }
-    if let Some(j) = l {
-        if priority < liquidation::fresh(book, book.order[j], w)? {
-            l = None;
-        }
+    if let Some(j) = l
+        && (priority < liquidation::fresh(book, book.order[j], w)?)
+    {
+        l = None;
     }
     if u.is_none() && l.is_some() {
         let mut j = l.ok_or(Failure::Domain)?;
@@ -149,18 +149,30 @@ pub(crate) fn cut(
         }
     }
 }
-pub fn redeem(
-    pre: &Book,
-    holder: Holder,
-    command: Command,
-    prices: Prices,
-    time: Option<fees::LogicalTime>,
-    bootstrap_minutes: Option<u64>,
-    params: Parameters,
-    capacity: u32,
-    bounds: stability::Bounds,
-    limits: Limits,
-) -> Evaluation<Outcome> {
+/// Immutable inputs for redeem.
+pub struct RedeemInputs<'a> {
+    pub pre: &'a Book,
+    pub holder: Holder,
+    pub command: Command,
+    pub prices: Prices,
+    pub time: Option<fees::LogicalTime>,
+    pub bootstrap_minutes: Option<u64>,
+    pub parameters: Parameters,
+    pub capacity: u32,
+    pub bounds: stability::Bounds,
+}
+pub fn redeem(input: RedeemInputs<'_>, limits: Limits) -> Evaluation<Outcome> {
+    let RedeemInputs {
+        pre,
+        holder,
+        command,
+        prices,
+        time,
+        bootstrap_minutes,
+        parameters: params,
+        capacity,
+        bounds,
+    } = input;
     run(limits, |w| {
         liquidation::validate(pre, capacity, bounds, w)?;
         if command.maximum == 0 {
