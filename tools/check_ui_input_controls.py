@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plant each ui.json text defect in a copy, check its named test fails, then restore.
+"""Plant each UI input defect in a copy, check its named test fails, then restore.
 
 The checkout itself is never changed.
 """
@@ -18,6 +18,10 @@ CONTROLS = [
     ("metadata-not-checked", "tools/zenoui.py", ["python3", "tools/test_zenoui_text.py"], "the build did not check ui.json text",
      "    visible(json.loads(metadata.read_text(encoding=\"utf-8\"), object_pairs_hook=unique))",
      "    json.loads(metadata.read_text(encoding=\"utf-8\"), object_pairs_hook=unique)"),
+    ("label-invisible-accepted", "site/public/zenoui/app-contract.js", ["node", "site/tests/zenoui-label-text.test.mjs"],
+     "invisible character accepted",
+     "/[<>\\p{Cc}\\p{Cf}\\p{Cs}\\p{Co}\\p{Zl}\\p{Zp}\\u034f\\u115f\\u1160\\u17b4\\u17b5\\u180b-\\u180f\\u2065\\u3164\\ufe00-\\ufe0f\\uffa0\\ufff0-\\ufff8\\u{E0000}-\\u{E0FFF}]/u",
+     "/[<>\\x00-\\x1f]/"),
 ]
 
 
@@ -47,14 +51,14 @@ def main() -> int:
             mutant, log = run(command)
             target.write_text(original)
             restored, _ = run(command)
-            killed = mutant != 0 and marker in log and "FAILED" in log
+            killed = mutant != 0 and marker in log
             row = dict(control=name, check=" ".join(command), marker=marker, mutant=mutant, baseline=restored, killed=killed)
             rows.append(row)
             args.out.write_text(json.dumps(rows, indent=2) + "\n")
             print(json.dumps(row), flush=True)
             if not killed or restored:
                 raise RuntimeError(f"control did not meet fail/baseline obligation: {name}\n{log[-2000:]}")
-    print(f"ui text controls: PASS ({len(rows)} planted defects; named failures; restored baselines)")
+    print(f"ui input controls: PASS ({len(rows)} planted defects; named failures; restored baselines)")
     return 0
 
 

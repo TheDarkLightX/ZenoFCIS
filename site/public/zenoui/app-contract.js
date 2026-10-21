@@ -12,7 +12,7 @@ export function canonical(value) {
 function exact(value, keys, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k=>!keys.includes(k)) || keys.some(k=>!Object.hasOwn(value,k))) throw Error(`UiInvalid${name}`);
 }
-function text(value, error) { if (typeof value !== 'string' || !value.trim() || value.length>300 || /[<>\x00-\x1f]/.test(value)) throw Error(error); return value; }
+function text(value, error) { if (typeof value !== 'string' || !value.trim() || value.length>300 || /[<>\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2065\u3164\ufe00-\ufe0f\uffa0\ufff0-\ufff8\u{E0000}-\u{E0FFF}]/u.test(value)) throw Error(error); return value; }
 // Optional labels for chosen integer values, such as 0 for "on shelf".
 function valueLabels(field, values) {
   const keys=values && typeof values==='object' && !Array.isArray(values) ? Object.keys(values) : [];
