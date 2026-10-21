@@ -52,30 +52,24 @@ fn summary(card: &Value) -> Value {
     json!({"name":card["name"], "title":card["title"], "synopsis":card["synopsis"], "use_when":card["use_when"]})
 }
 
-pub(crate) fn run(command: Command) -> u8 {
+fn lookup(command: Command) -> Result<Value, u8> {
     let cards: Vec<_> = CARDS
         .iter()
         .filter_map(|text| metadata(text).map(|m| (*text, m)))
         .collect();
     match command {
         Command::Show { name } => {
-            if let Some((text, _)) = cards
+            let Some((text, _)) = cards
                 .iter()
                 .find(|(_, card)| card["name"].as_str() == Some(&name))
-            {
-                print!("{text}");
-            } else {
-                crate::print_json(
-                    &json!({"schema":"zeno-fcis/guide/1", "authority":"none", "status":"unknown-card", "next":"Run zeno-fcis guide list."}),
-                );
-                return crate::USAGE;
-            }
+            else {
+                return Err(crate::USAGE);
+            };
+            Ok(json!({"schema":"zeno-fcis/guide/1", "authority":"none", "card":text}))
         }
-        Command::List => {
-            crate::print_json(
-                &json!({"schema":"zeno-fcis/guide/1", "authority":"none", "cards":cards.iter().map(|(_, card)| summary(card)).collect::<Vec<_>>()}),
-            );
-        }
+        Command::List => Ok(
+            json!({"schema":"zeno-fcis/guide/1", "authority":"none", "cards":cards.iter().map(|(_, card)| summary(card)).collect::<Vec<_>>()}),
+        ),
         Command::Find { task } => {
             let query = words(&task.join(" "));
             let mut ranked = Vec::new();
@@ -84,8 +78,6 @@ pub(crate) fn run(command: Command) -> u8 {
                 if let Some(phrases) = card["use_when"].as_array() {
                     for phrase in phrases.iter().filter_map(Value::as_str) {
                         let terms = words(phrase);
-                        // Best phrase overlap; complete phrase matches rank above
-                        // partial ones. Stable names break all remaining ties.
                         let overlap = query.intersection(&terms).count();
                         score = score
                             .max(overlap * 2 + usize::from(!query.is_empty() && query == terms));
@@ -99,12 +91,83 @@ pub(crate) fn run(command: Command) -> u8 {
                 b.cmp(a)
                     .then_with(|| x["name"].as_str().cmp(&y["name"].as_str()))
             });
-            crate::print_json(
-                &json!({"schema":"zeno-fcis/guide/1", "authority":"none", "ranking":"best-use-when-token-overlap/1", "cards":ranked.into_iter().map(|(score, card)| { let mut row=summary(card); row["score"]=json!(score); row }).collect::<Vec<_>>()}),
-            );
+            Ok(
+                json!({"schema":"zeno-fcis/guide/1", "authority":"none", "ranking":"best-use-when-token-overlap/1", "cards":ranked.into_iter().map(|(score, card)| { let mut row=summary(card); row["score"]=json!(score); row }).collect::<Vec<_>>()}),
+            )
         }
     }
-    crate::OK
+}
+
+pub(crate) fn run(command: Command) -> u8 {
+    let show = matches!(&command, Command::Show { .. });
+    match lookup(command) {
+        Ok(report) => {
+            if show {
+                print!("{}", report["card"].as_str().unwrap_or_default());
+            } else {
+                crate::print_json(&report);
+            }
+            crate::OK
+        }
+        Err(code) => {
+            crate::print_json(
+                &json!({"schema":"zeno-fcis/guide/1", "authority":"none", "status":"unknown-card", "next":"Run zeno-fcis guide list."}),
+            );
+            code
+        }
+    }
+}
+
+pub(crate) fn mcp_tools() -> Vec<Value> {
+    [
+        ("guide_list", "List embedded public checker cards without reading a project.", json!({}), json!([])),
+        ("guide_show", "Read one complete public command card.", json!({"name":{"type":"string","maxLength":80}}), json!(["name"])),
+        ("guide_find", "Rank public task phrases deterministically.", json!({"task":{"type":"string","maxLength":4096}}), json!(["task"])),
+    ].into_iter().map(|(name, description, properties, required)| json!({
+        "name":name, "description":description,
+        "inputSchema":{"type":"object","additionalProperties":false,"properties":properties,"required":required},
+        "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false}
+    })).collect()
+}
+
+pub(crate) fn mcp_call(
+    name: &str,
+    arguments: &Value,
+) -> Result<Value, zeno_fcis_commons::CommonsError> {
+    use zeno_fcis_commons::CommonsError;
+    let text = |key: &str| arguments.get(key).and_then(Value::as_str);
+    let command = match name {
+        "guide_list" => Command::List,
+        "guide_show" => {
+            let value = text("name")
+                .ok_or_else(|| CommonsError::new("Use an exact card name from guide_list."))?;
+            if value.is_empty()
+                || value.len() > 80
+                || !value.as_bytes()[0].is_ascii_lowercase()
+                || !value
+                    .bytes()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+            {
+                return Err(CommonsError::new("Use an exact card name from guide_list."));
+            }
+            Command::Show {
+                name: value.to_owned(),
+            }
+        }
+        "guide_find" => {
+            let value = text("task")
+                .ok_or_else(|| CommonsError::new("Supply 1-4096 characters of task words."))?;
+            if value.trim().is_empty() || value.chars().count() > 4096 {
+                return Err(CommonsError::new("Supply 1-4096 characters of task words."));
+            }
+            Command::Find {
+                task: vec![value.to_owned()],
+            }
+        }
+        _ => return Err(CommonsError::new(format!("unknown tool {name}"))),
+    };
+    lookup(command)
+        .map_err(|_| CommonsError::new("Unknown card or unavailable guide; run guide list."))
 }
 
 /// Card commands and examples are also the source for command help.

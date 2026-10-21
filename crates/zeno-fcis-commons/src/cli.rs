@@ -14,6 +14,12 @@ Commands: init register whoami dashboard verify head anchor storage archive expo
 
 /// Run the Commons CLI arguments after the top-level `commons` command.
 pub fn run(arguments: &[OsString]) -> u8 {
+    run_with_mcp(arguments, crate::mcp::serve)
+}
+
+/// Run CLI commands with an application-supplied MCP server entry point.
+/// The callback runs in the effectful shell and supplies no decision authority.
+pub fn run_with_mcp(arguments: &[OsString], serve: fn(&str, &str) -> u8) -> u8 {
     let arguments = arguments
         .iter()
         .map(|argument| argument.to_string_lossy().into_owned())
@@ -58,7 +64,7 @@ pub fn run(arguments: &[OsString]) -> u8 {
         if actor.is_empty() {
             return refuse("give --actor or set ZENO_FCIS_COMMONS_ACTOR");
         }
-        return crate::mcp::serve(&store, &actor);
+        return serve(&store, &actor);
     }
     let Some(store) = store else {
         return refuse("give --store or set ZENO_FCIS_COMMONS");

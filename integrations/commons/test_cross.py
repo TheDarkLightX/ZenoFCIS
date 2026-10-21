@@ -81,6 +81,11 @@ def mcp_transcript(command: list[str]) -> list[dict]:
     requests = [
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
         {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        {"jsonrpc": "2.0", "id": 21, "method": "tools/call", "params": {"name": "guide_list", "arguments": {}}},
+        {"jsonrpc": "2.0", "id": 22, "method": "tools/call", "params": {"name": "guide_show", "arguments": {"name": "check"}}},
+        {"jsonrpc": "2.0", "id": 23, "method": "tools/call", "params": {"name": "guide_find", "arguments": {"task": "check a contract"}}},
+        {"jsonrpc": "2.0", "id": 24, "method": "tools/call", "params": {"name": "guide_show", "arguments": {"name": "../private"}}},
+        {"jsonrpc": "2.0", "id": 25, "method": "tools/call", "params": {"name": "guide_find", "arguments": {"task": ""}}},
         {"jsonrpc": "2.0", "id": 20, "method": "tools/call", "params": {"name": "commons_register", "arguments": {"role": "test"}}},
         {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "commons_record_add", "arguments": {
             "type": "gap", "title": "No keyed collections", "tags": ["collections"]}}},

@@ -450,6 +450,17 @@ fn main() -> ExitCode {
     ExitCode::from(code)
 }
 
+fn run_commons(args: &[OsString]) -> u8 {
+    zeno_fcis_commons::cli::run_with_mcp(args, |directory, actor| {
+        zeno_fcis_commons::mcp::serve_with_tools(
+            directory,
+            actor,
+            &guide::mcp_tools(),
+            guide::mcp_call,
+        )
+    })
+}
+
 fn execute() -> u8 {
     if let Some(code) = checker_process::bootstrap() {
         return code;
@@ -460,7 +471,7 @@ fn execute() -> u8 {
     {
         Ok(cli) => {
             if let Command::Commons { args } = &cli.command {
-                return zeno_fcis_commons::cli::run(args);
+                return run_commons(args);
             }
             if let Command::Kb { operation } = cli.command {
                 return knowledge_command::execute(&cli.kb, operation);
@@ -589,7 +600,7 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 fn run(command: Command) -> u8 {
     match command {
         Command::Guide { command } => guide::run(command),
-        Command::Commons { args } => zeno_fcis_commons::cli::run(&args),
+        Command::Commons { args } => run_commons(&args),
         Command::Construct(args) => construction::construct(args),
         Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),

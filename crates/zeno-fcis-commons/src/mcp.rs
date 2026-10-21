@@ -12,6 +12,20 @@ const SERVER_VERSION: &str = "0.1.0";
 
 /// Run the newline-delimited JSON-RPC server on standard input and output.
 pub fn serve(directory: &str, actor: &str) -> u8 {
+    serve_with_tools(directory, actor, &[], |name, _| {
+        Err(CommonsError::new(format!("unknown tool {name}")))
+    })
+}
+
+/// Run the server with additional, immutable application tool descriptions.
+/// The callback receives only the tool name and immutable arguments, never
+/// the coordination store or a decision/publication capability.
+pub fn serve_with_tools(
+    directory: &str,
+    actor: &str,
+    extra_tools: &[Value],
+    extra_call: fn(&str, &Value) -> Result<Value, CommonsError>,
+) -> u8 {
     let mut commons = match Commons::open(directory, actor) {
         Ok(commons) => commons,
         Err(error) => {
@@ -53,7 +67,7 @@ pub fn serve(directory: &str, actor: &str) -> u8 {
             }
         };
         let id = request.get("id").cloned();
-        let result = handle(&mut commons, &request);
+        let result = handle(&mut commons, &request, extra_tools, extra_call);
         let Some(result) = result else {
             continue;
         };
@@ -101,7 +115,12 @@ fn write_response(output: &mut impl Write, response: &Value) -> io::Result<()> {
     output.flush()
 }
 
-fn handle(commons: &mut Commons, request: &Value) -> Option<Result<Value, CommonsError>> {
+fn handle(
+    commons: &mut Commons,
+    request: &Value,
+    extra_tools: &[Value],
+    extra_call: fn(&str, &Value) -> Result<Value, CommonsError>,
+) -> Option<Result<Value, CommonsError>> {
     if !request.is_object()
         || request.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
         || !request.get("method").is_some_and(Value::is_string)
@@ -123,7 +142,9 @@ fn handle(commons: &mut Commons, request: &Value) -> Option<Result<Value, Common
             "instructions": INSTRUCTIONS
         })),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({"tools": tools()})),
+        "tools/list" => Ok(
+            json!({"tools": tools().into_iter().chain(extra_tools.iter().cloned()).collect::<Vec<_>>()}),
+        ),
         "tools/call" => {
             let arguments = params
                 .get("arguments")
@@ -137,7 +158,15 @@ fn handle(commons: &mut Commons, request: &Value) -> Option<Result<Value, Common
                     .get("name")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                match call(commons, name, &arguments) {
+                // Built-in coordination operations always keep their own handler.
+                let result = if tools().iter().any(|tool| tool["name"] == name) {
+                    call(commons, name, &arguments)
+                } else if extra_tools.iter().any(|tool| tool["name"] == name) {
+                    extra_call(name, &arguments)
+                } else {
+                    Err(CommonsError::new(format!("unknown tool {name}")))
+                };
+                match result {
                     Ok(result) => Ok(json!({
                         "content": [{"type": "text", "text": pretty(&result)}],
                         "isError": false
