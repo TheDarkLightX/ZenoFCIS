@@ -232,9 +232,10 @@ JSON with a real parser, such as `jq`, and quotes every value it uses.
 
 The server serves one request at a time, so a delivery holds every other
 request until it ends. A delivery run tries a failing delivery three times,
-so one command can wait three times `timeout_seconds`, and a request that
-runs past the server's 10-second limit can lose its reply; the client then
-recovers it with the original request. Keep the program fast and
+so one command can wait three times `timeout_seconds`. A proxy that stops
+waiting first, such as nginx after its `proxy_read_timeout`, returns a
+gateway error although the commit stands; the client then recovers the
+reply with the original request. Keep the program fast and
 `timeout_seconds` low, such as 3, or hand the work to a queue the program
 only writes to.
 
