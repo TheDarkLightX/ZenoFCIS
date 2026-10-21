@@ -381,8 +381,8 @@ Unset, nothing changes. For example, with nginx:
 
 ```nginx
 # In the http block: request rates and connections per client address.
-limit_req_zone  $binary_remote_addr zone=zeno_requests:10m rate=10r/s;
-limit_req_zone  $binary_remote_addr zone=zeno_core:10m rate=2r/s;
+limit_req_zone  $binary_remote_addr zone=zeno_requests:10m rate=20r/s;
+limit_req_zone  $binary_remote_addr zone=zeno_core:10m rate=5r/s;
 limit_conn_zone $binary_remote_addr zone=zeno_connections:10m;
 
 server {
@@ -404,7 +404,7 @@ server {
     limit_conn_status 429;
     limit_req_status 429;
     location / {
-        limit_req zone=zeno_requests burst=20 nodelay;
+        limit_req zone=zeno_requests burst=40 nodelay;
         # TLS ends here; forward to the loopback address only.
         proxy_pass http://127.0.0.1:8080;
         # The ingress requires exactly one Host header; it does not compare it.
@@ -412,8 +412,9 @@ server {
         proxy_read_timeout 15s;
     }
     # Each state, preview and command reads and checks the whole store history.
+    # A burst waits its turn; only a longer flood is refused.
     location ~ ^/(state|preview|command)$ {
-        limit_req zone=zeno_core burst=5 nodelay;
+        limit_req zone=zeno_core burst=20;
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host 127.0.0.1:8080;
         proxy_read_timeout 15s;
@@ -458,13 +459,14 @@ history, so its cost grows with the number of commits: measured on the wide
 counter, a preview took about 0.09 ms per commit in a release build and
 1.3 ms per commit in the debug build that `cargo run` gives without
 `--release`; a command cost two to three times as much. Build deployments
-with `--release`. The rate limits keep one address from monopolising the server:
-two state, preview or command requests a second, with a burst of five, and
-ten requests a second overall, with a burst of twenty, which loading the
-interface's files needs. They are per client address, so clients behind one
+with `--release`. The rate limits keep one address from monopolising the
+server: five state, preview or command requests a second, and twenty
+requests a second overall for the interface's files. The interface previews
+every command after each edit, so bursts are normal: up to twenty core
+requests wait their turn rather than fail, and only a longer flood gets
+status 429. The limits are per client address, so clients behind one
 address share them, and many addresses together can still keep the server
-busy; size the rates for the store you expect. Requests over a limit get
-status 429.
+busy; size the rates for the number of commands and the store you expect.
 
 ## The formal model
 
