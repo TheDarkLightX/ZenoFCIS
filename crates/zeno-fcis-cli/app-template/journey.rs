@@ -1477,3 +1477,64 @@ fn mutated_requests_refuse_or_decide() {
     );
     ok(std::fs::remove_dir_all(root));
 }
+
+#[test]
+fn integer_text_round_trips_or_refuses() {
+    let root = std::env::temp_dir().join(format!("app-integers-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let load = |text: &str| {
+        application::app::load_parties(&parties_file(&root, &[("a", 0, 0, json!([text]))]))
+            .map(|parties| parties[0].context.clone())
+    };
+    // Every i128 written canonically comes back exactly.
+    let mut random = Seeded(0x2026_1021_0001);
+    let mut values = vec![i128::MIN, i128::MIN + 1, -1, 0, 1, i128::MAX - 1, i128::MAX];
+    values.extend((0..300).map(|_| {
+        let wide = (i128::from(random.next()) << 64) | i128::from(random.next());
+        wide >> random.below(127)
+    }));
+    for value in values {
+        assert_eq!(
+            load(&value.to_string()),
+            Ok(vec![value]),
+            "an integer did not round-trip"
+        );
+    }
+    // No other spelling is read as a number.
+    for text in [
+        "1e0",
+        "1E0",
+        "0x1",
+        "+1",
+        "--1",
+        "-",
+        "-0",
+        "01",
+        "00",
+        " 1",
+        "1 ",
+        "\t1",
+        "1\n",
+        "\u{a0}1",
+        "1,000",
+        "1.000",
+        "1_000",
+        "1'000",
+        "1.0",
+        ".1",
+        "\u{2212}1",
+        "\u{661}",
+        "\u{ff11}",
+        "",
+        "\u{200b}1",
+        "170141183460469231731687303715884105728",
+        "-170141183460469231731687303715884105729",
+        "11111111111111111111111111111111111111111",
+    ] {
+        assert!(
+            load(text).is_err(),
+            "a non-canonical integer was read: {text:?}"
+        );
+    }
+    ok(std::fs::remove_dir_all(root));
+}
