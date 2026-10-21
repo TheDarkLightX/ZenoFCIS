@@ -298,7 +298,7 @@ class Profile2Tests(unittest.TestCase):
             factory.lower(parse(ORDER + "unresolved arithmetic: fees round down;\n"))
         files = factory.lower(parse(ORDER))
         self.assertIn("law 520 require_approve_only_if_authorized_accept on accept = "
-                      "((command.101 == 120 && post.100.110 == 150) -> context.102.160);", files["project.zeno"])
+                      "((command.101 == 120 && post.100.110 == 150) -> context.102.160 == 1);", files["project.zeno"])
         self.assertNotIn("_reject on reject", files["project.zeno"])
         lane = dataclasses.replace(parse(LANE), fairness=(), properties=())
         files = factory.lower(lane)

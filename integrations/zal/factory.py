@@ -197,24 +197,25 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
             return f"{root[op == 'var_next']}.100.{variables[node.args[0]]}"
         return f"({term(node.args[0], root)} {'+' if op == 'add' else '-'} {term(node.args[1], root)})"
 
-    def expression(node, root):
+    def expression(node, root, law=False):
+        """Case guards read a Boolean fact directly; a law formula's atoms must be comparisons."""
         op = node.op
         if op in {"true", "false"}:
             return op
         if op == "fact":
-            return f"context.102.{facts[node.args[0]]}"
+            return f"context.102.{facts[node.args[0]]}" + (" == 1" if law else "")
         if op in {"state", "state_next"}:
             return f"{root[op == 'state_next']}.100.110 == {states[node.args[0]]}"
         if op == "event":
             return f"command.101 == {events[node.args[0]]}"
         if op == "not":
-            return f"!({expression(node.args[0], root)})"
+            return f"!({expression(node.args[0], root, law)})"
         if op in {"and", "or"}:
-            return "(" + (" && " if op == "and" else " || ").join(expression(a, root) for a in node.args) + ")"
+            return "(" + (" && " if op == "and" else " || ").join(expression(a, root, law) for a in node.args) + ")"
         if op == "implies":
-            return f"({expression(node.args[0], root)} -> {expression(node.args[1], root)})"
+            return f"({expression(node.args[0], root, law)} -> {expression(node.args[1], root, law)})"
         if op == "iff":
-            left, right = expression(node.args[0], root), expression(node.args[1], root)
+            left, right = expression(node.args[0], root, law), expression(node.args[1], root, law)
             return f"(({left} -> {right}) && ({right} -> {left}))"
         if op == "cmp":
             return f"({term(node.args[1], root)} {node.args[0]} {term(node.args[2], root)})"
@@ -242,7 +243,7 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     project.append(f"law 500 declared_control_domain on commit, genesis = {shape};")
     kinds = {"500": "StateInvariant"}
     for i, (name, formula) in enumerate(model.invariants, 501):
-        project.append(f"law {i} invariant_{name} on commit, genesis = {expression(formula, ('post', 'post'))};")
+        project.append(f"law {i} invariant_{name} on commit, genesis = {expression(formula, ('post', 'post'), True)};")
         kinds[str(i)] = "StateInvariant"
     law = 520
     for name, formula in model.requirements:
@@ -252,7 +253,7 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
             folded = _partial(formula, accepted)
             if folded is True:
                 continue
-            body = "false" if folded is False else expression(folded, root)
+            body = "false" if folded is False else expression(folded, root, True)
             project.append(f"law {law} require_{name}_{scope} on {scope} = {body};")
             kinds[str(law)] = kind
             law += 1
