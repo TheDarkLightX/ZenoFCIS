@@ -13,6 +13,7 @@ publish = false
 [features]
 default = ["sqlite"]
 sqlite = ["dep:zeno-fcis-shell-sqlite"]
+shell-effects = ["sqlite"]
 
 [dependencies]
 zeno-fcis-synthesis = { version = "=2.5.0", default-features = false }

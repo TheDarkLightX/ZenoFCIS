@@ -1001,3 +1001,62 @@ fn stale_publication_bundle_refuses_wrong_kind_before_refresh() {
         });
     });
 }
+
+// Compatibility observations include canonical receipts, export and refusal order.
+#[test]
+fn default_protocol_bytes() {
+    with_authority(None, |a| {
+        let file = StoreFile::new();
+        let initial = state(0, 0);
+        let cmd = command(120);
+        let ctx = context(true);
+        let key = Hash32::new([1; 32]);
+        let mut db = ok(V2SqliteShell::create(&file.0, a, genesis(a, &initial)));
+        println!("REVIEW genesis {:?}", stored_rows(&file.0));
+        println!(
+            "REVIEW commit {:?}",
+            db.commit(key, publication(a, &initial, &cmd, &ctx))
+        );
+        println!(
+            "REVIEW replay {:?}",
+            db.commit(key, publication(a, &initial, &cmd, &ctx))
+        );
+        println!(
+            "REVIEW changed {:?}",
+            db.commit(key, publication(a, &initial, &command(121), &ctx))
+        );
+        println!(
+            "REVIEW stale-pre {:?}",
+            db.commit(Hash32::new([2; 32]), publication(a, &initial, &cmd, &ctx))
+        );
+        println!(
+            "REVIEW stale-version {:?}",
+            db.commit_at(
+                0,
+                Hash32::new([2; 32]),
+                publication(a, &state(1, 0), &cmd, &ctx)
+            )
+        );
+        let d = ok(db.export_pending()).remove(0);
+        println!("REVIEW export {:?} {:?}", d.delivery_id(), d.payload());
+        println!(
+            "REVIEW wrong-ack {:?}",
+            zeno_fcis_shell_sqlite::v2::relay::acknowledge(
+                &mut db,
+                d.delivery_id(),
+                Hash32::new([255; 32])
+            )
+        );
+        let mut destination = MemoryDestination::default();
+        println!(
+            "REVIEW deliver {:?}",
+            deliver_next(&mut db, &mut destination)
+        );
+        println!("REVIEW rows {:?}", stored_rows(&file.0));
+        drop(db);
+        let mut db = ok(V2SqliteShell::open(&file.0, a));
+        ok(db.audit());
+        println!("REVIEW reopen {:?}", ok(db.snapshot()));
+        println!("REVIEW final {:?}", stored_rows(&file.0));
+    });
+}

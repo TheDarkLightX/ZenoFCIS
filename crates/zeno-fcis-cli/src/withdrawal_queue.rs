@@ -2,6 +2,14 @@
 
 pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
+        "src/shell_effects.rs",
+        include_bytes!("../templates/withdrawal-queue/src/shell_effects.rs"),
+    ),
+    (
+        "tests/shell_effects.rs",
+        include_bytes!("../templates/withdrawal-queue/tests/shell_effects.rs"),
+    ),
+    (
         "src/v2_contract.rs",
         include_bytes!("../templates/withdrawal-queue/src/v2_contract.rs"),
     ),

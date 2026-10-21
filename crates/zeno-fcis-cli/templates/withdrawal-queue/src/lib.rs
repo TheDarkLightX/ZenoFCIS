@@ -14,6 +14,9 @@ pub mod bindings {
 pub mod delivery;
 #[path = "../profile.rs"]
 pub mod profile;
+/// Explicit opt-in shell; default entry points continue to use V2 directly.
+#[cfg(feature = "shell-effects")]
+pub mod shell_effects;
 
 #[cfg(feature = "sqlite")]
 use bindings::GeneratedProject;

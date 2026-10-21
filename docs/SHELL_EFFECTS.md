@@ -173,6 +173,44 @@ The default tests explore retry budgets 0 and 1 in the simulation, and fewer
 on SQLite. The ignored tests `explore_frozen_profile_all_budgets` and
 `production_agrees_with_model_all_budgets` cover every budget.
 
+## Opt in from an application
+
+“I want my app's shell to run against real storage or a recorded run, so I
+can reproduce a lost reply and check recovery before deploying.”
+
+The generated `withdrawal-queue` template offers this as an optional library
+API. Enable its `shell-effects` Cargo feature; its existing entry points keep
+their default behavior even with that feature enabled. In a newly generated
+app, run `cargo +1.97.1 test --offline --features shell-effects` once to prune
+the copied workspace lock, then add `--locked` to subsequent commands.
+
+Open `shell_effects::Effects` with an existing store, its checked single-version
+`Lineage`, and your `Transport` and `Time` adapters. Retain a `CommitInvocation`
+containing the original key, guard and `publication_data` from a genuine
+publication. Call `commit(&request)`; after an uncertain result or a restart,
+call `recover(&request)` with those same inputs. Call `deliver(epoch)` to send
+pending payouts. These calls use the production handler, which rebuilds each
+publication through Authority. Each run allows two retries and at most 4,096
+requests; exhaustion can leave an unresolved outcome and pending payouts.
+Delivery waits ten adapter ticks before retrying, with zero jitter.
+
+Recording starts off. `record_private(true)` enables the Record handler;
+`transcript()` borrows the last run's private in-memory evidence. The next run
+replaces it, and disabling recording discards it. Capture never writes a file,
+prints a transcript, changes relay export or supplies authority to a decision.
+Keep any copy private. Its manifest identifies the store, not a complete
+initial database snapshot; retain that snapshot separately for investigation.
+
+Tests compare default bytes, original-key recovery, matching acknowledgements,
+retry exhaustion and private capture. The seeded performance check runs the unchanged 256 × 64
+SQLite corpus twice and, in its opt-in lane, also mounts this adapter once
+per seed against the independent model. These are tests; the finite simulation
+checks above apply only to their declared profile. The premises include retained
+original inputs, a stable identity, surviving SQLite storage, one trusted writer
+and relay, the compiler, OS, codecs and hashes, and the receiver's contract.
+External effects may repeat; power failures and guaranteed progress are not
+qualified.
+
 ## Scope and limits
 
 The evidence is finite exploration of the stated profile, tests and a static
