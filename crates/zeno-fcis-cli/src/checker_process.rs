@@ -2473,12 +2473,12 @@ fn preflight_selected(
     {
         // No runtime backend is qualified on this platform.
         let _ = source;
-        return Err(Unavailable {
+        Err(Unavailable {
             backend,
             missing: "platform-unqualified".into(),
         }
         .to_string()
-        .into());
+        .into())
     }
     #[cfg(target_os = "linux")]
     Ok(Some(Admission {
@@ -2500,6 +2500,7 @@ pub(crate) fn bootstrap() -> Option<u8> {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn receipt_paths(
     command: &crate::Command,
 ) -> (Option<std::path::PathBuf>, Option<&std::path::Path>) {
