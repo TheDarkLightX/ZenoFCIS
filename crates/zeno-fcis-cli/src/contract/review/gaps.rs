@@ -8,9 +8,9 @@
 //! every state law, the judge reports:
 //!
 //! - admissible decisions: for each tuple, every decision a contract of this
-//!   schema could make (a reject with each declared reason; an accept with
-//!   each declared state; when a case commits a failure, a committed failure
-//!   with each reason and state), checked against the declared laws by the
+//!   schema could make (a reject with each reject-class reason; an accept with
+//!   each declared state; a committed failure with each failure-class reason
+//!   and state), checked against the declared laws by the
 //!   library's law evaluator. A tuple is determined when exactly one decision
 //!   is admitted. Tuples where the contract's own decision is refused are
 //!   counted apart.
@@ -43,6 +43,7 @@ use super::evaluate::{self, Framer, LawSet, Proposed};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed, Space};
 use super::mutants::{self, Mutant};
 use super::parallel;
+use zeno_fcis_contract::internals::decision_space;
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
 /// The default limit on law checks: tuples times candidate decisions times
@@ -276,25 +277,17 @@ fn out_of_scope(rules: &Rules) -> Option<String> {
 /// # Errors
 /// The generator's refusal of the contract.
 fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
-    let laws = super::super::model::Contract::build(
+    let contract = super::super::model::Contract::build(
         &loaded.declarations,
         &loaded.rules,
         loaded.commitment,
-    )?
-    .laws
-    .len() as u128;
-    let reasons = loaded.reasons().len() as u128;
-    let states = space.states as u128;
-    let failure = u128::from(has_failure(&loaded.rules));
-    let candidates = reasons + states * (1 + failure * reasons);
+    )?;
+    let laws = contract.laws.len() as u128;
+    let rejects = decision_space::reasons_for(&contract.reasons, Class::Reject).len() as u128;
+    let failures =
+        decision_space::reasons_for(&contract.reasons, Class::CommittedFailure).len() as u128;
+    let candidates = rejects + (space.states as u128) * (1 + failures);
     Ok((space.tuples() as u128) * candidates * laws.max(1))
-}
-
-fn has_failure(rules: &Rules) -> bool {
-    rules
-        .cases
-        .iter()
-        .any(|case| case.class == Class::CommittedFailure)
 }
 
 /// Every measure of one contract.
@@ -440,8 +433,12 @@ fn measure(
     mutants: bool,
 ) -> Result<Measured, Stop> {
     let declared = loaded.declared_laws();
-    let reasons = loaded.reasons();
-    let failure = has_failure(&loaded.rules);
+    let reasons = super::super::model::Contract::build(
+        &loaded.declarations,
+        &loaded.rules,
+        loaded.commitment,
+    )?
+    .reasons;
     let (machine, valid, state_laws, gaps) = loaded.bind(&loaded.rules, |authority, framer| {
         let descriptor = authority.descriptor();
         let machine = Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
@@ -459,7 +456,7 @@ fn measure(
         let laws = LawSet::new(descriptor, &declared);
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let gaps = parallel(space.tuples(), |ordinal| {
-            tuple_gap(&laws, framer, &machine, &states, &reasons, failure, ordinal)
+            tuple_gap(&laws, framer, &machine, &states, &reasons, ordinal)
         });
         Ok((machine, valid, state_laws, gaps))
     })?;
@@ -543,8 +540,7 @@ fn tuple_gap(
     framer: &Framer,
     machine: &Machine,
     states: &[Vec<i128>],
-    reasons: &[u32],
-    failure: bool,
+    reasons: &[(u32, Class)],
     ordinal: usize,
 ) -> TupleGap {
     let space = &machine.space;
@@ -591,20 +587,7 @@ fn tuple_gap(
             })
         })
         .collect();
-    let mut candidates: Vec<(Class, Option<u32>, Option<usize>)> = reasons
-        .iter()
-        .map(|reason| (Class::Reject, Some(*reason), None))
-        .collect();
-    for successor in 0..space.states {
-        candidates.push((Class::Accept, None, Some(successor)));
-    }
-    if failure {
-        for reason in reasons {
-            for successor in 0..space.states {
-                candidates.push((Class::CommittedFailure, Some(*reason), Some(successor)));
-            }
-        }
-    }
+    let candidates = decision_space::alternatives(reasons, space.states);
     let own = (class, reason, (class != Class::Reject).then_some(next));
     let mut admissible = 0;
     let mut classes = BTreeSet::new();
@@ -1032,6 +1015,10 @@ fn check_proposals(
                     Some(Verdict::Satisfied) => applies[index] += 1,
                     Some(Verdict::Skipped) => {}
                     _ => {
+                        if verdict.is_some() {
+                            // A false or refused applicable law still applies.
+                            applies[index] += 1;
+                        }
                         false_alarm.get_or_insert_with(|| {
                             json!({
                                 "law": ids[index],

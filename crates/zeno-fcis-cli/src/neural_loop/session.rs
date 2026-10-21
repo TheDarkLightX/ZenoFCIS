@@ -1448,9 +1448,10 @@ fn rebuild_attempts(ledger: &Ledger, verified: &[Witness]) -> Vec<AttemptRecord>
                             attempt: *attempt,
                             witness: witness.clone(),
                         },
-                        None => Feedback::Incomplete {
+                        None => Feedback::Recorded {
                             attempt: *attempt,
-                            stop: json!({"outcome": "different", "witness": "not-retained"}),
+                            outcome: outcome.clone(),
+                            cost: *cost,
                         },
                     }
                 } else if let (Some(cost), "checked-improvement") = (cost, outcome.as_str()) {
@@ -1460,9 +1461,12 @@ fn rebuild_attempts(ledger: &Ledger, verified: &[Witness]) -> Vec<AttemptRecord>
                         selection: Selection::CheckedImprovement,
                     }
                 } else {
-                    Feedback::Incomplete {
+                    // A completed historical check is not an incomplete one.
+                    // Its settlement is retained, but it is not fresh evidence.
+                    Feedback::Recorded {
                         attempt: *attempt,
-                        stop: json!({"outcome": outcome, "cost": cost.map(Cost::json)}),
+                        outcome: outcome.clone(),
+                        cost: *cost,
                     }
                 };
                 Some(AttemptRecord {

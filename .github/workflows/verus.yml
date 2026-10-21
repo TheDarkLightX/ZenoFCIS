@@ -11,6 +11,7 @@ on:
       - "crates/zeno-fcis-value/**"
       - "crates/zeno-fcis-cli/templates/**"
       - "crates/zeno-fcis-cli/src/**"
+      - "crates/zeno-fcis-contract/**"
       - "crates/zeno-fcis-cli/tests/transform_cli.rs"
       - "crates/zeno-fcis-shell-sqlite/**"
       - "crates/zeno-fcis-cli/tests/fixtures/transform-check/**"
@@ -45,6 +46,30 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
+  tool-decisions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install native and verifier toolchains
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup toolchain install 1.98.1 --profile minimal
+      - name: Prove tool decisions and reject planted regressions
+        env:
+          TOOL_DECISIONS_OUT: ${{ runner.temp }}/tool-decisions
+        run: python3 tools/check_tool_decisions.py --install --out "$TOOL_DECISIONS_OUT"
+      - name: Retain targeted evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verus-tool-decisions-evidence
+          path: ${{ runner.temp }}/tool-decisions
+          if-no-files-found: error
+
   qualification:
     name: qualification (${{ matrix.gate }})
     runs-on: ubuntu-24.04
@@ -159,7 +184,7 @@ jobs:
         run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis --no-default-features --locked
 
   shared-runtime-source:
-    needs: [qualification, native-compatibility]
+    needs: [qualification, native-compatibility, tool-decisions]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -167,6 +192,8 @@ jobs:
         env:
           QUALIFICATION_RESULT: ${{ needs.qualification.result }}
           NATIVE_RESULT: ${{ needs.native-compatibility.result }}
+          TOOL_DECISIONS_RESULT: ${{ needs.tool-decisions.result }}
         run: |
           test "$QUALIFICATION_RESULT" = success
           test "$NATIVE_RESULT" = success
+          test "$TOOL_DECISIONS_RESULT" = success

@@ -458,7 +458,7 @@ schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
 final newline. It records both programs' SHA-256 digests, sizes and node
 counts, the domains, both limits, the tuples checked, the Step usage report
 and the checker identity: the checker's semantics version,
-`zeno-fcis/transform-check/3`, and the library's evaluator digest. The
+`zeno-fcis/transform-check/4`, and the library's evaluator digest. The
 semantics version changes only with a deliberate change of what the check
 means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
 pin it, so a refactor of the checker or a new crate version changes no
@@ -772,6 +772,14 @@ written; 64 for usage.
 
 ## Checked optimizer
 
+Use `optimize` when you already have a finite program and want a smaller
+implementation with the same behavior. It searches for redundant computations
+and equivalent expressions, then checks the proposed replacement on every
+declared input. It minimizes stored instructions and encoded size; it does not
+promise the fastest program or the smallest possible program. Use
+`transform check` when you already have a replacement to check, or
+[`loop`](#bounded-optimization-loop) when you want a resumable series of proposals.
+
 `optimize` searches for a smaller program equivalent to a canonical finite
 scalar program and hands every candidate to the transform checker. The
 optimizer is an untrusted proposer: nothing it believes about a candidate
@@ -920,8 +928,9 @@ refused. With a portfolio, the top-level `enodes` and
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
-| `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
-| `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000); no candidate could be judged, so nothing was searched. |
+| `unsupported-original` | 2 | An instruction in the original is outside the optimizer's instruction set, no search phase ran, and no supplied improvement was accepted. The report names the node and instruction. Nothing is written. |
+| `no-checked-improvement` | 2 | At least one search phase ran and the search completed without an accepted smaller candidate; the original stands. Nothing is written. |
+| `inconclusive` | 2 | No improvement was accepted and the search could not finish: for example, a search limit was reached, or the domain exceeds `--max-input-tuples` (default 100,000,000). Inspect the reported reason. |
 | `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |
 | `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, exceeds 64 KiB, or names a profile other than `--profile`. |
 | `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
@@ -930,6 +939,13 @@ refused. With a portfolio, the top-level `enodes` and
 The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
 original and the written candidate; `transform replay` reproduces it byte for
 byte. The same program, strategy and profile give byte-identical output.
+
+For `unsupported-original`, increasing limits cannot add instruction support.
+For example, `MulDivCeil` can be checked by `transform` but is not in this
+optimizer's e-graph instruction set. Supply a replacement to `transform check`,
+or request support for the instruction. A strictly smaller `--with-candidate`
+that passes the independent transform check can still yield `improved` even
+when the optimizer cannot search the original.
 
 On the recorded withdrawal-queue artifacts the default portfolio reaches the
 7-node Boolean kernel (from 16), a 35-node retained controller (from 69; the
@@ -958,6 +974,25 @@ does not perform.
 
 ## Bounded optimization loop
 
+Choose a loop when a task needs repeated proposals and feedback. For example,
+submit a replacement, inspect the counterexample when it differs, revise it,
+and check again. The optimization session retains the checked incumbent and
+charges each attempt against explicit limits. Other `loop` commands help with
+examples, incomplete expressions and unresolved requirements:
+
+| Your task | Start here |
+| --- | --- |
+| Check a replacement you already have | `transform check` |
+| Find a smaller program in one run | `optimize` |
+| Keep a resumable history of checked proposals | `loop open`, then `loop candidate` or `loop run`, then `loop resume` |
+| Find a program matching finite examples | `loop learn`; example fit alone is not full-domain equivalence |
+| Fill holes in a partial expression | `loop sketch` |
+| Find decisions the contract laws leave open | `loop question --contract DIR`; a person reviews the policy choice |
+
+Use `zeno-fcis describe loop <command>` or that command's `--help` for its
+inputs and limits. The session workflow below compares candidates with an
+existing original; it does not infer intended behavior from prose.
+
 `zeno-fcis loop` runs a bounded adaptive loop: a proposer suggests
 complete candidate programs and `transform check` judges every one against the
 admitted original on its whole declared input domain. The loop keeps an
@@ -985,6 +1020,15 @@ receipt status, every attempt's outcome and cost, the accounting (attempts,
 checks, model calls, tokens, work, unresolved reservations) and the claims the
 result does not make: global optimality, convergence, success probability,
 model learning, application authority, wall-time speedup.
+
+For a repair, inspect the witness input and both output vectors after
+`candidate` exits 1, revise the candidate, and submit it again. An equivalent
+but larger repair leaves the incumbent unchanged; it can still be useful
+feedback for the next proposal. On resume, non-improvement historical
+settlements and differences without a replayed witness use `recorded-outcome`
+with `replayed: false`. The retained replacement is checked again. Earlier
+`checked-improvement` entries retain their historical `equivalent` display;
+that display does not mean each earlier candidate was rechecked.
 
 Selection is strictly lexicographic on (stored nodes, canonical bytes): a
 candidate replaces the incumbent only if neither component exceeds the
@@ -1160,6 +1204,13 @@ guide is
 | `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer becomes laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for an accept that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). A reject reason has no law form and is recorded as a requirement only this door applies. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
 | `loop decompose --contract DIR --architecture FILE [--compose [--export DIR]]` | No session. Steps 1 to 3 for components in merge order (`zeno-fcis/loop-architecture/1`): required behaviour per component, interface counterexamples with suggested reads (and reads owned by a later component), unowned reasons, failures that must change a later-owned field, case tables projected from the core or tabulated for components without cases, and blame with regions for components with cases. Verdicts: `refused`, `unrealizable` (also whenever a structure problem or interface counterexample is found), `realizable`, `completed`, `meets-requirements`, `refuted`. Steps 1 to 3 are the door's own evaluation of the tables (`decided_by: door-simulation`), not a checker's, and do not claim that the composed architecture behaves as the core. With `--compose`, a realizable architecture whose components all have case tables becomes a `zeno-fcis/checked-composition/3` composition of generated contracts, every submitted guard kept (a catch-all reject with its own reason is appended where a last guard is not `true`); the composition checker's joint step is compared with the core on every declared input and its obligation check runs (`detail.compose`, `decided_by: composition-checker`). The verdict is the weaker of steps 1 to 3 and the composed check: `accepted` only when step 3 blames nothing, the joint step equals the core and the obligations are proved; `refuted` when either differs. `--export DIR` writes the manifest and contracts to a new directory (an existing one is refused), whatever the verdict. |
+
+For `loop question`, an option without `sets` leaves the successor unspecified;
+`"sets": {}` explicitly requires unchanged state. The original case's updates
+are shown only for its own decision, never copied onto a different option.
+`answer_supported: false` marks an admissible class the answer format cannot
+currently pin; CommittedFailure answers are refused with the displayed reason.
+Keep such alternatives visible when reviewing requirements.
 
 Results carry `authority: none`. Session doors use schema
 `zeno-fcis/transform-loop/1` with a `door` section; `family` and `transfer`

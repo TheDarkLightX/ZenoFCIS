@@ -53,16 +53,42 @@ When the optional pinned Probity hook is installed, obey `probity.config.ts`.
 Treat it as a deterministic development guardrail, not proof or release
 authority.
 
-Scale validation to the change. Ordinary commits and pushes do not require the
-full acceptance suite. For documentation, check the affected documents and
-links; for code or tooling, run the relevant tests and checks. Record what ran
-and any remaining gaps without implying that the full suite passed.
+## Avoid validation churn
 
-Run `python3 tools/atdd.py run --all` and inspect its complete passing result
-when preparing a new version for release, including release candidates. Bind
-that result to the exact release source and retain the other applicable release
-gates. This policy supersedes older per-commit full-suite instructions in plans
-and handoffs; it does not waive proof obligations for changed semantics.
+Use the smallest set of checks that covers the changed behavior and risk.
+Ordinary commits and pushes do not require the full acceptance suite. Check
+documents and links for documentation edits; run affected tests for code,
+tooling and workflow edits. A typo, CI timeout increase or inventory refresh
+does not by itself justify rerunning application acceptance or formal proofs.
+
+Before starting an expensive rerun, record the changed inputs, the checks they
+affect, and why existing evidence is insufficient. Reuse passing evidence only
+when its relevant inputs and assumptions are unchanged; record the original
+revision and the reviewed difference. Never describe reused evidence as a fresh
+pass on a different revision. Changed semantics, specifications, dependencies,
+toolchains, proof assumptions or test coverage require the affected checks;
+uncertain impact requires broader validation.
+
+Batch related repairs before qualification. Check test selection, platform
+assumptions, dependency availability and isolated-copy source bindings first.
+After repeated failures, diagnose and collect the remaining failures before
+launching another complete run; do not fix one test and blindly restart the
+same expensive sequence. Preserve completed results and logs.
+
+Freeze the release inputs while long checks run. Keep unrelated cleanup,
+documentation and policy edits separate from that frozen tree. Do not restart
+a healthy job or invalidate its evidence for an incidental edit. Stop and
+repair a demonstrated failure; a timeout or incomplete run is never a pass.
+
+Run `python3 tools/atdd.py run --all` for a new version or release candidate
+after the release changes are assembled. Subsequent non-behavioral edits may
+use focused checks plus a recorded evidence-reuse review instead of restarting
+the full suite. Preserve final release checks, source/artifact provenance and
+proof obligations; this is not permission to waive a failed check.
+
+This policy replaces unconditional full-suite-before-every-commit instructions
+in older plans and handoffs. Keep `probity.config.ts` and its tests consistent
+with it; report a conflicting instruction instead of silently repeating work.
 
 Before publishing documentation, follow `docs/PUBLICATION_POLICY.md`. Curate
 for library users and check the full contents and attachments. Private research,

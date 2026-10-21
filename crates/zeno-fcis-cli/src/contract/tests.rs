@@ -651,7 +651,7 @@ fn planted_declaration_errors_are_refused_where_they_are() {
     let cases = [
         (
             counter.with_project(
-                "law 503 reject_no_authority on reject = true;",
+                "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
                 "law 503 reject_no_authority = true;",
             ),
             "project.zeno law 503",
@@ -659,7 +659,7 @@ fn planted_declaration_errors_are_refused_where_they_are() {
         ),
         (
             counter.with_project(
-                "law 503 reject_no_authority on reject = true;",
+                "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
                 "law 503 reject_no_authority on reject = forall i in 0..2 { pre.100.110 >= 0 };",
             ),
             "project.zeno law 503",
@@ -834,7 +834,7 @@ fn library_rules_are_refused_where_they_are_written() {
             "applies at genesis, where `pre.100.110` has no value",
         ),
         (
-            "on reject = true;",
+            "on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);",
             "on reject = pre.100 == pre.100;",
             Box::new(|_| {}),
             "project.zeno law 503",

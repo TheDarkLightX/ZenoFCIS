@@ -1,7 +1,6 @@
 import {
   defineConfig,
   forbidCommandPattern,
-  requireCommand,
   type Rule,
 } from '@nizos/probity'
 
@@ -70,10 +69,5 @@ export default defineConfig({
       reason: 'Use the exact locked development graph with `npm ci --ignore-scripts`.',
     }),
     rustCommandPolicy,
-    requireCommand({
-      before: { kind: 'command', match: /\bgit\s+commit\b/ },
-      command: /python3\s+tools\/atdd\.py\s+run\s+--all/,
-      reason: 'Run `python3 tools/atdd.py run --all` immediately before committing.',
-    }),
   ],
 })

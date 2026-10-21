@@ -217,12 +217,18 @@ enum Command {
         #[command(subcommand)]
         command: transform_command::Command,
     },
-    /// Search for a smaller equivalent finite scalar program; every candidate is checked on every input tuple.
+    /// Find a smaller finite program without changing its behavior on the declared input domain.
+    #[command(
+        after_help = "Workflow:\n  contract export-program APP --out original.zcve\n  optimize --program original.zcve --candidate-out smaller.zcve --receipt receipt.json\n  transform replay --original original.zcve --candidate smaller.zcve --receipt receipt.json\n\nEvery accepted candidate passes the full-domain transform check. Optimization does not adopt the result; contract adopt is a separate step. Unsupported instructions are reported explicitly; increasing search limits does not add instruction support."
+    )]
     Optimize {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
     },
-    /// Run the bounded optimization loop: proposers suggest, the transform checker judges.
+    /// Learn, complete or improve finite programs through bounded proposals and checker feedback.
+    #[command(
+        after_help = "Choose by task:\n  Check a known replacement: transform check\n  Find a smaller program in one run: optimize\n  Keep a resumable proposal history: loop open, then candidate or run, then resume\n  Learn from finite examples: loop learn\n  Complete holes in an expression: loop sketch\n  Ask about decisions left open by contract laws: loop question\n\nA loop is propose, check, read feedback, revise. Read each command's checked scope: fitting examples alone does not establish equivalence over the full domain. Results do not adopt a program or authorize application effects."
+    )]
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
@@ -639,13 +645,13 @@ fn describe(path: &[String]) -> u8 {
             "sha256":loop_command::implementation_identity()},
         "authority": "diagnostic-only",
         "normal_program": {
-            "declaration_api": "zeno_fcis::program", "authority": "none",
+            "declaration_api": "generated v2_contract.rs", "authority": "none",
             "runtime_admission": "not-run",
             "templates": ["durable-counter", "account-lockout", "order-fulfillment",
                 "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
                 "prepared-counter", "compliance-gateway"],
-            "binding": ["complete original schema and policy", "complete ProgramDefinition",
-                "original frame and channel links", "bind_catalog", "bind_program"],
+            "binding": ["complete original schema and policy", "complete composition::Descriptor",
+                "original frame and channel links", "catalog::bind_original", "authority::bind"],
             "execution": "Original envelopes, private meter, complete decision, required transition/genesis laws, then private Publication",
             "unsupported": "Named library refusal; no native callback authority fallback",
             "shell": "Context authentication, durable replay/state comparison and physical effects require the trusted host"
@@ -693,6 +699,7 @@ fn describe_tree(command: &clap::Command, path: &[String]) -> Value {
         .collect();
     json!({
         "name": command.get_name(), "path": path, "about": command.get_about().map(ToString::to_string),
+        "guidance": command.get_after_help().map(ToString::to_string),
         "subcommand_required": command.is_subcommand_required_set(),
         "arguments": arguments, "subcommands": commands, "effects": describe_effects(path)
     })

@@ -102,7 +102,7 @@ def _program_command(arguments: list[str], json_report: bool) -> dict[str, Any]:
 
 @mcp.tool()
 def discover_program_authoring() -> dict[str, Any]:
-    """Discover the actual CLI and normal checked Program declaration workflow."""
+    """Discover commands and task guidance for contracts, optimization and checker loops."""
     return _program_command(["describe"], True)
 
 

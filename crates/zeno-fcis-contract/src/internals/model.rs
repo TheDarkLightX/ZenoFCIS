@@ -1211,7 +1211,11 @@ fn reasons(declarations: &Declarations, rules: &Rules) -> Result<Vec<(u32, Class
                 .filter(|case| case.reason == Some(*reason))
                 .map(|case| case.class);
             match classes.next() {
-                Some(class) if classes.all(|other| other == class) => Ok((*reason, class)),
+                Some(class)
+                    if classes.all(|other| super::decision_space::same_class(other, class)) =>
+                {
+                    Ok((*reason, class))
+                }
                 Some(_) => Err(rules_error(
                     "cases",
                     format!("reason {reason} is used with two classes"),

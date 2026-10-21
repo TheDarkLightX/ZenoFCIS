@@ -14,6 +14,7 @@ pub(crate) mod extract;
 pub(crate) mod rules;
 pub(crate) mod semantics;
 pub(crate) mod signature;
+mod status;
 pub(crate) mod strategy;
 
 use serde_json::{Value, json};
@@ -162,12 +163,20 @@ impl Accepted {
     }
 }
 
+/// An admitted instruction the proposer cannot represent, without its operands.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct UnsupportedOriginalNode {
+    pub(crate) index: usize,
+    pub(crate) opcode: &'static str,
+}
+
 /// One strategy's run within a search, from its own e-graph.
 #[derive(Debug)]
 pub(crate) struct Run {
     pub(crate) phases_requested: usize,
     /// Why the run ended before its last phase, when it did.
     pub(crate) stopped: Option<&'static str>,
+    pub(crate) unsupported_original: Option<UnsupportedOriginalNode>,
     pub(crate) enodes: u32,
     pub(crate) classes: u32,
     /// Merges the e-graph accepted and refused.
@@ -184,7 +193,7 @@ pub(crate) struct Run {
 
 impl Run {
     fn json(&self, index: usize) -> Value {
-        json!({
+        let mut report = json!({
             "run": index,
             "phases_requested": self.phases_requested,
             "stopped": self.stopped,
@@ -200,7 +209,12 @@ impl Run {
                 "budget_exhausted": self.tables.3,
             },
             "work": self.work,
-        })
+        });
+        if let Some(node) = self.unsupported_original {
+            report["unsupported_original_node"] =
+                json!({"index": node.index, "opcode": node.opcode});
+        }
+        report
     }
 }
 
@@ -229,8 +243,36 @@ pub(crate) struct Search {
 }
 
 impl Search {
+    /// Classify the checked search result without consulting files or output
+    /// paths. A checked candidate survives an incomplete proposal search.
+    pub(crate) fn status_and_exit(&self) -> (&'static str, u8) {
+        let status = status::classify(
+            self.best.as_ref().is_some_and(|best| {
+                best.nodes <= self.original_nodes
+                    && best.bytes.len() <= self.original_bytes
+                    && (best.nodes < self.original_nodes || best.bytes.len() < self.original_bytes)
+            }),
+            self.runs
+                .iter()
+                .any(|run| run.stopped == Some("original-not-typable")),
+            self.phases.len(),
+            self.runs.iter().any(|run| run.stopped.is_some()) || self.any_limit_hit(),
+        );
+        (status.name(), status.exit_code())
+    }
+
     pub(crate) fn any_limit_hit(&self) -> bool {
-        self.phases.iter().any(|phase| phase.limit_hit.is_some())
+        self.runs.iter().any(|run| {
+            matches!(
+                run.stopped,
+                Some(
+                    "original-exceeds-max-enodes"
+                        | "original-exceeds-max-classes"
+                        | "original-exceeds-limits"
+                        | "supplied-exceeds-limits"
+                )
+            )
+        }) || self.phases.iter().any(|phase| phase.limit_hit.is_some())
             || self
                 .candidates
                 .iter()
@@ -241,7 +283,7 @@ impl Search {
     /// run, `enodes`, `classes` and the merge counts are that run's; with a
     /// portfolio, the largest e-graph and the merge totals over all runs.
     pub(crate) fn json(&self) -> Value {
-        json!({
+        let mut report = json!({
             "original": {
                 "sha256": self.original_sha256,
                 "bytes": self.original_bytes,
@@ -279,7 +321,31 @@ impl Search {
                 "receipt": best.equivalence.receipt_value(),
                 "receipt_sha256": transform::sha256_hex(&best.equivalence.receipt()),
             })),
-        })
+        });
+        if self.best.is_none() {
+            if let Some(node) = self.runs.iter().find_map(|run| run.unsupported_original) {
+                report["reason"] = json!("unsupported-original-node");
+                report["unsupported_node"] = json!({"index": node.index, "opcode": node.opcode});
+                report["next_step"] = json!(
+                    "Use transform with a supplied candidate checked against this original, or request support for this opcode; changing limits cannot add instruction support."
+                );
+            } else if let Some(reason) = self.runs.iter().find_map(|run| run.stopped) {
+                report["reason"] = json!(reason);
+                report["next_step"] = json!(match reason {
+                    "original-exceeds-max-enodes"
+                    | "original-exceeds-max-classes"
+                    | "original-exceeds-limits" =>
+                        "Inspect the named search cap; increase it only within the available budget or use a separately checked candidate.",
+                    "supplied-exceeds-limits" | "supplied-not-typable" =>
+                        "Omit the supplied program or use one the proposer can represent; independent equivalence does not establish proposer support.",
+                    "inconsistent-egraph" =>
+                        "Retain the original, strategy and supplied programs; report the proposer inconsistency before retrying.",
+                    _ =>
+                        "Retain the original and stop diagnostic; inspect optimize --help and use a separately checked candidate.",
+                });
+            }
+        }
+        report
     }
 }
 
@@ -543,6 +609,7 @@ fn run_strategy(
     let mut run = Run {
         phases_requested: strategy.phases.len(),
         stopped: None,
+        unsupported_original: None,
         enodes: 0,
         classes: 0,
         merges: 0,
@@ -564,6 +631,19 @@ fn run_strategy(
         }
         Err(AddError::Type(_)) => {
             run.stopped = Some("original-not-typable");
+            // Admission already validated references. Supplying an image for
+            // every reference isolates unsupported opcodes using the same
+            // conversion as the proposer, without repeating a type checker.
+            run.unsupported_original = judging
+                .program
+                .nodes()
+                .iter()
+                .enumerate()
+                .find(|(_, op)| egraph::ENode::from_op(op, |id| Some(u32::from(id))).is_none())
+                .map(|(index, op)| UnsupportedOriginalNode {
+                    index,
+                    opcode: crate::neural_loop::profiles::opcode_name(op),
+                });
             return run;
         }
     };

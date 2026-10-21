@@ -86,13 +86,6 @@ impl Loaded {
     pub(super) fn declared_laws(&self) -> Vec<u32> {
         self.declarations.laws.iter().map(|law| law.id).collect()
     }
-
-    /// The reasons `project.zeno` declares, ascending.
-    pub(super) fn reasons(&self) -> Vec<u32> {
-        let mut reasons = self.declarations.reasons.clone();
-        reasons.sort_unstable();
-        reasons
-    }
 }
 
 /// Why a judge did not run to the end: the domain or the work exceeds the

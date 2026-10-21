@@ -1485,8 +1485,13 @@ impl Core {
             "class": class.name(),
             "reason": self.reason_name(label.1),
             "current": current == Some(label),
+            "answer_supported": class != Class::CommittedFailure,
         });
+        if class == Class::CommittedFailure {
+            out["answer_refusal"] = json!("question-choice-unsupported:CommittedFailure");
+        }
         if class != Class::Reject
+            && current == Some(label)
             && let Some(case) = case.and_then(|k| self.cases.get(k))
         {
             out["sets"] = Value::Object(

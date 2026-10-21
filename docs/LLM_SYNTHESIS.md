@@ -27,7 +27,12 @@ or target selection and documented booleans; they never invoke a shell or accept
 arbitrary CLI arguments.
 
 `discover_program_authoring` runs `zeno-fcis describe` to expose the actual
-command contracts and normal program route. `create_program_project` runs `new`
+command contracts, task guidance and normal program route. Use `optimize` to
+search for a smaller equivalent program, `transform check` for a known
+replacement, or a resumable `loop` session to propose and repair candidates.
+The [shipped skill](../skills/zenofcis-synthesis-first/SKILL.md) also routes
+requirements review, example learning and sketch completion.
+`create_program_project` runs `new`
 with one of durable-counter, account-lockout, order-fulfillment,
 inventory-reservation, withdrawal-queue, agent-treasury-guard, prepared-counter
 or compliance-gateway. The destination's
@@ -39,17 +44,17 @@ explicitly not run.
 Follow [the normal API migration](V2_PROGRAM_API_MIGRATION.md): independently
 review complete original schema/policy bytes, closed control and branches,
 footprints, reasons, channels, required transition/genesis laws and all legal
-input domains. `bind_catalog` and `bind_program` call the actual checked library.
-Generated `GeneratedProgramProposal`/`GeneratedDeclarations` are untrusted data;
+input domains. Generated `v2_contract.rs` binds its descriptor through
+`catalog::bind_original` and `authority::bind`. The declarations are proposals;
 metadata cannot invent a complete policy. Original envelopes are retained and
-independently admitted during execution. A committing `Program::publish` or
+independently admitted during execution. The library Authority's `publish` or
 `publish_genesis` can produce a private Publication only after actual execution
 and required law checks. Authentication, persistence/replay/state comparison and
 physical delivery remain trusted shell work.
 
-The library supports closed finite/control declarations and a full-width Account
-producer. Account-lockout uses that library-owned producer over its original
-timestamp domains; it does not fall back to an application-supplied authority callback.
+The generated templates use library-owned evaluation of their declared programs,
+including account-lockout's timestamp arithmetic. They do not supply an
+application decision callback or a special Account producer.
 Unsupported profiles return named refusals and grant no publication capability.
 Independent acceptance models and source-bound proof qualification remain
 separate from these generation tools.

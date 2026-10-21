@@ -406,6 +406,21 @@ large one; whether that agrees with `tests/decision-examples.txt`; which law
 refusals fall on states the contract's state laws allow; and which rule
 mutants those inputs distinguish, each with a proposed example.
 
+To improve an existing finite program, use `zeno-fcis optimize`: it searches
+for fewer instructions and smaller encoded programs, checking each accepted
+replacement against the original on every declared input. Use `transform
+check` for a replacement you already have. Neither command adopts the result
+or promises a globally optimal program.
+
+For repeated proposals, use `zeno-fcis loop`: open a bounded session, submit
+candidates, inspect counterexamples, revise, and resume from checked evidence.
+The other loop commands help learn from examples, complete expression holes,
+and ask about decisions left open by contract laws. Each has its own checked
+scope; fitting examples alone does not prove behavior on unseen inputs. The
+[agent guide](docs/LLM_USAGE.md#choose-the-tool-for-the-problem) maps tasks to
+commands, and the [CLI reference](docs/CLI_REFERENCE.md#bounded-optimization-loop)
+gives the complete workflows.
+
 `zeno-fcis contract export-program DIR --out P` writes the contract's
 decision program in the encoding that `optimize` and `transform` read.
 `zeno-fcis contract adopt DIR --candidate C --receipt R --usage

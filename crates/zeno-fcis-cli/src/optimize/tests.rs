@@ -1803,10 +1803,21 @@ fn tight_limits_are_reported_and_the_original_is_never_lost() {
     assert_eq!(search.stopped, Some("original-exceeds-max-enodes"));
     assert!(search.phases.is_empty());
     assert!(search.best.is_none());
+    assert!(search.any_limit_hit());
+    assert_eq!(search.status_and_exit(), ("inconclusive", 2));
     assert_eq!(
         search.json()["search"]["stopped"],
         "original-exceeds-max-enodes"
     );
+    assert_eq!(search.json()["search"]["any_limit_hit"], true);
+
+    let mut strategy = default_strategy();
+    strategy.limits.max_classes = 1;
+    let search = run(artifact("boolean-kernel-original"), &strategy);
+    assert_eq!(search.stopped, Some("original-exceeds-max-classes"));
+    assert!(search.phases.is_empty());
+    assert!(search.any_limit_hit());
+    assert_eq!(search.status_and_exit(), ("inconclusive", 2));
 }
 
 #[test]

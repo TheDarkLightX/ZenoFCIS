@@ -257,6 +257,12 @@ pub(crate) enum Feedback {
     Refused { attempt: u8, reason: Value },
     /// The check stopped without deciding (resource stop, worker failure).
     Incomplete { attempt: u8, stop: Value },
+    /// A settled historical result whose evidence was not replayed now.
+    Recorded {
+        attempt: u8,
+        outcome: String,
+        cost: Option<Cost>,
+    },
     /// Equivalent, with the actual cost and the selection decision.
     Equivalent {
         attempt: u8,
@@ -284,6 +290,14 @@ impl Feedback {
             Feedback::Incomplete { attempt, stop } => {
                 json!({"attempt": attempt, "kind": "incomplete-check", "stop": stop})
             }
+            Feedback::Recorded {
+                attempt,
+                outcome,
+                cost,
+            } => json!({
+                "attempt": attempt, "kind": "recorded-outcome", "outcome": outcome,
+                "cost": cost.map(Cost::json), "replayed": false,
+            }),
             Feedback::Equivalent {
                 attempt,
                 cost,

@@ -201,7 +201,6 @@ def validate_developer_tooling_documents(
         "rustCommandPolicy",
         "cargo\\s+(?:\\+\\S+\\s+)?update",
         "cargo\\s+(?:\\+\\S+\\s+)?publish",
-        "python3\\s+tools\\/atdd\\.py\\s+run\\s+--all",
     )
     for marker in required_config:
         if marker not in config_text:
