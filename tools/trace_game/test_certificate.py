@@ -74,7 +74,7 @@ class Certificate(unittest.TestCase):
             tree=ast.parse(Path(__file__).with_name(name).read_text())
             imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
                      for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
-            self.assertLessEqual(imports,{'hashlib','itertools','json','pathlib','subprocess','time','game_spec'})
+            self.assertLessEqual(imports,{'hashlib','itertools','json','pathlib','resource','subprocess','time','game_spec'})
 
     def test_standalone_checker_does_not_require_optional_helpers(self):
         import os

@@ -215,7 +215,7 @@ def checked_graph(packet,tables):
 
 
 def check(packet,tables):
-    if packet['schema']=='zeno-fcis/game-guard-exhaustion/1' or packet.get('spec',{}).get('model')=='contract':
+    if packet['schema'] in ('zeno-fcis/game-guard-exhaustion/1','zeno-fcis/game-incomplete/1') or packet.get('spec',{}).get('model')=='contract':
         return check_game(packet,tables)
     if packet['schema']=='zeno-fcis/trace-game-guard-exhaustion/1.1':
         need(packet['grammar']==list(GRAMMAR) and len(packet['attempts'])==3,'guard grammar exhaustion')

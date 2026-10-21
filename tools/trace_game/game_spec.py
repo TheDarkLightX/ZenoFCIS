@@ -61,10 +61,11 @@ def validate(game):
     need(objective['kind'] in ('safety', 'reachability'), 'unsupported objective')
     formula(objective['formula'])
     on = objective.get('on', ['Accept', 'Reject', 'CommittedFailure', 'Refused', 'Blocked'])
-    need(type(on) is list and on and len(set(on)) == len(on) and
+    need(type(on) is list and on and all(type(v) is str for v in on) and len(set(on)) == len(on) and
          set(on) <= {'Accept', 'Reject', 'CommittedFailure', 'Refused', 'Blocked'}, 'objective decision classes')
     guards = game.get('guards', ['true'])
-    need(type(guards) is list and 1 <= len(guards) <= 32 and len(set(guards)) == len(guards), 'guard candidate set')
+    need(type(guards) is list and 1 <= len(guards) <= 32 and all(type(g) is str for g in guards)
+         and len(set(guards)) == len(guards), 'guard candidate set')
     for guard in guards:
         formula(guard)
         need(not any(word in guard for word in ('post.', 'outbox.', 'decision_reason')), 'guards read only pre, command and context')
@@ -112,3 +113,12 @@ def description(game, native, guard=0, horizon=None):
                 genesis=native['genesis'], coalitions=list(coalitions(game)),
                 events=expand(game,native['positions']), guards=game.get('guards',['true']),
                 guard=guard, objective=game['objective'], horizon=horizon, empty=False)
+
+
+def native_numbers(packet):
+    """Decode the driver's decimal strings without narrowing signed 128-bit values."""
+    packet['genesis']=[int(v) for v in packet['genesis']]
+    for row in packet.get('rows',[]):
+        row['pre']=[int(v) for v in row['pre']]
+        row['post']=[int(v) for v in row['post']]
+    return packet

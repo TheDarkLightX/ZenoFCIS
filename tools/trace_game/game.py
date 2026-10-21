@@ -5,12 +5,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import resource
 import shutil
 import subprocess
 import time
 
 from certificate_check import check
-from game_spec import load, description, expand, SCOPE
+from game_spec import load, description, expand, native_numbers, SCOPE
 from solve import certify, Meter
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -31,10 +32,11 @@ def sources():
 
 def native(binary,request):
     completed=subprocess.run(['nice','-n','19','ionice','-c3',str(binary)],
-                             input=json.dumps(request).encode(),capture_output=True,timeout=30)
+                             input=json.dumps(request).encode(),capture_output=True,timeout=30,
+                             preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_AS,(1<<30,1<<30)))
     if completed.returncode:
         raise ValueError(completed.stderr.decode().strip()[:1000] or 'native process refused')
-    return json.loads(completed.stdout)
+    return native_numbers(json.loads(completed.stdout))
 
 
 def driver(args):
@@ -49,9 +51,20 @@ def driver(args):
     return target/'debug/examples/trace_game_input'
 
 
+def bind(args,horizon=None):
+    binary=args.out/'native-driver'
+    artifacts={p.name:digest(p) for p in args.out.iterdir() if p.is_file() and p.name not in ('native-driver','game-binding.json')}
+    binding=dict(schema='zeno-fcis/game-binding/1',sources=sources(),artifacts=artifacts,
+                 binary=dict(path=str(binary.resolve()),sha256=digest(binary)) if binary.is_file() else None,
+                 mode=args.mode,horizon=horizon)
+    write(args.out/'game-binding.json',binding)
+
+
 def run(args):
-    game,contract=load(args.game)
+    if args.out.resolve().is_relative_to(ROOT): raise ValueError('evidence directory must be outside repository')
     args.out.mkdir(parents=True,exist_ok=False)
+    args.created=True
+    game,contract=load(args.game)
     write(args.out/'game.json',game)
     binary=args.out/'native-driver'
     shutil.copy2(driver(args),binary)
@@ -93,16 +106,13 @@ def run(args):
     write(args.out/'certificate.json',packet)
     verdict.update(guard=spec['guards'][guard],solver_work=meter.work)
     write(args.out/'verdict.json',verdict)
-    artifacts={p.name:digest(p) for p in args.out.iterdir() if p.is_file() and p.name!='native-driver'}
-    binding=dict(schema='zeno-fcis/game-binding/1',sources=sources(),artifacts=artifacts,
-                 binary=dict(path=str(binary),sha256=digest(binary)),mode=args.mode,horizon=horizon)
-    write(args.out/'game-binding.json',binding)
+    bind(args,horizon)
     return verdict
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__,epilog=(
-        'Example: python3 -B tools/trace_game/game.py certify --game '
+    parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog=(
+        'Example: nice -n 19 ionice -c3 python3 -B tools/trace_game/game.py certify --game '
         'test-data/trace-games/escrow-safe.json --out ../escrow-game-evidence. '+SCOPE))
     parser.add_argument('mode',choices=('check','certify','select-guard'))
     parser.add_argument('--game',type=Path,required=True)
@@ -113,7 +123,10 @@ def main():
         verdict=run(args); code=0
     except (ValueError,KeyError,TypeError,IndexError,OverflowError,RecursionError,OSError,subprocess.SubprocessError) as error:
         verdict=dict(evidence='UNKNOWN',limit=str(error),claim='no certificate established',scope=SCOPE)
-        if args.out.is_dir() and not (args.out/'verdict.json').exists(): write(args.out/'verdict.json',verdict)
+        if getattr(args,'created',False):
+            write(args.out/'verdict.json',verdict)
+            write(args.out/'certificate.json',dict(schema='zeno-fcis/game-incomplete/1',**verdict))
+            bind(args)
         code=2
     print(json.dumps(verdict,sort_keys=True))
     return code
