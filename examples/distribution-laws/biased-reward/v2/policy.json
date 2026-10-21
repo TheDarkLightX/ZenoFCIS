@@ -1,0 +1,52 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "biased-reward",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "101": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": "context.102.130 == 0",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "0"
+      },
+      "outbox": []
+    },
+    {
+      "when": "context.102.130 == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "1"
+      },
+      "outbox": []
+    },
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "3"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

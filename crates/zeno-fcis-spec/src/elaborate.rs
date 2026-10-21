@@ -76,6 +76,7 @@ pub fn elaborate_project(
     );
     let mut random_inputs = Vec::new();
     let mut distributions = Vec::new();
+    let mut rewards = Vec::new();
     let mut spans = BTreeMap::new();
     for spanned in declarations {
         match spanned.declaration {
@@ -126,6 +127,10 @@ pub fn elaborate_project(
             Declaration::Distribution(value) => {
                 spans.insert((12, value.id().get()), spanned.span);
                 distributions.push(value);
+            }
+            Declaration::Reward(value) => {
+                spans.insert((13, value.id().get()), spanned.span);
+                rewards.push(value);
             }
             Declaration::Claim(value) => {
                 spans.insert((10, value.id().get()), spanned.span);
@@ -245,6 +250,30 @@ pub fn elaborate_project(
         &spans,
         &mut diagnostics,
     );
+
+    sort_and_duplicates(
+        &mut rewards,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "reward",
+        13,
+        &spans,
+        &mut diagnostics,
+    );
+    let random_ids: Vec<_> = random_inputs.iter().map(|v| v.id()).collect();
+    for reward in &rewards {
+        if random_ids.is_empty() || reward.random() != random_ids {
+            push(
+                &mut diagnostics,
+                DiagnosticCode::UnknownReference,
+                span_for(&spans, 13, reward.id()),
+                format!("reward.{}.random", reward.id().get()),
+                "all declared random premise IDs in sorted order",
+                "missing, extra or unknown premise",
+                "name every declared random input; rewards use the same full random domain",
+            );
+        }
+    }
 
     for value in &types {
         if value.kind() == TypeKind::U128 && value.unsigned_range().is_none() {
@@ -764,6 +793,7 @@ pub fn elaborate_project(
         claims: claims.into_boxed_slice(),
         random_inputs: random_inputs.into_boxed_slice(),
         distributions: distributions.into_boxed_slice(),
+        rewards: rewards.into_boxed_slice(),
     };
     // Resolve only after schema and formula-shape admission. Both parsed input
     // and ProjectSpecBuilder pass through this mandatory boundary.
@@ -783,10 +813,15 @@ pub fn elaborate_project(
         .distributions()
         .iter()
         .map(|v| (12, "distribution", v.id(), alloc::vec![v.outcome()]));
+    let reward_paths = spec
+        .rewards()
+        .iter()
+        .map(|v| (13, "reward", v.id(), alloc::vec![v.outcome()]));
     for (tag, kind, id, paths) in law_paths
         .chain(claim_paths)
         .chain(random_paths)
         .chain(distribution_paths)
+        .chain(reward_paths)
     {
         for path in paths {
             let resolution = crate::resolve_path(&spec, path);

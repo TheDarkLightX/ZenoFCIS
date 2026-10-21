@@ -663,6 +663,7 @@ mod tests {
                 Declaration::Claim(v) => builder.claim(v),
                 Declaration::Random(v) => builder.random_input(v),
                 Declaration::Distribution(v) => builder.distribution(v),
+                Declaration::Reward(v) => builder.reward(v),
             };
         }
         let errors = builder

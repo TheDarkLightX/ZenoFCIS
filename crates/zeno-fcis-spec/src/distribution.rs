@@ -148,3 +148,172 @@ impl DistributionDecl {
         Some(target.into_boxed_slice())
     }
 }
+
+/// A reduced signed rational with an i64 numerator and u64 positive denominator.
+/// Arithmetic uses checked wide intermediates; an unrepresentable result is refused.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Rational {
+    numerator: i64,
+    denominator: u64,
+}
+
+impl Rational {
+    /// Additive identity.
+    pub const ZERO: Self = Self {
+        numerator: 0,
+        denominator: 1,
+    };
+    /// Constructs and reduces a rational within the component bounds.
+    pub fn try_new(numerator: i128, denominator: u128) -> Option<Self> {
+        if denominator == 0 {
+            return None;
+        }
+        let divisor = gcd(numerator.unsigned_abs(), denominator);
+        let magnitude = u64::try_from(numerator.unsigned_abs() / divisor).ok()?;
+        let signed = if numerator < 0 {
+            -i128::from(magnitude)
+        } else {
+            i128::from(magnitude)
+        };
+        Some(Self {
+            numerator: i64::try_from(signed).ok()?,
+            denominator: u64::try_from(denominator / divisor).ok()?,
+        })
+    }
+    /// Reduced signed numerator.
+    pub const fn numerator(self) -> i64 {
+        self.numerator
+    }
+    /// Reduced positive denominator.
+    pub const fn denominator(self) -> u64 {
+        self.denominator
+    }
+    /// Exact bounded addition.
+    pub fn checked_add(self, other: Self) -> Option<Self> {
+        Self::try_new(
+            (i128::from(self.numerator) * i128::from(other.denominator))
+                .checked_add(i128::from(other.numerator) * i128::from(self.denominator))?,
+            u128::from(self.denominator) * u128::from(other.denominator),
+        )
+    }
+    /// Exact bounded subtraction.
+    pub fn checked_sub(self, other: Self) -> Option<Self> {
+        Self::try_new(
+            (i128::from(self.numerator) * i128::from(other.denominator))
+                .checked_sub(i128::from(other.numerator) * i128::from(self.denominator))?,
+            u128::from(self.denominator) * u128::from(other.denominator),
+        )
+    }
+    /// Exact bounded multiplication.
+    pub fn checked_mul(self, other: Self) -> Option<Self> {
+        Self::try_new(
+            i128::from(self.numerator) * i128::from(other.numerator),
+            u128::from(self.denominator) * u128::from(other.denominator),
+        )
+    }
+}
+
+impl Ord for Rational {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        (i128::from(self.numerator) * i128::from(other.denominator))
+            .cmp(&(i128::from(other.numerator) * i128::from(self.denominator)))
+    }
+}
+impl PartialOrd for Rational {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// One finite reward functional.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum RewardKind {
+    /// E[R].
+    Expectation,
+    /// E[R^2] - E[R]^2.
+    Variance,
+    /// P(R >= t), including equality at the threshold.
+    Threshold(i128),
+    /// E[max(0, R - b)].
+    Excess(i128),
+}
+
+/// An exact comparison with a declared rational bound.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum RewardComparison {
+    /// At most the bound.
+    AtMost,
+    /// At least the bound.
+    AtLeast,
+    /// Exactly the bound.
+    Equal,
+}
+impl RewardComparison {
+    /// Whether this comparison holds exactly.
+    pub fn holds(self, actual: Rational, bound: Rational) -> bool {
+        match self {
+            Self::AtMost => actual <= bound,
+            Self::AtLeast => actual >= bound,
+            Self::Equal => actual == bound,
+        }
+    }
+}
+
+/// One measure and its exact bound, in canonical order within a declaration.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct RewardMeasure {
+    pub(crate) kind: RewardKind,
+    pub(crate) comparison: RewardComparison,
+    pub(crate) bound: Rational,
+}
+impl RewardMeasure {
+    /// Functional to evaluate.
+    pub const fn kind(self) -> RewardKind {
+        self.kind
+    }
+    /// Comparison to apply.
+    pub const fn comparison(self) -> RewardComparison {
+        self.comparison
+    }
+    /// Exact rational bound.
+    pub const fn bound(self) -> Rational {
+        self.bound
+    }
+}
+
+/// Inert reward constraints, checked per fiber using the distribution fold.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RewardDecl {
+    pub(crate) id: StableId,
+    pub(crate) name: Identifier,
+    pub(crate) random: Box<[StableId]>,
+    pub(crate) outcome: ProjectionPath,
+    pub(crate) failure: Option<i128>,
+    pub(crate) measures: Box<[RewardMeasure]>,
+}
+impl RewardDecl {
+    /// Declaration identifier.
+    pub const fn id(&self) -> StableId {
+        self.id
+    }
+    /// Declaration name.
+    pub const fn name(&self) -> &Identifier {
+        &self.name
+    }
+    /// All random premise IDs, sorted and distinct.
+    pub const fn random(&self) -> &[StableId] {
+        &self.random
+    }
+    /// Integer successor projection.
+    pub const fn outcome(&self) -> &ProjectionPath {
+        &self.outcome
+    }
+    /// Explicit constant for committed failures, or none (which refutes).
+    pub const fn failure(&self) -> Option<i128> {
+        self.failure
+    }
+    /// Nonempty, sorted and distinct measure constraints.
+    pub const fn measures(&self) -> &[RewardMeasure] {
+        &self.measures
+    }
+}

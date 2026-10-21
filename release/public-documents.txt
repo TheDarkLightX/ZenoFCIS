@@ -387,3 +387,6 @@ examples/distribution-laws/payout-tie/README.md
 docs/CONTRACT_TABLES.md
 examples/contract-tables/README.md
 examples/contract-tables/library-loans/README.md
+examples/distribution-laws/lottery-reward/README.md
+examples/distribution-laws/shortfall-reward/README.md
+examples/distribution-laws/biased-reward/README.md

@@ -29,7 +29,10 @@ pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
-pub use distribution::{DistributionDecl, DistributionOutcome, Probability, RandomInputDecl};
+pub use distribution::{
+    DistributionDecl, DistributionOutcome, Probability, RandomInputDecl, Rational,
+    RewardComparison, RewardDecl, RewardKind, RewardMeasure,
+};
 pub use elaborate::elaborate_project;
 pub use induction::invariant_at;
 pub use mini_determinator::{

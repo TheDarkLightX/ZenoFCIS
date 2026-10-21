@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build six isolated finite-distribution mutants and require named test failures."""
+"""Build isolated finite-distribution and reward mutants and require named test failures."""
 
 import argparse
 import hashlib
@@ -33,6 +33,22 @@ CONTROLS = (
     ("dropped-premise", "crates/zeno-fcis-contract/src/distribution.rs",
      '"premise": PREMISE,', '"missing_premise": PREMISE,',
      "distribution_every_verdict_retains_the_randomness_premise"),
+    ("reward-variance-sign", "crates/zeno-fcis-contract/src/distribution.rs",
+     "moment\n            .checked_sub(mean.checked_mul(mean).ok_or(\"reward arithmetic bound\")?)",
+     "mean.checked_mul(mean).ok_or(\"reward arithmetic bound\")?.checked_sub(moment)",
+     "reward_variance_uses_second_moment_minus_squared_mean"),
+    ("reward-threshold-strict", "crates/zeno-fcis-contract/src/distribution.rs",
+     "i128::from(value >= t)", "i128::from(value > t)",
+     "reward_threshold_includes_equality"),
+    ("reward-excess-unclamped", "crates/zeno-fcis-contract/src/distribution.rs",
+     "integer(value.checked_sub(b)?.max(0))", "integer(value.checked_sub(b)?)",
+     "reward_excess_is_clamped_at_zero"),
+    ("reward-unnormalized", "crates/zeno-fcis-contract/src/distribution.rs",
+     "u128::from(bin.mass.denominator())", "1",
+     "reward_expectation_is_normalized"),
+    ("reward-dropped-premise", "crates/zeno-fcis-contract/src/distribution.rs",
+     '\"premise\": PREMISE,', '\"missing_premise\": PREMISE,',
+     "reward_every_verdict_retains_the_randomness_premise"),
     ("failure-distinction", "crates/zeno-fcis-contract/src/distribution.rs",
      "Class::CommittedFailure => Some(DistributionOutcome::CommittedFailure),",
      "Class::CommittedFailure => projected(&decision.post, *field),",

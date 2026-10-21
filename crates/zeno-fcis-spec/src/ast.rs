@@ -1317,6 +1317,7 @@ pub(crate) enum Declaration {
     Claim(ClaimDecl),
     Random(crate::RandomInputDecl),
     Distribution(crate::DistributionDecl),
+    Reward(crate::RewardDecl),
 }
 
 /// Canonical typed project specification.
@@ -1337,6 +1338,7 @@ pub struct ProjectSpec {
     pub(crate) claims: Box<[ClaimDecl]>,
     pub(crate) random_inputs: Box<[crate::RandomInputDecl]>,
     pub(crate) distributions: Box<[crate::DistributionDecl]>,
+    pub(crate) rewards: Box<[crate::RewardDecl]>,
 }
 
 impl ProjectSpec {
@@ -1413,6 +1415,10 @@ impl ProjectSpec {
     pub const fn distributions(&self) -> &[crate::DistributionDecl] {
         &self.distributions
     }
+    /// Finite reward declarations in stable-ID order.
+    pub const fn rewards(&self) -> &[crate::RewardDecl] {
+        &self.rewards
+    }
     /// Finds a claim by stable identifier.
     #[must_use]
     pub fn claim(&self, id: StableId) -> Option<&ClaimDecl> {
@@ -1441,7 +1447,10 @@ impl ProjectSpec {
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if !self.random_inputs.is_empty() || !self.distributions.is_empty() {
+        let format = if !self.random_inputs.is_empty()
+            || !self.distributions.is_empty()
+            || !self.rewards.is_empty()
+        {
             4u16
         } else if self.uses_u128() {
             3u16
@@ -1496,6 +1505,39 @@ impl ProjectSpec {
                     }
                     output.extend_from_slice(&p.numerator().to_be_bytes());
                     output.extend_from_slice(&p.denominator().to_be_bytes());
+                }
+            }
+            put_length(output, self.rewards.len())?;
+            for reward in &self.rewards {
+                reward.id.encode_to(output)?;
+                reward.name.encode_to(output)?;
+                put_ids(output, &reward.random)?;
+                encode_path(&reward.outcome, output)?;
+                output.push(u8::from(reward.failure.is_some()));
+                if let Some(value) = reward.failure {
+                    output.extend_from_slice(&value.to_be_bytes());
+                }
+                put_length(output, reward.measures.len())?;
+                for measure in &reward.measures {
+                    match measure.kind {
+                        crate::RewardKind::Expectation => output.push(0),
+                        crate::RewardKind::Variance => output.push(1),
+                        crate::RewardKind::Threshold(t) => {
+                            output.push(2);
+                            output.extend_from_slice(&t.to_be_bytes());
+                        }
+                        crate::RewardKind::Excess(b) => {
+                            output.push(3);
+                            output.extend_from_slice(&b.to_be_bytes());
+                        }
+                    }
+                    output.push(match measure.comparison {
+                        crate::RewardComparison::AtMost => 0,
+                        crate::RewardComparison::AtLeast => 1,
+                        crate::RewardComparison::Equal => 2,
+                    });
+                    output.extend_from_slice(&measure.bound.numerator().to_be_bytes());
+                    output.extend_from_slice(&measure.bound.denominator().to_be_bytes());
                 }
             }
         }

@@ -349,3 +349,252 @@ fn distribution_invalid_declarations_fail_closed_and_results_are_owned()
     );
     Ok(())
 }
+
+fn reward_project(measures: &str) -> String {
+    REPORTER.replace(
+        "distribution 601 reporters on post.100.110 = uniform over {0, 1, 2, 3};",
+        &format!("reward 610 payout random {{600}} on post.100.110 {{ {measures} }}"),
+    )
+}
+fn rational(n: &str, d: &str) -> serde_json::Value {
+    serde_json::json!({"numerator":n,"denominator":d})
+}
+
+#[test]
+fn reward_variance_uses_second_moment_minus_squared_mean() -> Result<(), Box<dyn std::error::Error>>
+{
+    let result = check(
+        &reward_project("variance = 5/4;"),
+        POLICY,
+        Limits::default(),
+    )?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
+    let wrong = check(&reward_project("variance <= 1;"), POLICY, Limits::default())?;
+    assert_eq!(wrong.verdict(), Verdict::Refuted);
+    assert_eq!(wrong.packet()["result"]["actual"], rational("5", "4"));
+    assert_eq!(wrong.packet()["result"]["outcomes"][0]["outcome"], "0");
+    assert_eq!(
+        wrong.packet()["result"]["outcomes"][0]["difference_contribution"],
+        rational("5", "16")
+    );
+    Ok(())
+}
+#[test]
+fn reward_threshold_includes_equality() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        check(
+            &reward_project("threshold 2 = 1/2;"),
+            POLICY,
+            Limits::default()
+        )?
+        .verdict(),
+        Verdict::Checked
+    );
+    Ok(())
+}
+#[test]
+fn reward_excess_is_clamped_at_zero() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        check(
+            &reward_project("excess 2 = 1/4;"),
+            POLICY,
+            Limits::default()
+        )?
+        .verdict(),
+        Verdict::Checked
+    );
+    Ok(())
+}
+#[test]
+fn reward_expectation_is_normalized() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        check(
+            &reward_project("expectation = 3/2;"),
+            POLICY,
+            Limits::default()
+        )?
+        .verdict(),
+        Verdict::Checked
+    );
+    Ok(())
+}
+#[test]
+fn reward_every_verdict_retains_the_randomness_premise() -> Result<(), Box<dyn std::error::Error>> {
+    for (measures, max_work, verdict) in [
+        ("expectation = 3/2;", 1000, Verdict::Checked),
+        ("expectation <= 1;", 1000, Verdict::Refuted),
+        ("expectation = 3/2;", 2, Verdict::Unknown),
+    ] {
+        let result = check(
+            &reward_project(measures),
+            POLICY,
+            Limits {
+                max_work,
+                ..Limits::default()
+            },
+        )?;
+        assert_eq!(result.verdict(), verdict);
+        assert_eq!(result.packet()["premise"], PREMISE);
+        if verdict != Verdict::Checked {
+            assert!(result.packet()["claim"].is_null());
+        }
+    }
+    Ok(())
+}
+#[test]
+fn reward_examples_and_ranked_bias_witness() -> Result<(), Box<dyn std::error::Error>> {
+    for (project, policy, wanted) in [
+        (
+            include_str!("../../../examples/distribution-laws/lottery-reward/project.zeno"),
+            include_str!("../../../examples/distribution-laws/lottery-reward/v2/policy.json"),
+            Verdict::Checked,
+        ),
+        (
+            include_str!("../../../examples/distribution-laws/shortfall-reward/project.zeno"),
+            include_str!("../../../examples/distribution-laws/shortfall-reward/v2/policy.json"),
+            Verdict::Checked,
+        ),
+        (
+            include_str!("../../../examples/distribution-laws/biased-reward/project.zeno"),
+            include_str!("../../../examples/distribution-laws/biased-reward/v2/policy.json"),
+            Verdict::Refuted,
+        ),
+    ] {
+        let result = check(project, policy, Limits::default())?;
+        assert_eq!(result.verdict(), wanted, "{:?}", result.packet());
+        if wanted == Verdict::Refuted {
+            let detail = &result.packet()["result"];
+            assert_eq!(detail["actual"], rational("3", "4"));
+            assert_eq!(detail["bound"], rational("1", "2"));
+            assert_eq!(detail["outcomes"][0]["outcome"], "3");
+            assert_eq!(
+                detail["outcomes"][0]["difference_contribution"],
+                rational("1", "4")
+            );
+            assert_eq!(
+                detail["outcomes"][0]["random_values"],
+                serde_json::json!([["2"], ["3"]])
+            );
+        }
+    }
+    Ok(())
+}
+#[test]
+fn reward_failures_require_an_explicit_constant() -> Result<(), Box<dyn std::error::Error>> {
+    let source = FAILURE.replace(
+        "distribution 601 d on post.100.110 = uniform over {0, 1, 2, 3};",
+        "reward 610 payout random {600} on post.100.110 { expectation = 3/4; }",
+    );
+    let undefined = check(&source, FAILURE_POLICY, Limits::default())?;
+    assert_eq!(
+        undefined.verdict(),
+        Verdict::Refuted,
+        "{:?}",
+        undefined.packet()
+    );
+    assert_eq!(
+        undefined.packet()["result"]["reason"],
+        "committed failure has no reward"
+    );
+    for (constant, expectation) in [("0", "3/4"), ("-3", "0"), ("3", "3/2")] {
+        let source = source
+            .replace(
+                "post.100.110 {",
+                &format!("post.100.110 failure {constant} {{"),
+            )
+            .replace("expectation = 3/4", &format!("expectation = {expectation}"));
+        let result = check(&source, FAILURE_POLICY, Limits::default())?;
+        assert_eq!(result.verdict(), Verdict::Checked, "{:?}", result.packet());
+    }
+    Ok(())
+}
+#[test]
+fn reward_limits_refusals_and_arithmetic_are_unknown() -> Result<(), Box<dyn std::error::Error>> {
+    let source = reward_project("expectation = 3/2;");
+    for cap in [0, 1, 8, 12, 51] {
+        let result = check(
+            &source,
+            POLICY,
+            Limits {
+                max_work: cap,
+                ..Limits::default()
+            },
+        )?;
+        assert_eq!(
+            result.verdict(),
+            Verdict::Unknown,
+            "cap {cap}: {:?}",
+            result.packet()
+        );
+        assert_eq!(result.packet()["measured"]["work"], cap);
+    }
+    assert_eq!(
+        check(
+            &source,
+            POLICY,
+            Limits {
+                max_work: 52,
+                ..Limits::default()
+            }
+        )?
+        .verdict(),
+        Verdict::Checked
+    );
+    // A witness also consumes work: after the first moment and comparison,
+    // there is no budget left to rank even one outcome.
+    let result = check(
+        &reward_project("expectation <= 1;"),
+        POLICY,
+        Limits {
+            max_work: 13,
+            ..Limits::default()
+        },
+    )?;
+    assert_eq!(result.verdict(), Verdict::Unknown);
+    let huge = reward_project("variance >= 0;")
+        .replace("Reporter in 0..=3", "Reporter in 0..=9223372036854775807");
+    // Tuple preflight stops this huge fixed domain before arithmetic.
+    assert_eq!(
+        check(&huge, POLICY, Limits::default())?.verdict(),
+        Verdict::Unknown
+    );
+    let overflow = reward_project("excess -170141183460469231731687303715884105728 >= 0;");
+    let result = check(&overflow, POLICY, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Unknown);
+    assert_eq!(
+        result.packet()["result"]["reason"],
+        "reward arithmetic bound"
+    );
+    let refused = POLICY.replace(
+        "\"110\": \"context.102.130\"",
+        "\"110\": \"context.102.130 + 4\"",
+    );
+    assert_eq!(
+        check(&source, &refused, Limits::default())?.verdict(),
+        Verdict::Unknown
+    );
+    Ok(())
+}
+#[test]
+fn reward_uses_each_fiber_and_shares_the_histogram() -> Result<(), Box<dyn std::error::Error>> {
+    let source = format!(
+        "{REPORTER}\nreward 610 payout random {{600}} on post.100.110 {{ expectation = 3/2; }}"
+    );
+    let result = check(&source, POLICY, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Checked);
+    assert_eq!(result.packet()["measured"]["tuples"], 16);
+    assert_eq!(result.packet()["measured"]["work"], 52);
+    let pooled = POLICY.replace("context.102.130", "pre.100.110");
+    let result = check(
+        &reward_project("expectation = 3/2;"),
+        &pooled,
+        Limits::default(),
+    )?;
+    assert_eq!(result.verdict(), Verdict::Refuted);
+    assert_eq!(result.packet()["result"]["actual"], rational("0", "1"));
+    assert_eq!(
+        result.packet()["result"]["non_random_input"][0]["value"],
+        "0"
+    );
+    Ok(())
+}

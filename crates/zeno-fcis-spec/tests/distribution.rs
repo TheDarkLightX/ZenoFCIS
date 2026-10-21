@@ -121,3 +121,87 @@ fn distribution_rational_arithmetic_is_exact_and_bounded() -> Result<(), Box<dyn
     }
     Ok(())
 }
+
+#[test]
+fn reward_syntax_is_canonical_and_binds_every_parameter() -> Result<(), Box<dyn std::error::Error>>
+{
+    let reward = "reward 610 payout random {600} on post.100.110 failure -1 { expectation >= -3/2; variance <= 5/4; threshold 2 = 1/2; excess 2 <= 1/4; }";
+    let source = format!("{PROJECT}\n{reward}");
+    let original = spec(&source)?;
+    assert_eq!(original.rewards()[0].random()[0].get(), 600);
+    assert_eq!(original.rewards()[0].failure(), Some(-1));
+    assert_eq!(original.rewards()[0].measures().len(), 4);
+    let spelling = source.replace(
+        "expectation >= -3/2; variance <= 5/4; threshold 2 = 1/2; excess 2 <= 1/4;",
+        "excess 2 <= 2/8; threshold 2 = 2/4; variance <= 10/8; expectation >= -6/4;",
+    );
+    assert_eq!(
+        original.canonical_bytes()?,
+        spec(&spelling)?.canonical_bytes()?
+    );
+    let bytes = original.canonical_bytes()?;
+    assert_eq!(
+        &bytes[b"ZFCIS-PROJECT-SPEC\0".len()..][..2],
+        &4u16.to_be_bytes()
+    );
+    for changed in [
+        source.replace("610 payout", "611 payout"),
+        source.replace("failure -1", "failure 0"),
+        source.replace("failure -1 ", ""),
+        source.replace("threshold 2", "threshold 1"),
+        source.replace("excess 2", "excess 1"),
+        source.replace("5/4", "6/4"),
+        source.replace("expectation >=", "expectation <="),
+    ] {
+        assert_ne!(
+            original.canonical_bytes()?,
+            spec(&changed)?.canonical_bytes()?
+        );
+    }
+    // Format 4 now appends the reward count even when it is zero.
+    let without = spec(PROJECT)?.canonical_bytes()?;
+    assert_eq!(&without[without.len() - 4..], &0u32.to_be_bytes());
+    Ok(())
+}
+#[test]
+fn reward_invalid_declarations_and_premises_fail_closed() {
+    for declaration in [
+        "reward 610 r random {} on post.100.110 { expectation = 0; }",
+        "reward 610 r random {600,600} on post.100.110 { expectation = 0; }",
+        "reward 610 r random {999} on post.100.110 { expectation = 0; }",
+        "reward 610 r random {600} on post.100.999 { expectation = 0; }",
+        "reward 610 r random {600} on post.100.110 {}",
+        "reward 610 r random {600} on post.100.110 { expectation = 0; expectation = 0; }",
+        "reward 610 r random {600} on post.100.110 { expectation = 1/0; }",
+        "reward 610 r random {600} on post.100.110 { expectation = 9223372036854775808; }",
+        "reward 610 r random {600} on post.100.110 { expectation > 0; }",
+        "reward 610 r random {600} on post.100.110 { median = 0; }",
+    ] {
+        assert!(
+            spec(&format!("{PROJECT}\n{declaration}")).is_err(),
+            "{declaration}"
+        );
+    }
+    for declarations in [
+        "reward 610 r random {600} on post.100.110 { expectation = 0; } reward 610 s random {600} on post.100.110 { expectation = 0; }",
+        "reward 610 r random {600} on post.100.110 { expectation = 0; } reward 611 r random {600} on post.100.110 { expectation = 0; }",
+        "random 602 other on context.102.130 bits 2 independent uniform; reward 610 r random {600} on post.100.110 { expectation = 0; }",
+    ] {
+        assert!(spec(&format!("{PROJECT}\n{declarations}")).is_err());
+    }
+}
+#[test]
+fn reward_signed_rationals_are_exact_and_bounded() -> Result<(), Box<dyn std::error::Error>> {
+    use zeno_fcis_spec::Rational;
+    let r = |n, d| Rational::try_new(n, d).ok_or("rational bounds");
+    assert_eq!(r(-2, 4)?, r(-1, 2)?);
+    assert!(Rational::try_new(1, 0).is_none());
+    assert_eq!(r(-1, 2)?.checked_add(r(3, 2)?), Some(r(1, 1)?));
+    assert_eq!(r(-1, 2)?.checked_mul(r(-3, 2)?), Some(r(3, 4)?));
+    assert_eq!(r(-1, 2)?.checked_sub(r(3, 2)?), Some(r(-2, 1)?));
+    assert!(r(i128::from(i64::MAX), 1)?.checked_add(r(1, 1)?).is_none());
+    assert_eq!(r(i128::MIN, 1u128 << 127)?, r(-1, 1)?);
+    assert_eq!(r(0, u128::MAX)?, Rational::ZERO);
+    assert!(r(i128::from(i64::MIN), u128::from(u64::MAX))? < Rational::ZERO);
+    Ok(())
+}

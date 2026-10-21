@@ -377,6 +377,10 @@ fn tables_refuse_entry_ids_that_meet_any_other_declaration() {
         ("reason 111 spare precedence 0;", "reason 111"),
         ("law 114 spare on commit = true;", "law 114"),
         (
+            "reward 113 spare random {600} on post.100.110 { expectation >= 0/1; }",
+            "reward 113",
+        ),
+        (
             "random 112 entropy on context.102.130 bits 1 independent uniform;",
             "random 112",
         ),

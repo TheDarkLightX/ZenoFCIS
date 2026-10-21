@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare finite modulo choices with an independent Fraction counting oracle."""
+"""Compare finite distributions and rewards with an independent Fraction oracle."""
 
 import argparse
 from collections import Counter
@@ -12,6 +12,70 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+
+def fraction(value):
+    return Fraction(int(value["numerator"]), int(value["denominator"]))
+
+
+def reward_reference(cli, app, project, policy):
+    """Compute from individual integer outcomes, independently of histogram code."""
+    count = 0
+    declaration = "distribution 601 reporters on post.100.110 = uniform over {0, 1, 2, 3};"
+    for bits in range(4):
+        n = 2**bits
+        for expression, values in [
+            ("context.102.130", list(range(n))),
+            ("0 - context.102.130", [-r for r in range(n)]),
+            ("2", [2] * n),
+        ]:
+            mean = sum(map(Fraction, values), Fraction()) / n
+            variance = sum((Fraction(v)**2 for v in values), Fraction()) / n - mean**2
+            for name, expected, transform in [
+                ("expectation", mean, lambda v: Fraction(v)),
+                ("variance", variance, lambda v: (Fraction(v) - mean)**2),
+                ("threshold 0", Fraction(sum(v >= 0 for v in values), n), lambda v: Fraction(v >= 0)),
+                (f"threshold {max(values)}", Fraction(sum(v >= max(values) for v in values), n), lambda v: Fraction(v >= max(values))),
+                ("excess 0", sum((Fraction(max(0,v)) for v in values), Fraction()) / n, lambda v: Fraction(max(0,v))),
+                ("excess 2", sum((Fraction(max(0,v-2)) for v in values), Fraction()) / n, lambda v: Fraction(max(0,v-2))),
+            ]:
+                # Equality at the bound plus upper, lower and equality violations.
+                for comparison, bound, exit_code in [("=", expected, 0), ("<=", expected-1, 1), (">=", expected+1, 1), ("=", expected+1, 1)]:
+                    source = project.replace("Reporter in 0..=3", f"Reporter in {min(0,min(values))}..={max(3,max(values))}")
+                    source = source.replace("RandomBits in 0..=3", f"RandomBits in 0..={n-1}")
+                    source = source.replace("bits 2", f"bits {bits}").replace("post.100.110 >= 0", f"post.100.110 >= {min(0,min(values))}")
+                    reward = f"reward 610 payout random {{600}} on post.100.110 {{ {name} {comparison} {bound.numerator}/{bound.denominator}; }}"
+                    source = source.replace(declaration, reward)
+                    policy["cases"][0]["post"]["110"] = expression
+                    (app / "project.zeno").write_text(source)
+                    (app / "v2/policy.json").write_text(json.dumps(policy))
+                    result = subprocess.run(["nice", "-n", "19", "ionice", "-c3", str(cli), "contract", "distribution", str(app)], capture_output=True, check=False, timeout=60)
+                    assert result.returncode == exit_code, (bits, expression, name, comparison, result.stderr, result.stdout)
+                    packet = json.loads(result.stdout)
+                    assert packet["premise"] == "given uniform independent random bits, independent of the fixed non-random inputs"
+                    assert packet["status"] == ("checked" if exit_code == 0 else "refuted")
+                    if exit_code:
+                        detail = packet["result"]
+                        assert fraction(detail["actual"]) == expected
+                        assert fraction(detail["bound"]) == bound
+                        rows = detail["outcomes"]
+                        contributions = []
+                        tapes = []
+                        for row in rows:
+                            value = int(row["reward"])
+                            preimages = [int(t[0]) for t in row["random_values"]]
+                            assert all(values[r] == value for r in preimages)
+                            mass = Fraction(len(preimages), n)
+                            assert fraction(row["mass"]) == mass
+                            contribution = mass * (transform(value) - bound)
+                            assert fraction(row["difference_contribution"]) == contribution
+                            contributions.append(contribution)
+                            tapes.extend(preimages)
+                        assert sorted(tapes) == list(range(n))
+                        assert sum(contributions, Fraction()) == expected - bound
+                        assert contributions == sorted(contributions, reverse=expected > bound)
+                    count += 1
+    return count
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -67,6 +131,8 @@ def main():
                             outcomes = {r % k for r in smaller}
                             assert Fraction(size, n) <= sum((target[v] for v in outcomes), Fraction())
                     assert packet["measured"]["tuples"] == n
+        rewards = reward_reference(args.cli, app, project, policy)
+    print(f"reward-reference: PASS ({rewards} exact comparisons; four measures; zero bits, single outcomes, signed rewards, exact-bound equality and ranked witnesses)")
     print(f"distribution-reference: PASS (20 boundary cases; {checked} checked, {refuted} refuted; exact Fraction oracle and brute-force witness minimality)")
 
 

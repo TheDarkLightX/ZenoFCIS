@@ -183,6 +183,8 @@ impl Parser {
                 self.parse_random().map(Declaration::Random)
             } else if self.take_keyword("distribution") {
                 self.parse_distribution().map(Declaration::Distribution)
+            } else if self.take_keyword("reward") {
+                self.parse_reward().map(Declaration::Reward)
             } else if self.take_keyword("law") {
                 self.parse_law().map(Declaration::Law)
             } else if self.take_keyword("claim") {
@@ -832,6 +834,105 @@ impl Parser {
             name,
             input,
             bits,
+        })
+    }
+
+    fn parse_reward(&mut self) -> Option<crate::RewardDecl> {
+        let id = self.take_id("reward.id")?;
+        let name = self.take_identifier("reward.name")?;
+        self.expect_keyword("random", "reward");
+        self.expect_symbol(TokenKind::LBrace, "reward.random");
+        let mut random = Vec::new();
+        while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::Eof) {
+            random.push(self.take_id("reward.random")?);
+            if !self.take_symbol(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect_symbol(TokenKind::RBrace, "reward.random");
+        random.sort();
+        self.expect_keyword("on", "reward");
+        let outcome = self.distribution_path()?;
+        let failure = if self.take_keyword("failure") {
+            Some(self.take_i128("reward.failure")?)
+        } else {
+            None
+        };
+        self.expect_symbol(TokenKind::LBrace, "reward.measures");
+        let mut measures = Vec::new();
+        while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::Eof) {
+            let kind = if self.take_keyword("expectation") {
+                crate::RewardKind::Expectation
+            } else if self.take_keyword("variance") {
+                crate::RewardKind::Variance
+            } else if self.take_keyword("threshold") {
+                crate::RewardKind::Threshold(self.take_i128("reward.threshold")?)
+            } else if self.take_keyword("excess") {
+                crate::RewardKind::Excess(self.take_i128("reward.excess")?)
+            } else {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "reward.measure",
+                    "expectation, variance, threshold t or excess b",
+                    self.describe_current(),
+                    "declare a supported finite reward measure",
+                );
+                return None;
+            };
+            let comparison = if self.take_symbol(&TokenKind::LessEq) {
+                crate::RewardComparison::AtMost
+            } else if self.take_symbol(&TokenKind::GreaterEq) {
+                crate::RewardComparison::AtLeast
+            } else {
+                self.expect_symbol(TokenKind::Equal, "reward.comparison");
+                crate::RewardComparison::Equal
+            };
+            let numerator = self.take_i128("reward.bound")?;
+            let denominator = if self.take_symbol(&TokenKind::Slash) {
+                self.take_unsigned("reward.denominator")?
+            } else {
+                1
+            };
+            let Some(bound) = crate::Rational::try_new(numerator, denominator) else {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "reward.bound",
+                    "reduced i64/u64 rational with positive denominator",
+                    "invalid rational",
+                    "use bounded exact rational components",
+                );
+                return None;
+            };
+            measures.push(crate::RewardMeasure {
+                kind,
+                comparison,
+                bound,
+            });
+            self.expect_symbol(TokenKind::Semicolon, "reward.measure");
+        }
+        self.expect_symbol(TokenKind::RBrace, "reward.measures");
+        measures.sort();
+        if random.is_empty()
+            || random.windows(2).any(|w| w[0] == w[1])
+            || measures.is_empty()
+            || measures.windows(2).any(|w| w[0] == w[1])
+        {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "reward",
+                "nonempty distinct premises and measures",
+                "empty or duplicate entry",
+                "name each random premise and measure once",
+            );
+            return None;
+        }
+        Some(crate::RewardDecl {
+            id,
+            name,
+            random: random.into_boxed_slice(),
+            outcome,
+            failure,
+            measures: measures.into_boxed_slice(),
         })
     }
 
@@ -2174,6 +2275,7 @@ fn declaration_ids(declaration: &Declaration) -> Vec<(u32, &'static str)> {
         Declaration::Claim(d) => vec![(d.id().get(), "claim")],
         Declaration::Random(d) => vec![(d.id().get(), "random")],
         Declaration::Distribution(d) => vec![(d.id().get(), "distribution")],
+        Declaration::Reward(d) => vec![(d.id().get(), "reward")],
     }
 }
 

@@ -110,3 +110,28 @@ fn distribution_cli_declares_its_effects() -> Result<(), Box<dyn std::error::Err
     assert_eq!(effects["executes_tools"], false);
     Ok(())
 }
+
+#[test]
+fn reward_cli_examples_and_budget_preserve_exact_values_and_premise()
+-> Result<(), Box<dyn std::error::Error>> {
+    for (example, extra, exit, status) in [
+        ("lottery-reward", vec![], 0, "checked"),
+        ("shortfall-reward", vec![], 0, "checked"),
+        ("biased-reward", vec![], 1, "refuted"),
+        ("lottery-reward", vec!["--max-work", "8"], 2, "UNKNOWN"),
+    ] {
+        let first = run(example, &extra, exit)?;
+        assert_eq!(first, run(example, &extra, exit)?);
+        let packet: Value = serde_json::from_slice(&first)?;
+        assert_eq!(packet["status"], status);
+        assert_eq!(packet["premise"], zeno_fcis_contract::distribution::PREMISE);
+        if status == "refuted" {
+            assert_eq!(
+                packet["result"]["actual"],
+                serde_json::json!({"numerator":"3","denominator":"4"})
+            );
+            assert_eq!(packet["result"]["outcomes"][0]["outcome"], "3");
+        }
+    }
+    Ok(())
+}

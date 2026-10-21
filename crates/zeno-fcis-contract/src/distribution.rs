@@ -7,18 +7,19 @@
 //! outcome, so its fiber is UNKNOWN. No sampling, conditioning on acceptance,
 //! or retry normalization is performed.
 //! The histogram fold is the future extension point for other weight algebras;
-//! this version implements only nonnegative exact rational probabilities.
+//! Reward measures reuse the same histograms with bounded signed rationals.
 
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 use zeno_fcis_spec::{
-    DistributionDecl, DistributionOutcome, Probability, ProjectionPath, ProjectionRoot,
+    DistributionDecl, DistributionOutcome, Probability, ProjectionPath, ProjectionRoot, Rational,
+    RewardComparison, RewardDecl, RewardKind, RewardMeasure,
 };
 
 use crate::ContractError;
 use crate::internals::{
-    declarations::Declarations,
+    declarations::{Declarations, Kind},
     model::Contract,
     policy,
     review::{
@@ -135,9 +136,11 @@ pub fn check(
     let spec = zeno_fcis_spec::parse_project(project, Default::default())
         .and_then(|p| zeno_fcis_spec::elaborate_project(p, Default::default()))
         .map_err(|e| invalid(e.to_string()))?;
-    if spec.random_inputs().is_empty() || spec.distributions().is_empty() {
+    if spec.random_inputs().is_empty()
+        || (spec.distributions().is_empty() && spec.rewards().is_empty())
+    {
         return Err(invalid(
-            "declare random inputs and at least one distribution law".to_owned(),
+            "declare random inputs and at least one distribution or reward law".to_owned(),
         ));
     }
     let rules = Rules::read(policy_source)?;
@@ -177,8 +180,13 @@ pub fn check(
         }
     }
     let mut projections = Vec::new();
-    for law in spec.distributions() {
-        let path = law.outcome();
+    let mut reward_indices = Vec::new();
+    for (path, is_reward) in spec
+        .distributions()
+        .iter()
+        .map(|v| (v.outcome(), false))
+        .chain(spec.rewards().iter().map(|v| (v.outcome(), true)))
+    {
         // The supported scalar contract shape uses one state record field.
         if path.root() != ProjectionRoot::Post
             || path.segments().len() != 2
@@ -190,7 +198,28 @@ pub fn check(
         }
         let field = u16::try_from(path.segments()[1].get())
             .map_err(|_| invalid("outcome field is too wide".to_owned()))?;
-        projections.push(field);
+        if is_reward {
+            let declared = declarations
+                .state_fields()?
+                .iter()
+                .find(|v| v.id == field)
+                .ok_or_else(|| invalid("reward field is absent".to_owned()))?;
+            if !matches!(declarations.kind(declared.type_id)?, Kind::I128 { .. }) {
+                return Err(invalid(
+                    "reward outcome must be an integer field".to_owned(),
+                ));
+            }
+            let index = match projections.iter().position(|v| *v == field) {
+                Some(index) => index,
+                None => {
+                    projections.push(field);
+                    projections.len() - 1
+                }
+            };
+            reward_indices.push(index);
+        } else {
+            projections.push(field);
+        }
     }
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
@@ -215,7 +244,8 @@ pub fn check(
             "random_inputs":random_indices.iter().map(|i|json!({"input":positions[*i].name,"bits":random[i],"uniform":true,"independent":true})).collect::<Vec<_>>(),
             "non_random_inputs":fixed_indices.iter().map(|i|positions[*i].name.clone()).collect::<Vec<_>>(),
             "laws":spec.distributions().iter().map(|law|json!({"id":law.id().get(),"name":law.name().as_str(),"outcome":path_name(law.outcome()),"expected":distribution_json(law.target().iter().copied())})).collect::<Vec<_>>(),
-            "work_unit":"one Authority invocation plus one outcome projection and exact weight addition per law"
+            "rewards":spec.rewards().iter().map(|law|json!({"id":law.id().get(),"name":law.name().as_str(),"random":law.random().iter().map(|v| v.get()).collect::<Vec<_>>(),"outcome":path_name(law.outcome()),"failure_reward":law.failure().map(|v|v.to_string()),"measures":law.measures().iter().map(|m| measure_json(*m)).collect::<Vec<_>>()})).collect::<Vec<_>>(),
+            "work_unit":"one Authority invocation, each projection/fold, each reward moment bin and comparison, and each witness bin"
         }),
         tuples: 0,
         work: 0,
@@ -241,11 +271,8 @@ pub fn check(
         // Committed failures in the current fiber.
         let mut failures = 0u64;
         loop {
-            let mut bins: Vec<BTreeMap<DistributionOutcome, Bin>> = spec
-                .distributions()
-                .iter()
-                .map(|_| BTreeMap::new())
-                .collect();
+            let mut bins: Vec<BTreeMap<DistributionOutcome, Bin>> =
+                projections.iter().map(|_| BTreeMap::new()).collect();
             let mut visited = 0u64;
             loop {
                 if progress.work >= work_cap {
@@ -297,7 +324,7 @@ pub fn check(
                 );
             }
             progress.fibers += 1;
-            for (law, histogram) in spec.distributions().iter().zip(bins) {
+            for (law, histogram) in spec.distributions().iter().zip(&bins) {
                 let actual: Vec<_> = histogram
                     .iter()
                     .map(|(value, bin)| (*value, bin.mass))
@@ -313,10 +340,43 @@ pub fn check(
                             "law":law.id().get(), "non_random_input":fixed,
                             "expected":distribution_json(law.target().iter().copied()),
                             "actual":distribution_json(actual.into_iter()),
-                            "witness":minimal_witness(law,&histogram,random_size),
+                            "witness":minimal_witness(law,histogram,random_size),
                             "decision_mass":decision_mass(failures,random_size),
                         }),
                     );
+                }
+            }
+            for (law, index) in spec.rewards().iter().zip(&reward_indices) {
+                let histogram = &bins[*index];
+                let fixed = || {
+                    fixed_indices
+                        .iter()
+                        .map(|i| json!({"input":positions[*i].name,"value":tuple[*i].to_string()}))
+                        .collect::<Vec<_>>()
+                };
+                if law.failure().is_none()
+                    && let Some(bin) = histogram.get(&DistributionOutcome::CommittedFailure)
+                {
+                    if let Err(reason) = charge(&mut progress.work, work_cap) {
+                        return progress.finish(
+                            Verdict::Unknown,
+                            json!({"reason":reason,"law":law.id().get()}),
+                        );
+                    }
+                    return progress.finish(Verdict::Refuted, json!({"law":law.id().get(),"reason":"committed failure has no reward","measure":"reward-defined","actual":null,"bound":null,"non_random_input":fixed(),"outcomes":[{"outcome":"committed-failure","mass":probability_json(bin.mass),"random_values":preimages_json(bin)}],"decision_mass":decision_mass(failures,random_size)}));
+                }
+                for measure in law.measures() {
+                    let (actual, mean) = match reward_actual(law, *measure, histogram, &mut progress.work, work_cap) {
+                        Ok(values) => values,
+                        Err(reason) => return progress.finish(Verdict::Unknown, json!({"reason":reason,"law":law.id().get(),"non_random_input":fixed()})),
+                    };
+                    if !measure.comparison().holds(actual, measure.bound()) {
+                        let outcomes = match reward_witness(law, *measure, histogram, actual, mean, &mut progress.work, work_cap) {
+                            Ok(outcomes) => outcomes,
+                            Err(reason) => return progress.finish(Verdict::Unknown, json!({"reason":reason,"law":law.id().get(),"non_random_input":fixed()})),
+                        };
+                        return progress.finish(Verdict::Refuted, json!({"law":law.id().get(),"non_random_input":fixed(),"measure":measure_json(*measure),"actual":rational_json(actual),"bound":rational_json(measure.bound()),"outcomes":outcomes,"witness_kind":"all outcomes ranked by signed contribution to actual minus bound, largest violation first","decision_mass":decision_mass(failures,random_size)}));
+                    }
                 }
             }
             if !advance(&positions, &fixed_indices, &mut tuple) {
@@ -330,13 +390,148 @@ pub fn check(
                 json!({"reason":"incomplete input domain"}),
             );
         }
-        // Every law compares the committed-failure mass and a reject stops the
-        // fold, so every compared fiber has the last fiber's decision mass.
+        // Reward bounds need not fix failure mass across fibers. State the
+        // scope explicitly rather than generalizing the last fiber's mass.
         progress.finish(
             Verdict::Checked,
-            json!({"all_fibers_compared":true,"decision_mass":decision_mass(failures,random_size)}),
+            json!({"all_fibers_compared":true,"decision_mass":decision_mass(failures,random_size),"decision_mass_scope":"last complete fiber"}),
         )
     })
+}
+
+fn charge(work: &mut u64, cap: u64) -> Result<(), &'static str> {
+    if *work >= cap {
+        return Err("work budget exceeded");
+    }
+    *work += 1;
+    Ok(())
+}
+fn integer(value: i128) -> Option<Rational> {
+    Rational::try_new(value, 1)
+}
+fn reward(law: &RewardDecl, outcome: DistributionOutcome) -> Option<i128> {
+    match outcome {
+        DistributionOutcome::Value(value) => Some(value),
+        DistributionOutcome::CommittedFailure => law.failure(),
+    }
+}
+fn reward_term(kind: RewardKind, value: i128) -> Option<Rational> {
+    match kind {
+        RewardKind::Expectation => integer(value),
+        RewardKind::Variance => integer(value)?.checked_mul(integer(value)?),
+        RewardKind::Threshold(t) => integer(i128::from(value >= t)),
+        RewardKind::Excess(b) => integer(value.checked_sub(b)?.max(0)),
+    }
+}
+fn weighted(term: Rational, bin: &Bin) -> Option<Rational> {
+    let weight = Rational::try_new(
+        i128::from(bin.mass.numerator()),
+        u128::from(bin.mass.denominator()),
+    )?;
+    term.checked_mul(weight)
+}
+fn reward_moment(
+    law: &RewardDecl,
+    kind: RewardKind,
+    histogram: &BTreeMap<DistributionOutcome, Bin>,
+    work: &mut u64,
+    cap: u64,
+) -> Result<Rational, &'static str> {
+    let mut sum = Rational::ZERO;
+    for (outcome, bin) in histogram {
+        charge(work, cap)?;
+        sum = (|| sum.checked_add(weighted(reward_term(kind, reward(law, *outcome)?)?, bin)?))()
+            .ok_or("reward arithmetic bound")?;
+    }
+    Ok(sum)
+}
+fn reward_actual(
+    law: &RewardDecl,
+    measure: RewardMeasure,
+    histogram: &BTreeMap<DistributionOutcome, Bin>,
+    work: &mut u64,
+    cap: u64,
+) -> Result<(Rational, Rational), &'static str> {
+    let moment = reward_moment(law, measure.kind(), histogram, work, cap)?;
+    let mean = if measure.kind() == RewardKind::Variance {
+        reward_moment(law, RewardKind::Expectation, histogram, work, cap)?
+    } else {
+        Rational::ZERO
+    };
+    charge(work, cap)?;
+    let actual = if measure.kind() == RewardKind::Variance {
+        moment
+            .checked_sub(mean.checked_mul(mean).ok_or("reward arithmetic bound")?)
+            .ok_or("reward arithmetic bound")?
+    } else {
+        moment
+    };
+    Ok((actual, mean))
+}
+fn reward_witness(
+    law: &RewardDecl,
+    measure: RewardMeasure,
+    histogram: &BTreeMap<DistributionOutcome, Bin>,
+    actual: Rational,
+    mean: Rational,
+    work: &mut u64,
+    cap: u64,
+) -> Result<Value, &'static str> {
+    let mut rows = Vec::new();
+    for (outcome, bin) in histogram {
+        charge(work, cap)?;
+        let value = reward(law, *outcome).ok_or("undefined reward")?;
+        let contribution = (|| {
+            let term = if measure.kind() == RewardKind::Variance {
+                let centered = integer(value)?.checked_sub(mean)?;
+                centered.checked_mul(centered)?
+            } else {
+                reward_term(measure.kind(), value)?
+            };
+            weighted(term.checked_sub(measure.bound())?, bin)
+        })()
+        .ok_or("reward witness arithmetic bound")?;
+        rows.push((contribution, *outcome, json!({"outcome":outcome_name(*outcome),"reward":value.to_string(),"mass":probability_json(bin.mass),"difference_contribution":rational_json(contribution),"random_values":preimages_json(bin)})));
+    }
+    rows.sort_by(|a, b| {
+        let order = if actual > measure.bound() {
+            b.0.cmp(&a.0)
+        } else {
+            a.0.cmp(&b.0)
+        };
+        order.then(a.1.cmp(&b.1))
+    });
+    Ok(json!(
+        rows.into_iter().map(|(_, _, row)| row).collect::<Vec<_>>()
+    ))
+}
+fn rational_json(value: Rational) -> Value {
+    json!({"numerator":value.numerator().to_string(),"denominator":value.denominator().to_string()})
+}
+fn probability_json(value: Probability) -> Value {
+    json!({"numerator":value.numerator().to_string(),"denominator":value.denominator().to_string()})
+}
+fn preimages_json(bin: &Bin) -> Value {
+    json!(
+        bin.preimages
+            .iter()
+            .map(|v| v.iter().map(ToString::to_string).collect::<Vec<_>>())
+            .collect::<Vec<_>>()
+    )
+}
+fn measure_json(measure: RewardMeasure) -> Value {
+    let (kind, parameter) = match measure.kind() {
+        RewardKind::Expectation => ("expectation", None),
+        RewardKind::Variance => ("variance", None),
+        RewardKind::Threshold(t) => ("threshold", Some(t.to_string())),
+        RewardKind::Excess(b) => ("excess", Some(b.to_string())),
+    };
+    let comparison = match measure.comparison() {
+        RewardComparison::AtMost => "<=",
+        RewardComparison::AtLeast => ">=",
+        RewardComparison::Equal => "=",
+    };
+    json!({"kind":kind,"parameter":parameter,"comparison":comparison,"bound":rational_json(measure.bound())})
 }
 
 struct Bin {

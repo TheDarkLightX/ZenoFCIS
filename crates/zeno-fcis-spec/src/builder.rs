@@ -97,6 +97,12 @@ impl ProjectSpecBuilder {
         self.declarations.push(Declaration::Distribution(value));
         self
     }
+    /// Adds a finite reward declaration.
+    #[must_use]
+    pub fn reward(mut self, value: crate::RewardDecl) -> Self {
+        self.declarations.push(Declaration::Reward(value));
+        self
+    }
     /// Adds a formal claim.
     #[must_use]
     pub fn claim(mut self, value: ClaimDecl) -> Self {
