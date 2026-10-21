@@ -386,7 +386,6 @@ impl Reference {
     }
 }
 
-
 #[cfg(test)]
 mod compare_charge_tests {
     use super::*;
