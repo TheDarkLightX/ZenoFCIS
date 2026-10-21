@@ -16,6 +16,8 @@ import subprocess
 import time
 import tomllib
 
+from cargo_source_scope import source_environment
+
 ROOT = Path(__file__).resolve().parents[1]
 CARGO = ["cargo", "+1.97.1"]
 TEMPLATES = ["durable-counter", "prepared-counter", "account-lockout",
@@ -25,7 +27,8 @@ TEMPLATES = ["durable-counter", "prepared-counter", "account-lockout",
 
 def run(command: list[str], cwd: Path, log: Path) -> subprocess.CompletedProcess:
     start = time.monotonic()
-    result = subprocess.run(command, cwd=cwd, stdout=subprocess.PIPE,
+    environment = source_environment(cwd, dict(os.environ)) if command[0] == "cargo" else dict(os.environ)
+    result = subprocess.run(command, cwd=cwd, env=environment, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=600)
     with log.open("ab") as output:
         output.write((json.dumps({"argv": command, "cwd": str(cwd),

@@ -17,6 +17,15 @@ use super::port::{Operation, Outcome, Response};
 use super::program::{Program, Step};
 use super::registry::{self, REGISTRY};
 
+/// A handler implementation's source pin, not an attestation of execution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Implementation {
+    /// Handler role in stack order.
+    pub name: &'static str,
+    /// Digest over its implementation source closure.
+    pub source: Hash32,
+}
+
 /// What a run is bound to before it starts.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Manifest {
@@ -32,6 +41,12 @@ pub struct Manifest {
     pub initial: Hash32,
     /// The program, how it starts and its invocation, as canonical bytes.
     pub start: Vec<u8>,
+    /// Qualified handler implementation identities; stack names alone are insufficient.
+    pub implementations: Vec<Implementation>,
+    /// Exact caller/profile/adapter configuration bytes.
+    pub configuration: Vec<u8>,
+    /// Explicit seed; zero denotes the exhaustive, schedule-driven simulator.
+    pub seed: u64,
 }
 
 impl Manifest {
@@ -50,6 +65,9 @@ impl Manifest {
             schedule,
             initial,
             start,
+            implementations: library_implementations(),
+            configuration: Vec::new(),
+            seed: 0,
         }
     }
 
@@ -66,8 +84,59 @@ impl Manifest {
         codec::bytes(&mut out, &self.schedule);
         codec::hash(&mut out, self.initial);
         codec::bytes(&mut out, &self.start);
+        out.extend_from_slice(&(self.implementations.len() as u64).to_be_bytes());
+        for implementation in &self.implementations {
+            codec::bytes(&mut out, implementation.name.as_bytes());
+            codec::hash(&mut out, implementation.source);
+        }
+        codec::bytes(&mut out, &self.configuration);
+        out.extend_from_slice(&self.seed.to_be_bytes());
         RustCryptoSha256::hash(&out)
     }
+
+    /// Whether every named handler has an explicit nonzero implementation pin.
+    #[must_use]
+    pub fn provenance_complete(&self) -> bool {
+        self.stack.iter().all(|name| {
+            self.implementations.iter().any(|implementation| {
+                implementation.name == *name && implementation.source != Hash32::ZERO
+            })
+        })
+    }
+}
+
+fn library_implementations() -> Vec<Implementation> {
+    let handler = registry::source_digest(&[("handler.rs", include_bytes!("handler.rs"))]);
+    let record = registry::source_digest(&[
+        ("record.rs", include_bytes!("record.rs")),
+        ("codec.rs", include_bytes!("codec.rs")),
+    ]);
+    alloc::vec![
+        Implementation {
+            name: "identity",
+            source: handler
+        },
+        Implementation {
+            name: "fault",
+            source: handler
+        },
+        Implementation {
+            name: "record",
+            source: record
+        },
+        Implementation {
+            name: "replay",
+            source: record
+        },
+        Implementation {
+            name: "policy",
+            source: super::policy::source()
+        },
+        Implementation {
+            name: "simulation",
+            source: registry::source_digest(&[("simulation.rs", include_bytes!("simulation.rs"))])
+        },
+    ]
 }
 
 /// One recorded event.
@@ -226,7 +295,8 @@ pub fn replay<P: Program>(
 ) -> Result<Ended, ReplayError> {
     transcript.verify().map_err(ReplayError::Chain)?;
     let manifest = &transcript.manifest;
-    if manifest.registry != registry::identity(&REGISTRY)
+    if !manifest.provenance_complete()
+        || manifest.registry != registry::identity(&REGISTRY)
         || manifest.program != registry::program_source()
         || manifest.start != start
     {

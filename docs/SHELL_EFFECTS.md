@@ -41,8 +41,8 @@ and footprint, the IDs of its handler laws, and its default V2 calls.
   rebuilds each commit's publication data with `audited_publication`.
 - Send answers `Sent`, `NotSent(Code)`, `Unknown(Fault)` or a policy's
   `Refused(Code)`. Wait answers a
-  tick, `Interrupted` or a fault; an interrupted delivery run ends with
-  `Refused(Interrupted)` and leaves the record pending.
+  tick, `Interrupted` or a fault; an interrupted delivery run leaves the record
+  pending. It ends `Refused(Interrupted)` before any possible send and `Unknown(Io)` afterward.
 
 ## Programs and the driver
 
@@ -55,7 +55,11 @@ A continuation has no `Clone`, so it is resumed at most once.
 - **Outbox delivery** sends each pending record's exact bytes and acknowledges
   it only when the transport's report matches its ID and payload hash. NotSent
   and Unknown leave it pending; a retry waits a backoff plus a jitter draw. An
-  unordered outbox, an early wake or an out-of-range draw ends with `Protocol`.
+  unordered outbox, an early wake or an out-of-range draw refuses with `Protocol`
+  before any possible send. After Sent or Unknown, every subsequent failure
+  ends Unknown, including acknowledgement exhaustion and later-record refusal.
+  Only a complete run returns Ok; NotApplied never erases earlier send progress.
+  The individual refusal remains in the transcript.
 
 The driver checks the program's declared capabilities and holds one
 outstanding request. It admits a response only if the epoch, ordinal, port,
@@ -81,7 +85,8 @@ A stack is layers in front of one terminal. `handler::bind` refuses a terminal
 that does not cover a port the program can request. The record layer appends
 every request, answer, crash and outcome to a transcript. Each link holds the
 SHA-256 of its predecessor, starting from a manifest that binds the registry,
-the program source, the stack, the schedule, the initial world and the start.
+the program source, each qualified handler implementation, stack order, the
+schedule, configuration, explicit seed, initial world and start.
 This is integrity evidence, not a signature. `record::replay` re-runs the
 program from a transcript with no handler: each request must equal the
 recorded one, and anything missing, extra, reordered or changed refuses.
@@ -92,7 +97,12 @@ recorded one, and anything missing, extra, reordered or changed refuses.
 breadth-first. Each node re-runs from the start, because a continuation is
 never resumed twice; states at every choice are fingerprinted and expanded
 once. A run is `complete` only with no frontier left; a budget stop is
-`incomplete` and a malformed profile or choice is `refused`.
+`incomplete` and a malformed profile or choice is `refused`. An incomplete
+report owns an opaque checkpoint with the popped and queued prefixes, visited
+states, final states and accumulated evidence. Pass it to `explore::resume`
+with an additional run budget. Source or profile substitution refuses. This
+is an in-memory continuation, without a persisted checkpoint format. Report
+statistics are advisory; editing them cannot change the retained progress.
 
 The frozen profile has two handles, two keys and two publication bodies, two
 deliveries per commit, a queue of two, ticks 0 to 3, jitter below 2, and retry
@@ -105,16 +115,49 @@ receiver.
 - Each stack is qualified separately: the bare simulation, record, and
   identity forwarder with record. Every final transcript must replay exactly.
 - Every final state must hold the protocol invariants: the store is the fold of
-  its history, each key applies once, receipts belong to the original key, no
-  effect repeats past deduplication, nothing is sent before it is committed,
+  its history by an independent specification that does not call Simulation,
+  including every delivery field, each key applies once, receipts belong to the
+  original key, no effect repeats past deduplication, nothing is sent before it
+  is committed,
   and only a record that was sent is acknowledged.
+
+## Qualified response alphabet
+
+`simulation::FAULT_ALPHABET` names `shell-faults/2`. Successful read/commit/ack
+responses retain their exact schemas and existing V2 refusal codes. The choices
+below occur in the listed order; each injected failure is explicit data.
+
+| Port | Choices |
+|---|---|
+| ReadState, ReadHistory, ReadOutbox, Reopen; refused or replayed Commit; refused Acknowledge | Exact answer; NotApplied(Busy); crash; NotApplied(Full); NotApplied(Io) |
+| Applied Commit/Acknowledge | Exact answer; NotApplied(Busy); Unknown(Io) without applying; apply with lost reply Unknown(Io); crash before; crash after; NotApplied(Full); NotApplied(Io) before applying |
+| Send, with queue room | Sent; NotSent(Delivery); Unknown(Io) with drop; carry with lost report Unknown(Io); crash before; crash after carrying; duplicate if two slots remain |
+| Send, queue full | NotSent(Delivery); crash |
+| Clock | Ticks from current through 3, ascending; Err(Busy); Err(Full); Err(Io) |
+| Random | Draws from zero below the bound, ascending; Err(Busy); Err(Full); Err(Io) |
+| Wait | Wakes from max(deadline,current) through 3, ascending; Interrupted; Failed(Busy); Failed(Full); Failed(Io) |
+
+A Wait with an out-of-profile tick or another epoch has no successful wake.
+The forwarding Fault handler uses the same fault classes. Its successful time
+choice forwards once to Time rather than enumerating ticks or draws. Scheduler
+choices separately select an actor, receiver copy, restart, statement-boundary
+interruption on SQLite, or late reply. Policies can additionally refuse Send.
+These are finite environment choices; Send ambiguity uses Io, and this profile
+does not qualify every arbitrary Transport/Time implementation. Transcript
+histories are projected out at scheduling fingerprints. The production explorer
+includes retained adapters, pending injection, connection/cache state, actors
+and the complete store and receiver snapshots; its test adapters expose all
+future-relevant state. Native SQLite/OS internals remain environment premises.
 
 ## The production SQLite handler
 
 `zeno_fcis_shell_sqlite::effects::production::Production` is the terminal for
 one handle on one store. Each port calls the V2 API the registry names, so no
-SQL is added or reordered. Send goes to a caller's `Transport`; Clock, Random
-and Wait go to an opt-in `Time`, and stay uncovered without one. V2 refusals
+commit SQL is added or reordered. Path rebinds additionally compare the
+audited genesis, Authority and interpreter with the initially retained store
+identity, including lazy reopen and history reads. Send goes to a caller's
+`Transport`; Clock, Random and Wait go to an opt-in `Time`, and stay uncovered
+without one. V2 refusals
 keep their codes. SQLite busy or full is `NotApplied`, because the transaction
 rolled back. Any other SQLite failure is `Unknown` for a write and `NotApplied`
 for a read.
@@ -125,7 +168,7 @@ its number. Two stores created from the same genesis share an identity. A
 request for another store or handle is refused untouched.
 
 `handler::Fault` sits in front of any terminal. It makes the simulation's
-fault choices for real: busy, an ambiguous answer, a lost answer after
+fault choices for real: busy, full, I/O, an ambiguous answer, a lost answer after
 forwarding, a crash before or after, and a duplicate Send. It never
 forwards a commit or an acknowledgement twice. The
 `effects_production` tests check the production handler against the
@@ -145,7 +188,7 @@ fixture produces them.
 
 ## Checks
 
-`tools/check_shell_effects_controls.py` builds eighteen mutants. Each must fail
+`tools/check_shell_effects_controls.py` builds twenty-five mutants. Each must fail
 its named check while the unmodified tree passes:
 
 | Control | Check |
@@ -168,6 +211,18 @@ its named check while the unmodified tree passes:
 | The store identity ignores the Authority | `store_identity_binds_genesis_authority_and_interpreter` |
 | Production commits `At(v)` without its version | `production_agrees_with_model` |
 | Production reports SQLite busy as `Unknown` | `production_real_busy` |
+| Production fingerprints omit retained time | `production_fingerprint_retains_clock` |
+| A committed delivery names the wrong recipient | `simulation_laws` |
+| A later failure erases send uncertainty | `lost_send_remains_unknown_after_clock_failure` |
+| Reopen accepts a substituted genesis | `production_rebind_rejects_other_genesis` |
+| The fault alphabet omits Full | `frozen_alphabet_contains_required_failures` |
+| A checkpoint drops its frontier | `resumed_search_matches_uninterrupted_closure` |
+| A manifest omits handler sources | `manifest_sources_configuration_and_seed_are_bound` |
+
+Control tools separate Cargo workspace artifacts by source-copy path using a
+pass-through compiler wrapper. `tools/test_cargo_source_scope.py` checks
+backdated copies, a building mutant and restoration against one shared target.
+This protects the named behavioral checks from stale artifact reuse.
 
 The default tests explore retry budgets 0 and 1 in the simulation, and fewer
 on SQLite. The ignored tests `explore_frozen_profile_all_budgets` and
@@ -198,12 +253,18 @@ Recording starts off. `record_private(true)` enables the Record handler;
 `transcript()` borrows the last run's private in-memory evidence. The next run
 replaces it, and disabling recording discards it. Capture never writes a file,
 prints a transcript, changes relay export or supplies authority to a decision.
-Keep any copy private. Its manifest identifies the store, not a complete
-initial database snapshot; retain that snapshot separately for investigation.
+Recording requires both adapters to supply `AdapterProvenance`: their actual
+source digest, configuration including retained state, and seed (zero without
+randomness). Missing provenance refuses capture before executing the run. The
+production manifest also binds the SQLite handler source and connection
+configuration. The template adds its own source, retry limit and request cap.
+These declarations are provenance, not authentication or proof
+of adapter conformance. Keep any copy private. Its manifest identifies the
+store, not a complete initial database snapshot; retain that snapshot separately for investigation.
 
 Tests compare default bytes, original-key recovery, matching acknowledgements,
-retry exhaustion and private capture. The seeded performance check runs the unchanged 256 × 64
-SQLite corpus twice and, in its opt-in lane, also mounts this adapter once
+retry exhaustion and private capture. The seeded performance check runs the
+unchanged 256 × 64 SQLite corpus twice and, in its opt-in lane, also mounts this adapter once
 per seed against the independent model. These are tests; the finite simulation
 checks above apply only to their declared profile. The premises include retained
 original inputs, a stable identity, surviving SQLite storage, one trusted writer
@@ -236,8 +297,10 @@ Bind `Layer::Policy(Monitor::new(policy))` before the terminal in the opt-in
 `Stack`. Every request, including retries, passes all policies before one
 terminal call with the original bytes. A rejection returns `Sent::Refused`
 with `PolicyDuplicate`, `PolicyRecipient`, `PolicyFields` or `PolicyCapacity`;
-the delivery program ends `Outcome::Refused` immediately, retaining the
-pending record. The record layer captures that response and the final outcome.
+the delivery program stops immediately, retaining the pending record. Its
+outcome is Refused before any possible send, or Unknown after earlier send
+uncertainty or progress. The record layer captures that response and the final
+outcome.
 Success, refusal, Unknown, NotApplied and crash are explicit transcript events;
 the latter three classify as incomplete actions. Exploration closure and
 individual action completion are separate results.
@@ -280,8 +343,9 @@ A closed two-case policy enum and projected fields avoid a callback runtime,
 extra operation language and response-dependent rollback bookkeeping.
 Existing port tags, failure codes and canonical bytes retain their numbering;
 new codes and the transport Refused branch are appended. The program source
-pin changes intentionally. The original explorer and non-policy stacks keep
-their prior behavior and are covered by the original shell regression tests.
+pin changes intentionally. The existing regression checks remain; the expanded
+fault alphabet and sticky send uncertainty intentionally change the qualified
+execution states and counts.
 
 Provider idempotency is an environment assumption. A timeout can hide success.
 The claim is "no second send of the same key by this protocol", never

@@ -12,8 +12,8 @@ use zeno_fcis_shell::effects::{
         CommitInvocation, CommitPolicy, CommitProgram, DeliveryInvocation, DeliveryPolicy,
         DeliveryProgram, Program, Step,
     },
-    record::{Manifest, Transcript},
-    registry::REGISTRY,
+    record::{Implementation, Transcript},
+    registry::{self, REGISTRY},
 };
 use zeno_fcis_shell_sqlite::{
     effects::production::{Production, Time, Transport},
@@ -164,14 +164,22 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
             Driver::<P>::start(REGISTRY, epoch, first).map_err(|e| format!("{e:?}"))?;
         let mut stack = Stack::default();
         if self.record {
-            stack
-                .layers
-                .push(Layer::Record(Transcript::new(Manifest::current(
-                    vec!["record", "production"],
-                    vec![],
-                    self.store().identity,
-                    start,
-                ))));
+            let mut manifest = self
+                .production
+                .manifest(start)
+                .ok_or("private recording requires transport and time source/configuration/seed")?;
+            manifest.implementations.push(Implementation {
+                name: "withdrawal-queue",
+                source: registry::source_digest(&[(
+                    "shell_effects.rs",
+                    include_bytes!("shell_effects.rs"),
+                )]),
+            });
+            manifest.configuration.push(RETRIES);
+            manifest
+                .configuration
+                .extend_from_slice(&(MAX_REQUESTS as u64).to_be_bytes());
+            stack.layers.push(Layer::Record(Transcript::new(manifest)));
         }
         let result = (|| {
             for _ in 0..MAX_REQUESTS {

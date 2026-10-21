@@ -45,6 +45,13 @@ use zeno_fcis_synthesis::finite::v2_authority::Authority;
 struct Wire {
     receiver: Option<Receiver>,
 }
+impl std::fmt::Debug for Wire {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Wire")
+            .field("receiver", &self.receiver.is_some())
+            .finish()
+    }
+}
 impl Transport for Wire {
     fn send(&mut self, delivery: &port::Delivery) -> Sent {
         if let Some(receiver) = &mut self.receiver {
@@ -68,7 +75,7 @@ fn carried(delivery: &port::Delivery) -> model::Delivery {
 }
 
 /// A clock that never moves on its own: waits return their deadline.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Ticks(u64);
 impl Time for Ticks {
     fn clock(&mut self, epoch: u64) -> Result<EpochTick, port::Fault> {
@@ -292,6 +299,12 @@ impl<'a, 'p> World<'a, 'p> {
             bytes.extend_from_slice(&(part.len() as u64).to_be_bytes());
             bytes.extend_from_slice(&part);
         }
+        for handle in &self.handles {
+            let state = ok(handle.test_execution_state());
+            bytes.extend_from_slice(&(state.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(&state);
+        }
+        bytes.extend_from_slice(format!("{:?}", self.interrupted).as_bytes());
         RustCryptoSha256::hash(&bytes)
     }
 
@@ -857,5 +870,46 @@ fn production_abort_reopen() {
             assert!(matches!(world.actors[1].delivery, Some(Outcome::Ok(2))));
             world.compare(&format!("role {role} delivered"));
         }
+    });
+}
+
+#[test]
+fn production_fingerprint_retains_clock() {
+    with_lineage(|lineage| {
+        let mut early = World::new(lineage, Scenario::Delivery, 1, &[0, 4]);
+        let op = Operation::Clock;
+        let binding = zeno_fcis_shell::effects::driver::Binding::of(port::OpId::first(17), &op);
+        let mut probe = Script::new(vec![]);
+        let has_time_faults =
+            Fault::new(&mut early.handles[0], &mut probe).handle(&binding, &op) == Handled::Suspend;
+        let prefix = if has_time_faults {
+            vec![0, 1, 0, 0, 0, 4]
+        } else {
+            vec![0, 1, 4]
+        };
+        let mut waited = World::new(lineage, Scenario::Delivery, 1, &prefix);
+        let (Run::Suspended(na, a), Run::Suspended(nb, b)) = (early.run(), waited.run()) else {
+            panic!("expected restart fault point")
+        };
+        assert_eq!(na, nb);
+        assert_ne!(a, b, "clock state projected away");
+        let op = Operation::Clock;
+        let binding = zeno_fcis_shell::effects::driver::Binding::of(port::OpId::first(17), &op);
+        let left = early.handles[0].handle(&binding, &op);
+        let right = waited.handles[0].handle(&binding, &op);
+        assert_ne!(left, right);
+        println!(
+            "CHECK: early and waited prefixes retain distinct fingerprints {a} and {b}; Clock returns {left:?} vs {right:?}"
+        );
+        early.script = Script::new(vec![0, 1]);
+        waited.script = Script::new(vec![0, 1]);
+        let (Run::Suspended(_, next_a), Run::Suspended(_, next_b)) = (early.run(), waited.run())
+        else {
+            panic!("expected next Send fault")
+        };
+        assert_ne!(next_a, next_b);
+        println!(
+            "CHECK: common suffix [0,1] also produces different successor fingerprints {next_a} and {next_b}"
+        );
     });
 }

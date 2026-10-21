@@ -82,19 +82,42 @@ impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
         self.forwarded = None;
         let port = operation.port();
         let options = match port {
-            Port::Commit | Port::Acknowledge => 6,
+            Port::Commit | Port::Acknowledge => 8,
             Port::Send => 7,
-            Port::ReadState | Port::ReadHistory | Port::ReadOutbox | Port::Reopen => 3,
-            Port::Clock | Port::Random | Port::Wait => 1,
+            Port::ReadState | Port::ReadHistory | Port::ReadOutbox | Port::Reopen => 5,
+            Port::Clock | Port::Random => 4,
+            Port::Wait => 5,
         };
         let Some(choice) = self.script.choose(options) else {
             return Handled::Suspend;
         };
-        if options == 3 {
+        if matches!(port, Port::Clock | Port::Random | Port::Wait) {
+            return if choice == 0 {
+                self.forward(binding, operation)
+            } else if port == Port::Wait && choice == 1 {
+                Handled::Answer(Response::Wait(Err(super::port::WaitError::Interrupted)))
+            } else {
+                let offset = if port == Port::Wait {
+                    choice - 2
+                } else {
+                    choice - 1
+                };
+                Handled::Answer(Response::not_applied(
+                    port,
+                    super::simulation::fault_choice(offset),
+                ))
+            };
+        }
+        if matches!(
+            port,
+            Port::ReadState | Port::ReadHistory | Port::ReadOutbox | Port::Reopen
+        ) {
             return match choice {
                 0 => self.forward(binding, operation),
                 1 => Handled::Answer(Response::not_applied(port, FaultKind::Busy)),
-                _ => self.crash(binding),
+                2 => self.crash(binding),
+                3 => Handled::Answer(Response::not_applied(port, FaultKind::Full)),
+                _ => Handled::Answer(Response::not_applied(port, FaultKind::Io)),
             };
         }
         // The order follows the simulation's: answer, busy or not sent, an
@@ -113,10 +136,12 @@ impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
                 Handled::Answer(_) => self.crash(binding),
                 other => other,
             },
-            _ => {
+            6 if port == Port::Send => {
                 let _ = self.forward(binding, operation);
                 self.forward(binding, operation)
             }
+            6 => Handled::Answer(Response::not_applied(port, FaultKind::Full)),
+            _ => Handled::Answer(Response::not_applied(port, FaultKind::Io)),
         }
     }
 }

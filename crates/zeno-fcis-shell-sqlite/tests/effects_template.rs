@@ -21,6 +21,19 @@ use zeno_fcis_shell_sqlite::{
 
 struct Wire(database::Receiver, bool);
 impl Transport for Wire {
+    fn provenance(&self) -> Option<zeno_fcis_shell_sqlite::effects::production::AdapterProvenance> {
+        Some(
+            zeno_fcis_shell_sqlite::effects::production::AdapterProvenance {
+                source: zeno_fcis_shell::effects::registry::source_digest(&[
+                    ("adapter.rs", include_bytes!("effects_template.rs")),
+                    ("receiver.rs", include_bytes!("sim/database.rs")),
+                ]),
+                configuration: format!("{:?}|{}", self.0.state(), self.1).into_bytes(),
+                seed: 0,
+            },
+        )
+    }
+
     fn send(&mut self, d: &port::Delivery) -> Sent {
         if self.1 {
             self.1 = false;
@@ -46,6 +59,19 @@ impl Transport for Wire {
 #[derive(Default)]
 struct Ticks(u64);
 impl Time for Ticks {
+    fn provenance(&self) -> Option<zeno_fcis_shell_sqlite::effects::production::AdapterProvenance> {
+        Some(
+            zeno_fcis_shell_sqlite::effects::production::AdapterProvenance {
+                source: zeno_fcis_shell::effects::registry::source_digest(&[(
+                    "adapter.rs",
+                    include_bytes!("effects_template.rs"),
+                )]),
+                configuration: self.0.to_be_bytes().to_vec(),
+                seed: 0,
+            },
+        )
+    }
+
     fn clock(&mut self, epoch: u64) -> Result<EpochTick, Fault> {
         Ok(EpochTick {
             epoch,
@@ -193,5 +219,74 @@ fn process_template_worker() {
         }
         assert!(actions.iter().all(|n| *n > 0), "action coverage");
         assert_eq!(crash_mask, 0xfe, "crash coverage");
+    });
+}
+
+#[test]
+fn production_manifest_binds_adapters_and_configuration() {
+    use zeno_fcis_shell_sqlite::effects::production::{self, Production};
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let files = database::Files::memory();
+        drop(sim::create(&files, &lineage.authorities()[0]));
+        let one = ok(Production::open(
+            &files.store,
+            &lineage,
+            1,
+            Wire(database::Receiver::open(&files.receiver), false),
+            Some(Ticks(0)),
+        ));
+        let first = one
+            .manifest(vec![])
+            .unwrap_or_else(|| panic!("missing qualified provenance"));
+        assert!(first.provenance_complete());
+        let production = first
+            .implementations
+            .iter()
+            .find(|entry| entry.name == "production")
+            .unwrap_or_else(|| panic!("missing production source"));
+        assert_eq!(production.source, production::implementation_source());
+        assert!(
+            first
+                .implementations
+                .iter()
+                .any(|entry| entry.name == "time")
+        );
+        assert!(
+            first
+                .implementations
+                .iter()
+                .any(|entry| entry.name == "transport")
+        );
+        for (fail, tick) in [(true, 0), (false, 1)] {
+            let other = ok(Production::open(
+                &files.store,
+                &lineage,
+                1,
+                Wire(database::Receiver::open(&files.receiver), fail),
+                Some(Ticks(tick)),
+            ));
+            let changed = other
+                .manifest(vec![])
+                .unwrap_or_else(|| panic!("missing provenance"));
+            assert_ne!(first.digest(), changed.digest(), "adapter state omitted");
+        }
+        struct Unqualified;
+        impl Transport for Unqualified {
+            fn send(&mut self, _: &port::Delivery) -> Sent {
+                Sent::Unknown(Fault::Io)
+            }
+        }
+        let unqualified = ok(Production::open(
+            &files.store,
+            &lineage,
+            1,
+            Unqualified,
+            Some(Ticks(0)),
+        ));
+        assert!(
+            unqualified.manifest(vec![]).is_none(),
+            "unqualified adapter recorded"
+        );
     });
 }

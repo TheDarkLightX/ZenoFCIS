@@ -15,10 +15,10 @@ use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};
 
 use super::codec;
 use super::driver::Binding;
-use super::handler::{Handled, Stack, Terminal};
+use super::handler::{Handled, Stack};
 use super::port::{
-    Code, CommitMode, EpochTick, HistoryEntry, OpId, Operation, Outcome, PublicationData, Purpose,
-    Response, Sent, Snapshot, WaitError,
+    Code, CommitMode, Delivery, EpochTick, Fault, HistoryEntry, OpId, Operation, Outcome,
+    PublicationData, Purpose, Response, Sent, Snapshot, WaitError,
 };
 use super::simulation::{self, Durable, IDENTITY, Profile, Script, Simulation, World};
 use crate::CommitStatus;
@@ -66,6 +66,16 @@ pub const REQUIRED: &[&str] = &[
     "time-monotone/wake",
     "time-monotone/interrupted",
     "jitter-in-range/draw",
+    "fault/full",
+    "fault/clock-busy",
+    "fault/clock-full",
+    "fault/clock-io",
+    "fault/random-busy",
+    "fault/random-full",
+    "fault/random-io",
+    "fault/wait-busy",
+    "fault/wait-full",
+    "fault/wait-io",
 ];
 
 fn fail(law: &'static str, detail: &'static str) -> Result<(), LawFailure> {
@@ -93,43 +103,51 @@ fn head(durable: &Durable) -> Snapshot {
 /// Whether `after` is `before` with exactly this one publication applied:
 /// state, chain, history entry, replay key, receipt and both outbox rows.
 fn applied(before: &Durable, after: &Durable, key: Hash32, data: &PublicationData) -> bool {
-    let n = before.commits.len();
-    let version = n as u64 + 1;
-    let (Some(count), Some(body)) = (before.state.first(), data.command.first()) else {
-        return false;
-    };
+    expected_commit(before, key, data).as_ref() == Some(after)
+}
+
+// Independent specification of the one-byte application and complete outbox.
+// This path never calls Simulation, decide, publication or deliveries.
+fn expected_commit(before: &Durable, key: Hash32, data: &PublicationData) -> Option<Durable> {
+    if data.prestate != before.state
+        || data.identity != IDENTITY
+        || data.context != [1]
+        || data.command.len() != 1
+        || data.subject
+            != sha256(&[IDENTITY, &data.prestate, &data.command, &data.context]).as_bytes()
+        || before.replays.contains(&key)
+    {
+        return None;
+    }
+    let next = before.state.first()?.checked_add(*data.command.first()?)?;
+    let version = u64::try_from(before.commits.len()).ok()?.checked_add(1)?;
     let chain = sha256(&[before.chain.as_bytes(), &data.subject]);
-    let rows = before.outbox.len();
-    after.commits.len() == n + 1
-        && after.commits[..n] == before.commits[..]
-        && after.commits[n]
-            == (HistoryEntry {
-                key,
+    let mut expected = before.clone();
+    expected.state = vec![next];
+    expected.chain = chain;
+    expected.commits.push(HistoryEntry {
+        key,
+        version,
+        publication: data.clone(),
+    });
+    expected.replays.push(key);
+    expected.receipts.push(chain);
+    for ordinal in [0_u32, 1] {
+        let payload = vec![next, u8::try_from(ordinal).ok()?];
+        expected.outbox.push((
+            Delivery {
+                id: sha256(&[b"delivery", chain.as_bytes(), &ordinal.to_be_bytes()]),
                 version,
-                publication: data.clone(),
-            })
-        && after.replays.len() == n + 1
-        && after.replays[..n] == before.replays[..]
-        && after.replays[n] == key
-        && after.receipts.len() == n + 1
-        && after.receipts[..n] == before.receipts[..]
-        && after.receipts[n] == chain
-        && after.chain == chain
-        && count.checked_add(*body).map(|next| vec![next]) == Some(after.state.clone())
-        && after.outbox.len() == rows + 2
-        && after.outbox[..rows] == before.outbox[..]
-        && after.outbox[rows..]
-            .iter()
-            .enumerate()
-            .all(|(ordinal, (delivery, acked))| {
-                !acked
-                    && delivery.version == version
-                    && delivery.lane == 1
-                    && delivery.ordinal as usize == ordinal
-                    && delivery.payload_sha256 == RustCryptoSha256::hash(&delivery.payload)
-                    && !before.outbox.iter().any(|(old, _)| old.id == delivery.id)
-            })
-        && after.outbox[rows].0.id != after.outbox[rows + 1].0.id
+                lane: 1,
+                ordinal,
+                destination: b"receiver".to_vec(),
+                payload_sha256: RustCryptoSha256::hash(&payload),
+                payload,
+            },
+            false,
+        ));
+    }
+    Some(expected)
 }
 
 /// Indices whose acknowledged bit differs, or `None` if anything else in D did.
@@ -207,6 +225,28 @@ impl Laws {
                 "send-exact",
                 "a request other than Send changed the transport",
             );
+        }
+        if let Some(response) = answer {
+            if operation.port() != super::registry::Port::Send
+                && *response == Response::not_applied(operation.port(), Fault::Full)
+            {
+                self.saw("fault/full");
+            }
+            let branch = match response {
+                Response::Clock(Err(Fault::Busy)) => Some("fault/clock-busy"),
+                Response::Clock(Err(Fault::Full)) => Some("fault/clock-full"),
+                Response::Clock(Err(Fault::Io)) => Some("fault/clock-io"),
+                Response::Random(Err(Fault::Busy)) => Some("fault/random-busy"),
+                Response::Random(Err(Fault::Full)) => Some("fault/random-full"),
+                Response::Random(Err(Fault::Io)) => Some("fault/random-io"),
+                Response::Wait(Err(WaitError::Failed(Fault::Busy))) => Some("fault/wait-busy"),
+                Response::Wait(Err(WaitError::Failed(Fault::Full))) => Some("fault/wait-full"),
+                Response::Wait(Err(WaitError::Failed(Fault::Io))) => Some("fault/wait-io"),
+                _ => None,
+            };
+            if let Some(branch) = branch {
+                self.saw(branch);
+            }
         }
         match operation {
             Operation::Commit(_, key, data, mode) => {
@@ -730,16 +770,16 @@ fn probes(profile: &Profile, durable: &Durable) -> Vec<Operation> {
 /// Applies one publication fault-free, for building probe and scenario stores.
 #[must_use]
 pub fn committed(durable: &Durable, key: Hash32, body: u8) -> Durable {
-    let mut simulation = Simulation::new(
-        World::new(durable.clone()),
-        Profile::frozen(0),
-        simulation::ALL_PORTS,
-        Script::fault_free(),
-    );
-    let data = simulation::publication(&durable.state, body);
-    let operation = Operation::Commit(simulation::store(1), key, data, CommitMode::Unversioned);
-    let _ = simulation.handle(&Binding::of(OpId::first(0), &operation), &operation);
-    simulation.world.durable
+    let data = PublicationData {
+        prestate: durable.state.clone(),
+        command: vec![body],
+        context: vec![1],
+        identity: IDENTITY.to_vec(),
+        subject: sha256(&[IDENTITY, &durable.state, &[body], &[1]])
+            .as_bytes()
+            .to_vec(),
+    };
+    expected_commit(durable, key, &data).unwrap_or_else(|| durable.clone())
 }
 
 /// Acknowledges every record fault-free.
@@ -750,4 +790,24 @@ pub fn acknowledged(durable: &Durable) -> Durable {
         record.1 = true;
     }
     durable
+}
+
+/// Independently derives the complete history fold, including every delivery field.
+#[must_use]
+pub fn history_fold(entries: &[HistoryEntry]) -> Option<Durable> {
+    let mut folded = Durable {
+        state: vec![0],
+        chain: sha256(&[b"genesis", IDENTITY]),
+        commits: Vec::new(),
+        receipts: Vec::new(),
+        replays: Vec::new(),
+        outbox: Vec::new(),
+    };
+    for entry in entries {
+        if entry.version != folded.commits.len() as u64 + 1 {
+            return None;
+        }
+        folded = expected_commit(&folded, entry.key, &entry.publication)?;
+    }
+    Some(folded)
 }

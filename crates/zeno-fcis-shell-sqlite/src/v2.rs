@@ -745,6 +745,34 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
         };
         Ok((shell, position))
     }
+    // Read the genesis on this exact connection, rather than opening its path
+    // again. Used only to bind the opt-in effect adapter after a path rebind.
+    pub(crate) fn effects_identity(&self) -> Result<Hash32, Error> {
+        let (_, genesis) = genesis_anchor(&self.connection, self.authority())?;
+        Ok(crate::effects::store_identity(
+            &genesis.state,
+            self.authority().identity(),
+            self.delivery_interpreter,
+        ))
+    }
+
+    pub(crate) fn effects_configuration(&self) -> Result<Vec<u8>, Error> {
+        let timeout: i64 = self
+            .connection
+            .query_row("PRAGMA busy_timeout", [], |r| r.get(0))?;
+        Ok(format!(
+            "{:?}|{:?}|{:?}|{}|{}|{}|{}",
+            self.anchor,
+            self.genesis,
+            self.delivery_interpreter,
+            self.data_version,
+            data_version(&self.connection)?,
+            timeout,
+            self.connection.is_autocommit()
+        )
+        .into_bytes())
+    }
+
     /// The contract the store runs now: the last member this handle is bound to.
     pub fn authority(&self) -> &'a Authority<'p, D> {
         self.current()

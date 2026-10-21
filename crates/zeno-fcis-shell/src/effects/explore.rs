@@ -9,6 +9,7 @@
 //! a budget stop is `incomplete`, and a malformed profile, choice or
 //! program is `refused`. Exhaustion is never a pass.
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeSet, VecDeque};
 use alloc::string::String;
 use alloc::vec;
@@ -164,6 +165,57 @@ pub struct Report {
     pub stores: Vec<Durable>,
     /// SHA-256 over the sorted fingerprints of every final state.
     pub finals: Hash32,
+    /// Owned resumable search state on budget exhaustion; no frontier is discarded.
+    pub checkpoint: Option<Checkpoint>,
+}
+
+/// Source/profile-bound search state. Its private owned fields cannot be
+/// altered through an advisory Report. Resume consumes it; clone explicitly
+/// to branch a search. This is an in-memory checkpoint, not a disk format.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Checkpoint {
+    source: Hash32,
+    binding: Hash32,
+    scenario: Scenario,
+    profile: Profile,
+    layers: Layers,
+    order: Order,
+    policies: Vec<Policy>,
+    frontier: VecDeque<Vec<u8>>,
+    visited: BTreeSet<Hash32>,
+    finals: BTreeSet<Hash32>,
+    progress: Box<Report>,
+}
+
+fn search_source() -> Hash32 {
+    super::registry::source_digest(&[
+        ("explore.rs", include_bytes!("explore.rs")),
+        ("simulation.rs", include_bytes!("simulation.rs")),
+        ("laws.rs", include_bytes!("laws.rs")),
+        ("program.rs", include_bytes!("program.rs")),
+        ("driver.rs", include_bytes!("driver.rs")),
+        ("handler.rs", include_bytes!("handler.rs")),
+        ("record.rs", include_bytes!("record.rs")),
+        ("policy.rs", include_bytes!("policy.rs")),
+        ("registry.rs", include_bytes!("registry.rs")),
+        ("port.rs", include_bytes!("port.rs")),
+        ("codec.rs", include_bytes!("codec.rs")),
+    ])
+}
+
+fn search_binding(
+    scenario: Scenario,
+    profile: Profile,
+    layers: Layers,
+    order: Order,
+    policies: &[Policy],
+) -> Hash32 {
+    let mut bytes = profile.bytes();
+    bytes.extend_from_slice(&[scenario as u8, layers as u8, order as u8]);
+    for policy in policies {
+        codec::hash(&mut bytes, policy.identity());
+    }
+    RustCryptoSha256::hash(&bytes)
 }
 
 /// A broken law or invariant, with the schedule that reproduces it.
@@ -264,6 +316,7 @@ struct System {
     // Independent multiset oracle; unlike World.sent this preserves repeats.
     attempts: Vec<EffectKey>,
     policy_refusals: u64,
+    manifest: Manifest,
 }
 
 impl System {
@@ -273,6 +326,18 @@ impl System {
         layers: Layers,
         prefix: &[u8],
         policies: &[Policy],
+    ) -> Result<Self, Failure> {
+        let manifest = Manifest::current(Vec::new(), Vec::new(), Hash32::ZERO, Vec::new());
+        Self::bound(scenario, profile, layers, prefix, policies, &manifest)
+    }
+
+    fn bound(
+        scenario: Scenario,
+        profile: Profile,
+        layers: Layers,
+        prefix: &[u8],
+        policies: &[Policy],
+        manifest: &Manifest,
     ) -> Result<Self, Failure> {
         let genesis = Durable::genesis();
         let (durable, roles) = match scenario {
@@ -315,6 +380,7 @@ impl System {
             policies: policies.to_vec(),
             attempts: Vec::new(),
             policy_refusals: 0,
+            manifest: manifest.clone(),
         };
         for role in roles {
             let body = match role {
@@ -431,13 +497,20 @@ impl System {
                 names.insert(0, "policy");
             }
         }
+        let mut configuration = self.profile.bytes();
+        for layer in &policy_layers {
+            if let Layer::Policy(monitor) = layer {
+                codec::hash(&mut configuration, monitor.identity());
+            }
+        }
         let record = || {
-            Layer::Record(Transcript::new(Manifest::current(
-                names.clone(),
-                self.prefix.clone(),
-                initial,
-                start.clone(),
-            )))
+            let mut manifest = self.manifest.clone();
+            manifest.stack = names.clone();
+            manifest.schedule = self.prefix.clone();
+            manifest.initial = initial;
+            manifest.start = start.clone();
+            manifest.configuration = configuration.clone();
+            Layer::Record(Transcript::new(manifest))
         };
         let mut layers = policy_layers;
         layers.extend(match self.layers {
@@ -733,11 +806,9 @@ impl System {
         let durable = &self.simulation.world.durable;
         let world = &self.simulation.world;
         // No partial commit: refold the store from genesis.
-        let mut fold = Durable::genesis();
-        for entry in &durable.commits {
-            let body = entry.publication.command.first().copied().unwrap_or(0);
-            fold = laws::committed(&fold, entry.key, body);
-        }
+        let Some(fold) = laws::history_fold(&durable.commits) else {
+            return Err(Failure::Violation("invalid history inputs", None));
+        };
         let acked: Vec<bool> = durable.outbox.iter().map(|(_, acked)| *acked).collect();
         let mut expected = fold;
         for (record, acked) in expected.outbox.iter_mut().zip(&acked) {
@@ -910,7 +981,7 @@ pub fn explore_with_policies(
         policy::PREMISES
     };
     let mut report = Report {
-        source: super::registry::source_digest(&[("explore.rs", include_bytes!("explore.rs"))]),
+        source: search_source(),
         policies: policies.iter().map(Policy::identity).collect(),
         premises,
         exploration: Exploration::Complete,
@@ -918,15 +989,74 @@ pub fn explore_with_policies(
         laws: Laws::default(),
         stores: Vec::new(),
         finals: Hash32::ZERO,
+        checkpoint: None,
     };
     if !profile.well_formed() {
         report.exploration = Exploration::Refused(Refusal::Profile);
         return Ok(report);
     }
-    let mut frontier: VecDeque<Vec<u8>> = VecDeque::new();
+    let mut frontier = VecDeque::new();
     frontier.push_back(Vec::new());
-    let mut visited = BTreeSet::new();
-    let mut finals = BTreeSet::new();
+    resume(
+        Checkpoint {
+            source: report.source,
+            binding: search_binding(scenario, profile, layers, order, policies),
+            scenario,
+            profile,
+            layers,
+            order,
+            policies: policies.to_vec(),
+            frontier,
+            visited: BTreeSet::new(),
+            finals: BTreeSet::new(),
+            progress: Box::new(report),
+        },
+        budget,
+    )
+}
+
+/// Continues exactly the retained search for at most `budget` additional runs.
+/// A changed implementation or profile binding refuses before doing work.
+pub fn resume(checkpoint: Checkpoint, budget: u64) -> Result<Report, Violation> {
+    if checkpoint.source != search_source()
+        || checkpoint.binding
+            != search_binding(
+                checkpoint.scenario,
+                checkpoint.profile,
+                checkpoint.layers,
+                checkpoint.order,
+                &checkpoint.policies,
+            )
+    {
+        return Err(Violation {
+            policies: checkpoint.policies.iter().map(Policy::identity).collect(),
+            premises: checkpoint.progress.premises,
+            schedule: Vec::new(),
+            what: "checkpoint source/profile mismatch",
+            law: None,
+        });
+    }
+    let Checkpoint {
+        source,
+        binding,
+        scenario,
+        profile,
+        layers,
+        order,
+        policies: policy_data,
+        mut frontier,
+        mut visited,
+        mut finals,
+        progress,
+    } = checkpoint;
+    let policies = policy_data.as_slice();
+    let mut report = *progress;
+    let premises = report.premises;
+    report.exploration = Exploration::Complete;
+    let limit = report.stats.runs.saturating_add(budget);
+    // Immutable source identities are calculated once per resumed invocation,
+    // then copied into each prefix. There is no global or retained cache.
+    let manifest = Manifest::current(Vec::new(), Vec::new(), Hash32::ZERO, Vec::new());
     loop {
         let next = match order {
             Order::Depth => frontier.pop_back(),
@@ -935,14 +1065,32 @@ pub fn explore_with_policies(
         let Some(prefix) = next else {
             break;
         };
-        if report.stats.runs >= budget {
-            report.exploration = Exploration::Incomplete(frontier.len() + 1);
+        if report.stats.runs >= limit {
+            // Put the popped prefix back at exactly its traversal position.
+            match order {
+                Order::Depth => frontier.push_back(prefix),
+                Order::Breadth => frontier.push_front(prefix),
+            }
+            report.exploration = Exploration::Incomplete(frontier.len());
+            report.checkpoint = Some(Checkpoint {
+                source,
+                binding,
+                scenario,
+                profile,
+                layers,
+                order,
+                policies: policy_data.clone(),
+                frontier,
+                visited,
+                finals: finals.clone(),
+                progress: Box::new(report.clone()),
+            });
             break;
         }
         report.stats.runs += 1;
         report.stats.deepest = report.stats.deepest.max(prefix.len());
-        let outcome =
-            System::new(scenario, profile, layers, &prefix, policies).and_then(|mut system| {
+        let outcome = System::bound(scenario, profile, layers, &prefix, policies, &manifest)
+            .and_then(|mut system| {
                 let run = system.run(&mut report.laws, &mut report.stores);
                 let tally = &mut report.stats.tally;
                 tally.crashes += system.tally.crashes;
@@ -1140,5 +1288,39 @@ pub fn next_choice_with_policies(
         Ok(Run::Finished(_)) => Ok(None),
         Err(Failure::Violation(what, law)) => Err(violation(what, law)),
         Err(Failure::Refused(_)) => Err(violation("refused", None)),
+    }
+}
+
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+
+    #[test]
+    fn checkpoint_refuses_source_or_profile_substitution() {
+        let original = explore(
+            Scenario::Commit,
+            Profile::frozen(0),
+            Layers::Record,
+            Order::Depth,
+            0,
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"))
+        .checkpoint
+        .unwrap_or_else(|| panic!("missing checkpoint"));
+        for changed_source in [true, false] {
+            let mut checkpoint = original.clone();
+            if changed_source {
+                checkpoint.source = Hash32::ZERO;
+            } else {
+                checkpoint.profile.ticks = 2;
+            }
+            assert_eq!(
+                resume(checkpoint, 10)
+                    .err()
+                    .unwrap_or_else(|| panic!("substituted checkpoint accepted"))
+                    .what,
+                "checkpoint source/profile mismatch"
+            );
+        }
     }
 }

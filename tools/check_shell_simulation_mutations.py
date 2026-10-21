@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 import time
 
+from cargo_source_scope import source_environment
+
 ROOT = Path(__file__).resolve().parents[1]
 V2 = 'crates/zeno-fcis-shell-sqlite/src/v2.rs'
 DELIVERY = 'crates/zeno-fcis-shell-sqlite/src/v2/delivery.rs'
@@ -122,7 +124,8 @@ def main():
     parser.add_argument('--check-hash-recheck-only',action='store_true',help='record the hash recheck masked by the earlier hash check')
     parser.add_argument('--only',choices=[m[0] for m in MUTATIONS])
     args=parser.parse_args()
-    env=dict(os.environ, CARGO_PROFILE_DEV_DEBUG='0', CARGO_BUILD_JOBS='2', CARGO_NET_OFFLINE='true')
+    env=dict(os.environ, CARGO_PROFILE_DEV_DEBUG='0', CARGO_NET_OFFLINE='true')
+    env.setdefault('CARGO_BUILD_JOBS', '2')
     env.setdefault('CARGO_TARGET_DIR',str(ROOT/'target'/'shell-simulation-mutations'))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     command=['cargo','+1.97.1','test','-p','zeno-fcis-shell-sqlite','--features','crash-injection','--locked','--offline','--test','simulation']
@@ -130,7 +133,7 @@ def main():
     def run(root, arguments):
         disk=subprocess.run(['df','-B1G','/'],capture_output=True,text=True,check=True)
         if shutil.disk_usage('/').free<6*1024**3: raise RuntimeError('root free space below 6 GiB')
-        process=subprocess.run(command+arguments,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300)
+        process=subprocess.run(command+arguments,cwd=root,env=source_environment(root,env),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300)
         return process
     selected=[m for m in MUTATIONS if args.only is None or args.only==m[0]]
     if args.check_cas_only:

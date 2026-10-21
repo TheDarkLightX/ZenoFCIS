@@ -62,6 +62,21 @@ impl Profile {
         }
     }
 
+    /// Exact profile configuration bytes for manifests and checkpoints.
+    #[must_use]
+    pub fn bytes(&self) -> Vec<u8> {
+        let mut bytes = vec![self.retries];
+        for value in [
+            self.queue as u64,
+            self.ticks,
+            self.jitter.get(),
+            self.backoff,
+        ] {
+            bytes.extend_from_slice(&value.to_be_bytes());
+        }
+        bytes
+    }
+
     /// Whether the profile stays within the frozen domains.
     #[must_use]
     pub fn well_formed(&self) -> bool {
@@ -484,14 +499,16 @@ impl Simulation {
 
     /// A store operation that writes nothing: answer, busy or crash.
     fn read(&mut self, handle: usize, port: Port, answer: Response) -> Handled {
-        match self.script.choose(3) {
+        match self.script.choose(5) {
             None => Handled::Suspend,
             Some(0) => {
                 self.world.handles[handle] = Some(self.world.durable.version());
                 Handled::Answer(answer)
             }
             Some(1) => Handled::Answer(Response::not_applied(port, Fault::Busy)),
-            Some(_) => self.crash(handle),
+            Some(2) => self.crash(handle),
+            Some(3) => Handled::Answer(Response::not_applied(port, Fault::Full)),
+            Some(_) => Handled::Answer(Response::not_applied(port, Fault::Io)),
         }
     }
 
@@ -505,7 +522,7 @@ impl Simulation {
         answer: Response,
     ) -> Handled {
         let port = binding.port;
-        match self.script.choose(6) {
+        match self.script.choose(8) {
             None => Handled::Suspend,
             Some(0) => {
                 self.world.durable = after;
@@ -520,10 +537,12 @@ impl Simulation {
                 Handled::Answer(Response::unknown(port))
             }
             Some(4) => self.crash(handle),
-            Some(_) => {
+            Some(5) => {
                 self.world.durable = after;
                 self.crash(handle)
             }
+            Some(6) => Handled::Answer(Response::not_applied(port, Fault::Full)),
+            Some(_) => Handled::Answer(Response::not_applied(port, Fault::Io)),
         }
     }
 
@@ -702,20 +721,31 @@ impl Terminal for Simulation {
             }
             (Operation::Clock, _) => {
                 let first = self.world.tick;
-                let Some(offset) = self.script.choose(choices(first, self.profile.ticks)) else {
-                    return Handled::Suspend;
-                };
-                self.world.tick = first + offset as u64;
-                Handled::Answer(Response::Clock(Ok(EpochTick {
-                    epoch: binding.id.epoch,
-                    tick: self.world.tick,
-                })))
+                let successful = choices(first, self.profile.ticks);
+                match self.script.choose(successful + 3) {
+                    None => Handled::Suspend,
+                    Some(offset) if offset < successful => {
+                        self.world.tick = first + offset as u64;
+                        Handled::Answer(Response::Clock(Ok(EpochTick {
+                            epoch: binding.id.epoch,
+                            tick: self.world.tick,
+                        })))
+                    }
+                    Some(offset) => {
+                        Handled::Answer(Response::Clock(Err(fault_choice(offset - successful))))
+                    }
+                }
             }
             (Operation::Random(_, bound), _) => {
                 let options = usize::try_from(bound.get()).unwrap_or(usize::MAX).min(256);
-                match self.script.choose(options) {
+                match self.script.choose(options + 3) {
                     None => Handled::Suspend,
-                    Some(draw) => Handled::Answer(Response::Random(Ok(draw as u64))),
+                    Some(draw) if draw < options => {
+                        Handled::Answer(Response::Random(Ok(draw as u64)))
+                    }
+                    Some(draw) => {
+                        Handled::Answer(Response::Random(Err(fault_choice(draw - options))))
+                    }
                 }
             }
             (Operation::Wait(deadline), _) => {
@@ -725,8 +755,8 @@ impl Terminal for Simulation {
                 } else {
                     0
                 };
-                // The last option is an explicit interruption.
-                match self.script.choose(wakes + 1) {
+                // Interruption precedes the three explicit failed-wait responses.
+                match self.script.choose(wakes + 4) {
                     None => Handled::Suspend,
                     Some(offset) if offset < wakes => {
                         self.world.tick = first + offset as u64;
@@ -735,7 +765,12 @@ impl Terminal for Simulation {
                             tick: self.world.tick,
                         })))
                     }
-                    Some(_) => Handled::Answer(Response::Wait(Err(WaitError::Interrupted))),
+                    Some(offset) if offset == wakes => {
+                        Handled::Answer(Response::Wait(Err(WaitError::Interrupted)))
+                    }
+                    Some(offset) => Handled::Answer(Response::Wait(Err(WaitError::Failed(
+                        fault_choice(offset - wakes - 1),
+                    )))),
                 }
             }
             _ => Handled::Answer(Response::refused(port, Code::Identity)),
@@ -747,3 +782,17 @@ impl Terminal for Simulation {
 fn choices(first: u64, last: u64) -> usize {
     usize::try_from(last.saturating_sub(first).saturating_add(1)).unwrap_or(usize::MAX)
 }
+
+/// Failure choices, in canonical order, following the successful responses.
+#[must_use]
+pub fn fault_choice(choice: usize) -> Fault {
+    match choice {
+        0 => Fault::Busy,
+        1 => Fault::Full,
+        _ => Fault::Io,
+    }
+}
+
+/// Exact frozen fault alphabet version. Existing storage/send indices remain
+/// stable; appended alternatives add explicit pre-execution failures.
+pub const FAULT_ALPHABET: &str = "shell-faults/2: read=[answer,busy,crash,full,io]; write=[answer,busy,unknown-io-before,lost-io-after,crash-before,crash-after,full,io-before]; send=[sent,not-sent,unknown-io-drop,lost-io-after,crash-before,crash-after,duplicate-if-room]; clock=[ticks-ascending,busy,full,io]; random=[draws-ascending,busy,full,io]; wait=[wakes-ascending,interrupted,busy,full,io]";

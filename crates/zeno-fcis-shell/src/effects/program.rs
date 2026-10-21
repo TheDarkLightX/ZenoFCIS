@@ -316,6 +316,7 @@ pub struct DeliveryContinuation {
     pending: Vec<Delivery>,
     current: usize,
     acknowledged: u64,
+    may_have_sent: bool,
     tick: EpochTick,
 }
 
@@ -338,6 +339,7 @@ impl DeliveryProgram {
                 pending: Vec::new(),
                 current: 0,
                 acknowledged: 0,
+                may_have_sent: false,
                 tick: EpochTick {
                     epoch: invocation.epoch,
                     tick: 0,
@@ -381,8 +383,8 @@ impl Program for DeliveryProgram {
                         Operation::Random(Purpose::RetryJitter, continuation.policy.jitter);
                     ask(continuation, DeliveryPhase::Jitter, operation)
                 }
-                Ok(_) => Step::Done(Outcome::Refused(Code::Protocol)),
-                Err(fault) => Step::Done(Outcome::NotApplied(fault)),
+                Ok(_) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
+                Err(fault) => delivery_done(&continuation, Outcome::NotApplied(fault)),
             },
             (DeliveryPhase::Jitter, Response::Random(draw)) => match draw {
                 Ok(draw) if draw < continuation.policy.jitter.get() => {
@@ -391,18 +393,18 @@ impl Program for DeliveryProgram {
                         .tick
                         .checked_add(continuation.policy.backoff)
                     else {
-                        return Step::Done(Outcome::Refused(Code::Range));
+                        return delivery_done(&continuation, Outcome::Refused(Code::Range));
                     };
                     let Some(deadline) = deadline.checked_add(draw) else {
-                        return Step::Done(Outcome::Refused(Code::Range));
+                        return delivery_done(&continuation, Outcome::Refused(Code::Range));
                     };
                     let mut continuation = continuation;
                     continuation.tick.tick = deadline;
                     let operation = Operation::Wait(continuation.tick);
                     ask(continuation, DeliveryPhase::Wait, operation)
                 }
-                Ok(_) => Step::Done(Outcome::Refused(Code::Protocol)),
-                Err(fault) => Step::Done(Outcome::NotApplied(fault)),
+                Ok(_) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
+                Err(fault) => delivery_done(&continuation, Outcome::NotApplied(fault)),
             },
             (DeliveryPhase::Wait, Response::Wait(woke)) => match woke {
                 Ok(now)
@@ -411,13 +413,17 @@ impl Program for DeliveryProgram {
                 {
                     send(continuation)
                 }
-                Ok(_) => Step::Done(Outcome::Refused(Code::Protocol)),
-                Err(WaitError::Interrupted) => Step::Done(Outcome::Refused(Code::Interrupted)),
-                Err(WaitError::Failed(fault)) => Step::Done(Outcome::NotApplied(fault)),
+                Ok(_) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
+                Err(WaitError::Interrupted) => {
+                    delivery_done(&continuation, Outcome::Refused(Code::Interrupted))
+                }
+                Err(WaitError::Failed(fault)) => {
+                    delivery_done(&continuation, Outcome::NotApplied(fault))
+                }
             },
             // Unreachable through the driver, which admits only the requested
             // port's response.
-            (_, _) => Step::Done(Outcome::Refused(Code::Protocol)),
+            (_, _) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
         }
     }
 }
@@ -426,18 +432,18 @@ fn read(continuation: DeliveryContinuation, outcome: Outcome<Vec<Delivery>>) -> 
     match outcome {
         Outcome::Ok(pending) => {
             if !ordered(&pending) {
-                return Step::Done(Outcome::Refused(Code::Protocol));
+                return delivery_done(&continuation, Outcome::Refused(Code::Protocol));
             }
             let mut continuation = continuation;
             continuation.pending = pending;
             continuation.current = 0;
             send(continuation)
         }
-        Outcome::Refused(code) => Step::Done(Outcome::Refused(code)),
+        Outcome::Refused(code) => delivery_done(&continuation, Outcome::Refused(code)),
         // A read changes nothing durable, so a failed read did not apply.
         Outcome::NotApplied(fault) | Outcome::Unknown(fault) => {
             if continuation.retries == 0 {
-                return Step::Done(Outcome::NotApplied(fault));
+                return delivery_done(&continuation, Outcome::NotApplied(fault));
             }
             let mut continuation = continuation;
             continuation.retries -= 1;
@@ -447,9 +453,13 @@ fn read(continuation: DeliveryContinuation, outcome: Outcome<Vec<Delivery>>) -> 
     }
 }
 
-fn sent_one(continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep {
+fn sent_one(mut continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep {
+    match &sent {
+        Sent::Sent(_) | Sent::Unknown(_) => continuation.may_have_sent = true,
+        Sent::NotSent(_) | Sent::Refused(_) => {}
+    }
     let Some(delivery) = continuation.pending.get(continuation.current) else {
-        return Step::Done(Outcome::Refused(Code::Protocol));
+        return delivery_done(&continuation, Outcome::Refused(Code::Protocol));
     };
     match sent {
         Sent::Sent(report)
@@ -463,17 +473,17 @@ fn sent_one(continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep {
             );
             ask(continuation, DeliveryPhase::Acknowledge, operation)
         }
-        Sent::Sent(_) => Step::Done(Outcome::Refused(Code::Protocol)),
-        Sent::Refused(code) => Step::Done(Outcome::Refused(code)),
+        Sent::Sent(_) => delivery_done(&continuation, Outcome::Refused(Code::Protocol)),
+        Sent::Refused(code) => delivery_done(&continuation, Outcome::Refused(code)),
         Sent::NotSent(code) => {
             if continuation.retries == 0 {
-                return Step::Done(Outcome::Refused(code));
+                return delivery_done(&continuation, Outcome::Refused(code));
             }
             back_off(continuation)
         }
         Sent::Unknown(fault) => {
             if continuation.retries == 0 {
-                return Step::Done(Outcome::Unknown(fault));
+                return delivery_done(&continuation, Outcome::Unknown(fault));
             }
             back_off(continuation)
         }
@@ -489,14 +499,14 @@ fn acknowledged(continuation: DeliveryContinuation, outcome: Outcome<()>) -> Del
     match outcome {
         Outcome::Ok(()) | Outcome::Refused(Code::AlreadyAcknowledged) => {
             let Some(count) = continuation.acknowledged.checked_add(1) else {
-                return Step::Done(Outcome::Refused(Code::Range));
+                return delivery_done(&continuation, Outcome::Refused(Code::Range));
             };
             let mut continuation = continuation;
             continuation.acknowledged = count;
             continuation.current += 1;
             send(continuation)
         }
-        Outcome::Refused(code) => Step::Done(Outcome::Refused(code)),
+        Outcome::Refused(code) => delivery_done(&continuation, Outcome::Refused(code)),
         Outcome::NotApplied(fault) => retry_acknowledge(continuation, Outcome::NotApplied(fault)),
         Outcome::Unknown(fault) => retry_acknowledge(continuation, Outcome::Unknown(fault)),
     }
@@ -506,10 +516,10 @@ fn acknowledged(continuation: DeliveryContinuation, outcome: Outcome<()>) -> Del
 /// answers AlreadyAcknowledged.
 fn retry_acknowledge(mut continuation: DeliveryContinuation, failed: Outcome<u64>) -> DeliveryStep {
     if continuation.retries == 0 {
-        return Step::Done(failed);
+        return delivery_done(&continuation, failed);
     }
     let Some(delivery) = continuation.pending.get(continuation.current) else {
-        return Step::Done(Outcome::Refused(Code::Protocol));
+        return delivery_done(&continuation, Outcome::Refused(Code::Protocol));
     };
     let operation = Operation::Acknowledge(
         continuation.invocation.store,
@@ -523,7 +533,7 @@ fn retry_acknowledge(mut continuation: DeliveryContinuation, failed: Outcome<u64
 /// Sends the current record's exact bytes, or ends when none is left.
 fn send(continuation: DeliveryContinuation) -> DeliveryStep {
     let Some(delivery) = continuation.pending.get(continuation.current) else {
-        return Step::Done(Outcome::Ok(continuation.acknowledged));
+        return delivery_done(&continuation, Outcome::Ok(continuation.acknowledged));
     };
     let operation = Operation::Send(continuation.invocation.store, delivery.clone());
     ask(continuation, DeliveryPhase::Send, operation)
@@ -535,7 +545,7 @@ fn ask(
     operation: Operation,
 ) -> DeliveryStep {
     let Some(id) = continuation.id.next() else {
-        return Step::Done(Outcome::Refused(Code::Range));
+        return delivery_done(&continuation, Outcome::Refused(Code::Range));
     };
     continuation.phase = phase;
     continuation.id = id;
@@ -555,4 +565,20 @@ fn ordered(pending: &[Delivery]) -> bool {
         index += 1;
     }
     true
+}
+
+// A run-level non-execution result is valid only before any possible send.
+// This flag stays set across acknowledgements and subsequent records: a later
+// refusal cannot erase an earlier external effect or partial progress.
+fn delivery_done(continuation: &DeliveryContinuation, outcome: Outcome<u64>) -> DeliveryStep {
+    let outcome = if continuation.may_have_sent {
+        match outcome {
+            Outcome::Ok(count) => Outcome::Ok(count),
+            Outcome::NotApplied(fault) | Outcome::Unknown(fault) => Outcome::Unknown(fault),
+            Outcome::Refused(_) => Outcome::Unknown(Fault::Io),
+        }
+    } else {
+        outcome
+    };
+    Step::Done(outcome)
 }

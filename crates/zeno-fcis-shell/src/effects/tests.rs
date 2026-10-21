@@ -421,7 +421,7 @@ fn delivery_cases() -> Vec<(&'static str, u8, Vec<Response>, Next<u64>)> {
                     payload_sha256: hash(0xee),
                 })),
             ],
-            Next::Done(Outcome::Refused(Code::Protocol)),
+            Next::Done(Outcome::Unknown(Fault::Io)),
         ),
         (
             "acknowledged sends the next record",
@@ -453,7 +453,7 @@ fn delivery_cases() -> Vec<(&'static str, u8, Vec<Response>, Next<u64>)> {
                 sent.clone(),
                 Response::Acknowledge(Outcome::Refused(Code::PayloadMismatch)),
             ],
-            Next::Done(Outcome::Refused(Code::PayloadMismatch)),
+            Next::Done(Outcome::Unknown(Fault::Io)),
         ),
         (
             "lost acknowledgement repeats it",

@@ -5,7 +5,7 @@ use withdrawal_queue::{
     bindings::GeneratedProject,
     create, deposit,
     generated::{Caller, Flag, TickContext},
-    shell_effects::{Effects, RETRIES},
+    shell_effects::{Effects, MAX_REQUESTS, RETRIES},
     v2_contract,
 };
 use zeno_fcis_codec::{CanonicalEncode, Hash32};
@@ -53,6 +53,23 @@ struct Wire {
     fail: bool,
 }
 impl Transport for Wire {
+    fn provenance(&self) -> Option<zeno_fcis_shell_sqlite::effects::production::AdapterProvenance> {
+        Some(
+            zeno_fcis_shell_sqlite::effects::production::AdapterProvenance {
+                source: zeno_fcis_shell::effects::registry::source_digest(&[(
+                    "adapter.rs",
+                    include_bytes!("shell_effects.rs"),
+                )]),
+                configuration: {
+                    let mut bytes = vec![u8::from(self.fail)];
+                    bytes.extend_from_slice(&(self.calls.get() as u64).to_be_bytes());
+                    bytes
+                },
+                seed: 0,
+            },
+        )
+    }
+
     fn send(&mut self, d: &zeno_fcis_shell::effects::port::Delivery) -> Sent {
         self.calls.set(self.calls.get() + 1);
         assert!(!self.fail || self.calls.get() <= 3, "retry budget exceeded");
@@ -73,6 +90,19 @@ impl Transport for Wire {
 #[derive(Default)]
 struct Ticks(u64);
 impl Time for Ticks {
+    fn provenance(&self) -> Option<zeno_fcis_shell_sqlite::effects::production::AdapterProvenance> {
+        Some(
+            zeno_fcis_shell_sqlite::effects::production::AdapterProvenance {
+                source: zeno_fcis_shell::effects::registry::source_digest(&[(
+                    "adapter.rs",
+                    include_bytes!("shell_effects.rs"),
+                )]),
+                configuration: self.0.to_be_bytes().to_vec(),
+                seed: 0,
+            },
+        )
+    }
+
     fn clock(&mut self, epoch: u64) -> Result<EpochTick, Fault> {
         Ok(EpochTick {
             epoch,
@@ -160,7 +190,27 @@ fn recovery_uses_original_key() {
             ),
             "original-key receipt changed"
         );
-        shell.transcript().unwrap().verify().unwrap();
+        let transcript = shell.transcript().unwrap();
+        transcript.verify().unwrap();
+        let wrapper = transcript
+            .manifest
+            .implementations
+            .iter()
+            .find(|entry| entry.name == "withdrawal-queue")
+            .expect("template source missing");
+        assert_eq!(
+            wrapper.source,
+            zeno_fcis_shell::effects::registry::source_digest(&[(
+                "shell_effects.rs",
+                include_bytes!("../src/shell_effects.rs")
+            ),])
+        );
+        let mut limits = vec![RETRIES];
+        limits.extend_from_slice(&(MAX_REQUESTS as u64).to_be_bytes());
+        assert!(
+            transcript.manifest.configuration.ends_with(&limits),
+            "execution limits missing"
+        );
         let mut direct = withdrawal_queue::Shell::open(&path, a).unwrap();
         assert_eq!(direct.snapshot().unwrap().version(), 1);
         // History absence keeps the original stale guard: it cannot become a fresh decision.

@@ -51,3 +51,7 @@ required-features = ["crash-injection"]
 [[test]]
 name = "effects_template"
 required-features = ["crash-injection"]
+
+[[test]]
+name = "review_regressions"
+required-features = ["crash-injection"]

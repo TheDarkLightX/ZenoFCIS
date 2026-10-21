@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the shell-effects stage-1 controls in an isolated source copy.
+"""Execute the shell-effects stages 1-3 and review controls in an isolated source copy.
 
 Each named check passes on the unmodified tree first. Each mutant must then
 build and fail its named check with the stated marker; a build failure, a
@@ -18,6 +18,8 @@ import subprocess
 import tempfile
 import time
 
+from cargo_source_scope import source_environment
+
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = 'crates/zeno-fcis-shell/src/effects/registry.rs'
 PROGRAM = 'crates/zeno-fcis-shell/src/effects/program.rs'
@@ -27,6 +29,11 @@ SIMULATION = 'crates/zeno-fcis-shell/src/effects/simulation.rs'
 RECORD = 'crates/zeno-fcis-shell/src/effects/record.rs'
 HANDLER = 'crates/zeno-fcis-shell/src/effects/handler.rs'
 SHELL =['-p', 'zeno-fcis-shell', '--lib']
+REVIEW = ['-p', 'zeno-fcis-shell', '--test', 'review_regressions']
+EVIDENCE = ['-p', 'zeno-fcis-shell', '--test', 'evidence_checks']
+SQL_REVIEW = ['-p', 'zeno-fcis-shell-sqlite', '--features', 'crash-injection', '--test', 'review_regressions']
+EXPLORER = 'crates/zeno-fcis-shell/src/effects/explore.rs'
+PRODUCTION_TEST = 'crates/zeno-fcis-shell-sqlite/tests/effects_production.rs'
 SQLITE = ['-p', 'zeno-fcis-shell-sqlite', '--test', 'effects']
 PRODUCTION = ['-p', 'zeno-fcis-shell-sqlite', '--features', 'crash-injection', '--test', 'effects_production']
 STORE = 'crates/zeno-fcis-shell-sqlite/src/effects.rs'
@@ -159,6 +166,45 @@ CONTROLS = [
                 rusqlite::ErrorCode::DiskFull''', '''                    Response::unknown(port)
                 }
                 rusqlite::ErrorCode::DiskFull''')]),
+    ('project-away-time', PRODUCTION, 'production_fingerprint_retains_clock',
+     ['clock state projected away'],
+     'Removing retained adapter and connection state merges the two reviewed clock futures.',
+     [(PRODUCTION_TEST, """        for handle in &self.handles {
+            let state = ok(handle.test_execution_state());
+            bytes.extend_from_slice(&(state.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(&state);
+        }
+""", '')]),
+    ('wrong-recipient', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law commit-atomic failed'],
+     'The reviewed surviving mutant reroutes both deliveries while leaving the specification helper unchanged.',
+     [(SIMULATION, 'for delivery in deliveries(version, after.chain, &after.state) {',
+       'for mut delivery in deliveries(version, after.chain, &after.state) {\n'
+       '            delivery.destination = b"wrong-recipient".to_vec();')]),
+    ('forget-send-uncertainty', REVIEW, 'lost_send_remains_unknown_after_clock_failure',
+     ['send uncertainty was erased'],
+     'A later clock failure falsely reports non-execution after an unknown send.',
+     [(PROGRAM, 'let outcome = if continuation.may_have_sent {',
+       'let outcome = if false && continuation.may_have_sent {')]),
+    ('unbound-reopen', SQL_REVIEW, 'production_rebind_rejects_other_genesis',
+     ['substituted genesis accepted'],
+     'Reopening a replaced path accepts a different valid genesis under the retained identity.',
+     [(MOUNT, 'if shell.effects_identity()? != self.store.identity {',
+       'if false && shell.effects_identity()? != self.store.identity {')]),
+    ('omit-full', REVIEW, 'frozen_alphabet_contains_required_failures',
+     ['Full missing from frozen alphabet'],
+     'The read fault alphabet loses Full again.',
+     [(SIMULATION, 'Some(3) => Handled::Answer(Response::not_applied(port, Fault::Full)),',
+       'Some(3) => Handled::Answer(Response::not_applied(port, Fault::Io)),')]),
+    ('discard-checkpoint-frontier', EVIDENCE, 'resumed_search_matches_uninterrupted_closure',
+     ['resumed closure differs'],
+     'A budget stop returns a checkpoint without the retained prefixes, so resume disagrees with uninterrupted closure.',
+     [(EXPLORER, '                policies: policy_data.clone(),\n                frontier,',
+       '                policies: policy_data.clone(),\n                frontier: VecDeque::new(),')]),
+    ('omit-handler-provenance', EVIDENCE, 'manifest_sources_configuration_and_seed_are_bound',
+     ['handler implementation missing'],
+     'A named stack without its implementation sources cannot be qualified.',
+     [(RECORD, 'implementations: library_implementations(),', 'implementations: Vec::new(),')]),
     ('ambient-clock', None, 'purity',
      ['error[clock]'],
      'A step function reads std::time::Instant: the purity checker reports a clock violation in program.rs.',
@@ -179,15 +225,16 @@ def main() -> None:
     parser.add_argument('--out', type=Path, help='write the control rows here, logs beside it')
     parser.add_argument('--cli', type=Path, required=True, help='built zeno-fcis binary for the purity control')
     parser.add_argument('--only', choices=[control[0] for control in CONTROLS])
+    parser.add_argument('--release', action='store_true', help='use optimized checks for the finite explorers')
     args = parser.parse_args()
     env = dict(os.environ, CARGO_NET_OFFLINE='true')
     env.setdefault('CARGO_TARGET_DIR', str(ROOT / 'target' / 'shell-effects-controls'))
-    cargo = ['cargo', '+1.97.1', 'test', '--locked', '--offline']
+    cargo = ['cargo', '+1.97.1', 'test', '--locked', '--offline'] + (['--release'] if args.release else [])
 
     def run(root: Path, argv: list[str]) -> subprocess.CompletedProcess[str]:
         if shutil.disk_usage('/').free < 8 * 1024**3:
             raise RuntimeError('root free space below 8 GiB')
-        return subprocess.run(argv, cwd=root, env=env, stdout=subprocess.PIPE,
+        return subprocess.run(argv, cwd=root, env=source_environment(root, env) if argv[0] == "cargo" else env, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True, timeout=900)
 
     def check(root: Path, target, name: str) -> subprocess.CompletedProcess[str]:
@@ -214,7 +261,7 @@ def main() -> None:
                 (copy / path).write_text(text)
             start = time.monotonic()
             package = target[:2] if target else ['-p', 'zeno-fcis-shell']
-            build = run(copy, ['cargo', '+1.97.1', 'test', '--locked', '--offline', '--no-run'] + package
+            build = run(copy, cargo + ['--no-run'] + package
                         + (target[2:] if target else ['--lib']))
             if build.returncode:
                 raise SystemExit(f'BUILD FAILURE (not a kill) {name}:\n{build.stdout}')

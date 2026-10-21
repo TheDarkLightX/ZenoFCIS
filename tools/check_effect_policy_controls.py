@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import tempfile
 
+from cargo_source_scope import source_environment
+
 ROOT = Path(__file__).resolve().parents[1]
 EFFECTS = "crates/zeno-fcis-shell/src/effects/"
 POLICY = EFFECTS + "policy.rs"
@@ -71,15 +73,17 @@ CONTROLS = [
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--release", action="store_true", help="use optimized finite checks")
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, CARGO_NET_OFFLINE="true")
-    cargo = ["cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-shell", "--lib"]
+    env.setdefault("CARGO_TARGET_DIR", str(ROOT / "target" / "effect-policy-controls"))
+    cargo = ["cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-shell", "--lib"] + (["--release"] if args.release else [])
 
     def run(root: Path, extra: list[str]) -> subprocess.CompletedProcess[str]:
         if shutil.disk_usage("/").free < 8 * 1024**3:
             raise RuntimeError("root free space below 8 GiB")
-        return subprocess.run(cargo + extra, cwd=root, env=env, text=True,
+        return subprocess.run(cargo + extra, cwd=root, env=source_environment(root, env), text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
 
     rows = []

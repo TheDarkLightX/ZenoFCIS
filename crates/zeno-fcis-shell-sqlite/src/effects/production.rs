@@ -32,14 +32,36 @@ use zeno_fcis_synthesis::finite::v2_authority::Authority;
 use super::{Unbound, audited_publication, bind_publication, store_identity};
 use crate::v2::{self, Error, Lineage, V2SqliteShell, relay};
 
+/// Source/configuration/seed of a qualified caller adapter. This is provenance
+/// data, not an attestation or authority to publish or acknowledge.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdapterProvenance {
+    /// Actual implementation source digest.
+    pub source: Hash32,
+    /// Initial configuration and future-relevant retained state.
+    pub configuration: Vec<u8>,
+    /// Explicit PRNG seed, or zero for an adapter without randomness.
+    pub seed: u64,
+}
+
 /// A transport for Send: an observation, never a proof of receipt.
 pub trait Transport {
+    /// Non-effecting provenance snapshot; None keeps recording unqualified.
+    fn provenance(&self) -> Option<AdapterProvenance> {
+        None
+    }
+
     /// Sends one delivery's exact bytes.
     fn send(&mut self, delivery: &Delivery) -> Sent;
 }
 
 /// The opt-in time adapter for Clock, Random and Wait.
 pub trait Time {
+    /// Non-effecting provenance snapshot; None keeps recording unqualified.
+    fn provenance(&self) -> Option<AdapterProvenance> {
+        None
+    }
+
     /// A monotonic tick of `epoch`.
     fn clock(&mut self, epoch: u64) -> Result<EpochTick, Fault>;
     /// A draw below `bound`, for retry jitter only.
@@ -103,6 +125,9 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         let interpreter = MemoryDestination::interpreter_identity()?;
         let identity = store_identity(&history.genesis, authority.identity(), interpreter);
         let shell = V2SqliteShell::open(&path, authority)?;
+        if shell.effects_identity()? != identity {
+            return Err(Error::Identity);
+        }
         Ok(Self {
             path,
             lineage,
@@ -113,6 +138,56 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
             #[cfg(feature = "crash-injection")]
             interrupt: None,
         })
+    }
+
+    /// Binds the terminal and both caller adapters before private recording.
+    /// Unqualified adapters may execute, but cannot yield qualified evidence.
+    pub fn manifest(&self, start: Vec<u8>) -> Option<zeno_fcis_shell::effects::record::Manifest> {
+        use zeno_fcis_shell::effects::{
+            codec,
+            record::{Implementation, Manifest},
+        };
+        let transport = self.transport.provenance()?;
+        let time = self.time.as_ref()?.provenance()?;
+        if transport.source == Hash32::ZERO || time.source == Hash32::ZERO {
+            return None;
+        }
+        let mut manifest = Manifest::current(
+            vec!["record", "production"],
+            vec![],
+            self.store.identity,
+            start,
+        );
+        manifest.implementations.extend([
+            Implementation {
+                name: "production",
+                source: implementation_source(),
+            },
+            Implementation {
+                name: "transport",
+                source: transport.source,
+            },
+            Implementation {
+                name: "time",
+                source: time.source,
+            },
+        ]);
+        manifest.configuration = self.shell.as_ref()?.effects_configuration().ok()?;
+        manifest
+            .configuration
+            .extend_from_slice(&self.store.handle.to_be_bytes());
+        for adapter in [transport, time] {
+            codec::bytes(&mut manifest.configuration, &adapter.configuration);
+            manifest
+                .configuration
+                .extend_from_slice(&adapter.seed.to_be_bytes());
+        }
+        #[cfg(feature = "crash-injection")]
+        codec::bytes(
+            &mut manifest.configuration,
+            format!("{:?}", self.interrupt).as_bytes(),
+        );
+        Some(manifest)
     }
 
     /// The handle's store: its identity and handle number.
@@ -141,7 +216,7 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
 
     fn shell(&mut self) -> Result<&mut V2SqliteShell<'a, 'p>, Error> {
         if self.shell.is_none() {
-            self.shell = Some(V2SqliteShell::open(&self.path, current(self.lineage)?)?);
+            self.shell = Some(self.open_bound()?);
         }
         match self.shell.as_mut() {
             Some(shell) => Ok(shell),
@@ -214,6 +289,14 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
 
     fn history(&mut self) -> Result<AuditedHistory, Error> {
         let audited = self.lineage.audit_history_read_only(&self.path)?;
+        let identity = store_identity(
+            &audited.genesis,
+            current(self.lineage)?.identity(),
+            MemoryDestination::interpreter_identity()?,
+        );
+        if identity != self.store.identity {
+            return Err(Error::Identity);
+        }
         let authorities = self.lineage.authorities();
         let mut commits = Vec::with_capacity(audited.commits.len());
         for commit in &audited.commits {
@@ -239,9 +322,41 @@ impl<'a, 'p, T: Transport, C: Time> Production<'a, 'p, T, C> {
         })
     }
 
+    fn open_bound(&self) -> Result<V2SqliteShell<'a, 'p>, Error> {
+        let shell = V2SqliteShell::open(&self.path, current(self.lineage)?)?;
+        if shell.effects_identity()? != self.store.identity {
+            return Err(Error::Identity);
+        }
+        Ok(shell)
+    }
+
+    /// Test projection including adapter state, connection/cache state and
+    /// pending injection. Transport Debug must cover its volatile state;
+    /// the qualified explorer separately snapshots its receiver database.
+    #[cfg(feature = "crash-injection")]
+    pub fn test_execution_state(&self) -> Result<Vec<u8>, Error>
+    where
+        T: core::fmt::Debug,
+        C: core::fmt::Debug,
+    {
+        let mut bytes = format!(
+            "{:?}|{:?}|{:?}|{:?}",
+            self.store, self.time, self.transport, self.interrupt
+        )
+        .into_bytes();
+        match &self.shell {
+            Some(shell) => {
+                bytes.push(1);
+                bytes.extend_from_slice(&shell.effects_configuration()?);
+            }
+            None => bytes.push(0),
+        }
+        Ok(bytes)
+    }
+
     fn reopen(&mut self) -> Result<Snapshot, Error> {
         self.shell = None;
-        let mut shell = V2SqliteShell::open(&self.path, current(self.lineage)?)?;
+        let mut shell = self.open_bound()?;
         shell.audit()?;
         let head = snapshot(&shell.snapshot()?);
         self.shell = Some(shell);
@@ -391,4 +506,56 @@ fn answer(port: Port, result: Result<Response, Error>, writes: bool) -> Handled 
         Error::InjectedCrash(_) => return Handled::Crash,
     };
     Handled::Answer(Response::refused(port, code))
+}
+
+/// Actual source closure of the qualified SQLite terminal, excluding tests.
+#[must_use]
+pub fn implementation_source() -> Hash32 {
+    zeno_fcis_shell::effects::registry::source_digest(&[
+        ("effects/production.rs", include_bytes!("production.rs")),
+        ("lib.rs", include_bytes!("../lib.rs")),
+        (
+            "shell/lib.rs",
+            include_bytes!("../../../zeno-fcis-shell/src/lib.rs"),
+        ),
+        ("effects.rs", include_bytes!("../effects.rs")),
+        ("v2.rs", include_bytes!("../v2.rs")),
+        ("v2/behaviour.rs", include_bytes!("../v2/behaviour.rs")),
+        ("v2/compact.rs", include_bytes!("../v2/compact.rs")),
+        ("v2/delivery.rs", include_bytes!("../v2/delivery.rs")),
+        (
+            "v2/equivalence/checker.rs",
+            include_bytes!("../v2/equivalence/checker.rs"),
+        ),
+        (
+            "v2/equivalence/checker_api.rs",
+            include_bytes!("../v2/equivalence/checker_api.rs"),
+        ),
+        (
+            "v2/equivalence/checker_equality.rs",
+            include_bytes!("../v2/equivalence/checker_equality.rs"),
+        ),
+        (
+            "v2/equivalence/checker_range_spec.rs",
+            include_bytes!("../v2/equivalence/checker_range_spec.rs"),
+        ),
+        (
+            "v2/equivalence/checker_ranges.rs",
+            include_bytes!("../v2/equivalence/checker_ranges.rs"),
+        ),
+        (
+            "v2/equivalence/checker_spec.rs",
+            include_bytes!("../v2/equivalence/checker_spec.rs"),
+        ),
+        ("v2/equivalence.rs", include_bytes!("../v2/equivalence.rs")),
+        ("v2/history.rs", include_bytes!("../v2/history.rs")),
+        ("v2/lineage.rs", include_bytes!("../v2/lineage.rs")),
+        (
+            "v2/migration/payload.rs",
+            include_bytes!("../v2/migration/payload.rs"),
+        ),
+        ("v2/migration.rs", include_bytes!("../v2/migration.rs")),
+        ("v2/relay.rs", include_bytes!("../v2/relay.rs")),
+        ("v2/upgrade.rs", include_bytes!("../v2/upgrade.rs")),
+    ])
 }

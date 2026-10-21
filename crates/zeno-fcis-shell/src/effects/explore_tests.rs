@@ -390,9 +390,16 @@ fn fault_handler_laws() {
         ),
         Operation::Acknowledge(store, record.id, record.payload_sha256),
         Operation::Send(store, record),
+        Operation::ReadState(store),
+        Operation::ReadHistory(store),
         Operation::ReadOutbox(store),
         Operation::Reopen(store),
         Operation::Clock,
+        Operation::Random(
+            super::port::Purpose::RetryJitter,
+            core::num::NonZeroU64::MIN,
+        ),
+        Operation::Wait(super::port::EpochTick { epoch: 1, tick: 1 }),
     ];
     let mut laws = Laws::default();
     let mut shapes = Vec::new();
@@ -425,18 +432,22 @@ fn fault_handler_laws() {
             shapes.push((operation.port(), choice, handled));
         }
     }
-    // Every write has six fault options, Send seven, reads three and Clock one.
+    // Full and I/O are explicit alongside Busy; each time port can also fail.
     let count = |port| shapes.iter().filter(|(p, ..)| *p == port).count();
     assert_eq!(
         [
             count(Port::Commit),
             count(Port::Acknowledge),
             count(Port::Send),
+            count(Port::ReadState),
+            count(Port::ReadHistory),
             count(Port::ReadOutbox),
             count(Port::Reopen),
-            count(Port::Clock)
+            count(Port::Clock),
+            count(Port::Random),
+            count(Port::Wait)
         ],
-        [6, 6, 7, 3, 3, 1]
+        [8, 8, 7, 5, 5, 5, 5, 4, 4, 5]
     );
     assert!(
         shapes
