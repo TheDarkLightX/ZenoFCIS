@@ -1,0 +1,22 @@
+# A delivery relay over the transport's answer, in profile zal/typed-fsm/1.
+# The input answer is a three-case variant; the checker sees it as indices 0..=2.
+zal typed 1;
+machine relay;
+states awaiting, delivered, pending, stuck;
+events reply, send;
+context none;
+type Attempts = int 0..=2;
+type Sent = sent | not_sent | unknown;
+input answer: Sent;
+var acknowledged: bool initially false;
+var tries: Attempts initially 0;
+initial pending;
+step atomic; frame control_and_variables;
+default reject not_enabled unchanged;
+rule acknowledge: awaiting + reply [answer == sent] -> accept delivered, acknowledged = true;
+rule give_up: awaiting + reply [(answer != sent & tries == 2)] -> accept stuck;
+rule retry: awaiting + reply [(answer != sent & tries <= 1)] -> accept pending;
+rule send_once: pending + send [tries <= 1] -> accept awaiting, tries += 1;
+invariant acknowledged_only_when_delivered: (acknowledged == true => state == delivered);
+require delivered_only_on_a_sent_report: ((accepted & state' == delivered) => answer == sent);
+property never_stuck_early: always((accepted & state' == stuck) => tries == 2);
