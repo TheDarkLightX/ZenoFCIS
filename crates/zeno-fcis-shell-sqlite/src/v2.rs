@@ -749,7 +749,8 @@ impl<'a, 'p, D: DescriptorData<'p> + 'p> V2SqliteShell<'a, 'p, D> {
     // Read the genesis on this exact connection, rather than opening its path
     // again. Used only to bind the opt-in effect adapter after a path rebind.
     pub(crate) fn effects_identity(&self) -> Result<Hash32, Error> {
-        let (_, genesis) = genesis_anchor(&self.connection, self.authority())?;
+        let (_, genesis) =
+            genesis_anchor_retained(&self.connection, self.authority(), None)?;
         Ok(crate::effects::store_identity(
             &genesis.state,
             self.authority().identity(),
