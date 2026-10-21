@@ -273,26 +273,30 @@ is shared.
    ```
 
    Z3 also answered `unsat`. Z3 proof checking is unsupported for these inductive claims, so the run is
-   recorded as blocked evidence, with exit code 2. This historical run predates
-   the restricted Lean inductive exporter, so its Lean command selected nothing.
+   recorded as blocked evidence, with exit code 2.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
    z3 claim 600 blocked: UnsupportedEvidence
    z3 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
    (exit 2)
-   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
-   claim 600 does not select compatible lean
-   no compatible claim/backend pair was selected
-   (exit 2)
    ```
 
    The development candidate routes claim 600 through `--backend lean`.
+   With the pinned Lean 4.30.0 runtime and an explicit manifest allowing
+   exactly `propext` and `Quot.sound`, the recorded output includes:
+
+   ```text
+   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
+   lean claim 600: generated theorem kernel checked
+   (exit 0)
+   ```
+
    Its finite-history theorem is conditional on the invariant holding at the
-   application's exact initial state. The ignored CLI test
-   `pinned_lean_kernel_checks_both_inductive_pilots_through_prove` must pass
-   with the pinned runtime before replacing the historical Lean output above.
-   That pinned run is not yet complete for this candidate.
+   application's exact initial state. Both `step_preserves` and `history_holds`
+   report exactly those two axioms; neither depends on `Classical.choice`.
+   The ignored `pinned_lean_kernel_checks_both_inductive_pilots_through_prove`
+   test checks this CLI route and its retained source-bound evidence.
 
    In the historical 1.1.0 run, the same control command on a copy whose three integer types
    declare no range printed, for CVC5:

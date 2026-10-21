@@ -255,11 +255,11 @@ and Boolean connectives. The export preserves i128 ranges, declared domains,
 strict checked-arithmetic definedness, and the law groups for each decision
 kind. The standalone source uses only Lean's core library.
 
-The generated `Inv` describes the invariant. `Admitted` describes the model's
-committing steps, and `step_preserves` proves that each keeps `Inv`.
+The generated `StateInv` describes the invariant. `Admitted` describes the model's
+committing steps, and `step_preserves` proves that each keeps `StateInv`.
 `Step` also permits an unchanged state for rejection or technical refusal.
 `history_holds` proves the invariant for every finite `Chain Step g h`,
-**conditional on `Inv g`**. The project has no concrete genesis value, so
+**conditional on `StateInv g`**. The project has no concrete genesis value, so
 the exporter emits no `genesis_holds` theorem and invents no initial state.
 
 The application's exact-genesis checks remain premises:

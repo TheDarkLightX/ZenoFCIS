@@ -137,10 +137,19 @@ project file.
 The development candidate also exports claim 600 through `--backend lean`
 for the restricted linear fragment. Its finite-history theorem assumes the
 initial state satisfies the invariant; it does not infer a genesis value from
-`project.zeno`. The ignored CLI test
-`pinned_lean_kernel_checks_both_inductive_pilots_through_prove` must pass with
-the pinned runtime before a new kernel-checked output is recorded here. That
-pinned run is not yet complete for this candidate.
+`project.zeno`. With the pinned Lean 4.30.0 runtime and an explicit manifest
+allowing exactly `propext` and `Quot.sound`, the recorded output includes:
+
+```text
+$ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
+lean claim 600: generated theorem kernel checked
+(exit 0)
+```
+
+Both `step_preserves` and `history_holds` report exactly those two axioms;
+neither depends on `Classical.choice`. The ignored
+`pinned_lean_kernel_checks_both_inductive_pilots_through_prove` test checks this
+CLI route and its retained source-bound evidence.
 
 The step says something about this application only with more checks,
 which `tests/induction.rs` runs:

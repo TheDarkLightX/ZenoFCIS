@@ -84,13 +84,13 @@ pub fn export_inductive_lean_with_limits(
     let law_sha = hash_hex(RustCryptoSha256::hash(&manifest));
     let mut source = format!(
         "-- {IDENTITY}\n-- claim-id {}\n-- project-sha256 {project_sha}\n-- law-manifest-sha256 {law_sha}\n-- theorem {THEOREM}\n\
-         -- Conditional base case: the application's exact initial state satisfies Inv.\n\
+         -- Conditional base case: the application's exact initial state satisfies StateInv.\n\
          -- Runtime premises: all assumed laws are enforced for their stated decision kinds;\n\
          -- observed values lie in their declared domains; rejects/refusals commit nothing\n\
          -- and preserve state; the runtime law checker reads these same projection paths.\n\
          -- Pilot base-case and observation checks: tests/induction.rs (durable-counter),\n\
          -- tests/claims.rs (account-lockout); see docs/INDUCTIVE_CLAIMS.md.\n\
-         import Lean\n\n\
+         import Init\n\n\
          def inI128 (x : Int) : Prop := {} <= x ∧ x <= {}\n\n",
         claim.id().get(),
         integer(i128::MIN),
@@ -123,8 +123,8 @@ pub fn export_inductive_lean_with_limits(
     }
     let before = &rendered[grouped.len()];
     let inv = satisfied(before).replace("pre.", "s.");
-    source.push_str(&format!("\ndef Inv (s : State) : Prop := {inv}\n\ndef Admitted (pre post : State) (inputs : Inputs) (kind : Nat) : Prop :=\n  {}\n\n", conjunction(assumptions)));
-    source.push_str("theorem step_preserves (pre post : State) (inputs : Inputs) (kind : Nat) :\n  Inv pre → Admitted pre post inputs kind → Inv post := by\n  intro hinv hadmitted\n  simp only [Inv, Admitted, inI128, true_and, and_true] at *\n  omega\n\n");
+    source.push_str(&format!("\ndef StateInv (s : State) : Prop := {inv}\n\ndef Admitted (pre post : State) (inputs : Inputs) (kind : Nat) : Prop :=\n  {}\n\n", conjunction(assumptions)));
+    source.push_str("theorem step_preserves (pre post : State) (inputs : Inputs) (kind : Nat) :\n  StateInv pre → Admitted pre post inputs kind → StateInv post := by\n  intro hinv hadmitted\n  simp only [StateInv, Admitted, inI128, true_and, and_true] at *\n  repeat' first | apply And.intro | intro\n  all_goals\n    try simp only [Decidable.imp_iff_not_or] at *\n    omega\n\n");
     source.push_str(HISTORY);
     if source.len() > limits.max_source_bytes() {
         return Err(ExportError::ResourceLimit);
@@ -156,8 +156,8 @@ inductive Chain (step : State → State → Prop) : State → List State → Pro
   | nil (g : State) : Chain step g []
   | cons {g s : State} {tail : List State} : step g s → Chain step s tail → Chain step g (s :: tail)
 
-theorem history_holds (g : State) (hg : Inv g) :
-  ∀ (h : List State), Chain Step g h → ∀ s ∈ h, Inv s := by
+theorem history_holds (g : State) (hg : StateInv g) :
+  ∀ (h : List State), Chain Step g h → ∀ s ∈ h, StateInv s := by
   intro h
   induction h generalizing g with
   | nil => intro _ target member; cases member
@@ -165,7 +165,7 @@ theorem history_holds (g : State) (hg : Inv g) :
     intro chain target member
     cases chain with
     | cons transition rest =>
-      have hs : Inv next := by
+      have hs : StateInv next := by
         rcases transition with ⟨inputs, kind, admitted⟩ | same
         · exact step_preserves g next inputs kind hg admitted
         · simpa only [same] using hg

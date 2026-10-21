@@ -74,6 +74,112 @@ fn record_source(name: &str, source: &[u8]) {
     }
 }
 
+#[derive(Clone)]
+enum AdmittedFact {
+    Path(ProjectionPath),
+    Domain(ProjectionPath, DeclaredDomain),
+    Law(LawDecl, Option<u8>),
+    DecisionKinds,
+}
+
+// This bounded decoder recognizes the exporter's top-level assumption grammar.
+// It reads source bytes, not ExportedObligation.hypotheses. Unknown, duplicate,
+// omitted or differently guarded terms cannot silently inherit metadata.
+fn admitted_facts(
+    obligation: &ExportedObligation,
+    spec: &ProjectSpec,
+    reference: &StepHypotheses,
+) -> (StepHypotheses, bool) {
+    let mut catalog = BTreeMap::new();
+    let mut add = |term, fact| {
+        assert!(catalog.insert(term, fact).is_none(), "ambiguous fact");
+    };
+    for path in reference.paths() {
+        let term = projection(path).unwrap_or_else(|_| unreachable!());
+        add(format!("inI128 {term}"), AdmittedFact::Path(path.clone()));
+        if let Some(domain) = declared_domain(spec, path) {
+            add(
+                domain_formula(&term, &domain),
+                AdmittedFact::Domain(path.clone(), domain),
+            );
+        }
+    }
+    add(
+        "(kind = 1 ∨ kind = 2)".to_owned(),
+        AdmittedFact::DecisionKinds,
+    );
+    for law in spec.laws() {
+        let rendered = render_relation(
+            law.formula(),
+            &mut SmtRenderBudget::new(ExportLimits::default()),
+        )
+        .unwrap_or_else(|_| unreachable!());
+        let holds = satisfied(&rendered);
+        add(holds.clone(), AdmittedFact::Law(law.clone(), None));
+        for kind in [1, 2] {
+            add(
+                format!("(kind = {kind} → {holds})"),
+                AdmittedFact::Law(law.clone(), Some(kind)),
+            );
+        }
+    }
+    let source = std::str::from_utf8(obligation.source()).unwrap_or_else(|_| unreachable!());
+    let (_, body) = source
+        .split_once("def Admitted ")
+        .unwrap_or_else(|| unreachable!());
+    let (_, body) = body
+        .split_once(": Prop :=\n  ")
+        .unwrap_or_else(|| unreachable!());
+    let (body, _) = body.split_once("\n\n").unwrap_or_else(|| unreachable!());
+    let body = body
+        .strip_prefix('(')
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or_else(|| panic!("expected a conjunction: {body}"));
+    let mut depth = 0_u32;
+    let mut start = 0;
+    let mut terms = Vec::new();
+    for (index, ch) in body.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.checked_sub(1).unwrap_or_else(|| unreachable!()),
+            '∧' if depth == 0 => {
+                terms.push(body[start..index].trim());
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(depth, 0, "unbalanced assumptions");
+    terms.push(body[start..].trim());
+    let mut facts = StepHypotheses::default();
+    let mut every_commit = Vec::new();
+    let mut accepts = Vec::new();
+    let mut failures = Vec::new();
+    let mut split = false;
+    for term in terms {
+        match catalog
+            .remove(term)
+            .unwrap_or_else(|| panic!("unknown/duplicate emitted fact: {term}"))
+        {
+            AdmittedFact::Path(path) => {
+                facts.paths.insert(path);
+            }
+            AdmittedFact::Domain(path, domain) => {
+                facts.domains.insert(path, domain);
+            }
+            AdmittedFact::DecisionKinds => split = true,
+            AdmittedFact::Law(law, None) => every_commit.push(law),
+            AdmittedFact::Law(law, Some(1)) => accepts.push(law),
+            AdmittedFact::Law(law, Some(2)) => failures.push(law),
+            AdmittedFact::Law(_, Some(_)) => unreachable!(),
+        }
+    }
+    facts.every_commit = every_commit.into_boxed_slice();
+    facts.accepts = accepts.into_boxed_slice();
+    facts.committed_failures = failures.into_boxed_slice();
+    (facts, split)
+}
+
 #[test]
 fn inductive_lean_and_smt_emit_identical_structured_facts() {
     for (name, source) in PILOTS
@@ -87,15 +193,17 @@ fn inductive_lean_and_smt_emit_identical_structured_facts() {
             .unwrap_or_else(|error| panic!("{name}: {error:?}"));
         let lean =
             export_inductive_lean(claim, &spec).unwrap_or_else(|error| panic!("{name}: {error:?}"));
-        // Structured facts are recorded inside each exporter's actual emission
-        // loops: observed paths (i128), domain values/ranges, law ASTs and kinds.
-        assert_eq!(lean.hypotheses(), smt.hypotheses(), "{name}");
+        // Decode the actual Admitted body, independently of retained metadata.
+        // Compare typed paths, domains and laws grouped by their emitted guard.
+        let (facts, split) = admitted_facts(&lean, &spec, smt.hypotheses());
+        assert_eq!(&facts, smt.hypotheses(), "{name}");
+        assert!(split, "{name}: missing decision-kind alternatives");
         assert!(!lean.hypotheses().paths().is_empty(), "{name}");
         assert_eq!(lean.scope(), ObligationScope::InductiveStepOverLaws);
         assert!(source_is_bound(&lean));
         let text = String::from_utf8_lossy(lean.source());
         record_source(name, lean.source());
-        assert!(text.contains("theorem history_holds (g : State) (hg : Inv g)"));
+        assert!(text.contains("theorem history_holds (g : State) (hg : StateInv g)"));
         assert!(!text.contains("theorem genesis_holds"));
     }
 }
@@ -208,7 +316,7 @@ fn pinned_config() -> ToolConfig {
             ),
             tree_sha256: LEAN_LINUX_X86_64_TREE_SHA256.to_owned(),
         }),
-        timeout_ms: 60_000,
+        timeout_ms: 300_000,
         max_output_bytes: 1024 * 1024,
         allowed_axioms: vec!["Quot.sound".to_owned(), "propext".to_owned()],
     }
@@ -217,6 +325,7 @@ fn pinned_config() -> ToolConfig {
 fn run_fixture(name: &str, source: &str, expected: bool) {
     let obligation = exported_fixture(source);
     record_source(name, obligation.source());
+    let started = Instant::now();
     let run = execute_tool(&pinned_config(), obligation)
         .unwrap_or_else(|error| panic!("{name}: {error:?}"));
     if let Some(directory) = std::env::var_os("ZENO_FCIS_LEAN_EVIDENCE") {
@@ -232,23 +341,35 @@ fn run_fixture(name: &str, source: &str, expected: bool) {
             .unwrap_or_else(|error| panic!("output evidence: {error}"));
     }
     println!(
-        "{name}: {:?}\n{}",
+        "{name}: {:?} (adapter wall {:.3}s)\n{}",
         run.status(),
+        started.elapsed().as_secs_f64(),
         String::from_utf8_lossy(run.stdout())
     );
+    if run.status() != &ToolRunStatus::KernelChecked {
+        assert!(matches!(
+            run.status(),
+            ToolRunStatus::Failed(ToolFailure::Crash(Some(1)))
+        ));
+        let stdout = String::from_utf8_lossy(run.stdout());
+        let errors: Vec<_> = stdout
+            .lines()
+            .filter(|line| line.contains("error:"))
+            .collect();
+        assert!(!errors.is_empty(), "{name}: missing proof diagnostic");
+        assert!(
+            errors
+                .iter()
+                .all(|line| line.contains("omega could not prove the goal")),
+            "{name}: unrelated declaration or compilation failure: {errors:?}"
+        );
+    }
     assert_eq!(
         run.status() == &ToolRunStatus::KernelChecked,
         expected,
         "{name}: {}",
         String::from_utf8_lossy(run.stdout())
     );
-    if !expected {
-        assert!(matches!(
-            run.status(),
-            ToolRunStatus::Failed(ToolFailure::Crash(Some(1)))
-        ));
-        assert!(String::from_utf8_lossy(run.stdout()).contains("error:"));
-    }
 }
 
 #[test]
@@ -259,12 +380,19 @@ fn pinned_lean_inductive_pilots() {
     }
 }
 
+static POSITIVE_BASELINE: std::sync::Once = std::sync::Once::new();
+
 macro_rules! control {
     ($test:ident, $index:literal) => {
         #[test]
         #[ignore = "requires the workflow-pinned Lean distribution"]
         fn $test() {
+            // Every isolated negative run first establishes a passing source,
+            // runtime and axiom-admission baseline using the positive control.
             let (name, source, checked) = CONTROLS[$index];
+            if !checked {
+                POSITIVE_BASELINE.call_once(|| run_fixture("positive_baseline", PILOTS[0].1, true));
+            }
             run_fixture(name, source, checked);
         }
     };

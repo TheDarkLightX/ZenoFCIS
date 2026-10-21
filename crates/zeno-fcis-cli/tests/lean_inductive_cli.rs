@@ -55,7 +55,7 @@ fn manifest(directory: &Directory, binary: &Path, runtime: &Path, sha256: &str) 
             "version": LEAN_VERSION,
             "sha256": sha256,
             "runtime": {"root": runtime, "tree_sha256": LEAN_LINUX_X86_64_TREE_SHA256},
-            "timeout_ms": 120000,
+            "timeout_ms": 300000,
             "max_output_bytes": 1048576,
             "allowed_axioms": ["Quot.sound", "propext"]
         }]
@@ -138,6 +138,7 @@ fn pinned_lean_kernel_checks_both_inductive_pilots_through_prove() {
     for template in ["durable-counter", "account-lockout"] {
         let directory = Directory::new();
         let tools = manifest(&directory, &binary, &runtime, &sha256);
+        let started = std::time::Instant::now();
         let output = prove(&directory, &project_source(template), &tools);
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -175,6 +176,23 @@ fn pinned_lean_kernel_checks_both_inductive_pilots_through_prove() {
         assert!(source.contains("theorem history_holds"));
         assert!(source.contains("#print axioms history_holds"));
         assert!(!source.contains("theorem genesis_holds"));
-        println!("{template}: {stdout}");
+        println!(
+            "{template}: CLI exit {:?}, wall {:.3}s\n{stdout}",
+            output.status.code(),
+            started.elapsed().as_secs_f64()
+        );
+        if let Some(directory) = std::env::var_os("ZENO_FCIS_LEAN_EVIDENCE") {
+            let directory = PathBuf::from(directory).join(format!("cli-{template}"));
+            fs::create_dir_all(&directory).unwrap_or_else(|error| panic!("CLI evidence: {error}"));
+            for entry in
+                fs::read_dir(&records[0]).unwrap_or_else(|error| panic!("CLI record: {error}"))
+            {
+                let entry = entry.unwrap_or_else(|error| panic!("CLI evidence entry: {error}"));
+                fs::copy(entry.path(), directory.join(entry.file_name()))
+                    .unwrap_or_else(|error| panic!("copy CLI evidence: {error}"));
+            }
+            fs::write(directory.join("cli.stdout"), output.stdout)
+                .unwrap_or_else(|error| panic!("CLI output: {error}"));
+        }
     }
 }

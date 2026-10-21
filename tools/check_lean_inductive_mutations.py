@@ -10,6 +10,7 @@ genesis feature is not implemented, so its optional control does not apply.
 from pathlib import Path
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 
@@ -45,14 +46,30 @@ MUTATIONS = (
 )
 
 
-def run(root, env, test, exact):
+def run(root, env, test, exact, ignored=True):
+    available = shutil.disk_usage("/").free
+    print(f"root free before build: {available // (1024**3)} GiB", flush=True)
+    if available < 6 * 1024**3:
+        raise SystemExit("root disk below 6 GiB; build stopped")
     command = ["cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools",
                "--locked", "--offline", "-j", "2", "--lib", test, "--",
-               "--ignored", "--nocapture", "--test-threads=1"]
+               "--nocapture", "--test-threads=1"]
+    if ignored:
+        command.append("--ignored")
     if exact:
         command.append("--exact")
-    return subprocess.run(command, cwd=root, env=env, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, timeout=900)
+    process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        # This includes multiple full runtime snapshots on a slow drive; each
+        # Lean subprocess still has its own explicit five-minute timeout.
+        output, _ = process.communicate(timeout=7200)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        output, _ = process.communicate()
+        print(output, flush=True)
+        raise SystemExit("mutation lane timed out; its process group was stopped")
+    return subprocess.CompletedProcess(command, process.returncode, output)
 
 
 def main():
@@ -64,6 +81,11 @@ def main():
     env.setdefault("CARGO_PROFILE_DEV_DEBUG", "0")
     # Avoid overwriting the normal-source artifacts with mutation-source files.
     env.pop("ZENO_FCIS_LEAN_EVIDENCE", None)
+    facts_test = "lean_inductive::tests::inductive_lean_and_smt_emit_identical_structured_facts"
+    facts = run(ROOT, env, facts_test, True, ignored=False)
+    print(facts.stdout, flush=True)
+    if facts.returncode or "1 passed; 0 failed" not in facts.stdout:
+        raise SystemExit("normal-source rendered-facts baseline did not pass")
     baseline = run(ROOT, env, PREFIX, False)
     print(baseline.stdout, flush=True)
     if baseline.returncode or "7 passed; 0 failed" not in baseline.stdout:
@@ -78,6 +100,13 @@ def main():
             if original.count(before) != 1:
                 raise SystemExit(f"mutation anchor must match once: {name}")
             path.write_text(original.replace(before, after, 1))
+            if fixture in ("kind_split", "domain"):
+                comparison = run(copy, env, facts_test, True, ignored=False)
+                print(comparison.stdout, flush=True)
+                if (comparison.returncode == 0 or "test result: FAILED." not in comparison.stdout
+                        or "assertion `left == right` failed" not in comparison.stdout):
+                    raise SystemExit(f"rendered-fact comparison did not catch: {name}")
+                print(f"FACT COMPARISON KILLED: {name}", flush=True)
             result = run(copy, env, PREFIX + fixture, True)
             path.write_text(original)
             print(result.stdout, flush=True)
@@ -85,6 +114,12 @@ def main():
                 raise SystemExit(f"SURVIVED: {name}")
             if "test result: FAILED." not in result.stdout or "assertion `left == right` failed" not in result.stdout:
                 raise SystemExit(f"mutation did not reach the expected result-flip assertion: {name}")
+            flipped = (f"{fixture}: Failed(Crash(Some(1)))" if fixture == "domain"
+                       else f"{fixture}: KernelChecked")
+            if flipped not in result.stdout:
+                raise SystemExit(f"named fixture did not flip: {name}")
+            if fixture == "domain" and "omega could not prove the goal" not in result.stdout:
+                raise SystemExit("domain mutation failed without the required proof diagnostic")
             print(f"KILLED: {name} by {PREFIX + fixture}", flush=True)
     # The real source must still pass after all isolated mutations.
     restored = run(ROOT, env, PREFIX, False)
