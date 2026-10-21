@@ -218,6 +218,8 @@ pub enum Code {
     /// A response broke its port law: an unordered outbox, a mismatched
     /// report, an early wake or an out-of-range draw.
     Protocol,
+    /// The run was cancelled while it waited; the record stays pending.
+    Interrupted,
 }
 
 /// Why an operation failed without a refusal code.
@@ -253,7 +255,16 @@ pub enum Sent {
     /// The transport did not send.
     NotSent(Code),
     /// The transport may or may not have sent.
-    Unknown(Code),
+    Unknown(Fault),
+}
+
+/// Why a wait ended without reaching its deadline.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WaitError {
+    /// The wait was cancelled explicitly.
+    Interrupted,
+    /// The clock failed.
+    Failed(Fault),
 }
 
 /// One request a program makes.
@@ -302,8 +313,8 @@ pub enum Response {
     Clock(Result<EpochTick, Fault>),
     /// Answers Random.
     Random(Result<u64, Fault>),
-    /// Answers Wait; an error is an explicit interruption.
-    Wait(Result<EpochTick, Fault>),
+    /// Answers Wait.
+    Wait(Result<EpochTick, WaitError>),
 }
 
 impl Operation {

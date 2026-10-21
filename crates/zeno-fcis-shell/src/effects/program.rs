@@ -13,7 +13,7 @@ use zeno_fcis_codec::Hash32;
 
 use super::port::{
     AuditedHistory, Code, CommitMode, CommitReceipt, Delivery, EpochTick, Fault, OpId, Operation,
-    Outcome, PublicationData, Purpose, Response, Sent, Store,
+    Outcome, PublicationData, Purpose, Response, Sent, Store, WaitError,
 };
 use super::registry::{Capability, Port};
 
@@ -108,6 +108,26 @@ impl CommitProgram {
                 retries: policy.retries,
                 mode,
                 unknown: None,
+                invocation,
+            },
+        )
+    }
+
+    /// Restarts a commit whose run ended without an answer, as after a
+    /// crash: the caller's retained request is recovered by reopening the
+    /// store and reading its history before any retry.
+    #[must_use]
+    pub fn recover(invocation: CommitInvocation, policy: CommitPolicy) -> CommitStep {
+        let id = OpId::first(invocation.epoch);
+        Step::Request(
+            id,
+            Operation::Reopen(invocation.store),
+            CommitContinuation {
+                phase: CommitPhase::Reopen,
+                id,
+                retries: policy.retries,
+                mode: invocation.mode,
+                unknown: Some(Fault::Io),
                 invocation,
             },
         )
@@ -392,7 +412,8 @@ impl Program for DeliveryProgram {
                     send(continuation)
                 }
                 Ok(_) => Step::Done(Outcome::Refused(Code::Protocol)),
-                Err(fault) => Step::Done(Outcome::NotApplied(fault)),
+                Err(WaitError::Interrupted) => Step::Done(Outcome::Refused(Code::Interrupted)),
+                Err(WaitError::Failed(fault)) => Step::Done(Outcome::NotApplied(fault)),
             },
             // Unreachable through the driver, which admits only the requested
             // port's response.
@@ -449,9 +470,9 @@ fn sent_one(continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep {
             }
             back_off(continuation)
         }
-        Sent::Unknown(_) => {
+        Sent::Unknown(fault) => {
             if continuation.retries == 0 {
-                return Step::Done(Outcome::Unknown(Fault::Io));
+                return Step::Done(Outcome::Unknown(fault));
             }
             back_off(continuation)
         }

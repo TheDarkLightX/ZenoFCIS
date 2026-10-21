@@ -19,7 +19,7 @@ pub const SCHEMA: &str = "zeno-fcis/shell-effects/1";
 /// SHA-256 of the step-function source, framed by [`source_digest`], as hex.
 /// Changing `program.rs` needs a deliberate new binding here.
 pub const PROGRAM_SOURCE_SHA256: &str =
-    "f43458e1caffa17ed87b0d233718f0dd7256875bdcf0252766838b389e901a64";
+    "7482203bdbf76d43464333f853daa50c00ec0f9bbd9bf8fc72021c356d672b58";
 
 /// Largest byte cap a field may declare.
 pub const MAX_BYTES: u64 = 1 << 20;
@@ -114,10 +114,12 @@ const fn field(name: &'static str, kind: Kind) -> Field {
 pub enum Answer {
     /// `Ok(T) | Refused(Code) | NotApplied(Fault) | Unknown(Fault)`.
     Outcome(Kind),
-    /// `Sent(T) | NotSent(Code) | Unknown(Code)`.
+    /// `Sent(T) | NotSent(Code) | Unknown(Fault)`.
     Transport(Kind),
     /// `Ok(T) | Err(Fault)`.
     Fallible(Kind),
+    /// `Ok(T) | Interrupted | Err(Fault)`.
+    Wait(Kind),
 }
 
 impl Answer {
@@ -125,7 +127,10 @@ impl Answer {
     #[must_use]
     pub const fn payload(self) -> Kind {
         match self {
-            Self::Outcome(kind) | Self::Transport(kind) | Self::Fallible(kind) => kind,
+            Self::Outcome(kind)
+            | Self::Transport(kind)
+            | Self::Fallible(kind)
+            | Self::Wait(kind) => kind,
         }
     }
 }
@@ -477,7 +482,7 @@ pub const SIGNATURES: &[Signature] = &[
     Signature {
         port: Port::Wait,
         arguments: Kind::Record(WAIT),
-        answer: Answer::Fallible(Kind::Record(TICK)),
+        answer: Answer::Wait(Kind::Record(TICK)),
         capability: Capability::Clock,
         footprint: TIME,
         laws: &[8],
@@ -748,6 +753,7 @@ pub fn canonical_bytes(registry: &Registry) -> Vec<u8> {
             Answer::Outcome(payload) => (0, payload),
             Answer::Transport(payload) => (1, payload),
             Answer::Fallible(payload) => (2, payload),
+            Answer::Wait(payload) => (3, payload),
         };
         out.push(shape);
         kind(&mut out, payload);

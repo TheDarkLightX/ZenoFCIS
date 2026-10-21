@@ -8,7 +8,7 @@
 //! refused response leaves the program where it was.
 
 use alloc::vec::Vec;
-use core::mem;
+use core::{fmt, mem};
 
 use super::port::{OpId, Operation, Outcome, Store};
 use super::program::{Program, Step};
@@ -90,6 +90,7 @@ pub enum Fatal {
 
 // One driver owns this value; boxing would add an allocation per request.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 enum State<K, T> {
     Waiting {
         binding: Binding,
@@ -106,6 +107,23 @@ pub struct Driver<P: Program> {
     epoch: u64,
     answered: Option<OpId>,
     state: State<P::Continuation, P::Output>,
+}
+
+/// The epoch, the last answered request and the program's saved state;
+/// the registry is a shared constant and is left out.
+impl<P: Program> fmt::Debug for Driver<P>
+where
+    P::Continuation: fmt::Debug,
+    P::Output: fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Driver")
+            .field("epoch", &self.epoch)
+            .field("answered", &self.answered)
+            .field("state", &self.state)
+            .finish()
+    }
 }
 
 impl<P: Program> Driver<P> {

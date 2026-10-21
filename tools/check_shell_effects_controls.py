@@ -23,7 +23,10 @@ REGISTRY = 'crates/zeno-fcis-shell/src/effects/registry.rs'
 PROGRAM = 'crates/zeno-fcis-shell/src/effects/program.rs'
 DRIVER = 'crates/zeno-fcis-shell/src/effects/driver.rs'
 ADAPTER = 'crates/zeno-fcis-shell-sqlite/src/effects.rs'
-SHELL = ['-p', 'zeno-fcis-shell', '--lib']
+SIMULATION = 'crates/zeno-fcis-shell/src/effects/simulation.rs'
+RECORD = 'crates/zeno-fcis-shell/src/effects/record.rs'
+HANDLER = 'crates/zeno-fcis-shell/src/effects/handler.rs'
+SHELL =['-p', 'zeno-fcis-shell', '--lib']
 SQLITE = ['-p', 'zeno-fcis-shell-sqlite', '--test', 'effects']
 
 
@@ -68,6 +71,72 @@ CONTROLS = [
                         continuation.invocation.mode
                     };''', '''                    let _ = (&history, contains);
                     let mode = CommitMode::Unversioned;''')]),
+    ('partial-commit', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law commit-atomic failed'],
+     'A commit writes its state, history entry and first outbox row but not the second: D is neither the '
+     'pre-state nor the complete post-state.',
+     [(SIMULATION, 'for delivery in deliveries(version, after.chain, &after.state) {',
+       'for delivery in deliveries(version, after.chain, &after.state).into_iter().take(1) {')]),
+    ('reset-key', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law reopen-audits failed'],
+     'Reopening the store resets its replay keys, so a recovering commit after a crash would apply the same '
+     'key a second time.',
+     [(SIMULATION, 'let answer = Response::Reopen(Outcome::Ok(durable.snapshot()));\n',
+       'let answer = Response::Reopen(Outcome::Ok(durable.snapshot()));\n'
+       '                self.world.durable.replays.clear();\n')]),
+    ('wrong-ack', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law acknowledge-exact failed'],
+     "Acknowledging the second record sets the first record's bit instead.",
+     [(SIMULATION, 'after.outbox[index].1 = true;', 'after.outbox[0].1 = true;')]),
+    ('early-wake', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law time-monotone failed'],
+     'A wait returns one tick before its deadline as an ordinary wake.',
+     [(SIMULATION, 'let first = deadline.tick.max(self.world.tick);',
+       'let first = deadline.tick.saturating_sub(1).max(self.world.tick);')]),
+    ('out-of-range-draw', SHELL, 'effects::explore_tests::simulation_laws',
+     ['law jitter-in-range failed'],
+     'The jitter draw may equal its bound.',
+     [(SIMULATION, '.unwrap_or(usize::MAX).min(256);', '.unwrap_or(usize::MAX).min(256) + 1;')]),
+    ('stale-response', SHELL, 'effects::explore_tests::late_replies_refused',
+     ['late reply admitted'],
+     "The driver stops refusing older ordinals: the lost report of a delivery's first send, offered after "
+     'the resend was requested, resumes the program.',
+     [(DRIVER, 'if got.id.ordinal < binding.id.ordinal {', 'if false && got.id.ordinal < binding.id.ordinal {'),
+      (DRIVER, 'if got.id.ordinal != binding.id.ordinal {', 'if false && got.id.ordinal != binding.id.ordinal {')]),
+    ('replay-fallback', SHELL, 'effects::explore_tests::replay_is_exact',
+     ['tampered transcript replayed: truncated'],
+     'When the transcript runs out, replay answers from a live simulated store and accepts the live '
+     'outcome: a truncated transcript replays to an outcome.',
+     [(RECORD, '        let binding = binding.clone();\n',
+       '        let binding = binding.clone();\n        let asked_live = operation.clone();\n'),
+      (RECORD, '            None => return Err(ReplayError::Missing(at + 1)),',
+       '            None => {\n'
+       '                let mut live = super::simulation::Simulation::new(\n'
+       '                    super::simulation::World::new(super::simulation::Durable::genesis()),\n'
+       '                    super::simulation::Profile::frozen(0),\n'
+       '                    super::simulation::ALL_PORTS,\n'
+       '                    super::simulation::Script::fault_free(),\n'
+       '                );\n'
+       '                match super::handler::Terminal::handle(&mut live, &binding, &asked_live) {\n'
+       '                    super::handler::Handled::Answer(response) => {\n'
+       '                        let _ = driver.reply(Reply { binding, response });\n'
+       '                        at = links.len();\n'
+       '                        continue;\n'
+       '                    }\n'
+       '                    _ => return Err(ReplayError::Missing(at + 1)),\n'
+       '                }\n'
+       '            }'),
+      (RECORD, '                None => return Err(ReplayError::Missing(at)),\n            }\n            if at + 1',
+       '                None => return Ok(Ended::Done(done(outcome))),\n            }\n            if at + 1')]),
+    ('broken-link', SHELL, 'effects::explore_tests::transcript_chain',
+     ['broken link verified'],
+     'Verification stops comparing each link with its predecessor and with its own digest.',
+     [(RECORD, 'if link.previous != previous || link.digest != link_digest(previous, &link.entry) {',
+       'if false && (link.previous != previous || link.digest != link_digest(previous, &link.entry)) {')]),
+    ('uncovered-capability', SHELL, 'effects::explore_tests::stack_binding',
+     ['uncovered port bound'],
+     'Binding stops checking coverage: the delivery program binds to a store-only terminal without Send.',
+     [(HANDLER, 'if !covered.contains(port) {', 'if false && !covered.contains(port) {')]),
     ('ambient-clock', None, 'purity',
      ['error[clock]'],
      'A step function reads std::time::Instant: the purity checker reports a clock violation in program.rs.',

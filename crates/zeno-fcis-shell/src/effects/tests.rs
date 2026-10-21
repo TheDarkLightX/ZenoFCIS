@@ -10,7 +10,7 @@ use super::driver::{Binding, Driver, Fatal, Refusal, Reply};
 use super::port::{
     AuditedHistory, Code, CommitMode, CommitReceipt, Delivery, EpochTick, Fault, HistoryEntry,
     OpId, Operation, Outcome, PublicationData, Purpose, Report, Response, Sent, Snapshot, Store,
-    Val,
+    Val, WaitError,
 };
 use super::program::{
     CommitInvocation, CommitPolicy, CommitProgram, DeliveryInvocation, DeliveryPolicy,
@@ -494,10 +494,7 @@ fn delivery_cases() -> Vec<(&'static str, u8, Vec<Response>, Next<u64>)> {
         (
             "unknown send with no budget",
             0,
-            vec![
-                outbox.clone(),
-                Response::Send(Sent::Unknown(Code::Delivery)),
-            ],
+            vec![outbox.clone(), Response::Send(Sent::Unknown(Fault::Io))],
             Next::Done(Outcome::Unknown(Fault::Io)),
         ),
         (
@@ -590,13 +587,60 @@ fn delivery_cases() -> Vec<(&'static str, u8, Vec<Response>, Next<u64>)> {
             "interrupted wait",
             2,
             vec![
+                outbox.clone(),
+                not_sent.clone(),
+                clock.clone(),
+                draw.clone(),
+                Response::Wait(Err(WaitError::Interrupted)),
+            ],
+            Next::Done(Outcome::Refused(Code::Interrupted)),
+        ),
+        (
+            "failed wait",
+            2,
+            vec![
                 outbox,
                 not_sent,
                 clock,
                 draw,
-                Response::Wait(Err(Fault::Busy)),
+                Response::Wait(Err(WaitError::Failed(Fault::Busy))),
             ],
             Next::Done(Outcome::NotApplied(Fault::Busy)),
+        ),
+    ]
+}
+
+/// The commit program restarted after a crash recovers before any retry.
+fn recover_cases() -> Vec<(&'static str, Vec<Response>, Next<CommitReceipt>)> {
+    let reopened = Response::Reopen(Outcome::Ok(snapshot(4)));
+    vec![
+        (
+            "restart reopens first",
+            vec![],
+            Next::Request(Operation::Reopen(store(1))),
+        ),
+        (
+            "restart reads history",
+            vec![reopened.clone()],
+            Next::Request(Operation::ReadHistory(store(1))),
+        ),
+        (
+            "restart retries unversioned on the exact key",
+            vec![
+                reopened.clone(),
+                Response::ReadHistory(Outcome::Ok(history(&[(hash(0x20), publication(120))]))),
+            ],
+            commit_request(CommitMode::Unversioned),
+        ),
+        (
+            "restart keeps the original guard on absence",
+            vec![reopened, Response::ReadHistory(Outcome::Ok(history(&[])))],
+            commit_request(CommitMode::At(3)),
+        ),
+        (
+            "restart with a refused reopen stays unknown",
+            vec![Response::Reopen(Outcome::Refused(Code::History))],
+            Next::Done(Outcome::Unknown(Fault::Io)),
         ),
     ]
 }
@@ -613,6 +657,17 @@ fn conformance_failures() -> Vec<&'static str> {
     }
     for (name, retries, responses, expected) in delivery_cases() {
         let mut driver = delivery_driver(retries);
+        answer(&mut driver, responses);
+        if next(&driver) != expected {
+            failures.push(name);
+        }
+    }
+    for (name, responses, expected) in recover_cases() {
+        let mut driver = ok(Driver::<CommitProgram>::start(
+            REGISTRY,
+            EPOCH,
+            CommitProgram::recover(invocation(CommitMode::At(3)), CommitPolicy { retries: 2 }),
+        ));
         answer(&mut driver, responses);
         if next(&driver) != expected {
             failures.push(name);
@@ -647,7 +702,7 @@ fn port_registry() {
     // The registry's identity; any change to its data needs a new pin.
     assert_eq!(
         hex(registry::identity(&REGISTRY)),
-        "f97591cd12b68199e9bb6d4b27a2aab878b5e70f4507388a43fd9fb752cbc872"
+        "9a88849d214cb711e5d173b16048baa58d40e5933faeff0df8a7220ff9599b89"
     );
     for port in Port::ALL {
         assert_eq!(some(registry::signature(&REGISTRY, port)).port, port);
@@ -1219,7 +1274,7 @@ fn delivery_runs_to_completion() {
         &mut driver,
         vec![
             Response::ReadOutbox(Outcome::Ok(vec![first.clone(), second.clone()])),
-            Response::Send(Sent::Unknown(Code::Delivery)),
+            Response::Send(Sent::Unknown(Fault::Io)),
             Response::Clock(Ok(EpochTick {
                 epoch: EPOCH,
                 tick: 0,

@@ -13,10 +13,18 @@
 //! source by SHA-256, so the purity checker, the conformance tests and any
 //! later proof target the same body.
 
+pub mod codec;
 pub mod driver;
+pub mod explore;
+pub mod handler;
+pub mod laws;
 pub mod port;
 pub mod program;
+pub mod record;
 pub mod registry;
+pub mod simulation;
 
+#[cfg(test)]
+mod explore_tests;
 #[cfg(test)]
 mod tests;
