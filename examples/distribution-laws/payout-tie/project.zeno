@@ -1,0 +1,20 @@
+zeno 1;
+project 1 payout_tie;
+namespace 2 payout;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 103 int Bit in 0..=1;
+field 110 100 alice 103;
+field 111 100 bob 103;
+field 130 102 entropy 103;
+component 400 payout {
+ owns 100; reads pre.100; writes post.100; contexts context.102;
+ budget steps 128;
+}
+merge [400];
+law 501 range on commit, genesis = post.100.110 >= 0 && post.100.111 >= 0;
+law 500 total on commit = post.100.110 + post.100.111 == 1;
+random 600 entropy on context.102.130 bits 1 independent uniform;
+distribution 601 alice_payout on post.100.110 = {0: 1/2, 1: 1/2};
+distribution 602 bob_payout on post.100.111 = uniform over {0, 1};

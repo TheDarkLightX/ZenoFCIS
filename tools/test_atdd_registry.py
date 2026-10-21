@@ -291,6 +291,18 @@ class RepairedRegistryTests(unittest.TestCase):
                 actual.add(test_filter)
             self.assertEqual(actual, filters, scenario)
 
+    def test_wrapped_cargo_still_refuses_empty_tests(self):
+        command = ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline")
+        for count in [0, 1]:
+            output = f"test result: ok. {count} passed; 0 failed; 0 ignored\n"
+            with mock.patch.object(atdd.subprocess, "run", return_value=subprocess.CompletedProcess(command, 0, output)) as run, contextlib.redirect_stdout(io.StringIO()):
+                if count == 0:
+                    with self.assertRaises(atdd.AcceptanceError):
+                        atdd.run_command(command)
+                else:
+                    atdd.run_command(command)
+                self.assertEqual(run.call_args.args[0], command)
+
     def test_empty_filter_or_package_cannot_pass(self):
         empty = "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 8 filtered out\n"
         for tail in (("--lib", "missing_filter"), ()):

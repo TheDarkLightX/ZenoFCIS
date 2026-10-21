@@ -74,6 +74,8 @@ pub fn elaborate_project(
         Vec::new(),
         Vec::new(),
     );
+    let mut random_inputs = Vec::new();
+    let mut distributions = Vec::new();
     let mut spans = BTreeMap::new();
     for spanned in declarations {
         match spanned.declaration {
@@ -116,6 +118,14 @@ pub fn elaborate_project(
             Declaration::Law(value) => {
                 spans.insert((9, value.id().get()), spanned.span);
                 laws.push(value)
+            }
+            Declaration::Random(value) => {
+                spans.insert((11, value.id().get()), spanned.span);
+                random_inputs.push(value);
+            }
+            Declaration::Distribution(value) => {
+                spans.insert((12, value.id().get()), spanned.span);
+                distributions.push(value);
             }
             Declaration::Claim(value) => {
                 spans.insert((10, value.id().get()), spanned.span);
@@ -213,6 +223,25 @@ pub fn elaborate_project(
         |v| (None, v.name()),
         "claim",
         10,
+        &spans,
+        &mut diagnostics,
+    );
+
+    sort_and_duplicates(
+        &mut random_inputs,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "random",
+        11,
+        &spans,
+        &mut diagnostics,
+    );
+    sort_and_duplicates(
+        &mut distributions,
+        |v| v.id(),
+        |v| (None, v.name()),
+        "distribution",
+        12,
         &spans,
         &mut diagnostics,
     );
@@ -733,6 +762,8 @@ pub fn elaborate_project(
         composition: CompositionAst::new(wirings, merge_order),
         laws: laws.into_boxed_slice(),
         claims: claims.into_boxed_slice(),
+        random_inputs: random_inputs.into_boxed_slice(),
+        distributions: distributions.into_boxed_slice(),
     };
     // Resolve only after schema and formula-shape admission. Both parsed input
     // and ProjectSpecBuilder pass through this mandatory boundary.
@@ -744,7 +775,19 @@ pub fn elaborate_project(
         .claims()
         .iter()
         .map(|claim| (10, "claim", claim.id(), crate::claim_paths(claim)));
-    for (tag, kind, id, paths) in law_paths.chain(claim_paths) {
+    let random_paths = spec
+        .random_inputs()
+        .iter()
+        .map(|v| (11, "random", v.id(), alloc::vec![v.input()]));
+    let distribution_paths = spec
+        .distributions()
+        .iter()
+        .map(|v| (12, "distribution", v.id(), alloc::vec![v.outcome()]));
+    for (tag, kind, id, paths) in law_paths
+        .chain(claim_paths)
+        .chain(random_paths)
+        .chain(distribution_paths)
+    {
         for path in paths {
             let resolution = crate::resolve_path(&spec, path);
             let actual = match resolution {

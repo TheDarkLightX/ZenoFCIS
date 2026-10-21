@@ -1,0 +1,19 @@
+zeno 1;
+project 1 modulo_bias;
+namespace 2 selection;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 103 int Reporter in 0..=2;
+type 104 int RandomBits in 0..=3;
+type 105 int Unit in 0..=0;
+field 110 100 reporter 103;
+field 130 102 entropy 104;
+component 400 selection {
+ owns 100; reads pre.100; writes post.100; contexts context.102;
+ budget steps 128;
+}
+merge [400];
+law 500 range on commit, genesis = post.100.110 >= 0;
+random 600 entropy on context.102.130 bits 2 independent uniform;
+distribution 601 reporters on post.100.110 = uniform over {0, 1, 2};

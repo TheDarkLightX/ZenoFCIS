@@ -120,7 +120,7 @@ mod formula;
 mod hierarchy;
 #[cfg(test)]
 mod hierarchy_tests;
-mod identity;
+pub(crate) mod identity;
 #[cfg(test)]
 mod identity_tests;
 pub mod joint;

@@ -377,3 +377,8 @@ docs/TRACE_GAME.md
 docs/COMPOSED_DOMAIN_PROOF.md
 docs/zal/ladder/WITHDRAWAL_PILOT.md
 docs/BUILD_AN_APP.md
+docs/DISTRIBUTION_LAWS.md
+examples/distribution-laws/README.md
+examples/distribution-laws/reporter-choice/README.md
+examples/distribution-laws/modulo-bias/README.md
+examples/distribution-laws/payout-tie/README.md

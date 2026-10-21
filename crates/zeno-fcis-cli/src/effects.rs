@@ -805,6 +805,12 @@ effects! { crate::loop_command::doors::capture::Command {
 
 effects! { crate::judge_command::Command {
     leaves {
+        "distribution" => Self::Distribution { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
         "profile" => Self::Profile { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],

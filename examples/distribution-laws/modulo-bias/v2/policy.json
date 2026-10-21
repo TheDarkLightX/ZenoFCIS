@@ -1,0 +1,34 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "modulo-bias",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "101": [
+      "I128",
+      0,
+      0
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "context.102.130 - 3 * div_floor(context.102.130, 3)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

@@ -108,6 +108,10 @@ impl Parser {
             } else if self.take_keyword("merge") {
                 self.parse_merge();
                 None
+            } else if self.take_keyword("random") {
+                self.parse_random().map(Declaration::Random)
+            } else if self.take_keyword("distribution") {
+                self.parse_distribution().map(Declaration::Distribution)
             } else if self.take_keyword("law") {
                 self.parse_law().map(Declaration::Law)
             } else if self.take_keyword("claim") {
@@ -579,6 +583,103 @@ impl Parser {
         self.expect_symbol(TokenKind::Semicolon, "merge");
         self.merge_order = values;
     }
+    fn distribution_path(&mut self) -> Option<ProjectionPath> {
+        match self.parse_value() {
+            ValueExpr::Projection(path) => Some(path),
+            _ => {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "distribution.path",
+                    "scalar projection",
+                    "expression",
+                    "write a root and numeric type/field path",
+                );
+                None
+            }
+        }
+    }
+
+    fn parse_random(&mut self) -> Option<crate::RandomInputDecl> {
+        let id = self.take_id("random.id")?;
+        let name = self.take_identifier("random.name")?;
+        self.expect_keyword("on", "random");
+        let input = self.distribution_path()?;
+        self.expect_keyword("bits", "random");
+        let bits = self.take_u16("random.bits")?;
+        self.expect_keyword("independent", "random premise");
+        self.expect_keyword("uniform", "random premise");
+        self.expect_symbol(TokenKind::Semicolon, "random");
+        Some(crate::RandomInputDecl {
+            id,
+            name,
+            input,
+            bits,
+        })
+    }
+
+    fn parse_distribution(&mut self) -> Option<crate::DistributionDecl> {
+        let id = self.take_id("distribution.id")?;
+        let name = self.take_identifier("distribution.name")?;
+        self.expect_keyword("on", "distribution");
+        let outcome = self.distribution_path()?;
+        self.expect_symbol(TokenKind::Equal, "distribution");
+        let uniform = self.take_keyword("uniform");
+        if uniform {
+            self.expect_keyword("over", "distribution");
+        }
+        self.expect_symbol(TokenKind::LBrace, "distribution");
+        let mut target = Vec::new();
+        while !matches!(self.current().kind, TokenKind::RBrace | TokenKind::Eof) {
+            let value = self.take_i128("distribution.value")?;
+            let probability = if uniform {
+                crate::Probability::try_new(1, 1)?
+            } else {
+                self.expect_symbol(TokenKind::Colon, "distribution");
+                let numerator = self.take_unsigned("distribution.numerator")?;
+                let denominator = if self.take_symbol(&TokenKind::Slash) {
+                    self.take_unsigned("distribution.denominator")?
+                } else {
+                    1
+                };
+                match crate::Probability::try_new(numerator, denominator) {
+                    Some(p) => p,
+                    None => {
+                        self.error(DiagnosticCode::InvalidDeclaration, "distribution.weight", "bounded nonnegative probability", "invalid rational", "use a positive denominator, mass at most one and reduced 64-bit components");
+                        return None;
+                    }
+                }
+            };
+            target.push((value, probability));
+            if !self.take_symbol(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect_symbol(TokenKind::RBrace, "distribution");
+        self.expect_symbol(TokenKind::Semicolon, "distribution");
+        if uniform && !target.is_empty() {
+            let p = crate::Probability::try_new(1, target.len() as u128)?;
+            for (_, weight) in &mut target {
+                *weight = p;
+            }
+        }
+        let Some(target) = crate::DistributionDecl::normalized_target(target) else {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "distribution.target",
+                "distinct outcomes with weights summing exactly to 1",
+                "invalid target",
+                "supply a nonempty normalized rational distribution within the arithmetic bounds",
+            );
+            return None;
+        };
+        Some(crate::DistributionDecl {
+            id,
+            name,
+            outcome,
+            target,
+        })
+    }
+
     fn parse_law(&mut self) -> Option<LawDecl> {
         let id = self.take_id("law.id")?;
         let name = self.take_identifier("law.name")?;

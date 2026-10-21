@@ -12,6 +12,7 @@ extern crate alloc;
 mod ast;
 mod builder;
 mod diagnostic;
+mod distribution;
 mod elaborate;
 mod induction;
 mod lexer;
@@ -27,6 +28,7 @@ pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
+pub use distribution::{DistributionDecl, Probability, RandomInputDecl};
 pub use elaborate::elaborate_project;
 pub use induction::invariant_at;
 pub use mini_determinator::{

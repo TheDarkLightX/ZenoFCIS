@@ -661,6 +661,8 @@ mod tests {
                 Declaration::Wiring(v) => builder.wiring(v),
                 Declaration::Law(v) => builder.law(v),
                 Declaration::Claim(v) => builder.claim(v),
+                Declaration::Random(v) => builder.random_input(v),
+                Declaration::Distribution(v) => builder.distribution(v),
             };
         }
         let errors = builder

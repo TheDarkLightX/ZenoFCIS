@@ -53,6 +53,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_app_factory.py"),
          ("python3", "tools/check_app_factory.py")),
     ),
+    "distribution-laws": AcceptanceScenario(
+        "Check exact finite distributions given uniform independent random bits",
+        (("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "distribution"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "distribution_laws"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "distribution_laws"),
+         ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/distribution_reference.py", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
+    ),
     # BEGIN version-space acceptance registrations
     "loop-version-space": AcceptanceScenario(
         "Count finite meanings, ask the owner and check the unique program",
@@ -1406,9 +1414,11 @@ def run_command(command: tuple[str, ...]) -> None:
     because a filter that matches nothing passes without checking anything."""
 
     environment = None
-    if command[0:3] == ("cargo", "+1.97.1", "doc"):
+    resource_prefix = ("nice", "-n", "19", "ionice", "-c3")
+    executable = command[len(resource_prefix):] if command[:len(resource_prefix)] == resource_prefix else command
+    if executable[0:3] == ("cargo", "+1.97.1", "doc"):
         environment = {**os.environ, "RUSTDOCFLAGS": "-D warnings"}
-    if command[0:3] != ("cargo", "+1.97.1", "test"):
+    if executable[0:3] != ("cargo", "+1.97.1", "test"):
         subprocess.run(command, cwd=ROOT, check=True, env=environment)
         return
     completed = subprocess.run(

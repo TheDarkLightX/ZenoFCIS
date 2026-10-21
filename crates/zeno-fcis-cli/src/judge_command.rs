@@ -47,6 +47,14 @@ pub(super) struct Common {
 
 #[derive(Subcommand)]
 pub(super) enum Command {
+    /// Check finite distribution laws exactly, given uniform independent random bits. Exit 0 checked, 1 refuted, 2 UNKNOWN; advisory only.
+    Distribution {
+        /// Invocations plus outcome projection/fold operations; a stop is UNKNOWN.
+        #[arg(long, default_value_t = zeno_fcis_contract::distribution::MAX_WORK)]
+        max_work: u64,
+        #[command(flatten)]
+        common: Common,
+    },
     /// Profile a contract's states, memory and robustness exactly over its declared domain: valid, reachable and Moore-minimal states, and what happens on pre-states that break a state law. Advisory; the application is not changed.
     Profile {
         #[command(flatten)]
@@ -140,6 +148,33 @@ pub(super) enum ProbeCommand {
 
 pub(super) fn run(command: Command) -> u8 {
     match command {
+        Command::Distribution { max_work, common } => judge(
+            &common,
+            "zeno-fcis/distribution-laws/1",
+            None,
+            true,
+            |sources| {
+                use zeno_fcis_contract::distribution::{self, Limits, Verdict};
+                let result = distribution::check(
+                    sources.project,
+                    sources.rules,
+                    Limits {
+                        max_tuples: common.max_tuples,
+                        max_work,
+                    },
+                )?;
+                let exit = match result.verdict() {
+                    Verdict::Checked => OK,
+                    Verdict::Refuted => INVALID,
+                    Verdict::Unknown => BLOCKED,
+                };
+                Ok(Judged::Done(
+                    result.packet().clone(),
+                    exit,
+                    result.verdict().name(),
+                ))
+            },
+        ),
         Command::Profile { common } => judge(
             &common,
             "zeno-fcis/contract-profile/2",
@@ -383,7 +418,9 @@ fn judge(
         "schema": schema,
         "integer_encoding": crate::report_numbers::ENCODING,
         "authority": "none",
-        "advisory": ADVISORY,
+        "advisory": if schema == "zeno-fcis/distribution-laws/1" {
+            "Advisory only; no runtime or publication authority. Exactly checked only on complete finite-domain results, given uniform independent random bits. UNKNOWN claims nothing."
+        } else { ADVISORY },
         "application": application,
         "tool": {"crate": "zeno-fcis-cli", "version": env!("CARGO_PKG_VERSION")},
         "sources": sources,
@@ -398,7 +435,11 @@ fn judge(
         }
     }
     let text = crate::transform::canonical_json(&packet);
-    let line = format!("{status} {application}: {schema}");
+    let premise = packet.get("premise");
+    let line = match premise.and_then(Value::as_str) {
+        Some(premise) => format!("{status} {application}: {schema}; {premise}"),
+        None => format!("{status} {application}: {schema}"),
+    };
     match &common.out {
         Some(path) => {
             let written = path
@@ -411,11 +452,17 @@ fn judge(
                 return report_failure(dir, Failure::Read(message), common.format);
             }
             match common.format {
-                OutputFormat::Json => print_json(&json!({
-                    "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
-                    "authority": "none", "packet": path.display().to_string(),
-                    "packet_schema": schema,
-                })),
+                OutputFormat::Json => {
+                    let mut summary = json!({
+                        "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
+                        "authority": "none", "packet": path.display().to_string(),
+                        "packet_schema": schema,
+                    });
+                    if let Some(premise) = premise {
+                        summary["premise"] = premise.clone();
+                    }
+                    print_json(&summary);
+                }
                 OutputFormat::Human => {
                     println!("{line}");
                     println!("packet: {}", path.display());

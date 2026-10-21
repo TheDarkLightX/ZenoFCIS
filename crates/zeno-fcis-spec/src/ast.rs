@@ -1315,6 +1315,8 @@ pub(crate) enum Declaration {
     Wiring(WiringDecl),
     Law(LawDecl),
     Claim(ClaimDecl),
+    Random(crate::RandomInputDecl),
+    Distribution(crate::DistributionDecl),
 }
 
 /// Canonical typed project specification.
@@ -1333,6 +1335,8 @@ pub struct ProjectSpec {
     pub(crate) composition: CompositionAst,
     pub(crate) laws: Box<[LawDecl]>,
     pub(crate) claims: Box<[ClaimDecl]>,
+    pub(crate) random_inputs: Box<[crate::RandomInputDecl]>,
+    pub(crate) distributions: Box<[crate::DistributionDecl]>,
 }
 
 impl ProjectSpec {
@@ -1401,6 +1405,14 @@ impl ProjectSpec {
     pub const fn claims(&self) -> &[ClaimDecl] {
         &self.claims
     }
+    /// Declared random-bit premises in stable-ID order.
+    pub const fn random_inputs(&self) -> &[crate::RandomInputDecl] {
+        &self.random_inputs
+    }
+    /// Finite distribution laws in stable-ID order.
+    pub const fn distributions(&self) -> &[crate::DistributionDecl] {
+        &self.distributions
+    }
     /// Finds a claim by stable identifier.
     #[must_use]
     pub fn claim(&self, id: StableId) -> Option<&ClaimDecl> {
@@ -1429,7 +1441,9 @@ impl ProjectSpec {
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if self.uses_u128() {
+        let format = if !self.random_inputs.is_empty() || !self.distributions.is_empty() {
+            4u16
+        } else if self.uses_u128() {
             3u16
         } else if self.types.iter().any(|t| t.quantity.is_some()) {
             2u16
@@ -1456,7 +1470,30 @@ impl ProjectSpec {
         put_slice(output, &self.composition.wirings, encode_wiring)?;
         put_ids(output, &self.composition.merge_order)?;
         put_slice(output, &self.laws, encode_law)?;
-        put_slice(output, &self.claims, encode_claim)
+        put_slice(output, &self.claims, encode_claim)?;
+        if format >= 4 {
+            put_length(output, self.random_inputs.len())?;
+            for input in &self.random_inputs {
+                input.id.encode_to(output)?;
+                input.name.encode_to(output)?;
+                encode_path(&input.input, output)?;
+                output.extend_from_slice(&input.bits.to_be_bytes());
+                output.push(1); // uniform independent bits, conditional on the non-random tuple
+            }
+            put_length(output, self.distributions.len())?;
+            for law in &self.distributions {
+                law.id.encode_to(output)?;
+                law.name.encode_to(output)?;
+                encode_path(&law.outcome, output)?;
+                put_length(output, law.target.len())?;
+                for (value, p) in &law.target {
+                    output.extend_from_slice(&value.to_be_bytes());
+                    output.extend_from_slice(&p.numerator().to_be_bytes());
+                    output.extend_from_slice(&p.denominator().to_be_bytes());
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Returns this protocol type's exact canonical bytes.

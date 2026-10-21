@@ -23,6 +23,7 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("src/ast.rs", include_bytes!("ast.rs")),
     ("src/builder.rs", include_bytes!("builder.rs")),
     ("src/diagnostic.rs", include_bytes!("diagnostic.rs")),
+    ("src/distribution.rs", include_bytes!("distribution.rs")),
     ("src/elaborate.rs", include_bytes!("elaborate.rs")),
     ("src/induction.rs", include_bytes!("induction.rs")),
     ("src/lexer.rs", include_bytes!("lexer.rs")),
