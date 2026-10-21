@@ -1,0 +1,23 @@
+zeno 1;
+project 1 induction_control;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Count;
+type 106 int Bounded in 0..=3;
+field 110 100 x 105;
+field 111 100 y 105;
+variant 120 101 A none;
+variant 121 101 B none;
+reason 200 denied precedence 0;
+component 300 machine {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 32;
+}
+merge [300];
+law 400 decrement on accept = post.100.110 == pre.100.110 - 1;
+law 401 unchanged on failure = post.100.110 == pre.100.110;
+claim 600 nonnegative all inductive accept [400] failure [401] = pre.100.110 >= 0;

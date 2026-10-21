@@ -86,7 +86,8 @@ must persist its delivery IDs and entry hashes. The local Boolean context and
 principal are trusted tutorial inputs, not remote authentication. Source hashes
 identify reviewed example policy, not certified binaries or release evidence.
 Changing the source changes policy identity and requires a new database unless
-a separately reviewed migration is implemented. No Lean installation is used.
+a separately reviewed migration is implemented. The demonstration uses no Lean
+installation.
 
 ## Check the application against its model
 
@@ -132,6 +133,14 @@ It prints `UNSAT proposal retained` and exits 2, as it does for every solver
 result: a solver's `unsat` is attested, not independently checked. Run it on a
 copy, because `prove` keeps its records in `.zeno-fcis/evidence` next to the
 project file.
+
+The development candidate also exports claim 600 through `--backend lean`
+for the restricted linear fragment. Its finite-history theorem assumes the
+initial state satisfies the invariant; it does not infer a genesis value from
+`project.zeno`. The ignored CLI test
+`pinned_lean_kernel_checks_both_inductive_pilots_through_prove` must pass with
+the pinned runtime before a new kernel-checked output is recorded here. That
+pinned run is not yet complete for this candidate.
 
 The step says something about this application only with more checks,
 which `tests/induction.rs` runs:

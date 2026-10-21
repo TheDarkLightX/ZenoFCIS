@@ -944,6 +944,7 @@ fn original_export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+        hypotheses.paths.insert(path.clone());
         if let Some(domain) = declared_domain(spec, path) {
             let member = match &domain {
                 DeclaredDomain::Values(values) => smt_or(
