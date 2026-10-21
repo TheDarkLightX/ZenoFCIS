@@ -1,6 +1,21 @@
 # ZenoFCIS release notes
 
-## 2.6 draft: indexed branch proposals
+## 2.6 draft: the app factory
+
+`zeno-fcis new DIR --contract project.zeno --app` combines the checked core,
+SQLite shell effects, authenticated Rust ingress and a descriptor-generated
+ZenoUI front end. The explicit offline Python build checks the finite UI
+domain and binds tools and output assets into an app manifest. The browser
+retains an unresolved request's original bytes and key for recovery after
+restart. See [Build an app with ZenoFCIS](BUILD_AN_APP.md) for the journey,
+formal model, deployment configuration and scope.
+
+Withdrawal, inventory and wide-counter fixtures exercise HTTP, durable
+publication, refusal and original-key replay. The wide counter has an empty
+outbox. The socket-free transport supplies no TCP or browser evidence;
+host checks and release acceptance remain separate.
+
+### Indexed branch proposals
 
 The program-search library adds an opt-in indexed branch proposer, disabled
 by default. `zeno-fcis optimize --indexed-branches` tries it after the ordinary

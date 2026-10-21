@@ -376,3 +376,4 @@ docs/TRACE_GAME.md
 
 docs/COMPOSED_DOMAIN_PROOF.md
 docs/zal/ladder/WITHDRAWAL_PILOT.md
+docs/BUILD_AN_APP.md

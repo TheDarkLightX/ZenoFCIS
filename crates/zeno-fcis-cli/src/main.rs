@@ -12,6 +12,7 @@ mod contract;
 mod contract_adopt;
 mod contract_diff;
 mod contract_evolve;
+mod app_factory;
 mod contract_files;
 mod draft_command;
 mod durable_counter;
@@ -240,6 +241,9 @@ enum Command {
         /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt and ui.json.
         #[arg(long, conflicts_with = "template")]
         contract: Option<PathBuf>,
+        /// Build the checked UI and authenticated SQLite application using the pinned Python generator.
+        #[arg(long, requires = "contract")]
+        app: bool,
         /// ZenoFCIS source tree a Cargo application's ZenoFCIS packages resolve to. Default: the tree this CLI was built from, while it exists.
         #[arg(long)]
         source: Option<PathBuf>,
@@ -546,11 +550,10 @@ fn run(command: Command) -> u8 {
             }
         },
         Command::New {
-            dir,
-            template,
-            contract,
-            source,
-        } => new_project(&dir, template, contract.as_deref(), source.as_deref()),
+            dir, template, contract, app, source,
+        } => if app {
+            app_factory::scaffold(&dir, contract.as_deref().unwrap_or(&dir), source.as_deref())
+        } else { new_project(&dir, template, contract.as_deref(), source.as_deref()) },
         Command::Check {
             project,
             format,

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Explicit offline app build using the pinned core and ZenoUI generators."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tomllib
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+
+def run(*command, **kwargs):
+    print("app build:", " ".join(map(str, command)), flush=True)
+    return subprocess.run(["nice", "-n", "19", "ionice", "-c3", *map(str, command)], check=True, **kwargs)
+
+def external(lock):
+    return {(p["name"], p["version"], p["source"], p.get("checksum"))
+            for p in tomllib.loads(lock)["package"] if "source" in p}
+
+def hashes(root):
+    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(root.rglob("*")) if p.is_file()}
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cli", required=True, type=Path)
+    parser.add_argument("--contract", required=True, type=Path)
+    parser.add_argument("--out", required=True, type=Path)
+    args = parser.parse_args()
+    node = subprocess.check_output(["node", "--version"], text=True).strip()
+    if not node.startswith("v22."):
+        raise ValueError("AppRequiresNode22")
+    contract = args.contract.resolve()
+    if contract.is_file():
+        if contract.name != "project.zeno":
+            raise ValueError("AppContractMustBeProject")
+        contract = contract.parent
+    out = args.out.resolve()
+    if out.exists() and (not out.is_dir() or any(out.iterdir())):
+        raise ValueError("AppOutputMustBeEmpty")
+    # Inspect the same standalone model the UI supports before writing the target.
+    policy = json.loads((contract / "v2/policy.json").read_text())
+    if policy.get("adoptions") or policy.get("evolutions"):
+        raise ValueError("AppRequiresStandaloneContract")
+    if not (contract / "ui.json").is_file():
+        raise ValueError("UiMissingMetadata:ui.json")
+    # The existing site workspace resolves its six generated demonstration libraries.
+    # Generate only missing copies, using the same CLI and reviewed template files.
+    for template in ["account-lockout", "order-fulfillment", "inventory-reservation", "compliance-gateway", "withdrawal-queue", "agent-treasury-guard"]:
+        destination = ROOT / "site/apps" / template
+        if not destination.exists():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            run(args.cli.resolve(), "new", destination, "--template", template, "--source", ROOT)
+            manifest = destination / "Cargo.toml"
+            manifest.write_text(manifest.read_text().split("\n[patch.crates-io]\n", 1)[0])
+            for name in ["Cargo.lock", "rust-toolchain.toml"]:
+                (destination / name).unlink(missing_ok=True)
+    target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")).resolve()
+    cargo = ("cargo", "+1.97.1", "build", "--locked", "--offline", "--release", "--manifest-path", ROOT / "site/Cargo.toml", "-p", "zeno-fcis-site-factory")
+    run(*cargo, "--bin", "ui_contract")
+    registry = Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")) / "registry/src"
+    remaps = [f"--remap-path-prefix={ROOT}=/zeno-fcis", f"--remap-path-prefix={target}=/target", f"--remap-path-prefix={registry}=/registry"]
+    wasm_environment = dict(os.environ, CARGO_ENCODED_RUSTFLAGS="\x1f".join(remaps))
+    run(*cargo, "--lib", "--target", "wasm32-unknown-unknown", env=wasm_environment)
+    # Use the existing checked transformation: the raw linker export includes memory.
+    sys.path.insert(0, str(ROOT / "site"))
+    from wasm import private_module
+    # Every law and mounted-runtime check completes before scaffold emission.
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="app-build-") as temporary:
+        work = Path(temporary)
+        runtime = work / "core.wasm"
+        runtime.write_bytes(private_module((target / "wasm32-unknown-unknown/release/zeno_fcis_site_factory.wasm").read_bytes()))
+        run("python3", ROOT / "tools/zenoui.py", contract, "--out", work / "www", "--evidence", work / "checks",
+            "--oracle", target / "release/ui_contract", "--runtime", runtime)
+        run(args.cli.resolve(), "new", out, "--contract", contract, "--source", ROOT)
+        manifest = (out / "Cargo.toml").read_text()
+        manifest = manifest.replace('default = ["sqlite"]', 'default = ["app"]\n' +
+            'shell-effects = ["sqlite"]\napp = ["shell-effects", "dep:zeno-fcis-ingress", "dep:serde_json", "dep:tokio"]')
+        manifest = manifest.replace('[dependencies]', '[dependencies]\n' +
+            'zeno-fcis-ingress = { version = "=2.5.0", optional = true }\n' +
+            'serde_json = { version = "=1.0.151", optional = true }\n' +
+            'tokio = { version = "=1.53.2", default-features = false, features = ["rt", "net", "time"], optional = true }')
+        manifest = manifest.replace('publish = false', 'publish = false\ndefault-run = "app-server"', 1)
+        manifest += '\nzeno-fcis-ingress = { path = ' + json.dumps(str(ROOT / "crates/zeno-fcis-ingress")) + ' }\n'
+        manifest += '\n[[bin]]\nname = "app-server"\npath = "src/app_main.rs"\nrequired-features = ["app"]\n'
+        (out / "Cargo.toml").write_text(manifest)
+        library = out / "src/lib.rs"
+        library.write_text(library.read_text() + '\n/// Authenticated durable application shell.\n#[cfg(feature = "app")]\npub mod app;\n')
+        session = out / "src/session.rs"
+        session.write_text(session.read_text().replace("fn root_numbers(schema:", "pub(crate) fn root_numbers(schema:"))
+        shutil.copyfile(ROOT / "crates/zeno-fcis-cli/app-template/app.rs", out / "src/app.rs")
+        (out / "src/app_main.rs").write_text('fn main() { if application::app::run().is_err() { eprintln!("application stopped; check configuration and retained storage"); std::process::exit(1); } }\n')
+        shutil.copytree(work / "www", out / "www")
+        shutil.copytree(work / "checks", out / "app-checks")
+        for name in ["durable.js", "durable-bootstrap.js"]:
+            shutil.copyfile(ROOT / "site/public/zenoui" / name, out / "www/zenoui" / name)
+        html = out / "www/index.html"
+        html.write_text(html.read_text().replace('zenoui/app-bootstrap.js', 'zenoui/durable-bootstrap.js'))
+        # Fixed reviewed context is shell configuration, never selected by a request.
+        bundle = json.loads((out / "www/app.json").read_text())
+        context = [f["initial"] for f in bundle["description"]["fields"] if f["source"] == "context"]
+        (out / "context.json").write_text(json.dumps(context) + "\n")
+        shutil.copyfile(ROOT / "crates/zeno-fcis-cli/app-template/journey.rs", out / "tests/app_journey.rs")
+        fixture = ROOT / "test-data/app-journeys" / (policy["template"] + ".json")
+        if fixture.is_file():
+            shutil.copyfile(fixture, out / "app-checks/journey.json")
+        else:
+            samples = json.loads((out / "app-checks/samples.json").read_text())
+            fields = bundle["description"]["fields"]
+            sample = next((s for s in samples if s["reply"]["class"] == "Accept" and all(s["input"][i] == f["initial"] for i,f in enumerate(fields) if f["source"] == "state")), None)
+            if sample is None:
+                raise ValueError("AppNeedsGenesisJourney")
+            step = {"class":"Accept", "command":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "command"], "context":[sample["input"][i] for i,f in enumerate(fields) if f["source"] == "context"]}
+            (out / "app-checks/journey.json").write_text(json.dumps({"steps":[step],"deliveries":None}))
+        # Reconcile only the copied lock, admitting no external identity outside it.
+        admitted = (ROOT / "Cargo.lock").read_text()
+        (out / "Cargo.lock").write_text(admitted)
+        run("cargo", "+1.97.1", "metadata", "--offline", "--format-version", "1", cwd=out, stdout=subprocess.DEVNULL)
+        if not external((out / "Cargo.lock").read_text()).issubset(external(admitted)):
+            raise ValueError("AppLockOutsideApprovedSet")
+        assets = hashes(out / "www")
+        # Compile in only the closed asset list; no runtime path traversal or file replacement.
+        records = []
+        types = {".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json", ".html":"text/html; charset=utf-8", ".wasm":"application/wasm"}
+        for name in assets:
+            records.append(f'Asset::new({json.dumps("/"+name)}, {json.dumps(types[Path(name).suffix])}, include_bytes!({json.dumps("../www/"+name)}))?')
+        records.append('Asset::new("/", "text/html; charset=utf-8", include_bytes!("../www/index.html"))?')
+        (out / "src/app_assets.rs").write_text('vec![\n' + ',\n'.join(records) + '\n]\n')
+        with (out / "README.md").open("a") as guide:
+            guide.write("\n## Run the durable application\n\nReview context.json for the configured principal. Create a private file containing 64 lowercase hexadecimal credential digits. Set ZENO_APP_SECRET_FILE to that file and run `cargo +1.97.1 run --locked --offline --bin app-server`. It serves http://127.0.0.1:8080. Enter the credential in the connection form. ZENO_APP_CONTEXT, ZENO_APP_STORE, ZENO_APP_RECEIVER and ZENO_APP_ADDRESS optionally select the context file, database, file receiver and loopback address. The UI retains exact requests for original-key recovery; clear a saved request only after resolving it. The local file receiver deduplicates delivery IDs. Delivery elsewhere needs a reviewed transport.\n\nThe explicit Python build checks all eight ZenoUI laws, uses the copied approved Cargo lock, and records source and asset digests in app-manifest.json. This manifest is build provenance, not authorization.\n")
+        receipt = {"format":"zeno-fcis/app-manifest/1", "authority":"none", "ui":bundle["contract"], "assets":assets,
+                   "files":{k:v for k,v in hashes(out).items()},
+                   "generator":hashes(ROOT / "crates/zeno-fcis-cli/app-template"),
+                   "cli":hashlib.sha256(args.cli.resolve().read_bytes()).hexdigest(),
+                   "oracle":hashlib.sha256((target / "release/ui_contract").read_bytes()).hexdigest(),
+                   "generator_sources":{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for directory in ["site/factory/src", "site/common/src", "site/public/zenoui", "site/zenoui"] for p in sorted((ROOT/directory).rglob("*")) if p.is_file()},
+                   "tools":{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ["tools/app_factory.py", "tools/zenoui.py", "site/wasm.py"]}}
+        (out / "app-manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print("Application ready. Review context.json, then start app-server as documented in README.md.")
+
+if __name__ == "__main__":
+    main()

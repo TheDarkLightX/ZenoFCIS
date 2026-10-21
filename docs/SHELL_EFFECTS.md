@@ -209,7 +209,17 @@ seconds. The credential header is exactly `Authorization: Bearer ` followed by
 credential. The source rule checks that comparison's form; it does not prove
 compiled-code or hardware timing independence. No credential enters a trace.
 
-Only `POST /command` is accepted. Its binary body is version byte 1, contract
+The committing route is `POST /command`. The optional authenticated
+`GET /state` and `POST /preview` delegate to application reporting and
+preparation methods; their default implementations refuse. A preview cannot
+commit. `Server::with_assets` installs an owned, closed list of public GET
+routes, with at most 128 assets and 32 MiB total, and no asset above 16 MiB.
+Those routes perform no filesystem lookup. GET routes refuse framed bodies;
+all routes retain header, origin and deadline checks. Application views and
+previews require the configured credential. `POST /preview` uses the same
+request envelope and body cap; its tail is application preparation data.
+
+The command route's binary body is version byte 1, contract
 hash (32 bytes), caller-retained retry key (32 bytes), expected revision (8 bytes,
 big endian), then the exact canonical application command. `encode_command`
 constructs it. There is no actor field. Headers are bounded to 4096 bytes and 24

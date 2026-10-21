@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "command": [
+        "160",
+        "170",
+        "2"
+      ],
+      "context": [
+        "190",
+        "0"
+      ],
+      "class": "Accept"
+    },
+    {
+      "command": [
+        "161",
+        "170",
+        "2"
+      ],
+      "context": [
+        "191",
+        "0"
+      ],
+      "class": "Accept"
+    },
+    {
+      "command": [
+        "161",
+        "170",
+        "1"
+      ],
+      "context": [
+        "191",
+        "0"
+      ],
+      "class": "Reject"
+    },
+    {
+      "command": [
+        "162",
+        "170",
+        "1"
+      ],
+      "context": [
+        "193",
+        "0"
+      ],
+      "class": "Accept"
+    }
+  ],
+  "deliveries": 1
+}

@@ -14,7 +14,7 @@ import re
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = tuple(f"crates/zeno-fcis-ingress/src/{name}.rs" for name in ("lib", "http", "durable", "trace"))
+SOURCES = tuple(f"crates/zeno-fcis-ingress/src/{name}.rs" for name in ("lib", "http", "durable", "trace", "assets"))
 APPROVED = {
     "atomic-waker": "1.1.2", "bytes": "1.12.1", "http": "1.5.0", "http-body": "1.1.0",
     "http-body-util": "0.1.5", "httparse": "1.10.1", "httpdate": "1.0.3", "hyper": "1.12.0",

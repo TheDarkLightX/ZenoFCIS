@@ -1,5 +1,5 @@
 //! One bounded HTTP/1 request per connection, on a current-thread runtime.
-use crate::{Command, Endpoint, Event, Refusal, Trace, TraceSink};
+use crate::{Asset, Command, Endpoint, Event, Refusal, Trace, TraceSink};
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::{
     Method, Request, Response, StatusCode,
@@ -70,6 +70,7 @@ pub fn runtime() -> io::Result<Runtime> {
 pub struct Server<B, S> {
     config: Config,
     state: RefCell<(B, S)>,
+    assets: Vec<Asset>,
 }
 impl<B: Endpoint, S: TraceSink> Server<B, S> {
     /// Create a serial server with its configured application and trace sink.
@@ -77,7 +78,29 @@ impl<B: Endpoint, S: TraceSink> Server<B, S> {
         Self {
             config,
             state: RefCell::new((backend, sink)),
+            assets: Vec::new(),
         }
+    }
+    /// Install a bounded, closed set of public assets before serving.
+    /// Copies are already owned by Asset; no mutable aliases escape.
+    pub fn with_assets(mut self, assets: Vec<Asset>) -> Result<Self, Refusal> {
+        let total = assets
+            .iter()
+            .try_fold(0usize, |sum, asset| sum.checked_add(asset.bytes.len()));
+        if assets.len() > 128
+            || total.is_none_or(|n| n > 32 * 1024 * 1024)
+            || assets
+                .iter()
+                .enumerate()
+                .any(|(i, asset)| assets[..i].iter().any(|old| old.route == asset.route))
+            || assets
+                .iter()
+                .any(|asset| ["/state", "/preview", "/command"].contains(&asset.route.as_str()))
+        {
+            return Err(Refusal::Malformed);
+        }
+        self.assets = assets;
+        Ok(self)
     }
     /// Recover the caller-owned shell and sink after serving.
     pub fn into_parts(self) -> (B, S) {
@@ -109,7 +132,7 @@ impl<B: Endpoint, S: TraceSink> Server<B, S> {
     {
         let config = &self.config;
         let state = &self.state;
-        let service = service_fn(|request| handle(config, state, request));
+        let service = service_fn(|request| handle(config, state, &self.assets, request));
         let mut builder = http1::Builder::new();
         builder
             .keep_alive(false)
@@ -147,15 +170,49 @@ impl<B: Endpoint, S: TraceSink> Server<B, S> {
 async fn handle<B: Endpoint, S: TraceSink>(
     config: &Config,
     state: &RefCell<(B, S)>,
+    assets: &[Asset],
     request: Request<Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
+    let path = request.uri().path().to_owned();
+    if request.method() == Method::GET && path != "/state" {
+        let result = headers(config, &request, false).and_then(|()| empty_body(&request));
+        if result.is_ok()
+            && request.uri().query().is_none()
+            && request.uri().authority().is_none()
+            && let Some(asset) = assets.iter().find(|asset| asset.route == path)
+        {
+            return Ok(response(
+                StatusCode::OK,
+                asset.bytes.clone(),
+                asset.content_type,
+            ));
+        }
+        return Ok(response(
+            StatusCode::BAD_REQUEST,
+            b"Malformed".to_vec(),
+            "application/octet-stream",
+        ));
+    }
+    if request.method() == Method::GET && path == "/state" {
+        let admission = headers(config, &request, true).and_then(|()| empty_body(&request));
+        let (backend, sink) = &mut *state.borrow_mut();
+        let result = admission.and_then(|()| backend.snapshot(config.principal));
+        if let Err(error) = result {
+            sink.record(Trace::empty(Event::Refused(error)));
+        }
+        return Ok(result_response(result, "application/json"));
+    }
     let result = admit(config, request).await;
     let (backend, sink) = &mut *state.borrow_mut();
     let result = match result {
         Ok(command) => {
             let trace = Trace::request(&command);
             sink.record(trace);
-            let result = backend.execute(&command, sink);
+            let result = if path == "/preview" {
+                backend.preview(&command)
+            } else {
+                backend.execute(&command, sink)
+            };
             sink.record(Trace {
                 event: match result {
                     Ok(_) => Event::Reply,
@@ -170,6 +227,13 @@ async fn handle<B: Endpoint, S: TraceSink>(
             Err(error)
         }
     };
+    Ok(result_response(result, "application/octet-stream"))
+}
+
+fn result_response(
+    result: Result<Vec<u8>, Refusal>,
+    content_type: &'static str,
+) -> Response<Full<Bytes>> {
     let (status, bytes) = match result {
         Ok(bytes) => (StatusCode::OK, bytes),
         Err(error) => (
@@ -185,75 +249,41 @@ async fn handle<B: Endpoint, S: TraceSink>(
             format!("{error:?}").into_bytes(),
         ),
     };
+    response(status, bytes, content_type)
+}
+fn response(
+    status: StatusCode,
+    bytes: Vec<u8>,
+    content_type: &'static str,
+) -> Response<Full<Bytes>> {
     let mut response = Response::new(Full::new(Bytes::from(bytes)));
     *response.status_mut() = status;
-    response.headers_mut().insert(
-        "content-type",
-        hyper::header::HeaderValue::from_static("application/octet-stream"),
-    );
-    response.headers_mut().insert(
-        "cache-control",
-        hyper::header::HeaderValue::from_static("no-store"),
-    );
-    Ok(response)
+    for (name, value) in [
+        ("content-type", content_type),
+        ("cache-control", "no-store"),
+        ("x-content-type-options", "nosniff"),
+        ("referrer-policy", "no-referrer"),
+        (
+            "content-security-policy",
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        ),
+    ] {
+        response
+            .headers_mut()
+            .insert(name, hyper::header::HeaderValue::from_static(value));
+    }
+    response
 }
 
 async fn admit(config: &Config, request: Request<Incoming>) -> Result<Command, Refusal> {
     if request.method() != Method::POST
-        || request.uri().path() != "/command"
+        || !["/command", "/preview"].contains(&request.uri().path())
         || request.uri().query().is_some()
         || request.uri().authority().is_some()
     {
         return Err(Refusal::Malformed);
     }
-    let headers = request.headers();
-    for name in headers.keys() {
-        if headers.get_all(name).iter().count() != 1 {
-            return Err(Refusal::Malformed);
-        }
-        if headers
-            .get(name)
-            .is_none_or(|value| value.to_str().is_err())
-        {
-            return Err(Refusal::Malformed);
-        }
-    }
-    if headers.get("host").is_none() {
-        return Err(Refusal::Malformed);
-    }
-    if headers
-        .get("origin")
-        .is_some_and(|origin| origin.as_bytes() != config.origin.as_bytes())
-    {
-        return Err(Refusal::Origin);
-    }
-    if headers
-        .get("sec-fetch-site")
-        .is_some_and(|value| value.as_bytes() == b"cross-site")
-    {
-        return Err(Refusal::Origin);
-    }
-    let credential = headers
-        .get("authorization")
-        .ok_or(Refusal::Credential)?
-        .to_str()
-        .map_err(|_| Refusal::Credential)?;
-    let hex = credential
-        .strip_prefix("Bearer ")
-        .filter(|hex| hex.len() == 64)
-        .ok_or(Refusal::Credential)?;
-    let mut candidate = [0; 32];
-    for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
-        let digit = |byte| match byte {
-            b'0'..=b'9' => Ok(byte - b'0'),
-            b'a'..=b'f' => Ok(byte - b'a' + 10),
-            _ => Err(Refusal::Credential),
-        };
-        candidate[index] = digit(pair[0])? * 16 + digit(pair[1])?;
-    }
-    if !credential_matches(&candidate, &config.secret) {
-        return Err(Refusal::Credential);
-    }
+    headers(config, &request, true)?;
     let body = Limited::new(request.into_body(), MAX_BODY)
         .collect()
         .await
@@ -284,6 +314,80 @@ async fn admit(config: &Config, request: Request<Incoming>) -> Result<Command, R
         expected,
         bytes: body[73..].to_vec(),
     })
+}
+
+fn empty_body(request: &Request<Incoming>) -> Result<(), Refusal> {
+    if request.headers().contains_key("transfer-encoding")
+        || request
+            .headers()
+            .get("content-length")
+            .is_some_and(|v| v.as_bytes() != b"0")
+    {
+        return Err(Refusal::Malformed);
+    }
+    Ok(())
+}
+
+fn headers(
+    config: &Config,
+    request: &Request<Incoming>,
+    authenticate: bool,
+) -> Result<(), Refusal> {
+    if request.uri().query().is_some() || request.uri().authority().is_some() {
+        return Err(Refusal::Malformed);
+    }
+    let headers = request.headers();
+    for name in headers.keys() {
+        if headers.get_all(name).iter().count() != 1 {
+            return Err(Refusal::Malformed);
+        }
+        if headers
+            .get(name)
+            .is_none_or(|value| value.to_str().is_err())
+        {
+            return Err(Refusal::Malformed);
+        }
+    }
+    if headers.get("host").is_none() {
+        return Err(Refusal::Malformed);
+    }
+    if headers
+        .get("origin")
+        .is_some_and(|origin| origin.as_bytes() != config.origin.as_bytes())
+    {
+        return Err(Refusal::Origin);
+    }
+    if headers
+        .get("sec-fetch-site")
+        .is_some_and(|value| value.as_bytes() == b"cross-site")
+    {
+        return Err(Refusal::Origin);
+    }
+    if !authenticate {
+        return Ok(());
+    }
+    let credential = headers
+        .get("authorization")
+        .ok_or(Refusal::Credential)?
+        .to_str()
+        .map_err(|_| Refusal::Credential)?;
+    let hex = credential
+        .strip_prefix("Bearer ")
+        .filter(|hex| hex.len() == 64)
+        .ok_or(Refusal::Credential)?;
+    let mut candidate = [0; 32];
+    for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
+        let digit = |byte| match byte {
+            b'0'..=b'9' => Ok(byte - b'0'),
+            b'a'..=b'f' => Ok(byte - b'a' + 10),
+            _ => Err(Refusal::Credential),
+        };
+        candidate[index] = digit(pair[0])? * 16 + digit(pair[1])?;
+    }
+    if !credential_matches(&candidate, &config.secret) {
+        return Err(Refusal::Credential);
+    }
+    Ok(())
 }
 
 // Source-checked full-width comparison. black_box prevents short-circuit folding;

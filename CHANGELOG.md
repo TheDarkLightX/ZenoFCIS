@@ -4,6 +4,17 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## 2.6 - unreleased
+
+- Add `zeno-fcis new --contract project.zeno --app`: an explicit pinned UI
+  build, checked core, SQLite shell effects and authenticated ingress server
+  with embedded static assets and a source-bound app manifest.
+- Add durable UI previews and original-key recovery, checked journeys for
+  withdrawal queue, inventory reservation and the wide counter, and an
+  expanded ingress fault corpus including time, disk-full and I/O responses.
+- Add [Build an app with ZenoFCIS](docs/BUILD_AN_APP.md). Browser, TCP and
+  release qualification remain separate gates.
+
 ## 2.5.0 - 2026-10-18
 
 - **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,

@@ -3,10 +3,12 @@
 //! Configuration owns its credential, and no credential or command is traceable.
 #![forbid(unsafe_code)]
 
+mod assets;
 mod durable;
 mod http;
 mod trace;
 
+pub use assets::Asset;
 pub use durable::Durable;
 pub use http::{Config, MAX_BODY, MAX_HEADER, Server, runtime};
 pub use trace::{Event, Trace, TraceSink};
@@ -85,6 +87,15 @@ pub enum Refusal {
 
 /// Shell endpoint. It may acquire and commit; decisions remain with Authority.
 pub trait Endpoint {
+    /// Authenticated application view. This supplies reporting data, never authority.
+    fn snapshot(&mut self, _principal: Hash32) -> Result<Vec<u8>, Refusal> {
+        Err(Refusal::Malformed)
+    }
+    /// Authenticated preview and canonical command preparation. It cannot commit.
+    fn preview(&mut self, _command: &Command) -> Result<Vec<u8>, Refusal> {
+        Err(Refusal::Malformed)
+    }
+
     /// Executes one immutable request and emits redacted structured observations.
     fn execute(&mut self, command: &Command, trace: &mut dyn TraceSink)
     -> Result<Vec<u8>, Refusal>;

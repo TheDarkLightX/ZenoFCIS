@@ -233,3 +233,54 @@ fn ambiguous_framing() {
         "length and transfer encoding accepted"
     );
 }
+
+#[test]
+fn closed_asset_routes_and_authenticated_views() {
+    use zeno_fcis_ingress::Asset;
+    let mut assets_server = ok(server().with_assets(vec![ok(Asset::new(
+        "/",
+        "text/html; charset=utf-8",
+        b"checked app",
+    ))]));
+    for (path, expected) in [
+        ("/", 200),
+        ("/../Cargo.toml", 400),
+        ("/%2e%2e/Cargo.toml", 400),
+        ("/unknown", 400),
+        ("/?x=1", 400),
+    ] {
+        let wire = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes();
+        let reply = exchange(&mut assets_server, wire, false);
+        assert_eq!(status(&reply), expected);
+        if expected == 200 {
+            assert_eq!(payload(&reply), b"checked app");
+            assert!(String::from_utf8_lossy(&reply).contains("nosniff"));
+        }
+    }
+    let reply = exchange(
+        &mut assets_server,
+        b"GET /state HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        false,
+    );
+    assert_eq!(status(&reply), 401);
+    let reply = exchange(
+        &mut assets_server,
+        b"GET / HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\n\r\n".to_vec(),
+        false,
+    );
+    assert_ne!(status(&reply), 200);
+    assert!(Asset::new("/../x", "text/html; charset=utf-8", b"x").is_err());
+    assert!(
+        server()
+            .with_assets(vec![ok(Asset::new("/state", "application/json", b"{}"))])
+            .is_err()
+    );
+    assert!(
+        server()
+            .with_assets(vec![
+                ok(Asset::new("/", "application/json", b"{}")),
+                ok(Asset::new("/", "application/json", b"{}"))
+            ])
+            .is_err()
+    );
+}

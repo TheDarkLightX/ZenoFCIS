@@ -47,6 +47,10 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "app-factory-journey": AcceptanceScenario(
+        "Generate and run the checked core, shell, ingress and UI together",
+        (("python3", "tools/check_app_factory.py"),),
+    ),
     # BEGIN version-space acceptance registrations
     "loop-version-space": AcceptanceScenario(
         "Count finite meanings, ask the owner and check the unique program",

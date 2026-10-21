@@ -426,11 +426,15 @@ fn loopback_stage2_fault_schedules() {
             Port::Commit,
             Port::Acknowledge,
             Port::Send,
+            Port::Clock,
+            Port::Random,
+            Port::Wait,
         ] {
             let options = match port {
-                Port::Commit | Port::Acknowledge => 6,
+                Port::Commit | Port::Acknowledge => 8,
                 Port::Send => 7,
-                _ => 3,
+                Port::Clock | Port::Random => 4,
+                _ => 5,
             };
             for choice in 0..options {
                 let files = Files::new();
@@ -440,6 +444,9 @@ fn loopback_stage2_fault_schedules() {
                 let mut choices = VecDeque::new();
                 if port == Port::Reopen {
                     choices.push_back((Port::Commit, 3));
+                }
+                if matches!(port, Port::Clock | Port::Random | Port::Wait) {
+                    choices.push_back((Port::Send, 1));
                 }
                 choices.push_back((port, choice));
                 let durable = ok(Durable::new(

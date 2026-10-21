@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "command": [
+        "153",
+        "3"
+      ],
+      "context": [
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "command": [
+        "150",
+        "3"
+      ],
+      "context": [
+        "1"
+      ],
+      "class": "Accept"
+    },
+    {
+      "command": [
+        "150",
+        "1"
+      ],
+      "context": [
+        "1"
+      ],
+      "class": "Reject"
+    },
+    {
+      "command": [
+        "152",
+        "2"
+      ],
+      "context": [
+        "1"
+      ],
+      "class": "Accept"
+    }
+  ],
+  "deliveries": 1
+}
