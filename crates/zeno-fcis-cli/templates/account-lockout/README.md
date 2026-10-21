@@ -283,8 +283,9 @@ is shared.
    ```
 
    The development candidate routes claim 600 through `--backend lean`.
-   With the pinned Lean 4.30.0 runtime and an explicit manifest allowing
-   exactly `propext` and `Quot.sound`, the recorded output includes:
+   The 2026-10-18 run used the pinned Lean 4.30.0 runtime and an explicit
+   manifest allowing exactly `propext` and `Quot.sound`. Its recorded
+   output includes:
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
