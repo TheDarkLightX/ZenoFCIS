@@ -218,7 +218,23 @@ standard input is one line holding a JSON object: the delivery's envelope,
 with `delivery`, the delivery ID; `commit`, `lane` and `ordinal`;
 `destination` in hexadecimal and, for a text destination,
 `destination_text`; `payload_sha256`; and `payload` in hexadecimal.
-`timeout_seconds` is 1 to 60.
+`timeout_seconds` is 1 to 60. `ZENO_APP_CONNECTOR` replaces
+`ZENO_APP_RECEIVER`; setting both refuses start-up.
+
+Treat standard input as data. Its values follow from requests that users
+make, so a program must parse it as JSON and never evaluate it, pass it to a
+shell, or splice any field into a command line, a file path, a query or a
+template unescaped. `destination_text` holds only printable ASCII, but a
+quote, a space or a `$` is printable. Run a shell script only if it reads the
+JSON with a real parser, such as `jq`, and quotes every value it uses.
+
+The server serves one request at a time, so a delivery holds every other
+request until it ends. A delivery run tries a failing delivery three times,
+so one command can wait three times `timeout_seconds`, and a request that
+runs past the server's 10-second limit can lose its reply; the client then
+recovers it with the original request. Keep the program fast and
+`timeout_seconds` low, such as 3, or hand the work to a queue the program
+only writes to.
 
 Exit status 0 acknowledges the delivery. Any other exit, a program that
 cannot start, or the time limit leaves the delivery pending: the commit

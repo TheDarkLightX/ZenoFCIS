@@ -1038,6 +1038,24 @@ fn program_connector_acknowledges_only_success() {
     assert!(started.elapsed() < Duration::from_secs(20), "time limit");
     let mut missing = ok(connector(json!(["/no/such/program"]), 1));
     assert_eq!(missing.send(&delivery), Sent::Unknown(Fault::Io));
+    // A program that never reads its input is stopped at the time limit too,
+    // even when the input is larger than the pipe holds.
+    let large = Delivery {
+        payload: vec![7; 1 << 20],
+        payload_sha256: RustCryptoSha256::hash(&vec![7; 1 << 20]),
+        ..delivery.clone()
+    };
+    let started = std::time::Instant::now();
+    let mut deaf = ok(connector(json!(["/bin/sleep", "30"]), 1));
+    assert_eq!(
+        deaf.send(&large),
+        Sent::Unknown(Fault::Io),
+        "time limit with unread input"
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "time limit with unread input"
+    );
     for (argv, timeout) in [
         (json!(["tee", "out"]), 10),
         (json!([]), 10),

@@ -746,8 +746,12 @@ impl ProgramConnector {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()?;
-        // A program that stops reading early still has its exit status judged.
-        let _ = child.stdin.take().map(|mut stdin| stdin.write_all(&input));
+        // The input is written beside the time limit: a program that never reads
+        // it cannot hold the server past the limit once the pipe is full. A
+        // program that stops reading early still has its exit status judged.
+        if let Some(mut stdin) = child.stdin.take() {
+            std::thread::spawn(move || stdin.write_all(&input));
+        }
         let deadline = Instant::now() + self.timeout;
         loop {
             if let Some(status) = child.try_wait()? {

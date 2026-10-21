@@ -51,6 +51,8 @@ CONTROLS = [
     ("clock-file-loose", "clock_file_is_read_strictly", "read loosely",
      ".and_then(|text| text.parse::<i128>().ok().filter(|n| n.to_string() == text))",
      ".and_then(|text| text.trim().parse::<i128>().ok())"),
+    ("connector-input-blocks", "program_connector_acknowledges_only_success", "time limit with unread input",
+     "std::thread::spawn(move || stdin.write_all(&input));", "let _ = stdin.write_all(&input);"),
 ]
 
 
