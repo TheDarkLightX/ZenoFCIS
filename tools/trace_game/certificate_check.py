@@ -6,7 +6,6 @@ import itertools
 import json
 from pathlib import Path
 import subprocess
-from game_check import check as check_game, load_bound as load_game_bound
 
 GRAMMAR = ('true', 'actor == 0', 'false')
 ORACLE_RESPONSES = ('wait','settle','cancel')
@@ -216,6 +215,7 @@ def checked_graph(packet,tables):
 
 def check(packet,tables):
     if packet['schema'] in ('zeno-fcis/game-guard-exhaustion/1','zeno-fcis/game-incomplete/1') or packet.get('spec',{}).get('model')=='contract':
+        from game_check import check as check_game
         return check_game(packet,tables)
     if packet['schema']=='zeno-fcis/trace-game-guard-exhaustion/1.1':
         need(packet['grammar']==list(GRAMMAR) and len(packet['attempts'])==3,'guard grammar exhaustion')
@@ -335,12 +335,16 @@ def main():
     parser.add_argument('certificate'); args=parser.parse_args()
     try:
         user_game=(args.directory/'game-binding.json').exists()
-        tables=load_game_bound(args.directory) if user_game else load_bound(args.directory)
+        if user_game:
+            from game_check import load_bound as load_game_bound
+            tables=load_game_bound(args.directory)
+        else:
+            tables=load_bound(args.directory)
         path=args.directory/args.certificate
         binding=json.loads((args.directory/('game-binding.json' if user_game else 'binding.json')).read_text())
         need(args.certificate in binding['artifacts'],'unbound certificate')
         print(json.dumps(check(json.loads(path.read_text()),tables),sort_keys=True))
-    except (ValueError,KeyError,TypeError,IndexError,OSError,subprocess.SubprocessError) as error:
+    except (ImportError,ValueError,KeyError,TypeError,IndexError,OSError,subprocess.SubprocessError) as error:
         parser.exit(2,f'certificate refused: {error}\n')
 
 

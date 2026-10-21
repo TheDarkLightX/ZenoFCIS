@@ -64,7 +64,7 @@ def main():
     if original.count(old)!=1: raise RuntimeError('native mutation anchor is not unique')
     mutated=original.replace(old,new); (args.out/'pre-state.rs').write_text(mutated)
     env=dict(os.environ,CARGO_TARGET_DIR=str(args.target.resolve()),CARGO_PROFILE_DEV_DEBUG='0',CARGO_PROFILE_TEST_DEBUG='0')
-    command=['nice','-n','19','ionice','-c3','cargo','build','--locked','--offline','-p','zeno-fcis-contract','--example','trace_game_input','-j','2']
+    command=['nice','-n','19','ionice','-c3','cargo','+1.97.1','build','--locked','--offline','-p','zeno-fcis-contract','--example','trace_game_input','-j','3']
     try:
         path.write_text(mutated)
         with (args.out/'pre-state-build.log').open('wb') as log:
