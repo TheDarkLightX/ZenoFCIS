@@ -49,6 +49,14 @@
         "status": "generated"
       },
       "contains": []
+    },
+    {
+      "command": "zeno-fcis contract collections --help",
+      "exit": 64,
+      "expected": {},
+      "contains": [
+        "unrecognized subcommand"
+      ]
     }
   ],
   "example": {
@@ -103,6 +111,12 @@ zeno-fcis generate contract examples/guide-counter --out "$WORK/collection-compi
 ```
 
 Expected: exit 0; {"status": "generated"}.
+
+```sh
+zeno-fcis contract collections --help
+```
+
+Expected: exit 64; ["unrecognized subcommand"].
 
 ## Verdicts
 

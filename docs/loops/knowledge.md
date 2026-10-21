@@ -49,6 +49,14 @@
       "exit": 0,
       "expected": {},
       "contains": []
+    },
+    {
+      "command": "zeno-fcis kb assess --help",
+      "exit": 64,
+      "expected": {},
+      "contains": [
+        "unrecognized subcommand"
+      ]
     }
   ],
   "example": {
@@ -110,6 +118,12 @@ zeno-fcis kb advise --task 'task(subject,check-program).'
 ```
 
 Expected: exit 0; [].
+
+```sh
+zeno-fcis kb assess --help
+```
+
+Expected: exit 64; ["unrecognized subcommand"].
 
 ## Verdicts
 

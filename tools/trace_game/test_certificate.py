@@ -58,10 +58,15 @@ class Certificate(unittest.TestCase):
         # Optional help and telemetry belong only to the command-line shell.
         core=ast.Module(body=[node for node in tree.body
             if not (isinstance(node,ast.FunctionDef) and node.name=='main')
-            and not isinstance(node,ast.If)], type_ignores=[])
+            and not (isinstance(node,ast.If) and ast.dump(node.test)==ast.dump(
+                ast.parse("__name__ == '__main__'",mode='eval').body))], type_ignores=[])
         imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
                  for node in ast.walk(core) if isinstance(node,(ast.Import,ast.ImportFrom))}
         self.assertLessEqual(imports,{'argparse','hashlib','itertools','json','pathlib','subprocess'})
+        all_imports={node.names[0].name.split('.')[0] if isinstance(node,ast.Import) else node.module.split('.')[0]
+                     for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
+        self.assertLessEqual(all_imports, {'argparse','hashlib','itertools','json','pathlib','subprocess',
+                                          'sys','telemetry','guide_help'})
 
     def test_standalone_checker_does_not_require_optional_helpers(self):
         import os

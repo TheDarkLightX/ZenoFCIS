@@ -75,7 +75,15 @@
     "refusals": "docs/TRACE_GAME.md:1-148; finite exclusion argument stated in this card"
   },
   "commands": [],
-  "pitfalls": "Each new candidate must satisfy every replayable attacker history in the pool under the declared model. Recompute candidate-dependent transitions. Preserve legitimacy requirements so reject-everything cannot win. The pool only grows: a refuted candidate never returns; finite candidate classes terminate after finitely many exclusions. Stop on any repeated candidate or counterexample, or class exhaustion. Prefer the smallest consistent candidate to discourage memorization; this gives no statistical generalization guarantee. Record pool size and candidate size each round. A certificate covers the declared attacker alphabet, not every attack."
+  "pitfalls": "Each new candidate must satisfy every replayable attacker history in the pool under the declared model. Recompute candidate-dependent transitions. Preserve legitimacy requirements so reject-everything cannot win. The pool only grows: a refuted candidate never returns; finite candidate classes terminate after finitely many exclusions. Stop on any repeated candidate or counterexample, or class exhaustion. Prefer the smallest consistent candidate to discourage memorization; this gives no statistical generalization guarantee. Record pool size and candidate size each round. A certificate covers the declared attacker alphabet, not every attack.",
+  "protocol_steps": [
+    "Freeze the discrete model: finite domains, permitted attacker moves, observation order, losing states, legitimate behavior, candidate class and round/work/time budget. The target is an invariant safety controller that never reaches a losing state.",
+    "Select the smallest candidate that satisfies every history in the pool. Replay histories using this candidate's transitions. If its digest was seen before, stop and report the repetition.",
+    "Challenge that candidate with bounded attacker search through the declared K, or enumerate the model and independently check its certificate when feasible.",
+    "Replay each reported counterexample. If a counterexample repeats, stop and report failed pool enforcement. Otherwise append it to the durable pool, record pool size and candidate size, and repeat candidate selection. Never remove a pooled history.",
+    "Stop on an independently checked certificate, the declared bound or the budget. Report a certificate as safe against every attacker history allowed by the declared model; report a bounded result as no exploit found up to K. Budget exhaustion claims no completed safety result. Complete candidate-class exhaustion means no strategy in this class.",
+    "For a small enumerable model, use the exact solver instead of alternating proposals. The repository example below demonstrates this route; there is no dedicated duel driver in this build."
+  ]
 }
 ```
 
@@ -100,6 +108,18 @@ Synopsis: "python3 -B tools/trace_game/run_v11.py --certificates-only --out OUT"
 Set WORK to a fresh writable directory outside the source tree. Run commands from the repository root with zeno-fcis on PATH.
 
 ## Steps
+
+1. Freeze the discrete model: finite domains, permitted attacker moves, observation order, losing states, legitimate behavior, candidate class and round/work/time budget. The target is an invariant safety controller that never reaches a losing state.
+
+2. Select the smallest candidate that satisfies every history in the pool. Replay histories using this candidate's transitions. If its digest was seen before, stop and report the repetition.
+
+3. Challenge that candidate with bounded attacker search through the declared K, or enumerate the model and independently check its certificate when feasible.
+
+4. Replay each reported counterexample. If a counterexample repeats, stop and report failed pool enforcement. Otherwise append it to the durable pool, record pool size and candidate size, and repeat candidate selection. Never remove a pooled history.
+
+5. Stop on an independently checked certificate, the declared bound or the budget. Report a certificate as safe against every attacker history allowed by the declared model; report a bounded result as no exploit found up to K. Budget exhaustion claims no completed safety result. Complete candidate-class exhaustion means no strategy in this class.
+
+6. For a small enumerable model, use the exact solver instead of alternating proposals. The repository example below demonstrates this route; there is no dedicated duel driver in this build.
 
 ```sh
 python3 -B tools/trace_game/run_v11.py --certificates-only --out "$WORK/trace"
