@@ -43,9 +43,9 @@ mod runtime {
     use std::fs;
     use std::io::{Read, Write};
     use std::os::fd::AsFd;
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     #[cfg(test)]
     use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     use std::os::unix::{
         net::UnixStream,
         process::{CommandExt, ExitStatusExt},
@@ -96,7 +96,8 @@ mod runtime {
         // Invocation::new obtains this identity from 256 bits of OS randomness.
         // Create its directory atomically, without a shared predictable parent.
         Ok(Path::new("/tmp").join(format!(
-            "zeno-fcis-containment-{}-{invocation}", nix::unistd::geteuid()
+            "zeno-fcis-containment-{}-{invocation}",
+            nix::unistd::geteuid()
         )))
     }
 
@@ -478,12 +479,16 @@ mod runtime {
         // Only parent/guardian read it; the 64 MiB worker never loads a copy.
         let file =
             fs::File::open("/proc/self/exe").map_err(|e| format!("policy-build-digest:{e}"))?;
+        read_build_identity(file)
+    }
+
+    fn read_build_identity(file: impl Read) -> Result<String, String> {
         let mut bytes = Vec::new();
         file.take(128 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)
             .map_err(|e| format!("policy-build-digest:{e}"))?;
         if bytes.len() > 128 * 1024 * 1024 {
-            return Err("policy-build-size".into());
+            return Err("the zeno-fcis executable is over the 128 MiB containment limit (a debug build?); use a release build".into());
         }
         Ok(crate::transform::sha256_hex(&bytes))
     }
@@ -1525,23 +1530,49 @@ mod runtime {
     mod stage_tests {
         use super::*;
         #[test]
+        fn containment_regression_build_identity_explains_size_limit() {
+            assert_eq!(
+                read_build_identity(&b"abc"[..]),
+                Ok("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_owned())
+            );
+            let oversized = std::io::repeat(0).take(128 * 1024 * 1024 + 1);
+            assert_eq!(read_build_identity(oversized), Err(
+                "the zeno-fcis executable is over the 128 MiB containment limit (a debug build?); use a release build".to_owned()));
+        }
+        #[test]
         fn containment_regression_journal_has_no_predictable_shared_directory() {
             use clap::Parser;
             let cli = crate::Cli::try_parse_from([
-                "zeno-fcis", "loop", "question", "--contract", "unused",
-            ]).unwrap_or_else(|e| panic!("{e:?}"));
-            let a = Invocation::new(&cli.command, Vec::new(), super::super::super::SelectionSource::Flag)
-                .unwrap_or_else(|e| panic!("{e:?}"));
-            let b = Invocation::new(&cli.command, Vec::new(), super::super::super::SelectionSource::Flag)
-                .unwrap_or_else(|e| panic!("{e:?}"));
+                "zeno-fcis",
+                "loop",
+                "question",
+                "--contract",
+                "unused",
+            ])
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            let a = Invocation::new(
+                &cli.command,
+                Vec::new(),
+                super::super::super::SelectionSource::Flag,
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            let b = Invocation::new(
+                &cli.command,
+                Vec::new(),
+                super::super::super::SelectionSource::Flag,
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
             assert_ne!(a.directory, b.directory);
             for directory in [&a.directory, &b.directory] {
                 let metadata = fs::symlink_metadata(directory).unwrap_or_else(|e| panic!("{e:?}"));
                 assert!(metadata.is_dir());
                 assert_eq!(metadata.mode() & 0o777, 0o700);
                 assert_eq!(metadata.uid(), nix::unistd::geteuid().as_raw());
-                assert_eq!(directory.parent(), Some(Path::new("/tmp")),
-                    "an invocation must not depend on a predictable application directory another user can occupy");
+                assert_eq!(
+                    directory.parent(),
+                    Some(Path::new("/tmp")),
+                    "an invocation must not depend on a predictable application directory another user can occupy"
+                );
             }
             // These are evidence records, so the test retains both journals.
         }

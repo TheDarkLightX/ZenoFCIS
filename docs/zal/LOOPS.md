@@ -503,12 +503,18 @@ Its spec uses the existing finite-program domain vocabulary:
 ```
 
 ```sh
-zeno-fcis loop capture open --spec spec.json --reference reference.py --session capture
+zeno-fcis --containment-backend systemd loop capture open --spec spec.json --reference reference.py --session capture
 zeno-fcis loop capture packet --session capture
-zeno-fcis loop capture candidate --session capture --candidate-json proposal.json
-zeno-fcis loop capture status --session capture
-zeno-fcis loop capture status --session capture --full
+zeno-fcis --containment-backend posix loop capture candidate --session capture --candidate-json proposal.json
+zeno-fcis --containment-backend posix loop capture status --session capture
+zeno-fcis --containment-backend posix loop capture status --session capture --full
 ```
+
+Reference acquisition (`open`, profile `python-reference/1`) needs the systemd
+user manager. Candidate checking and captured-result replay use `finite-data/1`
+on POSIX. Select the backend for each step as shown above; `packet` only reads
+the public packet. `status` can replay a captured result, so the example selects
+POSIX for it too. An unavailable backend refuses instead of falling back.
 
 `open` requires a new directory. It observes each point six times: twice in
 each of three fresh workers, ordered forward, reverse and forward. A crash,
