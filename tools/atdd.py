@@ -67,6 +67,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "construct", "--locked", "--offline"),
          ("python3", "tools/test_priority_reference.py")),
     ),
+    "keyed-collections": AcceptanceScenario(
+        "Check maps of any size by data independence over their named entries",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "collections"),
+         ("python3", "tools/check_collections_controls.py", "--remove-targets")),
+    ),
     "contract-tables": AcceptanceScenario(
         "Expand fixed-size tables exactly into ordinary fields and laws",
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "tables"),
