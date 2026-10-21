@@ -12,8 +12,15 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
+# Default-ignorable code points (Unicode DerivedCoreProperties), such as the
+# zero-width characters, bidirectional controls, fillers and variation selectors.
+IGNORABLE = ((0x00AD, 0x00AD), (0x034F, 0x034F), (0x061C, 0x061C), (0x115F, 0x1160), (0x17B4, 0x17B5),
+             (0x180B, 0x180F), (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F), (0x3164, 0x3164),
+             (0xFE00, 0xFE0F), (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8), (0x1BCA0, 0x1BCA3),
+             (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF))
 
 
 def unique(pairs):
@@ -23,6 +30,33 @@ def unique(pairs):
             raise ValueError(f"UiDuplicateKey:{key}")
         result[key] = value
     return result
+
+
+def invisible(character):
+    """A character that can make text read differently from its code points."""
+    code = ord(character)
+    return (code < 0x20 or 0x7F <= code <= 0x9F
+            or unicodedata.category(character) in {"Cf", "Cs", "Co", "Zl", "Zp"}
+            or any(low <= code <= high for low, high in IGNORABLE))
+
+
+def visible(value, path="ui.json"):
+    """Refuse C0 and C1 controls, bidirectional controls, zero-width and other
+    invisible characters, separators, surrogates and private use anywhere in
+    the metadata: every label, unit, value label, message and key."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            where = f"{path}.{json.dumps(key)[1:-1]}"
+            visible(key, where)
+            visible(item, where)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            visible(item, f"{path}[{index}]")
+    elif isinstance(value, str):
+        for character in value:
+            if invisible(character):
+                raise ValueError(f"UiInvisibleCharacter:{path}:U+{ord(character):04X}")
+    return value
 
 
 def save(path, value):
@@ -78,7 +112,7 @@ def main():
     metadata = project / "ui.json"
     if not metadata.is_file() or metadata.is_symlink():
         raise ValueError("UiMissingMetadata:ui.json")
-    json.loads(metadata.read_text(), object_pairs_hook=unique)
+    visible(json.loads(metadata.read_text(encoding="utf-8"), object_pairs_hook=unique))
     raw = json.loads(run([args.oracle.resolve(), project], capture_output=True, text=True).stdout)
     # The server sets a declared clock field; the interface compares replies without it.
     clock = json.loads((project / "v2/policy.json").read_text(), object_pairs_hook=unique).get("clock")

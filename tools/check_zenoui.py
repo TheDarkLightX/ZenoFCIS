@@ -21,6 +21,7 @@ def main():
     args = parser.parse_args()
     report = {"format":"zenoui/laws/1", "apps":{}}
     run(["node", ROOT / "site/tests/zenoui-contract.test.mjs"])
+    run(["python3", ROOT / "tools/test_zenoui_text.py"])
     for name, project in PROJECTS.items():
         out = args.out.resolve() / name
         run(["python3", ROOT / "tools/zenoui.py", project, "--out", out / "app",

@@ -478,6 +478,12 @@ contract supplies every field, domain, command and reason. The build refuses
 a missing or unknown key, a repeated key, metadata for an input, command or
 reason the contract does not declare, and any label that is empty, longer
 than 300 characters or contains `<`, `>` or a control character.
+No string in `ui.json`, key or value, may hold a character that changes how
+text reads without showing itself: C0 and C1 controls, bidirectional
+controls such as U+202E, zero-width and other default-ignorable characters
+such as U+200B and U+FEFF, line and paragraph separators, surrogates and
+private-use characters. The build names the first one, as in
+`UiInvisibleCharacter:ui.json.commands.160.label:U+202E`.
 
 | Key | Required | Value |
 |---|---|---|
