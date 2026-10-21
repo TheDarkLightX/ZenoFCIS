@@ -9,13 +9,13 @@
 //! building when a port type gains or loses a case.
 
 use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};
-use zeno_fcis_shell::effects::port::{Code, Fault, Outcome, Report, Sent};
+use zeno_fcis_shell::effects::port::{Code, Fault, Outcome, Report, Sent, WaitError};
 use zeno_fcis_shell::effects::registry::{
     self, Answer, Capability, Kind, Port, REGISTRY, Registry, RegistryError, Resources, SIGNATURES,
     Signature, V2,
 };
 
-const CODES: [Code; 22] = [
+const CODES: [Code; 27] = [
     Code::Provider,
     Code::Schema,
     Code::Identity,
@@ -38,6 +38,11 @@ const CODES: [Code; 22] = [
     Code::Succession,
     Code::Unsettled,
     Code::Protocol,
+    Code::Interrupted,
+    Code::PolicyDuplicate,
+    Code::PolicyRecipient,
+    Code::PolicyFields,
+    Code::PolicyCapacity,
 ];
 const FAULTS: [Fault; 3] = [Fault::Busy, Fault::Full, Fault::Io];
 const CAPABILITIES: [Capability; 7] = [
@@ -81,6 +86,11 @@ fn code_index(code: Code) -> usize {
         Code::Succession => 19,
         Code::Unsettled => 20,
         Code::Protocol => 21,
+        Code::Interrupted => 22,
+        Code::PolicyDuplicate => 23,
+        Code::PolicyRecipient => 24,
+        Code::PolicyFields => 25,
+        Code::PolicyCapacity => 26,
     }
 }
 
@@ -125,7 +135,11 @@ fn sent_case(sent: &Sent) -> &'static str {
             let _: &Report = report;
             "T"
         }
-        Sent::NotSent(code) | Sent::Unknown(code) => {
+        Sent::Unknown(fault) => {
+            let _: &Fault = fault;
+            "Fault"
+        }
+        Sent::NotSent(code) | Sent::Refused(code) => {
             let _: &Code = code;
             "Code"
         }
@@ -147,6 +161,7 @@ fn answer_number(answer: Answer) -> u8 {
         Answer::Outcome(_) => 0,
         Answer::Transport(_) => 1,
         Answer::Fallible(_) => 2,
+        Answer::Wait(_) => 3,
     }
 }
 
@@ -227,9 +242,15 @@ fn main() {
     let sends = [
         Sent::Sent(report),
         Sent::NotSent(Code::Provider),
-        Sent::Unknown(Code::Provider),
+        Sent::Unknown(Fault::Busy),
+        Sent::Refused(Code::Provider),
     ];
     let fallibles = [Ok(()), Err(Fault::Busy)];
+    let waits = [
+        Ok(()),
+        Err(WaitError::Interrupted),
+        Err(WaitError::Failed(Fault::Busy)),
+    ];
     let case = |name: String, payload: &str| format!("[\"{name}\",\"{payload}\"]");
     let answers = [
         (
@@ -251,6 +272,20 @@ fn main() {
             fallibles
                 .iter()
                 .map(|r| case(head(r), fallible_case(r)))
+                .collect::<Vec<_>>(),
+        ),
+        (
+            Answer::Wait(Kind::Unit),
+            waits
+                .iter()
+                .map(|r| match r {
+                    Ok(()) => case("Ok".to_owned(), "T"),
+                    Err(WaitError::Interrupted) => case("Interrupted".to_owned(), "unit"),
+                    Err(WaitError::Failed(fault)) => {
+                        let _: &Fault = fault;
+                        case("Err".to_owned(), "Fault")
+                    }
+                })
                 .collect::<Vec<_>>(),
         ),
     ];

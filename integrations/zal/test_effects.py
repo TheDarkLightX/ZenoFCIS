@@ -22,7 +22,7 @@ ROOT = Path(os.environ.get("ZENO_FCIS_ROOT", str(ZAL.parents[1]))).resolve()
 EXAMPLE = (ZAL / "examples/shell_effects.zal").read_text()
 TYPED = (ZAL / "examples/relay_typed.zal").read_text()
 # The shell library's pinned registry identity; the native printer must report the same.
-PINNED = "f97591cd12b68199e9bb6d4b27a2aab878b5e70f4507388a43fd9fb752cbc872"
+PINNED = "9a88849d214cb711e5d173b16048baa58d40e5933faeff0df8a7220ff9599b89"
 
 
 def native():
@@ -340,7 +340,7 @@ SLOTS = {"NAME": ["probe"], "SCHEMA": [effects.SCHEMA], "BIT": ["32"], "CAPABILI
          "FIELD": ["left", "right"], "CALL": ["Probe::call"], "LOW": ["-2"], "HIGH": ["5"], "CAP": ["3"], "LENGTH": ["32"],
          "VALUE": ["false"]}
 OVERRIDES = {"capability": {"NAME": ["durable", "volatile"]}, "footprint": {"NAME": ["durable", "volatile"],
-             "CAPABILITY": ["ReadStore"], "ID": ["3"]}, "answer": {"NUMBER": ["3"]}, "frame": {"ANSWER": ["Fallible"],
+             "CAPABILITY": ["ReadStore"], "ID": ["3"]}, "answer": {"NUMBER": ["4"]}, "frame": {"ANSWER": ["Fallible"],
              "CASE": ["ok", "err"]}, "operation": {"ANSWER": ["Outcome"]}, "ports": {"PORT": ["ReadState", "Commit"],
              "TAG": ["1", "2"]}, "recursion": {"NAME": ["Probe"], "CASE": ["stop", "more"]},
              "typed_compare": {"NAME": ["answer"], "VALUE": ["sent"]}, "record": {"NAME": ["Probe"]},

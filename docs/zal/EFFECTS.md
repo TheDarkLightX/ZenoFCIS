@@ -20,7 +20,7 @@ Operation Commit takes store (Store), key (Hash), publication (Publication), mod
 Operation Commit needs capability WriteStore, reads durable and volatile, writes durable and volatile, obeys laws 1 and 2, and maps to the V2 calls V2SqliteShell::commit, V2SqliteShell::commit_at and V2SqliteShell::commit_bounded_at.
 Arguments admit more than 2^4096 values.
   ok: CommitReceipt (2^320 values); the operation took effect
-  refused: Code (22 values); nothing changed
+  refused: Code (27 values); nothing changed
   not_applied: Fault (3 values); nothing changed
   unknown: Fault (3 values); it may or may not have taken effect
 Footprint stays within capability WriteStore; touches durable, volatile.
@@ -29,7 +29,7 @@ Footprint stays within capability WriteStore; touches durable, volatile.
 The answer comes from the checked source `examples/shell_effects.zal`, which
 declares the shell's ten ports. Lowering that source gives the
 `zeno-fcis/shell-effects/1` record of `zeno_fcis_shell::effects::registry` byte
-for byte, so its SHA-256 identity is the registry's own, `f97591cd…`.
+for byte, so its SHA-256 identity is the registry's own, `9a88849d…`.
 
 ## Three profiles, one type language
 

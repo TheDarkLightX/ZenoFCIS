@@ -20,17 +20,19 @@ capability Clock = 5: reads {clock}, writes {};
 capability Jitter = 6: reads {jitter}, writes {jitter};
 # Result shapes; T is the operation's success payload.
 answer Outcome = 0: ok(T) | refused(Code) | not_applied(Fault) | unknown(Fault);
-answer Transport = 1: sent(T) | not_sent(Code) | unknown(Code);
+answer Transport = 1: sent(T) | not_sent(Code) | unknown(Fault) | refused(Code);
 answer Fallible = 2: ok(T) | err(Fault);
+answer Wait = 3: ok(T) | interrupted(unit) | err(Fault);
 # What each case says about the effect: NotApplied needs evidence of rollback or
 # non-execution; an ambiguous commit or a lost reply is Unknown.
 frame Fallible: ok applied, err unchanged;
 frame Outcome: ok applied, refused unchanged, not_applied unchanged, unknown either;
-frame Transport: sent applied, not_sent unchanged, unknown either;
+frame Transport: sent applied, not_sent unchanged, unknown either, refused unchanged;
+frame Wait: ok applied, interrupted unchanged, err unchanged;
 ports ReadState = 1, Commit = 2, ReadHistory = 3, ReadOutbox = 4, Send = 5, Acknowledge = 6, Reopen = 7, Clock = 8, Random = 9, Wait = 10;
 type Any = int 0..=18446744073709551615;
 type Bounded = {version: Version, cap: Any};
-type Code = provider | schema | identity | authority | lineage | checkpoint | invocation_kind | history | range | pre_state | replay | concurrent | delivery | interpreter | unknown_delivery | already_acknowledged | payload_mismatch | capacity | upgrade | succession | unsettled | protocol;
+type Code = provider | schema | identity | authority | lineage | checkpoint | invocation_kind | history | range | pre_state | replay | concurrent | delivery | interpreter | unknown_delivery | already_acknowledged | payload_mismatch | capacity | upgrade | succession | unsettled | protocol | interrupted | policy_duplicate | policy_recipient | policy_fields | policy_capacity;
 type CommitReceipt = {version: Version, chain: Hash, status: Status};
 type Delivery = {id: Hash, version: Sequence, lane: int 0..=1, ordinal: int 0..=4294967295, destination: Envelope, payload: Envelope, payload_sha256: Hash};
 type Entry = {key: Hash, version: Sequence, publication: Publication};
@@ -74,5 +76,5 @@ operation Clock() -> Fallible Tick;
 footprint Clock: capability Clock, reads {clock}, writes {}, laws [8], v2 opt_in;
 operation Random(purpose: Purpose, bound: int 1..=18446744073709551615) -> Fallible int 0..=18446744073709551614;
 footprint Random: capability Jitter, reads {jitter}, writes {jitter}, laws [9], v2 opt_in;
-operation Wait(deadline: Tick) -> Fallible Tick;
+operation Wait(deadline: Tick) -> Wait Tick;
 footprint Wait: capability Clock, reads {clock}, writes {}, laws [8], v2 opt_in;
