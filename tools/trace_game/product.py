@@ -44,6 +44,8 @@ def description(model, guard='actor == 0', reactive=False, empty=False):
 
 
 def roots(spec):
+    if spec['model']=='quantifier':
+        return tuple(State((0,h),(0,h),1) for h in (0,1))
     return tuple(State(tuple(s), tuple(s), c) for s in starts(spec['model']) for c in (1, 2, 3))
 
 
@@ -55,9 +57,15 @@ def snapshot(state):
                          if state.entitlement else None), monitor=age, stage=state.stage)
 
 
+def terminal(spec, state):
+    return state.bad or (spec['model']=='quantifier' and state.native[0]==1)
+
+
 def events(spec, state):
-    if state.bad or spec['empty']:
+    if terminal(spec, state) or spec['empty']:
         return []
+    if spec['model']=='quantifier':
+        return [dict(actor=0,request=[0]),dict(actor=0,request=[1])]
     return moves(spec, snapshot(state), state.coalition)
 
 
@@ -73,6 +81,10 @@ def table_name(model, guard):
 
 def step(spec, tables, state, event, guard):
     action = events(spec, state)[event]
+    if spec['model']=='quantifier':
+        value = guard in ('true','actor == 0')  # actor is 0 for BOTH events
+        after = (1,state.native[1])
+        return State(after,after,1,bad=(value != (event==0)))
     native = tables[table_name(spec['model'], guard)][tuple(state.native)+tuple(action['request'])]
     after, _, violations, _ = advance(spec, snapshot(state), action, native)
     pending = after['pending']
@@ -100,7 +112,7 @@ def build(spec, tables, max_states=10000, max_edges=100000, seconds=30):
         if time.monotonic() >= end:
             return stopped('time budget')
         allowed = events(spec, state)
-        if not state.bad and not allowed:
+        if not terminal(spec,state) and not allowed:
             return stopped('empty environment')
         for event in range(len(allowed)):
             for guard in responses(spec):

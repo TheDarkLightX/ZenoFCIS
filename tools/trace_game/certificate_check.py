@@ -101,7 +101,7 @@ def validate_tables(packets):
 
 
 def validate_spec(spec):
-    need(spec['model'] in ('withdrawal','composition'),'unsupported model')
+    need(spec['model'] in ('withdrawal','composition','quantifier'),'unsupported model')
     need(spec['guard'] in GRAMMAR,'guard outside grammar')
     need(type(spec['reactive']) is bool and type(spec['empty']) is bool,'model flags')
     need(spec['powers']==POWERS and spec['unfair_delay'] is False and spec['only_objective'] is None
@@ -111,13 +111,19 @@ def validate_spec(spec):
 
 
 def initial_states(spec):
+    if spec['model']=='quantifier': return [[[0,h],[0,h],1,0,0,0,False] for h in (0,1)]
     starts=([1,0,0,0],[2,0,0,0]) if spec['model']=='withdrawal' else ([0,0,0,2,0,0],)
     return [[s[:],s[:],c,0,0,0,False] for s in starts for c in (1,2,3)]
 
 
+def is_terminal(spec,s):
+    return s[-1] or (spec['model']=='quantifier' and s[0][0]==1)
+
+
 def permitted(spec, s):
     native,ref,coalition,pending,left,stage,bad=s
-    if bad or spec['empty']: return []
+    if is_terminal(spec,s) or spec['empty']: return []
+    if spec['model']=='quantifier': return [(0,[0]),(0,[1])]
     if spec['model']=='withdrawal':
         if pending and left==1: return [(0,[1,0,0,1])]
         return [(a,[op,a,age,1]) for op in range(5) for a in (0,1)
@@ -127,6 +133,10 @@ def permitted(spec, s):
 
 def successor(spec,tables,s,event,guard):
     n,ref,c,p,left,stage,bad=s; actor,r=permitted(spec,s)[event]; op=r[0]
+    if spec['model']=='quantifier':
+        post=[1,n[1]]
+        value=guard=='true' or (guard=='actor == 0' and actor==0)
+        return [post,post[:],1,0,0,0,value != (r[0]==0)]
     table='lawful-composition' if spec['model']=='composition' else dict(zip(GRAMMAR,('guard-true','lawful','guard-false')))[guard]
     actual=tables[table][tuple(n+r)]; approved=reference(spec['model'],ref,r)
     post=actual['post']; required=approved['post']; accept=actual['kind']=='Accept'
@@ -179,28 +189,51 @@ def checked_graph(packet,tables):
 
 
 def check(packet,tables):
+    if packet['schema']=='zeno-fcis/trace-game-guard-exhaustion/1.1':
+        need(packet['grammar']==list(GRAMMAR) and len(packet['attempts'])==3,'guard grammar exhaustion')
+        subject=None
+        for guard,attempt in zip(GRAMMAR,packet['attempts']):
+            need(attempt['spec']['guard']==guard and not attempt['spec']['reactive'],'fixed guard quantifier')
+            frozen=dict(attempt['spec']); frozen.pop('guard')
+            if subject is None: subject=frozen
+            need(frozen==subject,'guard exhaustion subject mismatch')
+            need(attempt['certificate']['kind']=='counterexample','missing guard refutation')
+            check(attempt,tables)
+        return dict(evidence='exhausted fixed grammar',claim='no guard in G',grammar=list(GRAMMAR),model=subject['model'])
     need(packet['schema']=='zeno-fcis/trace-game-certificate/1.1','certificate schema')
     spec,states,edges=checked_graph(packet,tables); cert=packet['certificate']
-    need(cert['kind']=='safety' and not spec['reactive'],'evidence kind')
+    if cert['kind']=='counterexample':
+        need(not spec['reactive'] and cert['root'] in packet['graph']['roots'],'fixed counterexample root')
+        at=cert['root']
+        for event,guard in cert['moves']:
+            need(guard==spec['guard'],'counterexample guard')
+            targets=[t for e,g,t in edges[at] if (e,g)==(event,guard)]
+            need(len(targets)==1,'counterexample permitted move'); at=targets[0]
+        need(states[at][-1],'counterexample has no violation')
+        return dict(evidence='counterexample',scope='this fixed guard',model=spec['model'])
+    need(cert['kind'] in ('safety','guard') and not spec['reactive'],'evidence kind')
+    if cert['kind']=='guard':
+        need(cert['guard'] in GRAMMAR and cert['guard']==spec['guard'] and cert['grammar']==list(GRAMMAR),'guard outside grammar')
     winning=cert['W']; need(winning==sorted(set(winning)) and all(type(i) is int and 0<=i<len(states) for i in winning),'winning set encoding')
     W=set(winning)
     need(set(packet['graph']['roots'])<=W,'initial membership in W')
     for i in winning:
         need(not states[i][-1],'unsafe state inside W')
-        need(edges[i],'non-vacuity: empty environment gives UNKNOWN')
+        need(edges[i] or is_terminal(spec,states[i]),'non-vacuity: empty environment gives UNKNOWN')
         need(all(t in W for _,_,t in edges[i]),'closure under every permitted move')
     # One specified reference-corpus journey from EACH initial state inside W.
     for root in packet['graph']['roots']:
         at=root
-        requests=([0,0,0,1],[1,0,0,1]) if spec['model']=='withdrawal' else (
+        requests=([0],) if spec['model']=='quantifier' else ([0,0,0,1],[1,0,0,1]) if spec['model']=='withdrawal' else (
             [1,2,0,0,0],[2,0,0,0,0],[4,0,0,0,0],[4,0,0,0,0])
         for request in requests:
             options=permitted(spec,states[at]); event=next((i for i,(actor,r) in enumerate(options) if r==request and (spec['model']!='withdrawal' or actor==0)),None)
             need(event is not None,'legitimate journey not permitted: UNKNOWN')
             at=next(t for e,_,t in edges[at] if e==event)
             need(at in W,'legitimate journey outside W')
-        need(states[at][0][2 if spec['model']=='withdrawal' else 4]>0 and states[at][3]==0,'legitimate journey incomplete: UNKNOWN')
-    return dict(evidence='certified safety', claim='safe on every finite history of the declared model',
+        need((is_terminal(spec,states[at]) if spec['model']=='quantifier' else states[at][0][2 if spec['model']=='withdrawal' else 4]>0 and states[at][3]==0),'legitimate journey incomplete: UNKNOWN')
+    return dict(evidence='certified guard' if cert['kind']=='guard' else 'certified safety',
+                claim=f"guard {spec['guard']}, from grammar G, is certified safe" if cert['kind']=='guard' else 'safe on every finite history of the declared model',
                 model=spec['model'], states=len(states), winning=len(W), roots=len(packet['graph']['roots']))
 
 
