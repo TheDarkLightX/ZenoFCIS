@@ -56,6 +56,40 @@ struct TopDown<'a> {
 /// Most values an input may take before its point predicates are skipped.
 const PREDICATE_DOMAIN: u64 = 64;
 
+/// For a low-cardinality target, map each desired result to its exact class.
+/// The sorted classes preserve equality even at the signed-i128 extremes.
+const SPLIT_CLASS_LIMIT: usize = 64;
+
+fn split_classes(want: &[i128]) -> Option<Vec<u8>> {
+    let unique = distinct_up_to(want, SPLIT_CLASS_LIMIT)?;
+    Some(
+        want.iter()
+            .map(|value| {
+                // Every value occurs in unique, which has at most 64 members.
+                u8::try_from(unique.partition_point(|entry| entry < value))
+                    .unwrap_or(u8::MAX)
+            })
+            .collect(),
+    )
+}
+
+/// Exact equivalent of distinct_count(on) + distinct_count(off). A predicate
+/// is true only for value 1, matching the eager Boolean interpreter.
+fn split_mask_score(pos: &[u32], classes: &[u8], values: &[i128]) -> Option<usize> {
+    let mut on = 0u64;
+    let mut off = 0u64;
+    for (ordinal, class) in pos.iter().zip(classes) {
+        let bit = 1u64 << u32::from(*class);
+        if values.get(*ordinal as usize).copied().unwrap_or(i128::MIN) == 1 {
+            on |= bit;
+        } else {
+            off |= bit;
+        }
+    }
+    (on != 0 && off != 0).then_some(on.count_ones() as usize + off.count_ones() as usize)
+}
+
+
 impl<'a> TopDown<'a> {
     fn new(
         original: &'a Graph,
@@ -658,17 +692,39 @@ impl<'a> TopDown<'a> {
             }
             (on, off)
         };
+        // For decision-like targets with <=64 values, build exact class ids
+        // once and use two u64 masks per predicate instead of allocating four
+        // temporary arrays and sorting two of them. Small problems and
+        // high-cardinality targets retain the original scoring path. Charge
+        // the extra target scan before it occurs to keep budget refusals
+        // conservative; neither route changes the ranking or tie-breaking.
+        let classes = if pos.len() >= 128 && self.atoms_bool.len() >= 4 {
+            meter.charge(want.len())?;
+            split_classes(want)
+        } else {
+            None
+        };
         let mut scored = Vec::new();
         for predicate in self.atoms_bool.clone() {
             if !self.allowed(predicate, exclude) {
                 continue;
             }
             meter.charge(pos.len())?;
-            let (on, off) = parts(self, predicate);
-            if on.0.is_empty() || off.0.is_empty() {
-                continue;
-            }
-            let score = distinct_count(&on.1) + distinct_count(&off.1);
+            let score = if let Some(classes) = classes.as_ref() {
+                let Some(entry) = self.arena.get(predicate) else {
+                    continue;
+                };
+                let Some(score) = split_mask_score(pos, classes, &entry.value) else {
+                    continue;
+                };
+                score
+            } else {
+                let (on, off) = parts(self, predicate);
+                if on.0.is_empty() || off.0.is_empty() {
+                    continue;
+                }
+                distinct_count(&on.1) + distinct_count(&off.1)
+            };
             scored.push((score, self.cost(predicate), predicate));
         }
         scored.sort_by_key(|(score, cost, _)| (*score, *cost));
@@ -1039,4 +1095,69 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn class_mask_split_scores_match_sorted_full_scores() {
+        let pos: Vec<u32> = (0..256).collect();
+        for distinct in [1usize, 2, 3, 8, 32, 64] {
+            let values: Vec<i128> = (0..distinct)
+                .map(|index| match index {
+                    0 => i128::MIN,
+                    1 => i128::MAX,
+                    index => i128::try_from(index).unwrap_or(0) - 100,
+                })
+                .collect();
+            let want: Vec<i128> = (0..pos.len())
+                .map(|index| values[(index * 37) % distinct])
+                .collect();
+            let classes = split_classes(&want).unwrap_or_default();
+            assert_eq!(classes.len(), want.len());
+            for seed in 0..128usize {
+                let predicate: Vec<i128> = (0..pos.len())
+                    .map(|ordinal| match (ordinal * 7 + ordinal / 3 + seed * 11) % 7 {
+                        0 | 1 => 1,
+                        2 => 0,
+                        3 => 2,
+                        4 => i128::MIN,
+                        _ => i128::MAX,
+                    })
+                    .collect();
+                let mut on = Vec::new();
+                let mut off = Vec::new();
+                for (p, w) in pos.iter().zip(&want) {
+                    if predicate[*p as usize] == 1 {
+                        on.push(*w);
+                    } else {
+                        off.push(*w);
+                    }
+                }
+                let expected = if on.is_empty() || off.is_empty() {
+                    None
+                } else {
+                    Some(distinct_count(&on) + distinct_count(&off))
+                };
+                assert_eq!(
+                    split_mask_score(&pos, &classes, &predicate),
+                    expected,
+                    "classes {distinct}, seed {seed}"
+                );
+            }
+        }
+        assert_eq!(
+            split_classes(&(0..65).map(i128::from).collect::<Vec<_>>()),
+            None,
+            "high-cardinality targets must take the unchanged sorted fallback"
+        );
+        assert_eq!(
+            split_mask_score(&[0, 1], &[0, 1], &[1, 1]),
+            None,
+            "constant predicates cannot split"
+        );
+        assert_eq!(
+            split_mask_score(&[0, 1], &[0, 1], &[2, 1]),
+            Some(2),
+            "only Boolean value 1 is true"
+        );
+    }
+
 }
