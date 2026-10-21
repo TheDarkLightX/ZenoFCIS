@@ -67,6 +67,9 @@ fn run() -> Result<Value, String> {
                         zeno_fcis_contract::internals::rules::Constant::Bool(_) => {
                             return Err("noninteger genesis".into());
                         }
+                        zeno_fcis_contract::internals::rules::Constant::U128(_) => {
+                            return Err("unsigned genesis is outside the presentation model".into());
+                        }
                     };
                 }
             }

@@ -39,6 +39,7 @@ zeno-fcis-authority = { path = "../crates/zeno-fcis-authority" }
 zeno-fcis-bootstrap = { path = "../crates/zeno-fcis-bootstrap" }
 zeno-fcis-catalog = { path = "../crates/zeno-fcis-catalog" }
 zeno-fcis-codec = { path = "../crates/zeno-fcis-codec" }
+zeno-fcis-collections = { path = "../crates/zeno-fcis-collections" }
 zeno-fcis-codegen = { path = "../crates/zeno-fcis-codegen" }
 zeno-fcis-compose = { path = "../crates/zeno-fcis-compose" }
 zeno-fcis-core = { path = "../crates/zeno-fcis-core" }
