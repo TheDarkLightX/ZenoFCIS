@@ -89,8 +89,9 @@ try {
   const statement = { statement: vault.id, revision: vault.revision };
   assert.equal((await call('zal_ladder_render', { ...statement, rung: 'plain' })).rungs.plain,
     'No admitted operation sequence drains the vault.');
-  const ladderParse = await call('zal_ladder_parse', { ...statement, rung: 'typed', text: 'forall sigma in Traces: always(not Loss())' });
+  const ladderParse = await call('zal_ladder_parse', { ...statement, rung: 'typed', text: 'forall sigma in Traces: forall a in Assets: always(not Loss(a))' });
   assert.equal(ladderParse.uniqueness.counts.normalized_meanings, 1);
+  assert.equal(ladderParse.same_as_statement, true);
   assert.equal((await call('zal_ladder_same', { ...statement, rung: 'plain',
     text: 'No admitted operation sequence drains the vault.' })).status, 'same');
   const lowered = await call('zal_ladder_lower', statement);
