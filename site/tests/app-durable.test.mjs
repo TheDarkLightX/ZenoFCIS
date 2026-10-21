@@ -18,7 +18,9 @@ const settle=async predicate=>{const deadline=Date.now()+5000;while(!predicate()
  const session={contract:observation.contract,principal:observation.principal,revision:observation.revision,values:observation.before.slice(0,stateFields.length),context:contextFields.map(f=>observation.before[f.index])};
  const credential=hex(webcrypto.getRandomValues(new Uint8Array(32))),requests=[];let descriptionUnavailable=false;
  const storage=new Map();storage.getItem=k=>storage.get(k)??null;storage.setItem=(k,v)=>storage.set(k,v);storage.removeItem=k=>storage.delete(k);
- const fetcher=async(path,options)=>{
+ // Like a browser, refuse fetch invoked on any receiver other than the window.
+ const fetcher=async function(path,options){
+  if(this!==undefined&&this!==loader?.context)throw TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
   requests.push(path);assert.equal(options.cache,'no-store');assert.deepEqual(Object.keys(options.headers),['Authorization']);
   if(options.headers.Authorization!=='Bearer '+credential)return {ok:false,status:401};
   if(path==='/state')return {ok:true,json:async()=>plain(session)};
@@ -30,9 +32,10 @@ const settle=async predicate=>{const deadline=Date.now()+5000;while(!predicate()
   assert.equal(path,'/command');assert.equal(hex(options.body.slice(73)),observation.command);
   return {ok:true,json:async()=>plain(observation.response)};
  };
+ let loader;
  const open=async()=>{
   const doc=documentFrom('<div id="app"></div>');
-  const loader=moduleLoader({document:doc,fetch:fetcher,localStorage:storage,crypto:webcrypto,AbortController,innerWidth:390,addEventListener:()=>{},matchMedia:()=>({matches:false,addEventListener:()=>{}})});
+  loader=moduleLoader({document:doc,fetch:fetcher,localStorage:storage,crypto:webcrypto,AbortController,innerWidth:390,addEventListener:()=>{},matchMedia:()=>({matches:false,addEventListener:()=>{}})});
   await loader.evaluate('https://zenoui.test/ZenoFCIS/zenoui/durable-bootstrap.js');return doc.getElementById('app');
  };
  const root=await open(),submit=value=>{root.querySelector('#credential').value=value;root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true}));};

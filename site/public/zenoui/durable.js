@@ -29,7 +29,8 @@ export async function checkPacket(result,saved,description){
 }
 export class DurableTransport {
   #credential;
-  constructor(bundle,credential,session,{fetcher=fetch,storage=localStorage,random=bytes=>crypto.getRandomValues(bytes)}={}){
+  // Browsers refuse fetch called as a method of another object; keep the window receiver.
+  constructor(bundle,credential,session,{fetcher=(input,init)=>fetch(input,init),storage=localStorage,random=bytes=>crypto.getRandomValues(bytes)}={}){
     this.bundle=bundle;this.#credential=credential;this.session=structuredClone(session);this.fetcher=fetcher;this.storage=storage;this.random=random;this.retired=false;
   }
   async call(path,body){
