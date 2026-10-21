@@ -221,6 +221,8 @@ class Profile2Tests(unittest.TestCase):
         self.assertTrue(moved["value"])
         self.assertEqual(moved["tree"]["operands"][1]["operands"][0]["left"], {"operator": "var_next", "value": 1, "name": "balance"})
         self.assertTrue(all(i["before"] and i["after"] for i in report["invariants"]))
+        self.assertTrue(report["admissible"])
+        self.assertFalse(explain(model, "idle", lane_values(reserved=1, balance=1), "tick", {"alarm": False, "amount": 1})["admissible"])
         self.assertEqual(report["supplied_assumptions"], {"observations": {"alarm": False, "amount": 1}})
         order = parse(ORDER)
         for state, values, event, context in order.inputs_domain():

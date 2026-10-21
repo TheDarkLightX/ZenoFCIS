@@ -1524,6 +1524,7 @@ def explain(model: Machine, state: str, variables: dict, event: str, context: di
     explanation = {"kind": "decision-explanation", "profile": PROFILE, "revision": model.revision,
                    "checker": checker_identity,
                    "input": {"state": state, "variables": variables, "event": event, "context": context},
+                   "admissible": all(holds(f, _Step(state, variables, None, {})) for _, f in model.invariants),
                    "rules": rules, "default_reason": model.default, "effects": "none in this profile",
                    **assumption_groups(context),
                    "scope": "Deterministic explanation of one supplied input; context values are assumptions, "
