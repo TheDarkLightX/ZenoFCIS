@@ -38,6 +38,50 @@ fn cli() -> &'static str {
 }
 
 #[test]
+fn every_builtin_template_passes_the_substantive_check() {
+    let description = run(Command::new(cli()).args(["--no-kb", "describe", "new"]));
+    assert!(description.status.success());
+    let description = json_stdout(&description);
+    let templates = description["command"]["arguments"]
+        .as_array()
+        .and_then(|arguments| {
+            arguments
+                .iter()
+                .find(|argument| argument["id"] == "template")
+        })
+        .and_then(|argument| argument["choices"].as_array())
+        .unwrap_or_else(|| panic!("new describes its built-in templates"));
+    assert!(!templates.is_empty());
+    for name in templates {
+        let name = name.as_str().unwrap_or_else(|| panic!("template name"));
+        let temp = TempRoot::new("substantive-template");
+        let target = temp.path().join("app");
+        let generated = run(Command::new(cli())
+            .arg("--no-kb")
+            .arg("new")
+            .arg(&target)
+            .args(["--template", name, "--source"])
+            .arg(repository_root()));
+        assert!(
+            generated.status.success(),
+            "{name}: {}",
+            String::from_utf8_lossy(&generated.stderr)
+        );
+        let checked = run(Command::new(cli())
+            .arg("--no-kb")
+            .arg("check")
+            .arg(target.join("project.zeno"))
+            .args(["--require-substantive", "--require-resolved-paths"]));
+        assert!(
+            checked.status.success(),
+            "{name}: {}{}",
+            String::from_utf8_lossy(&checked.stdout),
+            String::from_utf8_lossy(&checked.stderr)
+        );
+    }
+}
+
+#[test]
 fn cli_example_templates_emit_substantive_projects_without_overwriting() {
     for template in [
         "account-lockout",

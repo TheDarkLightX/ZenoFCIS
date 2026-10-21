@@ -102,8 +102,8 @@ component 300 machine {
   budget steps 1024;
 }
 merge [300];
-law 400 identity = pre.100 == pre.100;
-claim 500 identity cvc5 relational = pre.100 == pre.100;
+law 400 reject_no_authority on reject = context.102 != 1;
+claim 500 identity cvc5 relational = pre.100 == post.100;
 "#;
 
 const MINI: &str = r#"zeno 1;
@@ -133,9 +133,9 @@ component 301 worker_space {
   budget nodes 256;
 }
 merge [300, 301];
-law 400 worker_isolation = pre.100 == pre.100;
-claim 500 finite_state_reflexivity all finite 4 = always atom(pre.100 == pre.100);
-claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pre.100);
+law 400 reject_no_authority on reject = context.103 != 1;
+claim 500 finite_state_reflexivity all finite 4 = always atom(pre.100 == post.100);
+claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == post.100);
 "#;
 
 #[derive(Parser)]
@@ -895,11 +895,11 @@ fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Op
     let (project, readme) = match template {
         Template::Minimal => (
             MINIMAL,
-            "# ZenoFCIS minimal project\n\nRun `zeno-fcis check`.\n",
+            "# ZenoFCIS minimal project\n\nRun `zeno-fcis check --require-substantive`.\n\nThis declaration sketch states unproved transition obligations. Author finite type bindings and v2/policy.json before executable contract review.\n",
         ),
         Template::MiniDeterminator => (
             MINI,
-            "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check`.\n",
+            "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check --require-substantive`.\n\nThis declaration sketch states unproved transition obligations. Author finite type bindings and v2/policy.json before executable contract review.\n",
         ),
         Template::DurableCounter
         | Template::PreparedCounter

@@ -21,6 +21,8 @@ use super::{
 };
 use crate::transform::{self, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, Limits};
 
+const COUNTER_REJECT_LAW: &str = "law 503 reject_no_authority on reject = context.102 != 1 || (command.101 == 120 && pre.100.110 == 3) || (command.101 == 121 && pre.100.111 == 3);";
+
 const TEMPLATES: [&str; 8] = [
     "durable-counter",
     "inventory-reservation",
@@ -650,16 +652,13 @@ fn planted_declaration_errors_are_refused_where_they_are() {
     let counter = template("durable-counter");
     let cases = [
         (
-            counter.with_project(
-                "law 503 reject_no_authority on reject = true;",
-                "law 503 reject_no_authority = true;",
-            ),
+            counter.with_project(COUNTER_REJECT_LAW, "law 503 reject_no_authority = true;"),
             "project.zeno law 503",
             "needs a scope",
         ),
         (
             counter.with_project(
-                "law 503 reject_no_authority on reject = true;",
+                COUNTER_REJECT_LAW,
                 "law 503 reject_no_authority on reject = forall i in 0..2 { pre.100.110 >= 0 };",
             ),
             "project.zeno law 503",
@@ -834,8 +833,8 @@ fn library_rules_are_refused_where_they_are_written() {
             "applies at genesis, where `pre.100.110` has no value",
         ),
         (
-            "on reject = true;",
-            "on reject = pre.100 == pre.100;",
+            COUNTER_REJECT_LAW,
+            "law 503 reject_no_authority on reject = pre.100 == pre.100;",
             Box::new(|_| {}),
             "project.zeno law 503",
             "`pre.100` is a record; name one of its fields",
