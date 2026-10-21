@@ -1,5 +1,4 @@
 //! The library loans table example through the library Authority.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use zeno_fcis_contract::internals::{
     declarations::Declarations,
@@ -21,9 +20,11 @@ const LIBRARIAN: i128 = 130;
 
 /// Decides each `(copies, action, copy, member)` input at the librarian desk.
 fn decide(project: &str, rules: &str, inputs: &[([i128; 6], i128, i128, i128)]) -> Vec<Outcome> {
-    let rules = Rules::read(rules).unwrap();
-    let declarations = Declarations::read(project, &rules.leaf_bindings).unwrap();
-    let positions: Vec<Position> = domain::positions(&declarations).unwrap();
+    let rules = Rules::read(rules).unwrap_or_else(|error| panic!("{error:?}"));
+    let declarations = Declarations::read(project, &rules.leaf_bindings)
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    let positions: Vec<Position> =
+        domain::positions(&declarations).unwrap_or_else(|error| panic!("{error:?}"));
     let names: Vec<&str> = positions.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(
         names,
@@ -41,9 +42,13 @@ fn decide(project: &str, rules: &str, inputs: &[([i128; 6], i128, i128, i128)]) 
         ]
     );
     assert_eq!(domain::domain_size(&positions), Some(294_912));
-    let schema = schema::encode(&declarations).unwrap();
-    let contract =
-        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    let schema = schema::encode(&declarations).unwrap_or_else(|error| panic!("{error:?}"));
+    let contract = Contract::build(
+        &declarations,
+        &rules,
+        schema_commitment(&schema).unwrap_or_else(|error| panic!("{error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("{error:?}"));
     let framer = Framer::new(&positions, &contract);
     policy::with_authority(&contract, &schema, |authority| {
         inputs
@@ -55,7 +60,7 @@ fn decide(project: &str, rules: &str, inputs: &[([i128; 6], i128, i128, i128)]) 
             })
             .collect()
     })
-    .unwrap()
+    .unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 fn post(outcome: &Outcome) -> Vec<i128> {
@@ -63,7 +68,10 @@ fn post(outcome: &Outcome) -> Vec<i128> {
         Outcome::Decision(decision) => decision
             .post
             .iter()
-            .map(|(_, v)| v.number().unwrap())
+            .map(|(_, v)| {
+                v.number()
+                    .unwrap_or_else(|| panic!("expected integer outcome"))
+            })
             .collect(),
         Outcome::Refused(refusal) => panic!("refused: {refusal:?}"),
     }
@@ -100,14 +108,16 @@ fn contract_tables_example_decides_through_its_expanded_laws() {
 fn contract_tables_expanded_laws_refuse_rules_that_break_them() {
     // A borrow that also changes the last copy breaks the frame law 502, and
     // one that gives the member a third copy breaks the count law 500.
-    let mut rules: serde_json::Value = serde_json::from_str(POLICY).unwrap();
+    let mut rules: serde_json::Value =
+        serde_json::from_str(POLICY).unwrap_or_else(|error| panic!("{error:?}"));
     rules["cases"][4]["post"]["115"] = serde_json::json!("choose(copy == 0, member, pre.100.115)");
     let frame = decide(
         PROJECT,
         &rules.to_string(),
         &[([0, 0, 0, 0, 0, 0], BORROW, 0, 2)],
     );
-    let mut rules: serde_json::Value = serde_json::from_str(POLICY).unwrap();
+    let mut rules: serde_json::Value =
+        serde_json::from_str(POLICY).unwrap_or_else(|error| panic!("{error:?}"));
     rules["cases"][2]["when"] = serde_json::json!("false");
     let limit = decide(
         PROJECT,

@@ -1,5 +1,4 @@
 //! Fixed-size tables: exact expansion, stable IDs and diagnostics at the source.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::BTreeMap;
 
@@ -18,14 +17,16 @@ merge [400];\n";
 
 fn spec(source: &str) -> ProjectSpec {
     elaborate_project(
-        parse_project(source, SourceLimits::default()).unwrap(),
+        parse_project(source, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}")),
         ProjectLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 fn bytes(source: &str) -> Vec<u8> {
-    spec(source).canonical_bytes().unwrap()
+    spec(source)
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 fn law(source: &str, id: u32) -> RelExpr {
@@ -33,14 +34,15 @@ fn law(source: &str, id: u32) -> RelExpr {
         .laws()
         .iter()
         .find(|law| law.id().get() == id)
-        .unwrap()
+        .unwrap_or_else(|| panic!("expected table fixture value"))
         .formula()
         .clone()
 }
 
 fn errors(source: &str) -> Vec<(DiagnosticCode, u32, String)> {
     parse_project(source, SourceLimits::default())
-        .expect_err("refused")
+        .err()
+        .unwrap_or_else(|| panic!("expected refusal"))
         .diagnostics()
         .iter()
         .map(|d| (d.code(), d.span().start(), d.path().as_str().to_owned()))
@@ -228,7 +230,8 @@ fn tables_entry_ids_do_not_depend_on_declaration_order() {
 
 #[test]
 fn tables_expansion_text_reparses_to_the_same_project() {
-    let expansion = expand_tables(LIBRARY, SourceLimits::default()).unwrap();
+    let expansion =
+        expand_tables(LIBRARY, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(bytes(&expansion.text), bytes(LIBRARY));
     for form in ["table 110", "index", "[i]", "[j]", "forall", "count"] {
         assert!(!expansion.text.contains(form), "{form}");
@@ -254,7 +257,8 @@ fn tables_expansion_text_reparses_to_the_same_project() {
 law 500 total on commit, genesis = 2 * sum i in table 110 {{ post.100.110[i] }} <= 9 && post.100.110[2] >= -1;\n\
 law 501 tail on commit, genesis = sum i in table 110 where i > 0 {{ post.100.110[i] }} - post.100.110[0] <= 3;\n"
     );
-    let expansion = expand_tables(&source, SourceLimits::default()).unwrap();
+    let expansion =
+        expand_tables(&source, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}"));
     assert!(
         expansion.text.contains(
             "2 * (post.100.110 + post.100.111 + post.100.112) <= 9 && post.100.112 >= -1;"
@@ -275,8 +279,10 @@ fn tables_index_types_take_the_table_range() {
         .types()
         .iter()
         .find(|t| t.id().get() == 106)
-        .unwrap();
-    let range = index.range().unwrap();
+        .unwrap_or_else(|| panic!("expected copy index"));
+    let range = index
+        .range()
+        .unwrap_or_else(|| panic!("expected table fixture value"));
     assert_eq!((range.min(), range.max()), (0, 5));
     assert_eq!(
         project
@@ -290,7 +296,11 @@ fn tables_index_types_take_the_table_range() {
 
 #[test]
 fn tables_report_errors_at_the_table_source() {
-    let at = |source: &str, needle: &str| source.find(needle).unwrap() as u32;
+    let at = |source: &str, needle: &str| {
+        source
+            .find(needle)
+            .unwrap_or_else(|| panic!("expected table fixture value")) as u32
+    };
     // Too many entries is the resource limit, at the table declaration.
     let source = format!("{HEADER}table 110 100 slot 105 size 65;\n");
     assert_eq!(
@@ -342,7 +352,9 @@ law 502 c on commit = post.100.120[0] == 0;\n"
             "table.count".to_owned()
         )]
     );
-    let refused = parse_project(&source, SourceLimits::default()).expect_err("refused");
+    let refused = parse_project(&source, SourceLimits::default())
+        .err()
+        .unwrap_or_else(|| panic!("expected refusal"));
     assert_eq!(
         refused.diagnostics()[0].actual(),
         "1832624140942590534 clauses of 32 entries each, per expansion"
@@ -351,7 +363,11 @@ law 502 c on commit = post.100.120[0] == 0;\n"
 
 #[test]
 fn tables_refuse_entry_ids_that_meet_any_other_declaration() {
-    let at = |source: &str, needle: &str| source.find(needle).unwrap() as u32;
+    let at = |source: &str, needle: &str| {
+        source
+            .find(needle)
+            .unwrap_or_else(|| panic!("expected table fixture value")) as u32
+    };
     // Entry IDs 110..=115 against a field, a type, a variant, a reason, a
     // law and another table: each is refused at the table.
     for (other, kind) in [
@@ -360,10 +376,20 @@ fn tables_refuse_entry_ids_that_meet_any_other_declaration() {
         ("variant 115 102 Spare none;", "variant 115"),
         ("reason 111 spare precedence 0;", "reason 111"),
         ("law 114 spare on commit = true;", "law 114"),
+        (
+            "random 112 entropy on context.102.130 bits 1 independent uniform;",
+            "random 112",
+        ),
+        (
+            "distribution 114 outcomes on post.100.110 = uniform over {0, 1};",
+            "distribution 114",
+        ),
         ("table 115 100 other 105 size 2;", "field 115"),
     ] {
         let source = format!("{HEADER}table 110 100 slot 105 size 6;\n{other}\n");
-        let refused = parse_project(&source, SourceLimits::default()).expect_err(other);
+        let refused = parse_project(&source, SourceLimits::default())
+            .err()
+            .unwrap_or_else(|| panic!("{other} must refuse"));
         let found: Vec<_> = refused
             .diagnostics()
             .iter()
@@ -394,8 +420,13 @@ fn tables_refuse_entry_ids_that_meet_any_other_declaration() {
 
 #[test]
 fn tables_report_each_count_with_its_clauses() {
-    let expansion = expand_tables(LIBRARY, SourceLimits::default()).unwrap();
-    let line = LIBRARY[..LIBRARY.find("count j").unwrap()].lines().count() as u32;
+    let expansion =
+        expand_tables(LIBRARY, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}"));
+    let line = LIBRARY[..LIBRARY
+        .find("count j")
+        .unwrap_or_else(|| panic!("expected table fixture value"))]
+        .lines()
+        .count() as u32;
     assert_eq!(expansion.counts.len(), 1);
     let count = &expansion.counts[0];
     // C(6, 3) clauses, once per copy of the enclosing forall.

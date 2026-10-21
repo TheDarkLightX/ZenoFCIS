@@ -2172,6 +2172,8 @@ fn declaration_ids(declaration: &Declaration) -> Vec<(u32, &'static str)> {
         Declaration::Wiring(_) => Vec::new(),
         Declaration::Law(d) => vec![(d.id().get(), "law")],
         Declaration::Claim(d) => vec![(d.id().get(), "claim")],
+        Declaration::Random(d) => vec![(d.id().get(), "random")],
+        Declaration::Distribution(d) => vec![(d.id().get(), "distribution")],
     }
 }
 

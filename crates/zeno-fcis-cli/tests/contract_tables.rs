@@ -1,5 +1,4 @@
 //! `check --expand` and the library loans table example through the CLI.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -15,13 +14,13 @@ fn cli(arguments: &[&str], paths: &[&Path]) -> Output {
     for path in paths {
         command.arg(path);
     }
-    command.output().unwrap()
+    command.output().unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 fn scratch(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("contract-tables-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("{error:?}"));
     dir
 }
 
@@ -34,8 +33,8 @@ fn contract_tables_expand_prints_the_checked_project() {
         "{}",
         String::from_utf8_lossy(&human.stderr)
     );
-    let text = String::from_utf8(human.stdout).unwrap();
-    let summary = String::from_utf8(human.stderr).unwrap();
+    let text = String::from_utf8(human.stdout).unwrap_or_else(|error| panic!("{error:?}"));
+    let summary = String::from_utf8(human.stderr).unwrap_or_else(|error| panic!("{error:?}"));
     assert!(
         summary.contains("tables=1 entries=6 inputs=10 domain=294912"),
         "{summary}"
@@ -49,7 +48,7 @@ fn contract_tables_expand_prints_the_checked_project() {
     // The printed expansion checks as the same program.
     let dir = scratch("expand");
     let expanded = dir.join("project.zeno");
-    std::fs::write(&expanded, &text).unwrap();
+    std::fs::write(&expanded, &text).unwrap_or_else(|error| panic!("{error:?}"));
     let hash = |path: &Path| {
         let output = cli(&["check", "--format", "json"], &[path]);
         assert!(
@@ -57,13 +56,18 @@ fn contract_tables_expand_prints_the_checked_project() {
             "{}",
             String::from_utf8_lossy(&output.stdout)
         );
-        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
-        value["semantic_program_hash"].as_str().unwrap().to_owned()
+        let value: Value =
+            serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{error:?}"));
+        value["semantic_program_hash"]
+            .as_str()
+            .unwrap_or_else(|| panic!("expected table fixture value"))
+            .to_owned()
     };
     assert_eq!(hash(&project), hash(&expanded));
     let json = cli(&["check", "--expand", "--format", "json"], &[&project]);
     assert!(json.status.success());
-    let value: Value = serde_json::from_slice(&json.stdout).unwrap();
+    let value: Value =
+        serde_json::from_slice(&json.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(value["status"], "expanded");
     assert_eq!(value["expansion"], text);
     assert_eq!(value["domain_size"], "294912");
@@ -74,19 +78,22 @@ fn contract_tables_expand_prints_the_checked_project() {
     // A table error is a diagnostic at the table source, not printed text.
     let bad = dir.join("bad.zeno");
     let source = std::fs::read_to_string(&project)
-        .unwrap()
+        .unwrap_or_else(|error| panic!("{error:?}"))
         .replace("size 6;", "size 65;");
-    std::fs::write(&bad, &source).unwrap();
+    std::fs::write(&bad, &source).unwrap_or_else(|error| panic!("{error:?}"));
     let refused = cli(&["check", "--expand", "--format", "json"], &[&bad]);
     assert_eq!(refused.status.code(), Some(1));
-    let value: Value = serde_json::from_slice(&refused.stdout).unwrap();
+    let value: Value =
+        serde_json::from_slice(&refused.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     let diagnostic = &value["diagnostics"][0];
     assert_eq!(diagnostic["code"], "ZENO-E0207");
     assert_eq!(
         diagnostic["span"]["start"],
-        source.find("table 110").unwrap()
+        source
+            .find("table 110")
+            .unwrap_or_else(|| panic!("expected table fixture value"))
     );
-    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));
 }
 
 #[test]
@@ -104,12 +111,19 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
     assert!(dir.join("v2/policy.zcve").is_file());
     // `--lemma` text may not contain braces, so pass law 500's expansion.
     let expansion = cli(&["check", "--expand"], &[&example().join("project.zeno")]);
-    let text = String::from_utf8(expansion.stdout).unwrap();
+    let text = String::from_utf8(expansion.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     let start = text
         .find("law 500 at_most_two_per_member on commit, genesis =")
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected count law"));
     let law = &text[start..];
-    let formula = law[law.find('=').unwrap() + 1..law.find(";\n").unwrap()].trim();
+    let formula = law[law
+        .find('=')
+        .unwrap_or_else(|| panic!("expected table fixture value"))
+        + 1
+        ..law
+            .find(";\n")
+            .unwrap_or_else(|| panic!("expected table fixture value"))]
+        .trim();
     let lemma = cli(
         &["contract", "lemma"],
         &[&example(), Path::new("--lemma"), Path::new(formula)],
@@ -119,9 +133,10 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
         "{}",
         String::from_utf8_lossy(&lemma.stderr)
     );
-    let value: Value = serde_json::from_slice(&lemma.stdout).unwrap();
+    let value: Value =
+        serde_json::from_slice(&lemma.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(value["lemmas"][0]["verdict"], "inductive");
     assert_eq!(value["lemmas"][0]["states"]["declared"], 4096);
     assert_eq!(value["lemmas"][0]["states"]["reachable"], 2074);
-    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));
 }
