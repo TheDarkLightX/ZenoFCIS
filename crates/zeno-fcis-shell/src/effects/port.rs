@@ -6,9 +6,10 @@
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::fmt;
 use core::num::NonZeroU64;
 
-use zeno_fcis_codec::Hash32;
+use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};
 
 use super::registry::Port;
 use crate::CommitStatus;
@@ -55,7 +56,7 @@ impl OpId {
 ///
 /// Reporting data only: the trusted driver holds the matching Publication or
 /// rebuilds it through Authority, and refuses data whose subject differs.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct PublicationData {
     /// Exact original prestate envelope.
     pub prestate: Vec<u8>,
@@ -67,6 +68,39 @@ pub struct PublicationData {
     pub identity: Vec<u8>,
     /// Publication subject the Authority computed for these inputs.
     pub subject: Vec<u8>,
+}
+
+/// Shows long fields by length and SHA-256; identities and subjects run to
+/// kilobytes.
+impl fmt::Debug for PublicationData {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PublicationData")
+            .field("prestate", &Bytes(&self.prestate))
+            .field("command", &Bytes(&self.command))
+            .field("context", &Bytes(&self.context))
+            .field("identity", &Bytes(&self.identity))
+            .field("subject", &Bytes(&self.subject))
+            .finish()
+    }
+}
+
+/// Bytes in full up to 32, otherwise their length and SHA-256.
+pub(crate) struct Bytes<'a>(pub(crate) &'a [u8]);
+
+impl fmt::Debug for Bytes<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.len() <= 32 {
+            write!(formatter, "{:?}", self.0)
+        } else {
+            write!(
+                formatter,
+                "{} bytes, sha256 {}",
+                self.0.len(),
+                RustCryptoSha256::hash(self.0)
+            )
+        }
+    }
 }
 
 /// The expected-version guard of a commit, one per existing V2 commit API.
@@ -395,6 +429,49 @@ impl Operation {
 }
 
 impl Response {
+    /// The answer to `port` that did not apply.
+    #[must_use]
+    pub const fn not_applied(port: Port, fault: Fault) -> Self {
+        match port {
+            Port::ReadState => Self::ReadState(Outcome::NotApplied(fault)),
+            Port::Commit => Self::Commit(Outcome::NotApplied(fault)),
+            Port::ReadHistory => Self::ReadHistory(Outcome::NotApplied(fault)),
+            Port::ReadOutbox => Self::ReadOutbox(Outcome::NotApplied(fault)),
+            Port::Acknowledge => Self::Acknowledge(Outcome::NotApplied(fault)),
+            Port::Reopen => Self::Reopen(Outcome::NotApplied(fault)),
+            Port::Send => Self::Send(Sent::NotSent(Code::Delivery)),
+            Port::Clock => Self::Clock(Err(fault)),
+            Port::Random => Self::Random(Err(fault)),
+            Port::Wait => Self::Wait(Err(WaitError::Failed(fault))),
+        }
+    }
+
+    /// The answer to `port` that may or may not have applied.
+    #[must_use]
+    pub const fn unknown(port: Port) -> Self {
+        match port {
+            Port::Commit => Self::Commit(Outcome::Unknown(Fault::Io)),
+            Port::Acknowledge => Self::Acknowledge(Outcome::Unknown(Fault::Io)),
+            Port::Send => Self::Send(Sent::Unknown(Fault::Io)),
+            other => Self::not_applied(other, Fault::Io),
+        }
+    }
+
+    /// The refusal of `port` with `code`.
+    #[must_use]
+    pub const fn refused(port: Port, code: Code) -> Self {
+        match port {
+            Port::ReadState => Self::ReadState(Outcome::Refused(code)),
+            Port::Commit => Self::Commit(Outcome::Refused(code)),
+            Port::ReadHistory => Self::ReadHistory(Outcome::Refused(code)),
+            Port::ReadOutbox => Self::ReadOutbox(Outcome::Refused(code)),
+            Port::Acknowledge => Self::Acknowledge(Outcome::Refused(code)),
+            Port::Reopen => Self::Reopen(Outcome::Refused(code)),
+            Port::Send => Self::Send(Sent::NotSent(code)),
+            other => Self::not_applied(other, Fault::Io),
+        }
+    }
+
     /// The port this response answers.
     #[must_use]
     pub const fn port(&self) -> Port {

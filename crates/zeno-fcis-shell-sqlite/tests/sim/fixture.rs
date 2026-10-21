@@ -19,6 +19,9 @@ use zeno_fcis_value::Value;
 pub(crate) mod counter;
 
 pub(crate) fn with_authority(run: impl FnOnce(&Authority<'_>)) {
+    with_catalog(|catalog| run(&ok(authority::bind(catalog))));
+}
+pub(crate) fn with_catalog(run: impl FnOnce(&catalog::BoundCatalog<'_>)) {
     let contract = counter::Contract::new();
     let mut descriptor = contract.descriptor();
     // Same counter commands; two notifications make omission of a second entry observable.
@@ -109,7 +112,7 @@ pub(crate) fn with_authority(run: impl FnOnce(&Authority<'_>)) {
         &counter::FRAMING,
         counter::CHANNEL_ROOTS,
     ));
-    run(&ok(authority::bind(&catalog)));
+    run(&catalog);
 }
 pub(crate) fn schema_hash() -> Hash32 {
     Hash32::new(counter::FRAMING.state.schema)

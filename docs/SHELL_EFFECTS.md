@@ -5,8 +5,7 @@ delivers outbox records. The aim is one shell that runs unchanged against real
 storage, a deterministic faulty world or a recorded run. The shell's effects
 are declared once, its decisions are pure programs, and handlers carry the
 effects out. This page covers the registry, the programs, the simulation, the
-record and replay layers and the explorers. The production SQLite handler is
-not mounted yet.
+record and replay layers, the explorers and the production SQLite handler.
 
 ## A commit whose reply is lost
 
@@ -109,9 +108,43 @@ receiver.
   effect repeats past deduplication, nothing is sent before it is committed,
   and only a record that was sent is acknowledged.
 
+## The production SQLite handler
+
+`zeno_fcis_shell_sqlite::effects::production::Production` is the terminal for
+one handle on one store. Each port calls the V2 API the registry names, so no
+SQL is added or reordered. Send goes to a caller's `Transport`; Clock, Random
+and Wait go to an opt-in `Time`, and stay uncovered without one. V2 refusals
+keep their codes. SQLite busy or full is `NotApplied`, because the transaction
+rolled back. Any other SQLite failure is `Unknown` for a write and `NotApplied`
+for a read.
+
+A store's identity is the SHA-256 of its original genesis envelope, its
+Authority's identity and the delivery interpreter's identity; a handle adds
+its number. Two stores created from the same genesis share an identity. A
+request for another store or handle is refused untouched.
+
+`handler::Fault` sits in front of any terminal. It makes the simulation's
+fault choices for real: busy, an ambiguous answer, a lost answer after
+forwarding, a crash before or after, and a duplicate Send. It never
+forwards a commit or an acknowledgement twice. The
+`effects_production` tests check the production handler against the
+independent protocol model from the SQLite fault simulation. After every
+step they compare a complete snapshot of every `v2_*` table and the
+receiver. They cover:
+- every fault schedule of two commit programs on two handles, and of
+  delivery to a deduplicating receiver;
+- an interruption at each of the eight statement boundaries of a commit,
+  followed by recovery;
+- a real busy store;
+- the ten real process aborts, each followed by recovery and redelivery.
+
+Disk-full and other I/O failures are qualified only in the simulation, by
+the `NotApplied` and `Unknown` branches they map to. No deterministic SQLite
+fixture produces them.
+
 ## Checks
 
-`tools/check_shell_effects_controls.py` builds fifteen mutants. Each must fail
+`tools/check_shell_effects_controls.py` builds eighteen mutants. Each must fail
 its named check while the unmodified tree passes:
 
 | Control | Check |
@@ -131,15 +164,20 @@ its named check while the unmodified tree passes:
 | Replay continues live when the transcript ends | `replay_is_exact` |
 | Chain verification skips its link checks | `transcript_chain` |
 | Binding skips the coverage check | `stack_binding` |
+| The store identity ignores the Authority | `store_identity_binds_genesis_authority_and_interpreter` |
+| Production commits `At(v)` without its version | `production_agrees_with_model` |
+| Production reports SQLite busy as `Unknown` | `production_real_busy` |
 
-The default tests explore retry budgets 0 and 1. The ignored test
-`explore_frozen_profile_all_budgets` explores the whole profile.
+The default tests explore retry budgets 0 and 1 in the simulation, and fewer
+on SQLite. The ignored tests `explore_frozen_profile_all_budgets` and
+`production_agrees_with_model_all_budgets` cover every budget.
 
 ## Scope and limits
 
 The evidence is finite exploration of the stated profile, tests and a static
 rule check; it is not a proof. The laws are checked against the simulation and
-its stacks, not yet against SQLite or a transport. The premises are one store,
+its stacks. SQLite is checked by agreement with the independent model, and
+the transport is only a test receiver. The premises are one store,
 one trusted writer and relay, and two handles; history absence is trusted
 only under that single-writer premise. Creation, upgrades, multiple stores,
 multiple processes, exactly-once external effects and power-loss durability are

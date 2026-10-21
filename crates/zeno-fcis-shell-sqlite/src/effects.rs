@@ -5,13 +5,32 @@
 //! Before a commit, the trusted driver rebuilds the genuine publication from
 //! the inputs through Authority and refuses data that names another
 //! Authority or another subject, so replay and simulation can never mint a
-//! publication. The V2 shell's own APIs are unchanged.
+//! publication. The V2 shell's own APIs are unchanged; [`production`]
+//! mounts them behind the ports.
 
-use zeno_fcis_shell::effects::port::PublicationData;
+use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};
+use zeno_fcis_shell::effects::{codec, port::PublicationData};
 use zeno_fcis_synthesis::finite::{
     v2_authority::{Authority, Publication, PublicationOutcome},
     v2_composition::{DescriptorData, Raw},
 };
+
+/// The production SQLite handler behind the shell-effects ports.
+pub mod production;
+
+/// A store's identity: SHA-256 of its original genesis envelope, the full
+/// identity of its Authority and the delivery interpreter's identity. A
+/// handle adds only its number. It names what the store was created from,
+/// not a file: two stores created from the same genesis share it.
+#[must_use]
+pub fn store_identity(genesis: &[u8], authority: &[u8], interpreter: Hash32) -> Hash32 {
+    let mut out = Vec::new();
+    codec::bytes(&mut out, b"zeno-fcis/shell-effects/1 store");
+    codec::bytes(&mut out, genesis);
+    codec::bytes(&mut out, authority);
+    codec::hash(&mut out, interpreter);
+    RustCryptoSha256::hash(&out)
+}
 
 /// Why publication data did not bind to a genuine publication.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

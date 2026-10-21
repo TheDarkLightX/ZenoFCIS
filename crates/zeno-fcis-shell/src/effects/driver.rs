@@ -10,12 +10,12 @@
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
-use super::port::{OpId, Operation, Outcome, Store};
+use super::port::{Bytes, OpId, Operation, Outcome, Store};
 use super::program::{Program, Step};
 use super::registry::{self, Port, Registry, RegistryError, TypeError};
 
 /// What binds a response to the request that asked for it.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Binding {
     /// The request's epoch and ordinal.
     pub id: OpId,
@@ -25,6 +25,18 @@ pub struct Binding {
     pub store: Option<Store>,
     /// The publication subject or delivery ID, if any.
     pub subject: Vec<u8>,
+}
+
+impl fmt::Debug for Binding {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Binding")
+            .field("id", &self.id)
+            .field("port", &self.port)
+            .field("store", &self.store)
+            .field("subject", &Bytes(&self.subject))
+            .finish()
+    }
 }
 
 impl Binding {

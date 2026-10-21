@@ -28,6 +28,9 @@ RECORD = 'crates/zeno-fcis-shell/src/effects/record.rs'
 HANDLER = 'crates/zeno-fcis-shell/src/effects/handler.rs'
 SHELL =['-p', 'zeno-fcis-shell', '--lib']
 SQLITE = ['-p', 'zeno-fcis-shell-sqlite', '--test', 'effects']
+PRODUCTION = ['-p', 'zeno-fcis-shell-sqlite', '--features', 'crash-injection', '--test', 'effects_production']
+STORE = 'crates/zeno-fcis-shell-sqlite/src/effects.rs'
+MOUNT = 'crates/zeno-fcis-shell-sqlite/src/effects/production.rs'
 
 
 def signature_block(text: str, port: str) -> str:
@@ -137,6 +140,25 @@ CONTROLS = [
      ['uncovered port bound'],
      'Binding stops checking coverage: the delivery program binds to a store-only terminal without Send.',
      [(HANDLER, 'if !covered.contains(port) {', 'if false && !covered.contains(port) {')]),
+    ('store-identity-authority', PRODUCTION, 'store_identity_binds_genesis_authority_and_interpreter',
+     ['store identity ignores an input'],
+     "The store identity leaves out the Authority's identity: stores of two contracts with one genesis "
+     'would share it.',
+     [(STORE, '    codec::bytes(&mut out, authority);\n', '    let _ = authority;\n')]),
+    ('commit-mode-dropped', PRODUCTION, 'production_agrees_with_model',
+     ['failed: commit'],
+     'The production handler commits At(v) without its expected version: a stale handle gets PreState '
+     'where V2 and the model refuse Concurrent.',
+     [(MOUNT, 'shell.commit_with_crash_at(version, key, publication, interrupt)',
+       'shell.commit_with_crash(key, publication, { let _ = version; interrupt })')]),
+    ('busy-as-unknown', PRODUCTION, 'production_real_busy',
+     ['busy is not applied'],
+     'The production handler reports a real SQLite busy store as Unknown, though the transaction rolled back.',
+     [(MOUNT, '''                    Response::not_applied(port, Fault::Busy)
+                }
+                rusqlite::ErrorCode::DiskFull''', '''                    Response::unknown(port)
+                }
+                rusqlite::ErrorCode::DiskFull''')]),
     ('ambient-clock', None, 'purity',
      ['error[clock]'],
      'A step function reads std::time::Instant: the purity checker reports a clock violation in program.rs.',

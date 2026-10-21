@@ -460,42 +460,6 @@ pub struct Simulation {
     pub script: Script,
 }
 
-fn not_applied(port: Port, fault: Fault) -> Response {
-    match port {
-        Port::ReadState => Response::ReadState(Outcome::NotApplied(fault)),
-        Port::Commit => Response::Commit(Outcome::NotApplied(fault)),
-        Port::ReadHistory => Response::ReadHistory(Outcome::NotApplied(fault)),
-        Port::ReadOutbox => Response::ReadOutbox(Outcome::NotApplied(fault)),
-        Port::Acknowledge => Response::Acknowledge(Outcome::NotApplied(fault)),
-        Port::Reopen => Response::Reopen(Outcome::NotApplied(fault)),
-        Port::Send => Response::Send(Sent::NotSent(Code::Delivery)),
-        Port::Clock => Response::Clock(Err(fault)),
-        Port::Random => Response::Random(Err(fault)),
-        Port::Wait => Response::Wait(Err(WaitError::Failed(fault))),
-    }
-}
-
-fn unknown(port: Port) -> Response {
-    match port {
-        Port::Commit => Response::Commit(Outcome::Unknown(Fault::Io)),
-        Port::Acknowledge => Response::Acknowledge(Outcome::Unknown(Fault::Io)),
-        other => not_applied(other, Fault::Io),
-    }
-}
-
-fn refused(port: Port, code: Code) -> Response {
-    match port {
-        Port::ReadState => Response::ReadState(Outcome::Refused(code)),
-        Port::Commit => Response::Commit(Outcome::Refused(code)),
-        Port::ReadHistory => Response::ReadHistory(Outcome::Refused(code)),
-        Port::ReadOutbox => Response::ReadOutbox(Outcome::Refused(code)),
-        Port::Acknowledge => Response::Acknowledge(Outcome::Refused(code)),
-        Port::Reopen => Response::Reopen(Outcome::Refused(code)),
-        Port::Send => Response::Send(Sent::NotSent(code)),
-        other => not_applied(other, Fault::Io),
-    }
-}
-
 impl Simulation {
     /// A simulation of `world` that covers `ports`.
     #[must_use]
@@ -526,7 +490,7 @@ impl Simulation {
                 self.world.handles[handle] = Some(self.world.durable.version());
                 Handled::Answer(answer)
             }
-            Some(1) => Handled::Answer(not_applied(port, Fault::Busy)),
+            Some(1) => Handled::Answer(Response::not_applied(port, Fault::Busy)),
             Some(_) => self.crash(handle),
         }
     }
@@ -548,12 +512,12 @@ impl Simulation {
                 self.world.handles[handle] = Some(self.world.durable.version());
                 Handled::Answer(answer)
             }
-            Some(1) => Handled::Answer(not_applied(port, Fault::Busy)),
-            Some(2) => Handled::Answer(unknown(port)),
+            Some(1) => Handled::Answer(Response::not_applied(port, Fault::Busy)),
+            Some(2) => Handled::Answer(Response::unknown(port)),
             Some(3) => {
                 self.world.durable = after;
                 self.world.late.push((binding.clone(), answer));
-                Handled::Answer(unknown(port))
+                Handled::Answer(Response::unknown(port))
             }
             Some(4) => self.crash(handle),
             Some(_) => {
@@ -677,16 +641,25 @@ impl Terminal for Simulation {
         self.ports
     }
 
+    fn crash(&mut self, binding: &Binding) {
+        if let Some(store) = binding.store
+            && store.identity == STORE
+            && (1..=2).contains(&store.handle)
+        {
+            self.world.handles[store.handle as usize - 1] = None;
+        }
+    }
+
     fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled {
         let port = operation.port();
         if !self.ports.contains(&port) {
-            return Handled::Answer(refused(port, Code::Identity));
+            return Handled::Answer(Response::refused(port, Code::Identity));
         }
         let handle = match operation.store() {
             Some(store) if store.identity == STORE && (1..=2).contains(&store.handle) => {
                 Some(store.handle as usize - 1)
             }
-            Some(_) => return Handled::Answer(refused(port, Code::Identity)),
+            Some(_) => return Handled::Answer(Response::refused(port, Code::Identity)),
             None => None,
         };
         let durable = &self.world.durable;
@@ -765,7 +738,7 @@ impl Terminal for Simulation {
                     Some(_) => Handled::Answer(Response::Wait(Err(WaitError::Interrupted))),
                 }
             }
-            _ => Handled::Answer(refused(port, Code::Identity)),
+            _ => Handled::Answer(Response::refused(port, Code::Identity)),
         }
     }
 }

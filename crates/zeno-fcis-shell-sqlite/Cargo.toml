@@ -43,3 +43,7 @@ workspace = true
 [[test]]
 name = "simulation"
 required-features = ["crash-injection"]
+
+[[test]]
+name = "effects_production"
+required-features = ["crash-injection"]

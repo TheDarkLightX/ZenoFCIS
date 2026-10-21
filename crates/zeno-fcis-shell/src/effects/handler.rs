@@ -10,9 +10,10 @@
 use alloc::vec::Vec;
 
 use super::driver::Binding;
-use super::port::{Operation, Response};
+use super::port::{Fault as FaultKind, Operation, Response};
 use super::record::{Entry, Transcript};
 use super::registry::Port;
+use super::simulation::Script;
 
 /// What a handler did with one request.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,6 +32,92 @@ pub trait Terminal {
     fn ports(&self) -> &'static [Port];
     /// Carries out one request.
     fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled;
+    /// The process crashed around the request with this binding: drop its
+    /// handle's volatile state. Durable state stays as the handler left it.
+    fn crash(&mut self, binding: &Binding) {
+        let _ = binding;
+    }
+}
+
+/// The fault handler, `Fault(H)`: in front of a terminal, it may fail a
+/// request before forwarding it or drop the answer after, following its
+/// schedule's choices. It forwards a request at most once, except a Send it
+/// duplicates in transit; it never repeats a Commit or an Acknowledge.
+pub struct Fault<'a, T: Terminal + ?Sized> {
+    inner: &'a mut T,
+    script: &'a mut Script,
+    /// The terminal's own answer to the last forwarded request.
+    pub forwarded: Option<Handled>,
+}
+
+impl<'a, T: Terminal + ?Sized> Fault<'a, T> {
+    /// Faults in front of `inner`, choosing from `script`.
+    pub fn new(inner: &'a mut T, script: &'a mut Script) -> Self {
+        Self {
+            inner,
+            script,
+            forwarded: None,
+        }
+    }
+
+    fn forward(&mut self, binding: &Binding, operation: &Operation) -> Handled {
+        let handled = self.inner.handle(binding, operation);
+        self.forwarded = Some(handled.clone());
+        handled
+    }
+
+    fn crash(&mut self, binding: &Binding) -> Handled {
+        self.inner.crash(binding);
+        Handled::Crash
+    }
+}
+
+impl<T: Terminal + ?Sized> Terminal for Fault<'_, T> {
+    fn ports(&self) -> &'static [Port] {
+        self.inner.ports()
+    }
+
+    fn handle(&mut self, binding: &Binding, operation: &Operation) -> Handled {
+        self.forwarded = None;
+        let port = operation.port();
+        let options = match port {
+            Port::Commit | Port::Acknowledge => 6,
+            Port::Send => 7,
+            Port::ReadState | Port::ReadHistory | Port::ReadOutbox | Port::Reopen => 3,
+            Port::Clock | Port::Random | Port::Wait => 1,
+        };
+        let Some(choice) = self.script.choose(options) else {
+            return Handled::Suspend;
+        };
+        if options == 3 {
+            return match choice {
+                0 => self.forward(binding, operation),
+                1 => Handled::Answer(Response::not_applied(port, FaultKind::Busy)),
+                _ => self.crash(binding),
+            };
+        }
+        // The order follows the simulation's: answer, busy or not sent, an
+        // ambiguous answer without forwarding, a lost answer after it, a
+        // crash before or after it, and for Send a duplicate in transit.
+        match choice {
+            0 => self.forward(binding, operation),
+            1 => Handled::Answer(Response::not_applied(port, FaultKind::Busy)),
+            2 => Handled::Answer(Response::unknown(port)),
+            3 => match self.forward(binding, operation) {
+                Handled::Answer(_) => Handled::Answer(Response::unknown(port)),
+                other => other,
+            },
+            4 => self.crash(binding),
+            5 => match self.forward(binding, operation) {
+                Handled::Answer(_) => self.crash(binding),
+                other => other,
+            },
+            _ => {
+                let _ = self.forward(binding, operation);
+                self.forward(binding, operation)
+            }
+        }
+    }
 }
 
 /// One forwarding layer.

@@ -370,3 +370,76 @@ fn transcript_chain() {
         );
     }
 }
+
+/// The fault handler in front of the simulation keeps every law: it fails a
+/// request before forwarding it or drops the answer after, and it never
+/// applies a commit or an acknowledgement twice.
+#[test]
+fn fault_handler_laws() {
+    let durable = super::laws::committed(&Durable::genesis(), Hash32::new([0x11; 32]), 1);
+    let profile = Profile::frozen(0);
+    let record = durable.outbox[0].0.clone();
+    let store = simulation::store(1);
+    let operations = [
+        Operation::Commit(
+            store,
+            Hash32::new([0x22; 32]),
+            simulation::publication(&durable.state, 2),
+            CommitMode::Unversioned,
+        ),
+        Operation::Acknowledge(store, record.id, record.payload_sha256),
+        Operation::Send(store, record),
+        Operation::ReadOutbox(store),
+        Operation::Reopen(store),
+        Operation::Clock,
+    ];
+    let mut laws = Laws::default();
+    let mut shapes = Vec::new();
+    for operation in &operations {
+        let binding = Binding::of(OpId::first(1), operation);
+        for choice in 0..8 {
+            let mut terminal = Simulation::new(
+                World::new(durable.clone()),
+                profile,
+                simulation::ALL_PORTS,
+                Script::fault_free(),
+            );
+            let before = terminal.world.clone();
+            let mut script = Script::new(vec![choice]);
+            let mut fault = handler::Fault::new(&mut terminal, &mut script);
+            let handled = fault.handle(&binding, operation);
+            if handled == Handled::Suspend || script.made().is_empty() && choice > 0 {
+                break;
+            }
+            if let Err(failure) = laws.check(
+                &profile,
+                &before,
+                &binding,
+                operation,
+                &handled,
+                &terminal.world,
+            ) {
+                panic!("{operation:?} choice {choice}: law {} failed", failure.law);
+            }
+            shapes.push((operation.port(), choice, handled));
+        }
+    }
+    // Every write has six fault options, Send seven, reads three and Clock one.
+    let count = |port| shapes.iter().filter(|(p, ..)| *p == port).count();
+    assert_eq!(
+        [
+            count(Port::Commit),
+            count(Port::Acknowledge),
+            count(Port::Send),
+            count(Port::ReadOutbox),
+            count(Port::Reopen),
+            count(Port::Clock)
+        ],
+        [6, 6, 7, 3, 3, 1]
+    );
+    assert!(
+        shapes
+            .iter()
+            .any(|(_, _, handled)| *handled == Handled::Crash)
+    );
+}
