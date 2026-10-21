@@ -20,6 +20,12 @@ receive only those observations. Reject, Refused and Skip are allowed by
 `local`; only committing decisions must preserve the invariant. Read-only
 commits preserve the delivered state. Couplings refer only to owned state.
 
+The local preservation premise includes refusal of out-of-domain successors by
+the bound Authority. This refusal is part of the decision-table bridge; it is
+not supplied by the resolver proof. The provider rule is checked by the domain
+validator and its `read_only_bindings_read_earlier_owned_state_only` regression:
+providers must be earlier owning components.
+
 The coupling premise checks member endings and every possible outside failure
 cut. It over-approximates failures using the manifest's failure-case flag, even
 when that outside failure is unreachable on the current request. A separate
@@ -34,7 +40,7 @@ the first committed failure in its prefix. The proof requires callback permissio
 through the first terminal decision; an extra call after Reject fails
 verification. The loop has a decreasing finite bound.
 
-`resolve.rs::apply` implements `apply_spec` on the production `Vec<i64>` state:
+`resolve.rs::apply` implements `apply_spec` on the production `Vec<i128>` state:
 it frames skipped, later and read-only components and rolls back the whole
 state on Reject or Refused. The abstract joint step uses both shared specs.
 
