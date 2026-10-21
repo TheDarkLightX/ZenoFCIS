@@ -5,7 +5,7 @@
 use crate::containment_policy::{Backend, Profile, Unavailable};
 use std::time::Duration;
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[path = "posix_process.rs"]
 mod posix;
 
@@ -2243,11 +2243,13 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
 }
 
 pub(crate) struct Admission {
+    #[cfg(target_os = "linux")]
     backend: Backend,
     #[cfg(target_os = "linux")]
     required_profile: Profile,
     #[cfg(target_os = "linux")]
     invocation: Option<posix::Invocation>,
+    #[cfg(target_os = "linux")]
     selection_source: SelectionSource,
 }
 
@@ -2353,6 +2355,7 @@ fn required_profile(command: &crate::Command) -> Result<Profile, String> {
 }
 
 /// Pure injected-capability gate, shared by production admission and refusal tests.
+#[cfg(target_os = "linux")]
 fn admit_capabilities(
     command: &crate::Command,
     backend: Backend,
@@ -2402,6 +2405,7 @@ fn preflight_selected(
     let backend = selected_backend(profile, requested)?;
     // Injection can remove a control but cannot invent one. On POSIX the
     // comparator consumes observations from the disposable setup/cleanup run.
+    #[cfg(target_os = "linux")]
     let missing = std::env::var("ZENO_FCIS_CONTAINMENT_MISSING").unwrap_or_default();
     #[cfg(target_os = "linux")]
     let mut invocation = None;
@@ -2466,12 +2470,16 @@ fn preflight_selected(
         Backend::Auto => return Err("containment-unavailable:auto:unselected".to_owned().into()),
     }
     #[cfg(not(target_os = "linux"))]
-    return Err(Unavailable {
-        backend,
-        missing: "platform-unqualified".into(),
+    {
+        // No runtime backend is qualified on this platform.
+        let _ = source;
+        return Err(Unavailable {
+            backend,
+            missing: "platform-unqualified".into(),
+        }
+        .to_string()
+        .into());
     }
-    .to_string()
-    .into());
     #[cfg(target_os = "linux")]
     Ok(Some(Admission {
         backend,
@@ -2531,83 +2539,85 @@ pub(crate) fn dispatch(
     knowledge_task: Option<&str>,
     knowledge_paths: Option<&[std::path::PathBuf]>,
 ) -> Option<u8> {
-    let profile = contained_profile(command)?;
-    let (staging_parent, receipt) = receipt_paths(command);
-    let args = {
-        let mut args = std::env::args_os().skip(1).collect::<Vec<_>>();
-        if let Some(hash) = knowledge_snapshot {
-            args.extend([
-                std::ffi::OsString::from("--kb-snapshot"),
-                std::ffi::OsString::from(hash),
-            ]);
-        }
-        if let Some(id) = knowledge_invocation {
-            args.extend([
-                std::ffi::OsString::from("--kb-invocation"),
-                std::ffi::OsString::from(id),
-            ]);
-        }
-        if let Some(task) = knowledge_task
-            && !task.is_empty()
-        {
-            args.extend([
-                std::ffi::OsString::from("--kb-task"),
-                std::ffi::OsString::from(task),
-            ]);
-        }
-        if let Some(paths) = knowledge_paths {
-            for p in paths {
+    #[cfg(target_os = "linux")]
+    let outcome = {
+        let profile = contained_profile(command)?;
+        let (staging_parent, receipt) = receipt_paths(command);
+        let args = {
+            let mut args = std::env::args_os().skip(1).collect::<Vec<_>>();
+            if let Some(hash) = knowledge_snapshot {
                 args.extend([
-                    std::ffi::OsString::from("--kb"),
-                    p.as_os_str().to_os_string(),
+                    std::ffi::OsString::from("--kb-snapshot"),
+                    std::ffi::OsString::from(hash),
                 ]);
             }
-        }
-        args
-    };
-    #[cfg(target_os = "linux")]
-    let outcome = match linux::child() {
-        Ok(true) => return None,
-        Ok(false) => match admission {
-            Some(Admission {
-                backend: Backend::Posix,
-                invocation: Some(invocation),
-                ..
-            }) => posix::supervise(command, &args, invocation),
-            Some(Admission {
-                backend: Backend::Systemd,
-                required_profile,
-                selection_source,
-                ..
-            }) => linux::supervise(
-                &args,
-                profile.0,
-                profile.1,
-                linux::Receipts {
-                    staging_parent: staging_parent.as_deref(),
-                    receipt,
-                },
-                Some((required_profile, selection_source)),
-            )
-            .map_err(|mut failure| {
-                failure.selection_source = Some(selection_source);
-                failure
-            }),
-            _ => Err("containment-unavailable:admission-missing"
-                .to_owned()
-                .into()),
-        },
-        Err(error) => {
-            // The supervisor quotes the child's stderr in its refusal.
-            eprintln!("zeno-fcis: contained child refused: {error}");
-            Err(error.into())
+            if let Some(id) = knowledge_invocation {
+                args.extend([
+                    std::ffi::OsString::from("--kb-invocation"),
+                    std::ffi::OsString::from(id),
+                ]);
+            }
+            if let Some(task) = knowledge_task
+                && !task.is_empty()
+            {
+                args.extend([
+                    std::ffi::OsString::from("--kb-task"),
+                    std::ffi::OsString::from(task),
+                ]);
+            }
+            if let Some(paths) = knowledge_paths {
+                for p in paths {
+                    args.extend([
+                        std::ffi::OsString::from("--kb"),
+                        p.as_os_str().to_os_string(),
+                    ]);
+                }
+            }
+            args
+        };
+        match linux::child() {
+            Ok(true) => return None,
+            Ok(false) => match admission {
+                Some(Admission {
+                    backend: Backend::Posix,
+                    invocation: Some(invocation),
+                    ..
+                }) => posix::supervise(command, &args, invocation),
+                Some(Admission {
+                    backend: Backend::Systemd,
+                    required_profile,
+                    selection_source,
+                    ..
+                }) => linux::supervise(
+                    &args,
+                    profile.0,
+                    profile.1,
+                    linux::Receipts {
+                        staging_parent: staging_parent.as_deref(),
+                        receipt,
+                    },
+                    Some((required_profile, selection_source)),
+                )
+                .map_err(|mut failure| {
+                    failure.selection_source = Some(selection_source);
+                    failure
+                }),
+                _ => Err("containment-unavailable:admission-missing"
+                    .to_owned()
+                    .into()),
+            },
+            Err(error) => {
+                // The supervisor quotes the child's stderr in its refusal.
+                eprintln!("zeno-fcis: contained child refused: {error}");
+                Err(error.into())
+            }
         }
     };
     #[cfg(not(target_os = "linux"))]
     let outcome: Result<u8, SupervisorFailure> = {
+        contained_profile(command)?;
         let _ = (
-            staging_parent,
-            receipt,
+            admission,
             knowledge_snapshot,
             knowledge_invocation,
             knowledge_task,

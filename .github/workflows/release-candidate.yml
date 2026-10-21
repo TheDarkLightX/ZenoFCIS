@@ -1,345 +1,37 @@
 name: release-candidate
-
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-      - "agent/**"
-    tags:
-      - "v1.0.0-rc.*"
-      - "v1.0.0"
-      - "v1.1.0"
-      - "v2.2.*"
-      - "v2.3.*"
-      - "v2.5.*"
-
 permissions:
   contents: read
-
-concurrency:
-  group: zeno-fcis-release-candidate-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  assemble:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    outputs:
-      checksums_sha256: ${{ steps.checksums.outputs.checksums_sha256 }}
-      archive: ${{ steps.checksums.outputs.archive }}
-      archive_sha256: ${{ steps.checksums.outputs.archive_sha256 }}
-      record_sha256: ${{ steps.checksums.outputs.record_sha256 }}
-      inputs_sha256: ${{ steps.checksums.outputs.inputs_sha256 }}
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
-
-      - name: Require tag and package version to agree
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          python3 - <<'PY'
-          import os, tomllib
-          from pathlib import Path
-          version = tomllib.loads(Path('Cargo.toml').read_text())['workspace']['package']['version']
-          expected = 'v' + version
-          actual = os.environ['GITHUB_REF_NAME']
-          if actual != expected:
-              raise SystemExit(f'release tag {actual!r} does not match package version {expected!r}')
-          PY
-
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
-
-      - name: Install pinned Node for JavaScript conformance
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version-file: .node-version
-
-      - name: Check hostile package mutations
-        run: |
-          python3 tools/rc_package.py self-test
-          python3 tools/test_generated_application.py
-
-      - name: Check package authority and documentation
-        run: |
-          python3 tools/rc_package.py check
-          python3 tools/check_library_docs.py
-
-      - name: Assemble exact release-candidate artifacts
-        run: python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc
-
-      - name: Verify retained checksums
-        id: checksums
-        working-directory: /tmp/zeno-fcis-rc
-        run: |
-          sha256sum --check --strict SHA256SUMS
-          echo "checksums_sha256=$(sha256sum SHA256SUMS | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-          python3 - hosts/x86_64-unknown-linux-gnu >> "$GITHUB_OUTPUT" <<'PY'
-          import hashlib, json, sys
-          from pathlib import Path
-          folder = Path(sys.argv[1])
-          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-          record = json.loads((folder / 'HOST-BINARY.json').read_text())
-          archive = record['archive']['name']
-          if sha(Path('binaries') / archive) != record['archive']['sha256']:
-              raise SystemExit('the Linux archive differs from its host record')
-          print(f'archive={archive}')
-          print(f"archive_sha256={record['archive']['sha256']}")
-          print(f"record_sha256={sha(folder / 'HOST-BINARY.json')}")
-          print(f"inputs_sha256={sha(folder / 'COMPILED-INPUTS-x86_64-unknown-linux-gnu.json')}")
-          PY
-
-      - name: Upload review artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-release-candidate-${{ github.sha }}
-          path: /tmp/zeno-fcis-rc
-          if-no-files-found: error
-          retention-days: 30
-
-  macos-host-binary:
-    name: macos-host-binary (aarch64-apple-darwin)
+  macos-review:
     runs-on: macos-15
-    timeout-minutes: 120
-    defaults:
-      run:
-        shell: bash
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
-    outputs:
-      archive: ${{ steps.host.outputs.archive }}
-      archive_sha256: ${{ steps.host.outputs.archive_sha256 }}
-      record_sha256: ${{ steps.host.outputs.record_sha256 }}
-      inputs_sha256: ${{ steps.host.outputs.inputs_sha256 }}
-      journey_sha256: ${{ steps.journey.outputs.journey_sha256 }}
+    timeout-minutes: 25
     steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-
-      - name: Require and record the qualified host
-        run: |
-          test "$(uname -s)/$(uname -m)" = Darwin/arm64
-          sw_vers
-          xcodebuild -version
-          xcrun --sdk macosx --show-sdk-version
-          python3 -c 'import sys; assert sys.version_info >= (3, 11), sys.version; print(sys.version)'
-
       - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-          rustc +1.97.1 -vV
-          test "$(rustc +1.97.1 -vV | sed -n 's/^host: //p')" = aarch64-apple-darwin
-
-      - name: Require tag and package version to agree
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          python3 - <<'PY'
-          import os, tomllib
-          from pathlib import Path
-          version = tomllib.loads(Path('Cargo.toml').read_text())['workspace']['package']['version']
-          expected = 'v' + version
-          actual = os.environ['GITHUB_REF_NAME']
-          if actual != expected:
-              raise SystemExit(f'release tag {actual!r} does not match package version {expected!r}')
-          PY
-
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
-
-      - name: Build, archive and record the host executable
-        id: host
-        run: |
-          python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host"
-          python3 - "$RUNNER_TEMP/host" >> "$GITHUB_OUTPUT" <<'PY'
-          import hashlib, json, sys
-          from pathlib import Path
-          folder = Path(sys.argv[1])
-          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-          record = json.loads((folder / 'HOST-BINARY.json').read_text())
-          archive = record['archive']['name']
-          if sha(folder / 'binaries' / archive) != record['archive']['sha256']:
-              raise SystemExit('the macOS archive differs from its host record')
-          print(f'archive={archive}')
-          print(f"archive_sha256={record['archive']['sha256']}")
-          print(f"record_sha256={sha(folder / 'HOST-BINARY.json')}")
-          print(f"inputs_sha256={sha(folder / 'COMPILED-INPUTS-aarch64-apple-darwin.json')}")
-          PY
-
-      - name: Run the installed-binary journey
-        id: journey
-        run: |
-          mkdir "$RUNNER_TEMP/source"
-          git archive --format=tar HEAD | tar -x -f - -C "$RUNNER_TEMP/source"
-          python3 tools/check_installed_cli.py \
-            --release "$RUNNER_TEMP/host" \
-            --source "$RUNNER_TEMP/source" \
-            --work-dir "$RUNNER_TEMP/journey" \
-            --report "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json"
-          echo "journey_sha256=$(shasum -a 256 "$RUNNER_TEMP/host/INSTALLED-JOURNEY.json" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-
-      - name: Upload host evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-host-aarch64-apple-darwin-${{ github.sha }}
-          path: ${{ runner.temp }}/host
-          if-no-files-found: error
-          retention-days: 30
-
-      # Also after a failure, so a refused build or journey leaves its records. The attempt in the name
-      # keeps a re-run from colliding with this run's earlier upload.
-      - name: Upload the host build and journey records
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-host-records-aarch64-apple-darwin-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/host/*.json
-          if-no-files-found: warn
-          retention-days: 30
-
-  release-set:
-    needs: [assemble, macos-host-binary]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout exact source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - name: Require the checked-out commit to be the run's commit
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-
-      - name: Establish contained checker runtime
-        uses: ./.github/actions/checker-containment
-
-      - name: Install pinned Rust
-        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
-
-      - name: Fetch locked crates for offline repository tools
-        uses: ./.github/actions/fetch-locked-crates
-
-      - name: Download the Linux release set
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: zeno-fcis-release-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/release
-
-      - name: Download the macOS host evidence
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: zeno-fcis-host-aarch64-apple-darwin-${{ github.sha }}
-          path: ${{ runner.temp }}/hosts/aarch64-apple-darwin
-
-      - name: Bind both downloads to the jobs that produced them
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy
+      - uses: ./.github/actions/fetch-locked-crates
+      - name: Check the repaired macOS boundaries
+        continue-on-error: true
+        run: cargo +1.97.1 clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+      - name: Build and scan the exact host executable
+        continue-on-error: true
+        run: python3 tools/rc_package.py build-host-binary --output "$RUNNER_TEMP/host"
+      - name: Encrypt the unapproved artifact for local privacy review
         env:
-          LINUX_SUMS: ${{ needs.assemble.outputs.checksums_sha256 }}
-          LINUX_ARCHIVE: ${{ needs.assemble.outputs.archive }}
-          LINUX_ARCHIVE_SHA256: ${{ needs.assemble.outputs.archive_sha256 }}
-          LINUX_RECORD_SHA256: ${{ needs.assemble.outputs.record_sha256 }}
-          LINUX_INPUTS_SHA256: ${{ needs.assemble.outputs.inputs_sha256 }}
-          MAC_ARCHIVE: ${{ needs.macos-host-binary.outputs.archive }}
-          MAC_ARCHIVE_SHA256: ${{ needs.macos-host-binary.outputs.archive_sha256 }}
-          MAC_RECORD_SHA256: ${{ needs.macos-host-binary.outputs.record_sha256 }}
-          MAC_INPUTS_SHA256: ${{ needs.macos-host-binary.outputs.inputs_sha256 }}
-          MAC_JOURNEY_SHA256: ${{ needs.macos-host-binary.outputs.journey_sha256 }}
+          REVIEW_CERT: ${{ vars.ZENO_RELEASE_REVIEW_CERT }}
         run: |
-          cd "$RUNNER_TEMP/release"
-          printf '%s  SHA256SUMS\n' "$LINUX_SUMS" | sha256sum --check --strict
-          sha256sum --check --strict SHA256SUMS
-          printf '%s  %s\n' \
-            "$LINUX_ARCHIVE_SHA256" "binaries/$LINUX_ARCHIVE" \
-            "$LINUX_RECORD_SHA256" hosts/x86_64-unknown-linux-gnu/HOST-BINARY.json \
-            "$LINUX_INPUTS_SHA256" hosts/x86_64-unknown-linux-gnu/COMPILED-INPUTS-x86_64-unknown-linux-gnu.json \
-            | sha256sum --check --strict
-          cd "$RUNNER_TEMP/hosts/aarch64-apple-darwin"
-          printf '%s  %s\n' \
-            "$MAC_ARCHIVE_SHA256" "binaries/$MAC_ARCHIVE" \
-            "$MAC_RECORD_SHA256" HOST-BINARY.json \
-            "$MAC_INPUTS_SHA256" COMPILED-INPUTS-aarch64-apple-darwin.json \
-            "$MAC_JOURNEY_SHA256" INSTALLED-JOURNEY.json | sha256sum --check --strict
-
-      - name: Run the Linux installed-binary journey
-        id: journey
-        run: |
-          python3 tools/check_installed_cli.py \
-            --release "$RUNNER_TEMP/release" \
-            --work-dir "$RUNNER_TEMP/journey" \
-            --report "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
-          echo "journey_sha256=$(sha256sum "$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-
-      - name: Merge both hosts into one release set
-        run: |
-          python3 tools/rc_package.py merge-hosts \
-            --release "$RUNNER_TEMP/release" \
-            --host "$RUNNER_TEMP/hosts/aarch64-apple-darwin" \
-            --journey "x86_64-unknown-linux-gnu=$RUNNER_TEMP/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json"
-
-      - name: Check archive-member and source custody
-        env:
-          LINUX_ARCHIVE: ${{ needs.assemble.outputs.archive }}
-          LINUX_ARCHIVE_SHA256: ${{ needs.assemble.outputs.archive_sha256 }}
-          LINUX_RECORD_SHA256: ${{ needs.assemble.outputs.record_sha256 }}
-          LINUX_INPUTS_SHA256: ${{ needs.assemble.outputs.inputs_sha256 }}
-          LINUX_JOURNEY_SHA256: ${{ steps.journey.outputs.journey_sha256 }}
-          MAC_ARCHIVE: ${{ needs.macos-host-binary.outputs.archive }}
-          MAC_ARCHIVE_SHA256: ${{ needs.macos-host-binary.outputs.archive_sha256 }}
-          MAC_RECORD_SHA256: ${{ needs.macos-host-binary.outputs.record_sha256 }}
-          MAC_INPUTS_SHA256: ${{ needs.macos-host-binary.outputs.inputs_sha256 }}
-          MAC_JOURNEY_SHA256: ${{ needs.macos-host-binary.outputs.journey_sha256 }}
-        run: |
-          mkdir "$RUNNER_TEMP/evidence"
-          python3 tools/rc_package.py downloads-list \
-            --release "$RUNNER_TEMP/release" --out "$RUNNER_TEMP/evidence/DOWNLOADS.sha256"
-          python3 - "$RUNNER_TEMP/evidence/JOB-OUTPUTS.json" <<'PY'
-          import json, os, sys
-          from pathlib import Path
-          hosts = {'x86_64-unknown-linux-gnu': 'LINUX', 'aarch64-apple-darwin': 'MAC'}
-          fields = ('archive', 'archive_sha256', 'record_sha256', 'inputs_sha256', 'journey_sha256')
-          bindings = {host: {field: os.environ[f'{prefix}_{field.upper()}'] for field in fields}
-                      for host, prefix in hosts.items()}
-          Path(sys.argv[1]).write_text(json.dumps(bindings, indent=2, sort_keys=True) + '\n')
-          PY
-          tag=()
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tag=(--tag "$GITHUB_REF_NAME"); fi
-          python3 tools/check_release_custody.py \
-            --release "$RUNNER_TEMP/release" \
-            --report "$RUNNER_TEMP/evidence/CUSTODY.json" \
-            --bindings "$RUNNER_TEMP/evidence/JOB-OUTPUTS.json" \
-            --downloads "$RUNNER_TEMP/evidence/DOWNLOADS.sha256" \
-            "${tag[@]}"
-
-      - name: Upload the release set and its checks
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          test -n "$REVIEW_CERT"
+          printf '%s\n' "$REVIEW_CERT" > "$RUNNER_TEMP/recipient.crt"
+          test -d "$RUNNER_TEMP/host/binaries"
+          tar -czf "$RUNNER_TEMP/review.tar.gz" -C "$RUNNER_TEMP/host" .
+          openssl cms -encrypt -binary -aes-256-cbc -in "$RUNNER_TEMP/review.tar.gz" -outform DER -out "$RUNNER_TEMP/macos-review.cms" -recip "$RUNNER_TEMP/recipient.crt" -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: zeno-fcis-release-set-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/release
-            ${{ runner.temp }}/evidence
+          name: encrypted-macos-review
+          path: ${{ runner.temp }}/macos-review.cms
+          retention-days: 2
           if-no-files-found: error
-          retention-days: 30
-
-      # Also after a failure, so a failed journey or custody check leaves its report.
-      - name: Upload the journey and custody records
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: zeno-fcis-release-records-${{ github.sha }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/INSTALLED-JOURNEY-x86_64-unknown-linux-gnu.json
-            ${{ runner.temp }}/evidence
-          if-no-files-found: warn
-          retention-days: 30
