@@ -270,6 +270,11 @@ def main() -> None:
     if "native" in stages:
         run(["python3", str(SITE / "tests" / "factory_check.py")], ROOT, environment)
         run(["python3", str(SITE / "tests" / "presentation_check.py")], ROOT, environment)
+        run(["node", "--experimental-vm-modules", str(SITE / "tests" / "factory-readiness.test.mjs")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "browser-launcher.test.mjs")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "asset-manifest.test.mjs")], ROOT, environment)
+        run(["python3", "-B", "-m", "unittest", "discover", "-s", str(SITE / "tests"),
+             "-p", "test_socket_free_launcher.py"], ROOT, environment)
     if "replay" in stages:
         run(["node", str(SITE / "tests" / "abi.mjs"), *templates], ROOT, environment)
         run(["node", str(SITE / "tests" / "replay.mjs"), *templates], ROOT, environment)

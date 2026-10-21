@@ -2,15 +2,18 @@
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {loadAssets,ORIGIN} from './asset-manifest.mjs';
 const [chrome,profile,root,manifestPath,nativePath,reportPath]=process.argv.slice(2);
 if(!reportPath)throw new Error('usage: pipe-browser.mjs CHROME PROFILE PUBLIC MANIFEST NATIVE REPORT');
 const manifest=JSON.parse(await readFile(manifestPath,'utf8')),assets=await loadAssets(root,manifest);
 const expected=JSON.parse(await readFile(nativePath,'utf8')).search;
-const args=['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-background-networking','--disable-component-update','--disable-sync','--disable-crashpad-for-testing','--remote-debugging-pipe',`--user-data-dir=${profile}`];
+const args=['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-background-networking','--disable-component-update','--disable-sync','--remote-debugging-pipe',`--user-data-dir=${profile}`];
 if(process.getuid?.()===0||process.env.SITE_CHROME_NO_SANDBOX==='1')args.push('--no-sandbox');
-const browser=spawn(chrome,args,{stdio:['ignore','ignore','pipe','pipe','pipe']});
+// The exec boundary closes inherited descriptors above 4, including non-CLOEXEC handles.
+const launcher=fileURLToPath(new URL('./exec_chrome.py',import.meta.url));
+const browser=spawn('python3',[launcher,chrome,...args],{stdio:['ignore','ignore','pipe','pipe','pipe']});
 const pending=new Map(),sessions=new Map(),targetSessions=new Map(),fulfilled=[],denied=[];let sequence=0,buffer='',stderr='',stopped,workerAttached=0;
 function stop(error){stopped??=error;for(const p of pending.values())p.reject(stopped);pending.clear();}
 browser.stderr.setEncoding('utf8');browser.stderr.on('data',data=>{stderr=(stderr+data).slice(-12000);});

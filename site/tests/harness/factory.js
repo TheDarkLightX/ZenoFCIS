@@ -1,4 +1,4 @@
-import { captureGrid,checkGrid,point } from "./grid-check.js";
+import { captureGrid,checkGrid } from "./grid-check.js";
 const parameters = new URLSearchParams(location.search);
 const output = document.getElementById("results");
 const frame = document.querySelector("iframe");
@@ -11,6 +11,9 @@ async function waitFor(test,label) {
 }
 function require(condition,message) {if(!condition)throw new Error(message);}
 try {
+  const base = new URL(parameters.get("base") ?? "/ZenoFCIS/", location.href);
+  const layout = await import(new URL("factory-layout.js", base));
+  const point = layout.cellPosition;
   const expected = await (await fetch("factory-native.json")).json();
   const detailOracle = await (await fetch("inventory-details-native.json")).json();
   const loaded = new Promise(resolve=>frame.addEventListener("load",resolve,{once:true}));
@@ -66,7 +69,7 @@ try {
       require(Number(grid.dataset.progressChunks)===18,"grid did not receive every bounded progress chunk");
       require(partialGrid,"L3 both motion settings must render the same progress evidence");
       if(parameters.get("control")==="stale-grid"&&mutant==="m0002")context.putImageData(baselineBitmap,0,0);
-      entry.grid=checkGrid(captureGrid(doc,oracle),oracle);
+      entry.grid=checkGrid(captureGrid(doc,oracle,layout),oracle);
       if(mutant==="none")baselineBitmap=context.getImageData(0,0,canvas.width,canvas.height);
       if(mutant==="m0049") {
         const current=context.getImageData(0,0,canvas.width,canvas.height).data;

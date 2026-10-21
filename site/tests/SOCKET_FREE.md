@@ -31,3 +31,28 @@ tracing their address families was unavailable because `PTRACE_TRACEME` and
 pass is claimed. The lead must run the spike and existing browser checks on a
 host that allows Chrome's internal IPC. `SITE_CHROME_NO_SANDBOX=1` reproduces
 the additional diagnostic only; it is not required by the normal runner.
+
+
+The launcher now execs Chrome through `exec_chrome.py`. It preserves only
+standard IO and the DevTools channels 3/4, closes every higher inherited
+descriptor and keeps the same process ID for shutdown. The profile is created
+directly under `/tmp`, independently of `TMPDIR`. The normal Chrome launch
+also drops the earlier Crashpad testing flag to match the regular browser
+runner. Whether these changes resolve the host's FD ownership crash requires
+the lead's rerun; no successful Chrome run is claimed here.
+
+Offline regressions:
+
+```sh
+node --experimental-vm-modules site/tests/factory-readiness.test.mjs
+node site/tests/browser-launcher.test.mjs
+python3 -B -m unittest discover -s site/tests -p test_socket_free_launcher.py
+```
+
+The readiness test executes the shipped page module, worker and actual Wasm
+with a small DOM adapter. It requires completion after rendering and native
+parity, kills a missing-event control, checks the served module paths and
+checks that an import error produces failed harness output. It does not
+establish Chrome layout, raster or keyboard behavior. The geometry oracle
+receives the artifact's geometry through the declared deployment base; a
+filesystem-relative public import is never used as a served URL.

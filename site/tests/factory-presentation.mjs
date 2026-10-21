@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { GRID,cellPosition,cellOrdinal,paintInventory } from "../public/factory-grid.js";
 import { inventoryInput,inventoryDecision,synthesisInput,synthesisOutput,booleanTuple,amount } from "../public/factory-format.js";
-import { checkGrid,point } from "./harness/grid-check.js";
+import { checkGrid } from "./harness/grid-check.js";
 const native=JSON.parse(readFileSync(new URL("harness/factory-native.json",import.meta.url)));
 const css=readFileSync(new URL("../public/site.css",import.meta.url),"utf8");
 function palette(dark) {
@@ -16,7 +16,7 @@ function snapshot(result,painted,dark=false) {
   const colors=palette(dark),rectangles=[];
   const context={fillRect(x,y,w,h){rectangles.push({x,y,w,h,color:this.fillStyle});},fillText(){},strokeRect(){},beginPath(){},arc(){},stroke(){},setLineDash(){}};
   paintInventory(context,painted.grid.cells,painted.names,colors,painted.grid.first_ordinal,null);
-  const pixels=result.grid.cells.map((cell)=>{const {x,y}=point(cell.input);return rgb(rectangles.findLast(r=>x+4>=r.x&&x+4<r.x+r.w&&y+4>=r.y&&y+4<r.y+r.h).color);});
+  const pixels=result.grid.cells.map((cell)=>{const {x,y}=cellPosition(cell.input);return rgb(rectangles.findLast(r=>x+4>=r.x&&x+4<r.x+r.w&&y+4>=r.y&&y+4<r.y+r.h).color);});
   return {count:864,mutant:result.mutant,differences:result.differences,first:result.grid.first_ordinal,cellSize:8,colors:Object.fromEntries(Object.entries(colors).map(([key,v])=>[key,rgb(v)])),pixels,marker:rgb(colors.ink)};
 }
 test("grid_draw_commands_match_all_native_cells_in_both_themes",()=>{

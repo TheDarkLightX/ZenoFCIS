@@ -6,6 +6,9 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'site/tests'))
 from deploy_check import find_chrome
 
+def short_profile():
+ return tempfile.TemporaryDirectory(prefix='zu-',dir='/tmp')
+
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('--out',type=Path,required=True)
@@ -14,9 +17,9 @@ def main():
  chrome=find_chrome(args.chrome)
  manifest=args.out.resolve()/'assets.json'
  subprocess.run(['node',str(ROOT/'site/tests/asset-manifest.mjs'),str(ROOT/'site/public'),str(manifest)],check=True)
- with tempfile.TemporaryDirectory(prefix='zenoui-pipe-') as profile:
+ with short_profile() as profile:
   command=['node',str(ROOT/'site/tests/pipe-browser.mjs'),chrome,profile,str(ROOT/'site/public'),str(manifest),str(ROOT/'site/tests/harness/factory-native.json'),str(args.out.resolve()/'browser.json')]
-  result=subprocess.run(command,timeout=55)
+  result=subprocess.run(command,timeout=55,close_fds=True)
   return result.returncode
 if __name__=='__main__':
  try:sys.exit(main())

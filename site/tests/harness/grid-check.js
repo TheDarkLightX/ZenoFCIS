@@ -1,9 +1,7 @@
-import { cellPosition, GRID } from "../../public/factory-layout.js";
 // Independent decision-colour oracle; geometry is shared data, structurally checked.
 function require(condition, message) {
   if (!condition) throw new Error(`grid_matches_native_result: ${message}`);
 }
-export const point = cellPosition;
 const same = (a,b) => a.slice(0,3).every((value,index)=>value===b[index]);
 function contrast(a,b) {
   const luminance = (rgb) => rgb.slice(0,3).map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((total,v,i)=>total+v*[0.2126,0.7152,0.0722][i],0);
@@ -30,7 +28,7 @@ export function checkGrid(snapshot,result) {
   for (const role of ["ink","muted"]) require(contrast(snapshot.colors[role],snapshot.colors.paper)>=4.5,`${role} text lacks contrast`);
   return {cells:864,differences:paintedDifferences,first:snapshot.first};
 }
-export function captureGrid(doc,result) {
+export function captureGrid(doc,result, { cellPosition: point, GRID }) {
   const grid=doc.querySelector(".inventory-grid"),canvas=grid.querySelector("canvas"),context=canvas.getContext("2d");
   const rgba=(x,y)=>Array.from(context.getImageData(x,y,1,1).data);
   const style=doc.defaultView.getComputedStyle(grid);
