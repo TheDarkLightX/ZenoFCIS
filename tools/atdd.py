@@ -193,6 +193,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "integrations/zal/oracles/independent_oracle.py"),
          ("python3", "integrations/zal/oracles/formula_oracle.py"),
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),
+         ("python3", "integrations/zal/oracles/temporal_oracle.py"),
+         ("python3", "-B", "integrations/zal/check_behavior2.py", "planted"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
     ),
     "core-component-families": AcceptanceScenario(

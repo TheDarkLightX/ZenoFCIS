@@ -16,3 +16,5 @@ Feature: Finite behavior dialogue with deterministic meaning help
     And unbounded targets and execution membership remain explicit obligations
     And why-not, what-if and narrative explanations match independent oracles and their planted defects are killed
     And registry help and revision-bound ladder tools refuse drift and stale revisions without new authority
+    And machine-profile temporal verdicts match an independent lasso and finite-word oracle
+    And every planted machine-profile checker defect fails its named test
