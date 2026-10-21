@@ -5,6 +5,7 @@ pub(super) const FILES: &[(&str, &[u8])] = &[
     ("core-apps/zusd-v1/Cargo.lock", include_bytes!("../../Cargo.lock")),
     ("core-apps/zusd-v1/Cargo.toml", include_bytes!("../../Cargo.toml")),
     ("core-apps/zusd-v1/STEP4.md", include_bytes!("../../STEP4.md")),
+    ("core-apps/zusd-v1/src/accounting.rs", include_bytes!("../accounting.rs")),
     ("core-apps/zusd-v1/src/accumulator.rs", include_bytes!("../accumulator.rs")),
     ("core-apps/zusd-v1/src/application/encoding.rs", include_bytes!("encoding.rs")),
     ("core-apps/zusd-v1/src/application/mod.rs", include_bytes!("mod.rs")),

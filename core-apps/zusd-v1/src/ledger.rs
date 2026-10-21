@@ -81,8 +81,11 @@ pub(crate) fn observe(sheet: &Sheet, capacity: u32, w: &mut Work) -> Result<Obse
         );
     }
     // C<=u32::MAX makes every nonnegative sum <2^160. No persisted U256 value.
-    let debt = Wide::from(sheet.active_debt).add(Wide::from(sheet.default_debt), w)?;
-    if totals[0] != Wide::from(sheet.supply) || debt != Wide::from(sheet.supply) {
+    // Preserve the prior six-limb debt-add charge and its check order.
+    w.charge(6, 0, 0)?;
+    if totals[0] != Wide::from(sheet.supply)
+        || !crate::accounting::debt_matches(sheet.supply, sheet.active_debt, sheet.default_debt)
+    {
         return Err(Failure::Conservation);
     }
     let value = Value::map_canonical(entries).map_err(|_| Failure::Canonical)?;
@@ -150,14 +153,12 @@ fn change(
         .ok()
         .map(|i| sheet.balances[i].quantity.atoms())
         .unwrap_or(0);
-    let value = if credit {
-        crate::add(old, q.atoms(), w)?
-    } else {
-        if old < q.atoms() {
-            return Err(Failure::Reject(1033));
-        }
-        crate::sub(old, q.atoms(), w)?
-    };
+    if !credit && old < q.atoms() {
+        return Err(Failure::Reject(1033));
+    }
+    w.charge(1, 0, 0)?;
+    let value = crate::accounting::balance_change(old, q.atoms(), credit)
+        .ok_or(Failure::Arithmetic)?;
     let quantity = match q {
         Quantity::Zusd(_) => Quantity::Zusd(value),
         Quantity::Agrs(_) => Quantity::Agrs(value),
@@ -206,7 +207,11 @@ pub fn compose(
             if leg.from.is_none() && leg.to.is_none() {
                 return Err(Failure::Domain);
             }
-            if (leg.from.is_none() || leg.to.is_none()) && leg.quantity.asset() != Asset::Zusd {
+            if !crate::accounting::movement_allowed(
+                leg.from.is_some(),
+                leg.to.is_some(),
+                leg.quantity.asset() == Asset::Zusd,
+            ) {
                 return Err(Failure::Conservation);
             }
             if let Some(id) = leg.from {

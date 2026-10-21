@@ -6,6 +6,7 @@
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
+mod accounting;
 pub mod accumulator;
 pub mod application;
 pub use accumulator::Accumulator256;
