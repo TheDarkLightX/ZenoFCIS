@@ -1,12 +1,18 @@
 """Untrusted fixed point and certificate construction for finite products."""
 from product import build, terminal, GUARDS
+import time
+
+SOLVER_WORK = 1_000_000
 
 
 def safety(graph, spec=None):
     """nu W. Safe intersect universal Pre(W)."""
     if graph.status!='complete': return None
     W={i for i,s in enumerate(graph.states) if not s.bad and (graph.edges[i] or (spec is not None and terminal(spec,s)))}
+    work=0; end=time.monotonic()+30
     while True:
+        work+=sum(len(graph.edges[i]) for i in W)
+        if work>SOLVER_WORK or time.monotonic()>=end: return None
         following={i for i in W if all(t in W for _,_,t in graph.edges[i])}
         if following==W: return sorted(W)
         W=following
@@ -16,7 +22,7 @@ def certify(spec,tables,**budgets):
     graph=build(spec,tables,**budgets)
     W=safety(graph,spec)
     if W is None or not set(graph.roots)<=set(W):
-        return dict(status='UNKNOWN' if W is None else 'not safe',stop=graph.stop,graph=graph.wire())
+        return dict(status='UNKNOWN' if W is None else 'not safe',stop=graph.stop if graph.status!='complete' else 'solver budget',graph=graph.wire())
     return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=spec,graph=graph.wire(),
                 certificate=dict(kind='safety',W=W))
 
@@ -41,7 +47,7 @@ def fixed_guard(spec,tables,**budgets):
     for guard in GUARDS:
         candidate=dict(spec,guard=guard,reactive=False)
         graph=build(candidate,tables,**budgets); W=safety(graph,candidate)
-        if W is None: return dict(status='UNKNOWN',stop=graph.stop)
+        if W is None: return dict(status='UNKNOWN',stop=graph.stop if graph.status!='complete' else 'solver budget')
         if set(graph.roots)<=set(W):
             return dict(schema='zeno-fcis/trace-game-certificate/1.1',spec=candidate,graph=graph.wire(),
                         certificate=dict(kind='guard',W=W,guard=guard,grammar=list(GUARDS)))
@@ -54,8 +60,10 @@ def unrealizable(spec,tables,**budgets):
     graph=build(spec,tables,**budgets)
     if graph.status!='complete': return dict(status='UNKNOWN',stop=graph.stop)
     rank={i:0 for i,s in enumerate(graph.states) if s.bad}
-    strategy={}
+    strategy={}; work=0; end=time.monotonic()+30
     while True:
+        work+=sum(len(row) for row in graph.edges)
+        if work>SOLVER_WORK or time.monotonic()>=end: return dict(status='UNKNOWN',stop='attractor budget')
         following={}
         for i,row in enumerate(graph.edges):
             if i in rank: continue
@@ -84,7 +92,10 @@ def reactive(spec,tables,**budgets):
     graph=build(spec,tables,**budgets)
     if graph.status!='complete': return dict(status='UNKNOWN',stop=graph.stop)
     W={i for i,s in enumerate(graph.states) if not s.bad}
+    work=0; end=time.monotonic()+30
     while True:
+        work+=sum(len(graph.edges[i])*(1+len({e for e,_,_ in graph.edges[i]})) for i in W)
+        if work>SOLVER_WORK or time.monotonic()>=end: return dict(status='UNKNOWN',stop='reactive fixed point budget')
         following={i for i in W if all(any(t in W for e,g,t in graph.edges[i] if e==event)
                                       for event in {e for e,_,_ in graph.edges[i]})}
         if following==W: break

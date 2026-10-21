@@ -59,6 +59,15 @@ class Certificate(unittest.TestCase):
                  for node in ast.walk(tree) if isinstance(node,(ast.Import,ast.ImportFrom))}
         self.assertLessEqual(imports,{'argparse','hashlib','itertools','json','pathlib','subprocess'})
 
+    def test_solver_budgets_are_unknown(self):
+        from unittest.mock import patch
+        from solve import fixed_guard, unrealizable, reactive
+        with patch('solve.SOLVER_WORK',0):
+            self.assertEqual(certify(description('withdrawal'),self.tables)['status'],'UNKNOWN')
+            self.assertEqual(fixed_guard(description('withdrawal'),self.tables)['status'],'UNKNOWN')
+            self.assertEqual(reactive(description('withdrawal'),self.tables)['status'],'UNKNOWN')
+            self.assertEqual(unrealizable(description('oracle-withholding'),{})['status'],'UNKNOWN')
+
     def test_baseline(self): self.assertEqual(check(self.packet,self.tables)['evidence'],'certified safety')
     def test_reachable_hole(self): self.rejected(lambda p:p['certificate']['W'].pop(),'closure')
     def test_product_move_omitted(self): self.rejected(lambda p:p['graph']['edges'][0].pop(),'move coverage')

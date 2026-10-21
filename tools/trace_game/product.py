@@ -114,6 +114,10 @@ def build(spec, tables, max_states=10000, max_edges=100000, seconds=30):
     Builders own all mutation; Graph and State expose only tuples and primitives.
     A partial graph can be inspected but can never support a certificate.
     """
+    if (type(max_states) is not int or not 0<=max_states<=10000 or
+            type(max_edges) is not int or not 0<=max_edges<=100000 or
+            type(seconds) not in (int,float) or not 0<=seconds<=30):
+        return Graph((),(),(),'UNKNOWN','invalid or excessive budget')
     states = list(roots(spec)); index = {s:i for i,s in enumerate(states)}
     edges = []; work = 0; end = time.monotonic()+seconds
     initial = tuple(range(len(states)))

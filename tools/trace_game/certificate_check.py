@@ -176,7 +176,7 @@ def checked_graph(packet,tables):
     spec=packet['spec']; validate_spec(spec); g=packet['graph']
     need(g['status']=='complete','incomplete product: UNKNOWN')
     states=g['states']; edges=g['edges']; n=len(states)
-    need(0<n<=10000 and len(edges)==n,'product size')
+    need(0<n<=10000 and len(edges)==n and sum(map(len,edges))<=100000,'product size')
     index={key(s):i for i,s in enumerate(states)}
     need(len(index)==n,'duplicate product state')
     expected_roots=[index.get(key(s)) for s in initial_states(spec)]
@@ -294,6 +294,7 @@ def load_bound(directory):
     need(subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()==binding['revision'],'source revision drift')
     files=subprocess.check_output(['git','ls-files','-z','--cached','--others','--exclude-standard'],cwd=root).split(b'\0')
     current={p.decode():digest(root/p.decode()) for p in files if p and (root/p.decode()).is_file()}
+    current['Cargo.lock']=digest(root/'Cargo.lock')
     need(current==binding['sources'],'source/model/checker drift')
     need(digest(Path(binding['binary']['path']))==binding['binary']['sha256'],'native binary drift')
     for path,sha in binding['artifacts'].items(): need(digest(directory/path)==sha,'artifact drift')

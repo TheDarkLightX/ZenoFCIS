@@ -23,7 +23,7 @@ class Strategy(unittest.TestCase):
         self.assertEqual(len(p['certificate']['strategy']['rules']),2) # uniform across hidden starts
 
     def test_hidden_read_refused(self):
-        p=copy.deepcopy(self.packet); p['certificate']['strategy']['reads'].append('hidden')
+        p=reactive(description('quantifier'),{}); p['certificate']['strategy']['reads'].append('hidden')
         with self.assertRaisesRegex(ValueError,'reading hidden variable'): check(p,self.tables)
 
     def test_hidden_rule_field_refused(self):

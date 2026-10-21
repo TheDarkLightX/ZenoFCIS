@@ -28,6 +28,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)
 - [Wide values and larger decisions](WIDE_VALUE_EXECUTION.md): development
   profile support, capacity and assurance boundaries
+- [Finite trace-game certificates](TRACE_GAME.md)
 - [Determinism](DETERMINISM.md)
 - [Using ZenoFCIS with coding and reasoning models](LLM_USAGE.md)
 - [Synthesis-first skill and MCP tools](LLM_SYNTHESIS.md)
