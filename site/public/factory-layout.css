@@ -1,0 +1,16 @@
+/* Generated from factory-layout.js; run node site/tests/factory-width.test.mjs --write. */
+main { padding-inline: 1.25rem; }
+#factory { min-width: 0; overflow-wrap: anywhere; }
+#factory .act-controls { display: flex; min-width: 0; column-gap: 1rem; padding-inline: 0rem;  }
+#factory .factory-instrument { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); column-gap: 0rem; padding-inline: 0rem;  }
+#factory .factory-metrics { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); column-gap: 0rem; padding-inline: 0rem;  }
+#factory .factory-comparison { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); column-gap: 0rem; padding-inline: 0rem;  }
+#factory .technical-record { display: block; min-width: 0; column-gap: 0rem; padding-inline: 0rem;  }
+#factory .inventory-grid { display: block; min-width: 0; column-gap: 0rem; padding-inline: 0.75rem; border-width: 1px; }
+#factory .ledger-table { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); column-gap: 1.5rem; padding-inline: 0rem;  }
+#factory .witness-table { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 1rem; padding-inline: 0rem;  }
+#factory .act-controls > *, #factory .mutation-label { min-width: 0; max-width: 100%; }
+#factory .mutation-label { display: grid; grid-template-columns: minmax(0, 1fr); }
+#factory .ledger-table dd { min-width: 0; padding-left: 0; overflow-wrap: anywhere; }
+#factory .witness-table dd { min-width: 0; overflow-wrap: anywhere; }
+#factory .inventory-grid canvas { width: 612px; height: 258px; }

@@ -97,7 +97,12 @@ try {
     }
     results[act]=entry;
   }
-  require(doc.documentElement.scrollWidth<=frame.clientWidth,"page overflows phone width");
+  if(doc.documentElement.scrollWidth>frame.clientWidth){
+    const boxes=[...root.querySelectorAll('[data-region], .act-controls, .ledger-table, .mutation-label')].map(node=>{
+      const box=node.getBoundingClientRect();return {region:node.dataset.region??node.className,left:box.left,right:box.right,width:box.width,scroll:node.scrollWidth};
+    });
+    throw new Error(`page overflows phone width: ${JSON.stringify({viewport:frame.clientWidth,page:doc.documentElement.scrollWidth,boxes})}`);
+  }
   const challenge=doc.querySelector('details[data-template="agent-treasury-guard"]');challenge.open=true;
   await waitFor(()=>challenge.querySelector(".challenge-score"),"treasury scoreboard did not load");
   require(!challenge.querySelector(".challenge-about").open,"long treasury description is not collapsed");

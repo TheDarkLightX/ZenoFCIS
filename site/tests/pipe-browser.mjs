@@ -26,8 +26,12 @@ async function event(message){
   targetSessions.set(p.targetInfo.targetId,p.sessionId);
   const ready=(async()=>{
    if(p.targetInfo.type==='worker')workerAttached++;
-   await command('Fetch.enable',{patterns:[{urlPattern:'*',requestStage:'Request'}]},p.sessionId);
-   await command('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:true,flatten:true},p.sessionId);
+   // Fetch is a page domain. Dedicated workers have no Fetch.enable; their
+   // requests are intercepted by the owning page before they can use the network.
+   if(p.targetInfo.type==='page'){
+    await command('Fetch.enable',{patterns:[{urlPattern:'*',requestStage:'Request'}]},p.sessionId);
+    await command('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:true,flatten:true},p.sessionId);
+   }
    await command('Runtime.runIfWaitingForDebugger',{},p.sessionId);
   })();sessions.set(p.sessionId,ready);await ready;
  }

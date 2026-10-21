@@ -56,3 +56,25 @@ checks that an import error produces failed harness output. It does not
 establish Chrome layout, raster or keyboard behavior. The geometry oracle
 receives the artifact's geometry through the declared deployment base; a
 filesystem-relative public import is never used as a served URL.
+
+The lead's next host run reached the page and attached its module worker, but
+stopped because dedicated-worker sessions do not provide `Fetch.enable`.
+Fetch is now enabled only on page sessions; flattened auto-attach resumes the
+worker while the page handles manifest requests. `pipe-browser.test.mjs` drives
+the actual pipe runner with a scripted protocol peer that rejects worker Fetch,
+checks manifest hashes/refusals, and supplies a full result with a planted
+nested-witness mismatch. This tests routing and parity enforcement, not Chrome
+interception or execution. Those still require the lead's host run.
+
+```sh
+node site/tests/pipe-browser.test.mjs
+node site/tests/factory-width.test.mjs
+```
+
+The width check computes each declared region's minimum against 350 CSS pixels
+at a 390-pixel viewport, from the same datum that generates
+`factory-layout.css`. Regenerate it with the width test's `--write` option.
+Intrinsic ledger columns and oversized-region controls must fail. The canvas
+retains its exact geometry and scroll container; ledger and comparison text
+wrap instead of forcing the page wider. This is a structural check, not browser
+font, layout, raster or reflow evidence.

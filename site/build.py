@@ -268,8 +268,10 @@ def main() -> None:
                   "identical across two builds")
         report_sizes()
     if "native" in stages:
+        run(["node", str(SITE / "tests" / "factory-width.test.mjs")], ROOT, environment)
         run(["python3", str(SITE / "tests" / "factory_check.py")], ROOT, environment)
         run(["python3", str(SITE / "tests" / "presentation_check.py")], ROOT, environment)
+        run(["node", str(SITE / "tests" / "pipe-browser.test.mjs")], ROOT, environment)
         run(["node", "--experimental-vm-modules", str(SITE / "tests" / "factory-readiness.test.mjs")], ROOT, environment)
         run(["node", str(SITE / "tests" / "browser-launcher.test.mjs")], ROOT, environment)
         run(["node", str(SITE / "tests" / "asset-manifest.test.mjs")], ROOT, environment)

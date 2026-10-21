@@ -32,3 +32,41 @@ export function checkLayout(g=GRID) {
   }
   return domain;
 }
+
+// Width declarations are shared by the generated stylesheet and the offline
+// minimum-width check. Zero-minimum tracks wrap text; only the cell canvas scrolls.
+export const FACTORY_LAYOUT=Object.freeze({pageInsetRem:1.25,regions:Object.freeze([
+  Object.freeze({name:'controls',selector:'.act-controls',display:'flex',columns:null,gapRem:1,insetRem:0}),
+  Object.freeze({name:'instrument',selector:'.factory-instrument',columns:'minmax(0, 1fr)',gapRem:0,insetRem:0}),
+  Object.freeze({name:'metrics',selector:'.factory-metrics',columns:'minmax(0, 1fr)',gapRem:0,insetRem:0}),
+  Object.freeze({name:'comparison',selector:'.factory-comparison',columns:'minmax(0, 1fr)',gapRem:0,insetRem:0}),
+  Object.freeze({name:'record',selector:'.technical-record',display:'block',columns:null,gapRem:0,insetRem:0}),
+  Object.freeze({name:'grid',selector:'.inventory-grid',display:'block',columns:null,gapRem:0,insetRem:.75,borderPx:1}),
+  Object.freeze({name:'ledger',selector:'.ledger-table',columns:'minmax(0, 1fr) minmax(0, 1.5fr)',gapRem:1.5,insetRem:0}),
+  Object.freeze({name:'witness',selector:'.witness-table',columns:'minmax(0, 1fr) minmax(0, 1fr)',gapRem:1,insetRem:0}),
+])});
+export function factoryLayoutCSS(layout=FACTORY_LAYOUT) {
+  return `/* Generated from factory-layout.js; run node site/tests/factory-width.test.mjs --write. */
+main { padding-inline: ${layout.pageInsetRem}rem; }
+#factory { min-width: 0; overflow-wrap: anywhere; }
+${layout.regions.map(r=>`#factory ${r.selector} { display: ${r.display??'grid'}; min-width: 0; ${r.columns?`grid-template-columns: ${r.columns}; `:''}column-gap: ${r.gapRem}rem; padding-inline: ${r.insetRem}rem; ${r.borderPx?`border-width: ${r.borderPx}px;`:''} }`).join('\n')}
+#factory .act-controls > *, #factory .mutation-label { min-width: 0; max-width: 100%; }
+#factory .mutation-label { display: grid; grid-template-columns: minmax(0, 1fr); }
+#factory .ledger-table dd { min-width: 0; padding-left: 0; overflow-wrap: anywhere; }
+#factory .witness-table dd { min-width: 0; overflow-wrap: anywhere; }
+#factory .inventory-grid canvas { width: ${GRID.width}px; height: ${GRID.height}px; }
+`;
+}
+export function factoryMinimumWidths(viewport,layout=FACTORY_LAYOUT,rem=16) {
+  const available=viewport-2*layout.pageInsetRem*rem;
+  return layout.regions.map(region=>{
+    // Deliberately accept only declared flexible tracks with numeric minima.
+    // An intrinsic/max-content or fixed column needs explicit new accounting.
+    const columns=region.columns??'';
+    const tracks=[...columns.matchAll(/minmax\((\d+(?:\.\d+)?)(rem|px)?,\s*\d+(?:\.\d+)?fr\)/g)];
+    if((columns&&!tracks.length)||columns.replace(/minmax\((\d+(?:\.\d+)?)(rem|px)?,\s*\d+(?:\.\d+)?fr\)/g,'').trim())throw new Error(`${region.name}: unaccounted minimum width`);
+    const minimum=tracks.reduce((sum,t)=>sum+Number(t[1])*(t[2]==='rem'?rem:1),0)+Math.max(0,tracks.length-1)*region.gapRem*rem+2*region.insetRem*rem+2*(region.borderPx??0);
+    if(minimum>available)throw new Error(`${region.name}: minimum ${minimum}px exceeds ${available}px`);
+    return {region:region.name,minimum,available};
+  });
+}
