@@ -30,7 +30,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/cases-i128.json'
 ARTIFACTS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/i128-programs'
-VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/4'
+VECTORS = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/transform-check/5'
 ARTIFACT_PAIRS = (
     ('kernel', 'boolean-kernel-original', 'boolean-kernel-candidate'),
     ('kernel-padded', 'boolean-kernel-original', 'boolean-kernel-padded'),
