@@ -467,6 +467,28 @@ fn operator_corpus_checks_with_existing_lean() {
     );
 }
 
+// Exports one lowered unbounded ladder claim for an external kernel check.
+// The exported proposition is an obligation; this test proves nothing.
+#[test]
+#[ignore = "set ZENO_FCIS_LADDER_LEAN_CLAIM and ZENO_FCIS_LADDER_LEAN_OUT"]
+fn ladder_claim_lean_export_from_environment() {
+    let input = std::env::var_os("ZENO_FCIS_LADDER_LEAN_CLAIM")
+        .unwrap_or_else(|| panic!("set ZENO_FCIS_LADDER_LEAN_CLAIM to a lowered claim"));
+    let output = std::env::var_os("ZENO_FCIS_LADDER_LEAN_OUT")
+        .unwrap_or_else(|| panic!("set ZENO_FCIS_LADDER_LEAN_OUT to a new file"));
+    let source = fs::read_to_string(input).unwrap_or_else(|error| panic!("read claim: {error}"));
+    let parsed = zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+        .unwrap_or_else(|error| panic!("parse claim: {error:?}"));
+    let project =
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|error| panic!("elaborate claim: {error:?}"));
+    let [claim] = project.claims() else {
+        panic!("exactly one claim required")
+    };
+    let exported = export_lean(claim).unwrap_or_else(|error| panic!("export: {error:?}"));
+    fs::write(output, exported.source()).unwrap_or_else(|error| panic!("write: {error}"));
+}
+
 // Temporal ladder macros are expanded before reaching this unchanged grammar.
 // These are translation fixtures, never evidence of an unbounded theorem.
 #[test]
