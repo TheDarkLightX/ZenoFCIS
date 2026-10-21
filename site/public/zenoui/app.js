@@ -48,7 +48,7 @@ export async function mount(root,bundle,options={}) {
   function paint(){
     const data=view(state);root.dataset.phase=data.phase;root.dataset.revision=state.revision;
     if([...main.children].some((n,i)=>n!==regions.get(data.layout[i].id))){const focus=document.activeElement;for(const {id} of data.layout)main.append(regions.get(id));focus?.focus?.({preventScroll:true});}
-    regions.get('state').replaceChildren(node('h2',null,'Current state'),...data.state.map(f=>node('p',null,`${f.label}: ${f.value} (${f.type}).`)));
+    regions.get('state').replaceChildren(node('h2',null,'Current state'),...data.state.map(f=>node('p',null,`${f.label}: ${f.value}.`)));
     for(const a of data.actions){const c=buttons.get(a.id);c.button.disabled=!a.enabled;c.feedback.textContent=a.explanation;}
     for(const c of controls)c.disabled=!!state.active;principal.input.disabled=!!options.session||!!state.active;retry.disabled=!ready||!!state.active;
     const confirmation=regions.get('confirmation');
@@ -56,7 +56,7 @@ export async function mount(root,bundle,options={}) {
     if(confirmationKey!==lastConfirmation){
     lastConfirmation=confirmationKey;confirmation.replaceChildren(node('h2',null,'Confirmation'));
     if(data.confirmation){
-      const c=data.confirmation;confirmation.append(node('h3',null,c.label),...c.fields.map(f=>node('p',null,`${f.label}: ${f.value} (${f.type}).`)),node('p',null,`Principal: ${c.principal}. Revision: ${c.revision}.`),node('p',null,`Contract: ${description.title}.`),record({contract:c.contract}));
+      const c=data.confirmation;confirmation.append(node('h3',null,c.label),...c.fields.map(f=>node('p',null,`${f.label}: ${f.value}.`)),node('p',null,`Principal: ${c.principal}. Revision: ${c.revision}.`),node('p',null,`Contract: ${description.title}.`),record({contract:c.contract}));
       confirm.textContent=`Confirm ${c.label}`;confirmation.append(confirm);
     }else confirmation.append(node('p','help','No command awaiting confirmation.'));
     }

@@ -13,6 +13,12 @@ function exact(value, keys, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k=>!keys.includes(k)) || keys.some(k=>!Object.hasOwn(value,k))) throw Error(`UiInvalid${name}`);
 }
 function text(value, error) { if (typeof value !== 'string' || !value.trim() || value.length>300 || /[<>\x00-\x1f]/.test(value)) throw Error(error); return value; }
+// Optional labels for chosen integer values, such as 0 for "on shelf".
+function valueLabels(field, values) {
+  const keys=values && typeof values==='object' && !Array.isArray(values) ? Object.keys(values) : [];
+  if (field.domain.kind!=='int' || !keys.length || keys.length>64 || keys.some(k=>!inDomain(field,k))) throw Error(`UiInvalidValueLabels:${field.path}`);
+  return Object.fromEntries(keys.map(k=>[k,text(values[k],`UiMissingLabel:${field.path}.${k}`)]));
+}
 export function inDomain(field, value) {
   if (typeof value !== 'string' || value.length>40 || !/^(0|-?[1-9][0-9]*)$/.test(value)) return false;
   if (field.domain.kind === 'int') return BigInt(value)>=BigInt(field.domain.min) && BigInt(value)<=BigInt(field.domain.max);
@@ -27,12 +33,13 @@ export function describe(raw, meta) {
     const m=meta.fields[f.path];
     if (!m?.label) throw Error(`UiMissingLabel:${f.path}`);
     if (!m?.unit) throw Error(`UiMissingUnit:${f.path}`);
-    exact(m,['label','unit'],'FieldMetadata');
+    exact(m,Object.hasOwn(m,'values')?['label','unit','values']:['label','unit'],'FieldMetadata');
     const options=f.domain.kind==='bool' ? [{value:'0',label:'No'},{value:'1',label:'Yes'}] : f.domain.kind==='sum'
       ? f.options.map(o=>({value:o.value,label:text(meta.variants[o.value],`UiMissingLabel:variant.${o.value}`)})) : [];
     if (!['bool','sum','int'].includes(f.domain.kind)) throw Error(`UiUnsupportedDomain:${f.path}`);
     const out={...f,label:text(m.label,`UiMissingLabel:${f.path}`),unit:text(m.unit,`UiMissingUnit:${f.path}`),options};
     if (!inDomain(out,out.initial)) throw Error(`UiInvalidInitial:${f.path}`);
+    if (Object.hasOwn(m,'values')) out.values=valueLabels(out,m.values);
     return out;
   });
   if (Object.keys(meta.fields).some(p=>!fields.some(f=>f.path===p))) throw Error('UiUnknownFieldMetadata');
@@ -57,5 +64,7 @@ export function layoutCheck(layout) {
   return true;
 }
 export function display(field,value) {
-  return `${field.options.find(o=>o.value===value)?.label ?? value} ${field.unit}`;
+  const named=field.options.find(o=>o.value===value)?.label ?? (field.values && Object.hasOwn(field.values,value) ? field.values[value] : null);
+  // A named value reads alone; "unitless" is never shown.
+  return named ?? (field.unit==='unitless' ? value : `${value} ${field.unit}`);
 }

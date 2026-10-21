@@ -14,8 +14,9 @@ export function control(field, id, initial) {
   else {input.type='text';input.inputMode='numeric';input.maxLength=40;input.required=true;input.pattern='-?(0|[1-9][0-9]*)';}
   input.value=initial;
   const label=node('label',null,field.label);label.htmlFor=id;
-  const domain=field.options.length?field.options.map(o=>o.label).join(', '):`${field.domain.min} to ${field.domain.max}`;
-  const help=node('p','help',`${field.type_name ?? field.domain.kind}; ${field.unit}; ${domain}.`);help.id=`${id}-help`;input.setAttribute('aria-describedby',help.id);
+  const named=Object.entries(field.values??{}).map(([value,label])=>`${value} is ${label}`).join(', ');
+  const domain=field.options.length?field.options.map(o=>o.label).join(', '):`${field.domain.min} to ${field.domain.max}${named?` (${named})`:''}`;
+  const help=node('p','help',field.unit==='unitless'?`${domain}.`:`${field.unit}; ${domain}.`);help.id=`${id}-help`;input.setAttribute('aria-describedby',help.id);
   return {input,wrapper:node('div','field',label,input,help)};
 }
 export const verdict=(message)=>node('p','verdict',message);
