@@ -186,6 +186,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Review finite behavior through deterministic language help and exact revisions",
         (("python3", "-B", "integrations/zal/check_ladder_temporal.py", "native-build"),
          ("python3", "-B", "integrations/zal/check_withdrawal_pilot.py", "native-build"),
+         ("python3", "-B", "integrations/zal/check_effects.py", "native-build"),
          ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
          ("python3", "-B", "integrations/zal/check_ladder_temporal.py", "planted"),
          ("python3", "-B", "integrations/zal/check_zal_tools.py"),
@@ -198,6 +199,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),
          ("python3", "integrations/zal/oracles/temporal_oracle.py"),
          ("python3", "-B", "integrations/zal/check_behavior2.py", "planted"),
+         ("python3", "-B", "integrations/zal/check_effects.py", "planted"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
     ),
     "core-component-families": AcceptanceScenario(
