@@ -26,16 +26,20 @@ globalThis.self = {postMessage(message) {
 import("data:text/javascript;base64,"+Buffer.from(workerData.source).toString("base64")).then(()=>{
  parentPort.on("message", data=>self.onmessage({data}));parentPort.postMessage({ready:true});
 });`;
-async function run(act, control) {
+async function run(act, control, identity) {
   const worker = new Worker(bootstrap, { eval:true, workerData:{source,control} });
   try {
     return await new Promise((resolve,reject) => {
       const timer=setTimeout(()=>reject(new Error("worker deadline")),10000);
       worker.on("error",reject);
       worker.on("message", message => {
-        if(message.ready) worker.postMessage({id:1,act});
+        if(message.ready) worker.postMessage({id:1,...(typeof act === "string" ? {act} : act),identity});
+        else if(identity) {
+          assert.deepEqual(message.identity,identity,"worker echoes the complete identity on every message");
+          if(message.detail) assert.equal(message.ordinal,act.ordinal,"worker echoes the selected ordinal");
+        }
         if(message.error) {clearTimeout(timer);reject(new Error(message.error));}
-        if(message.result) {clearTimeout(timer);resolve(message.result);}
+        if(message.result || message.detail) {clearTimeout(timer);resolve(message.result ?? message.detail);}
       });
     });
   } finally { await worker.terminate(); }
@@ -56,4 +60,11 @@ test("native_mutant_first_difference_kills_ignored_witness",async()=> {
 test("native_synthesis_counterexample_kills_unchecked_witness",async()=> {
   const actual=await run("synthesis","unchecked-counterexample");
   assert.throws(()=>assert.deepEqual(actual,expected.synthesis),/AssertionError/);
+});
+
+test("published_worker_binds_progress_results_and_cells",async()=> {
+  const identity={epoch:"9007199254740993",run:"18446744073709551615",request:"340282366920938463463374607431768211455"};
+  assert.deepEqual(await run("inventory/none",undefined,identity),expected["inventory/none"]);
+  const details=JSON.parse(readFileSync(new URL("harness/inventory-details-native.json",import.meta.url)));
+  assert.deepEqual(await run({kind:"inspect",mutant:"none",ordinal:143},undefined,identity),details["none/143"]);
 });

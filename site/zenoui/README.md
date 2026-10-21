@@ -10,7 +10,7 @@ The finite contracts use the existing `.zeno` and V2 policy compiler.
 capacity guards found by full-domain comparison with the actual 2.5 Authority.
 Restock retains the prototype's conservative total-stock guard. Accepted
 restocks with available + quantity ≤ 5 but available + reserved + quantity > 5
-are omitted. The check retains a positive witness for every action.
+are omitted (41 of the 244 accepted inventory inputs). The check retains a positive witness for every action.
 
 `public/zenoui/presentation.js` owns phase, draft, run identity, progress,
 selection and received evidence. Start, Progress, Result, Select, CellResult,

@@ -16,6 +16,11 @@ try {
   const loaded = new Promise(resolve=>frame.addEventListener("load",resolve,{once:true}));
   frame.src=parameters.get("base")??"/ZenoFCIS/";await loaded;
   const doc=frame.contentDocument,root=doc.getElementById("factory");
+  await waitFor(()=>root.querySelectorAll('[data-region]').length===16,'L1 incomplete initial presentation');
+  for(const section of root.querySelectorAll('[data-factory-act]')) {
+    require(section.querySelectorAll('[data-region]').length===4,'L1 missing initial region');
+    require(section.querySelector('[data-value="checked"] dd')?.textContent==='0','L1 initial checked count is not zero');
+  }
   let baselineBitmap;
   const rank=(act)=>act==="synthesis"?0:act==="inventory/none"?1:act.startsWith("inventory/")?2:act==="search"?3:4;
   for(const [act,oracle] of Object.entries(expected).sort(([left],[right])=>rank(left)-rank(right))) {
@@ -42,6 +47,9 @@ try {
     const section=root.querySelector(`[data-factory-act="${name}"]`);
     require(section.querySelector(".factory-output").dataset.complete==="true",`${act}: result not rendered`);
     require(section.querySelector(".technical-record:not([open])"),`${act}: raw technical record is not collapsed`);
+    for(const metric of section.querySelectorAll('.metrics .metric')) {
+      require(metric.dataset.value&&metric.dataset.type&&metric.dataset.unit,'L5 displayed metric lacks name, type or unit');
+    }
     const entry={elapsed:data.elapsed,ticks,maxGap:gap,parity:true};
     if(name==="synthesis") {
       const cards=[...section.querySelectorAll(".candidate-cards > li")];
@@ -56,8 +64,7 @@ try {
     if(name==="inventory") {
       const grid=section.querySelector(".inventory-grid"),canvas=grid.querySelector("canvas"),context=canvas.getContext("2d");
       require(Number(grid.dataset.progressChunks)===18,"grid did not receive every bounded progress chunk");
-      const reduced=frame.contentWindow.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      require(partialGrid===!reduced,"grid did not respect the motion preference");
+      require(partialGrid,"L3 both motion settings must render the same progress evidence");
       if(parameters.get("control")==="stale-grid"&&mutant==="m0002")context.putImageData(baselineBitmap,0,0);
       entry.grid=checkGrid(captureGrid(doc,oracle),oracle);
       if(mutant==="none")baselineBitmap=context.getImageData(0,0,canvas.width,canvas.height);

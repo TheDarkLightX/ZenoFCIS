@@ -269,6 +269,7 @@ def main() -> None:
         report_sizes()
     if "native" in stages:
         run(["python3", str(SITE / "tests" / "factory_check.py")], ROOT, environment)
+        run(["python3", str(SITE / "tests" / "presentation_check.py")], ROOT, environment)
     if "replay" in stages:
         run(["node", str(SITE / "tests" / "abi.mjs"), *templates], ROOT, environment)
         run(["node", str(SITE / "tests" / "replay.mjs"), *templates], ROOT, environment)
