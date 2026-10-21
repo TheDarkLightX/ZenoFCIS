@@ -337,12 +337,28 @@ fn astra_non_utf8_and_depth_boundaries() {
     use std::os::unix::ffi::OsStrExt;
     let d = Directory::new();
     let c = contract(&d);
-    let non_utf8 =
-        d.0.join("app")
-            .join(std::ffi::OsStr::from_bytes(b"bad-\xff"));
-    fs::write(&non_utf8, b"data").unwrap_or_else(|e| panic!("{e}"));
-    refused(Snapshot::new(&d.0, &c, &[]), "kb-evidence-snapshot-path");
-    fs::remove_file(non_utf8).unwrap_or_else(|e| panic!("{e}"));
+    let relative = Path::new("app").join(std::ffi::OsStr::from_bytes(b"bad-\xff"));
+    let non_utf8 = d.0.join(&relative);
+    match fs::write(&non_utf8, b"data") {
+        Ok(()) => {
+            refused(Snapshot::new(&d.0, &c, &[]), "kb-evidence-snapshot-path");
+            fs::remove_file(non_utf8).unwrap_or_else(|e| panic!("{e}"));
+        }
+        // APFS rejects this fixture name before snapshot traversal can see it.
+        // The same declared input must still refuse, at the source-open boundary.
+        #[cfg(target_os = "macos")]
+        Err(e) if e.raw_os_error() == Some(nix::libc::EILSEQ) => {
+            let input = Input {
+                path: relative,
+                sha256: sha256_hex(b"data"),
+            };
+            refused(
+                Snapshot::new(&d.0, &c, &[input]),
+                "kb-evidence-snapshot-source",
+            );
+        }
+        Err(e) => panic!("{e}"),
+    }
     let nested = format!(
         "app/{}",
         std::iter::repeat_n("d", 126).collect::<Vec<_>>().join("/")

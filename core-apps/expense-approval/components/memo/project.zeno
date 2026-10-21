@@ -28,5 +28,5 @@ law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.
 law 502 exact_record on accept = post.100.110 == 1 && post.100.111 == command.101.120 && post.100.112 == command.101.121 && ((pre.100.110 == 1 && pre.100.111 == command.101.120) -> post.100.112 == pre.100.112);
 // Core seed idempotency-slot/1; parameters {"C": 7}.
 // Instance source-set SHA256 ecf2167bf84c13c05a1042b34ff33be379ae4d15e1326df8ea940e0eede6fc1c.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 5e0651348ae821600c3106355ec5dfe6a27e28f68d65bae424b1943d5b337f1e; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/idempotency-slot.json SHA256 0dea1f2b90c7c65aab3256aff666b07a57f1172d0066360a1d7d5b534940687c; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

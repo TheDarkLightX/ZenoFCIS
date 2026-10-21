@@ -11,7 +11,7 @@
     {
       "family": "reservation-pool",
       "instance": "components/pool/core-instance.json",
-      "instance_sha256": "5800f72cf395ac55cacf027e72ea4fb0f556358f02ff3c9ff1eec26ef7692a0b",
+      "instance_sha256": "c4315d01217deb02bd1931fc065a690130b1f21394e0b25d224bfc59c80cedf3",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "pool",
       "owns_fields": [
@@ -40,7 +40,7 @@
     {
       "family": "versioned-register",
       "instance": "components/register/core-instance.json",
-      "instance_sha256": "e2cb620125a4970a958c709613eb11af152a3a40c66b15b0a9d64f7486cb520a",
+      "instance_sha256": "7f96cf09d46bbe9fced1a20ae4a68e2b7428ea2ffb42325e4dba27b6e1d27839",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "register",
       "owns_fields": [
@@ -68,7 +68,7 @@
     {
       "family": "logical-deadline",
       "instance": "components/deadline/core-instance.json",
-      "instance_sha256": "09972257624eab03234b89130a2f4c8ca10ef4f6d87c509b124c6a162959f0cd",
+      "instance_sha256": "c60529172df4224f22d1ed42fb4589521f84bf09d24694f6b72d82505d34d0cd",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "deadline",
       "owns_fields": [
@@ -95,7 +95,7 @@
     {
       "family": "bounded-counter",
       "instance": "components/counter/core-instance.json",
-      "instance_sha256": "e7f63b6a567a98c97412a869b8d5833a320808eaffa1ec7126fe768914a1584c",
+      "instance_sha256": "f12bde15263e72387a1b027ebf273e0a15d815ff620c07ee1bad3e5c302fa7bb",
       "local_evidence": "Identified; actual component/app replay required",
       "name": "counter",
       "owns_fields": [],

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import gzip
 import io
 import json
@@ -135,6 +136,86 @@ class DownloadsTest(unittest.TestCase):
         self.assertEqual(listed, rc_package.downloads_lines(release))
         self.assertEqual([line.split("  ")[1] for line in listed.splitlines()],
                          ["SBOM.cdx.json", f"zeno-fcis-9.9.9-{LINUX}.tar.gz", "zeno-fcis-rustdoc-9.9.9.tar.gz"])
+
+
+class PlatformRoutesTest(unittest.TestCase):
+    def reports(self):
+        # The current public containment protocol, independently specified here.
+        parallel = json.loads('''{
+          "schema":"zeno-fcis/transform-result/1", "status":"inconclusive", "authority":"none",
+          "accounting_complete":false, "backend":"systemd", "required_profile":"group-resources/1",
+          "reason":"containment-unavailable:systemd:platform-unqualified",
+          "containment":{
+            "schema":"zeno-fcis/containment-result/1", "backend":"systemd", "required_profile":"group-resources/1",
+            "selection_source":"flag", "evidence":"inline-unqualified-refusal",
+            "startup":{"admitted":false,"guarantees":[]},
+            "final":{"termination":"stopped", "reason":"containment-unavailable:systemd:platform-unqualified",
+                     "application_work_started":false,"cleanup":"unknown","absence_verified":false}
+          }}''')
+        loop = copy.deepcopy(parallel)
+        loop["schema"] = "zeno-fcis/transform-loop/1"
+        for document in (loop, loop["containment"]):
+            document["backend"], document["required_profile"] = "posix", "finite-data/1"
+        loop["reason"] = loop["containment"]["final"]["reason"] = "containment-unavailable:posix:platform-unqualified"
+        loop["acquisition"] = {"observed_intake": None, "accounting_complete": False}
+        return {"offline-parallel": parallel, "loop-open": loop}
+
+    def run_routes(self, reports, *, writes=False):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-platform-test-") as directory:
+            work = Path(directory)
+            journey = object.__new__(installed.Journey)
+            journey.work, journey.host, journey.counter = work, MAC, work / "counter"
+            journey.counter.mkdir()
+
+            def report(name, command, *, cwd, expected=0):
+                if name == "synth-run":
+                    return {"status": "current"}
+                self.assertEqual(expected, 2)
+                self.assertEqual(command[-2:], ["--containment-backend", "systemd" if name == "offline-parallel" else "auto"])
+                if writes and name == "offline-parallel":
+                    (cwd / "parallel.json").write_bytes(b"unexpected receipt")
+                return copy.deepcopy(reports[name])
+
+            journey.report_of = report
+            journey.run = lambda *args, **kwargs: subprocess.CompletedProcess([], 2,
+                stdout=b"conformance-unknown: unsupported-runtime-platform", stderr=b"")
+            return journey.platform_routes(Path("zeno-fcis"),
+                                           {"check": ["zeno-fcis", "transform", "check"], "original": work / "original"})
+
+    def test_typed_macos_refusals_remain_inconclusive_without_writes(self):
+        self.assertIn("offline_parallel", self.run_routes(self.reports()))
+
+    def test_misleading_admission_execution_or_authority_is_rejected(self):
+        mutations = [
+            (("authority",), "verified"), (("status",), "equivalent"), (("accounting_complete",), True),
+            (("backend",), "another-backend"), (("reason",), "another-refusal"),
+            (("containment", "selection_source"), "environment"),
+            (("containment", "startup", "admitted"), True),
+            (("containment", "startup", "guarantees"), [{"control": "cpu"}]),
+            (("containment", "final", "application_work_started"), True),
+            (("containment", "final", "absence_verified"), True),
+        ]
+        for name in ("offline-parallel", "loop-open"):
+            for path, value in mutations:
+                reports = self.reports()
+                document = reports[name]
+                for part in path[:-1]:
+                    document = document[part]
+                document[path[-1]] = value
+                with self.subTest(route=name, field=path), self.assertRaises(installed.JourneyError):
+                    self.run_routes(reports)
+
+    def test_unavailable_routes_must_not_write_a_receipt(self):
+        with self.assertRaisesRegex(installed.JourneyError, "wrote"):
+            self.run_routes(self.reports(), writes=True)
+
+    def test_unavailable_loop_must_not_claim_observed_or_complete_accounting(self):
+        for acquisition in (None, {"observed_intake": 0, "accounting_complete": False},
+                            {"observed_intake": None, "accounting_complete": True}):
+            reports = self.reports()
+            reports["loop-open"]["acquisition"] = acquisition
+            with self.subTest(acquisition=acquisition), self.assertRaises(installed.JourneyError):
+                self.run_routes(reports)
 
 
 INSTALL_TOOLS = ("bash", "curl", "sha256sum", "shasum", "grep", "tar")
