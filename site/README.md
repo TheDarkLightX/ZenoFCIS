@@ -206,8 +206,8 @@ their difference count against the complete review. The canvas groups all
 864 cells by action and quantity. Selecting a cell runs a fresh library
 evaluation in Wasm; the colour is not used to infer its decision. Display
 names come from the template declarations, while raw vectors and mutation
-identifiers remain in collapsed Technical records. Reduced motion renders
-only the completed grid and candidate bars.
+identifiers remain in collapsed Technical records. Both motion settings consume the same presentation events and results;
+preferences never bypass progressive evidence updates.
 Program search checks a swapped seed, includes the example’s 7-node proposal,
 tries its own rewrites and independently replays the selected output table.
 The swap panel runs the pilot’s 12-node numeric graph with explicit decimal
@@ -240,3 +240,11 @@ are separate concerns. Runtime contract models and input frames belong to one
 invocation, the authorities borrow them immutably, and only owned JSON leaves
 the closure. The retained worker caches a loaded module, not decisions or
 contract models. The shared ABI's session and byte limits still apply.
+
+## Checked presentation
+
+The factory page renders complete view data from the pure ZenoUI presentation
+core. It owns run and selection identities, counts and evidence scope; the
+browser dispatches events and carries out worker intents. See
+[the presentation contract](zenoui/README.md) for the finite domains, retained
+semantic projection, conservative omissions and evidence limits.

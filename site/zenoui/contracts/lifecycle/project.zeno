@@ -1,0 +1,32 @@
+zeno 1;
+project 1 lifecycle;
+namespace 2 presentation;
+type 100 state ViewState;
+type 101 command ViewEvent;
+type 102 context ViewContext;
+type 105 int Phase;
+type 106 int Selection;
+type 107 int Mask;
+type 108 int Event;
+type 109 int Flag;
+field 110 100 phase 105;
+field 111 100 selection 106;
+field 112 100 mask 107;
+field 120 101 event 108;
+field 130 102 epoch_match 109;
+field 131 102 run_match 109;
+field 132 102 request_match 109;
+field 133 102 ordinal_match 109;
+field 134 102 ready 109;
+component 400 presentation {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 512;
+}
+merge [400];
+law 499 state_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 3 && post.100.111 >= 0 && post.100.111 <= 2 && post.100.112 >= 0 && post.100.112 <= 15;
+law 500 complete_start on any, genesis = post.100.110 == 0 && post.100.111 == 0 && post.100.112 == 15;
+law 501 complete_regions on any = pre.100.112 == 15 -> post.100.112 == 15;
+law 502 stale_identity_no_change on any = ((command.101.120 == 1 || command.101.120 == 2 || command.101.120 == 4 || command.101.120 == 5) && (context.102.130 == 0 || context.102.131 == 0 || context.102.132 == 0 || (command.101.120 == 4 && context.102.133 == 0))) -> (post.100.110 == pre.100.110 && post.100.111 == pre.100.111 && post.100.112 == pre.100.112);

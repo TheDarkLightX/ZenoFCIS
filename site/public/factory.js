@@ -1,19 +1,13 @@
 import { mountInventoryGrid } from "./factory-grid.js";
 import { human, inventoryInput, inventoryDecision, synthesisInput, yesNo, amount } from "./factory-format.js";
 
-const count = (value) => Number(value).toLocaleString("en-US");
+import { ACTS, initial, step, view, count, descriptor } from "./zenoui/presentation.js";
 
 function element(tag, className, ...children) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   node.append(...children.filter((child) => child !== null && child !== undefined));
   return node;
-}
-function technicalRecord(output, result) {
-  const details = element("details","technical-record",element("summary",null,"Technical record"));
-  details.append(element("pre",null,JSON.stringify(result,null,2)));
-  output.append(details);
-  return details;
 }
 // A row of headline figures: the number first, then what it counts.
 function metrics(...items) {
@@ -95,144 +89,149 @@ function decisionComparison(output, witness, names) {
   output.replaceChildren(comparison);
 }
 export function mountFactory(root) {
-  let worker, sequence = 0, pending, inspection, inventoryGrid, inventoryRun;
-  const controls = [...root.querySelectorAll("button[data-act]")];
-  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  function setBusy(busy) {
-    for (const button of controls) button.disabled = busy;
-    root.querySelector(".mutant-choice").disabled = busy;
-    inventoryGrid?.setEnabled(!busy);
+  let worker, pending, inventoryGrid, gridTask, selectedPanel, cellRecord;
+  let state = initial('0', {motion:matchMedia('(prefers-reduced-motion: reduce)').matches?'reduce':'normal',theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light',width:innerWidth});
+  const controls = [...root.querySelectorAll('button[data-act]')];
+  const regions = new Map();
+  function resetRegions(act) {
+    const output=root.querySelector(`[data-factory-act="${act}"] .factory-output`);
+    const instrument=element('div','factory-instrument',element('p','help','No inputs checked yet.'));
+    const metricsHost=element('div','factory-metrics');
+    const comparison=element('div','factory-comparison',element('p','help','No comparison yet.'));
+    const record=element('details','technical-record',element('summary',null,'Technical record'));
+    const report=element('pre',null,'No result yet.');record.append(report);
+    for(const [key,node] of [['instrument',instrument],['metrics',metricsHost],['comparison',comparison],['record',record]])node.dataset.region=key;
+    output.replaceChildren(instrument,metricsHost,comparison,record);delete output.dataset.complete;
+    const task={output,instrument,metricsHost,comparison,report,record,chunks:0,candidates:0};regions.set(act,task);return task;
   }
-  function cancelInspection() {
-    if (inspection) { inspection.reject(new Error("Cell selection changed")); inspection = null; }
+  function showMetrics(task,data) {
+    const strip=metrics(...data.metrics.map(m=>[m.value,m.label,m.tone]));
+    [...strip.children].forEach((node,i)=>{node.dataset.value=data.metrics[i].key;node.dataset.type=data.metrics[i].type;node.dataset.unit=data.metrics[i].unit;});
+    task.metricsHost.replaceChildren(strip);
   }
-  function inspect(mutant, ordinal, runId) {
-    cancelInspection();
-    return new Promise((resolve,reject) => {
-      const id = ++sequence;
-      inspection = { id,runId,resolve,reject };
-      worker.postMessage({ id,kind:"inspect",mutant,ordinal });
-    });
+  function gridFor(task,data) {
+    const layout=element('div','inventory-layout'),host=element('div','inventory-map');
+    selectedPanel=element('section','cell-inspection',element('h4',null,'Selected input'),element('p','help','Select a cell to see its decision.'));
+    cellRecord=element('pre');task.record.append(cellRecord);layout.append(host,selectedPanel);task.instrument.replaceChildren(layout);
+    const identity=state.identity;
+    inventoryGrid=mountInventoryGrid(host,data.result?.mutant??data.draft.mutant,state.run,(cell)=>dispatch({type:'Select',identity,ordinal:cell.ordinal}));
+    gridTask=task;return inventoryGrid;
   }
-  function gridFor(task, mutant) {
-    const layout = element("div","inventory-layout");
-    const gridHost = element("div","inventory-map");
-    const selected = element("section","cell-inspection",element("h4",null,"Selected input"),element("p","help","Select a cell to see its decision."));
-    const raw = element("details","technical-record",element("summary",null,"Technical record"));
-    const report = element("pre"), cellRecord = element("pre"); raw.append(report,cellRecord);
-    layout.append(gridHost,selected);
-    task.output.append(layout,raw);
-    task.record = report;
-    let selection = 0;
-    const grid = mountInventoryGrid(gridHost,mutant,task.id,async (cell,names) => {
-      const version = ++selection;
-      delete selected.dataset.ready;
-      const heading = cell.different ? "A decision the bug changed" : "Selected input";
-      selected.replaceChildren(element("h4",null,heading),element("p","selected-input",inventoryInput(cell.input,names)),element("p","help","Deciding this input…"));
-      try {
-        const detail = await inspect(mutant,cell.ordinal,task.id);
-        if (version !== selection || inventoryRun !== task.id) return;
-        if (JSON.stringify(detail.input) !== JSON.stringify(cell.input)) throw new Error("Cell report belongs to another input");
-        const decisions = element("div");
-        if (mutant === "none") {
-          const view = inventoryDecision(detail.original,names);
-          decisions.append(element("div","decision-single",element("p","label",view.label),element("p","reason",view.reason),
-            element("p","after",view.after),element("p","effects",view.effects.length ? `Queued: ${view.effects.join("; ")}.` : "Nothing queued."),
-            element("p","law-summary",view.laws.length ? `Laws: ${view.laws.join("; ")}.` : "Stopped before the laws.")));
-        } else decisionComparison(decisions,detail,names);
-        selected.replaceChildren(element("h4",null,heading),element("p","selected-input",inventoryInput(cell.input,names)),decisions);
-        selected.dataset.ready = "true"; selected.dataset.ordinal = cell.ordinal; selected.dataset.mutant = mutant;
-        cellRecord.textContent = JSON.stringify({selected_cell:cell.ordinal,...detail},null,2);
-        root.dispatchEvent(new CustomEvent("factory-detail",{detail:{mutant,ordinal:cell.ordinal,result:detail}}));
-      } catch (error) { if (version === selection && inventoryRun === task.id) selected.replaceChildren(element("p",null,error.message)); }
-    });
-    task.grid = grid; inventoryGrid = grid;
-    return grid;
+  function renderSelection(data) {
+    if(!selectedPanel||!data.selection)return;
+    const selection=data.selection,r=data.tasks.inventory.result,names=r.names,cell=r.grid.cells[selection.ordinal];
+    const heading=cell.different?'A decision the bug changed':'Selected input';
+    const text=element('p','selected-input',inventoryInput(cell.input,names));
+    selectedPanel.replaceChildren(element('h4',null,heading),text);
+    delete selectedPanel.dataset.ready;
+    if(selection.error)selectedPanel.append(element('p',null,selection.error));
+    else if(!selection.result)selectedPanel.append(element('p','help','Deciding this input…'));
+    else {
+      const decisions=element('div');
+      if(r.mutant==='none') {
+        const detail=inventoryDecision(selection.result.original,names);
+        decisions.append(element('div','decision-single',element('p','label',detail.label),element('p','reason',detail.reason),element('p','after',detail.after),
+          element('p','effects',detail.effects.length?`Queued: ${detail.effects.join('; ')}.`:'Nothing queued.'),element('p','law-summary',detail.laws.length?`Laws: ${detail.laws.join('; ')}.`:'Stopped before the laws.')));
+      } else decisionComparison(decisions,selection.result,names);
+      selectedPanel.append(decisions);selectedPanel.dataset.ready='true';selectedPanel.dataset.ordinal=selection.ordinal;selectedPanel.dataset.mutant=r.mutant;
+      cellRecord.textContent=JSON.stringify({selected_cell:selection.ordinal,...selection.result},null,2);
+      root.dispatchEvent(new CustomEvent('factory-detail',{detail:{mutant:r.mutant,ordinal:selection.ordinal,result:selection.result}}));
+    }
+  }
+  function paint(data,event) {
+    for(const button of controls)button.disabled=!data.actions.find(a=>a.act===button.dataset.act).enabled;
+    root.querySelector('.mutant-choice').disabled=data.busy;
+    inventoryGrid?.setEnabled(data.gridEnabled);
+    for(const act of ACTS) {
+      const taskData=data.tasks[act];let task=regions.get(act);
+      if(!task||event.type==='Start'&&data.act===act)task=resetRegions(act);
+      root.querySelector(`[data-factory-act="${act}"] .factory-status`).textContent=taskData.status;
+      showMetrics(task,taskData);
+      if(taskData.phase==='running') {
+        if(act==='synthesis') {
+          if(!task.updateCandidate){task.instrument.replaceChildren();task.updateCandidate=candidateList(task.instrument);}
+          for(const c of taskData.candidates.slice(task.candidates))task.updateCandidate(c);
+          task.candidates=taskData.candidates.length;
+        }
+        if(act==='inventory'&&taskData.chunks.length>task.chunks) {
+          const grid=gridTask===task?inventoryGrid:gridFor(task,taskData);
+          for(const chunk of taskData.chunks.slice(task.chunks))grid.append(chunk);
+          task.chunks=taskData.chunks.length;
+        }
+      }
+      if(event.type==='Result'&&data.act===act&&taskData.phase==='done') {
+        task.comparison.replaceChildren(element('p','verdict',taskData.summary));
+        task.report.textContent=JSON.stringify(taskData.record,null,2);
+        if(act==='inventory') {
+          const grid=gridTask===task?inventoryGrid:gridFor(task,taskData);
+          task.output.querySelector('.inventory-grid').dataset.progressChunks=taskData.chunks.length;
+          grid.finish(taskData.result);
+        } else {
+          if(act==='synthesis')for(const c of taskData.result.candidates)task.updateCandidate(c);
+          render(task.comparison,taskData);
+        }
+        task.output.dataset.complete='true';
+      }
+    }
+    if(['Select','CellResult','Fail'].includes(event.type))renderSelection(data);
   }
   function connect() {
-    worker = new Worker(new URL("./factory-worker.js",import.meta.url),{type:"module"});
-    worker.onmessage = ({data}) => {
-      if (inspection?.id === data.id) {
-        const current = inspection; inspection = null;
-        if (current.runId !== inventoryRun) current.reject(new Error("Cell belongs to an earlier run"));
-        else if (data.error) current.reject(new Error(data.error));
-        else current.resolve(data.detail);
-        return;
-      }
-      if (!pending || data.id !== pending.id) return;
-      const task = pending;
+    const connectionEpoch=state.epoch;
+    worker=new Worker(new URL('./factory-worker.js',import.meta.url),{type:'module'});
+    worker.onmessage=({data})=>{
       try {
-        if (data.candidate) { pending.candidateCount++; if (!reducedMotion.matches) pending.updateCandidate(data.candidate); return; }
-        if (data.progress) {
-          pending.chunks++;
-          if (!reducedMotion.matches) (pending.grid ?? gridFor(pending,data.progress.mutant)).append(data.progress);
-          return;
-        }
-        if (data.error) throw new Error(data.error);
-        clearTimeout(task.timer); pending = null; setBusy(false);
-        if (data.result.act === "inventory") {
-          const result = data.result, mutant = result.mutant;
-          const changed = mutant === "none" ? null : result.differences;
-          const summary = mutant === "none"
-            ? `All ${count(result.domain)} decisions satisfy every law that applies to them.`
-            : changed === 0 ? "This change alters no decision on any of the 864 inputs: the two versions are equivalent."
-            : `The bug changes ${count(changed)} of ${count(result.domain)} decisions. The first is ringed in the grid, and its two decisions are compared in the panel.`;
-          task.output.prepend(metrics(
-            [count(result.domain),"inputs decided"],
-            [count(mutant === "none" ? result.passed : result.mutant_passed),"within every applicable law", "good"],
-            ...(changed === null ? [[count(result.law_checks),"law checks passed"]] : [[count(changed),"decisions changed",changed ? "warn" : "good"]]),
-            [`${data.elapsed.toFixed(0)} ms`,"in this browser"]),
-            element("p","verdict",summary));
-          const grid = task.grid ?? gridFor(task,mutant);
-          task.output.querySelector(".inventory-grid").dataset.progressChunks = task.chunks;
-          task.record.textContent = JSON.stringify(result,null,2);
-          grid.finish(result);
-        } else {
-          if (data.result.act === "synthesis") for (const candidate of data.result.candidates) task.updateCandidate(candidate);
-          render(task.output,data.result,data.elapsed);
-        }
-        task.status.textContent = `Done in ${data.elapsed.toFixed(0)} ms, in this browser.`;
-        task.output.dataset.complete = "true";
-        root.dispatchEvent(new CustomEvent("factory-result",{detail:data})); task.resolve(data);
-      } catch (error) {
-        if (pending) fail(error.message);
-        else { task.status.textContent = `Stopped: ${error.message}`; task.reject(error); }
-      }
+        const event=data.error?{type:'Fail',identity:data.identity,ordinal:data.ordinal,message:data.error}:data.detail?{type:'CellResult',identity:data.identity,ordinal:data.ordinal,result:data.detail}:data.result?{type:'Result',identity:data.identity,result:data.result,elapsed:data.elapsed}:{type:'Progress',identity:data.identity,progress:data.progress,candidate:data.candidate};
+        dispatch(event);
+      }catch(error){dispatch({type:'Fail',identity:data.identity,message:error.message});}
     };
-    worker.onerror = () => fail("The worker could not run. Reload and try again.");
+    worker.onerror=()=>dispatch({type:'Fail',identity:{...state.identity,epoch:connectionEpoch},message:'The worker could not run. Reload and try again.'});
   }
-  function fail(message) {
-    cancelInspection();
-    if (!pending) return;
-    const task = pending; pending = null; clearTimeout(task.timer);
-    worker.terminate(); worker = null; setBusy(false);
-    task.status.textContent = `Stopped: ${message}`; task.reject(new Error(message));
+  function dispatch(event) {
+    const before=state,result=step(state,event);
+    if(result.state===before)return false;
+    state=result.state;
+    paint(result.view,event);
+    if(event.type==='Result'&&pending) {
+      clearTimeout(pending.timer);const task=pending;pending=null;
+      const detail={identity:state.identity,result:result.view.tasks[state.act].result,elapsed:result.view.tasks[state.act].elapsed};
+      root.dispatchEvent(new CustomEvent('factory-result',{detail}));task.resolve(detail);
+    }
+    if((event.type==='Fail'&&event.ordinal===undefined)||event.type==='Cancel') {
+      if(pending){clearTimeout(pending.timer);pending.reject(new Error(event.message??'Cancelled'));pending=null;}
+      worker?.terminate();worker=null;
+    }
+    for(const intent of result.intents) {
+      if(intent.kind==='cancel')continue;
+      if(!worker)connect();
+      worker.postMessage(intent);
+    }
+    return true;
   }
   function run(act) {
-    if (pending) return Promise.reject(new Error("A check is already running"));
-    cancelInspection();
-    const section = root.querySelector(`[data-factory-act="${act.split("/")[0]}"]`);
-    const status = section.querySelector(".factory-status"), output = section.querySelector(".factory-output");
-    if (act.startsWith("inventory/")) { inventoryGrid?.dispose(); inventoryGrid = null; }
-    output.replaceChildren(); delete output.dataset.complete;
-    status.textContent = "Running the library in a background worker…"; setBusy(true);
-    if (!worker) connect();
-    return new Promise((resolve,reject) => {
-      const id = ++sequence, timer = setTimeout(() => fail("the check timed out; no result is claimed."),10000);
-      if (act.startsWith("inventory/")) inventoryRun = id;
-      pending = {id,status,output,resolve,reject,timer,chunks:0,candidateCount:0};
-      if (act === "synthesis") pending.updateCandidate = candidateList(output);
-      const options = act === "money" ? Object.fromEntries([...section.querySelectorAll("input[data-money]")].map((input) => [input.dataset.money,input.value])) : {};
-      worker.postMessage({id,act,options});
+    const kind=act.split('/')[0],section=root.querySelector(`[data-factory-act="${kind}"]`);
+    const draft=kind==='money'?Object.fromEntries([...section.querySelectorAll('input[data-money]')].map(input=>[input.dataset.money,input.value])):kind==='inventory'?{mutant:act.split('/')[1]}:{};
+    if(state.phase==='running')return Promise.reject(new Error('A check is already running'));
+    return new Promise((resolve,reject)=>{
+      pending={resolve,reject};
+      if(kind==='inventory'){inventoryGrid?.dispose();inventoryGrid=null;gridTask=null;selectedPanel=null;}
+      if(!dispatch({type:'Start',act,draft})){pending=null;reject(new Error('Check the input bounds.'));return;}
+      const identity=state.identity;
+      pending.timer=setTimeout(()=>dispatch({type:'Fail',identity,message:'The check timed out; no result is claimed'}),10000);
     });
   }
-  for (const button of controls) button.addEventListener("click",() => run(button.dataset.act === "inventory" ? `inventory/${root.querySelector(".mutant-choice").value}` : button.dataset.act).catch(() => {}));
-  for (const link of root.querySelectorAll("[data-open-example]")) link.addEventListener("click",() => {
-    const example = document.getElementById(link.dataset.openExample);
-    if (example && !example.open) example.open = true;
-  });
-  return {run,dispose:() => {fail("cancelled.");inventoryGrid?.dispose();worker?.terminate();}};
+  for(const button of controls)button.addEventListener('click',()=>run(button.dataset.act==='inventory'?`inventory/${root.querySelector('.mutant-choice').value}`:button.dataset.act).catch(()=>{}));
+  for(const link of root.querySelectorAll('[data-open-example]'))link.addEventListener('click',()=>{const example=document.getElementById(link.dataset.openExample);if(example)example.open=true;});
+  for(const input of root.querySelectorAll('input[data-money]'))input.addEventListener('input',()=>dispatch({type:'DraftChanged',act:'money',draft:Object.fromEntries([...root.querySelectorAll('input[data-money]')].map(input=>[input.dataset.money,input.value]))}));
+  root.querySelector('.mutant-choice').addEventListener('change',()=>dispatch({type:'DraftChanged',act:'inventory',draft:{mutant:root.querySelector('.mutant-choice').value}}));
+  const listeners=[];
+  for(const [query,key,values] of [['(prefers-reduced-motion: reduce)','motion',['normal','reduce']],['(prefers-color-scheme: dark)','theme',['light','dark']]]) {
+    const media=matchMedia(query),listener=()=>dispatch({type:'PreferencesChanged',preferences:{[key]:values[Number(media.matches)]}});
+    media.addEventListener('change',listener);listeners.push(()=>media.removeEventListener('change',listener));
+  }
+  paint(view(state),{type:'Initial'});
+  return {run,dispose:()=>{dispatch({type:'Cancel'});inventoryGrid?.dispose();listeners.forEach(remove=>remove());}};
 }
+
 function nodeStrip(label, nodes, tone) {
   const strip = element("div",`node-strip ${tone}`,element("span","node-label",label));
   const cells = element("span","node-cells");
@@ -241,26 +240,14 @@ function nodeStrip(label, nodes, tone) {
   strip.append(cells);
   return strip;
 }
-function render(output,result,elapsed) {
+function render(output,data) {
+  const result=data.result;
   if (result.act === "synthesis") {
-    const refuted = result.candidates.filter((candidate) => candidate.status === "refuted").length;
-    const selected = result.candidates.find((candidate) => candidate.status === "selected");
-    output.append(metrics(
-      [String(result.assignments),"orders tried"],
-      [String(refuted),"refuted by an exact input","warn"],
-      [`${count(result.passed)} / ${count(result.domain)}`,"inputs pass for the chosen order","good"],
-      [`${elapsed.toFixed(0)} ms`,"in this browser"]),
-      element("p","verdict",`Order ${selected.candidate + 1} is chosen: ${orderOf(selected.choices).join(", ")}. It is right on every one of the ${count(result.domain)} inputs.`),
-      synthesisExplanation(result));
+    output.append(synthesisExplanation(result));
   }
   if (result.act === "search") {
     const w = result.first_difference;
-    output.append(metrics(
-      [`${result.before_nodes} → ${result.after_nodes}`,"nodes"],
-      [`${result.passed} / ${result.domain}`,"inputs give the same answers","good"],
-      [count(result.work),"search work units"],
-      [`${elapsed.toFixed(0)} ms`,"in this browser"]),
-      element("div","node-strips",nodeStrip("Original",result.before_nodes,"before"),nodeStrip("Found",result.after_nodes,"after")),
+    output.append(element("div","node-strips",nodeStrip("Original",result.before_nodes,"before"),nodeStrip("Found",result.after_nodes,"after")),
       element("div","counterexample",element("h4",null,"A wrong proposal is refused"),
         element("p",null,`A proposal with two outputs swapped is checked first. The checker refuses it at input ${w.ordinal + 1} of ${result.domain}:`),
         element("dl","witness-table",
@@ -273,16 +260,16 @@ function render(output,result,elapsed) {
     const [fee,net,out,reserveIn,reserveOut,k] = result.outputs;
     const [amountIn,feeBps] = result.input;
     output.append(element("dl","ledger-table",
-      element("dt",null,`Fee, ${count(feeBps)} basis points of ${count(amountIn)}, rounded up`),element("dd",null,count(fee)),
-      element("dt",null,"Net amount in"),element("dd",null,count(net)),
-      element("dt","strong","Amount out, rounded down"),element("dd","strong",count(out)),
-      element("dt",null,"Reserves after"),element("dd",null,`${count(reserveIn)} · ${count(reserveOut)}`),
+      element("dt",null,`${descriptor("fee").label}, ${count(feeBps)} basis points of ${count(amountIn)} input atoms`),element("dd",null,`${count(fee)} input atoms`),
+      element("dt",null,descriptor("net").label),element("dd",null,`${count(net)} input atoms`),
+      element("dt","strong",descriptor("out").label),element("dd","strong",`${count(out)} output atoms`),
+      element("dt",null,"Reserves after"),element("dd",null,`${count(reserveIn)} input atoms · ${count(reserveOut)} output atoms`),
       element("dt",null,"Product of reserves"),element("dd",k ? "good" : "warn",k ? "did not decrease" : "decreased: refused")),
       element("div","counterexample",element("h4",null,"A result that cannot fit is refused"),
         element("p",null,`The same calculation with an input reserve of ${amount(result.overflow.input[2])} and a net amount of ${result.overflow.input[0]}: their sum does not fit.`),
         element("p",null,`The library refuses after ${result.overflow.steps} instructions and returns no output, rather than a wrapped number.`)));
   }
-  technicalRecord(output,result);
+
 }
 const root = document.querySelector("#factory");
 if (root) mountFactory(root);

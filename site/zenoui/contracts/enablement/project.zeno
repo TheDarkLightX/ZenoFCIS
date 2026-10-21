@@ -1,0 +1,21 @@
+zeno 1;
+project 1 enablement;
+namespace 2 presentation;
+type 100 state ViewState;
+type 101 command ViewEvent;
+type 102 context ViewContext;
+type 105 int Flag;
+field 110 100 observed 105;
+field 120 101 enabled 105;
+field 130 102 accepted 105;
+reason 200 invalid_view precedence 0;
+component 400 presentation {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 512;
+}
+merge [400];
+law 499 state_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 500 never_offer_refused on accept = command.101.120 == 0 || context.102.130 == 1;

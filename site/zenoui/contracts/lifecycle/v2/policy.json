@@ -1,0 +1,140 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "ready",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "105": [
+      "I128",
+      0,
+      3
+    ],
+    "106": [
+      "I128",
+      0,
+      2
+    ],
+    "107": [
+      "I128",
+      0,
+      15
+    ],
+    "108": [
+      "I128",
+      0,
+      8
+    ],
+    "109": [
+      "I128",
+      0,
+      1
+    ]
+  },
+  "variables": {
+    "phase": "pre.100.110",
+    "selection": "pre.100.111",
+    "mask": "pre.100.112",
+    "event": "command.101.120",
+    "epoch_match": "context.102.130",
+    "run_match": "context.102.131",
+    "request_match": "context.102.132",
+    "ordinal_match": "context.102.133",
+    "ready": "context.102.134"
+  },
+  "cases": [
+    {
+      "when": "event == 0 && ready == 1 && phase != 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "1",
+        "111": "0",
+        "112": "15"
+      },
+      "outbox": []
+    },
+    {
+      "when": "event == 6",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "0",
+        "111": "0",
+        "112": "15"
+      },
+      "outbox": []
+    },
+    {
+      "when": "event == 2 && epoch_match == 1 && run_match == 1 && request_match == 1 && phase == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "2",
+        "111": "selection",
+        "112": "mask"
+      },
+      "outbox": []
+    },
+    {
+      "when": "event == 3 && phase == 2",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "phase",
+        "111": "1",
+        "112": "mask"
+      },
+      "outbox": []
+    },
+    {
+      "when": "event == 4 && epoch_match == 1 && run_match == 1 && request_match == 1 && ordinal_match == 1 && phase == 2 && selection == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "phase",
+        "111": "2",
+        "112": "mask"
+      },
+      "outbox": []
+    },
+    {
+      "when": "event == 5 && epoch_match == 1 && run_match == 1 && request_match == 1 && phase == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "3",
+        "111": "selection",
+        "112": "mask"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "phase",
+        "111": "selection",
+        "112": "mask"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 15
+  },
+  "law_kinds": {
+    "499": "StateInvariant",
+    "500": "InitialCondition",
+    "501": "DecisionConformance",
+    "502": "DecisionConformance"
+  },
+  "idempotency": "No external effects.",
+  "framework_reject_law": 509,
+  "framework_failure_law": 508
+}

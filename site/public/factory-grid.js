@@ -1,38 +1,26 @@
 import { inventoryInput } from "./factory-format.js";
 
-// Four action groups across; in each, a 6 x 6 block of stock states (available
-// across, reserved down) for requests without and with operator authorization.
-// Quantities 1 to 3 run down the rows. The test oracle keeps its own copy of
-// this geometry (site/tests/harness/grid-check.js); change both together.
-export const GRID = Object.freeze({ width: 612, height: 258, size: 8 });
-export function cellPosition([available, reserved, action, quantity, authorized]) {
-  return { x: 30 + (action - 150) * 148 + (authorized * 6 + available) * 10 + authorized * 6,
-    y: 50 + (quantity - 1) * 72 + reserved * 10,
-    column: (action - 150) * 12 + authorized * 6 + available, row: (quantity - 1) * 6 + reserved };
-}
-export function cellOrdinal(row, column) {
-  const action = Math.floor(column / 12), authorized = Math.floor((column % 12) / 6), available = column % 6;
-  return (((available * 6 + row % 6) * 4 + action) * 3 + Math.floor(row / 6)) * 2 + authorized;
-}
+import { GRID, cellPosition, cellOrdinal, hitTest } from "./factory-layout.js";
+export { GRID, cellPosition, cellOrdinal } from "./factory-layout.js";
 export const cellRole = (cell) => cell.different ? "difference" : ({ Accept: "accept", Reject: "reject", CommittedFailure: "failure", Refused: "failure" })[cell.class];
 export function paintInventory(context, cells, names, colors, first, selected) {
   context.fillStyle = colors.paper;
   context.fillRect(0, 0, GRID.width, GRID.height);
   context.textBaseline = "alphabetic";
   for (let action = 0; action < 4; action++) {
-    const x = 30 + action * 148;
+    const x = GRID.x + action * GRID.groupStep;
     context.fillStyle = colors.ink;
     context.font = "600 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
     context.fillText(names?.variants[150 + action] ?? `Action ${action + 1}`, x, 16);
     context.fillStyle = colors.muted;
     context.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
     context.fillText("no", x, 38);
-    context.fillText("yes", x + 66, 38);
+    context.fillText("yes", x + GRID.stocks * GRID.step + GRID.authGap, 38);
   }
   context.fillStyle = colors.muted;
   context.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
   context.fillText("qty", 2, 38);
-  for (let quantity = 0; quantity < 3; quantity++) context.fillText(String(quantity + 1), 8, 50 + quantity * 72 + 33);
+  for (let quantity = 0; quantity < 3; quantity++) context.fillText(String(quantity + 1), 8, GRID.y + quantity * GRID.quantityStep + 33);
   // Unchecked cells are outlines; none receives a decision colour in advance.
   context.strokeStyle = colors.line;
   context.lineWidth = 1;
@@ -115,8 +103,9 @@ export function mountInventoryGrid(container, mutant, job, onSelect) {
   wrapper.addEventListener("click", (event) => {
     if (event.target !== canvas || !enabled) return;
     const rect = canvas.getBoundingClientRect(), x = (event.clientX - rect.left) * canvas.width / rect.width, y = (event.clientY - rect.top) * canvas.height / rect.height;
-    // A one-pixel margin around each square makes small targets easier to hit.
-    const cell = cells.find((cell) => { if (!cell) return false; const p = cellPosition(cell.input); return x >= p.x - 1 && x < p.x + 9 && y >= p.y - 1 && y < p.y + 9; });
+    // Hit testing uses the same declared rectangles as drawing.
+    const ordinal = hitTest(x,y);
+    const cell = ordinal === null ? null : cells[ordinal];
     if (cell) { wrapper.focus({preventScroll:true}); select(cell.ordinal); }
   });
   wrapper.addEventListener("keydown", (event) => {

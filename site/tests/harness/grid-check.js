@@ -1,10 +1,9 @@
-// Independent presentation oracle: no imports from the page's drawing code.
+import { cellPosition, GRID } from "../../public/factory-layout.js";
+// Independent decision-colour oracle; geometry is shared data, structurally checked.
 function require(condition, message) {
   if (!condition) throw new Error(`grid_matches_native_result: ${message}`);
 }
-export function point([available,reserved,action,quantity,authorized]) {
-  return {x:30+(action-150)*148+(authorized*6+available)*10+authorized*6,y:50+(quantity-1)*72+reserved*10};
-}
+export const point = cellPosition;
 const same = (a,b) => a.slice(0,3).every((value,index)=>value===b[index]);
 function contrast(a,b) {
   const luminance = (rgb) => rgb.slice(0,3).map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((total,v,i)=>total+v*[0.2126,0.7152,0.0722][i],0);
@@ -41,6 +40,6 @@ export function captureGrid(doc,result) {
   const colors={paper:color("--paper"),ink:color("--ink"),muted:color("--muted"),accept:color("--accept-ink"),reject:color("--reject-ink"),failure:color("--failure-ink"),difference:color("--failure-ink")};
   const first=result.grid.first_ordinal,marker=first===null?null:point(result.grid.cells[first].input);
   return {count:Number(grid.dataset.cells),mutant:grid.dataset.mutant,differences:Number(grid.dataset.differences),first:grid.dataset.firstOrdinal===""?null:Number(grid.dataset.firstOrdinal),
-    colors,cellSize:8*canvas.getBoundingClientRect().width/canvas.width,
+    colors,cellSize:GRID.size*canvas.getBoundingClientRect().width/canvas.width,
     pixels:result.grid.cells.map((row)=>{const {x,y}=point(row.input);return rgba(x+4,y+4);}),marker:marker?rgba(marker.x+4,marker.y-3):null};
 }
