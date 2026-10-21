@@ -325,10 +325,8 @@ impl<'a> Graph<'a> {
         let requested = compiler_context_path(path)?;
         let mut found = None;
         for (loaded, source) in &self.source_paths {
-            if compiler_context_path(loaded)? == requested {
-                if found.replace(*source).is_some() {
-                    return Err("module source has multiple loaded path identities".to_string());
-                }
+            if compiler_context_path(loaded)? == requested && found.replace(*source).is_some() {
+                return Err("module source has multiple loaded path identities".to_string());
             }
         }
         Ok(found)
@@ -349,10 +347,8 @@ impl<'a> Graph<'a> {
         };
         let mut matches = Vec::new();
         for candidate in candidates {
-            match self.declared_source(&candidate) {
-                Ok(Some(child)) => matches.push(child),
-                Ok(None) => {}
-                Err(message) => return Err(message),
+            if let Some(child) = self.declared_source(&candidate)? {
+                matches.push(child);
             }
         }
         if matches.len() != 1 {
