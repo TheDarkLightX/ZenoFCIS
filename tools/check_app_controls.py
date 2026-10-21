@@ -39,6 +39,11 @@ CONTROLS = [
     ("connector-drops-delivery-id", "program_connector_acknowledges_only_success", "the delivery ID is missing from the envelope",
      'value["payload"] = Value::from(hex(&delivery.payload));',
      'value["payload"] = Value::from(hex(&delivery.payload));\n        value.as_object_mut().map(|object| object.remove("delivery"));'),
+    # Mutated requests: a decode panic, or a refusal shown as a decision.
+    ("decode-panics", "mutated_requests_refuse_or_decide", "ParseIntError",
+     "let n = text.parse::<i128>().map_err(|_| Refusal::Malformed)?;", "let n = text.parse::<i128>().unwrap();"),
+    ("refusal-shown-as-accept", "mutated_requests_refuse_or_decide", "an input outside its declared domain was decided",
+     '"class":"Refused","reason":null,"post":[]', '"class":"Accept","reason":null,"post":[]'),
 ]
 
 

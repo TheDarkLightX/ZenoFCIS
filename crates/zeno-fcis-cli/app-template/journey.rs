@@ -1164,3 +1164,316 @@ fn public_origin_is_the_only_origin() {
     drop(server);
     ok(std::fs::remove_dir_all(root));
 }
+
+// A fixed-seed generator (SplitMix64): the same cases on every run, with no
+// dependency.
+struct Seeded(u64);
+impl Seeded {
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+    fn below(&mut self, bound: usize) -> usize {
+        usize::try_from(self.next() % u64::try_from(bound.max(1)).unwrap()).unwrap()
+    }
+}
+// One to four edits of a byte string: a flipped bit, a replaced, inserted or
+// removed byte, a truncation, a repeated range or appended bytes.
+fn mutate(random: &mut Seeded, original: &[u8]) -> Vec<u8> {
+    let mut bytes = original.to_vec();
+    for _ in 0..=random.below(4) {
+        let at = random.below(bytes.len() + 1);
+        let byte = [0x00, 0x01, 0x7f, 0x80, 0xff, random.next().to_le_bytes()[0]][random.below(6)];
+        match random.below(7) {
+            0 if at < bytes.len() => bytes[at] ^= 1 << random.below(8),
+            1 if at < bytes.len() => bytes[at] = byte,
+            2 => bytes.insert(at, byte),
+            3 if at < bytes.len() => {
+                bytes.remove(at);
+            }
+            4 => bytes.truncate(at),
+            5 if at < bytes.len() => {
+                let end = (at + 1 + random.below(8)).min(bytes.len());
+                let repeated = bytes[at..end].to_vec();
+                bytes.splice(at..at, repeated);
+            }
+            _ => bytes.extend(std::iter::repeat_n(byte, 1 + random.below(4))),
+        }
+    }
+    bytes
+}
+// Whether a decimal value lies in its field's declared domain.
+fn in_domain(field: &Value, value: &Value) -> bool {
+    let Some(text) = value.as_str() else {
+        return false;
+    };
+    match field["domain"]["kind"].as_str() {
+        Some("int") => text.parse::<i128>().is_ok_and(|number| {
+            scalar(&field["domain"]["min"]) <= number && number <= scalar(&field["domain"]["max"])
+        }),
+        _ => field["options"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|option| option["value"] == text),
+    }
+}
+// Values a canonical frame can carry that a declared domain may not hold.
+const EXTREMES: [i128; 9] = [
+    i128::MIN,
+    -65_537,
+    -1,
+    0,
+    1,
+    65_535,
+    65_536,
+    i128::MAX - 1,
+    i128::MAX,
+];
+
+#[test]
+fn mutated_requests_refuse_or_decide() {
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    let bundle: Value = ok(serde_json::from_slice(include_bytes!("../www/app.json")));
+    let fields = bundle["description"]["fields"].as_array().unwrap().clone();
+    let step = &fixture["steps"][0];
+    let root = std::env::temp_dir().join(format!("app-mutation-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let path = root.join("app.sqlite");
+    ok(application::init(&path));
+    ok(std::fs::write(
+        root.join("clock"),
+        step["clock"].as_str().unwrap_or("0"),
+    ));
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let hash = RustCryptoSha256::hash(authority.identity());
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let clock = ok(application::app::ServerClock::declared(Some(
+        root.join("clock"),
+    )));
+    let mut context: Vec<i128> = step_context(&fixture, step).iter().map(scalar).collect();
+    if let Some(clock) = &clock {
+        context.insert(clock.position(), scalar(&step["clock"]));
+    }
+    let command: Vec<i128> = step["command"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(scalar)
+        .collect();
+    let mut genesis = ok(application::current(&path)).state;
+    genesis.extend(&command);
+    genesis.extend(&context);
+    let frames = ok(application::wire(&descriptor, &genesis));
+    let widths = [
+        genesis.len() - command.len() - context.len(),
+        command.len(),
+        context.len(),
+    ];
+    let principal = Hash32::new([7; 32]);
+    let serve = |configured: &[u8]| {
+        let production = ok(Production::open(
+            &path,
+            &lineage,
+            1,
+            ok(FileReceiver::new(&root.join("received"))),
+            Some(Clock::default()),
+        ));
+        let store = production.store();
+        let mut endpoint = ok(Application::new(
+            &lineage, production, store, &path, principal, configured,
+        ));
+        if let Some(clock) = ok(application::app::ServerClock::declared(Some(
+            root.join("clock"),
+        ))) {
+            endpoint = ok(endpoint.with_clock(clock));
+        }
+        let config = ok(Config::new(
+            [0xab; 32],
+            principal,
+            hash,
+            "http://localhost".into(),
+            Duration::from_secs(10),
+        ));
+        Server::new(config, endpoint, Sink::default())
+    };
+    // A decided reply's inputs and successor lie in their declared domains, and
+    // its inputs frame to exactly the bytes that were decided.
+    let decided = |reply: &Value, sent: Option<(usize, &[u8])>| {
+        let input = reply["input"].as_array().unwrap();
+        assert!(
+            input.iter().zip(&fields).all(|(v, f)| in_domain(f, v)),
+            "an input outside its declared domain was decided: {input:?}"
+        );
+        let post = reply["post"].as_array().unwrap();
+        let state: Vec<&Value> = fields.iter().filter(|f| f["source"] == "state").collect();
+        assert!(
+            post.iter().zip(state).all(|(v, f)| in_domain(f, v)),
+            "a successor outside its declared domain: {post:?}"
+        );
+        if let Some((root, bytes)) = sent {
+            let numbers: Vec<i128> = input.iter().map(scalar).collect();
+            assert_eq!(
+                ok(application::wire(&descriptor, &numbers))[root],
+                bytes,
+                "a non-canonical encoding was decided"
+            );
+        }
+    };
+    let mut random = Seeded(0x2026_1021);
+    let mut seen = std::collections::BTreeMap::<(&str, u16), usize>::new();
+    let mut case = 0u64;
+    let mut key = || {
+        case += 1;
+        let mut bytes = [0; 32];
+        bytes[..8].copy_from_slice(&case.to_be_bytes());
+        Hash32::new(bytes)
+    };
+    // Mutated configured context bytes, as from a corrupted context file or
+    // stored record: a command is refused or decided within the domains.
+    for index in 0..120 {
+        let configured = if index % 3 == 2 {
+            let mut numbers = genesis.clone();
+            let at = widths[0] + widths[1] + random.below(widths[2]);
+            numbers[at] = EXTREMES[random.below(EXTREMES.len())];
+            match application::wire(&descriptor, &numbers) {
+                Ok(frames) => frames[2].clone(),
+                Err(_) => continue,
+            }
+        } else {
+            mutate(&mut random, &frames[2])
+        };
+        let mut server = serve(&configured);
+        let before = ok(application::current(&path));
+        let body = encode_command(hash, key(), before.head.commits, &frames[1]);
+        let (status, bytes) = exchange(&mut server, "/command", &body);
+        *seen.entry(("context", status)).or_default() += 1;
+        // A context that does not decode is a server fault, never a decision:
+        // start-up refuses one, so only this direct binding reaches 503.
+        assert!(
+            [200, 400, 403, 422, 503].contains(&status),
+            "context status {status}"
+        );
+        if status == 200 {
+            let result: Value = ok(serde_json::from_slice(&bytes));
+            decided(&result["reply"], None);
+        } else {
+            assert_eq!(
+                ok(application::current(&path)),
+                before,
+                "a refused command changed the store"
+            );
+        }
+        // The Authority alone, on mutated context and state bytes.
+        for state in [mutate(&mut random, &frames[0]), frames[0].clone()] {
+            let _ = authority.evaluate(zeno_fcis_synthesis::finite::v2_composition::Raw {
+                state: &state,
+                command: &frames[1],
+                context: &configured,
+            });
+        }
+    }
+    // Mutated and truncated command bytes, and canonical frames of values outside
+    // the declared domains, through the decode, admission and Authority path.
+    let mut server = serve(&frames[2]);
+    for index in 0..400 {
+        let sent = if index % 5 == 4 {
+            let mut numbers = genesis.clone();
+            numbers[widths[0] + random.below(widths[1])] = EXTREMES[random.below(EXTREMES.len())];
+            numbers.splice(..widths[0], ok(application::current(&path)).state);
+            match application::wire(&descriptor, &numbers) {
+                Ok(frames) => frames[1].clone(),
+                Err(_) => continue,
+            }
+        } else {
+            mutate(&mut random, &frames[1])
+        };
+        let before = ok(application::current(&path));
+        let body = encode_command(hash, key(), before.head.commits, &sent);
+        let (status, bytes) = exchange(&mut server, "/command", &body);
+        *seen.entry(("command", status)).or_default() += 1;
+        assert!(
+            [200, 400, 403, 422].contains(&status),
+            "command status {status}"
+        );
+        if status == 200 {
+            let result: Value = ok(serde_json::from_slice(&bytes));
+            decided(&result["reply"], Some((1, &sent)));
+        } else {
+            assert_eq!(
+                ok(application::current(&path)),
+                before,
+                "a refused command changed the store"
+            );
+        }
+    }
+    // Mutated preview inputs: the server decides or refuses and never commits.
+    let state = ok(application::current(&path));
+    let mut inputs = state.state.clone();
+    inputs.extend(&command);
+    inputs.extend(&context);
+    let strings: Vec<String> = inputs.iter().map(ToString::to_string).collect();
+    let payload = ok(serde_json::to_vec(&strings));
+    for index in 0..400 {
+        let sent = if index % 3 == 2 {
+            let mut changed = strings.clone();
+            let at = widths[0] + random.below(widths[1]);
+            changed[at] = EXTREMES[random.below(EXTREMES.len())].to_string();
+            ok(serde_json::to_vec(&changed))
+        } else {
+            mutate(&mut random, &payload)
+        };
+        let body = encode_command(hash, key(), state.head.commits, &sent);
+        let (status, bytes) = exchange(&mut server, "/preview", &body);
+        *seen.entry(("preview", status)).or_default() += 1;
+        assert!([200, 400, 403].contains(&status), "preview status {status}");
+        if status == 200 {
+            let preview: Value = ok(serde_json::from_slice(&bytes));
+            let class = preview["reply"]["class"].as_str().unwrap();
+            assert!(["Accept", "Reject", "CommittedFailure", "Refused"].contains(&class));
+            if class != "Refused" {
+                decided(&preview["reply"], None);
+            }
+        }
+        assert_eq!(
+            ok(application::current(&path)),
+            state,
+            "a preview changed the store"
+        );
+    }
+    drop(server);
+    // Every committed input and successor lies in its domain, and the journal
+    // still matches the store.
+    let history = ok(application::history(&path));
+    for entry in &history.entries {
+        let numbers: Vec<Value> = entry
+            .command
+            .iter()
+            .chain(&entry.context)
+            .map(|v| json!(v.to_string()))
+            .collect();
+        let request: Vec<&Value> = fields.iter().filter(|f| f["source"] != "state").collect();
+        assert!(
+            numbers.iter().zip(request).all(|(v, f)| in_domain(f, v)),
+            "a committed input outside its declared domain"
+        );
+    }
+    // The cases reached both decoding refusals and the Authority's decisions.
+    let count = |route, status| seen.get(&(route, status)).copied().unwrap_or_default();
+    assert!(count("command", 400) > 0 && count("command", 422) + count("command", 200) > 0);
+    assert!(count("preview", 400) > 0 && count("preview", 200) > 0);
+    eprintln!(
+        "mutation outcomes: {seen:?}; {} commits",
+        history.entries.len()
+    );
+    ok(std::fs::remove_dir_all(root));
+}
