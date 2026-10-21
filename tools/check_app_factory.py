@@ -83,4 +83,10 @@ def main():
     print(f'app-factory: PASS; {out}',flush=True)
 
 if __name__=='__main__':
-    main()
+    from commons_hook import failure, report
+    try:
+        main()
+    except BaseException as error:
+        report('app-factory', 'check-failed', 'check_app_factory', failure(error))
+        raise
+    report('app-factory', 'check-passed', 'check_app_factory', {})

@@ -10,8 +10,11 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
+
+from commons_hook import failure, report
 
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_ROOT = ROOT / "acceptance" / "features"
@@ -61,6 +64,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "distribution_laws"),
          ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/distribution_reference.py", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
+    ),
+    "zeno-commons": AcceptanceScenario(
+        "Share factory state, negative memory and coordination through Zeno Commons",
+        (("python3", "integrations/commons/test_commons.py"),
+         ("python3", "tools/test_commons_hooks.py"),
+         ("python3", "-I", "tools/check_commons_controls.py")),
     ),
     "construction-command": AcceptanceScenario(
         "Refuse unsupported families and preserve construction authority boundaries",
@@ -1479,9 +1488,18 @@ def run_scenario(scenario_id: str) -> None:
 
     scenario = SCENARIOS[scenario_id]
     print(f"atdd: RUN {scenario_id}: {scenario.title}", flush=True)
-    for command in scenario.commands:
-        print(f"atdd: EXEC {shlex.join(command)}", flush=True)
-        run_command(command)
+    started = time.monotonic()
+    command: tuple[str, ...] = ()
+    try:
+        for command in scenario.commands:
+            print(f"atdd: EXEC {shlex.join(command)}", flush=True)
+            run_command(command)
+    except BaseException as error:
+        report("atdd", "scenario-failed", scenario_id, {**failure(error), "command": shlex.join(command),
+                                                        "seconds": round(time.monotonic() - started, 1)})
+        raise
+    report("atdd", "scenario-passed", scenario_id, {"commands": len(scenario.commands),
+                                                   "seconds": round(time.monotonic() - started, 1)})
     print(f"atdd: PASS {scenario_id}", flush=True)
 
 

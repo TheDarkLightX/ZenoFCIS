@@ -159,4 +159,11 @@ def main():
     print("Application ready. Review context.json, then start app-server as documented in README.md.")
 
 if __name__ == "__main__":
-    main()
+    from commons_hook import failure, report
+    subject = Path(sys.argv[1]).name if len(sys.argv) > 1 else "unnamed"
+    try:
+        main()
+    except BaseException as error:
+        report("app-factory", "failed", subject, failure(error))
+        raise
+    report("app-factory", "built", subject, {})

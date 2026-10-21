@@ -153,4 +153,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    from commons_hook import failure, report
+    subject = Path(sys.argv[1]).name if len(sys.argv) > 1 else "unnamed"
+    try:
+        main()
+    except BaseException as error:
+        report("zenoui", "refused", subject, failure(error))
+        raise
+    report("zenoui", "synthesized", subject, {})
