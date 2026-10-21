@@ -4,9 +4,9 @@
 For examples/apps/escrow-deal and examples/apps/library-loans it runs state
 and transition lemmas, implication probes and the adversarial scenarios in
 each app's tests/decision-scenarios.txt, and requires every verdict to hold.
-It also records the properties the judges cannot state: a lemma over
-deliveries must be refused as having no contract form (exit 65), so a change
-that makes it expressible is noticed.
+Explicit channel and total delivery counts are checked on every committing
+transition. The payload-only shorthand stays refused when two channels share
+the payload type; that ambiguity is distinct from observing a delivery.
 
 Controls copy an app, remove a protecting law and weaken one rule, and require
 the named lemma or scenario to fail; a control that passes means the property
@@ -39,6 +39,9 @@ STATE = {
 }
 TRANSITION = {
     ESCROW: {
+        "at-most-one-delivery-per-decision": "outbox.count <= 1",
+        "at-most-one-seller-payout-per-decision": "outbox.300 <= 1",
+        "at-most-one-buyer-refund-per-decision": "outbox.301 <= 1",
         "paid-once": "pre.100.112 > 0 -> post.100.112 == pre.100.112",
         "refunded-once": "pre.100.113 > 0 -> post.100.113 == pre.100.113",
         "nothing-after-the-end": "pre.100.110 != 153 && pre.100.110 != 154",
@@ -61,7 +64,8 @@ IMPLIES = {
     },
     LIBRARY: {},
 }
-# Properties the judges cannot state today; each must stay refused (exit 65).
+# Ambiguous payload-only shorthand must stay refused (exit 65). Explicit
+# channels above are observable; these checks do not claim external delivery.
 INEXPRESSIBLE = {
     ESCROW: {"at-most-one-payout-delivery": "outbox.104 <= 1"},
     LIBRARY: {},
@@ -140,7 +144,7 @@ def main() -> int:
             code, _, log = judge(args.cli, app, args.out, f"{name}-inexpressible-{key}", ["lemma", "--transition", "--lemma", formula])
             report["inexpressible"][f"{name}:{key}"] = {"formula": formula, "exit": code, "message": log.strip()[-200:]}
             if code != 65:
-                failures.append(f"{name} {key}: expected no contract form (65), got {code}; record the gap as closed")
+                failures.append(f"{name} {key}: expected ambiguous observation refusal (65), got {code}")
     for control, name, laws, (before, after), expected in CONTROLS:
         with tempfile.TemporaryDirectory(prefix=f"attack-{control}-") as directory:
             app = Path(directory) / name
@@ -169,7 +173,7 @@ def main() -> int:
         print(line, file=sys.stderr)
     checks = sum(len(app["checks"]) for app in report["apps"].values())
     print(f"attack judges: {'PASS' if not failures else 'FAIL'}; {checks} checks on 2 apps, "
-          f"{len(report['inexpressible'])} recorded gap, {len(CONTROLS)} controls", flush=True)
+          f"{len(report['inexpressible'])} ambiguous observation refusal, {len(CONTROLS)} controls", flush=True)
     return 1 if failures else 0
 
 

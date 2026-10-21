@@ -863,7 +863,7 @@ fn the_study_example_forms_parse_alike_and_malformed_lines_are_refused() {
         ),
         (
             "150 161 160 140 162 | accept - 151 161 162 | 300 162 161;",
-            "a delivery is a declared channel followed by its payload numbers, or the payload numbers alone when one channel is declared",
+            "empty delivery",
         ),
         (
             "150 161 160 140 162 | accept - 151 161 162 | 300 162 164",
