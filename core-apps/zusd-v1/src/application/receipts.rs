@@ -41,6 +41,9 @@ pub enum VerificationFailure {
 /// conditional on this contract; zUSD alone decides admissibility, arithmetic,
 /// resource usage, movements, replay, exposure and publication.
 ///
+/// The shell BLS implementation authenticates a qualified issuer's attestation
+/// over these exact bytes. Registry adoption must establish the following
+/// semantic premises; cryptographic acceptance alone does not establish them.
 /// Oracle additionally verifies exact committed-record extraction and pending
 /// restrictions against the accepted oracle graph. Clock verifies certified
 /// synchronization; Actor checks actual actor authority for this exact action.
@@ -49,7 +52,8 @@ pub enum VerificationFailure {
 /// bound/window. Drip proves the bound schedule on the exact prior state/supply.
 /// ParameterPolicy proves a SEPARATELY APPROVED policy, not just a signer.
 /// ExposureRelease proves all linked liabilities/finality obligations have ended.
-/// No production implementation is supplied by this crate.
+/// The production adapter lives in the inward-dependent shell crate
+/// zeno-fcis-bls; this semantic crate has no BLS dependency.
 pub trait ReceiptVerifierV1 {
     fn verify(
         &self,

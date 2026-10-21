@@ -21,7 +21,7 @@ class ResolutionError(RuntimeError):
 
 class ResolvedChecker:
     def __init__(self) -> None:
-        self.environment = dict(os.environ, CARGO_INCREMENTAL="0", CARGO_BUILD_JOBS="1")
+        self.environment = dict(os.environ, CARGO_INCREMENTAL="0", CARGO_BUILD_JOBS=os.environ.get("CARGO_BUILD_JOBS", "1"))
         self.binary: Path | None = None
 
     def prepare(self) -> None:

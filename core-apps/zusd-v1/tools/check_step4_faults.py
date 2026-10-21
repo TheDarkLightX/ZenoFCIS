@@ -27,6 +27,12 @@ def run(name,source,test,disabled=None):
 for name,test,marker,edits in faults:
  baseline=run(name+'-baseline',app,test);assert baseline.returncode==0 and '1 passed' in baseline.stdout
  location=out/'copies'/name;location.mkdir(parents=True,exist_ok=False);(location/'crates').symlink_to(root/'crates',target_is_directory=True);(location/'Cargo.toml').symlink_to(root/'Cargo.toml');candidate=location/'core-apps/zusd-v1';candidate.parent.mkdir();shutil.copytree(app,candidate,ignore=shutil.ignore_patterns('target','__pycache__'))
+ # Private package identity isolates compiled artifacts in the shared target.
+ package='zenofcis-zusd-v1-fault-'+name
+ manifest=candidate/'Cargo.toml'
+ manifest.write_text(manifest.read_text().replace('name = "zenofcis-zusd-v1"','name = "'+package+'"')+'\n[lib]\nname = "zenofcis_zusd_v1"\n')
+ lock=candidate/'Cargo.lock'
+ lock.write_text(lock.read_text().replace('name = "zenofcis-zusd-v1"','name = "'+package+'"'))
  for path,before,after in edits:
   target=candidate/path;text=target.read_text();assert text.count(before)==1,(name,path,text.count(before));target.write_text(text.replace(before,after))
  patch=[]

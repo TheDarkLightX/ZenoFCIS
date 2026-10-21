@@ -1,5 +1,5 @@
-//! TEST ONLY: deterministic HMAC-SHA256 fixture issuer. It authenticates the
-//! explicitly supplied synthetic facts, not a live oracle/finality/custody graph.
+//! TEST ONLY: shared synthetic state builders, with an explicit fixture issuer.
+//! These facts do not establish a live oracle/finality/custody graph.
 use zeno_fcis_codec::{CommitmentHasher, RustCryptoSha256};
 use zenofcis_zusd_v1::{
     Failure, Limits, Q,
@@ -22,40 +22,7 @@ pub fn limits() -> Limits {
 pub fn hash(b: &[u8]) -> [u8; 32] {
     *RustCryptoSha256::hash(b).as_bytes()
 }
-pub struct TestVerifier;
-pub fn mac(message: &[u8]) -> Vec<u8> {
-    let key = [0x42u8; 32];
-    let mut inner = vec![0x36; 64];
-    let mut outer = vec![0x5c; 64];
-    for i in 0..32 {
-        inner[i] ^= key[i];
-        outer[i] ^= key[i]
-    }
-    inner.extend_from_slice(message);
-    outer.extend_from_slice(&hash(&inner));
-    hash(&outer).to_vec()
-}
-impl ReceiptVerifierV1 for TestVerifier {
-    fn verify(
-        &self,
-        _d: Domain,
-        _a: [u8; 32],
-        message: &[u8],
-        proof: &[u8],
-    ) -> Result<(), VerificationFailure> {
-        let expected = mac(message);
-        let different = if proof.len() != expected.len() {
-            true
-        } else {
-            proof.iter().zip(expected).fold(0, |v, (a, b)| v | (a ^ b)) != 0
-        };
-        if different {
-            Err(VerificationFailure::Invalid)
-        } else {
-            Ok(())
-        }
-    }
-}
+pub(crate) use super::issuer::{TestVerifier, issue};
 pub fn policy(change: bool) -> Policy {
     Policy::bind(Config {
         chain: id(60),
@@ -164,7 +131,7 @@ pub fn genesis(p: &Policy) -> State {
         .into_iter()
         .map(|m| Proof {
             domain: m.domain,
-            bytes: mac(&m.bytes),
+            bytes: issue(&m.bytes),
         })
         .collect();
     initialize(p, &g, &TestVerifier, limits())
@@ -190,7 +157,7 @@ pub fn sign(p: &Policy, s: &State, mut r: Request) -> Result<Request, Failure> {
         .into_iter()
         .map(|m| Proof {
             domain: m.domain,
-            bytes: mac(&m.bytes),
+            bytes: issue(&m.bytes),
         })
         .collect();
     Ok(r)

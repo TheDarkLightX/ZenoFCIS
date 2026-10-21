@@ -91,6 +91,8 @@ DEPENDENCY_RING = {
     "zeno-fcis-adapter-zenodex": 3,
     "zeno-fcis-shell-sqlite": 5,
     "zeno-fcis-ingress": 6,
+    "zeno-fcis-bls": 5,
+    "zenofcis-zusd-v1": 3,
     "zeno-fcis-collections": 3,
 }
 
@@ -224,6 +226,29 @@ def check_dependency_ring(manifest: Path) -> list[str]:
                     f"{manifest.relative_to(ROOT)} [{table_name}] {dependency_name}: "
                     f"ring {package_ring} cannot depend on ring {dependency_ring}"
                 )
+    return failures
+
+
+def check_shell_crypto_boundary(manifests: list[Path]) -> list[str]:
+    """Crypto must remain outside even transitive semantic/test dependencies."""
+    graph = {}
+    for manifest in manifests:
+        doc = read_toml(manifest)
+        graph[doc["package"]["name"]] = {
+            (spec.get("package", name) if isinstance(spec, dict) else name)
+            for _, table in dependency_tables(doc) for name, spec in table.items()
+        }
+    failures = []
+    for name in (*SEMANTIC_CRATES, "zenofcis-zusd-v1"):
+        pending, seen = [name], set()
+        while pending:
+            dependency = pending.pop()
+            if dependency in seen:
+                continue
+            seen.add(dependency)
+            if dependency in {"blst", "zeno-fcis-bls"}:
+                failures.append(f"semantic crate {name} reaches shell crypto {dependency}")
+            pending.extend(graph.get(dependency, ()))
     return failures
 
 
@@ -752,6 +777,11 @@ def main() -> int:
             failures.extend(check_dependency_ring(manifest))
         except (OSError, tomllib.TOMLDecodeError) as error:
             failures.append(f"{manifest.relative_to(ROOT)}: cannot parse: {error}")
+
+    failures.extend(check_shell_crypto_boundary(
+        [member / "Cargo.toml" for member in members]
+        + [ROOT / "core-apps/zusd-v1/Cargo.toml"]
+    ))
 
     if checker is not None:
         failures.extend(check_semantic_sources(checker))

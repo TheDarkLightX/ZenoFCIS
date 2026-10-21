@@ -1,8 +1,10 @@
 # Conditional step-4 composition
 
 Every authentication claim here means **authenticated given a verifier meeting
-ReceiptVerifierV1**. No production verifier or live owner profile is provided.
-The HMAC-SHA256 issuer exists only in tests/support/step4.rs; it authenticates
+ReceiptVerifierV1**. The shell crate zeno-fcis-bls now authenticates receipts by
+BLS (PoP quorum or G2Basic) over the canonical receipt bytes. No live owner profile
+is provided.
+The HMAC-SHA256 issuer exists only in tests/support/hmac.rs; it authenticates
 explicit synthetic facts, not market truth, consensus or actual custody.
 
 ## ReceiptVerifierV1 contract
@@ -46,10 +48,12 @@ preparation/serialization utilities, never decision, work or publication authori
 | ParameterPolicy | A separately approved, pinned admissible policy authorizes this exact change/actor/activation, not merely a signature from an arbitrary key. Installation of that policy is a separate adoption boundary. |
 | ExposureRelease | Every named retained event has ended all linked exposure, dispute, finality and withdrawal liabilities. Elapsed local epochs alone do not prove those conditions. |
 
-These graph/finality/custody obligations are assumptions exercised with explicit
-fixture facts, not established by the MAC test issuer. The real BLS adapter must
-implement them, including exact accepted-oracle extraction; a tag-check-only
-adapter does not meet the Oracle contract. Its dependencies remain unmounted.
+These graph/finality/custody obligations remain explicit issuer-profile premises.
+The BLS adapter authenticates the complete attestation; it does not independently
+replay the oracle graph or establish finality/custody truth. Qualified registry
+adoption must establish these obligations, including exact accepted-oracle
+extraction. See ../../crates/zeno-fcis-bls/CONTRACT.md for the concrete scheme and
+registry contract. A signature alone does not discharge these semantic premises.
 
 ## Core and ownership
 
@@ -142,8 +146,8 @@ cold replay, corruption and subprocess termination at six publication points (in
 Compiled mutants cover bad tags, PriceView authority, non-atomic publication and
 unapproved parameter changes, with positive/unrelated and comparison-disabled controls.
 
-The MAC issuer and all clock/drip/security numbers are test-only fixtures. Real
-BLS/artifact replay, independent clock/finality, actual custody/funding/rail,
+The MAC and BLS test issuers and all clock/drip/security numbers are test-only fixtures. Real
+artifact replay, independent clock/finality, actual custody/funding/rail,
 shared allocation proofs and approved policies remain backend/owner qualification.
 The original schema dispatcher/application-wide A63 gate, full finite atlas,
 V1/EVM/C1 differential replay, 100% money-branch coverage and conservation/No free

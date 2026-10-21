@@ -1,0 +1,20 @@
+[package]
+name = "zeno-fcis-bls"
+description = "Shell-side BLS receipt authentication with validated PoP registries"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+blst = { version = "=0.3.17", default-features = false, features = ["portable", "no-threads"] }
+zenofcis-zusd-v1 = { path = "../../core-apps/zusd-v1" }
+
+[dev-dependencies]
+zenofcis-zusd-v1 = { path = "../../core-apps/zusd-v1", features = ["std"] }
+zeno-fcis-codec = { version = "=2.5.0", path = "../zeno-fcis-codec" }
+
+[lints]
+workspace = true
