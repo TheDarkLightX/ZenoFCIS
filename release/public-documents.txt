@@ -372,3 +372,4 @@ crates/zeno-fcis-bls/CONTRACT.md
 docs/TRACE_GAME.md
 
 docs/COMPOSED_DOMAIN_PROOF.md
+docs/zal/ladder/WITHDRAWAL_PILOT.md

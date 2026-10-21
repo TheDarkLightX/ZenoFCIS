@@ -98,6 +98,11 @@ needs the same event count and order; hiding/stuttering and liveness require
 separate correspondence and progress arguments.
 
 The [worked examples](EXAMPLES.md) cover loss absence, alarm-safe withdrawal
-response and UI discoverability. Their interpretations remain proposals.
+response and UI discoverability. The [withdrawal pilot](WITHDRAWAL_PILOT.md)
+binds the withdrawal statements to the withdrawal-queue contract through a
+checked observation adapter. Its bounded response is finite checked over every
+tick history through length 12, and its unbounded response is kernel checked
+by Lean under the stated fairness premise. The vault and interface
+interpretations remain proposals awaiting owner confirmation.
 An abstract UI invariant or observation table is no browser or accessibility
 result. Machine membership and concrete refinement remain obligations.

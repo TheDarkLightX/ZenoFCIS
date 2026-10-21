@@ -523,8 +523,12 @@ still use profile 1; `run.py ui` refuses a profile 2 model.
 The [ladder prototype](ladder/README.md) presents a statement through seven
 deterministic readings. Its separate temporal profile uses explicit event
 order, finite or unbounded scope, and versioned assumptions. Rendering and
-native-source previews have authority none; the worked temporal definitions
-are placeholders awaiting interpretation review.
+native-source previews have authority none. The [withdrawal
+pilot](ladder/WITHDRAWAL_PILOT.md) binds the withdrawal statements to the
+withdrawal-queue contract: its bounded claim is finite checked through length
+12, and its unbounded claim is kernel checked by Lean under a stated fairness
+premise. The vault and interface examples use proposed definitions awaiting
+owner confirmation.
 
 The same statements are available through the `zal_ladder_*` MCP tools above
 and the review terminal's `ladder` commands, which bind the revision read when

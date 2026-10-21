@@ -183,6 +183,20 @@ not add an acceptance tool or change the Rust core. Earlier cloud/harness eviden
 above remains historical; current native configuration and live model results
 must be reported separately.
 
+## Withdrawal temporal pilot
+
+The [withdrawal pilot](zal/ladder/WITHDRAWAL_PILOT.md) binds two
+`zal/ladder-temporal/1` statements to the withdrawal-queue template. Its sources:
+
+| Source | Role |
+| --- | --- |
+| `crates/zeno-fcis-synthesis/examples/withdrawal_queue_decisions.rs` | Decision graph of `templates/withdrawal-queue/src/v2_contract.rs` through its checked Authority |
+| `integrations/zal/withdrawal_pilot.py` | Observation adapter and its obligations, tick projection, consequent lowering, Lean rows; in the `zal/checker` identity |
+| `crates/zeno-fcis-formal-tools/examples/withdrawal_temporal_pilot.rs` | Every word of the tick projection replayed through `src/model_diagnostics.rs`; Lean tree inventory |
+| `crates/zeno-fcis-formal-tools/src/translation_tests.rs` | `ladder_claim_lean_export_from_environment` applies the existing Lean exporter to the lowered consequent |
+| `integrations/zal/withdrawal_pilot.lean`, `withdrawal_pilot_refutation.lean` | Controller model, response theorem and the planted-defect refutation; in the `zal/checker` identity |
+| `integrations/zal/test_withdrawal_pilot.py`, `check_withdrawal_pilot.py` | Named checks, the length-12 run and the planted defects |
+
 ## Definition of done for the prototype
 
 The primary-literature review, bounded grammar, paired canonical surfaces and
