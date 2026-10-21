@@ -20,6 +20,7 @@ use zeno_fcis_shell_sqlite::{
     v2::{Lineage, V2SqliteShell},
 };
 use zeno_fcis_synthesis::finite::{
+    V2InputLeaf as InputLeaf,
     v2_authority::{Authority, PublicationOutcome},
     v2_composition as c,
 };
@@ -922,9 +923,34 @@ pub fn load_parties(path: &Path) -> AppResult<Vec<Party>> {
     }
     Ok(parties)
 }
+// Whether each number lies in its field's declared domain: a declared integer
+// range, a listed variant, or 0 or 1.
+fn declared(schema: c::Schema<'_>, numbers: &[i128]) -> bool {
+    let within = |leaf: &InputLeaf, number: i128| match leaf {
+        InputLeaf::Bool => number == 0 || number == 1,
+        InputLeaf::I128 { min, max } => (*min..=*max).contains(&number),
+        InputLeaf::U128 { min, max } => {
+            u128::try_from(number).is_ok_and(|n| (*min..=*max).contains(&n))
+        }
+        InputLeaf::Sum { variants, .. } => variants.iter().any(|v| i128::from(v.id) == number),
+        _ => false,
+    };
+    match schema {
+        c::Schema::Record(fields) => {
+            fields.len() == numbers.len()
+                && fields
+                    .iter()
+                    .zip(numbers)
+                    .all(|(field, number)| within(&field.leaf, *number))
+        }
+        c::Schema::Leaf(leaf) => numbers.len() == 1 && within(leaf, numbers[0]),
+        _ => false,
+    }
+}
 /// Each party's principal and canonical configured context. With a server clock,
 /// a party's context values omit the clock field, which holds the range's lower
-/// bound until admission sets it.
+/// bound until admission sets it. A value outside its declared domain refuses
+/// start-up, rather than every one of that party's requests.
 pub fn party_contexts(
     authority: &Authority<'_>,
     parties: &[Party],
@@ -942,6 +968,12 @@ pub fn party_contexts(
         }
         if context.len() != crate::width(schema)? {
             return Err(format!("party {}: context width", party.name));
+        }
+        if !declared(schema, &context) {
+            return Err(format!(
+                "party {}: context outside its declared domain",
+                party.name
+            ));
         }
         let framed = crate::root_value(schema, &context)
             .and_then(|value| crate::frame(&crate::v2_contract::FRAMING.context, value))

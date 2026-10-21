@@ -1538,3 +1538,60 @@ fn integer_text_round_trips_or_refuses() {
     }
     ok(std::fs::remove_dir_all(root));
 }
+
+#[test]
+fn party_contexts_refuse_values_outside_their_domains() {
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    let bundle: Value = ok(serde_json::from_slice(include_bytes!("../www/app.json")));
+    let root = std::env::temp_dir().join(format!("app-context-domain-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let clock = ok(application::app::ServerClock::declared(None));
+    let start = |context: &[Value]| {
+        let parties = ok(application::app::load_parties(&parties_file(
+            &root,
+            &[("a", 0, 0, json!(context))],
+        )));
+        application::app::party_contexts(&authority, &parties, clock.as_ref())
+    };
+    let base = step_context(&fixture, &fixture["steps"][0]);
+    assert!(start(&base).is_ok(), "the fixture's context refused");
+    // Each configured field, with a value just outside its declared domain.
+    let configured: Vec<&Value> = bundle["description"]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["source"] == "context" && f["clock"] != true)
+        .collect();
+    for (index, field) in configured.iter().enumerate() {
+        let outside: Vec<i128> = if field["domain"]["kind"] == "int" {
+            vec![
+                scalar(&field["domain"]["min"]) - 1,
+                scalar(&field["domain"]["max"]) + 1,
+            ]
+        } else {
+            let options: Vec<i128> = field["options"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|o| scalar(&o["value"]))
+                .collect();
+            vec![options.iter().max().unwrap() + 1]
+        };
+        for value in outside {
+            let mut context = base.clone();
+            context[index] = json!(value.to_string());
+            let refusal = start(&context).err().unwrap_or_default();
+            assert!(
+                refusal.contains("outside its declared domain"),
+                "a context outside its declared domain started: {} = {value}",
+                field["path"]
+            );
+        }
+    }
+    ok(std::fs::remove_dir_all(root));
+}

@@ -44,6 +44,10 @@ CONTROLS = [
      "let n = text.parse::<i128>().map_err(|_| Refusal::Malformed)?;", "let n = text.parse::<i128>().unwrap();"),
     ("refusal-shown-as-accept", "mutated_requests_refuse_or_decide", "an input outside its declared domain was decided",
      '"class":"Refused","reason":null,"post":[]', '"class":"Accept","reason":null,"post":[]'),
+    # Operator configuration is parsed strictly.
+    ("context-domain-unchecked", "party_contexts_refuse_values_outside_their_domains",
+     "a context outside its declared domain started",
+     "if !declared(schema, &context) {", "if false && !declared(schema, &context) {"),
 ]
 
 
