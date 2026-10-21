@@ -26,7 +26,12 @@ DB_NAME = "commons.sqlite3"
 RECORD_TYPES = ("hypothesis", "claim", "evidence", "refutation", "counterexample", "result", "gap",
                 "lesson", "decision", "question", "answer", "risk", "note")
 RECORD_STATUSES = ("open", "testing", "supported", "refuted", "superseded", "stale", "answered",
-                   "resolved", "accepted", "rejected")
+                   "resolved", "accepted", "rejected", "planned")
+# Gap severity lives in one tag, severity-<level>; ranking orders by it, then by independent reporters, then by age.
+SEVERITIES = ("blocker", "high", "medium", "low")
+STOPWORDS = frozenset("""the and for with that this from into are was were has have not but its can each one per
+when what which while who will would than then them they their there these those also only over under about
+more most such some any all out use used using via does did may might must should could need needs""".split())
 AGENT_STATES = ("working", "blocked", "idle", "done")
 LINK_RELATIONS = ("supports", "refutes", "answers", "supersedes", "cites", "duplicates", "blocks", "relates")
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
@@ -488,7 +493,8 @@ class Commons:
         except _Existing:
             return {"seq": None, "id": record_id, "existing": True}
 
-    def record_update(self, record_id: str, status: str = "", note: str = "", refs=None, title: str = "") -> dict:
+    def record_update(self, record_id: str, status: str = "", note: str = "", refs=None, title: str = "",
+                      severity: str = "", tags=None) -> dict:
         """Change status, append a dated note, add references or correct the title (the old title stays in the note).
 
         A record never grows past the text limit: once full, add a new record and link it."""
@@ -496,15 +502,23 @@ class Commons:
             raise CommonsError(f"status must be one of {', '.join(RECORD_STATUSES)}")
         note = _text(note, "note", True)
         title = _text(title, "title", True).strip()
+        if severity and severity not in SEVERITIES:
+            raise CommonsError(f"severity must be one of {', '.join(SEVERITIES)}")
+        added_tags = _tags(tags)
         refs = refs or []
         if not isinstance(refs, list) or len(refs) > 64 or not all(isinstance(r, str) and len(r) <= 4096 for r in refs):
             raise CommonsError("refs must be a list of at most 64 references (paths, commits, record IDs, hashes)")
 
         def apply(cursor, seq, at):
             self._require_registered(cursor)
-            row = cursor.execute("SELECT status, refs, body, title FROM records WHERE id=?", (record_id,)).fetchone()
+            row = cursor.execute("SELECT status, refs, body, title, tags FROM records WHERE id=?", (record_id,)).fetchone()
             if not row:
                 raise CommonsError(f"no record {record_id}")
+            new_tags = set(json.loads(row[4])) | set(added_tags)
+            if severity:
+                new_tags = {t for t in new_tags if not t.startswith("severity-")} | {f"severity-{severity}"}
+            if len(new_tags) > MAX_TAGS:
+                raise CommonsError(f"{record_id} would have more than {MAX_TAGS} tags")
             new_status = status or row[0]
             new_refs = sorted(set(json.loads(row[1])) | set(refs))
             if len(new_refs) > 64:
@@ -514,13 +528,18 @@ class Commons:
             new_body = row[2] + "".join(f"\n[{_iso(at)} {self.actor}] {line}" for line in lines)
             if len(new_body) > MAX_TEXT:
                 raise CommonsError(f"{record_id} is full ({MAX_TEXT} characters); add a new record and link it")
-            cursor.execute("UPDATE records SET status=?, refs=?, body=?, title=?, updated_seq=? WHERE id=?",
-                           (new_status, _canonical(new_refs), new_body, new_title, seq, record_id))
+            cursor.execute("UPDATE records SET status=?, refs=?, body=?, title=?, tags=?, updated_seq=? WHERE id=?",
+                           (new_status, _canonical(new_refs), new_body, new_title, _canonical(sorted(new_tags)), seq,
+                            record_id))
             return {"seq": seq, "id": record_id, "status": new_status, "title": new_title}
 
         body = {"status": status, "note": note, "refs": refs}
         if title:
             body["title"] = title
+        if severity:
+            body["severity"] = severity
+        if added_tags:
+            body["tags"] = added_tags
         return self._write("record.update", record_id, body, apply)
 
     def link(self, src: str, rel: str, dst: str) -> dict:
@@ -532,12 +551,103 @@ class Commons:
             for rid in (src, dst):
                 if not cursor.execute("SELECT 1 FROM records WHERE id=?", (rid,)).fetchone():
                     raise CommonsError(f"no record {rid}")
+            if rel == "duplicates" and not cursor.execute(
+                    "SELECT 1 FROM links WHERE src=? AND rel='duplicates' AND dst=?", (src, dst)).fetchone():
+                self._fold_duplicate(cursor, src, dst, seq, at)
             cursor.execute("INSERT OR IGNORE INTO links VALUES(?,?,?,?)", (src, rel, dst, seq))
             if rel == "supersedes":
                 cursor.execute("UPDATE records SET status='superseded', updated_seq=? WHERE id=?", (seq, dst))
             return {"seq": seq, "link": [src, rel, dst]}
 
         return self._write("link.add", src, {"rel": rel, "dst": dst}, apply)
+
+    def _fold_duplicate(self, cursor, src: str, dst: str, seq: int, at: float) -> None:
+        """src duplicates dst: src is closed as superseded and dst keeps its references, tags and the higher severity.
+
+        Merging never loses a report: the link records who reported it, so the ranking counts independent
+        reporters."""
+        if src == dst:
+            raise CommonsError("a record cannot duplicate itself")
+        rows = {rid: cursor.execute("SELECT type, status, tags, refs, body, title FROM records WHERE id=?",
+                                    (rid,)).fetchone() for rid in (src, dst)}
+        if rows[src][0] != rows[dst][0]:
+            raise CommonsError("only records of the same type can be duplicates")
+        if rows[dst][1] == "superseded":
+            raise CommonsError(f"{dst} is itself superseded; fold into the record that replaced it")
+        src_tags, dst_tags = set(json.loads(rows[src][2])), set(json.loads(rows[dst][2]))
+        level = min((SEVERITIES.index(t[9:]) for t in src_tags | dst_tags
+                     if t.startswith("severity-") and t[9:] in SEVERITIES), default=None)
+        tags = {t for t in src_tags | dst_tags if not t.startswith("severity-")}
+        if level is not None:
+            tags.add(f"severity-{SEVERITIES[level]}")
+        refs = sorted(set(json.loads(rows[src][3])) | set(json.loads(rows[dst][3])) | {src})[:64]
+        body = rows[dst][4] + f"\n[{_iso(at)} {self.actor}] folded in duplicate {src}: {rows[src][5]}"
+        if len(body) > MAX_TEXT:
+            body = rows[dst][4]
+        cursor.execute("UPDATE records SET tags=?, refs=?, body=?, updated_seq=? WHERE id=?",
+                       (_canonical(sorted(tags)[:MAX_TAGS]), _canonical(refs), body, seq, dst))
+        cursor.execute("UPDATE records SET status='superseded', updated_seq=? WHERE id=?", (seq, src))
+
+    def _reporters(self, record_id: str) -> list[str]:
+        """Distinct authors of a record and of every duplicate folded into it, directly or transitively."""
+        seen, authors, frontier = {record_id}, set(), [record_id]
+        while frontier:
+            rid = frontier.pop()
+            row = self.db.execute("SELECT author FROM records WHERE id=?", (rid,)).fetchone()
+            if row:
+                authors.add(row[0])
+            for (src,) in self.db.execute("SELECT src FROM links WHERE rel='duplicates' AND dst=?", (rid,)):
+                if src not in seen:
+                    seen.add(src)
+                    frontier.append(src)
+        return sorted(authors)
+
+    def gaps(self, include_closed: bool = False, limit: int = 200) -> list[dict]:
+        """Gaps ranked by severity (blocker first, unrated last), then by independent reporters, then oldest first.
+
+        Duplicates folded into another gap are not listed; their reporters count toward it."""
+        rows = [self._row(r) for r in self.db.execute("SELECT * FROM records WHERE type='gap'")]
+        ranked = []
+        for record in rows:
+            if record["status"] == "superseded":
+                continue
+            if not include_closed and record["status"] not in ("open", "planned", "testing"):
+                continue
+            levels = [t[9:] for t in record["tags"] if t.startswith("severity-") and t[9:] in SEVERITIES]
+            severity = min(levels, key=SEVERITIES.index) if levels else "unrated"
+            rank = SEVERITIES.index(severity) if severity in SEVERITIES else len(SEVERITIES)
+            reporters = self._reporters(record["id"])
+            ranked.append((rank, -len(reporters), record["created_seq"], {
+                "id": record["id"], "severity": severity, "reporters": reporters, "status": record["status"],
+                "title": record["title"], "tags": [t for t in record["tags"] if not t.startswith("severity-")]}))
+        ranked.sort(key=lambda item: item[:3])
+        return [item[3] for item in ranked[:max(1, min(limit, 1000))]]
+
+    def similar(self, type: str = "gap", threshold: float = 0.3, limit: int = 100) -> list[dict]:
+        """Candidate duplicate pairs among live records of one type, by word overlap. Proposals only: a person or
+        the lead confirms each with link <duplicate> duplicates <canonical>."""
+        if not 0 < threshold <= 1:
+            raise CommonsError("threshold must be in (0, 1]")
+        live = [r for r in (self._row(r) for r in self.db.execute(
+            "SELECT * FROM records WHERE type=? ORDER BY created_seq", (type,)))
+            if r["status"] not in ("superseded", "rejected")]
+        words = {r["id"]: (_words(r["title"] + " " + r["body"]) - STOPWORDS) for r in live}
+        titles = {r["id"]: (_words(r["title"]) - STOPWORDS) for r in live}
+        pairs = []
+        for i, a in enumerate(live):
+            for b in live[i + 1:]:
+                wa, wb = words[a["id"]], words[b["id"]]
+                if not wa or not wb:
+                    continue
+                body_score = len(wa & wb) / len(wa | wb)
+                ta, tb = titles[a["id"]], titles[b["id"]]
+                title_score = len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+                score = round(max(body_score, title_score), 3)
+                if score >= threshold:
+                    pairs.append({"score": score, "older": a["id"], "newer": b["id"], "older_title": a["title"],
+                                  "newer_title": b["title"], "shared": sorted(wa & wb)[:12]})
+        pairs.sort(key=lambda p: (-p["score"], p["older"], p["newer"]))
+        return pairs[:max(1, min(limit, 1000))]
 
     def _row(self, row) -> dict:
         rid, type_, status, title, body, tags, refs, author, created, updated = row

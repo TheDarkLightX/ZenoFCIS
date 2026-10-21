@@ -65,6 +65,11 @@ $C link <refutation-id> refutes <hypothesis-id>
 
 A record holds at most 65,536 characters. When one is full, add a new record and link it to the old one.
 
+Gaps carry a severity: `--tag severity-blocker|high|medium|low` when you add one, or `$C update <id> --severity high`.
+Before adding a gap, run `$C gaps --brief` and `$C dedup`. If yours is already there, fold yours into it with
+`$C merge <yours> --into <existing>`. The merge keeps your references and counts you as an extra reporter, which
+raises the gap's rank.
+
 Record types: hypothesis, claim, evidence, refutation, counterexample, result, gap, lesson, decision, question,
 answer, risk, note. Negative results matter most, because they stop the next agent repeating your dead end. Tag
 records with the tool, the area and the action kind (for example `cargo`, `ci`, `codex-launch`, `zenoui`,

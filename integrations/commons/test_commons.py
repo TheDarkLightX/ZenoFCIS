@@ -368,6 +368,50 @@ class CommonsTests(unittest.TestCase):
         with self.assertRaisesRegex(CommonsError, "symbolic link"):
             Commons(self.dir, "lead")
 
+    def test_a_duplicate_gap_folds_into_its_canonical_gap(self):
+        first, second = self.open("sec-review"), self.open("zenomail")
+        canonical = first.record_add("gap", "Judges cannot see deliveries", "lemmas see state only",
+                                     tags=["judges", "severity-medium"], refs=["log-a"])["id"]
+        duplicate = second.record_add("gap", "Lemmas cannot observe deliveries a decision makes", "paid at most once",
+                                      tags=["security", "severity-high"], refs=["log-b"])["id"]
+        second.link(duplicate, "duplicates", canonical)
+        second.link(duplicate, "duplicates", canonical)  # idempotent: folded once
+        merged = first.record(canonical)
+        self.assertEqual(first.record(duplicate)["status"], "superseded")
+        self.assertEqual(merged["tags"], ["judges", "security", "severity-high"])  # the higher severity wins
+        self.assertEqual(merged["refs"], sorted(["log-a", "log-b", duplicate]))
+        self.assertEqual(merged["body"].count("folded in duplicate"), 1)
+        [gap] = first.gaps()
+        self.assertEqual((gap["id"], gap["severity"], gap["reporters"]), (canonical, "high", ["sec-review", "zenomail"]))
+        with self.assertRaises(CommonsError):
+            first.link(canonical, "duplicates", duplicate)  # no folding into a closed record
+
+    def test_gaps_rank_by_severity_then_reporters_then_age(self):
+        a, b = self.open("agent-a"), self.open("agent-b")
+        low = a.record_add("gap", "Low one", tags=["severity-low"])["id"]
+        unrated = a.record_add("gap", "Unrated one")["id"]
+        high_old = a.record_add("gap", "High old", tags=["severity-high"])["id"]
+        high_new = a.record_add("gap", "High new", tags=["severity-high"])["id"]
+        twice = a.record_add("gap", "High twice", tags=["severity-high"])["id"]
+        echo = b.record_add("gap", "High twice, again", tags=["severity-medium"])["id"]
+        blocker = b.record_add("gap", "Blocker", tags=["severity-blocker"])["id"]
+        b.link(echo, "duplicates", twice)
+        a.record_update(unrated, severity="medium")
+        done = a.record_add("gap", "Already fixed", tags=["severity-blocker"])["id"]
+        a.record_update(done, status="resolved")
+        order = [g["id"] for g in a.gaps()]
+        self.assertEqual(order, [blocker, twice, high_old, high_new, unrated, low])
+        self.assertIn(done, [g["id"] for g in a.gaps(include_closed=True)])
+
+    def test_dedup_proposes_similar_gaps_and_leaves_distinct_ones(self):
+        s = self.open("lead")
+        a = s.record_add("gap", "Per-request work grows with the store's history", "every request replays history")["id"]
+        b = s.record_add("gap", "Serve state and command in time that does not grow with the store's history",
+                         "replays every decision on each request")["id"]
+        s.record_add("gap", "Show token amounts with decimals", "1.5 tokens at scale e18")
+        pairs = s.similar("gap", threshold=0.2)
+        self.assertEqual([(p["older"], p["newer"]) for p in pairs], [(a, b)])
+
     def test_refusals(self):
         s = self.open("lead")
         for bad in (lambda: s.record_add("opinion", "x"), lambda: s.record_add("lesson", "  "),

@@ -80,6 +80,17 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("update", help="change a record's status, correct its title, add a note or references")
     p.add_argument("id"); p.add_argument("--status", default=""); p.add_argument("--note", default="")
     p.add_argument("--title", default="", help="corrected title; the old one is kept in a dated note")
+    p.add_argument("--severity", default="", choices=["", "blocker", "high", "medium", "low"])
+    p.add_argument("--tag", action="append", default=[], help="add a tag")
+    p = sub.add_parser("gaps", help="gaps ranked by severity, then independent reporters, then age")
+    p.add_argument("--all", action="store_true", help="include resolved, accepted and rejected gaps")
+    p.add_argument("--brief", action="store_true", help="one line per gap")
+    p.add_argument("--limit", type=int, default=200)
+    p = sub.add_parser("dedup", help="propose duplicate pairs by word overlap (confirm each with merge)")
+    p.add_argument("--type", default="gap"); p.add_argument("--threshold", type=float, default=0.3)
+    p.add_argument("--limit", type=int, default=100)
+    p = sub.add_parser("merge", help="fold a duplicate into its canonical record (link duplicate duplicates canonical)")
+    p.add_argument("duplicate"); p.add_argument("--into", required=True)
     p.add_argument("--ref", action="append", default=[])
     p = sub.add_parser("link", help="relate two records")
     p.add_argument("src"); p.add_argument("rel"); p.add_argument("dst")
@@ -176,7 +187,16 @@ def run(args) -> tuple[int, object]:
         if cmd == "add":
             return 0, c.record_add(args.type, args.title, args.body, args.status, args.tag, args.ref, args.id)
         if cmd == "update":
-            return 0, c.record_update(args.id, args.status, args.note, args.ref, args.title)
+            return 0, c.record_update(args.id, args.status, args.note, args.ref, args.title, args.severity, args.tag)
+        if cmd == "gaps":
+            out = c.gaps(args.all, args.limit)
+            if args.brief:
+                out = [f"{g['severity']:8} x{len(g['reporters'])} {g['status']:8} {g['id']} {g['title']}" for g in out]
+            return 0, out
+        if cmd == "dedup":
+            return 0, c.similar(args.type, args.threshold, args.limit)
+        if cmd == "merge":
+            return 0, c.link(args.duplicate, "duplicates", args.into)
         if cmd == "link":
             return 0, c.link(args.src, args.rel, args.dst)
         if cmd == "show":
