@@ -7,11 +7,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from commons import Commons, CommonsError  # noqa: E402
+from commons import KEEP_EVENTS, Commons, CommonsError  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -26,7 +27,18 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("whoami", help="your registered identity, or another agent's by name or ID")
     p.add_argument("who", nargs="?", default="")
     sub.add_parser("dashboard", help="agents, leases, record counts and your unread messages")
-    sub.add_parser("verify", help="recompute the event hash chain")
+    p = sub.add_parser("verify", help="recompute the event hash chain (from the latest checkpoint, or all of it)")
+    p.add_argument("--archives", action="store_true", help="also check every archive segment from the first event")
+    sub.add_parser("storage", help="live and archive sizes, and whether the live store is over its budget")
+    p = sub.add_parser("archive", help="move all but the newest events into a compressed, chain-checked segment")
+    p.add_argument("--keep", type=int, default=None, help="events to keep live (default 20000)")
+    p.add_argument("--if-over", action="store_true", help="only when the live store is over its budget")
+    p.add_argument("--no-vacuum", action="store_true", help="do not return freed space to the file system")
+    p = sub.add_parser("export", help="write records (jsonl or md) or events (jsonl, chain-checkable)")
+    p.add_argument("what", choices=["records", "events"])
+    p.add_argument("--format", default="jsonl", choices=["jsonl", "md"])
+    p.add_argument("--with-archive", action="store_true", help="events: include archived segments first")
+    p.add_argument("--out", default="", help="file to write; default standard output")
 
     p = sub.add_parser("advise", help="read before acting: negative memory, leases and unread messages")
     p.add_argument("action")
@@ -60,8 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--body", default=""); p.add_argument("--status", default="open")
     p.add_argument("--tag", action="append", default=[]); p.add_argument("--ref", action="append", default=[])
     p.add_argument("--id", default="")
-    p = sub.add_parser("update", help="change a record's status, add a note or references")
+    p = sub.add_parser("update", help="change a record's status, correct its title, add a note or references")
     p.add_argument("id"); p.add_argument("--status", default=""); p.add_argument("--note", default="")
+    p.add_argument("--title", default="", help="corrected title; the old one is kept in a dated note")
     p.add_argument("--ref", action="append", default=[])
     p = sub.add_parser("link", help="relate two records")
     p.add_argument("src"); p.add_argument("rel"); p.add_argument("dst")
@@ -93,8 +106,28 @@ def run(args) -> tuple[int, object]:
         if cmd == "whoami":
             return 0, c.identity(args.who)
         if cmd == "verify":
-            out = c.verify()
+            out = c.verify(args.archives)
             return (0 if out["ok"] else 2), out
+        if cmd == "storage":
+            return 0, c.storage()
+        if cmd == "archive":
+            keep = KEEP_EVENTS if args.keep is None else args.keep
+            return 0, c.archive(keep, args.if_over, not args.no_vacuum)
+        if cmd == "export":
+            if args.what == "events" and args.format != "jsonl":
+                raise CommonsError("events export only as jsonl")
+            lines = c.export_events(args.with_archive) if args.what == "events" else c.export_records(args.format)
+            separator = "\n" if args.what == "events" or args.format == "jsonl" else ""
+            count = 0
+            stream = open(args.out, "w", encoding="utf-8") if args.out else sys.stdout
+            try:
+                for line in lines:
+                    stream.write(line + separator)
+                    count += 1
+            finally:
+                if args.out:
+                    stream.close()
+            return 0, ({"written": count, "out": args.out} if args.out else None)
         if cmd == "advise":
             out = c.advise(args.action, args.tag, args.text, args.limit)
             if args.brief:
@@ -127,7 +160,7 @@ def run(args) -> tuple[int, object]:
         if cmd == "add":
             return 0, c.record_add(args.type, args.title, args.body, args.status, args.tag, args.ref, args.id)
         if cmd == "update":
-            return 0, c.record_update(args.id, args.status, args.note, args.ref)
+            return 0, c.record_update(args.id, args.status, args.note, args.ref, args.title)
         if cmd == "link":
             return 0, c.link(args.src, args.rel, args.dst)
         if cmd == "show":
@@ -142,17 +175,29 @@ def run(args) -> tuple[int, object]:
             return 0, c.import_gaps(args.path)
         raise CommonsError(f"unknown command {cmd}")
     finally:
-        c.close()
+        try:
+            if args.command not in ("archive", "storage", "export") and c.storage()["over_budget"]:
+                print("commons: the live store is over its budget; run `commons archive` (see `commons storage`)",
+                      file=sys.stderr)
+        except (sqlite3.Error, OSError):
+            pass  # the size warning is advisory and never hides the command's own result
+        finally:
+            c.close()
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
         code, out = run(args)
+    except BrokenPipeError:
+        # A reader such as `head` closed the pipe early: stop quietly (Python's documented SIGPIPE practice).
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 0
     except (CommonsError, json.JSONDecodeError, OSError) as error:
         print(json.dumps({"refused": str(error)[:2000]}), file=sys.stderr)
         return 2
-    print(json.dumps(out, indent=2, ensure_ascii=False))
+    if out is not None:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
     return code
 
 

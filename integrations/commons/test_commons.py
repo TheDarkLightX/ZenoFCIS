@@ -201,7 +201,92 @@ class CommonsTests(unittest.TestCase):
         raw.execute("UPDATE events SET body=? WHERE seq=3", (json.dumps({"exit": 1}),))
         raw.commit()
         raw.close()
-        self.assertEqual(s.verify(), {"ok": False, "broken_at": 3, "checked": 2})
+        self.assertEqual(s.verify(), {"ok": False, "broken_at": 3, "checked": 2, "reason": "hash chain mismatch"})
+
+    def test_archive_keeps_the_newest_events_and_the_whole_history_still_verifies(self):
+        s = self.open("lead")
+        for i in range(30):
+            s.emit("atdd", "result", f"scenario-{i}", {"i": i})
+        top = s.events(limit=1000)[-1]["seq"]
+        out = s.archive(keep_events=10)
+        self.assertEqual((out["first"], out["last"], out["archived"]), (1, top - 10, top - 10))
+        self.assertEqual(s.events(limit=1000)[0]["seq"], top - 9)  # the newest ten stay live
+        live = s.verify()
+        self.assertTrue(live["ok"])
+        self.assertEqual(live["from_seq"], top - 9)
+        for i in range(30):
+            s.emit("atdd", "result", f"later-{i}", {"i": i})
+        second = s.archive(keep_events=5)
+        self.assertEqual(second["first"], top - 9)
+        full = s.verify(archives=True)
+        self.assertTrue(full["ok"], full)
+        self.assertEqual((full["from_seq"], full["archives"]), (1, 2))
+        self.assertEqual(full["checked"], s.events(limit=1000)[-1]["seq"])
+        self.assertEqual(s.archive(keep_events=5)["archived"], 1)  # only the previous archive event was left over
+        self.assertEqual(s.archive(keep_events=5)["archived"], 1)
+
+    def test_archive_keeps_unread_messages_and_drops_read_ones(self):
+        lead, worker, idle = self.open("lead"), self.open("worker"), self.open("idle")
+        read = lead.send("worker", "read this")["seq"]
+        unread = lead.send("idle", "still waiting")["seq"]
+        lead.send("*", "everyone")
+        worker.ack(read)
+        for i in range(5):
+            lead.emit("test", "tick", f"t-{i}", {})
+        out = lead.archive(keep_events=0)
+        self.assertEqual(out["messages_removed"], 2)
+        self.assertEqual([m["seq"] for m in idle.inbox()["messages"]], [unread])
+        self.assertEqual(worker.inbox(include_read=True)["messages"], [])
+
+    def test_archive_refuses_a_broken_chain_and_writes_nothing(self):
+        s = self.open("lead")
+        for i in range(6):
+            s.emit("atdd", "result", f"s-{i}", {"exit": 0})
+        raw = sqlite3.connect(self.dir / DB_NAME)
+        raw.execute("UPDATE events SET body=? WHERE seq=4", (json.dumps({"exit": 1}),))
+        raw.commit()
+        raw.close()
+        with self.assertRaisesRegex(CommonsError, "chain is broken at 4"):
+            s.archive(keep_events=1)
+        self.assertEqual(list((self.dir / "archive").glob("*.xz")) if (self.dir / "archive").exists() else [], [])
+        self.assertEqual(s.storage()["archived_through"], 0)
+
+    def test_a_changed_segment_or_checkpoint_is_detected(self):
+        s = self.open("lead")
+        for i in range(12):
+            s.emit("atdd", "result", f"s-{i}", {"exit": 0})
+        out = s.archive(keep_events=3)
+        segment = self.dir / "archive" / out["segment"]
+        self.assertTrue(s.verify(archives=True)["ok"])
+        original = segment.read_bytes()
+        segment.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+        self.assertFalse(s.verify(archives=True)["ok"])
+        segment.write_bytes(original)
+        raw = sqlite3.connect(self.dir / DB_NAME)
+        raw.execute("UPDATE checkpoints SET head=?", ("f" * 64,))
+        raw.commit()
+        raw.close()
+        self.assertFalse(s.verify()["ok"])  # the live chain no longer starts where the checkpoint says
+
+    def test_archive_if_over_does_nothing_within_budget(self):
+        s = self.open("lead")
+        for i in range(8):
+            s.emit("test", "tick", f"t-{i}", {})
+        self.assertEqual(s.archive(keep_events=1, if_over=True)["reason"], "within budget")
+        out = s.archive(keep_events=1, if_over=True, max_live_events=5)
+        self.assertGreater(out["archived"], 0)
+        self.assertFalse(out["storage"]["over_budget"])
+
+    def test_record_title_correction_and_size_cap(self):
+        s = self.open("lead")
+        rid = s.record_add("lesson", "wrong cause named", "first body")["id"]
+        s.record_update(rid, title="right cause named", note="the lead deleted it, not the agent")
+        record = s.record(rid)
+        self.assertEqual(record["title"], "right cause named")
+        self.assertIn("title was: wrong cause named", record["body"])
+        with self.assertRaises(CommonsError):
+            s.record_update(rid, note="x" * (65536 - len(record["body"])))
+        self.assertEqual(s.record(rid)["body"], record["body"])
 
     def test_refusals(self):
         s = self.open("lead")
@@ -256,6 +341,28 @@ class InterfaceTests(unittest.TestCase):
         refused = self.cli("lead", "lease", "take", "/tmp/work-x/source")
         self.assertEqual(refused.returncode, 2)
         self.assertIn("leased by builder", refused.stderr)
+
+    def test_cli_export_events_with_archive_recomputes_the_chain(self):
+        for i in range(12):
+            self.cli("lead", "emit", "test", "tick", f"t-{i}")
+        self.assertEqual(self.cli("lead", "archive", "--keep", "4").returncode, 0)
+        out = Path(self.tmp.name) / "events.jsonl"
+        self.assertEqual(self.cli("lead", "export", "events", "--with-archive", "--out", str(out)).returncode, 0)
+        prev, seqs = "0" * 64, []
+        import hashlib
+        for line in out.read_text().splitlines():
+            e = json.loads(line)
+            body = json.loads(e["body"])
+            digest = hashlib.sha256((prev + json.dumps([e["at"], e["actor"], e["kind"], e["subject"], body],
+                                                       sort_keys=True, separators=(",", ":"),
+                                                       ensure_ascii=False)).encode()).hexdigest()
+            self.assertEqual((e["prev"], e["hash"]), (prev, digest))
+            prev = digest
+            seqs.append(e["seq"])
+        self.assertEqual(seqs, list(range(1, len(seqs) + 1)))
+        md = self.cli("lead", "export", "records", "--format", "md")
+        self.assertEqual(md.returncode, 0)
+        self.assertIn("# Zeno Commons records", md.stdout)
 
     def test_mcp_round_trip(self):
         proc = subprocess.Popen([sys.executable, "-I", str(HERE / "mcp.py"), "--store", self.store, "--actor", "agent-1"],

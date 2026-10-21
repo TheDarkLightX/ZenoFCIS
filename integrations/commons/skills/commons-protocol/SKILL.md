@@ -59,8 +59,11 @@ $C add gap "A mailbox needs keyed collections" --tag collections --body "what_ze
 $C add lesson "Debug builds exceed the POSIX containment limit" --tag ci --tag containment --body "Set CARGO_PROFILE_DEV_DEBUG=0" --ref <log>
 $C add hypothesis "Adaptive indexing halves search work" --tag synthesis
 $C update <id> --status refuted --note "no gain below 300k comparisons" --ref <evidence>
+$C update <id> --title "corrected title"                  # the old title stays in a dated note
 $C link <refutation-id> refutes <hypothesis-id>
 ```
+
+A record holds at most 65,536 characters. When one is full, add a new record and link it to the old one.
 
 Record types: hypothesis, claim, evidence, refutation, counterexample, result, gap, lesson, decision, question,
 answer, risk, note. Negative results matter most, because they stop the next agent repeating your dead end. Tag
@@ -79,6 +82,14 @@ $C lease release /tmp/zf26-x && $C status done                     # done is ref
 ```
 
 Every report you send states **"read through message N"**, and lists the IDs of the records you added.
+
+## Size and history
+
+The store keeps the newest 20,000 events live. A keeper service runs `$C archive --if-over` every hour. Older
+events move to compressed segments under `archive/`, and each move is checked against the hash chain and recorded
+in it. Records and unread messages always stay live. `$C storage` shows the sizes. `$C verify --archives` checks
+the whole history. `$C export records --format md` and `$C export events --with-archive` write copies. Agents
+don't run `archive`; the lead and the keeper do.
 
 ## What never goes in
 

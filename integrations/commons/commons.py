@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import lzma
 import os
 import re
 import sqlite3
@@ -33,6 +34,13 @@ MAX_TEXT = 65536
 MAX_TAGS = 32
 # Negative memory: what advise returns before an action.
 ADVISE_TYPES = ("lesson", "refutation", "counterexample", "gap", "risk", "decision")
+# Size bounds. The live store keeps the newest events; older ones move to compressed, chain-checked segments.
+ARCHIVE_DIR = "archive"
+ARCHIVE_FORMAT = "zeno-fcis/commons-archive/1"
+BUDGET_BYTES = 64 * 1024 * 1024
+MAX_LIVE_EVENTS = 50_000
+KEEP_EVENTS = 20_000
+GENESIS = "0" * 64
 
 
 class CommonsError(ValueError):
@@ -119,7 +127,50 @@ CREATE TABLE IF NOT EXISTS identities(
   registered_by TEXT NOT NULL, registered_seq INTEGER NOT NULL, registered_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS links(
   src TEXT NOT NULL, rel TEXT NOT NULL, dst TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(src, rel, dst));
+CREATE TABLE IF NOT EXISTS checkpoints(
+  last INTEGER PRIMARY KEY, first INTEGER NOT NULL, prev TEXT NOT NULL, head TEXT NOT NULL, segment TEXT NOT NULL,
+  sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, events INTEGER NOT NULL, archived_seq INTEGER NOT NULL);
 """
+
+
+def _check_chain(rows, prev: str, first: int) -> dict:
+    """Recompute a run of events from the hash before it. Sequence numbers must be contiguous from first."""
+    count = 0
+    for seq, at, actor, kind, subject, body, stored_prev, digest in rows:
+        expected = hashlib.sha256((prev + _canonical([at, actor, kind, subject, json.loads(body)])).encode()).hexdigest()
+        if seq != first + count:
+            return {"ok": False, "broken_at": seq, "checked": count, "reason": f"expected event {first + count}"}
+        if stored_prev != prev or digest != expected:
+            return {"ok": False, "broken_at": seq, "checked": count, "reason": "hash chain mismatch"}
+        prev, count = digest, count + 1
+    return {"ok": True, "checked": count, "head": prev}
+
+
+def _segment_rows(path: Path) -> tuple[dict, list]:
+    """The header and event rows of one archive segment."""
+    with lzma.open(path, "rt", encoding="utf-8") as stream:
+        header = json.loads(stream.readline())
+        if header.get("format") != ARCHIVE_FORMAT:
+            raise CommonsError(f"{path.name} is not a {ARCHIVE_FORMAT} segment")
+        rows = []
+        for line in stream:
+            e = json.loads(line)
+            rows.append((e["seq"], e["at"], e["actor"], e["kind"], e["subject"], e["body"], e["prev"], e["hash"]))
+    return header, rows
+
+
+def _event_line(row) -> str:
+    seq, at, actor, kind, subject, body, prev, digest = row
+    return _canonical({"seq": seq, "at": at, "actor": actor, "kind": kind, "subject": subject, "body": body,
+                       "prev": prev, "hash": digest})
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for block in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 class Commons:
@@ -379,25 +430,40 @@ class Commons:
         except _Existing:
             return {"seq": None, "id": record_id, "existing": True}
 
-    def record_update(self, record_id: str, status: str = "", note: str = "", refs=None) -> dict:
+    def record_update(self, record_id: str, status: str = "", note: str = "", refs=None, title: str = "") -> dict:
+        """Change status, append a dated note, add references or correct the title (the old title stays in the note).
+
+        A record never grows past the text limit: once full, add a new record and link it."""
         if status and status not in RECORD_STATUSES:
             raise CommonsError(f"status must be one of {', '.join(RECORD_STATUSES)}")
         note = _text(note, "note", True)
+        title = _text(title, "title", True).strip()
         refs = refs or []
+        if not isinstance(refs, list) or len(refs) > 64 or not all(isinstance(r, str) and len(r) <= 4096 for r in refs):
+            raise CommonsError("refs must be a list of at most 64 references (paths, commits, record IDs, hashes)")
 
         def apply(cursor, seq, at):
             self._require_registered(cursor)
-            row = cursor.execute("SELECT status, refs, body FROM records WHERE id=?", (record_id,)).fetchone()
+            row = cursor.execute("SELECT status, refs, body, title FROM records WHERE id=?", (record_id,)).fetchone()
             if not row:
                 raise CommonsError(f"no record {record_id}")
             new_status = status or row[0]
             new_refs = sorted(set(json.loads(row[1])) | set(refs))
-            new_body = row[2] + (f"\n[{_iso(at)} {self.actor}] {note}" if note.strip() else "")
-            cursor.execute("UPDATE records SET status=?, refs=?, body=?, updated_seq=? WHERE id=?",
-                           (new_status, _canonical(new_refs), new_body, seq, record_id))
-            return {"seq": seq, "id": record_id, "status": new_status}
+            if len(new_refs) > 64:
+                raise CommonsError(f"{record_id} would have more than 64 references; add a new record and link it")
+            new_title = title or row[3]
+            lines = ([f"title was: {row[3]}"] if title and title != row[3] else []) + ([note] if note.strip() else [])
+            new_body = row[2] + "".join(f"\n[{_iso(at)} {self.actor}] {line}" for line in lines)
+            if len(new_body) > MAX_TEXT:
+                raise CommonsError(f"{record_id} is full ({MAX_TEXT} characters); add a new record and link it")
+            cursor.execute("UPDATE records SET status=?, refs=?, body=?, title=?, updated_seq=? WHERE id=?",
+                           (new_status, _canonical(new_refs), new_body, new_title, seq, record_id))
+            return {"seq": seq, "id": record_id, "status": new_status, "title": new_title}
 
-        return self._write("record.update", record_id, {"status": status, "note": note, "refs": refs}, apply)
+        body = {"status": status, "note": note, "refs": refs}
+        if title:
+            body["title"] = title
+        return self._write("record.update", record_id, body, apply)
 
     def link(self, src: str, rel: str, dst: str) -> dict:
         if rel not in LINK_RELATIONS:
@@ -484,16 +550,202 @@ class Commons:
         return [{"seq": s, "at": _iso(a), "actor": ac, "kind": k, "subject": su, "body": json.loads(b)}
                 for s, a, ac, k, su, b in rows]
 
-    def verify(self) -> dict:
-        """Recompute the hash chain. Any edit, deletion or reordering of past events breaks it."""
-        prev, count = "0" * 64, 0
-        for seq, at, actor, kind, subject, body, stored_prev, digest in self.db.execute(
-                "SELECT seq, at, actor, kind, subject, body, prev, hash FROM events ORDER BY seq"):
-            expected = hashlib.sha256((prev + _canonical([at, actor, kind, subject, json.loads(body)])).encode()).hexdigest()
-            if stored_prev != prev or digest != expected:
-                return {"ok": False, "broken_at": seq, "checked": count}
-            prev, count = digest, count + 1
-        return {"ok": True, "checked": count, "head": prev}
+    def _checkpoints(self) -> list[tuple]:
+        return self.db.execute("SELECT first, last, prev, head, segment, sha256, bytes, events, archived_seq "
+                               "FROM checkpoints ORDER BY last").fetchall()
+
+    def verify(self, archives: bool = False) -> dict:
+        """Recompute the hash chain. Any edit, deletion or reordering of past events breaks it.
+
+        Without archives the live events are checked from the latest checkpoint (from_seq says where). With
+        archives every segment is checked too, so the whole history is recomputed from the first event."""
+        checkpoints = self._checkpoints()
+        archived = {c[1]: c for c in checkpoints}
+        prev, first, checked = GENESIS, 1, 0
+        if archives:
+            for c_first, last, c_prev, head, segment, digest, _, events, _ in checkpoints:
+                path = self.directory / ARCHIVE_DIR / segment
+                if c_first != first or c_prev != prev:
+                    return {"ok": False, "broken_at": c_first, "checked": checked, "reason": "checkpoints are not contiguous"}
+                if not path.exists() or _sha256_file(path) != digest:
+                    return {"ok": False, "broken_at": c_first, "checked": checked,
+                            "reason": f"segment {segment} is missing or does not match its checkpoint"}
+                try:
+                    _, rows = _segment_rows(path)
+                except (lzma.LZMAError, EOFError, ValueError, KeyError, CommonsError) as error:
+                    return {"ok": False, "broken_at": c_first, "checked": checked,
+                            "reason": f"segment {segment} is unreadable ({type(error).__name__})"}
+                segment_check = _check_chain(rows, prev, first)
+                if not segment_check["ok"]:
+                    return dict(segment_check, checked=checked + segment_check["checked"])
+                if segment_check["head"] != head or segment_check["checked"] != events or rows[-1][0] != last:
+                    return {"ok": False, "broken_at": c_first, "checked": checked, "reason": f"segment {segment} ends elsewhere"}
+                bad = self._archived_event_mismatch(rows, archived)
+                if bad:
+                    return {"ok": False, "broken_at": bad, "checked": checked, "reason": "an archive record disagrees with its checkpoint"}
+                prev, first, checked = head, last + 1, checked + events
+        elif checkpoints:
+            prev, first = checkpoints[-1][3], checkpoints[-1][1] + 1
+        rows = self.db.execute("SELECT seq, at, actor, kind, subject, body, prev, hash FROM events ORDER BY seq").fetchall()
+        result = _check_chain(rows, prev, first)
+        if not result["ok"]:
+            return dict(result, checked=checked + result["checked"])
+        bad = self._archived_event_mismatch(rows, archived)
+        if bad:
+            return {"ok": False, "broken_at": bad, "checked": checked, "reason": "an archive record disagrees with its checkpoint"}
+        return {"ok": True, "checked": checked + result["checked"], "head": result["head"],
+                "from_seq": 1 if archives else first, "archives": len(checkpoints) if archives else 0}
+
+    @staticmethod
+    def _archived_event_mismatch(rows, archived: dict) -> int | None:
+        """Each store.archived event in the chain must match its checkpoint row: the chain binds every segment."""
+        for seq, _, _, kind, _, body, _, _ in rows:
+            if kind != "store.archived":
+                continue
+            b = json.loads(body)
+            c = archived.get(b.get("last"))
+            if not c or (c[0], c[2], c[3], c[4], c[5], c[6], c[7]) != (
+                    b.get("first"), b.get("prev"), b.get("head"), b.get("segment"), b.get("sha256"), b.get("bytes"),
+                    b.get("events")) or c[8] != seq:
+                return seq
+        return None
+
+    def storage(self, budget_bytes: int = BUDGET_BYTES, max_live_events: int = MAX_LIVE_EVENTS) -> dict:
+        """Sizes of the live store and its archive, and whether the live store is over its budget."""
+        live = sum(p.stat().st_size for p in (self.directory / n for n in (DB_NAME, DB_NAME + "-wal")) if p.exists())
+        folder = self.directory / ARCHIVE_DIR
+        segments = sorted(folder.glob("events-*.jsonl.xz")) if folder.exists() else []
+        low, high = self.db.execute("SELECT MIN(seq), MAX(seq) FROM events").fetchone()
+        live_events = (high - low + 1) if low else 0
+        record_chars = self.db.execute("SELECT COALESCE(SUM(LENGTH(title) + LENGTH(body)), 0) FROM records").fetchone()[0]
+        checkpoints = self._checkpoints()
+        return {"live_bytes": live, "budget_bytes": budget_bytes, "live_events": live_events,
+                "max_live_events": max_live_events, "archived_through": checkpoints[-1][1] if checkpoints else 0,
+                "archive_segments": len(segments), "archive_bytes": sum(p.stat().st_size for p in segments),
+                "record_characters": record_chars,
+                "over_budget": live > budget_bytes or live_events > max_live_events}
+
+    def archive(self, keep_events: int = KEEP_EVENTS, if_over: bool = False, vacuum: bool = True,
+                budget_bytes: int = BUDGET_BYTES, max_live_events: int = MAX_LIVE_EVENTS) -> dict:
+        """Move all but the newest keep_events events into one compressed segment and record a checkpoint.
+
+        The segment is written, read back and chain-checked before anything is removed. The removal is one
+        transaction that also appends a store.archived event naming the segment's hash, so the live chain binds
+        it. Read messages, broadcasts and messages to finished agents in the archived range leave the live
+        message table (their text stays in the segment); unread messages to other agents stay. Expired leases
+        are dropped. Records are knowledge and are never archived; each is capped at the text limit."""
+        if not isinstance(keep_events, int) or keep_events < 0:
+            raise CommonsError("keep_events must be a non-negative number of events")
+        before = self.storage(budget_bytes, max_live_events)
+        if if_over and not before["over_budget"]:
+            return {"archived": 0, "reason": "within budget", "storage": before}
+        checkpoints = self._checkpoints()
+        base, prev = (checkpoints[-1][1], checkpoints[-1][3]) if checkpoints else (0, GENESIS)
+        top = self.db.execute("SELECT COALESCE(MAX(seq), 0) FROM events").fetchone()[0]
+        cut = top - keep_events
+        if cut <= base:
+            return {"archived": 0, "reason": f"nothing older than the newest {keep_events} events", "storage": before}
+        rows = self.db.execute("SELECT seq, at, actor, kind, subject, body, prev, hash FROM events "
+                               "WHERE seq > ? AND seq <= ? ORDER BY seq", (base, cut)).fetchall()
+        checked = _check_chain(rows, prev, base + 1)
+        if not checked["ok"]:
+            raise CommonsError(f"the event chain is broken at {checked['broken_at']}; archive refused")
+        head = checked["head"]
+        folder = self.directory / ARCHIVE_DIR
+        folder.mkdir(exist_ok=True)
+        name = f"events-{base + 1:012d}-{cut:012d}.jsonl.xz"
+        path = folder / name
+        temporary = folder / f".{name}.{os.getpid()}.{os.urandom(4).hex()}.tmp"
+        try:
+            with lzma.open(temporary, "wt", encoding="utf-8", preset=6) as out:
+                out.write(_canonical({"format": ARCHIVE_FORMAT, "first": base + 1, "last": cut, "prev": prev,
+                                      "head": head, "events": len(rows)}) + "\n")
+                for row in rows:
+                    out.write(_event_line(row) + "\n")
+            with open(temporary, "rb") as stream:
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        header, back = _segment_rows(path)  # read back before removing anything
+        again = _check_chain(back, prev, base + 1)
+        if not again["ok"] or again["head"] != head or len(back) != len(rows) or header["head"] != head:
+            path.unlink(missing_ok=True)
+            raise CommonsError("the written segment does not read back to the same events; archive refused")
+        body = {"first": base + 1, "last": cut, "events": len(rows), "prev": prev, "head": head, "segment": name,
+                "sha256": _sha256_file(path), "bytes": path.stat().st_size}
+
+        def apply(cursor, seq, at):
+            self._require_registered(cursor)
+            if (cursor.execute("SELECT COALESCE(MAX(last), 0) FROM checkpoints").fetchone()[0] != base):
+                raise CommonsError("another archive ran meanwhile; run archive again")
+            row = cursor.execute("SELECT hash FROM events WHERE seq=?", (cut,)).fetchone()
+            if not row or row[0] != head:
+                raise CommonsError("events changed during archive; archive refused")
+            cursor.execute("INSERT INTO checkpoints VALUES(?,?,?,?,?,?,?,?,?)",
+                           (cut, base + 1, prev, head, name, body["sha256"], body["bytes"], len(rows), seq))
+            cursor.execute("DELETE FROM events WHERE seq <= ?", (cut,))
+            removed = cursor.execute(
+                "DELETE FROM messages WHERE seq <= ? AND (recipient = '*' "
+                "OR seq <= COALESCE((SELECT read_through FROM agents a WHERE a.name = messages.recipient), 0) "
+                "OR (SELECT state FROM agents a WHERE a.name = messages.recipient) = 'done')", (cut,)).rowcount
+            expired = cursor.execute("DELETE FROM leases WHERE expires_at <= ?", (at,)).rowcount
+            return {"seq": seq, "archived": len(rows), "segment": name, "first": base + 1, "last": cut,
+                    "messages_removed": removed, "expired_leases_removed": expired}
+
+        try:
+            result = self._write("store.archived", name, body, apply)
+        except BaseException:
+            referenced = self.db.execute("SELECT 1 FROM checkpoints WHERE segment=?", (name,)).fetchone()
+            if not referenced:
+                path.unlink(missing_ok=True)
+            raise
+        if vacuum:
+            try:
+                self.db.execute("VACUUM")
+                self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.OperationalError as error:
+                result["vacuum"] = f"skipped ({error}); freed pages are reused by later writes"
+        result["storage"] = self.storage(budget_bytes, max_live_events)
+        return result
+
+    def export_events(self, with_archive: bool = False):
+        """Event lines (seq, at, actor, kind, subject, body, prev, hash): enough to recompute the chain elsewhere."""
+        if with_archive:
+            for checkpoint in self._checkpoints():
+                for row in _segment_rows(self.directory / ARCHIVE_DIR / checkpoint[4])[1]:
+                    yield _event_line(row)
+        for row in self.db.execute("SELECT seq, at, actor, kind, subject, body, prev, hash FROM events ORDER BY seq"):
+            yield _event_line(row)
+
+    def export_records(self, fmt: str = "jsonl"):
+        """Every record with its links, as JSON lines or as Markdown grouped by type."""
+        if fmt not in ("jsonl", "md"):
+            raise CommonsError("format must be jsonl or md")
+        rows = [self._row(r) for r in self.db.execute("SELECT * FROM records ORDER BY type, created_seq")]
+        links = self.db.execute("SELECT src, rel, dst FROM links ORDER BY seq").fetchall()
+        if fmt == "jsonl":
+            for record in rows:
+                yield _canonical(record)
+            for src, rel, dst in links:
+                yield _canonical({"link": [src, rel, dst]})
+            return
+        yield f"# Zeno Commons records\n\n{len(rows)} records and {len(links)} links.\n"
+        current = None
+        for record in rows:
+            if record["type"] != current:
+                current = record["type"]
+                yield f"\n## {current}\n"
+            meta = f"{record['status']} · by {record['author']}"
+            if record["tags"]:
+                meta += " · tags: " + ", ".join(record["tags"])
+            yield f"\n### {record['id']}: {record['title']}\n\n{meta}\n"
+            if record["body"].strip():
+                yield "\n" + record["body"].rstrip() + "\n"
+            if record["refs"]:
+                yield "\nReferences: " + ", ".join(record["refs"]) + "\n"
+        if links:
+            yield "\n## Links\n\n" + "".join(f"- {s} {r} {d}\n" for s, r, d in links)
 
     def dashboard(self) -> dict:
         counts = {}
@@ -501,7 +753,7 @@ class Commons:
             counts.setdefault(type_, {})[status] = n
         top = self.db.execute("SELECT COALESCE(MAX(seq), 0) FROM events").fetchone()[0]
         return {"format": FORMAT, "events": top, "agents": self.agents(), "leases": self.leases(),
-                "records": counts, "unread_for_me": len(self.inbox()["messages"])}
+                "records": counts, "unread_for_me": len(self.inbox()["messages"]), "storage": self.storage()}
 
     # ---- migration --------------------------------------------------------------------------------------
     def import_gaps(self, path: str | os.PathLike) -> dict:

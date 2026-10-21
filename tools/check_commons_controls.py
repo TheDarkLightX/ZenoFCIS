@@ -7,6 +7,7 @@ test. Exit 0 only if every mutation is caught and the unmutated copy passes the 
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -30,14 +31,30 @@ CONTROLS = [
     ("reimport-writes-events", "                raise _Existing()  # idempotent: same content, same id, and no event is written",
      "                return {\"seq\": seq, \"id\": record_id, \"existing\": True}",
      "CommonsTests.test_import_is_idempotent_and_writes_no_events_the_second_time"),
+    ("archive-drops-unread", "                \"DELETE FROM messages WHERE seq <= ? AND (recipient = '*' \"",
+     "                \"DELETE FROM messages WHERE seq <= ? OR (recipient = '*' \"",
+     "CommonsTests.test_archive_keeps_unread_messages_and_drops_read_ones"),
+    ("archive-past-the-keep-window", "        cut = top - keep_events\n", "        cut = top - keep_events + 1\n",
+     "CommonsTests.test_archive_keeps_the_newest_events_and_the_whole_history_still_verifies"),
+    ("archive-skips-chain-check",
+     "        if not checked[\"ok\"]:\n            raise CommonsError(f\"the event chain is broken at {checked['broken_at']}; "
+     "archive refused\")\n        head = checked[\"head\"]",
+     "        head = rows[-1][7]",
+     "CommonsTests.test_archive_refuses_a_broken_chain_and_writes_nothing"),
+    ("record-grows-past-limit", "            if len(new_body) > MAX_TEXT:\n", "            if False:\n",
+     "CommonsTests.test_record_title_correction_and_size_cap"),
     ("unregistered-writes", "        if not cursor.execute(\"SELECT 1 FROM identities WHERE name=?\", (self.actor,)).fetchone():\n            raise CommonsError(f\"{self.actor} is not registered; run register first so others can address you\")",
      "        pass", "CommonsTests.test_unregistered_actors_cannot_coordinate_but_tools_can_emit"),
 ]
 
 
-def run_test(directory: Path, test: str) -> int:
-    return subprocess.run([sys.executable, "-m", "unittest", f"test_commons.{test}"], cwd=directory,
-                          capture_output=True, text=True, timeout=300).returncode
+def run_test(directory: Path, test: str) -> str:
+    """'pass', 'fail' (an assertion refuted the mutant) or 'error' (it crashed, which does not count as caught)."""
+    done = subprocess.run([sys.executable, "-m", "unittest", f"test_commons.{test}"], cwd=directory,
+                          capture_output=True, text=True, timeout=300)
+    if done.returncode == 0:
+        return "pass"
+    return "fail" if re.search(r"FAILED \(failures=\d+", done.stderr) else "error"
 
 
 def main() -> int:
@@ -46,7 +63,7 @@ def main() -> int:
         for name, before, after, test in CONTROLS:
             copy = Path(tmp) / name
             shutil.copytree(SOURCE, copy, ignore=shutil.ignore_patterns("__pycache__"))
-            if run_test(copy, test) != 0:
+            if run_test(copy, test) != "pass":
                 failures.append(f"{name}: the unmutated test {test} does not pass")
                 continue
             target = copy / "commons.py"
@@ -55,10 +72,10 @@ def main() -> int:
                 failures.append(f"{name}: the mutation site is missing or ambiguous")
                 continue
             target.write_text(text.replace(before, after))
-            caught = run_test(copy, test) != 0
-            print(f"{name}: {'caught by ' + test if caught else 'NOT CAUGHT'}")
-            if not caught:
-                failures.append(f"{name}: {test} still passes with the mutation")
+            verdict = run_test(copy, test)
+            print(f"{name}: {'caught by ' + test if verdict == 'fail' else 'NOT CAUGHT (' + verdict + ')'}")
+            if verdict != "fail":
+                failures.append(f"{name}: {test} gives {verdict} with the mutation, not a failed assertion")
     for failure in failures:
         print("FAIL", failure)
     return 1 if failures else 0
