@@ -1,5 +1,4 @@
 //! Keyed collections: the view, the metadata and the type checks.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use zeno_fcis_spec::{
     DiagnosticCode, ProjectLimits, ProjectSpec, SourceLimits, SummaryKind, elaborate_project,
@@ -10,17 +9,18 @@ const TOKENS: &str = include_str!("../../../examples/collections/token-balances/
 
 fn spec(source: &str) -> ProjectSpec {
     elaborate_project(
-        parse_project(source, SourceLimits::default()).unwrap(),
+        parse_project(source, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}")),
         ProjectLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 /// The refusal paths of a source that adds `extra` to the token example.
 fn refusals(extra: &str) -> Vec<(DiagnosticCode, String, String)> {
     let source = format!("{TOKENS}{extra}\n");
     parse_project(&source, SourceLimits::default())
-        .expect_err(extra)
+        .err()
+        .unwrap_or_else(|| panic!("unexpected acceptance: {extra}"))
         .diagnostics()
         .iter()
         .map(|d| {
@@ -53,8 +53,12 @@ fn collections_lower_to_a_view_of_named_entries() {
         ]
     );
     let range = |id: u32| {
-        let t = project.types().iter().find(|t| t.id().get() == id).unwrap();
-        let r = t.range().unwrap();
+        let t = project
+            .types()
+            .iter()
+            .find(|t| t.id().get() == id)
+            .unwrap_or_else(|| panic!("missing declaration"));
+        let r = t.range().unwrap_or_else(|| panic!("expected range"));
         (r.min(), r.max())
     };
     // Two key positions of AccountId: from and to.
@@ -66,10 +70,16 @@ fn collections_lower_to_a_view_of_named_entries() {
     assert_eq!(collections.entries().len(), 2);
     assert_eq!(
         collections.summaries()[0].kind(),
-        SummaryKind::Sum(zeno_fcis_spec::StableId::new(140).unwrap())
+        SummaryKind::Sum(
+            zeno_fcis_spec::StableId::new(140).unwrap_or_else(|| panic!("invalid stable ID"))
+        )
     );
     // The per-entry law is the conjunction over the named entries.
-    let law = project.laws().iter().find(|l| l.id().get() == 501).unwrap();
+    let law = project
+        .laws()
+        .iter()
+        .find(|l| l.id().get() == 501)
+        .unwrap_or_else(|| panic!("missing declaration"));
     let written = spec(&TOKENS.replace(
         "forall e in entries 110 { post.100.e == 1 || post.100.e.140 == 0 }",
         "(post.100.160 == 1 || post.100.161 == 0) && (post.100.170 == 1 || post.100.171 == 0)",
@@ -80,14 +90,15 @@ fn collections_lower_to_a_view_of_named_entries() {
             .laws()
             .iter()
             .find(|l| l.id().get() == 501)
-            .unwrap()
+            .unwrap_or_else(|| panic!("missing declaration"))
             .formula()
     );
 }
 
 #[test]
 fn collections_print_their_view_and_bind_their_metadata() {
-    let expansion = expand_tables(TOKENS, SourceLimits::default()).unwrap();
+    let expansion =
+        expand_tables(TOKENS, SourceLimits::default()).unwrap_or_else(|error| panic!("{error:?}"));
     for line in [
         "type 103 int AccountId in 0..=1;",
         "type 110 int accounts_present in 0..=1;",
@@ -101,19 +112,36 @@ fn collections_print_their_view_and_bind_their_metadata() {
     let view = spec(&expansion.text);
     assert!(view.collections().is_empty());
     assert_eq!(
-        original.view().canonical_bytes().unwrap(),
-        view.canonical_bytes().unwrap()
+        original
+            .view()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}")),
+        view.canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}"))
     );
     // The full encoding is format 5 and binds the capacity, which the view
     // does not.
-    let bytes = original.canonical_bytes().unwrap();
+    let bytes = original
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("{error:?}"));
     let marker = b"ZFCIS-PROJECT-SPEC\0".len();
     assert_eq!(&bytes[marker..marker + 2], &5u16.to_be_bytes());
     let smaller = spec(&TOKENS.replace("capacity 1048576", "capacity 1024"));
-    assert_ne!(smaller.canonical_bytes().unwrap(), bytes);
+    assert_ne!(
+        smaller
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}")),
+        bytes
+    );
     assert_eq!(
-        smaller.view().canonical_bytes().unwrap(),
-        original.view().canonical_bytes().unwrap()
+        smaller
+            .view()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}")),
+        original
+            .view()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}"))
     );
 }
 
@@ -224,4 +252,26 @@ fn collections_state_laws_read_one_named_entry_or_only_scalars() {
             "{extra}"
         );
     }
+}
+
+#[test]
+fn collection_format_five_keeps_rewards_before_collection_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
+    let source = format!(
+        "{TOKENS}\nrandom 600 entropy on command.101.133 bits 2 independent uniform;\nreward 610 payout random {{600}} on post.100.120 failure -1 {{ expectation >= 0; }}\n"
+    );
+    let project = spec(&source);
+    let encoded = project.canonical_bytes()?;
+    let view = project.view().canonical_bytes()?;
+    let marker = b"ZFCIS-PROJECT-SPEC\0".len();
+    assert_eq!(&encoded[marker..marker + 2], &5u16.to_be_bytes());
+    assert_eq!(&view[marker..marker + 2], &4u16.to_be_bytes());
+    assert_eq!(project.rewards().len(), 1);
+    // Everything after the format word in the view, including the complete
+    // random/distribution/reward section, precedes the collection metadata.
+    assert!(encoded.len() > view.len());
+    assert_eq!(&encoded[marker + 2..view.len()], &view[marker + 2..]);
+    let changed = spec(&source.replace("expectation >= 0", "expectation >= 1"));
+    assert_ne!(encoded, changed.canonical_bytes()?);
+    Ok(())
 }

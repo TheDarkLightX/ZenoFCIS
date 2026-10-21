@@ -1,5 +1,4 @@
 //! `contract collections`: exits, packets and declared effects.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -17,14 +16,14 @@ fn collections(dir: &Path, more: &[&str], exit: i32) -> Value {
         .arg(dir)
         .args(more)
         .output()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(
         output.status.code(),
         Some(exit),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    serde_json::from_slice(&output.stdout).unwrap()
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 #[test]
@@ -37,29 +36,36 @@ fn collections_cli_checks_the_examples_and_refutes_a_minting_self_transfer() {
         assert!(
             packet["claim"]
                 .as_str()
-                .unwrap()
+                .unwrap_or_else(|| panic!("expected as_str"))
                 .contains("every number of entries")
         );
     }
     let dir = std::env::temp_dir().join(format!("collections-cli-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("v2")).unwrap();
+    std::fs::create_dir_all(dir.join("v2")).unwrap_or_else(|error| panic!("{error:?}"));
     let source = example("token-balances");
-    std::fs::copy(source.join("project.zeno"), dir.join("project.zeno")).unwrap();
-    let mut rules: Value =
-        serde_json::from_slice(&std::fs::read(source.join("v2/policy.json")).unwrap()).unwrap();
-    for case in rules["cases"].as_array_mut().unwrap() {
+    std::fs::copy(source.join("project.zeno"), dir.join("project.zeno"))
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    let mut rules: Value = serde_json::from_slice(
+        &std::fs::read(source.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("{error:?}"));
+    for case in rules["cases"]
+        .as_array_mut()
+        .unwrap_or_else(|| panic!("expected as_array_mut"))
+    {
         if case["rule"] == "a transfer to the same account changes nothing" {
             case["post"] = serde_json::json!({"170": "1", "171": "receiver_balance + amount"});
         }
     }
-    std::fs::write(dir.join("v2/policy.json"), rules.to_string()).unwrap();
+    std::fs::write(dir.join("v2/policy.json"), rules.to_string())
+        .unwrap_or_else(|error| panic!("{error:?}"));
     let packet = collections(&dir, &[], 1);
     assert_eq!(packet["result"]["obligation"], "summary delta");
     assert!(packet["claim"].is_null());
     let packet = collections(&example("token-balances"), &["--max-tuples", "100"], 2);
     assert_eq!(packet["status"], "UNKNOWN");
-    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));
 }
 
 #[test]
@@ -67,9 +73,10 @@ fn collections_cli_declares_its_effects() {
     let output = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
         .args(["describe", "contract", "collections"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("{error:?}"));
     assert!(output.status.success());
-    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let result: Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     let effects = &result["command"]["effects"];
     assert_eq!(
         effects["reads"],
