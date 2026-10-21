@@ -235,6 +235,29 @@ fn ambiguous_framing() {
 }
 
 #[test]
+fn transfer_codings_other_than_chunked() {
+    let chunked = |coding: &str| {
+        let mut wire = format!(
+            "POST /command HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {}\r\nTransfer-Encoding: {coding}\r\n\r\n{:x}\r\n",
+            "ab".repeat(32),
+            body().len()
+        )
+        .into_bytes();
+        wire.extend_from_slice(&body());
+        wire.extend_from_slice(b"\r\n0\r\n\r\n");
+        wire
+    };
+    assert_eq!(status(&exchange(&mut server(), chunked("chunked"), false)), 200);
+    for coding in ["gzip, chunked", "deflate, chunked", "x-custom, chunked"] {
+        assert_eq!(
+            status(&exchange(&mut server(), chunked(coding), false)),
+            400,
+            "transfer coding other than chunked accepted: {coding}"
+        );
+    }
+}
+
+#[test]
 fn closed_asset_routes_and_authenticated_views() {
     use zeno_fcis_ingress::Asset;
     let mut assets_server = ok(server().with_assets(vec![ok(Asset::new(

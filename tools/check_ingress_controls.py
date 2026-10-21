@@ -39,6 +39,9 @@ CONTROLS = [
     ("party-replay-key", "journey", "parties_cannot_replay_each_other", "another party replayed a request", DURABLE,
      "let key = command.replay_key();",
      "let key = crate::Command { principal: self.parties[0].0, contract: command.contract, key: command.key, expected: command.expected, bytes: Vec::new() }.replay_key();"),
+    # Only chunked framing; `gzip, chunked` would hand over still-coded bytes.
+    ("transfer-coding", "http", "transfer_codings_other_than_chunked", "transfer coding other than chunked accepted", HTTP,
+     '.is_some_and(|value| !value.as_bytes().eq_ignore_ascii_case(b"chunked"))', ".is_some_and(|_| false)"),
     # A public origin from ZENO_APP_ORIGIN must match exactly.
     ("origin-prefix", "http", "configured_https_origin_is_exact", "configured origin not exact", HTTP,
      "origin.as_bytes() != config.origin.as_bytes()", "!origin.as_bytes().starts_with(config.origin.as_bytes())"),

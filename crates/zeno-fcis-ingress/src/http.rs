@@ -368,6 +368,14 @@ fn headers(config: &Config, request: &Request<Incoming>) -> Result<(), Refusal> 
     if headers.get("host").is_none() {
         return Err(Refusal::Malformed);
     }
+    // Only chunked framing is read. hyper accepts another coding before it, such
+    // as `gzip, chunked`, and would hand over the still-coded bytes as the body.
+    if headers
+        .get("transfer-encoding")
+        .is_some_and(|value| !value.as_bytes().eq_ignore_ascii_case(b"chunked"))
+    {
+        return Err(Refusal::Malformed);
+    }
     if headers
         .get("origin")
         .is_some_and(|origin| origin.as_bytes() != config.origin.as_bytes())
