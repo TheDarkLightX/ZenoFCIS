@@ -18,7 +18,7 @@ HTTP = "crates/zeno-fcis-ingress/src/http.rs"
 DURABLE = "crates/zeno-fcis-ingress/src/durable.rs"
 CONTROLS = [
     ("body-actor", "http", "actor_from_credential", "actor came from body", HTTP,
-     "principal: config.principal,", "principal: Hash32::new(body[73..105].try_into().unwrap_or([0; 32])),"),
+     "principal: authenticated,", "principal: Hash32::new(body[73..105].try_into().unwrap_or([0; 32])),"),
     ("missing-size-limit", "http", "oversized_requests", "body size limit missing", HTTP,
      "Limited::new(request.into_body(), MAX_BODY)", "Limited::new(request.into_body(), usize::MAX)"),
     ("duplicate-header", "http", "duplicate_headers", "duplicate header accepted", HTTP,
@@ -28,9 +28,17 @@ CONTROLS = [
     ("changed-command", "journey", "durable_journey_and_changed_key", "changed command accepted under old key", DURABLE,
      "entry.publication.command != command.bytes", "false"),
     ("trace-secret", "http", "trace_redaction", "secret in trace", HTTP,
-     "let trace = Trace::request(&command);", "let trace = Trace { request: Some(Hash32::new(config.secret)), ..Trace::request(&command) };"),
+     "let trace = Trace::request(&command);", "let trace = Trace { request: Some(Hash32::new(config.parties[0].0)), ..Trace::request(&command) };"),
     ("credential-compare", None, "credential-constant-time", "credential-constant-time", HTTP,
      "difference |= std::hint::black_box(candidate[index] ^ configured[index]);", "if candidate[index] != configured[index] { return false; } difference |= 0;"),
+    # Several parties per server: each control builds and fails its named test.
+    ("party-first-context", "journey", "parties_use_their_own_context", "context came from another party", DURABLE,
+     ".find(|(owner, _)| *owner == principal)", ".find(|_| true)"),
+    ("credential-scan-early-exit", "lib", "http::tests::credential_scan_visits_every_entry", "credential scan stopped early", HTTP,
+     "*byte |= owned & mask;\n        }\n", "*byte |= owned & mask;\n        }\n        if found != 0 {\n            break;\n        }\n"),
+    ("party-replay-key", "journey", "parties_cannot_replay_each_other", "another party replayed a request", DURABLE,
+     "let key = command.replay_key();",
+     "let key = crate::Command { principal: self.parties[0].0, contract: command.contract, key: command.key, expected: command.expected, bytes: Vec::new() }.replay_key();"),
 ]
 
 def main() -> int:
@@ -50,7 +58,8 @@ def main() -> int:
         args.out.with_name(label+".log").write_text(log)
         return result.returncode, log
     def check(root, suite, name, label):
-        command = cargo+["--test", suite, name, "--", "--exact", "--nocapture"] if suite else ["python3", "tools/check_ingress.py"]
+        selector = ["--lib"] if suite == "lib" else ["--test", suite]
+        command = cargo+selector+[name, "--", "--exact", "--nocapture"] if suite else ["python3", "tools/check_ingress.py"]
         return run(root, command, label)
     with tempfile.TemporaryDirectory(prefix="ingress-controls-") as directory:
         source = Path(directory)/"source"
@@ -72,7 +81,7 @@ def main() -> int:
             args.out.write_text(json.dumps(rows, indent=2)+"\n")
             print(json.dumps(row), flush=True)
             if build or not killed or restored or (suite and "1 passed" not in baseline_log): raise RuntimeError(f"control did not meet build/fail/baseline obligation: {name}")
-    print("ingress controls: PASS (7 compiled mutants; named failures; restored baselines)")
+    print(f"ingress controls: PASS ({len(CONTROLS)} compiled mutants; named failures; restored baselines)")
     return 0
 if __name__ == "__main__":
     raise SystemExit(main())

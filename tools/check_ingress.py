@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check the ingress source boundary and optional add-only reviewed lock delta.
 
-The credential rule deliberately admits one full-width source form. It does
-not establish compiled timing independence or replace transport tests.
+The credential rules deliberately admit one full-width comparison and one
+all-entry scan form. They do not establish compiled timing independence or
+replace transport tests.
 """
 from __future__ import annotations
 import argparse
@@ -28,6 +29,22 @@ COMPARE = '''fn credential_matches(candidate: &[u8; 32], configured: &[u8; 32]) 
     }
     difference == 0
 }'''
+SCAN = '''fn matched_principal(candidate: &[u8; 32], parties: &[([u8; 32], Hash32)]) -> Option<Hash32> {
+    let mut found = 0u8;
+    let mut principal = [0u8; 32];
+    for (secret, owner) in parties {
+        #[cfg(test)]
+        tests::VISITS.with(|visits| visits.set(visits.get() + 1));
+        let mask = 0u8.wrapping_sub(u8::from(std::hint::black_box(credential_matches(
+            candidate, secret,
+        ))));
+        found |= mask;
+        for (byte, owned) in principal.iter_mut().zip(owner.as_bytes()) {
+            *byte |= owned & mask;
+        }
+    }
+    (found != 0).then_some(Hash32::new(principal))
+}'''
 
 def source_failures(root: Path) -> list[str]:
     failures = []
@@ -39,7 +56,9 @@ def source_failures(root: Path) -> list[str]:
         compact = lambda text: re.sub(r"\s+", "", text)
         if compact(COMPARE) not in compact(http) or http.count("fn credential_matches(") != 1:
             failures.append("credential-constant-time: reviewed full-width comparison changed")
-        if compact('if !credential_matches(&candidate, &config.secret) { return Err(Refusal::Credential); }') not in compact(http):
+        if compact(SCAN) not in compact(http) or http.count("fn matched_principal(") != 1 or http.count("credential_matches(") != 2:
+            failures.append("credential-all-entries: reviewed all-entry scan changed")
+        if compact('matched_principal(&candidate, &config.parties).ok_or(Refusal::Credential)') not in compact(http) or http.count("matched_principal(") != 3:
             failures.append("credential-constant-time: credential admission bypassed")
         manifest = tomllib.loads((root / "crates/zeno-fcis-ingress/Cargo.toml").read_text())
         deps = manifest["dependencies"]

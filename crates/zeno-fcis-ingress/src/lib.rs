@@ -10,7 +10,7 @@ mod trace;
 
 pub use assets::Asset;
 pub use durable::Durable;
-pub use http::{Config, MAX_BODY, MAX_HEADER, Server, runtime};
+pub use http::{Config, MAX_BODY, MAX_HEADER, MAX_PARTIES, Server, runtime};
 pub use trace::{Event, Trace, TraceSink};
 
 use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};

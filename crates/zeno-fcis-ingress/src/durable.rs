@@ -19,15 +19,15 @@ use zeno_fcis_synthesis::finite::{
     v2_composition::Raw,
 };
 
-/// Serial shell around an immutable Authority, one principal's canonical context
-/// and one production terminal. The context must express that principal's rights
-/// in the application's checked contract. No body field can select it.
+/// Serial shell around an immutable Authority, each configured principal's
+/// canonical context and one production terminal. Each context must express that
+/// principal's rights in the application's checked contract. The authenticated
+/// principal alone selects its context; no body field can select one.
 pub struct Durable<'a, 'p, H> {
     authority: &'a Authority<'p>,
     terminal: H,
     store: Store,
-    principal: Hash32,
-    context: Vec<u8>,
+    parties: Vec<(Hash32, Vec<u8>)>,
 }
 impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
     /// Bind the terminal's store and copy the principal's immutable core context.
@@ -39,15 +39,45 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
         principal: Hash32,
         context: &[u8],
     ) -> Result<Self, Refusal> {
+        Self::with_parties(
+            authority,
+            terminal,
+            store,
+            vec![(principal, context.to_vec())],
+        )
+    }
+    /// Bind 1 to 64 distinct principals, each with its own immutable core context.
+    /// Contexts may repeat; replay keys remain scoped to each principal.
+    pub fn with_parties(
+        authority: &'a Authority<'p>,
+        terminal: H,
+        store: Store,
+        parties: Vec<(Hash32, Vec<u8>)>,
+    ) -> Result<Self, Refusal> {
+        if parties.is_empty()
+            || parties.len() > crate::MAX_PARTIES
+            || parties
+                .iter()
+                .enumerate()
+                .any(|(i, (principal, _))| parties[..i].iter().any(|(old, _)| old == principal))
+        {
+            return Err(Refusal::Malformed);
+        }
         handler::bind(terminal.ports(), CommitProgram::PORTS).map_err(|_| Refusal::Binding)?;
         handler::bind(terminal.ports(), DeliveryProgram::PORTS).map_err(|_| Refusal::Binding)?;
         Ok(Self {
             authority,
             terminal,
             store,
-            principal,
-            context: context.to_vec(),
+            parties,
         })
+    }
+    /// The canonical context configured for an authenticated principal, if any.
+    pub fn context(&self, principal: Hash32) -> Option<&[u8]> {
+        self.parties
+            .iter()
+            .find(|(owner, _)| *owner == principal)
+            .map(|(_, context)| context.as_slice())
     }
     /// Return the exclusively owned shell handler after use.
     pub fn into_terminal(self) -> H {
@@ -66,11 +96,12 @@ impl<'a, 'p, H: Terminal> Durable<'a, 'p, H> {
 }
 impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
     fn execute(&mut self, command: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
-        if command.principal != self.principal
-            || command.contract != digest(self.authority.identity())
-        {
-            return Err(Refusal::Binding);
-        }
+        let context = match self.context(command.principal) {
+            Some(context) if command.contract == digest(self.authority.identity()) => {
+                context.to_vec()
+            }
+            _ => return Err(Refusal::Binding),
+        };
         let mut trace = Trace::request(command);
         let key = command.replay_key();
         // Audited history is reporting data, never a committing capability.
@@ -81,7 +112,7 @@ impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
         let original = history.commits.iter().find(|entry| entry.key == key);
         let data = if let Some(entry) = original {
             if entry.publication.command != command.bytes
-                || entry.publication.context != self.context
+                || entry.publication.context != context
                 || Some(entry.version) != command.expected.checked_add(1)
             {
                 return Err(Refusal::Replay);
@@ -98,7 +129,7 @@ impl<H: Terminal> Endpoint for Durable<'_, '_, H> {
             match self.authority.publish(Raw {
                 state: &head.state,
                 command: &command.bytes,
-                context: &self.context,
+                context: &context,
             }) {
                 PublicationOutcome::Commit(publication) => publication_data(&publication),
                 _ => return Err(Refusal::Decision),

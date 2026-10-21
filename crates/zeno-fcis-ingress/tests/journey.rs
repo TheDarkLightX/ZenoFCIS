@@ -880,3 +880,172 @@ fn principal_context_and_core_refusals() {
         }
     });
 }
+
+fn party_wire(credential: u8, body: &[u8]) -> Vec<u8> {
+    let mut bytes=format!("POST /command HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {}\r\nOrigin: https://app.example\r\nContent-Length: {}\r\n\r\n",format!("{credential:02x}").repeat(32),body.len()).into_bytes();
+    bytes.extend_from_slice(body);
+    bytes
+}
+fn party_exchange<B: Endpoint>(
+    server: &mut Server<B, Sink>,
+    credential: u8,
+    body: &[u8],
+    lost: bool,
+) -> Vec<u8> {
+    let rt = ok(runtime());
+    if std::env::var_os("INGRESS_TEST_MEMORY").is_some() {
+        let reply = support::exchange(server, party_wire(credential, body), false);
+        return if lost { Vec::new() } else { reply };
+    }
+    let listener = ok(rt.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")));
+    let address = ok(listener.local_addr());
+    let request = party_wire(credential, body);
+    let thread = std::thread::spawn(move || client(address, request, lost));
+    let _ = rt.block_on(server.serve_one(&listener));
+    ok(thread.join())
+}
+fn party(n: u8) -> Hash32 {
+    Hash32::new([n; 32])
+}
+fn party_config(contract: Hash32, parties: &[(u8, u8)]) -> Config {
+    ok(Config::with_parties(
+        parties
+            .iter()
+            .map(|(credential, principal)| ([*credential; 32], party(*principal)))
+            .collect(),
+        contract,
+        "https://app.example".into(),
+        Duration::from_secs(2),
+    ))
+}
+fn permission(allow: bool) -> Vec<u8> {
+    model::envelope(
+        102,
+        fixture::schema_hash(),
+        zeno_fcis_value::Value::boolean(allow),
+    )
+}
+
+#[test]
+fn parties_use_their_own_context() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = open_production(&files, &lineage, 0);
+        let store = production.store();
+        // The permitted party is first, so taking the first entry's context would
+        // grant the second party's command.
+        let durable = ok(Durable::with_parties(
+            authority,
+            production,
+            store,
+            vec![
+                (party(31), permission(true)),
+                (party(32), permission(false)),
+            ],
+        ));
+        let mut server = Server::new(
+            party_config(contract, &[(0xa1, 31), (0xa2, 32)]),
+            durable,
+            Sink::default(),
+        );
+        let genesis = database::snapshot(&files.store);
+        let refused = party_exchange(&mut server, 0xa2, &body(contract, 120, 1, 0), false);
+        assert_eq!(status(&refused), 422, "context came from another party");
+        assert_eq!(database::snapshot(&files.store), genesis);
+        let unknown = party_exchange(&mut server, 0xa3, &body(contract, 120, 1, 0), false);
+        assert_eq!(status(&unknown), 401, "unknown credential admitted");
+        assert_eq!(database::snapshot(&files.store), genesis);
+        let accepted = party_exchange(&mut server, 0xa1, &body(contract, 120, 1, 0), false);
+        assert_eq!(status(&accepted), 200, "permitted party refused");
+        let (durable, _) = server.into_parts();
+        assert_eq!(
+            durable.context(party(32)),
+            Some(permission(false).as_slice())
+        );
+        assert_eq!(durable.context(party(33)), None);
+    });
+}
+
+#[test]
+fn parties_cannot_replay_each_other() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let contract = payload_hash(authority.identity());
+        let files = Files::new();
+        create(&files, authority);
+        let production = open_production(&files, &lineage, 0);
+        let store = production.store();
+        // Equal contexts: only the principal-scoped replay key separates them.
+        let durable = ok(Durable::with_parties(
+            authority,
+            production,
+            store,
+            vec![(party(41), permission(true)), (party(42), permission(true))],
+        ));
+        let mut server = Server::new(
+            party_config(contract, &[(0xb1, 41), (0xb2, 42)]),
+            Capture {
+                inner: durable,
+                packet: Vec::new(),
+            },
+            Sink::default(),
+        );
+        // The first party's reply is lost; its request is unresolved.
+        assert!(party_exchange(&mut server, 0xb1, &body(contract, 120, 1, 0), true).is_empty());
+        let original = server.into_parts().0;
+        let lost = original.packet.clone();
+        assert!(!lost.is_empty());
+        let mut server = Server::new(
+            party_config(contract, &[(0xb1, 41), (0xb2, 42)]),
+            original,
+            Sink::default(),
+        );
+        let after = database::snapshot(&files.store);
+        let other = party_exchange(&mut server, 0xb2, &body(contract, 120, 1, 0), false);
+        assert_ne!(status(&other), 200, "another party replayed a request");
+        assert_ne!(
+            packet(&other),
+            lost.as_slice(),
+            "another party read a packet"
+        );
+        assert_eq!(database::snapshot(&files.store), after);
+        let recovered = party_exchange(&mut server, 0xb1, &body(contract, 120, 1, 0), false);
+        assert_eq!(status(&recovered), 200);
+        assert_eq!(
+            packet(&recovered),
+            lost.as_slice(),
+            "original packet changed"
+        );
+        // The same caller key is the second party's own new request.
+        let own = party_exchange(&mut server, 0xb2, &body(contract, 120, 1, 1), false);
+        assert_eq!(status(&own), 200, "caller keys are not principal-scoped");
+    });
+}
+
+#[test]
+fn party_tables_refuse_ambiguity() {
+    fixture::with_catalog(|catalog| {
+        let lineage = ok(Lineage::bind(&[catalog], &[]));
+        let authority = &lineage.authorities()[0];
+        let files = Files::new();
+        create(&files, authority);
+        let too_many: Vec<_> = (0..=64u8).map(|n| (party(n), permission(true))).collect();
+        for parties in [
+            Vec::new(),
+            vec![(party(1), permission(true)), (party(1), permission(false))],
+            too_many,
+        ] {
+            let production = open_production(&files, &lineage, 0);
+            let store = production.store();
+            assert!(matches!(
+                Durable::with_parties(authority, production, store, parties),
+                Err(Refusal::Malformed)
+            ));
+        }
+    });
+}

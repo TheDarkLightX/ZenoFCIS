@@ -20,11 +20,12 @@ use zeno_fcis_codec::Hash32;
 pub const MAX_HEADER: usize = 4096;
 /// Maximum body bytes, enforced while streaming, including chunked bodies.
 pub const MAX_BODY: usize = 65_536;
+/// Maximum configured credentials; each names exactly one principal.
+pub const MAX_PARTIES: usize = 64;
 
 /// Owned immutable transport policy. Deliberately has no Debug implementation.
 pub struct Config {
-    secret: [u8; 32],
-    principal: Hash32,
+    parties: Vec<([u8; 32], Hash32)>,
     contract: Hash32,
     origin: String,
     deadline: Duration,
@@ -39,7 +40,25 @@ impl Config {
         origin: String,
         deadline: Duration,
     ) -> Result<Self, Refusal> {
-        if secret == [0; 32]
+        Self::with_parties(vec![(secret, principal)], contract, origin, deadline)
+    }
+    /// Bind 1 to 64 nonzero credentials, each to its own principal, under one
+    /// contract, origin and deadline. Credentials and principals must be distinct:
+    /// the presented credential alone selects the principal.
+    pub fn with_parties(
+        parties: Vec<([u8; 32], Hash32)>,
+        contract: Hash32,
+        origin: String,
+        deadline: Duration,
+    ) -> Result<Self, Refusal> {
+        if parties.is_empty()
+            || parties.len() > MAX_PARTIES
+            || parties.iter().any(|(secret, _)| *secret == [0; 32])
+            || parties.iter().enumerate().any(|(i, (secret, principal))| {
+                parties[..i]
+                    .iter()
+                    .any(|(old, owner)| old == secret || owner == principal)
+            })
             || !(origin.starts_with("https://") || origin.starts_with("http://"))
             || !origin.is_ascii()
             || origin.bytes().any(|b| b.is_ascii_whitespace())
@@ -49,8 +68,7 @@ impl Config {
             return Err(Refusal::Malformed);
         }
         Ok(Self {
-            secret,
-            principal,
+            parties,
             contract,
             origin,
             deadline,
@@ -175,7 +193,7 @@ async fn handle<B: Endpoint, S: TraceSink>(
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let path = request.uri().path().to_owned();
     if request.method() == Method::GET && path != "/state" {
-        let result = headers(config, &request, false).and_then(|()| empty_body(&request));
+        let result = headers(config, &request).and_then(|()| empty_body(&request));
         if result.is_ok()
             && request.uri().query().is_none()
             && request.uri().authority().is_none()
@@ -194,9 +212,11 @@ async fn handle<B: Endpoint, S: TraceSink>(
         ));
     }
     if request.method() == Method::GET && path == "/state" {
-        let admission = headers(config, &request, true).and_then(|()| empty_body(&request));
+        let admission = headers(config, &request)
+            .and_then(|()| authenticate(config, &request))
+            .and_then(|principal| empty_body(&request).map(|()| principal));
         let (backend, sink) = &mut *state.borrow_mut();
-        let result = admission.and_then(|()| backend.snapshot(config.principal));
+        let result = admission.and_then(|principal| backend.snapshot(principal));
         if let Err(error) = result {
             sink.record(Trace::empty(Event::Refused(error)));
         }
@@ -283,7 +303,8 @@ async fn admit(config: &Config, request: Request<Incoming>) -> Result<Command, R
     {
         return Err(Refusal::Malformed);
     }
-    headers(config, &request, true)?;
+    headers(config, &request)?;
+    let authenticated = authenticate(config, &request)?;
     let body = Limited::new(request.into_body(), MAX_BODY)
         .collect()
         .await
@@ -308,7 +329,7 @@ async fn admit(config: &Config, request: Request<Incoming>) -> Result<Command, R
     let key = Hash32::new(array(33..65)?);
     let expected = u64::from_be_bytes(body[65..73].try_into().map_err(|_| Refusal::Malformed)?);
     Ok(Command {
-        principal: config.principal,
+        principal: authenticated,
         contract,
         key,
         expected,
@@ -328,11 +349,7 @@ fn empty_body(request: &Request<Incoming>) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn headers(
-    config: &Config,
-    request: &Request<Incoming>,
-    authenticate: bool,
-) -> Result<(), Refusal> {
+fn headers(config: &Config, request: &Request<Incoming>) -> Result<(), Refusal> {
     if request.uri().query().is_some() || request.uri().authority().is_some() {
         return Err(Refusal::Malformed);
     }
@@ -363,10 +380,14 @@ fn headers(
     {
         return Err(Refusal::Origin);
     }
-    if !authenticate {
-        return Ok(());
-    }
-    let credential = headers
+    Ok(())
+}
+
+// The presented credential alone selects the principal; no body field or other
+// header can choose one.
+fn authenticate(config: &Config, request: &Request<Incoming>) -> Result<Hash32, Refusal> {
+    let credential = request
+        .headers()
         .get("authorization")
         .ok_or(Refusal::Credential)?
         .to_str()
@@ -384,10 +405,28 @@ fn headers(
         };
         candidate[index] = digit(pair[0])? * 16 + digit(pair[1])?;
     }
-    if !credential_matches(&candidate, &config.secret) {
-        return Err(Refusal::Credential);
+    matched_principal(&candidate, &config.parties).ok_or(Refusal::Credential)
+}
+
+// Source-checked all-entry scan. Every configured credential is compared at full
+// width, with no early exit, and the matched principal is selected by mask.
+// Configuration refuses duplicate credentials, so at most one entry matches.
+// A reviewed source rule, not a hardware side-channel proof.
+fn matched_principal(candidate: &[u8; 32], parties: &[([u8; 32], Hash32)]) -> Option<Hash32> {
+    let mut found = 0u8;
+    let mut principal = [0u8; 32];
+    for (secret, owner) in parties {
+        #[cfg(test)]
+        tests::VISITS.with(|visits| visits.set(visits.get() + 1));
+        let mask = 0u8.wrapping_sub(u8::from(std::hint::black_box(credential_matches(
+            candidate, secret,
+        ))));
+        found |= mask;
+        for (byte, owned) in principal.iter_mut().zip(owner.as_bytes()) {
+            *byte |= owned & mask;
+        }
     }
-    Ok(())
+    (found != 0).then_some(Hash32::new(principal))
 }
 
 // Source-checked full-width comparison. black_box prevents short-circuit folding;
@@ -512,5 +551,41 @@ impl<I: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for HeaderGuard<I> 
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<io::Result<()>> {
         std::pin::Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    thread_local! {
+        // Test-only count of configured entries the credential scan compares.
+        pub(super) static VISITS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    #[test]
+    fn credential_scan_visits_every_entry() {
+        let parties: Vec<_> = (1..=5u8)
+            .map(|n| ([n; 32], Hash32::new([n + 100; 32])))
+            .collect();
+        for (candidate, expected) in [
+            ([1; 32], Some(Hash32::new([101; 32]))),
+            ([3; 32], Some(Hash32::new([103; 32]))),
+            ([5; 32], Some(Hash32::new([105; 32]))),
+            ([9; 32], None),
+        ] {
+            VISITS.with(|visits| visits.set(0));
+            assert_eq!(
+                matched_principal(&candidate, &parties),
+                expected,
+                "wrong party selected"
+            );
+            assert_eq!(
+                VISITS.with(Cell::get),
+                parties.len(),
+                "credential scan stopped early"
+            );
+        }
     }
 }

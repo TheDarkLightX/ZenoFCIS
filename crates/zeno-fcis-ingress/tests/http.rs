@@ -284,3 +284,84 @@ fn closed_asset_routes_and_authenticated_views() {
             .is_err()
     );
 }
+fn party_server() -> Server<Echo, Sink> {
+    Server::new(
+        ok(Config::with_parties(
+            vec![
+                ([0xab; 32], Hash32::new([7; 32])),
+                ([0xcd; 32], Hash32::new([17; 32])),
+                ([0xef; 32], Hash32::new([27; 32])),
+            ],
+            Hash32::new([8; 32]),
+            "https://app.example".into(),
+            Duration::from_millis(80),
+        )),
+        Echo,
+        Sink::default(),
+    )
+}
+fn party_request(credential: &str) -> Vec<u8> {
+    let body = body();
+    let mut bytes = format!(
+        "POST /command HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {credential}\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    bytes.extend_from_slice(&body);
+    bytes
+}
+#[test]
+fn party_credentials_select_principals() {
+    for (credential, principal) in [("ab", 7), ("cd", 17), ("ef", 27)] {
+        let response = exchange(
+            &mut party_server(),
+            party_request(&credential.repeat(32)),
+            false,
+        );
+        assert_eq!(status(&response), 200);
+        assert_eq!(payload(&response), [principal; 32], "wrong principal");
+    }
+    for credential in ["12".repeat(32), "ab".repeat(31) + "ac", String::new()] {
+        let response = exchange(&mut party_server(), party_request(&credential), false);
+        assert_eq!(status(&response), 401, "unknown credential admitted");
+    }
+}
+#[test]
+fn party_configuration_refusals() {
+    let config = |parties: Vec<([u8; 32], Hash32)>| {
+        Config::with_parties(
+            parties,
+            Hash32::new([8; 32]),
+            "https://app.example".into(),
+            Duration::from_millis(80),
+        )
+        .is_err()
+    };
+    let many = (0..=64u8)
+        .map(|n| ([n + 1; 32], Hash32::new([n; 32])))
+        .collect();
+    assert!(config(Vec::new()), "empty party table");
+    assert!(config(many), "more than 64 parties");
+    assert!(
+        config(vec![([0; 32], Hash32::new([1; 32]))]),
+        "zero credential"
+    );
+    assert!(
+        config(vec![
+            ([1; 32], Hash32::new([1; 32])),
+            ([1; 32], Hash32::new([2; 32]))
+        ]),
+        "duplicate credential"
+    );
+    assert!(
+        config(vec![
+            ([1; 32], Hash32::new([1; 32])),
+            ([2; 32], Hash32::new([1; 32]))
+        ]),
+        "duplicate principal"
+    );
+    assert!(!config(vec![
+        ([1; 32], Hash32::new([1; 32])),
+        ([2; 32], Hash32::new([2; 32]))
+    ]));
+}
