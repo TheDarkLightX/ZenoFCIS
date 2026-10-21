@@ -55,7 +55,7 @@ export function documentFrom(html){
     stack.at(-1).append(node);
     if(!['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'].includes(tag))stack.push(node);
   }
-  doc.createElement=tag=>new Element(tag);doc.getElementById=id=>doc.querySelector(`#${id}`);return doc;
+  doc.createElement=tag=>new Element(tag);doc.createTextNode=text=>new Text(String(text));doc.getElementById=id=>doc.querySelector(`#${id}`);return doc;
 }
 export function moduleLoader(globals, transform=(_url,source)=>source){
   const context=vm.createContext({URL,URLSearchParams,console,structuredClone,performance,setTimeout,clearTimeout,queueMicrotask,Event,CustomEvent,WebAssembly,TextEncoder,TextDecoder,...globals}),modules=new Map();

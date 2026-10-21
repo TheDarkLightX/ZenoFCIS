@@ -79,7 +79,7 @@ function law7(candidate){
  return {contexts,witnesses,omissions:omissions.Restock.length};
 }
 test('L7_never_offer_what_the_core_refuses',()=>{
- validateContract(contract);console.log('L7 full real-authority domain',law7(contract));
+ validateContract(contract);console.log('L7 separate inventory projection over full real-authority domain',law7(contract));
  const bad=copy(contract);bad.actions.find(a=>a.id==='Reserve').when.args.pop();killed(law7,bad);
 });
 test('finite_contract_runtime_refinement',()=>{

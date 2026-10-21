@@ -3,7 +3,7 @@ export const ACTS = Object.freeze(['synthesis','inventory','search','money']);
 export const EVENTS = Object.freeze(['Start','Progress','Result','Select','CellResult','Fail','Cancel','PreferencesChanged','DraftChanged']);
 export const REGIONS = Object.freeze(['instrument','metrics','comparison','record']);
 export const PHASES = Object.freeze(['idle','running','done','error']);
-export const DESCRIPTORS = Object.freeze({
+export const DESCRIPTORS = freeze({
   checked:{label:'Inputs checked',type:'integer',unit:'inputs'},total:{label:'Declared domain',type:'integer',unit:'inputs'},
   passed:{label:'Within every applicable law',type:'integer',unit:'inputs'},differences:{label:'Decisions changed',type:'integer',unit:'decisions'},
   law_checks:{label:'Law checks passed',type:'integer',unit:'checks'},elapsed:{label:'In this browser',type:'decimal',unit:'ms'},
@@ -20,8 +20,8 @@ export const DESCRIPTORS = Object.freeze({
 });
 export function descriptor(key, descriptors=DESCRIPTORS) {
   const d=descriptors[key];
-  if(!d || !d.label || !d.type || !d.unit) throw new Error(`Missing value descriptor: ${key}`);
-  return d;
+  if(!d || !['label','type','unit'].every(k=>typeof d[k]==='string'&&d[k].length)) throw new Error(`Missing value descriptor: ${key}`);
+  return freeze({label:d.label,type:d.type,unit:d.unit});
 }
 export function count(value) {
   if(typeof value==='string' && /^(0|[1-9][0-9]*)$/.test(value)) return BigInt(value).toLocaleString('en-US');
@@ -31,6 +31,9 @@ export function count(value) {
 const integer=(x,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(x)&&x>=0&&x<=max;
 const id=x=>typeof x==='string'&&/^(0|[1-9][0-9]*)$/.test(x)&&x.length<=100;
 const next=x=>(BigInt(x)+1n).toString();
+// Frozen domains of the shipped factory, independent of producer-supplied counts.
+const TOTALS=Object.freeze({synthesis:6144,inventory:864,search:16,money:1});
+const MONEY_FIELDS=Object.freeze(['amount','fee_bps','reserve_in','reserve_out']);
 function own(x) { return structuredClone(x); }
 function freeze(x) { if(x && typeof x==='object'&&!Object.isFrozen(x)){Object.values(x).forEach(freeze);Object.freeze(x);}return x; }
 export function sameIdentity(a,b) {return !!a&&!!b&&['epoch','run','request'].every(k=>id(a[k])&&a[k]===b[k]);}
@@ -55,40 +58,69 @@ export function evidence(checked,total,complete=false) {
 export function initial(epoch='0',preferences={motion:'reduce',theme:'light',width:1440}) {
   if(!id(epoch))throw new Error('Invalid session epoch');
   const defaults={amount:'1000',fee_bps:'30',reserve_in:'10000',reserve_out:'20000'};
-  const tasks=Object.fromEntries(ACTS.map(act=>[act,{phase:'idle',draft:act==='money'?defaults:act==='inventory'?{mutant:'none'}:{},result:null,candidates:[],chunks:[],evidence:evidence(0,0),elapsed:null,error:null}]));
+  const tasks=Object.fromEntries(ACTS.map(act=>[act,{phase:'idle',draft:act==='money'?defaults:act==='inventory'?{mutant:'none'}:{},submitted:null,result:null,candidates:[],chunks:[],evidence:evidence(0,0),elapsed:null,error:null}]));
   return freeze({act:null,phase:'idle',epoch,run:'0',request:'0',identity:null,selection:null,tasks,preferences:own(preferences)});
 }
-function validateResult(act,r) {
+function sequence(values,length) {return Array.isArray(values)&&values.length===length&&Array.from(values).every(value=>value!==undefined);}
+function validateResult(act,r,task) {
   if(!r||r.act!==act)throw new Error('Result belongs to another act');
   if(act==='money'){
-    if(!Array.isArray(r.outputs)||r.outputs.length!==6||typeof r.outputs[5]!=='boolean')throw new Error('Invalid money result');
-    for(const v of [...r.input,...r.outputs.slice(0,5),...r.overflow.input])if(typeof v!=='string'||!/^\d+$/.test(v))throw new Error('Wide integer must be a decimal string');
+    if(!sequence(r.input,4)||!sequence(r.outputs,6)||typeof r.outputs[5]!=='boolean'||!sequence(r.overflow?.input,4))throw new Error('Invalid money result');
+    for(const v of [...r.input,...r.outputs.slice(0,5),...r.overflow.input])if(typeof v!=='string'||!/^(0|[1-9][0-9]*)$/.test(v))throw new Error('Wide integer must be a decimal string');
+    if(r.input.some((value,i)=>value!==task.submitted[MONEY_FIELDS[i]]))throw new Error('Money result belongs to another request');
     return evidence(1,1,false); // A tuple and a probe never establish a domain theorem.
   }
-  if(!integer(r.domain)||!integer(r.passed,r.domain))throw new Error('Invalid result counts');
+  const total=TOTALS[act];
+  if(r.domain!==total||task.evidence.total!==total)throw new Error('Result does not cover the frozen task domain');
+  if(r.passed!==total)throw new Error('Passing count does not support the result claim');
+  const bits=(values,length)=>sequence(values,length)&&values.every(v=>v===0||v===1);
   if(act==='inventory') {
-    if(r.domain!==864||!integer(r.differences,r.domain)||!integer(r.mutant_passed,r.domain)||!integer(r.law_checks))throw new Error('Invalid inventory evidence');
-    if(!r.grid||r.grid.mutant!==r.mutant||r.grid.cells.length!==r.domain)throw new Error('Incomplete result grid');
-    if(r.grid.cells.some((c,i)=>c.ordinal!==i||typeof c.different!=='boolean'))throw new Error('Unordered result grid');
+    if(r.mutant!==task.submitted.mutant||!integer(r.differences,total)||!integer(r.mutant_passed,total)||!integer(r.law_checks))throw new Error('Invalid inventory evidence');
+    if(!r.grid||r.grid.mutant!==r.mutant||!sequence(r.grid.cells,total))throw new Error('Incomplete result grid');
+    if(r.grid.cells.some((c,i)=>{
+      const input=c?.input;
+      if(!sequence(input,5))return true;
+      const [available,reserved,action,quantity,authorized]=input;
+      if(!integer(available,5)||!integer(reserved,5)||!integer(action,153)||action<150||!integer(quantity,3)||quantity<1||!integer(authorized,1))return true;
+      const ordinal=(((available*6+reserved)*4+action-150)*3+quantity-1)*2+authorized;
+      return c.ordinal!==i||ordinal!==i||typeof c.different!=='boolean';
+    }))throw new Error('Unordered or incomplete result grid coverage');
     if(r.grid.cells.filter(c=>c.different).length!==r.differences)throw new Error('Grid counts disagree');
   }
-  if(act==='synthesis'&&(!Array.isArray(r.candidates)||!r.candidates.some(c=>c.status==='selected'&&c.checked===r.domain)))throw new Error('No complete selected candidate');
-  if(act==='search'&&(!Array.isArray(r.table)||r.table.length!==r.domain))throw new Error('Incomplete search replay');
-  return evidence(r.domain,r.domain,true);
+  if(act==='synthesis') {
+    if(!sequence(r.candidates,8)||r.assignments!==r.candidates.length)throw new Error('Incomplete candidate coverage');
+    if(r.candidates.some((c,i)=>c.candidate!==i||!bits(c.choices,3)||c.choices.some((v,bit)=>v!==(i>>(2-bit)&1))||!integer(c.checked,total)||c.checked===0||!['selected','refuted'].includes(c.status)))throw new Error('Invalid candidate evidence');
+    const selected=r.candidates.filter(c=>c.status==='selected');
+    if(selected.length!==1||selected[0].checked!==total||selected[0].witness!==null)throw new Error('No complete selected candidate');
+    if(r.candidates.some(c=>c.status==='refuted'&&(!c.witness||!Array.isArray(c.witness.input)||c.witness.input.length!==12||!Array.isArray(c.witness.output))))throw new Error('Missing candidate counterexample');
+    if(JSON.stringify(r.first_counterexample)!==JSON.stringify(r.candidates.find(c=>c.status==='refuted')?.witness))throw new Error('Candidate counterexample disagrees');
+  }
+  if(act==='search') {
+    if(!sequence(r.table,total)||r.table.some((row,i)=>!bits(row.input,4)||row.input.some((v,bit)=>v!==(i>>(3-bit)&1))||!bits(row.output,3)))throw new Error('Incomplete search replay coverage');
+  }
+  return evidence(total,total,true);
 }
-function ready(act,draft) {
-  if(!ACTS.includes(act.split('/')[0]))return false;
-  if(act.startsWith('inventory/'))return ['none','m0002','m0018','m0040','m0049','m0054','m0061'].includes(act.split('/')[1]);
-  if(act==='money')return ['amount','fee_bps','reserve_in','reserve_out'].every(k=>typeof draft[k]==='string'&&/^(0|[1-9][0-9]*)$/.test(draft[k])&&BigInt(draft[k])<=BigInt(k==='fee_bps'?10000:3000000000)&&(!k.startsWith('reserve')||BigInt(draft[k])>0n));
-  return ['synthesis','search'].includes(act);
+function inputIssue(act,draft={}) {
+  if(typeof act!=='string'||!ACTS.includes(act.split('/')[0]))return 'Choose a declared factory act.';
+  if(draft===null||typeof draft!=='object'||Array.isArray(draft))return 'Supply the declared input fields.';
+  if(act.startsWith('inventory/'))return ['none','m0002','m0018','m0040','m0049','m0054','m0061'].includes(act.split('/')[1])&&draft.mutant===act.split('/')[1]?null:'Choose a declared inventory variant.';
+  if(act==='money') {
+    for(const key of MONEY_FIELDS){
+      const maximum=key==='fee_bps'?10000:3000000000,minimum=key.startsWith('reserve')?1:0;
+      if(typeof draft[key]!=='string'||!/^(0|[1-9][0-9]*)$/.test(draft[key])||BigInt(draft[key])>BigInt(maximum)||BigInt(draft[key])<BigInt(minimum))return `${key.replaceAll('_',' ')} must be a whole number from ${count(minimum)} to ${count(maximum)}.`;
+    }
+    return null;
+  }
+  return ['synthesis','search'].includes(act)?null:'Choose a declared factory act.';
 }
+function ready(act,draft) {return inputIssue(act,draft)===null;}
 export function abstractState(state) {return {phase:PHASES.indexOf(state.phase),selection:state.selection?(state.selection.result?2:1):0,mask:15};}
 export function step(state,event) {
   const intents=[];
   if(!event||!EVENTS.includes(event.type))return {state,intents,view:view(state)};
   if(event.type==='DraftChanged') {
-    if(state.phase==='running'||!ACTS.includes(event.act))return {state,intents,view:view(state)};
-    const updated=freeze({...state,tasks:{...state.tasks,[event.act]:{...state.tasks[event.act],draft:own(event.draft)}}});
+    if(!ACTS.includes(event.act))return {state,intents,view:view(state)};
+    const updated=freeze({...state,tasks:{...state.tasks,[event.act]:{...state.tasks[event.act],draft:own(event.draft??{})}}});
     return {state:updated,intents,view:view(updated)};
   }
   if(event.type==='PreferencesChanged') {
@@ -105,8 +137,8 @@ export function step(state,event) {
     const draft=own(event.draft??{});
     if(typeof event.act!=='string'||control(abstractState(state),0,[],ready(event.act,draft)).phase!==1||state.phase==='running')return {state,intents,view:view(state)};
     const act=event.act.split('/')[0],run=next(state.run),request=next(state.request),identity={epoch:state.epoch,run,request};
-    const total={synthesis:6144,inventory:864,search:16,money:1}[act];
-    const task={phase:'running',draft,result:null,candidates:[],chunks:[],evidence:evidence(0,total),elapsed:null,error:null};
+    const total=TOTALS[act];
+    const task={phase:'running',draft,submitted:draft,result:null,candidates:[],chunks:[],evidence:evidence(0,total),elapsed:null,error:null};
     const updated=freeze({...state,act,phase:'running',run,request,identity,selection:null,tasks:{...state.tasks,[act]:task}});
     return {state:updated,intents:freeze([{kind:'run',identity,act:event.act,options:draft}]),view:view(updated)};
   }
@@ -136,12 +168,13 @@ export function step(state,event) {
       changes={candidates:[...task.candidates,own(c)],evidence:evidence(c.checked,6144)};
     } else {
       const p=event.progress;
-      if(state.act!=='inventory'||!p||p.start!==task.chunks.length*48||p.cells?.length!==48||p.cells.some((c,i)=>c.ordinal!==p.start+i)||p.mutant!==task.draft.mutant)throw new Error('Invalid inventory progress');
+      if(state.act!=='inventory'||!p||p.start!==task.chunks.length*48||p.cells?.length!==48||p.cells.some((c,i)=>c.ordinal!==p.start+i)||p.mutant!==task.submitted.mutant)throw new Error('Invalid inventory progress');
       changes={chunks:[...task.chunks,own(p)],evidence:evidence(p.start+p.cells.length,864)};
     }
   } else if(event.type==='Result') {
     if(!Number.isFinite(event.elapsed)||event.elapsed<0)throw new Error('Invalid elapsed time');
-    changes={phase:PHASES[control(abstractState(state),2,[true,true,true,true],true).phase],result:own(event.result),evidence:validateResult(state.act,event.result),elapsed:event.elapsed};
+    const result=own(event.result),checked=validateResult(state.act,result,task);
+    changes={phase:PHASES[control(abstractState(state),2,[true,true,true,true],true).phase],result,evidence:checked,elapsed:event.elapsed};
   } else if(event.type==='Fail') {
     changes={phase:PHASES[control(abstractState(state),5,[true,true,true,true],true).phase],result:null,error:String(event.message),evidence:evidence(task.evidence.checked,task.evidence.total)};
   } else return {state,intents,view:view(state)};
@@ -170,9 +203,9 @@ function resultView(act,task) {
 }
 export function view(state) {
   const tasks=Object.fromEntries(ACTS.map(act=>{
-    const t=state.tasks[act],content=resultView(act,t);
+    const t=state.tasks[act],content=resultView(act,t),issue=inputIssue(act==='inventory'?`inventory/${t.draft.mutant}`:act,t.draft);
     return [act,{...t,...content,regions:REGIONS,record:t.result,verdict:t.evidence.verdict==='complete'?'finite checked':null,
-      status:t.phase==='running'?`${count(t.evidence.checked)} of ${count(t.evidence.total)} checked — running in a background worker…`:t.phase==='done'?`Done in ${t.elapsed.toFixed(0)} ms, in this browser.`:t.phase==='error'?`Stopped: ${t.error}. No verdict.`:'Ready. No result yet.'}];
+      status:t.phase==='running'?`${count(t.evidence.checked)} of ${count(t.evidence.total)} checked — running in a background worker…`:t.phase==='error'?`Stopped: ${t.error}. No verdict.`:issue?`Input bounds: ${issue}`:t.phase==='done'?`Done in ${t.elapsed.toFixed(0)} ms, in this browser.`:'Ready. No result yet.'}];
   }));
   return freeze({tasks,act:state.act,phase:state.phase,selection:state.selection,busy:state.phase==='running',preferences:state.preferences,
     actions:ACTS.map(act=>({act,enabled:state.phase!=='running'&&ready(act==='inventory'?`inventory/${state.tasks.inventory.draft.mutant}`:act,state.tasks[act].draft)})),gridEnabled:state.act==='inventory'&&state.phase==='done'});

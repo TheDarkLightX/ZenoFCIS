@@ -114,7 +114,7 @@ export function mountFactory(root) {
     selectedPanel=element('section','cell-inspection',element('h4',null,'Selected input'),element('p','help','Select a cell to see its decision.'));
     cellRecord=element('pre');task.record.append(cellRecord);layout.append(host,selectedPanel);task.instrument.replaceChildren(layout);
     const identity=state.identity;
-    inventoryGrid=mountInventoryGrid(host,data.result?.mutant??data.draft.mutant,state.run,(cell)=>dispatch({type:'Select',identity,ordinal:cell.ordinal}));
+    inventoryGrid=mountInventoryGrid(host,data.result?.mutant??data.submitted.mutant,state.run,(cell)=>dispatch({type:'Select',identity,ordinal:cell.ordinal}));
     gridTask=task;return inventoryGrid;
   }
   function renderSelection(data) {
@@ -211,6 +211,8 @@ export function mountFactory(root) {
     const kind=act.split('/')[0],section=root.querySelector(`[data-factory-act="${kind}"]`);
     const draft=kind==='money'?Object.fromEntries([...section.querySelectorAll('input[data-money]')].map(input=>[input.dataset.money,input.value])):kind==='inventory'?{mutant:act.split('/')[1]}:{};
     if(state.phase==='running')return Promise.reject(new Error('A check is already running'));
+    // Sync even a programmatic start that changed a form value without an input event.
+    dispatch({type:'DraftChanged',act:kind,draft});
     return new Promise((resolve,reject)=>{
       pending={resolve,reject};
       if(kind==='inventory'){inventoryGrid?.dispose();inventoryGrid=null;gridTask=null;selectedPanel=null;}
