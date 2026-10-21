@@ -1000,6 +1000,38 @@ pub fn listen_address(text: &str) -> AppResult<std::net::SocketAddr> {
     }
     Ok(address)
 }
+/// Parse the public HTTPS origin a trusted TLS proxy serves, such as
+/// `https://app.example.com`, exactly as browsers send it: lowercase, with a
+/// port only when it is not 443, and no path, query or user information.
+pub fn public_origin(text: &str) -> AppResult<String> {
+    let refused = || -> AppResult<String> {
+        Err("ZENO_APP_ORIGIN is an https origin such as https://app.example.com, lowercase, with a port only when it is not 443 and no path".into())
+    };
+    let Some(authority) = text.strip_prefix("https://") else {
+        return refused();
+    };
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) => (host, Some(port)),
+        None => (authority, None),
+    };
+    let host_ok = !host.is_empty()
+        && host.len() <= 253
+        && host
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.')
+        && !host.starts_with(['-', '.'])
+        && !host.ends_with(['-', '.']);
+    let port_ok = port.is_none_or(|port| {
+        !port.starts_with('0')
+            && port
+                .parse::<u16>()
+                .is_ok_and(|number| number != 0 && number != 443)
+    });
+    if !host_ok || !port_ok {
+        return refused();
+    }
+    Ok(text.to_owned())
+}
 // ZENO_APP_PARTIES, or the single credential, principal and context variables.
 fn configured_parties() -> AppResult<Vec<Party>> {
     let Some(file) = std::env::var_os("ZENO_APP_PARTIES") else {
@@ -1041,6 +1073,11 @@ pub fn run() -> AppResult<()> {
     let address = listen_address(
         &std::env::var("ZENO_APP_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8080".into()),
     )?;
+    // Behind a trusted TLS proxy, the browser's origin is the proxy's.
+    let origin = match std::env::var("ZENO_APP_ORIGIN") {
+        Ok(text) => public_origin(&text)?,
+        Err(_) => format!("http://{address}"),
+    };
     crate::session::with_lineage(|lineage| {
         let authority = lineage.authorities().last().ok_or("empty lineage")?;
         if !path.exists() {
@@ -1076,7 +1113,7 @@ pub fn run() -> AppResult<()> {
         let config = ingress_config(
             &parties,
             RustCryptoSha256::hash(authority.identity()),
-            format!("http://{address}"),
+            origin,
         )?;
         let assets = (|| -> Result<Vec<Asset>, Refusal> { Ok(include!("app_assets.rs")) })()
             .map_err(|_| "assets")?;

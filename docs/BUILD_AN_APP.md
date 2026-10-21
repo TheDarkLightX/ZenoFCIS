@@ -127,7 +127,8 @@ payload under its delivery ID, with `ID.json` beside it: an envelope naming
 the commit, lane, ordinal and destination. It acknowledges the delivery after
 syncing both. It is a local example receiver. Other services require a reviewed transport and
 receiver deduplication. Cleartext HTTP is confined to loopback; remote use
-needs a trusted TLS proxy and an explicitly reviewed origin configuration.
+needs a trusted TLS proxy and `ZENO_APP_ORIGIN`, as
+[Deploy behind a TLS proxy](#deploy-behind-a-tls-proxy) describes.
 
 ## Several parties on one server
 
@@ -338,6 +339,55 @@ status, preview = call("POST", "/preview", credential,
 command = bytes.fromhex(json.loads(preview)["command"])
 status, reply = call("POST", "/command", credential, frame(state, key, command))
 ```
+
+## Deploy behind a TLS proxy
+
+“Let the buyer, the seller and the operator use the escrow app from their
+own computers.”
+
+The server listens only on loopback and speaks cleartext HTTP, so a trusted
+reverse proxy on the same host terminates TLS and forwards to it. Set
+`ZENO_APP_ORIGIN` to the public origin exactly as browsers send it, such as
+`https://app.example.com`: lowercase, with a port only when it is not 443,
+and no path. The ingress then accepts only that `Origin`, as it otherwise
+accepts only `http://ADDRESS`; the server refuses to start with any other
+form. For example, with nginx:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name app.example.com;
+    ssl_certificate     /etc/ssl/app.example.com/fullchain.pem;
+    ssl_certificate_key /etc/ssl/app.example.com/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    client_max_body_size 64k;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_read_timeout 15s;
+    }
+}
+server {
+    listen 80;
+    server_name app.example.com;
+    return 301 https://app.example.com$request_uri;
+}
+```
+
+```sh
+ZENO_APP_ORIGIN=https://app.example.com ZENO_APP_PARTIES=run/parties.json \
+  cargo +1.97.1 run --locked --offline --bin app-server
+```
+
+The proxy must terminate TLS with a certificate for the public name,
+forward only to the loopback address, and pass the `Authorization`,
+`Origin` and `Sec-Fetch-Site` headers unchanged. It must keep each request
+to one upstream connection, which nginx's default HTTP/1.0 upstream does,
+and may limit bodies to the server's 64 KiB. It must not add, rewrite or
+remove `Origin` or `Authorization`, serve the application over plain HTTP,
+cache responses, which are all `no-store`, log `Authorization` headers, or
+expose the loopback port. The proxy and its host are trusted: whoever
+controls them sees credentials in transit. This recipe does not add rate
+limits, lockout or client certificates.
 
 ## The formal model
 

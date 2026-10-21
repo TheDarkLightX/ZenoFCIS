@@ -469,6 +469,25 @@ fn parties_file_start_up_refusals() {
             "{address}"
         );
     }
+    // A TLS proxy's public origin, exactly as browsers send it.
+    for origin in ["https://app.example.com", "https://app.example.com:8443"] {
+        assert_eq!(
+            application::app::public_origin(origin).as_deref(),
+            Ok(origin)
+        );
+    }
+    for origin in [
+        "http://app.example.com",
+        "https://App.example.com",
+        "https://app.example.com/",
+        "https://app.example.com:443",
+        "https://user@app.example.com",
+        "https://app.example.com:08443",
+        "https://",
+        "app.example.com",
+    ] {
+        assert!(application::app::public_origin(origin).is_err(), "{origin}");
+    }
     // The server refuses these before it opens a store or a socket.
     let parties = parties_file(&root, &[("a", 0, 0, json!([]))]);
     let credential = root.join("credential-0");
@@ -484,12 +503,20 @@ fn parties_file_start_up_refusals() {
             vec![("ZENO_APP_SECRET_FILE", &credential)],
             "loopback required",
         ),
+        (
+            vec![
+                ("ZENO_APP_SECRET_FILE", &credential),
+                ("ZENO_APP_ORIGIN", &credential),
+            ],
+            "ZENO_APP_ORIGIN",
+        ),
     ] {
         let output = ok(std::process::Command::new(env!("CARGO_BIN_EXE_app-server"))
             .env_remove("ZENO_APP_PARTIES")
             .env_remove("ZENO_APP_SECRET_FILE")
             .env_remove("ZENO_APP_PRINCIPAL")
             .env_remove("ZENO_APP_CONTEXT")
+            .env_remove("ZENO_APP_ORIGIN")
             .envs(variables)
             .env(
                 "ZENO_APP_ADDRESS",
