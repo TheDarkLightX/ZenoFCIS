@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Build and check the three supported app journeys; TCP is an explicit host lane."""
+"""Build and check the three supported app journeys and the multi-party escrow
+example; TCP is an explicit host lane."""
 import argparse
 import hashlib
 import json
@@ -51,6 +52,16 @@ def main():
         run([*cargo,'test','--locked','--offline','--all-features'],cwd=app,env=local)
         run([*cargo,'clippy','--locked','--offline','--all-features','--all-targets','--','-D','warnings'],cwd=app)
         run(['node','--experimental-vm-modules',ROOT/'site/tests/app-durable.test.mjs',out/f'{template}.json'])
+    # One server for three parties: buyer, seller and operator each act with their own credential.
+    app = out/'escrow-deal'
+    run([cli,'new',app,'--contract',ROOT/'examples/apps/escrow-deal/project.zeno','--app'])
+    receipt = json.loads((app/'app-manifest.json').read_text())
+    for name,digest in receipt['files'].items():
+        if hashlib.sha256((app/name).read_bytes()).hexdigest()!=digest:
+            raise RuntimeError(f'manifest drift: escrow-deal/{name}')
+    run([*cargo,'test','--locked','--offline','--all-features','--test','app_journey'],cwd=app)
+    if 'test parties_journey ... ok' not in (out/checks[-1]['log']).read_text():
+        raise SystemExit('parties journey did not run')
     run([*cargo,'test','--locked','--offline','-p','zeno-fcis-ingress'])
     run(['python3','tools/check_ingress.py'])
     print(f'app-factory: PASS; {out}',flush=True)

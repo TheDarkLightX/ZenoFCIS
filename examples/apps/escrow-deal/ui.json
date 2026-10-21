@@ -1,0 +1,38 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Escrow deal",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {"label": "Stage", "unit": "unitless"},
+    "pre.100.111": {"label": "Held in escrow", "unit": "units"},
+    "pre.100.112": {"label": "Paid to seller", "unit": "units"},
+    "pre.100.113": {"label": "Refunded to buyer", "unit": "units"},
+    "command.101.120": {"label": "Command", "unit": "unitless"},
+    "command.101.121": {"label": "Deposit amount (used by Deposit only)", "unit": "units"},
+    "context.102": {"label": "Party", "unit": "unitless"}
+  },
+  "variants": {
+    "150": "Open",
+    "151": "Funded",
+    "152": "Shipped",
+    "153": "Released",
+    "154": "Refunded",
+    "160": "Deposit",
+    "161": "Mark shipped",
+    "162": "Release to seller",
+    "163": "Refund to buyer",
+    "170": "Buyer",
+    "171": "Seller",
+    "172": "Operator"
+  },
+  "commands": {
+    "160": {"label": "Deposit", "consequential": true},
+    "161": {"label": "Mark shipped", "consequential": true},
+    "162": {"label": "Release to seller", "consequential": true},
+    "163": {"label": "Refund to buyer", "consequential": true}
+  },
+  "reasons": {
+    "200": "This party cannot take that step. The buyer deposits and releases, the seller ships, and the operator refunds.",
+    "201": "The deal is not at the right stage for that step."
+  }
+}

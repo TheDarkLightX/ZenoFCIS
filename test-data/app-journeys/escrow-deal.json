@@ -1,0 +1,16 @@
+{
+  "parties": [
+    {"name": "buyer", "context": ["170"]},
+    {"name": "seller", "context": ["171"]},
+    {"name": "operator", "context": ["172"]}
+  ],
+  "steps": [
+    {"party": "buyer", "command": ["160", "2"], "class": "Accept"},
+    {"party": "seller", "command": ["163", "1"], "class": "Reject"},
+    {"party": "buyer", "command": ["161", "1"], "class": "Reject"},
+    {"party": "seller", "command": ["161", "1"], "class": "Accept"},
+    {"party": "operator", "command": ["162", "1"], "class": "Reject"},
+    {"party": "buyer", "command": ["162", "1"], "class": "Accept"}
+  ],
+  "deliveries": 1
+}

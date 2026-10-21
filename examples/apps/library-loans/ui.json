@@ -1,0 +1,30 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Library loans",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {"label": "Copy 1", "unit": "unitless", "values": {"0": "on the shelf", "1": "with member 1", "2": "with member 2", "3": "with member 3"}},
+    "pre.100.111": {"label": "Copy 2", "unit": "unitless", "values": {"0": "on the shelf", "1": "with member 1", "2": "with member 2", "3": "with member 3"}},
+    "pre.100.112": {"label": "Copy 3", "unit": "unitless", "values": {"0": "on the shelf", "1": "with member 1", "2": "with member 2", "3": "with member 3"}},
+    "command.101.120": {"label": "Command", "unit": "unitless"},
+    "command.101.121": {"label": "Copy number", "unit": "unitless"},
+    "command.101.122": {"label": "Member number", "unit": "unitless"},
+    "context.102": {"label": "Desk", "unit": "unitless"}
+  },
+  "variants": {
+    "150": "Borrow",
+    "151": "Return",
+    "130": "Librarian",
+    "131": "Visitor"
+  },
+  "commands": {
+    "150": {"label": "Borrow", "consequential": true},
+    "151": {"label": "Return", "consequential": true}
+  },
+  "reasons": {
+    "200": "Only the librarian desk can record loans.",
+    "201": "That copy is already on loan. Choose a copy on the shelf.",
+    "202": "This member already holds two copies. Return one first.",
+    "203": "This member does not hold that copy."
+  }
+}

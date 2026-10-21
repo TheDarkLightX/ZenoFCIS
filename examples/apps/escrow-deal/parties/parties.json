@@ -1,0 +1,8 @@
+{
+  "schema": "zeno-fcis/app-parties/1",
+  "parties": [
+    {"name": "buyer", "credential": "buyer.credential", "principal": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1", "context": "buyer.context.json"},
+    {"name": "seller", "credential": "seller.credential", "principal": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2", "context": "seller.context.json"},
+    {"name": "operator", "credential": "operator.credential", "principal": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3", "context": "operator.context.json"}
+  ]
+}
