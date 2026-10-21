@@ -39,7 +39,7 @@
     "view-limit": "Reduce the finite view domain or choose an explicitly reviewed tuple cap."
   },
   "cost": {
-    "measured_units": "unknown",
+    "measured_units": "view tuples and admissible views",
     "example_wall_ms": "unknown",
     "telemetry": "PENDING: populate from source-bound invocation telemetry"
   },
@@ -126,11 +126,11 @@ Expected: exit 2; {"status": "UNKNOWN"}.
 
 `checked` covers the stated collection obligations under the documented premises, including runtime framing P4. `refuted` includes a concrete failed view to revise. `UNKNOWN` grants no acceptance; the declared view domain exceeded the cap.
 
-The map capacity is not enumerated. The default view-domain cap is1,048,576 tuples.
+The map capacity is not enumerated. The default view-domain cap is 1,048,576 tuples.
 
 ## Cost
 
-Measured work counts view tuples and admissible views. The token example checks28,672 tuples and2,304 admissible views. Telemetry is advisory observation.
+Measured work counts view tuples and admissible views. The token example checks 28,672 tuples and 2,304 admissible views. Telemetry is advisory observation.
 
 ## Coordinate
 
