@@ -40,8 +40,6 @@ const LANES: [i128; 2] = [170, 171];
 const AMOUNTS: [i128; 2] = [1, 2];
 const CALLERS: [i128; 4] = [190, 191, 192, 193];
 const ALARMS: [i128; 2] = [0, 1];
-// Miri interprets two decisions only; the graph then reports itself incomplete.
-const MIRI_DECISIONS: usize = 2;
 
 fn value(kind: Leaf, n: i128) -> Value {
     match kind {
@@ -92,11 +90,21 @@ fn list(values: &[i128]) -> String {
 fn main() {
     let contract = vault::Contract::new();
     let descriptor = contract.descriptor();
+    let genesis = fields(vault::GENESIS, STATE);
+    // Miri interprets the descriptor and genesis only: the template-contract
+    // Miri groups interpret this contract's checked Authority, and a complete
+    // exploration there would take hours. The adapter refuses this graph.
+    if cfg!(miri) {
+        println!(
+            "{{\"profile\":\"withdrawal-queue/decision-graph/1\",\"authority\":\"none\",\"complete\":false,\"vaults\":[{}],\"decisions\":[]}}",
+            list(&genesis)
+        );
+        return;
+    }
     let Ok(authority) = vault::checked_authority(&descriptor) else {
         panic!("checked withdrawal-queue authority");
     };
     let framing = &vault::FRAMING;
-    let genesis = fields(vault::GENESIS, STATE);
     let commits = authority
         .genesis(&frame(&framing.state, record(STATE, &genesis)))
         .result()
@@ -126,14 +134,9 @@ fn main() {
             })
         })
         .collect();
-    let mut complete = true;
-    'explore: while let Some(from) = queue.pop_front() {
+    while let Some(from) = queue.pop_front() {
         let state = vaults[from].clone();
         for [action, lane, amount, caller, alarm] in inputs.iter().copied() {
-            if cfg!(miri) && count == MIRI_DECISIONS {
-                complete = false;
-                break 'explore;
-            }
             let raw = [
                 frame(&framing.state, record(STATE, &state)),
                 frame(&framing.command, record(COMMAND, &[action, lane, amount])),
@@ -189,7 +192,7 @@ fn main() {
     let rendered: Vec<String> = vaults.iter().map(|v| list(v)).collect();
     println!(
         "{{\"profile\":\"withdrawal-queue/decision-graph/1\",\"authority\":\"none\",\
-\"complete\":{complete},\"genesis_commits\":{commits},\"changed_genesis_refused\":{changed_refused},\
+\"complete\":true,\"genesis_commits\":{commits},\"changed_genesis_refused\":{changed_refused},\
 \"domain\":{{\"action\":{},\"lane\":{},\"amount\":{},\"caller\":{},\"alarm\":{}}},\
 \"vaults\":[{}],\"decisions\":[{decisions}]}}",
         list(&ACTIONS),
