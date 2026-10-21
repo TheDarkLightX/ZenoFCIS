@@ -4,7 +4,7 @@
 mod holdings;
 #[path = "support/hmac.rs"]
 mod issuer;
-#[path = "support/step4.rs"]
+#[path = "support/requests.rs"]
 mod support;
 use support::*;
 use zenofcis_zusd_v1::{
@@ -67,7 +67,7 @@ fn opened(p: &Policy, state: &mut State, actor: u8, collateral: u128, principal:
         },
     );
     use_price(p, state, &mut request);
-    execute(p, state, request);
+    let _ = execute(p, state, request);
 }
 
 fn fallen_price_state(p: &Policy) -> State {
