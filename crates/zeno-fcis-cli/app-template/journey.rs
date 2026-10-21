@@ -880,3 +880,69 @@ fn server_clock_journey() {
 fn original_command(body: &[u8]) -> String {
     application::app::hex(&body[73..])
 }
+
+#[test]
+fn program_connector_acknowledges_only_success() {
+    use application::app::ProgramConnector;
+    use zeno_fcis_shell::effects::port::{Delivery, Fault, Sent};
+    use zeno_fcis_shell_sqlite::effects::production::Transport;
+    let root = std::env::temp_dir().join(format!("app-connector-{}", std::process::id()));
+    ok(std::fs::create_dir(&root));
+    let payload = b"connector delivery".to_vec();
+    let delivery = Delivery {
+        id: Hash32::new([5; 32]),
+        version: 2,
+        lane: 1,
+        ordinal: 0,
+        destination: [&[6, 0, 0, 0, 5][..], b"buyer"].concat(),
+        payload_sha256: RustCryptoSha256::hash(&payload),
+        payload,
+    };
+    let connector = |argv: Value, timeout: u64| {
+        let file = root.join("connector.json");
+        ok(std::fs::write(
+            &file,
+            json!({"schema":"zeno-fcis/app-connector/1","argv":argv,"timeout_seconds":timeout})
+                .to_string(),
+        ));
+        ProgramConnector::load(&file)
+    };
+    // The program reads the envelope and payload on standard input.
+    let received = root.join("received.json");
+    let mut tee = ok(connector(json!(["/usr/bin/tee", received]), 10));
+    assert!(matches!(tee.send(&delivery), Sent::Sent(_)));
+    let input: Value = ok(serde_json::from_slice(&ok(std::fs::read(&received))));
+    assert_eq!(
+        input["delivery"],
+        application::app::hex(delivery.id.as_bytes()),
+        "the delivery ID is missing from the envelope"
+    );
+    assert_eq!(input["destination_text"], "buyer");
+    assert_eq!(input["commit"], 2);
+    assert_eq!(input["payload"], application::app::hex(&delivery.payload));
+    // Any other exit, or the time limit, leaves the delivery pending.
+    let mut fails = ok(connector(json!(["/usr/bin/false"]), 10));
+    assert_eq!(
+        fails.send(&delivery),
+        Sent::Unknown(Fault::Io),
+        "a non-zero exit is acknowledged"
+    );
+    let started = std::time::Instant::now();
+    let mut slow = ok(connector(json!(["/bin/sleep", "30"]), 1));
+    assert_eq!(slow.send(&delivery), Sent::Unknown(Fault::Io));
+    assert!(started.elapsed() < Duration::from_secs(20), "time limit");
+    let mut missing = ok(connector(json!(["/no/such/program"]), 1));
+    assert_eq!(missing.send(&delivery), Sent::Unknown(Fault::Io));
+    for (argv, timeout) in [
+        (json!(["tee", "out"]), 10),
+        (json!([]), 10),
+        (json!(["/usr/bin/tee"]), 0),
+        (json!(["/usr/bin/tee"]), 61),
+    ] {
+        assert!(
+            connector(argv, timeout).is_err(),
+            "connector configuration accepted"
+        );
+    }
+    ok(std::fs::remove_dir_all(root));
+}

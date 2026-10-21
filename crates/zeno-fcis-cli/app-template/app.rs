@@ -676,6 +676,115 @@ impl Transport for FileReceiver {
         }
     }
 }
+/// A delivery handler that runs one configured program per delivery, directly,
+/// with no shell, an empty environment apart from `PATH`, and discarded output.
+/// Its standard input is the delivery's envelope with `payload` added in
+/// hexadecimal. Exit 0 acknowledges; any other exit, a failure to start or the
+/// time limit leaves the delivery pending for the outbox's retry, so delivery
+/// is at least once and the program must treat the delivery ID as its
+/// idempotency key.
+pub struct ProgramConnector {
+    argv: Vec<String>,
+    timeout: Duration,
+}
+impl ProgramConnector {
+    /// Read a `zeno-fcis/app-connector/1` file: `argv`, an absolute program
+    /// path and its arguments, at most 64 entries of at most 4,096 bytes, and
+    /// `timeout_seconds`, from 1 to 60.
+    pub fn load(path: &Path) -> AppResult<Self> {
+        let file: Value =
+            serde_json::from_slice(&bounded(path)?).map_err(|_| "connector encoding")?;
+        let file = file.as_object().ok_or("connector encoding")?;
+        let argv: Option<Vec<String>> =
+            file.get("argv").and_then(Value::as_array).and_then(|argv| {
+                argv.iter()
+                    .map(|arg| arg.as_str().map(str::to_owned))
+                    .collect()
+            });
+        let timeout = file.get("timeout_seconds").and_then(Value::as_u64);
+        let (3, Some(Some("zeno-fcis/app-connector/1")), Some(argv), Some(timeout @ 1..=60)) = (
+            file.len(),
+            file.get("schema").map(Value::as_str),
+            argv,
+            timeout,
+        ) else {
+            return Err(
+                "the connector file has exactly schema zeno-fcis/app-connector/1, argv and timeout_seconds from 1 to 60"
+                    .into(),
+            );
+        };
+        if argv.is_empty()
+            || argv.len() > 64
+            || argv
+                .iter()
+                .any(|arg| arg.len() > 4096 || arg.contains('\0'))
+            || !Path::new(&argv[0]).is_absolute()
+        {
+            return Err(
+                "connector argv is an absolute program path and at most 63 arguments".into(),
+            );
+        }
+        Ok(Self {
+            argv,
+            timeout: Duration::from_secs(timeout),
+        })
+    }
+    fn run(&self, delivery: &Delivery) -> std::io::Result<bool> {
+        let mut value: Value = serde_json::from_slice(&envelope(delivery)?)?;
+        value["payload"] = Value::from(hex(&delivery.payload));
+        let mut input = serde_json::to_vec(&value)?;
+        input.push(b'\n');
+        let mut child = std::process::Command::new(&self.argv[0])
+            .args(&self.argv[1..])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
+        // A program that stops reading early still has its exit status judged.
+        let _ = child.stdin.take().map(|mut stdin| stdin.write_all(&input));
+        let deadline = Instant::now() + self.timeout;
+        loop {
+            if let Some(status) = child.try_wait()? {
+                return Ok(status.success());
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                child.wait()?;
+                return Ok(false);
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+impl Transport for ProgramConnector {
+    fn send(&mut self, delivery: &Delivery) -> Sent {
+        match self.run(delivery) {
+            Ok(true) => Sent::Sent(Report {
+                delivery_id: delivery.id,
+                payload_sha256: delivery.payload_sha256,
+            }),
+            // The program may have acted before it failed: retry under the same ID.
+            _ => Sent::Unknown(Fault::Io),
+        }
+    }
+}
+/// The configured delivery transport: the local file receiver, or a program.
+pub enum Receiver {
+    /// Files under `ZENO_APP_RECEIVER`.
+    File(FileReceiver),
+    /// The program `ZENO_APP_CONNECTOR` configures.
+    Program(ProgramConnector),
+}
+impl Transport for Receiver {
+    fn send(&mut self, delivery: &Delivery) -> Sent {
+        match self {
+            Self::File(receiver) => receiver.send(delivery),
+            Self::Program(connector) => connector.send(delivery),
+        }
+    }
+}
 struct Log;
 impl TraceSink for Log {
     fn record(&mut self, trace: Trace) {
@@ -948,7 +1057,10 @@ pub fn run() -> AppResult<()> {
             &path,
             lineage,
             1,
-            FileReceiver::new(&receiver).map_err(|_| "receiver")?,
+            match std::env::var_os("ZENO_APP_CONNECTOR") {
+                Some(file) => Receiver::Program(ProgramConnector::load(Path::new(&file))?),
+                None => Receiver::File(FileReceiver::new(&receiver).map_err(|_| "receiver")?),
+            },
             Some(Clock::default()),
         )
         .map_err(|_| "open store")?;

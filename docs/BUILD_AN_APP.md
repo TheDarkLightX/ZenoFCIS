@@ -192,6 +192,51 @@ start-up, so adding or rotating one needs a restart. There is no rate limit
 or lockout. The all-entry comparison is a reviewed source form checked by
 `tools/check_ingress.py`, not a timing proof of the compiled code.
 
+## Deliver through a program
+
+“When the buyer releases the money, post it to our payments webhook.”
+
+By default the server hands each delivery to the local file receiver. Set
+`ZENO_APP_CONNECTOR` to a connector file to run one program per delivery
+instead:
+
+```json
+{"schema": "zeno-fcis/app-connector/1",
+ "argv": ["/usr/bin/curl", "--fail", "--silent", "--show-error",
+          "--max-time", "8", "--header", "Content-Type: application/json",
+          "--data-binary", "@-", "https://hooks.example.com/escrow"],
+ "timeout_seconds": 10}
+```
+
+`argv` is an absolute program path and its arguments, at most 64 entries;
+the server runs it directly, never through a shell, with an empty
+environment apart from `PATH=/usr/bin:/bin`, and discards its output. Its
+standard input is one line holding a JSON object: the delivery's envelope,
+with `delivery`, the delivery ID; `commit`, `lane` and `ordinal`;
+`destination` in hexadecimal and, for a text destination,
+`destination_text`; `payload_sha256`; and `payload` in hexadecimal.
+`timeout_seconds` is 1 to 60.
+
+Exit status 0 acknowledges the delivery. Any other exit, a program that
+cannot start, or the time limit leaves the delivery pending: the commit
+stands, the request's reply is 503, and the outbox sends it again on the
+next delivery run, such as a retry of the same request. Delivery is
+therefore at least once. The program, or the service it calls, must treat
+the delivery ID as an idempotency key and apply each ID once. The curl
+example posts the JSON object to a webhook, which deduplicates on
+`delivery`. A mail command, such as
+
+```json
+{"schema": "zeno-fcis/app-connector/1",
+ "argv": ["/usr/bin/mail", "-s", "Escrow delivery", "ops@example.com"],
+ "timeout_seconds": 10}
+```
+
+sends the JSON object as the message body; mail has no deduplication, so a
+retry can send the same delivery twice. A successful exit shows only that
+the program reported success, not that a payment settled or a message was
+read.
+
 ## A server clock for deadlines
 
 “The operator may refund a deal only after day 7, the seller's shipping

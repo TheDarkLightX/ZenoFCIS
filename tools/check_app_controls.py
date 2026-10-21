@@ -34,6 +34,11 @@ CONTROLS = [
      "\n        let view = Some(shown.as_slice());"),
     ("journal-drops-request", "parties_journey", "an admitted request is missing from the journal",
      "file.write_all(submission.line().as_bytes())?;", ""),
+    ("connector-acknowledges-failure", "program_connector_acknowledges_only_success", "a non-zero exit is acknowledged",
+     "return Ok(status.success());", "return Ok(true);"),
+    ("connector-drops-delivery-id", "program_connector_acknowledges_only_success", "the delivery ID is missing from the envelope",
+     'value["payload"] = Value::from(hex(&delivery.payload));',
+     'value["payload"] = Value::from(hex(&delivery.payload));\n        value.as_object_mut().map(|object| object.remove("delivery"));'),
 ]
 
 
