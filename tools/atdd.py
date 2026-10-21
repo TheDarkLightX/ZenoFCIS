@@ -669,7 +669,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "composed-domain-reference": AcceptanceScenario(
         "Agree with an independent reference on fresh-seed random compositions",
-        (("python3", "tools/test_composition_domain_reference.py"),
+        (("python3", "tools/test_check_composed_domain.py"),
+         ("python3", "tools/test_composed_domain_runtime_controls.py", "--out",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "composed-domain-runtime-atdd.json")),
+         ("python3", "tools/test_composition_domain_reference.py"),
          ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"),
          ("python3", "tools/composition_domain_soundness.py", "fixtures", "--check", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis")),
@@ -803,6 +806,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "release-contract": AcceptanceScenario(
         "Run the local V1 release gate",
         (
+            ("python3", "-B", "site/tests/test_socket_free_launcher.py"),
+            ("python3", "tools/test_bls_boundary.py"),
+            ("python3", "tools/test_cargo_source_scope.py"),
+            ("python3", "-B", "-m", "unittest", "discover", "-s", "tools/trace_game", "-p", "test_*.py"),
             ("python3", "tools/check_assurance.py", "--self-test"),
             ("python3", "tools/test_resolved_assurance.py"),
             ("python3", "tools/check_assurance.py"),
