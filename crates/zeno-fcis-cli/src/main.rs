@@ -40,6 +40,7 @@ mod shell_v2;
 mod symbolic;
 mod symbolic_command;
 mod synth;
+mod table_expansion;
 mod tau_command;
 mod transform;
 mod transform_command;
@@ -268,6 +269,9 @@ enum Command {
         /// Compatibility option: unresolved paths always fail in V2.
         #[arg(long)]
         require_resolved_paths: bool,
+        /// Print the exact expansion of the project's tables and the size of its input domain, instead of the check summary.
+        #[arg(long)]
+        expand: bool,
     },
     /// Generate deterministic Rust and manifest artifacts, or check for drift.
     #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
@@ -575,8 +579,15 @@ fn run(command: Command) -> u8 {
         Command::Check {
             project,
             format,
+            expand: true,
+            ..
+        } => table_expansion::expand(&project, format),
+        Command::Check {
+            project,
+            format,
             require_substantive,
             require_resolved_paths,
+            expand: false,
         } => check(
             &project,
             format,
