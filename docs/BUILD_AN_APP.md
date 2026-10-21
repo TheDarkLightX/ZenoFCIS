@@ -122,7 +122,9 @@ state and pending outbox. The server writes the submission journal the
 generated command line's `history` reads, in the same format as `submit`,
 so `history` lists and decides again every request the server committed. `ZENO_APP_STORE`, `ZENO_APP_RECEIVER`,
 `ZENO_APP_CONTEXT` and `ZENO_APP_ADDRESS` select the database, local file
-receiver, context file and loopback address. The receiver stores each exact
+receiver, context file and loopback address. Unset, each takes its default;
+set but empty or not text, the server refuses to start and names it, rather
+than open a default store. The receiver stores each exact
 payload under its delivery ID, with `ID.json` beside it: an envelope naming
 the commit, lane, ordinal and destination. It acknowledges the delivery after
 syncing both. It is a local example receiver. Other services require a reviewed transport and

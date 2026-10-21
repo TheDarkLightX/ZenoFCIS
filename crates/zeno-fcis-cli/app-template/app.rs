@@ -1032,16 +1032,27 @@ pub fn public_origin(text: &str) -> AppResult<String> {
     }
     Ok(text.to_owned())
 }
+// An optional setting: unset is `None`, so its default applies; a value that is
+// set must be nonempty text, never silently replaced by the default.
+fn setting(name: &str) -> AppResult<Option<String>> {
+    match std::env::var_os(name).map(std::ffi::OsString::into_string) {
+        None => Ok(None),
+        Some(Ok(text)) if !text.is_empty() => Ok(Some(text)),
+        Some(_) => Err(format!(
+            "{name} is set but empty or not text; unset it to use its default"
+        )),
+    }
+}
 // ZENO_APP_PARTIES, or the single credential, principal and context variables.
 fn configured_parties() -> AppResult<Vec<Party>> {
-    let Some(file) = std::env::var_os("ZENO_APP_PARTIES") else {
+    let Some(file) = setting("ZENO_APP_PARTIES")? else {
         let secret_file =
             std::env::var_os("ZENO_APP_SECRET_FILE").ok_or("set ZENO_APP_SECRET_FILE")?;
-        let principal = match std::env::var("ZENO_APP_PRINCIPAL") {
-            Ok(value) => Hash32::new(unhex(&value)?.try_into().map_err(|_| "principal width")?),
-            Err(_) => Hash32::new([7; 32]),
+        let principal = match setting("ZENO_APP_PRINCIPAL")? {
+            Some(value) => Hash32::new(unhex(&value)?.try_into().map_err(|_| "principal width")?),
+            None => Hash32::new([7; 32]),
         };
-        let context = std::env::var_os("ZENO_APP_CONTEXT").unwrap_or_else(|| "context.json".into());
+        let context = setting("ZENO_APP_CONTEXT")?.unwrap_or_else(|| "context.json".into());
         return Ok(vec![Party {
             name: "default".into(),
             secret: credential(Path::new(&secret_file))?,
@@ -1066,19 +1077,19 @@ fn configured_parties() -> AppResult<Vec<Party>> {
 /// is required. The existing store is reopened; a new store receives checked genesis.
 pub fn run() -> AppResult<()> {
     let parties = configured_parties()?;
-    let path =
-        PathBuf::from(std::env::var_os("ZENO_APP_STORE").unwrap_or_else(|| "app.sqlite".into()));
+    let path = PathBuf::from(setting("ZENO_APP_STORE")?.unwrap_or_else(|| "app.sqlite".into()));
     let receiver =
-        PathBuf::from(std::env::var_os("ZENO_APP_RECEIVER").unwrap_or_else(|| "deliveries".into()));
-    let address = listen_address(
-        &std::env::var("ZENO_APP_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8080".into()),
-    )?;
+        PathBuf::from(setting("ZENO_APP_RECEIVER")?.unwrap_or_else(|| "deliveries".into()));
+    let address =
+        listen_address(&setting("ZENO_APP_ADDRESS")?.unwrap_or_else(|| "127.0.0.1:8080".into()))?;
     // Behind a trusted TLS proxy, the browser's origin is the proxy's.
     // Unset keeps the loopback origin; a value that is set must be a valid origin.
-    let origin = match std::env::var_os("ZENO_APP_ORIGIN") {
+    let origin = match setting("ZENO_APP_ORIGIN")? {
         None => format!("http://{address}"),
-        Some(text) => public_origin(text.to_str().unwrap_or_default())?,
+        Some(text) => public_origin(&text)?,
     };
+    let clock_file = setting("ZENO_APP_CLOCK_FILE")?.map(PathBuf::from);
+    let connector = setting("ZENO_APP_CONNECTOR")?.map(PathBuf::from);
     crate::session::with_lineage(|lineage| {
         let authority = lineage.authorities().last().ok_or("empty lineage")?;
         if !path.exists() {
@@ -1088,15 +1099,14 @@ pub fn run() -> AppResult<()> {
             };
             drop(V2SqliteShell::create(&path, authority, genesis).map_err(|_| "create store")?);
         }
-        let clock =
-            ServerClock::declared(std::env::var_os("ZENO_APP_CLOCK_FILE").map(PathBuf::from))?;
+        let clock = ServerClock::declared(clock_file)?;
         let table = party_contexts(authority, &parties, clock.as_ref())?;
         let production = Production::open(
             &path,
             lineage,
             1,
-            match std::env::var_os("ZENO_APP_CONNECTOR") {
-                Some(file) => Receiver::Program(ProgramConnector::load(Path::new(&file))?),
+            match &connector {
+                Some(file) => Receiver::Program(ProgramConnector::load(file)?),
                 None => Receiver::File(FileReceiver::new(&receiver).map_err(|_| "receiver")?),
             },
             Some(Clock::default()),

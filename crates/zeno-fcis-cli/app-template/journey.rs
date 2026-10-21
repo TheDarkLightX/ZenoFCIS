@@ -577,6 +577,42 @@ fn parties_file_start_up_refusals() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("ZENO_APP_ORIGIN"));
         assert!(!root.join("never.sqlite").exists());
     }
+    // A store or address that is set but empty or not text refuses with its name;
+    // it never falls back to the default store or address.
+    #[cfg(unix)]
+    for (name, value) in [
+        ("ZENO_APP_STORE", std::ffi::OsString::new()),
+        (
+            "ZENO_APP_STORE",
+            std::os::unix::ffi::OsStringExt::from_vec(b"store\xff.sqlite".to_vec()),
+        ),
+        ("ZENO_APP_ADDRESS", std::ffi::OsString::new()),
+        (
+            "ZENO_APP_ADDRESS",
+            std::os::unix::ffi::OsStringExt::from_vec(b"127.0.0.1:\xff".to_vec()),
+        ),
+    ] {
+        let output = ok(std::process::Command::new(env!("CARGO_BIN_EXE_app-server"))
+            .current_dir(&root)
+            .env_remove("ZENO_APP_PARTIES")
+            .env_remove("ZENO_APP_PRINCIPAL")
+            .env_remove("ZENO_APP_ORIGIN")
+            .env_remove("ZENO_APP_STORE")
+            .env_remove("ZENO_APP_ADDRESS")
+            .env("ZENO_APP_SECRET_FILE", &credential)
+            .env(
+                "ZENO_APP_CONTEXT",
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("context.json"),
+            )
+            .env(name, value)
+            .output());
+        assert_eq!(output.status.code(), Some(1), "{name}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(name),
+            "{name}"
+        );
+        assert!(!root.join("app.sqlite").exists(), "default store opened");
+    }
     ok(std::fs::remove_dir_all(root));
 }
 
