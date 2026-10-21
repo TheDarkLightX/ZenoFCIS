@@ -626,11 +626,30 @@ fn bell(n: u32) -> u128 {
 
 /// Refuses rules that use a key other than in `==` or `!=` with another key
 /// of its type: a key has no value, order or arithmetic.
+/// A stored key field of an entry may be written a key of its type: the
+/// entry then holds that key's class.
 fn refuse_key_values(rules: &Rules, keys: &BTreeMap<String, u32>) -> Result<(), ContractError> {
     for (index, case) in rules.cases.iter().enumerate() {
         let place = format!("v2/policy.json cases[{index}]");
         let mut expressions = vec![&case.when];
-        expressions.extend(case.post.values());
+        for (field, ast) in &case.post {
+            let stored = keys
+                .iter()
+                .find(|(name, _)| name.starts_with("pre.") && name.ends_with(&format!(".{field}")))
+                .map(|(_, key_type)| *key_type);
+            let written = expr::expand(ast, &rules.variables)
+                .map_err(|reason| ContractError::new(&place, reason))?;
+            match (stored, &written) {
+                (Some(key_type), Ast::Name(name)) if keys.get(name) == Some(&key_type) => {}
+                (Some(_), _) => {
+                    return Err(ContractError::new(
+                        &place,
+                        format!("a stored key field ({field}) is written only a key of its type"),
+                    ));
+                }
+                (None, _) => expressions.push(ast),
+            }
+        }
         expressions.extend(case.outbox.iter().flat_map(|d| d.payload.values()));
         for ast in expressions {
             let expanded = expr::expand(ast, &rules.variables)
