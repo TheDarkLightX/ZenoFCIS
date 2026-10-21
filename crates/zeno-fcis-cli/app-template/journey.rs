@@ -1595,3 +1595,38 @@ fn party_contexts_refuse_values_outside_their_domains() {
     }
     ok(std::fs::remove_dir_all(root));
 }
+
+#[test]
+fn clock_file_is_read_strictly() {
+    let Some(journey) = Journey::new("clock-file") else {
+        return;
+    };
+    if journey.clock().is_none() {
+        return;
+    }
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = ok(v2_contract::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let mut server = serve(&journey, &lineage);
+    let credential = journey.credential(&journey.parties[0].name);
+    for (text, expected) in [
+        ("1", 200),
+        ("1\n", 200),
+        ("+1", 503),
+        ("01", 503),
+        ("-0", 503),
+        (" 1", 503),
+        ("1 ", 503),
+        ("1\n\n", 503),
+        ("1\r\n", 503),
+        ("0x1", 503),
+        ("1e0", 503),
+        ("", 503),
+    ] {
+        journey.set_clock(text);
+        let (status, _) = snapshot(&mut server, &credential);
+        assert_eq!(status, expected, "clock file {text:?} read loosely");
+    }
+}

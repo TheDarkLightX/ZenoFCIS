@@ -271,7 +271,9 @@ domain, `contract review`, the judges and the interface build check every
 time without any change.
 
 `ZENO_APP_CLOCK_FILE` names a file holding the current time in the clock's
-units, read at every admission. It is a test and operator tool, not a
+units, as one decimal integer in plain form with at most one final newline,
+read at every admission; anything else, such as `+5`, `05` or a space,
+refuses the request with status 503. It is a test and operator tool, not a
 security boundary: whoever controls the server's configuration or system
 time controls the clock. The clock has a single time zone, UTC. A preview is
 advice: when the time changes between a preview and its command, the

@@ -48,6 +48,9 @@ CONTROLS = [
     ("context-domain-unchecked", "party_contexts_refuse_values_outside_their_domains",
      "a context outside its declared domain started",
      "if !declared(schema, &context) {", "if false && !declared(schema, &context) {"),
+    ("clock-file-loose", "clock_file_is_read_strictly", "read loosely",
+     ".and_then(|text| text.parse::<i128>().ok().filter(|n| n.to_string() == text))",
+     ".and_then(|text| text.trim().parse::<i128>().ok())"),
 ]
 
 

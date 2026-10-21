@@ -178,9 +178,12 @@ impl ServerClock {
     }
     fn now(&self) -> Result<i128, Refusal> {
         match &self.source {
+            // One canonical decimal, as every other number, and at most one
+            // final newline.
             Some(file) => std::str::from_utf8(&bounded(file).map_err(|_| Refusal::Unavailable)?)
                 .ok()
-                .and_then(|text| text.trim().parse::<i128>().ok())
+                .map(|text| text.strip_suffix('\n').unwrap_or(text))
+                .and_then(|text| text.parse::<i128>().ok().filter(|n| n.to_string() == text))
                 .ok_or(Refusal::Unavailable),
             None => {
                 let seconds = std::time::SystemTime::now()
