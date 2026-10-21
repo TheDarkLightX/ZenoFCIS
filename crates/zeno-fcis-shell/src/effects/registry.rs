@@ -19,7 +19,7 @@ pub const SCHEMA: &str = "zeno-fcis/shell-effects/1";
 /// SHA-256 of the step-function source, framed by [`source_digest`], as hex.
 /// Changing `program.rs` needs a deliberate new binding here.
 pub const PROGRAM_SOURCE_SHA256: &str =
-    "7482203bdbf76d43464333f853daa50c00ec0f9bbd9bf8fc72021c356d672b58";
+    "b136c0259cfdba65e0a90b0b3b6be285c27f16adf1ee5b984e9b23d27d1699e9";
 
 /// Largest byte cap a field may declare.
 pub const MAX_BYTES: u64 = 1 << 20;
@@ -114,7 +114,7 @@ const fn field(name: &'static str, kind: Kind) -> Field {
 pub enum Answer {
     /// `Ok(T) | Refused(Code) | NotApplied(Fault) | Unknown(Fault)`.
     Outcome(Kind),
-    /// `Sent(T) | NotSent(Code) | Unknown(Fault)`.
+    /// `Sent(T) | NotSent(Code) | Unknown(Fault) | Refused(Code)`.
     Transport(Kind),
     /// `Ok(T) | Err(Fault)`.
     Fallible(Kind),

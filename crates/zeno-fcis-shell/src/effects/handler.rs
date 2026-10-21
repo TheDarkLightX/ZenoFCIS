@@ -2,15 +2,16 @@
 //!
 //! A request passes through the stack's layers, innermost first, to the
 //! terminal handler that carries it out; the answer passes back outward.
-//! Layers here intercept nothing: the identity forwarder passes requests on
-//! unchanged and the record layer appends them to its transcript. Before a
+//! The identity forwarder passes requests unchanged, policies may veto them,
+//! and the record layer appends them to its transcript. Before a
 //! run, [`bind`] refuses a stack whose terminal does not cover every port the
 //! program can request. Only the driver resumes a program.
 
 use alloc::vec::Vec;
 
 use super::driver::Binding;
-use super::port::{Fault as FaultKind, Operation, Response};
+use super::policy::{self, Monitor, Verdict};
+use super::port::{Fault as FaultKind, Operation, Response, Sent};
 use super::record::{Entry, Transcript};
 use super::registry::Port;
 use super::simulation::Script;
@@ -127,6 +128,8 @@ pub enum Layer {
     Identity,
     /// Also appends every request, answer, crash and outcome to a transcript.
     Record(Transcript),
+    /// Pure veto monitor. Its state survives retries and simulated restarts.
+    Policy(Monitor),
 }
 
 impl Layer {
@@ -136,6 +139,7 @@ impl Layer {
         match self {
             Self::Identity => "identity",
             Self::Record(_) => "record",
+            Self::Policy(_) => "policy",
         }
     }
 }
@@ -172,7 +176,45 @@ impl Stack {
         binding: &Binding,
         operation: &Operation,
     ) -> Handled {
-        let handled = terminal.handle(binding, operation);
+        // Tentative reservations are private invocation scratch. A rejection
+        // by any layer or a simulation Suspend discards all of them. There is
+        // one terminal call, with the caller's exact immutable operation.
+        let mut next = Vec::new();
+        let mut rejection = None;
+        for (index, layer) in self.layers.iter().enumerate() {
+            if let Layer::Policy(monitor) = layer {
+                let (state, verdict) =
+                    policy::step(&monitor.policy, &monitor.state, operation, None);
+                match verdict {
+                    Verdict::Allow => next.push((index, state)),
+                    Verdict::Reject(code) => {
+                        rejection = Some(code);
+                        break;
+                    }
+                }
+            }
+        }
+        let mut previous = Vec::new();
+        if rejection.is_none() {
+            for (index, state) in next {
+                if let Layer::Policy(monitor) = &mut self.layers[index] {
+                    previous.push((index, core::mem::replace(&mut monitor.state, state)));
+                }
+            }
+        }
+        let handled = match rejection {
+            Some(code) => Handled::Answer(Response::Send(Sent::Refused(code))),
+            None => terminal.handle(binding, operation),
+        };
+        // Reserve before the terminal call, including if it unwinds. Only a
+        // model suspension certifies that no invocation took place.
+        if handled == Handled::Suspend {
+            for (index, state) in previous {
+                if let Layer::Policy(monitor) = &mut self.layers[index] {
+                    monitor.state = state;
+                }
+            }
+        }
         let entry = match &handled {
             Handled::Answer(response) => Some(Entry::Response(binding.clone(), response.clone())),
             Handled::Crash => Some(Entry::Crash(binding.clone())),
@@ -208,5 +250,30 @@ impl Stack {
             }
         }
         transcripts
+    }
+
+    /// Owned policy layers for a restarted program under the same relay.
+    #[must_use]
+    pub fn policies(&self) -> Vec<Layer> {
+        self.layers
+            .iter()
+            .filter_map(|layer| match layer {
+                Layer::Policy(_) => Some(layer.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Canonical identities and states in stack order. Transcripts are absent.
+    #[must_use]
+    pub fn policy_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for layer in &self.layers {
+            if let Layer::Policy(monitor) = layer {
+                super::codec::hash(&mut bytes, monitor.identity());
+                super::codec::bytes(&mut bytes, &monitor.state.bytes());
+            }
+        }
+        bytes
     }
 }

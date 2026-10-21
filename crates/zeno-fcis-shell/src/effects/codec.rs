@@ -33,6 +33,7 @@ pub fn response(response: &Response) -> Vec<u8> {
         Response::Send(Sent::Sent(_)) => out.push(0),
         Response::Send(Sent::NotSent(code)) => out.extend_from_slice(&[1, *code as u8]),
         Response::Send(Sent::Unknown(fault)) => out.extend_from_slice(&[2, *fault as u8]),
+        Response::Send(Sent::Refused(code)) => out.extend_from_slice(&[3, *code as u8]),
         Response::Clock(Ok(_)) | Response::Random(Ok(_)) | Response::Wait(Ok(_)) => out.push(0),
         Response::Clock(Err(fault)) | Response::Random(Err(fault)) => {
             out.extend_from_slice(&[1, *fault as u8]);

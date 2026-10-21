@@ -251,6 +251,7 @@ fn recovery_transcript() -> (Transcript, Vec<u8>, u64) {
         epoch,
         recover,
         ended,
+        ..
     } = all[0].clone();
     assert!(!recover);
     let mut asked = Vec::new();

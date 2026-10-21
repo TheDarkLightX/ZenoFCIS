@@ -313,7 +313,7 @@ impl Laws {
                         });
                         Ok(())
                     }
-                    Some(Response::Send(Sent::NotSent(_))) => {
+                    Some(Response::Send(Sent::NotSent(_) | Sent::Refused(_))) => {
                         if copies != 0 {
                             return fail("send-exact", "not sent, yet a copy left");
                         }

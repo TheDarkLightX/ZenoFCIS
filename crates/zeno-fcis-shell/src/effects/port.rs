@@ -254,6 +254,14 @@ pub enum Code {
     Protocol,
     /// The run was cancelled while it waited; the record stays pending.
     Interrupted,
+    /// A second send attempt under the same store and delivery key.
+    PolicyDuplicate,
+    /// The recipient is absent from the bound allowlist.
+    PolicyRecipient,
+    /// A policy attempted to read an undeclared field.
+    PolicyFields,
+    /// The policy reservation log reached its bound.
+    PolicyCapacity,
 }
 
 /// Why an operation failed without a refusal code.
@@ -290,6 +298,8 @@ pub enum Sent {
     NotSent(Code),
     /// The transport may or may not have sent.
     Unknown(Fault),
+    /// A policy refused before transport invocation; never retried in this run.
+    Refused(Code),
 }
 
 /// Why a wait ended without reaching its deadline.

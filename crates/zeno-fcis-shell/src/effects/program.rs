@@ -464,6 +464,7 @@ fn sent_one(continuation: DeliveryContinuation, sent: Sent) -> DeliveryStep {
             ask(continuation, DeliveryPhase::Acknowledge, operation)
         }
         Sent::Sent(_) => Step::Done(Outcome::Refused(Code::Protocol)),
+        Sent::Refused(code) => Step::Done(Outcome::Refused(code)),
         Sent::NotSent(code) => {
             if continuation.retries == 0 {
                 return Step::Done(Outcome::Refused(code));

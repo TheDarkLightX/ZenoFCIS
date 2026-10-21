@@ -21,6 +21,7 @@ use super::codec;
 use super::driver::{Driver, Fatal, Reply};
 use super::handler::{self, Handled, Layer, Stack, Unbound};
 use super::laws::{self, LawFailure, Laws};
+use super::policy::{self, EffectKey, Monitor, Policy};
 use super::port::{CommitMode, CommitReceipt, Operation, Outcome, PublicationData, Response};
 use super::program::{
     CommitInvocation, CommitPolicy, CommitProgram, DeliveryInvocation, DeliveryPolicy,
@@ -78,6 +79,33 @@ pub struct Stats {
     /// Crashes, restarts after a crash, copies received and late replies
     /// refused, each counted once.
     pub tally: Tally,
+    /// Explicit policy refusals witnessed at newly explored transitions.
+    pub policy_refusals: u64,
+    /// Program outcomes across finished schedules; exploration closure is
+    /// separate from whether any individual action completed.
+    pub actions: Actions,
+}
+
+/// No action silently disappears: success, explicit refusal, or unresolved.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Actions {
+    /// Protocol success, such as a matching acknowledgement, not proof of
+    /// external execution.
+    pub committed: u64,
+    /// Explicit refusal.
+    pub refused: u64,
+    /// Crash, Unknown, or NotApplied; progress remains unresolved.
+    pub incomplete: u64,
+}
+
+impl Actions {
+    fn count<T>(&mut self, outcome: Option<&Outcome<T>>) {
+        match outcome {
+            Some(Outcome::Ok(_)) => self.committed += 1,
+            Some(Outcome::Refused(_)) => self.refused += 1,
+            _ => self.incomplete += 1,
+        }
+    }
 }
 
 /// Events of an exploration, each counted in the run that first reaches it.
@@ -120,6 +148,12 @@ pub enum Exploration {
 /// The result of one exploration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Report {
+    /// Source identity of the explorer, including its policy retry path.
+    pub source: Hash32,
+    /// Bound policy identities, in stack order; empty for the original explorer.
+    pub policies: Vec<Hash32>,
+    /// Premises and nonclaims for this policy product.
+    pub premises: &'static [&'static str],
     /// How it ended.
     pub exploration: Exploration,
     /// Its counts.
@@ -135,6 +169,10 @@ pub struct Report {
 /// A broken law or invariant, with the schedule that reproduces it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Violation {
+    /// Bound policy identities, in stack order.
+    pub policies: Vec<Hash32>,
+    /// Premises and nonclaims of the checked product.
+    pub premises: &'static [&'static str],
     /// The choices that reach it.
     pub schedule: Vec<u8>,
     /// The invariant that broke.
@@ -222,6 +260,10 @@ struct System {
     simulation: Simulation,
     actors: Vec<Actor>,
     prefix: Vec<u8>,
+    policies: Vec<Policy>,
+    // Independent multiset oracle; unlike World.sent this preserves repeats.
+    attempts: Vec<EffectKey>,
+    policy_refusals: u64,
 }
 
 impl System {
@@ -230,6 +272,7 @@ impl System {
         profile: Profile,
         layers: Layers,
         prefix: &[u8],
+        policies: &[Policy],
     ) -> Result<Self, Failure> {
         let genesis = Durable::genesis();
         let (durable, roles) = match scenario {
@@ -269,6 +312,9 @@ impl System {
             simulation,
             actors: Vec::new(),
             prefix: prefix.to_vec(),
+            policies: policies.to_vec(),
+            attempts: Vec::new(),
+            policy_refusals: 0,
         };
         for role in roles {
             let body = match role {
@@ -305,6 +351,16 @@ impl System {
             self.simulation.world.digest()
         };
         let actor = &mut self.actors[index];
+        let policy_layers = if actor.incarnation == 0 {
+            self.policies
+                .iter()
+                .cloned()
+                .map(Monitor::new)
+                .map(Layer::Policy)
+                .collect()
+        } else {
+            actor.stack.policies()
+        };
         let epoch = (index as u64 + 1) * 16 + u64::from(actor.incarnation);
         let mut start = Vec::new();
         let running = match actor.role {
@@ -359,11 +415,22 @@ impl System {
                 )
             }
         };
-        let names = match self.layers {
+        let mut names = match self.layers {
             Layers::Bare => vec!["simulation"],
             Layers::Record => vec!["record", "simulation"],
             Layers::IdentityRecord => vec!["identity", "record", "simulation"],
         };
+        if !policy_layers.is_empty() {
+            let binding = Stack {
+                layers: policy_layers.clone(),
+            }
+            .policy_bytes();
+            codec::bytes(&mut start, b"zeno-fcis/effect-policy-stack/1");
+            codec::bytes(&mut start, &binding);
+            for _ in &policy_layers {
+                names.insert(0, "policy");
+            }
+        }
         let record = || {
             Layer::Record(Transcript::new(Manifest::current(
                 names.clone(),
@@ -372,11 +439,12 @@ impl System {
                 start.clone(),
             )))
         };
-        let layers = match self.layers {
+        let mut layers = policy_layers;
+        layers.extend(match self.layers {
             Layers::Bare => Vec::new(),
             Layers::Record => vec![record()],
             Layers::IdentityRecord => vec![Layer::Identity, record()],
-        };
+        });
         let stack = Stack { layers };
         let actor = &mut self.actors[index];
         actor.running = Some(running);
@@ -408,6 +476,12 @@ impl System {
                 "|{:?}|{}|{}|{:?}|{:?}",
                 actor.running, actor.incarnation, actor.crashed, actor.commit, actor.delivery
             );
+            if !self.policies.is_empty() {
+                let _ = write!(text, "|{:?}", actor.stack.policy_bytes());
+            }
+        }
+        if !self.policies.is_empty() {
+            let _ = write!(text, "|{:?}", self.attempts);
         }
         RustCryptoSha256::hash(text.as_bytes())
     }
@@ -455,6 +529,32 @@ impl System {
             .handle(&mut self.simulation, &binding, &operation);
         if handled == Handled::Suspend {
             return Ok(false);
+        }
+        if !self.policies.is_empty() {
+            if matches!(&handled, Handled::Answer(response) if policy::refused(response)) {
+                if self.fresh() {
+                    self.policy_refusals += 1;
+                }
+            } else if let Operation::Send(store, delivery) = &operation {
+                let key = (store.identity, delivery.id);
+                for policy in &self.policies {
+                    match policy {
+                        Policy::AtMostOne { .. } if self.attempts.contains(&key) => {
+                            return Err(Failure::Violation("policy: second send of a key", None));
+                        }
+                        Policy::Allowlist(recipients)
+                            if !recipients.contains(&delivery.destination) =>
+                        {
+                            return Err(Failure::Violation(
+                                "policy: recipient not allowlisted",
+                                None,
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+                self.attempts.push(key);
+            }
         }
         if let (Some(before), true) = (
             before,
@@ -790,7 +890,29 @@ pub fn explore(
     order: Order,
     budget: u64,
 ) -> Result<Report, Violation> {
+    explore_with_policies(scenario, profile, layers, order, budget, &[])
+}
+
+/// Explores program × world × policy, including policy state at every
+/// fingerprint and every retry/restart. Refused actions remain recorded and
+/// pending; an exhausted search is incomplete, never a pass.
+pub fn explore_with_policies(
+    scenario: Scenario,
+    profile: Profile,
+    layers: Layers,
+    order: Order,
+    budget: u64,
+    policies: &[Policy],
+) -> Result<Report, Violation> {
+    let premises = if policies.is_empty() {
+        &[][..]
+    } else {
+        policy::PREMISES
+    };
     let mut report = Report {
+        source: super::registry::source_digest(&[("explore.rs", include_bytes!("explore.rs"))]),
+        policies: policies.iter().map(Policy::identity).collect(),
+        premises,
         exploration: Exploration::Complete,
         stats: Stats::default(),
         laws: Laws::default(),
@@ -819,23 +941,37 @@ pub fn explore(
         }
         report.stats.runs += 1;
         report.stats.deepest = report.stats.deepest.max(prefix.len());
-        let outcome = System::new(scenario, profile, layers, &prefix).and_then(|mut system| {
-            let run = system.run(&mut report.laws, &mut report.stores);
-            let tally = &mut report.stats.tally;
-            tally.crashes += system.tally.crashes;
-            tally.restarts += system.tally.restarts;
-            tally.received += system.tally.received;
-            tally.late += system.tally.late;
-            let run = run?;
-            if matches!(run, Run::Finished(_)) && layers != Layers::Bare {
-                let mut count = 0;
-                for actor in &system.actors {
-                    count += actor.done.len() as u64;
+        let outcome =
+            System::new(scenario, profile, layers, &prefix, policies).and_then(|mut system| {
+                let run = system.run(&mut report.laws, &mut report.stores);
+                let tally = &mut report.stats.tally;
+                tally.crashes += system.tally.crashes;
+                tally.restarts += system.tally.restarts;
+                tally.received += system.tally.received;
+                tally.late += system.tally.late;
+                report.stats.policy_refusals += system.policy_refusals;
+                let run = run?;
+                if matches!(run, Run::Finished(_)) {
+                    for actor in &system.actors {
+                        match actor.role {
+                            Role::Commit { .. } => {
+                                report.stats.actions.count(actor.commit.as_ref())
+                            }
+                            Role::Delivery { .. } => {
+                                report.stats.actions.count(actor.delivery.as_ref())
+                            }
+                        }
+                    }
                 }
-                report.stats.replays += count;
-            }
-            Ok(run)
-        });
+                if matches!(run, Run::Finished(_)) && layers != Layers::Bare {
+                    let mut count = 0;
+                    for actor in &system.actors {
+                        count += actor.done.len() as u64;
+                    }
+                    report.stats.replays += count;
+                }
+                Ok(run)
+            });
         match outcome {
             Ok(Run::Suspended {
                 options,
@@ -872,6 +1008,8 @@ pub fn explore(
             }
             Err(Failure::Violation(what, law)) => {
                 return Err(Violation {
+                    policies: report.policies.clone(),
+                    premises,
                     schedule: prefix,
                     what,
                     law,
@@ -894,6 +1032,8 @@ pub fn explore(
 /// One finished run's transcript and what replaying it needs.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Recorded {
+    /// Premises and nonclaims, including for refused or crashed actions.
+    pub premises: &'static [&'static str],
     /// The transcript.
     pub transcript: Transcript,
     /// The manifest's start bytes.
@@ -914,7 +1054,22 @@ pub fn transcripts(
     layers: Layers,
     schedule: &[u8],
 ) -> Option<Vec<Recorded>> {
-    let mut system = System::new(scenario, profile, layers, schedule).ok()?;
+    transcripts_with_policies(scenario, profile, layers, schedule, &[])
+}
+
+/// Reproduces a schedule with the same policy product, retaining its bound
+/// manifests and premises. A short or invalid schedule yields `None`.
+pub fn transcripts_with_policies(
+    scenario: Scenario,
+    profile: Profile,
+    layers: Layers,
+    schedule: &[u8],
+    policies: &[Policy],
+) -> Option<Vec<Recorded>> {
+    if !profile.well_formed() {
+        return None;
+    }
+    let mut system = System::new(scenario, profile, layers, schedule, policies).ok()?;
     let mut laws = Laws::default();
     let mut stores = Vec::new();
     match system.run(&mut laws, &mut stores).ok()? {
@@ -926,6 +1081,11 @@ pub fn transcripts(
         for done in &actor.done {
             for transcript in &done.transcripts {
                 all.push(Recorded {
+                    premises: if policies.is_empty() {
+                        &[]
+                    } else {
+                        policy::PREMISES
+                    },
                     transcript: transcript.clone(),
                     start: done.start.clone(),
                     epoch: done.epoch,
@@ -946,14 +1106,34 @@ pub fn next_choice(
     layers: Layers,
     prefix: &[u8],
 ) -> Result<Option<usize>, Violation> {
+    next_choice_with_policies(scenario, profile, layers, prefix, &[])
+}
+
+/// Reproduces a policy counterexample or offers its next schedule choice.
+pub fn next_choice_with_policies(
+    scenario: Scenario,
+    profile: Profile,
+    layers: Layers,
+    prefix: &[u8],
+    policies: &[Policy],
+) -> Result<Option<usize>, Violation> {
     let violation = |what, law| Violation {
+        policies: policies.iter().map(Policy::identity).collect(),
+        premises: if policies.is_empty() {
+            &[]
+        } else {
+            policy::PREMISES
+        },
         schedule: prefix.to_vec(),
         what,
         law,
     };
+    if !profile.well_formed() {
+        return Err(violation("refused profile", None));
+    }
     let mut laws = Laws::default();
     let mut stores = Vec::new();
-    let run = System::new(scenario, profile, layers, prefix)
+    let run = System::new(scenario, profile, layers, prefix, policies)
         .and_then(|mut system| system.run(&mut laws, &mut stores));
     match run {
         Ok(Run::Suspended { options, .. }) => Ok(Some(options)),

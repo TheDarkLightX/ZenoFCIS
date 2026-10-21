@@ -39,7 +39,8 @@ and footprint, the IDs of its handler laws, and its default V2 calls.
   Random and Wait have no default V2 API. ReadHistory maps to
   `Lineage::audit_history_read_only` and also needs Authority: the adapter
   rebuilds each commit's publication data with `audited_publication`.
-- Send answers `Sent`, `NotSent(Code)` or `Unknown(Fault)`. Wait answers a
+- Send answers `Sent`, `NotSent(Code)`, `Unknown(Fault)` or a policy's
+  `Refused(Code)`. Wait answers a
   tick, `Interrupted` or a fault; an interrupted delivery run ends with
   `Refused(Interrupted)` and leaves the record pending.
 
@@ -182,3 +183,78 @@ one trusted writer and relay, and two handles; history absence is trusted
 only under that single-writer premise. Creation, upgrades, multiple stores,
 multiple processes, exactly-once external effects and power-loss durability are
 not covered.
+
+## Opt-in effect policies
+
+A policy is data and a pure step:
+`policy::step(&Policy, &State, &Operation, Option<&Response>) -> (State, Verdict)`.
+`Verdict` is only `Allow` or `Reject(Code)`. It cannot contain an operation.
+`None` admits a request; `Some(response)` observes its result. The shipped
+policies read no response payload fields and never release a reservation.
+They are defense in depth: the core still decides and grants publication
+through Authority. A policy cannot authorize a new action.
+
+Bind `Layer::Policy(Monitor::new(policy))` before the terminal in the opt-in
+`Stack`. Every request, including retries, passes all policies before one
+terminal call with the original bytes. A rejection returns `Sent::Refused`
+with `PolicyDuplicate`, `PolicyRecipient`, `PolicyFields` or `PolicyCapacity`;
+the delivery program ends `Outcome::Refused` immediately, retaining the
+pending record. The record layer captures that response and the final outcome.
+Success, refusal, Unknown, NotApplied and crash are explicit transcript events;
+the latter three classify as incomplete actions. Exploration closure and
+individual action completion are separate results.
+
+| Policy | Fields read besides the Send tag | Rule |
+|---|---|---|
+| `AtMostOne { capacity }` | `Store.identity`, `Delivery.id` | At most one forwarded Send attempt per pair, including identical sends |
+| `Policy::allowlist(recipients)` | `Delivery.destination` | Exact destination bytes must occur in the bound list |
+
+Send carries no publication replay key. Its effect key is the store identity
+and delivery ID, shared across handles. It is not a payload hash or a subset
+comparison. Every actual attempt consumes its reservation, including NotSent,
+Unknown and crash; capacity exhaustion refuses. A simulation suspension has
+not forwarded and consumes nothing. Transport duplication can still produce
+multiple copies from that single send.
+
+The versioned policy identity binds the canonical allowlist, capacity, field
+declarations, and source of `policy.rs` and `handler.rs`. Projection exposes
+only declared fields to the decision body; an absent field access refuses.
+Stack order, policy identities and initial reservation states are bound into
+the explorer's manifest start bytes. Policy state and the independent send
+multiset enter each explorer fingerprint and survive modelled restarts.
+`explore_with_policies` returns complete, incomplete or refused, with identities,
+source, action counts and premises; violations include a reproducing schedule.
+Use `next_choice_with_policies` and `transcripts_with_policies` to reproduce
+that schedule under the same configuration.
+The frozen policy check uses both policies, retry budgets 0-2, every modelled
+response, and both an admitted and a denied recipient configuration.
+
+Ownership review: step takes transitively immutable shared inputs and returns
+owned state. Its cloned reservation vector is exclusive scratch, never a
+mutable alias of the input. `Monitor` and `Stack` are retained shell handles,
+not decision, metering or publication authority. Only their exclusive owner
+installs a successor after all policies admit, before calling the terminal,
+including if that call unwinds. Another
+policy's rejection or a suspension discards tentative state. The monitor's
+private bound configuration permits caching its identity without invalidation.
+The source digest above pins this review to the implementation being checked.
+A closed two-case policy enum and projected fields avoid a callback runtime,
+extra operation language and response-dependent rollback bookkeeping.
+Existing port tags, failure codes and canonical bytes retain their numbering;
+new codes and the transport Refused branch are appended. The program source
+pin changes intentionally. The original explorer and non-policy stacks keep
+their prior behavior and are covered by the original shell regression tests.
+
+Provider idempotency is an environment assumption. A timeout can hide success.
+The claim is "no second send of the same key by this protocol", never
+"executed exactly once externally". One trusted relay must retain policy
+state across retries and restarts; real process loss requires durable state
+restoration before sending. That persistence adapter is outside this finite
+simulation check. Receiver deduplication remains a separate environment law.
+Every policy exploration result carries these premises and nonclaims.
+
+`tools/check_effect_policy_controls.py --out <file>` builds six source mutants:
+recipient rewrite, duplicate send admission, missing allowlist, silent record
+drop, undeclared field access, and skipping policies on retry. Each must fail
+its named behavioral check and pass again after restoration. The ignored
+`policy_frozen_profile` test runs the complete frozen policy product.
