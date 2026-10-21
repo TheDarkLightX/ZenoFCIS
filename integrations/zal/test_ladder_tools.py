@@ -70,7 +70,7 @@ class LadderToolTests(unittest.TestCase):
                 rendered += 1
         vault = self.call("zal_ladder_render", statement=VAULT, revision=self.revisions[VAULT])
         self.assertEqual(vault["rungs"]["plain"], "No admitted operation sequence drains the vault.")
-        self.assertEqual(vault["rungs"]["formula"], "∀sigma ∈ Traces : □(¬Loss())")
+        self.assertEqual(vault["rungs"]["formula"], "∀sigma ∈ Traces : ∀a ∈ Assets : □(¬Loss(a))")
         self.assertEqual(vault["evidence"]["evidence"], "obligation")
         self.assertEqual([item["field"] for item in vault["scope"]][:6],
                          ["source_revision", "event_schema", "order", "projection", "mode", "horizon"])
@@ -105,7 +105,7 @@ class LadderToolTests(unittest.TestCase):
             self.assertIn(name, str(caught.exception))
         with self.assertRaises(REFUSALS) as caught:
             self.call("zal_ladder_parse", statement=VAULT, revision=self.revisions[VAULT], rung="typed",
-                      text="forall sigma in Traces: within(4, not Loss())")
+                      text="forall sigma in Traces: forall a in Assets: within(4, not Loss(a))")
         self.assertIn("temporal:within-horizon", str(caught.exception))
         print(f"LADDER PARSE: {parsed} rung texts parse back to one normalized meaning; named refusals kept")
 
@@ -116,9 +116,9 @@ class LadderToolTests(unittest.TestCase):
         self.assertEqual((same["status"], same["same"]), ("same", True))
         self.assertEqual(same["evidence"]["scope_identity"]["left"], same["evidence"]["scope_identity"]["right"])
         different = self.call("zal_ladder_same", statement=VAULT, revision=vault, rung="typed",
-                              text="forall sigma in Traces: always(Loss())")
+                              text="forall sigma in Traces: forall a in Assets: always(Loss(a))")
         self.assertEqual(different["status"], "different-normal-forms")
-        self.assertEqual(different["evidence"]["first_difference"]["path"], "root/2/1")
+        self.assertEqual(different["evidence"]["first_difference"]["path"], "root/2/3/1")
         self.assertIn("does not show the meanings differ", different["summary"])
         crossed = self.call("zal_ladder_same", statement=VAULT, revision=vault, other_statement=DEX, other_revision=dex)
         self.assertEqual((crossed["status"], crossed["same"]), ("not-compared", None))
