@@ -187,6 +187,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("python3", "-B", "integrations/zal/check_ladder_temporal.py", "native-build"),
          ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
          ("python3", "-B", "integrations/zal/check_ladder_temporal.py", "planted"),
+         ("python3", "-B", "integrations/zal/check_zal_tools.py"),
          ("node", "integrations/zal/test_workspace.cjs"),
          ("node", "integrations/zal/test_mcp_sdk.mjs"),
          ("python3", "integrations/zal/oracles/independent_oracle.py"),
