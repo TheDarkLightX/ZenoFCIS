@@ -124,6 +124,12 @@ These commands belong to the review terminal, not the model grammar:
 | `translate english`, `translate symbolic` | Complete current canonical model in the chosen surface. |
 | `why` | Help for the currently selected object, without assumed input values. |
 | `why STATE EVENT FACT=yes ...` | One exact decision explanation; supply every declared fact once. |
+| `whynot STATE EVENT FACT=yes ... want Accept [TARGET]` | Fewest input changes giving the wanted outcome; also `want Reject [REASON]`, `want rule ID`, and a trailing `scope input`. |
+| `whatif STATE EVENT FACT=yes ... change FACT=no [state:NAME] [event:NAME]` | Apply every named change and compare both decisions rule by rule. |
+| `story`, `story candidate`, `story trace EVENT FACT=yes then ...` | Numbered story of a counterexample or trace, paired with symbolic lines. |
+| `guide [TOPIC]` | Construct help generated from the construct registry (`zal/help/2`). |
+| `ladder list`, `ladder render ID [RUNG]`, `ladder parse ID RUNG TEXT` | Ladder statements; the revision read when the command runs is bound. |
+| `ladder same ID OTHER_ID`, `ladder same ID RUNG TEXT`, `ladder explain ID [[RUNG] TEXT]`, `ladder lower ID` | Meaning comparison with evidence, rung and scope explanation, inert lowering. |
 
 `yes`/`true` and `no`/`false` are Boolean values in terminal input commands.
 MCP/HTTP input uses actual JSON Booleans. Missing or extra keys and non-Boolean

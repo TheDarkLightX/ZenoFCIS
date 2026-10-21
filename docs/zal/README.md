@@ -114,6 +114,50 @@ printf '%s\n' '? and' 'man rule:approve_order' 'translate english' \
   'check' 'quit' | python3 integrations/zal/terminal.py review --workspace "$ZAL_WORKSPACE"
 ```
 
+### Ask why not, what if, and for the story
+
+Three further explanation commands use the same typed model and no provider:
+
+```text
+whynot pending approve authorized=no want Accept
+whynot draft approve authorized=no want Accept approved scope input
+whatif pending approve authorized=no change authorized=yes
+story
+story trace submit authorized=no then approve authorized=yes
+```
+
+`whynot` searches a stated finite scope for the fewest input changes that give
+the wanted outcome. `want` takes `Accept [TARGET]`, `Reject [REASON]` or
+`rule ID`. The default scope keeps the state and event fixed and tries every
+context valuation; `scope input` searches every declared input. It reports each
+minimal input, the rule that would fire and that rule's statement, and says
+plainly when no input in the scope (or in the whole declared domain) gives it.
+For the first example it reports one change, `authorized` from no to yes, and
+`approve_order`. Inputs are hypotheses: each witness also says whether its
+source state is reachable.
+
+`whatif` applies every named change (`fact=yes`, `state:NAME`, `event:NAME`)
+and compares the two decisions rule by rule. Undeclared names are refused, and
+a change to the value already supplied is reported as having no effect.
+
+`story` turns the current check's counterexample (determinism, a reachable
+invariant violation or a raw Accept that breaks an invariant) into a short
+numbered story; `story candidate` does the same for the pending candidate, and
+`story trace ...` narrates assumed inputs. Every sentence is a registered
+template filled from the witness, paired with a symbolic line, and re-derived
+from the model before it is shown. For example, adding
+`invariant never_cancelled: !(state == cancelled);` to the seed gives
+"Step 2: in pending, event cancel arrives with authorized=no; rule cancel_order
+accepts and moves to cancelled." and `pending + cancel (authorized=false) ->
+accept cancelled [cancel_order]`.
+
+`guide TOPIC` is construct help (`zal/help/2`) generated from the construct
+registry: meaning, symbolic and English forms, the model's own lines and the
+typed IDs that use an operator. It resolves the same topics as `?`. Bare
+`guide` lists every construct with its forms. A drift test requires a registry
+entry for every statement kind, Boolean node and unsupported kind, and requires
+the live parser to accept every registry form.
+
 ### Check scope and the intent boundary
 
 Completed `check` reports warn when no application invariants are declared. Other
@@ -185,7 +229,7 @@ python3 /absolute/path/to/repository/integrations/zal/mcp.py \
 
 Normally the harness launches it; there is no HTTP service to start. The bridge
 uses newline-delimited MCP JSON-RPC, advertises protocol `2024-11-05`, and exposes
-only these seven tools:
+these model tools:
 
 | Tool | Required arguments | Result/purpose |
 | --- | --- | --- |
@@ -196,6 +240,26 @@ only these seven tools:
 | `zal_compare` | `revision`, `syntax`, `surface` | Compare a complete candidate surface without staging it. |
 | `zal_trace` | `revision`, `inputs` | Replay an array of `{event, context}` inputs from the initial state. |
 | `zal_propose` | `base_revision`, `object_ids`, `message`, `syntax`, `surface` | Parse and stage a complete candidate with checks and diff; never accept it. |
+| `zal_why_not` | `revision`, `state`, `event`, `context`, `want`, optional `scope` | Fewest input changes giving a wanted outcome in the stated scope. |
+| `zal_what_if` | `revision`, `state`, `event`, `context`, `change` | Apply named changes and compare both decisions rule by rule. |
+| `zal_narrate` | `revision`, `source` (`check`, `candidate`, `trace`), optional `inputs` | Numbered story of a counterexample or trace, paired with symbolic lines. |
+| `zal_guide` | `revision`, `topic` | Construct help (`zal/help/2`) generated from the construct registry. |
+
+The ladder tools work on the shipped [ladder examples](ladder/README.md) and,
+when `ZAL_LADDER_DIR` names a directory, its `*.json` statements as
+`project:NAME`. Each statement has its own revision: a SHA-256 of its canonical
+JSON. Read first, then pass the statement ID and exact revision; a stale
+revision is refused with `Stale ladder revision; call zal_ladder_read again`.
+There is no ladder write or acceptance tool.
+
+| Tool | Required arguments | Result/purpose |
+| --- | --- | --- |
+| `zal_ladder_read` | `{}` | Statement IDs, revisions, profiles and scope identities. |
+| `zal_ladder_render` | `statement`, `revision`, optional `rung` | All seven rungs (or one), scope strip, legend and evidence status. |
+| `zal_ladder_parse` | `statement`, `revision`, `rung`, `text` | Exactly one normalized tree with its uniqueness counts, or a named refusal. |
+| `zal_ladder_same` | `statement`, `revision`, and `other_statement`/`other_revision` or `rung`/`text` | Same normal form and scope, with the evidence. |
+| `zal_ladder_lower` | `statement`, `revision` | The inert `.zeno` claim and its obligations; authority none. |
+| `zal_ladder_explain` | `statement`, `revision`, optional `rung`, `text` | Which rung admits a text, why its parse is unique, and what the scope strip means. |
 
 `syntax` is `symbolic` or `english`. Copy `model.revision` from `zal_read`;
 `object_ids` must refer to the current model. Surface text follows the grammar,
@@ -241,7 +305,7 @@ ZAL_ARGS=$(python3 -c 'import json,sys; print(json.dumps([sys.argv[1], "--worksp
 codex \
   -c 'mcp_servers.zal.command="python3"' \
   -c "mcp_servers.zal.args=$ZAL_ARGS" \
-  -c 'mcp_servers.zal.enabled_tools=["zal_read","zal_check","zal_help","zal_explain","zal_propose","zal_compare","zal_trace"]'
+  -c 'mcp_servers.zal.enabled_tools=["zal_read","zal_check","zal_help","zal_explain","zal_propose","zal_compare","zal_trace","zal_why_not","zal_what_if","zal_narrate","zal_guide","zal_ladder_read","zal_ladder_render","zal_ladder_parse","zal_ladder_same","zal_ladder_lower","zal_ladder_explain"]'
 ```
 
 Before starting the interactive session, the same command with `mcp get zal
@@ -422,3 +486,22 @@ deterministic readings. Its separate temporal profile uses explicit event
 order, finite or unbounded scope, and versioned assumptions. Rendering and
 native-source previews have authority none; the worked temporal definitions
 are placeholders awaiting interpretation review.
+
+The same statements are available through the `zal_ladder_*` MCP tools above
+and the review terminal's `ladder` commands, which bind the revision read when
+the command runs:
+
+```text
+ladder list
+ladder render example:temporal/vault_drain plain
+ladder parse example:ladders/dex_k typed forall t in T: S(t) => x'(t)*y'(t) >= x(t)*y(t)
+ladder same example:temporal/vault_drain plain No admitted operation sequence drains the vault.
+ladder explain example:temporal/vault_drain No admitted operation sequence drains the vault.
+ladder lower example:temporal/vault_drain
+```
+
+`ladder explain` without a rung tries every rung, names the rungs that admit
+the text and gives the parse counts behind its uniqueness. `same` reports
+"same" only for identical expanded normal forms with an identical scope
+identity (temporal) or declared vocabulary (`zal/ladder/0`). Different normal
+forms do not prove different meanings.

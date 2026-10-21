@@ -186,6 +186,66 @@ change no model/proposal/selection/agreement, and neither create nor invalidate
 the client's successfully displayed candidate binding. Storage adapters may
 rewrite snapshots while preserving this semantic state.
 
+## Why-not, what-if, narratives and the construct guide
+
+These read-only explanations (`explain.py`, `constructs.py`) use the admitted
+typed model only: no provider, eval or authority. Each result names its schema
+and the exact revision and checker identity.
+
+`zal/why-not/1` takes one complete input and a wanted outcome: any of `class`,
+`state`, `reason` and `rule`, all declared. It enumerates the stated scope:
+`context` keeps the state and event and tries every context valuation, and
+`input` tries every declared input. Inputs with overlapping enabled rules are
+skipped and counted. Minimality is the fewest changed inputs, where the state,
+the event and each fact count one each. The result lists every minimal input
+(capped at 32, with the full count), its changes as typed IDs, the deciding
+rule and its canonical lines, and whether its source state is reachable from
+the initial state. With nothing found, it says so for the scope and reports
+how many inputs outside a `context` scope would give the outcome. Rules whose
+own outcome matches are listed with their source and event matches and their
+guard's value at the given input.
+
+`zal/what-if/1` applies a `change` of `state`, `event` and named facts.
+Undeclared facts and empty changes are refused. Every requested change is
+reported, including changes that keep a value. The result checks that each
+one reached the second input, then compares both whole-model decisions and,
+rule by rule, source/event matches, guard value and enablement. It also names
+the changed facts each guard reads.
+
+`zal/narrative/1` tells a determinism, invariant or invariant-preservation
+counterexample, or an assumed trace, as numbered sentences. Each sentence
+records its registered template, its facts and a witness path per fact. Its
+English and symbolic text are that template filled from those facts. Before
+returning, the narrator re-derives every sentence. It checks the witness
+paths, the template text, the declared initial state, each step's decision
+and continuity, the enabled rules, the accepting rule, the invariant's
+falsity and the final state. Any mismatch refuses the whole narrative.
+Obligations without templates are refused by name; the structured witness
+remains authoritative.
+
+`zal/help/2` (`zal_guide`, terminal `guide`) resolves topics exactly as
+`zal/help/1` and assembles each answer from the construct registry. Forms for
+statements with a parser pattern are derived from `grammar_patterns`. The
+registry covers every statement kind, Boolean node, rule outcome, rule syntax
+mark and unsupported kind. A drift test requires that coverage, and requires
+the live parser to accept every registry form as that construct. `zal/help/1`
+output is unchanged.
+
+## Ladder statements in the tools
+
+`ladder_tools.py` exposes the shipped ladder examples and optional
+`ZAL_LADDER_DIR` statements. Each statement revision is the SHA-256 of
+`zal/ladder-statement/1`, a NUL byte and the statement's canonical JSON. Every
+render, parse, same, lower and explain call rereads the file, recomputes the
+revision and refuses a mismatch before parsing. Files must be regular, at most
+256 KiB and named by a lowercase stem; at most 64 statements are listed.
+Rendering is `ladder_text` and `render`; parsing is `ladder.parse`, with
+uniqueness counts recomputed from the same Earley grammar and cross-checked
+against admission. `same` compares expanded normal forms and the temporal scope
+identity, or the declared vocabulary for `zal/ladder/0`. Different normal forms
+are not a proof of different meaning. Lowering is the existing inert
+`temporal_lowering.lower`. All of these results have authority none.
+
 ## Dialogue, agreement and realization
 
 The client owns the current revision, selected typed ID, pending candidate,
@@ -223,8 +283,10 @@ It requires successful rendering of that exact model/checker/event cursor and
 no pending proposal. The cursor is captured with the displayed snapshot under
 the same workspace lock; an intervening event requires another display.
 Agreement records bind the candidate revision, canonical English and checker.
-The checker identity version `zal/checker/2` hashes `behavior.py`, `workflow.py`,
-`factory.py`, `shared.py`, `terminal.py`, `mcp.py` and `workspace.py`.
+The checker identity version `zal/checker/3` hashes `behavior.py`, `workflow.py`,
+`factory.py`, `shared.py`, `terminal.py`, `mcp.py`, `workspace.py`, `server.py`,
+`workspace.html`, `explain.py`, `constructs.py`, `ladder_tools.py`, `ladder.py`,
+`ladder_en.json` and `temporal_lowering.py`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no
@@ -244,7 +306,9 @@ protocol and never grants agreement or factory authority.
 The primary workflow uses the human review terminal and a provider-independent
 MCP bridge against one existing `zal/shared-workspace/1` file. The bridge exposes
 `zal_read`, `zal_check`, `zal_help`, `zal_explain`, `zal_propose`, `zal_compare`
-and `zal_trace`; there is no acceptance tool. The harness must refresh the
+and `zal_trace`, the explanation tools `zal_why_not`, `zal_what_if`,
+`zal_narrate` and `zal_guide`, and the revision-bound `zal_ladder_*` tools;
+there is no acceptance tool. The harness must refresh the
 exact revision before continuing
 on changed meaning; the human separately reviews the current candidate. The bridge
 does not start inference. Setup and exact commands are in [README.md](README.md).

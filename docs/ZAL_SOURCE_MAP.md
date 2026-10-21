@@ -61,6 +61,15 @@ frame. `terminal.py` routes `?`, `man`, `help TOPIC`, `legend TOPIC`, canonical
 `translate` and `why` without a provider. `server.py` exposes the same help and
 explanation functions to the optional browser.
 
+The 2.6 additions are separate modules. `explain.py` supplies `zal/why-not/1`,
+`zal/what-if/1` and `zal/narrative/1`; `constructs.py` holds the construct
+registry and its generated `zal/help/2` guide; `ladder_tools.py` binds ladder
+statements to revisions for the `zal_ladder_*` tools. `mcp.py` adds four
+explanation tools and six ladder tools after the existing ones, and `terminal.py`
+adds `whynot`, `whatif`, `story`, `guide` and `ladder`. `check_zal_tools.py`
+runs their planted-defect controls on an isolated copy. `behavior.py` is
+unchanged by these additions.
+
 The browser's visible help controls and pointer/focus previews resolve canonical
 typed objects or grammar topics. Local `Explain next input` and
 `Why this recorded step?` are distinct from `Ask Codex`. No editable-source-span

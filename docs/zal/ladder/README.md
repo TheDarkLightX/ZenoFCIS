@@ -33,6 +33,12 @@ canonical meaning; `same A B` and `find A --corpus DIR` compare normalized
 statements within one theory. Temporal comparisons also bind the complete
 observation context and its versions.
 
+The MCP bridge and review terminal expose the same statements with exact
+revisions (`zal_ladder_read`, `zal_ladder_render`, `zal_ladder_parse`,
+`zal_ladder_same`, `zal_ladder_lower`, `zal_ladder_explain`); see the
+[ZAL guide](../README.md). A stale revision is refused, and nothing there
+writes, accepts or evaluates a statement.
+
 Read the [M0 contract](BUILD_SPEC_M0.md), [temporal contract](TEMPORAL.md),
 [review checklist](REVIEW.md), [validation guide](VALIDATION.md), and
 [generated temporal examples](EXAMPLES.md). All three temporal formalizations

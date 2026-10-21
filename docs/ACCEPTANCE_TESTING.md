@@ -65,7 +65,7 @@ there with a reviewed reason.
 | `bounded-collections-pipes` | Entry/item/snapshot bounds, canonical backend parity, immutable refusal, FIFO order and pending-ID pipe contracts. |
 | `minimal-core` | Immutable transition and logical budget example. |
 | `checked-backend` | Bounded tool-neutral backend request example. |
-| `zal-dialogue` | Deterministic finite-FSM help and explanation, paired language views, exact-revision human review, terminal/MCP shared state, UI-state doubles, and actual sample-domain factory replay. Native browser and model-provider access remain separate. |
+| `zal-dialogue` | Deterministic finite-FSM help and explanation, why-not/what-if/narrative explanations, registry-generated help, revision-bound ladder tools, paired language views, exact-revision human review, terminal/MCP shared state, UI-state doubles, planted-defect controls and actual sample-domain factory replay. Native browser and model-provider access remain separate. |
 | `external-consumer` | Isolated downstream compile against the public specification API. |
 | `project-bootstrap` | Deterministic generated starter and negative vectors. |
 | `generated-application` | Authored schema lowering, complete invocation binding, runtime laws, dependency admission, and isolated durable lifecycle, for the durable counter and the six example applications. |
