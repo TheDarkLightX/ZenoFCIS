@@ -247,7 +247,10 @@ fn transfer_codings_other_than_chunked() {
         wire.extend_from_slice(b"\r\n0\r\n\r\n");
         wire
     };
-    assert_eq!(status(&exchange(&mut server(), chunked("chunked"), false)), 200);
+    assert_eq!(
+        status(&exchange(&mut server(), chunked("chunked"), false)),
+        200
+    );
     for coding in ["gzip, chunked", "deflate, chunked", "x-custom, chunked"] {
         assert_eq!(
             status(&exchange(&mut server(), chunked(coding), false)),
