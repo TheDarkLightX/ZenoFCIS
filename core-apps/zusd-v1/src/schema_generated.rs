@@ -136,81 +136,72 @@ pub fn build(b: Bounds) -> Result<Schema, SchemaError> {
     types.push(TypeDef::try_new(
         TypeId::new(16),
         "LA_AGRS_AGRS_e18",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(17),
         "LZ_zUSD_AGRS_e18",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(18),
         "S_AGRS_zUSD_e36",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(19),
         "G_zDEX_zUSD_e36",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(20),
         "FZ_zUSD_zDEX_e18",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(21),
         "FA_AGRS_zDEX_e18",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(22),
         "AGRS_e36",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(23),
         "zUSD_e36",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
     types.push(TypeDef::try_new(
         TypeId::new(24),
         "zDEX_e36",
-        Kind::U128 {
-            min: 0,
-            max: u128::MAX,
+        Kind::Tuple {
+            items: vec![TypeId::new(119), TypeId::new(119)].into_boxed_slice(),
         },
         limits,
     )?);
@@ -1474,6 +1465,15 @@ pub fn build(b: Bounds) -> Result<Schema, SchemaError> {
                 FieldDef::try_new(FieldId::new(4), "movements", TypeId::new(117))?,
             ]
             .into_boxed_slice(),
+        },
+        limits,
+    )?);
+    types.push(TypeDef::try_new(
+        TypeId::new(119),
+        "AccumulatorLimb",
+        Kind::U128 {
+            min: 0,
+            max: u128::MAX,
         },
         limits,
     )?);

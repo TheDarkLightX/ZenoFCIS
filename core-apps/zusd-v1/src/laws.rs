@@ -2,21 +2,96 @@
 //! check all outcomes, not producer-selected cases or a conformance law 991.
 //! The full collection/effect A63 binding remains a separate integration gate.
 use crate::{
-    Evaluation, Failure, Limits, Q, Work, add,
+    Accumulator256, Evaluation, Failure, Limits, Q, Work, add,
     liquidation::Partition,
     muldiv, run, sub,
     vaults::{CCR, MCR, PriceStatus, Prices, Status, System, Vault},
     wide::Wide,
 };
+/// Complete local addition law, independent of the producer's six-limb add.
+pub fn check_accumulator_add(
+    a: Accumulator256,
+    b: Accumulator256,
+    candidate: Result<Accumulator256, Failure>,
+    limits: Limits,
+) -> Evaluation<()> {
+    run(limits, |w| {
+        w.charge(6, 0, 0)?;
+        let (ah, al) = a.limbs();
+        let (bh, bl) = b.limbs();
+        let (low, carry) = al.overflowing_add(bl);
+        let expected = ah
+            .checked_add(bh)
+            .and_then(|high| high.checked_add(u128::from(carry)))
+            .map(|high| Accumulator256::from_limbs(high, low))
+            .ok_or(Failure::Arithmetic);
+        if candidate != expected {
+            return Err(Failure::Law(2002));
+        }
+        Ok(())
+    })
+}
+/// Complete local multiply/divide law without calling either producer divider.
+/// For d>0, q is unique iff q*d<=n<(q+1)*d. Arithmetic is legitimate exactly
+/// when d=0 or n >= 2^128*d (the final payout does not fit U128).
+pub fn check_accumulator_product(
+    a: Accumulator256,
+    amount: u128,
+    divisor: u128,
+    candidate: Result<u128, Failure>,
+    limits: Limits,
+) -> Evaluation<()> {
+    run(limits, |w| {
+        w.charge(1, 0, 0)?;
+        let lawful = if divisor == 0 {
+            candidate == Err(Failure::Arithmetic)
+        } else {
+            let n = Wide::from(a).mul(amount, w)?;
+            match candidate {
+                Ok(q) => {
+                    let product = Wide::from(divisor).mul(q, w)?;
+                    w.charge(12, 0, 0)?;
+                    product.cmp(n).is_le() && n.sub(product, w)?.cmp(Wide::from(divisor)).is_lt()
+                }
+                Err(Failure::Arithmetic) => {
+                    let cutoff = Wide::from(divisor)
+                        .mul(u128::MAX, w)?
+                        .add(Wide::from(divisor), w)?;
+                    w.charge(6, 0, 0)?;
+                    n.cmp(cutoff).is_ge()
+                }
+                Err(_) => false,
+            }
+        };
+        if !lawful {
+            return Err(Failure::Law(2003));
+        }
+        Ok(())
+    })
+}
 fn expected_pending(v: Vault, s: System, w: &mut Work) -> Result<Vault, Failure> {
     if v.status != Status::Active {
         return Err(Failure::Reject(1011));
     }
-    let delta_c = sub(s.reward_c, v.snapshot_c, w)?;
-    let delta_d = sub(s.reward_d, v.snapshot_d, w)?;
+    let delta_c = s.reward_c.sub(v.snapshot_c, w)?;
+    let delta_d = s.reward_d.sub(v.snapshot_d, w)?;
     Ok(Vault {
-        collateral: add(v.collateral, muldiv(v.stake, delta_c, Q, w)?, w)?,
-        debt: add(v.debt, muldiv(v.stake, delta_d, Q, w)?, w)?,
+        collateral: add(
+            v.collateral,
+            Wide::from(delta_c)
+                .mul(v.stake, w)?
+                .quotient(Wide::from(Q), w)?
+                .0,
+            w,
+        )?,
+        debt: add(
+            v.debt,
+            Wide::from(delta_d)
+                .mul(v.stake, w)?
+                .quotient(Wide::from(Q), w)?
+                .0,
+            w,
+        )?,
         snapshot_c: s.reward_c,
         snapshot_d: s.reward_d,
         ..v

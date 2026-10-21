@@ -1,7 +1,8 @@
 //! Pure owner-vault relations. Sorted insertion, ledger publication and receipt
 //! authentication are explicit composition obligations, not caller booleans.
 use crate::{
-    Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, fees, muldiv, run, sub, wide::Wide,
+    Accumulator256, Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, fees, muldiv, run, sub,
+    wide::Wide,
 };
 pub const MCR: u128 = 1_100_000_000_000_000_000;
 pub const CCR: u128 = 1_500_000_000_000_000_000;
@@ -41,8 +42,8 @@ pub struct Vault {
     pub debt: u128,
     pub reserve: u128,
     pub stake: u128,
-    pub snapshot_c: u128,
-    pub snapshot_d: u128,
+    pub snapshot_c: Accumulator256,
+    pub snapshot_d: Accumulator256,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct System {
@@ -52,8 +53,8 @@ pub struct System {
     pub stakes: u128,
     pub stakes_snapshot: u128,
     pub collateral_snapshot: u128,
-    pub reward_c: u128,
-    pub reward_d: u128,
+    pub reward_c: Accumulator256,
+    pub reward_d: Accumulator256,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PriceStatus {
@@ -111,12 +112,18 @@ pub(crate) fn effective(v: Vault, s: System, w: &mut Work) -> Result<Vault, Fail
     // D3: either lag is sufficient, including debt-only changes.
     out.collateral = add(
         v.collateral,
-        muldiv(v.stake, sub(s.reward_c, v.snapshot_c, w)?, Q, w)?,
+        Wide::from(s.reward_c.sub(v.snapshot_c, w)?)
+            .mul(v.stake, w)?
+            .quotient(Wide::from(Q), w)?
+            .0,
         w,
     )?;
     out.debt = add(
         v.debt,
-        muldiv(v.stake, sub(s.reward_d, v.snapshot_d, w)?, Q, w)?,
+        Wide::from(s.reward_d.sub(v.snapshot_d, w)?)
+            .mul(v.stake, w)?
+            .quotient(Wide::from(Q), w)?
+            .0,
         w,
     )?;
     out.snapshot_c = s.reward_c;
@@ -129,7 +136,7 @@ pub(crate) fn inventory(rows: &[Vault], s: System, w: &mut Work) -> Result<(), F
     w.charge(
         rows.len() as u64,
         rows.len() as u64,
-        rows.len() as u64 * 256,
+        rows.len() as u64 * 288,
     )?;
     if rows.windows(2).any(|pair| pair[0].id >= pair[1].id) {
         return Err(Failure::Canonical);
@@ -241,7 +248,7 @@ pub fn open(
     limits: Limits,
 ) -> Evaluation<Outcome> {
     run(limits, |w| {
-        w.charge(1, 1, 256)?;
+        w.charge(1, 1, 288)?;
         if collateral == 0 || principal == 0 {
             return Err(Failure::Reject(1010));
         }
@@ -330,7 +337,7 @@ pub fn adjust(
     limits: Limits,
 ) -> Evaluation<Outcome> {
     run(limits, |w| {
-        w.charge(1, 1, 256)?;
+        w.charge(1, 1, 288)?;
         if coll == Delta::None && debt == Delta::None
             || matches!(coll, Delta::Add(0) | Delta::Remove(0))
             || matches!(debt, Delta::Add(0) | Delta::Remove(0))
@@ -507,8 +514,8 @@ pub fn close(
             debt: 0,
             reserve: 0,
             stake: 0,
-            snapshot_c: 0,
-            snapshot_d: 0,
+            snapshot_c: Accumulator256::ZERO,
+            snapshot_d: Accumulator256::ZERO,
             ..old
         };
         Ok(Outcome {

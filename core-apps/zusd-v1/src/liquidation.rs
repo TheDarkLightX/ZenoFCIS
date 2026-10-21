@@ -1,6 +1,7 @@
 //! Source-shaped liquidation branches and batch transition with D2/D3/D4.
 use crate::{
-    Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, muldiv, run, stability, sub,
+    Accumulator256, Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, muldiv, run, stability,
+    sub,
     vaults::{self, MCR, Prices, Status, System, Vault},
     wide::Wide,
 };
@@ -108,8 +109,8 @@ pub struct Book {
     pub system: System,
     pub default_collateral: u128,
     pub default_debt: u128,
-    pub error_c: u128,
-    pub error_d: u128,
+    pub error_c: Accumulator256,
+    pub error_d: Accumulator256,
     pub gas_balance: u128,
     pub surplus: Vec<(Id, u128)>,
     pub pool: stability::State,
@@ -160,7 +161,7 @@ pub(crate) fn validate(
     w.charge(
         book.vaults.len() as u64,
         book.vaults.len() as u64,
-        book.vaults.len() as u64 * 256
+        book.vaults.len() as u64 * 288
             + book.order.len() as u64 * 64
             + book.surplus.len() as u64 * 48,
     )?;
@@ -177,16 +178,11 @@ pub(crate) fn validate(
         .collect();
     for v in &book.vaults {
         if v.status != Status::Active
-            && [
-                v.collateral,
-                v.debt,
-                v.reserve,
-                v.stake,
-                v.snapshot_c,
-                v.snapshot_d,
-            ]
-            .iter()
-            .any(|x| *x != 0)
+            && (v.snapshot_c != Accumulator256::ZERO
+                || v.snapshot_d != Accumulator256::ZERO
+                || [v.collateral, v.debt, v.reserve, v.stake]
+                    .iter()
+                    .any(|x| *x != 0))
         {
             return Err(Failure::Domain);
         }
@@ -251,13 +247,13 @@ pub(crate) fn validate(
 }
 fn advance_accumulator(
     amount: u128,
-    error: u128,
+    error: Accumulator256,
     stakes: u128,
     w: &mut Work,
-) -> Result<(u128, u128), Failure> {
+) -> Result<(Accumulator256, Accumulator256), Failure> {
     let n = Wide::from(amount).mul(Q, w)?.add(Wide::from(error), w)?;
-    let (q, r) = n.quotient(Wide::from(stakes), w)?;
-    Ok((q, r.narrow()?))
+    let (q, r) = n.quotient_wide(Wide::from(stakes), w)?;
+    Ok((q.accumulator()?, r.accumulator()?))
 }
 fn repair(book: &mut Book, w: &mut Work) -> Result<(), Failure> {
     // Stable sorted-prefix reinsertion. Only an inverting member moves; placing
@@ -334,8 +330,8 @@ mod repair_tests {
                         debt: 1,
                         reserve: 0,
                         stake: c,
-                        snapshot_c: 0,
-                        snapshot_d: 0,
+                        snapshot_c: Accumulator256::ZERO,
+                        snapshot_d: Accumulator256::ZERO,
                     });
                 }
                 for history in &histories {
@@ -350,13 +346,13 @@ mod repair_tests {
                             stakes: 0,
                             stakes_snapshot: 0,
                             collateral_snapshot: 0,
-                            reward_c: 0,
-                            reward_d: 0,
+                            reward_c: Accumulator256::ZERO,
+                            reward_d: Accumulator256::ZERO,
                         },
                         default_collateral: 0,
                         default_debt: 0,
-                        error_c: 0,
-                        error_d: 0,
+                        error_c: Accumulator256::ZERO,
+                        error_d: Accumulator256::ZERO,
                         gas_balance: 0,
                         surplus: Vec::new(),
                         pool: stability::State::reference_genesis(stability::FUNDED_CAP).unwrap(),
@@ -439,8 +435,8 @@ pub fn liquidate(
                     Command::Batch(ids) => ids.len() as u64 * 32,
                     _ => 32,
                 }
-                + pre.pool.history.len() as u64 * 64
-                + 512,
+                + pre.pool.history.len() as u64 * 96
+                + 640,
         )?;
         let mut book = pre.clone();
         let mut running = pre.system;
@@ -498,8 +494,8 @@ pub fn liquidate(
                 debt: 0,
                 reserve: 0,
                 stake: 0,
-                snapshot_c: 0,
-                snapshot_d: 0,
+                snapshot_c: Accumulator256::ZERO,
+                snapshot_d: Accumulator256::ZERO,
                 ..v
             };
             book.order.retain(|x| *x != id);
@@ -554,8 +550,8 @@ pub fn liquidate(
             let (d, ed) = advance_accumulator(red_d, book.error_d, book.system.stakes, w)?;
             book.error_c = ec;
             book.error_d = ed;
-            book.system.reward_c = add(book.system.reward_c, c, w)?;
-            book.system.reward_d = add(book.system.reward_d, d, w)?;
+            book.system.reward_c = book.system.reward_c.add(c, w)?;
+            book.system.reward_d = book.system.reward_d.add(d, w)?;
         }
         book.system.collateral = running.collateral;
         book.system.debt = running.debt;

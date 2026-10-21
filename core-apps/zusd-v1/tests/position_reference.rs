@@ -37,8 +37,8 @@ fn system() -> v::System {
         stakes: 3000 * Q,
         stakes_snapshot: 0,
         collateral_snapshot: 0,
-        reward_c: 0,
-        reward_d: 0,
+        reward_c: Accumulator256::from(0),
+        reward_d: Accumulator256::from(0),
     }
 }
 fn vault(x: u8) -> v::Vault {
@@ -51,8 +51,8 @@ fn vault(x: u8) -> v::Vault {
         debt: 1000 * Q,
         reserve: 50 * Q,
         stake: 1500 * Q,
-        snapshot_c: 0,
-        snapshot_d: 0,
+        snapshot_c: Accumulator256::from(0),
+        snapshot_d: Accumulator256::from(0),
     }
 }
 include!("test-data/sp_positions.rs");

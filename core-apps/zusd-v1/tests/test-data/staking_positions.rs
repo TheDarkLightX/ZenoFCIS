@@ -10,8 +10,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -26,8 +26,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -42,8 +42,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -58,8 +58,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -72,8 +72,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -81,8 +81,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -94,8 +94,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -110,8 +110,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -126,8 +126,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -142,8 +142,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -158,8 +158,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -174,8 +174,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -190,8 +190,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -206,8 +206,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -222,8 +222,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -238,8 +238,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -254,8 +254,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -270,8 +270,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -284,8 +284,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -293,8 +293,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -306,8 +306,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -322,8 +322,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -338,8 +338,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -354,8 +354,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -370,8 +370,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -386,8 +386,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -402,8 +402,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -418,8 +418,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -434,8 +434,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -450,8 +450,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -466,8 +466,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -482,8 +482,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -496,8 +496,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -505,8 +505,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -518,8 +518,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -534,8 +534,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -550,8 +550,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -566,8 +566,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -582,8 +582,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -598,8 +598,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -614,8 +614,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -630,8 +630,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -646,8 +646,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -662,8 +662,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -678,8 +678,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -694,8 +694,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -708,8 +708,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -717,8 +717,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -730,8 +730,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -746,8 +746,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -762,8 +762,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -778,8 +778,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -794,8 +794,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -810,8 +810,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -826,8 +826,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -842,8 +842,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -858,8 +858,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -874,8 +874,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -890,8 +890,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -906,8 +906,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -920,8 +920,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -929,8 +929,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -942,8 +942,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -958,8 +958,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -974,8 +974,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -990,8 +990,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1006,8 +1006,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1022,8 +1022,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1038,8 +1038,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1054,8 +1054,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1070,8 +1070,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1086,8 +1086,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1102,8 +1102,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1118,8 +1118,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1132,8 +1132,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -1141,8 +1141,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -1154,8 +1154,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1170,8 +1170,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1186,8 +1186,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1202,8 +1202,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1218,8 +1218,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1234,8 +1234,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1250,8 +1250,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1266,8 +1266,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1282,8 +1282,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1298,8 +1298,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1314,8 +1314,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1330,8 +1330,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1344,8 +1344,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -1353,8 +1353,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -1366,8 +1366,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1382,8 +1382,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1398,8 +1398,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1414,8 +1414,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1430,8 +1430,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1446,8 +1446,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1462,8 +1462,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1478,8 +1478,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1494,8 +1494,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1510,8 +1510,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1526,8 +1526,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1542,8 +1542,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1556,8 +1556,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -1565,8 +1565,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -1578,8 +1578,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1594,8 +1594,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1610,8 +1610,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1626,8 +1626,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1642,8 +1642,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1658,8 +1658,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1674,8 +1674,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1690,8 +1690,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1706,8 +1706,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1722,8 +1722,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1738,8 +1738,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1754,8 +1754,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1768,8 +1768,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -1777,8 +1777,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -1790,8 +1790,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1806,8 +1806,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1822,8 +1822,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1838,8 +1838,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1854,8 +1854,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1870,8 +1870,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1886,8 +1886,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1902,8 +1902,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1918,8 +1918,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1934,8 +1934,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1950,8 +1950,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1966,8 +1966,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -1980,8 +1980,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -1989,8 +1989,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -2002,8 +2002,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2018,8 +2018,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2034,8 +2034,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2050,8 +2050,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2066,8 +2066,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2082,8 +2082,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2098,8 +2098,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2114,8 +2114,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2130,8 +2130,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2146,8 +2146,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2162,8 +2162,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2178,8 +2178,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2192,8 +2192,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2201,8 +2201,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 2,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -2214,8 +2214,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2230,8 +2230,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2246,8 +2246,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2262,8 +2262,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2278,8 +2278,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2294,8 +2294,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2310,8 +2310,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2326,8 +2326,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2342,8 +2342,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2358,8 +2358,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2374,8 +2374,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2390,8 +2390,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2404,8 +2404,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2413,8 +2413,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(3),
                         stake: 2,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -2426,8 +2426,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2442,8 +2442,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2458,8 +2458,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2474,8 +2474,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2490,8 +2490,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2506,8 +2506,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2522,8 +2522,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2538,8 +2538,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 0,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2554,8 +2554,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2563,8 +2563,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2575,8 +2575,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2584,8 +2584,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2596,8 +2596,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2605,8 +2605,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2617,8 +2617,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2626,8 +2626,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2636,8 +2636,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2645,8 +2645,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -2658,8 +2658,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2667,8 +2667,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2677,8 +2677,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2686,8 +2686,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2699,8 +2699,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2708,8 +2708,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2718,8 +2718,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2727,8 +2727,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2740,8 +2740,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2749,8 +2749,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2759,8 +2759,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2776,8 +2776,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2785,8 +2785,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2795,8 +2795,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2812,8 +2812,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2821,8 +2821,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2831,8 +2831,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2840,8 +2840,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2853,8 +2853,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2862,8 +2862,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2872,8 +2872,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2881,8 +2881,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2894,8 +2894,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2903,8 +2903,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2913,8 +2913,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2922,8 +2922,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2935,8 +2935,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2944,8 +2944,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -2954,8 +2954,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -2963,8 +2963,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -2976,8 +2976,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -2985,8 +2985,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -2997,8 +2997,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3006,8 +3006,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3018,8 +3018,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3027,8 +3027,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3039,8 +3039,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3048,8 +3048,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3058,8 +3058,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3068,14 +3068,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -3088,8 +3088,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3097,8 +3097,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3109,8 +3109,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3118,8 +3118,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3130,8 +3130,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3139,8 +3139,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3151,8 +3151,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3160,8 +3160,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3172,8 +3172,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3181,8 +3181,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3193,8 +3193,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3202,8 +3202,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3214,8 +3214,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3223,8 +3223,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3235,8 +3235,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3244,8 +3244,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3256,8 +3256,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3265,8 +3265,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3277,8 +3277,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3286,8 +3286,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3298,8 +3298,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3307,8 +3307,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3319,8 +3319,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3328,8 +3328,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3338,8 +3338,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3347,8 +3347,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -3360,8 +3360,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3369,8 +3369,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3379,8 +3379,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3388,8 +3388,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3401,8 +3401,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3410,8 +3410,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3420,8 +3420,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3429,8 +3429,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3442,8 +3442,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3451,8 +3451,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3461,8 +3461,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3478,8 +3478,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3487,8 +3487,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3497,8 +3497,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3514,8 +3514,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3523,8 +3523,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3533,8 +3533,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3542,8 +3542,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3555,8 +3555,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3564,8 +3564,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3574,8 +3574,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3583,8 +3583,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3596,8 +3596,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3605,8 +3605,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3615,8 +3615,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3624,8 +3624,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3637,8 +3637,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3646,8 +3646,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3656,8 +3656,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -3665,8 +3665,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -3678,8 +3678,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3687,8 +3687,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3699,8 +3699,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3708,8 +3708,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3720,8 +3720,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3729,8 +3729,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3741,8 +3741,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3750,8 +3750,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3760,8 +3760,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -3770,14 +3770,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                     ],
                 },
@@ -3790,8 +3790,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3799,8 +3799,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3811,8 +3811,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3820,8 +3820,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3832,8 +3832,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3841,8 +3841,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3853,8 +3853,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3862,8 +3862,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3874,8 +3874,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3883,8 +3883,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3895,8 +3895,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3904,8 +3904,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3916,8 +3916,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3925,8 +3925,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3937,8 +3937,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -3946,8 +3946,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -3958,8 +3958,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3967,8 +3967,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -3979,8 +3979,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -3988,8 +3988,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4000,8 +4000,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4009,8 +4009,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4021,8 +4021,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4030,8 +4030,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4040,8 +4040,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4049,8 +4049,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -4062,8 +4062,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4071,8 +4071,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4081,8 +4081,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4090,8 +4090,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4103,8 +4103,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4112,8 +4112,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4122,8 +4122,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4131,8 +4131,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4144,8 +4144,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4153,8 +4153,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4163,8 +4163,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4180,8 +4180,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4189,8 +4189,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4199,8 +4199,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4216,8 +4216,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4225,8 +4225,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4235,8 +4235,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4244,8 +4244,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4257,8 +4257,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4266,8 +4266,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4276,8 +4276,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4285,8 +4285,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4298,8 +4298,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4307,8 +4307,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4317,8 +4317,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4326,8 +4326,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4339,8 +4339,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4348,8 +4348,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4358,8 +4358,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4367,8 +4367,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -4380,8 +4380,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4389,8 +4389,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4401,8 +4401,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4410,8 +4410,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4422,8 +4422,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4431,8 +4431,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4443,8 +4443,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4452,8 +4452,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4462,8 +4462,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4472,14 +4472,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -4492,8 +4492,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4501,8 +4501,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4513,8 +4513,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4522,8 +4522,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4534,8 +4534,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4543,8 +4543,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4555,8 +4555,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4564,8 +4564,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4576,8 +4576,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4585,8 +4585,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4597,8 +4597,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4606,8 +4606,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4618,8 +4618,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4627,8 +4627,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4639,8 +4639,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -4648,8 +4648,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -4660,8 +4660,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4669,8 +4669,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4681,8 +4681,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4690,8 +4690,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4702,8 +4702,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4711,8 +4711,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4723,8 +4723,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4732,8 +4732,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4742,8 +4742,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4751,8 +4751,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -4764,8 +4764,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4773,8 +4773,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4783,8 +4783,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4792,8 +4792,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -4805,8 +4805,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4814,8 +4814,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4824,8 +4824,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4833,8 +4833,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -4846,8 +4846,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4855,8 +4855,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4865,8 +4865,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4882,8 +4882,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4891,8 +4891,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4901,8 +4901,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4918,8 +4918,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4927,8 +4927,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4937,8 +4937,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4946,8 +4946,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -4959,8 +4959,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -4968,8 +4968,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -4978,8 +4978,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -4987,8 +4987,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -5000,8 +5000,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5009,8 +5009,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5019,8 +5019,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5028,8 +5028,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -5041,8 +5041,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5050,8 +5050,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5060,8 +5060,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5069,8 +5069,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 500000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -5082,8 +5082,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5091,8 +5091,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5103,8 +5103,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5112,8 +5112,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5124,8 +5124,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5133,8 +5133,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5145,8 +5145,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5154,8 +5154,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5164,8 +5164,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -5174,14 +5174,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                     ],
                 },
@@ -5194,8 +5194,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5203,8 +5203,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5215,8 +5215,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5224,8 +5224,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5236,8 +5236,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5245,8 +5245,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5257,8 +5257,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5266,8 +5266,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5278,8 +5278,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5287,8 +5287,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5299,8 +5299,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5308,8 +5308,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5320,8 +5320,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5329,8 +5329,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5341,8 +5341,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 6,
                 zero_z: 3,
@@ -5350,8 +5350,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5362,8 +5362,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5371,8 +5371,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5383,8 +5383,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5392,8 +5392,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5404,8 +5404,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5413,8 +5413,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5425,8 +5425,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5434,8 +5434,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5444,8 +5444,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5453,8 +5453,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 2,
@@ -5466,8 +5466,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5475,8 +5475,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5485,8 +5485,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5494,8 +5494,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5507,8 +5507,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5516,8 +5516,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5526,8 +5526,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5535,8 +5535,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5548,8 +5548,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5557,8 +5557,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5567,8 +5567,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5584,8 +5584,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5593,8 +5593,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5603,8 +5603,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5620,8 +5620,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5629,8 +5629,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5639,8 +5639,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5648,8 +5648,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5661,8 +5661,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5670,8 +5670,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5680,8 +5680,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5689,8 +5689,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5702,8 +5702,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5711,8 +5711,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5721,8 +5721,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5730,8 +5730,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5743,8 +5743,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5752,8 +5752,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -5762,8 +5762,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -5771,8 +5771,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -5784,8 +5784,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5793,8 +5793,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5805,8 +5805,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5814,8 +5814,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5826,8 +5826,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5835,8 +5835,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5847,8 +5847,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5856,8 +5856,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5866,8 +5866,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -5876,14 +5876,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -5896,8 +5896,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5905,8 +5905,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5917,8 +5917,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5926,8 +5926,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5938,8 +5938,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5947,8 +5947,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5959,8 +5959,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5968,8 +5968,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -5980,8 +5980,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -5989,8 +5989,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6001,8 +6001,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -6010,8 +6010,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6022,8 +6022,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -6031,8 +6031,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6043,8 +6043,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 4,
                 custody_a: 5,
                 zero_z: 3,
@@ -6052,8 +6052,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6064,8 +6064,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6073,8 +6073,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6085,8 +6085,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6094,8 +6094,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6106,8 +6106,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6115,8 +6115,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6127,8 +6127,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6136,8 +6136,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6146,8 +6146,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6155,8 +6155,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 3,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 2,
@@ -6168,8 +6168,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6177,8 +6177,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6187,8 +6187,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6196,8 +6196,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6209,8 +6209,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6218,8 +6218,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6228,8 +6228,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6237,8 +6237,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6250,8 +6250,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6259,8 +6259,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6269,8 +6269,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6286,8 +6286,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6295,8 +6295,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6305,8 +6305,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 0,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6322,8 +6322,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6331,8 +6331,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6341,8 +6341,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6350,8 +6350,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6363,8 +6363,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6372,8 +6372,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6382,8 +6382,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6391,8 +6391,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6404,8 +6404,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6413,8 +6413,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6423,8 +6423,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6432,8 +6432,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6445,8 +6445,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6454,8 +6454,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(1),
@@ -6464,8 +6464,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6473,8 +6473,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 1000000000000000000,
-                        snapshot_a: 1000000000000000000,
+                        snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                        snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     }],
                 },
                 stake_in: 0,
@@ -6486,8 +6486,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6495,8 +6495,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6507,8 +6507,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6516,8 +6516,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6528,8 +6528,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6537,8 +6537,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6549,8 +6549,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6558,8 +6558,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6568,8 +6568,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 3,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -6578,14 +6578,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(3),
                             stake: 2,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                     ],
                 },
@@ -6598,8 +6598,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6607,8 +6607,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6619,8 +6619,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6628,8 +6628,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6640,8 +6640,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6649,8 +6649,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6661,8 +6661,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6670,8 +6670,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6682,8 +6682,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6691,8 +6691,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6703,8 +6703,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6712,8 +6712,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6724,8 +6724,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6733,8 +6733,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6745,8 +6745,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 1,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 4,
                 custody_a: 6,
                 zero_z: 3,
@@ -6754,8 +6754,8 @@ fn staking_cases() -> Vec<(
                 positions: vec![st::Position {
                     owner: id(1),
                     stake: 1,
-                    snapshot_z: 0,
-                    snapshot_a: 0,
+                    snapshot_z: Accumulator256::from_limbs(0, 0),
+                    snapshot_a: Accumulator256::from_limbs(0, 0),
                 }],
             },
             id(3),
@@ -6766,8 +6766,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6776,14 +6776,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6795,8 +6795,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6805,14 +6805,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6824,8 +6824,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6834,14 +6834,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6853,8 +6853,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6863,14 +6863,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6880,8 +6880,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6890,14 +6890,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -6910,8 +6910,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6920,14 +6920,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6937,8 +6937,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -6947,14 +6947,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -6967,8 +6967,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -6977,14 +6977,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -6994,8 +6994,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7004,14 +7004,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7024,8 +7024,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7034,14 +7034,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7051,8 +7051,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7060,8 +7060,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -7073,8 +7073,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7083,14 +7083,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7100,8 +7100,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7109,8 +7109,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -7122,8 +7122,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7132,14 +7132,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7149,8 +7149,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7159,14 +7159,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7179,8 +7179,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7189,14 +7189,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7206,8 +7206,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7216,14 +7216,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7236,8 +7236,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7246,14 +7246,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7263,8 +7263,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7273,14 +7273,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7293,8 +7293,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7303,14 +7303,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7320,8 +7320,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -7330,14 +7330,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7350,8 +7350,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7360,14 +7360,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7379,8 +7379,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7389,14 +7389,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7408,8 +7408,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7418,14 +7418,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7437,8 +7437,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7447,14 +7447,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7466,8 +7466,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7476,14 +7476,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7495,8 +7495,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7505,14 +7505,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7524,8 +7524,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7534,14 +7534,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7553,8 +7553,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7563,14 +7563,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7582,8 +7582,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7592,14 +7592,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7611,8 +7611,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7621,14 +7621,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7640,8 +7640,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7650,14 +7650,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7669,8 +7669,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -7679,14 +7679,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7698,8 +7698,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7708,14 +7708,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7727,8 +7727,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7737,14 +7737,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7756,8 +7756,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7766,14 +7766,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7785,8 +7785,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7795,14 +7795,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7812,8 +7812,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -7822,14 +7822,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7842,8 +7842,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7852,14 +7852,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7869,8 +7869,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -7879,14 +7879,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7899,8 +7899,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7909,14 +7909,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7926,8 +7926,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -7936,14 +7936,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -7956,8 +7956,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -7966,14 +7966,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -7983,8 +7983,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -7992,8 +7992,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -8005,8 +8005,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8015,14 +8015,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8032,8 +8032,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -8041,8 +8041,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -8054,8 +8054,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8064,14 +8064,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8081,8 +8081,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -8091,14 +8091,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8111,8 +8111,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8121,14 +8121,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8138,8 +8138,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -8148,14 +8148,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8168,8 +8168,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8178,14 +8178,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8195,8 +8195,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -8205,14 +8205,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8225,8 +8225,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8235,14 +8235,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8252,8 +8252,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 0,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 0),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -8262,14 +8262,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8282,8 +8282,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8292,14 +8292,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8311,8 +8311,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8321,14 +8321,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8340,8 +8340,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8350,14 +8350,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8369,8 +8369,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8379,14 +8379,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8398,8 +8398,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8408,14 +8408,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8427,8 +8427,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8437,14 +8437,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8456,8 +8456,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8466,14 +8466,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8485,8 +8485,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8495,14 +8495,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8514,8 +8514,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8524,14 +8524,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8543,8 +8543,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8553,14 +8553,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8572,8 +8572,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8582,14 +8582,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8601,8 +8601,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 0,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 0),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -8611,14 +8611,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8630,8 +8630,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8640,14 +8640,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8659,8 +8659,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8669,14 +8669,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8688,8 +8688,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8698,14 +8698,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8717,8 +8717,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8727,14 +8727,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8744,8 +8744,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -8754,14 +8754,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8774,8 +8774,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8784,14 +8784,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8801,8 +8801,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -8811,14 +8811,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8831,8 +8831,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8841,14 +8841,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8858,8 +8858,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -8868,14 +8868,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -8888,8 +8888,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8898,14 +8898,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8915,8 +8915,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -8924,8 +8924,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -8937,8 +8937,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8947,14 +8947,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -8964,8 +8964,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -8973,8 +8973,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -8986,8 +8986,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -8996,14 +8996,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9013,8 +9013,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -9023,14 +9023,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9043,8 +9043,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9053,14 +9053,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9070,8 +9070,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -9080,14 +9080,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9100,8 +9100,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9110,14 +9110,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9127,8 +9127,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -9137,14 +9137,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9157,8 +9157,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9167,14 +9167,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9184,8 +9184,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 3,
                     custody_a: 5,
                     zero_z: 3,
@@ -9194,14 +9194,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9214,8 +9214,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9224,14 +9224,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9243,8 +9243,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9253,14 +9253,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9272,8 +9272,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9282,14 +9282,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9301,8 +9301,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9311,14 +9311,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9330,8 +9330,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9340,14 +9340,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9359,8 +9359,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9369,14 +9369,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9388,8 +9388,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9398,14 +9398,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9417,8 +9417,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9427,14 +9427,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9446,8 +9446,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9456,14 +9456,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9475,8 +9475,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9485,14 +9485,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9504,8 +9504,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9514,14 +9514,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9533,8 +9533,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 3,
                 custody_a: 5,
                 zero_z: 3,
@@ -9543,14 +9543,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9562,8 +9562,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9572,14 +9572,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9591,8 +9591,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9601,14 +9601,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9620,8 +9620,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9630,14 +9630,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9649,8 +9649,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9659,14 +9659,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9676,8 +9676,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9686,14 +9686,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9706,8 +9706,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9716,14 +9716,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9733,8 +9733,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9743,14 +9743,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9763,8 +9763,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9773,14 +9773,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9790,8 +9790,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9800,14 +9800,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9820,8 +9820,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9830,14 +9830,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9847,8 +9847,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9856,8 +9856,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -9869,8 +9869,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9879,14 +9879,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9896,8 +9896,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9905,8 +9905,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -9918,8 +9918,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9928,14 +9928,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -9945,8 +9945,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -9955,14 +9955,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -9975,8 +9975,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -9985,14 +9985,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10002,8 +10002,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -10012,14 +10012,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10032,8 +10032,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10042,14 +10042,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10059,8 +10059,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -10069,14 +10069,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10089,8 +10089,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10099,14 +10099,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10116,8 +10116,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 500000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 3,
                     custody_a: 6,
                     zero_z: 3,
@@ -10126,14 +10126,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 500000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 500000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10146,8 +10146,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10156,14 +10156,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10175,8 +10175,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10185,14 +10185,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10204,8 +10204,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10214,14 +10214,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10233,8 +10233,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10243,14 +10243,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10262,8 +10262,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10272,14 +10272,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10291,8 +10291,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10301,14 +10301,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10320,8 +10320,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10330,14 +10330,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10349,8 +10349,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10359,14 +10359,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10378,8 +10378,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10388,14 +10388,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10407,8 +10407,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10417,14 +10417,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10436,8 +10436,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10446,14 +10446,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10465,8 +10465,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 500000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 500000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 3,
                 custody_a: 7,
                 zero_z: 3,
@@ -10475,14 +10475,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10494,8 +10494,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10504,14 +10504,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10523,8 +10523,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10533,14 +10533,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10552,8 +10552,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10562,14 +10562,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10581,8 +10581,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10591,14 +10591,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10608,8 +10608,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10618,14 +10618,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10638,8 +10638,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10648,14 +10648,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10665,8 +10665,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10675,14 +10675,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10695,8 +10695,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10705,14 +10705,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10722,8 +10722,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10732,14 +10732,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10752,8 +10752,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10762,14 +10762,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10779,8 +10779,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10788,8 +10788,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -10801,8 +10801,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10811,14 +10811,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10828,8 +10828,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10837,8 +10837,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -10850,8 +10850,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10860,14 +10860,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10877,8 +10877,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10887,14 +10887,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10907,8 +10907,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10917,14 +10917,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10934,8 +10934,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -10944,14 +10944,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -10964,8 +10964,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -10974,14 +10974,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -10991,8 +10991,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -11001,14 +11001,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11021,8 +11021,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11031,14 +11031,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11048,8 +11048,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 0,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 0),
                     custody_z: 4,
                     custody_a: 5,
                     zero_z: 3,
@@ -11058,14 +11058,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11078,8 +11078,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11088,14 +11088,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11107,8 +11107,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11117,14 +11117,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11136,8 +11136,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11146,14 +11146,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11165,8 +11165,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11175,14 +11175,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11194,8 +11194,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11204,14 +11204,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11223,8 +11223,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11233,14 +11233,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11252,8 +11252,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11262,14 +11262,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11281,8 +11281,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11291,14 +11291,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11310,8 +11310,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11320,14 +11320,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11339,8 +11339,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11349,14 +11349,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11368,8 +11368,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11378,14 +11378,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11397,8 +11397,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 0,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 0),
                 custody_z: 5,
                 custody_a: 5,
                 zero_z: 3,
@@ -11407,14 +11407,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11426,8 +11426,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11436,14 +11436,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11455,8 +11455,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11465,14 +11465,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11484,8 +11484,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11494,14 +11494,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11513,8 +11513,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11523,14 +11523,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11540,8 +11540,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 4,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11550,14 +11550,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 3,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11570,8 +11570,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11580,14 +11580,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11597,8 +11597,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11607,14 +11607,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11627,8 +11627,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11637,14 +11637,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11654,8 +11654,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11664,14 +11664,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11684,8 +11684,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11694,14 +11694,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11711,8 +11711,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11720,8 +11720,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -11733,8 +11733,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11743,14 +11743,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11760,8 +11760,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 1,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11769,8 +11769,8 @@ fn staking_cases() -> Vec<(
                     positions: vec![st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     }],
                 },
                 stake_in: 0,
@@ -11782,8 +11782,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11792,14 +11792,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11809,8 +11809,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11819,14 +11819,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11839,8 +11839,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11849,14 +11849,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11866,8 +11866,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11876,14 +11876,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11896,8 +11896,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11906,14 +11906,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11923,8 +11923,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11933,14 +11933,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -11953,8 +11953,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -11963,14 +11963,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -11980,8 +11980,8 @@ fn staking_cases() -> Vec<(
             Ok(st::Outcome {
                 state: st::State {
                     total: 2,
-                    f_z: 1000000000000000000,
-                    f_a: 1000000000000000000,
+                    f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                    f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                     custody_z: 4,
                     custody_a: 6,
                     zero_z: 3,
@@ -11990,14 +11990,14 @@ fn staking_cases() -> Vec<(
                         st::Position {
                             owner: id(1),
                             stake: 1,
-                            snapshot_z: 1000000000000000000,
-                            snapshot_a: 1000000000000000000,
+                            snapshot_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                            snapshot_a: Accumulator256::from_limbs(0, 1000000000000000000),
                         },
                         st::Position {
                             owner: id(2),
                             stake: 1,
-                            snapshot_z: 0,
-                            snapshot_a: 0,
+                            snapshot_z: Accumulator256::from_limbs(0, 0),
+                            snapshot_a: Accumulator256::from_limbs(0, 0),
                         },
                     ],
                 },
@@ -12010,8 +12010,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12020,14 +12020,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12039,8 +12039,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12049,14 +12049,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12068,8 +12068,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12078,14 +12078,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12097,8 +12097,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12107,14 +12107,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12126,8 +12126,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12136,14 +12136,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12155,8 +12155,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12165,14 +12165,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12184,8 +12184,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12194,14 +12194,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12213,8 +12213,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12223,14 +12223,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12242,8 +12242,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12252,14 +12252,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12271,8 +12271,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12281,14 +12281,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12300,8 +12300,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12310,14 +12310,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },
@@ -12329,8 +12329,8 @@ fn staking_cases() -> Vec<(
         (
             st::State {
                 total: 2,
-                f_z: 1000000000000000000,
-                f_a: 1000000000000000000,
+                f_z: Accumulator256::from_limbs(0, 1000000000000000000),
+                f_a: Accumulator256::from_limbs(0, 1000000000000000000),
                 custody_z: 5,
                 custody_a: 7,
                 zero_z: 3,
@@ -12339,14 +12339,14 @@ fn staking_cases() -> Vec<(
                     st::Position {
                         owner: id(1),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                     st::Position {
                         owner: id(2),
                         stake: 1,
-                        snapshot_z: 0,
-                        snapshot_a: 0,
+                        snapshot_z: Accumulator256::from_limbs(0, 0),
+                        snapshot_a: Accumulator256::from_limbs(0, 0),
                     },
                 ],
             },

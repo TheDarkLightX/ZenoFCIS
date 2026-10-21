@@ -535,3 +535,39 @@ fn complete_collection_and_ordered_movement_observations_reject_deleted_extra_an
     assert!(matches!(a.result(), Err(Failure::Budget { .. })));
     assert_eq!(a.usage(), b.usage());
 }
+
+#[test]
+fn accumulator_schema_roundtrips_high_limbs_and_rejects_scalar_aliases() {
+    let p = Policy::prepare(bounds()).unwrap();
+    // Stable nominal IDs for L, S/G, F, and feedback errors in schema-ids.json.
+    for ty in 16..=24 {
+        for a in [
+            Accumulator256::ZERO,
+            Accumulator256::from(u128::MAX),
+            Accumulator256::from_limbs(1, 0),
+            Accumulator256::MAX,
+        ] {
+            let value = a.to_value().unwrap();
+            let f = p.frame(ty, &value, limits());
+            assert_eq!(
+                p.admit(ty, f.result().unwrap(), limits()).result(),
+                Ok(&value)
+            );
+        }
+        assert!(p.frame(ty, &Value::unsigned(0), limits()).result().is_err());
+    }
+    let v = state(&p);
+    let mut h = match v.view() {
+        ValueRef::Record(fs) => fs[0].value().clone(),
+        _ => panic!(),
+    };
+    for i in [21, 22, 23, 24, 30, 31, 32, 34, 35] {
+        h = replace(&h, i, Accumulator256::MAX.to_value().unwrap());
+    }
+    let high = replace(&v, 1, h);
+    let framed = p.frame(STATE, &high, limits());
+    assert_eq!(
+        p.admit(STATE, framed.result().unwrap(), limits()).result(),
+        Ok(&high)
+    );
+}

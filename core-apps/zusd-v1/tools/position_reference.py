@@ -6,8 +6,15 @@ import argparse,copy,itertools,subprocess
 from pathlib import Path
 Q=10**18;R=10**9;CAP=35_000_000*Q
 ROOT=Path(__file__).resolve().parents[1]
+ACCUMULATOR_FIELDS = {'error_c','error_d','error_g','error_loss','error_s','f_a','f_z','g','reward_c','reward_d','s','snapshot_a','snapshot_c','snapshot_d','snapshot_z'}
 def emit(ty,d):
-    return ty+' { '+', '.join(k+': '+str(v) for k,v in d.items())+' }'
+    fields=[]
+    for k,v in d.items():
+        if isinstance(v,int) and k in ACCUMULATOR_FIELDS:
+            assert 0<=v<2**256,(k,v)
+            v=f'Accumulator256::from_limbs({v >> 128}, {v & (2**128-1)})'
+        fields.append(k+': '+str(v))
+    return ty+' { '+', '.join(fields)+' }'
 def rid(x):return f'id({x})'
 def snap(p=Q,s=0,g=0,e=0,scale=0):return dict(p=p,s=s,g=g,epoch=e,scale=scale)
 def rs(s,front=False):return emit('sp::FrontSnapshot' if front else 'sp::Snapshot',{k:v for k,v in s.items() if not(front and k=='s')})

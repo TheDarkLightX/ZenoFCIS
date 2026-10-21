@@ -64,8 +64,8 @@ def offset_corpus():
                 if factor==0:epoch=1;newp=Q
                 elif newp<10**9:scale=1;newp=p*factor*10**9//Q
                 out=(total-debt,newp,epoch,scale,es,el,eg,coll,cap-issuance,issuance,issuance,0,0,a*p,g*p)
-                if newp==0 or any(x<0 or x>M for x in out):out=None
-            rows.append('\t'.join(map(str,args))+'\t'+('refuse' if out is None else ','.join(map(str,out)))+'\n')
+                if newp==0 or any(x<0 or x>(2**256-1 if j in (4,5,6,13,14) else M) for j,x in enumerate(out)):out=None
+            rows.append('\t'.join(map(str,args))+'\t'+('refuse' if out is None else ','.join(f'{x>>128}:{x&M}' if j in (4,5,6,13,14) else str(x) for j,x in enumerate(out)))+'\n')
     return ''.join(rows)
 def main():
     p=argparse.ArgumentParser();p.add_argument('--check',action='store_true');args=p.parse_args()

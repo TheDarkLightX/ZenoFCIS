@@ -1,7 +1,8 @@
 //! StabilityPool P/S/G and complete position/snapshot transitions. Schedule
 //! deltas are abstract, explicitly supplied inputs; no drip is selected here.
 use crate::{
-    Evaluation, Failure, Id, Limits, Q, SCALE, Work, add, muldiv, run, sub, vaults, wide::Wide,
+    Accumulator256, Evaluation, Failure, Id, Limits, Q, SCALE, Work, add, muldiv, run, sub, vaults,
+    wide::Wide,
 };
 use alloc::vec::Vec;
 pub const FUNDED_CAP: u128 = 35_000_000 * Q;
@@ -9,8 +10,8 @@ pub const FUNDED_CAP: u128 = 35_000_000 * Q;
 pub struct Cell {
     pub epoch: u64,
     pub scale: u64,
-    pub s: u128,
-    pub g: u128,
+    pub s: Accumulator256,
+    pub g: Accumulator256,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Epoch {
@@ -46,9 +47,9 @@ pub struct State {
     pub p: u128,
     pub epoch: u64,
     pub scale: u64,
-    pub error_s: u128,
-    pub error_loss: u128,
-    pub error_g: u128,
+    pub error_s: Accumulator256,
+    pub error_loss: Accumulator256,
+    pub error_g: Accumulator256,
     pub collateral: u128,
     pub stock: Stock,
     pub history: Vec<Cell>,
@@ -65,8 +66,8 @@ pub struct Bounds {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Snapshot {
     pub p: u128,
-    pub s: u128,
-    pub g: u128,
+    pub s: Accumulator256,
+    pub g: Accumulator256,
     pub epoch: u64,
     pub scale: u64,
 }
@@ -80,7 +81,7 @@ pub struct Deposit {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FrontSnapshot {
     pub p: u128,
-    pub g: u128,
+    pub g: Accumulator256,
     pub epoch: u64,
     pub scale: u64,
 }
@@ -122,16 +123,16 @@ impl State {
             p: Q,
             epoch: 0,
             scale: 0,
-            error_s: 0,
-            error_loss: 0,
-            error_g: 0,
+            error_s: Accumulator256::ZERO,
+            error_loss: Accumulator256::ZERO,
+            error_g: Accumulator256::ZERO,
             collateral: 0,
             stock: Stock::funded_reference(funded)?,
             history: alloc::vec![Cell {
                 epoch: 0,
                 scale: 0,
-                s: 0,
-                g: 0
+                s: Accumulator256::ZERO,
+                g: Accumulator256::ZERO
             }],
             epochs: alloc::vec![Epoch {
                 epoch: 0,
@@ -149,7 +150,7 @@ pub(crate) fn validate(s: &State, b: Bounds, w: &mut Work) -> Result<(), Failure
     w.charge(
         s.history.len() as u64 + s.epochs.len() as u64,
         s.history.len() as u64 + s.epochs.len() as u64,
-        (s.history.len() as u64 * 64) + (s.epochs.len() as u64 * 24),
+        (s.history.len() as u64 * 96) + (s.epochs.len() as u64 * 24),
     )?;
     if s.p == 0
         || s.p > Q
@@ -195,8 +196,8 @@ fn cell(s: &State, e: u64, scale: u64, w: &mut Work) -> Result<Cell, Failure> {
         return Ok(Cell {
             epoch: e,
             scale,
-            s: 0,
-            g: 0,
+            s: Accumulator256::ZERO,
+            g: Accumulator256::ZERO,
         });
     }
     s.history
@@ -226,13 +227,13 @@ fn current_front(s: &State) -> FrontSnapshot {
 }
 fn accumulator(
     amount: u128,
-    error: u128,
+    error: Accumulator256,
     total: u128,
     w: &mut Work,
-) -> Result<(u128, u128), Failure> {
+) -> Result<(Accumulator256, Accumulator256), Failure> {
     let n = Wide::from(amount).mul(Q, w)?.add(Wide::from(error), w)?;
-    let (q, r) = n.quotient(Wide::from(total), w)?;
-    Ok((q, r.narrow()?))
+    let (q, r) = n.quotient_wide(Wide::from(total), w)?;
+    Ok((q.accumulator()?, r.accumulator()?))
 }
 fn issue(s: &mut State, delta: Option<u128>, w: &mut Work) -> Result<(), Failure> {
     let amount = delta.ok_or(Failure::UnboundProfile)?;
@@ -248,7 +249,7 @@ fn issue(s: &mut State, delta: Option<u128>, w: &mut Work) -> Result<(), Failure
         let (g, error) = accumulator(amount, s.error_g, s.total, w)?;
         s.error_g = error;
         let last = s.history.last_mut().ok_or(Failure::Domain)?;
-        last.g = add(last.g, Wide::from(g).mul(s.p, w)?.narrow()?, w)?;
+        last.g = last.g.add(Wide::from(g).mul(s.p, w)?.accumulator()?, w)?;
     }
     Ok(())
 }
@@ -264,7 +265,7 @@ pub(crate) fn offset_inner(
     w.charge(
         1,
         0,
-        pre.history.len() as u64 * 64 + pre.epochs.len() as u64 * 24 + 256,
+        pre.history.len() as u64 * 96 + pre.epochs.len() as u64 * 24 + 304,
     )?;
     if pre.total == 0 || debt == 0 {
         return Ok(pre.clone());
@@ -277,7 +278,7 @@ pub(crate) fn offset_inner(
     let (gain, error) = accumulator(collateral, s.error_s, s.total, w)?;
     s.error_s = error;
     let loss = if debt == s.total {
-        s.error_loss = 0;
+        s.error_loss = Accumulator256::ZERO;
         Q
     } else {
         let n = Wide::from(debt)
@@ -285,12 +286,14 @@ pub(crate) fn offset_inner(
             .sub(Wide::from(s.error_loss), w)?;
         let floor = n.quotient(Wide::from(s.total), w)?.0;
         let loss = add(floor, 1, w)?;
-        s.error_loss = Wide::from(loss).mul(s.total, w)?.sub(n, w)?.narrow()?;
+        s.error_loss = Wide::from(loss).mul(s.total, w)?.sub(n, w)?.accumulator()?;
         loss
     };
     let factor = sub(Q, loss, w)?;
     let last = s.history.last_mut().ok_or(Failure::Domain)?;
-    last.s = add(last.s, Wide::from(gain).mul(s.p, w)?.narrow()?, w)?;
+    last.s = last
+        .s
+        .add(Wide::from(gain).mul(s.p, w)?.accumulator()?, w)?;
     if factor == 0 {
         if s.epochs.len() >= b.epochs as usize || s.history.len() >= b.history as usize {
             return Err(Failure::Reject(1061));
@@ -307,8 +310,8 @@ pub(crate) fn offset_inner(
         s.history.push(Cell {
             epoch: s.epoch,
             scale: 0,
-            s: 0,
-            g: 0,
+            s: Accumulator256::ZERO,
+            g: Accumulator256::ZERO,
         });
     } else if muldiv(s.p, factor, Q, w)? < SCALE {
         if s.history.len() >= b.history as usize {
@@ -324,8 +327,8 @@ pub(crate) fn offset_inner(
         s.history.push(Cell {
             epoch: s.epoch,
             scale: s.scale,
-            s: 0,
-            g: 0,
+            s: Accumulator256::ZERO,
+            g: Accumulator256::ZERO,
         });
     } else {
         s.p = muldiv(s.p, factor, Q, w)?;
@@ -391,13 +394,25 @@ fn gains(
         snap.scale.checked_add(1).ok_or(Failure::Arithmetic)?,
         w,
     )?;
-    let ds = add(sub(a.s, snap.s, w)?, next.s / SCALE, w)?;
-    let dg = add(sub(a.g, snap.g, w)?, next.g / SCALE, w)?;
+    let ds = a.s.sub(snap.s, w)?.add(
+        Wide::from(next.s)
+            .quotient_wide(Wide::from(SCALE), w)?
+            .0
+            .accumulator()?,
+        w,
+    )?;
+    let dg = a.g.sub(snap.g, w)?.add(
+        Wide::from(next.g)
+            .quotient_wide(Wide::from(SCALE), w)?
+            .0
+            .accumulator()?,
+        w,
+    )?;
     let denominator = Wide::from(snap.p).mul(Q, w)?;
     Ok((
         compounded(s, initial, snap.p, snap.epoch, snap.scale, w)?,
-        Wide::from(initial).mul(ds, w)?.quotient(denominator, w)?.0,
-        Wide::from(initial).mul(dg, w)?.quotient(denominator, w)?.0,
+        Wide::from(ds).mul(initial, w)?.quotient(denominator, w)?.0,
+        Wide::from(dg).mul(initial, w)?.quotient(denominator, w)?.0,
     ))
 }
 fn front_gains(
@@ -416,11 +431,17 @@ fn front_gains(
         snap.scale.checked_add(1).ok_or(Failure::Arithmetic)?,
         w,
     )?;
-    let delta = add(sub(a.g, snap.g, w)?, next.g / SCALE, w)?;
+    let delta = a.g.sub(snap.g, w)?.add(
+        Wide::from(next.g)
+            .quotient_wide(Wide::from(SCALE), w)?
+            .0
+            .accumulator()?,
+        w,
+    )?;
     Ok((
         compounded(s, initial, snap.p, snap.epoch, snap.scale, w)?,
-        Wide::from(initial)
-            .mul(delta, w)?
+        Wide::from(delta)
+            .mul(initial, w)?
             .quotient(Wide::from(snap.p).mul(Q, w)?, w)?
             .0,
     ))
@@ -440,7 +461,7 @@ fn validate_book(book: &Book, b: Bounds, w: &mut Work) -> Result<Liabilities, Fa
     w.charge(
         book.deposits.len() as u64 + book.front_ends.len() as u64,
         book.deposits.len() as u64 + book.front_ends.len() as u64,
-        (book.deposits.len() as u64 + book.front_ends.len() as u64) * 192,
+        (book.deposits.len() as u64 + book.front_ends.len() as u64) * 224,
     )?;
     if book.deposits.windows(2).any(|v| v[0].owner >= v[1].owner)
         || book.front_ends.windows(2).any(|v| v[0].owner >= v[1].owner)
@@ -537,7 +558,7 @@ pub fn change(
         w.charge(
             inventory.len() as u64,
             inventory.len() as u64,
-            inventory.len() as u64 * 256,
+            inventory.len() as u64 * 288,
         )?;
         let index = pre.deposits.binary_search_by_key(&actor, |d| d.owner).ok();
         let front = pre
@@ -557,9 +578,9 @@ pub fn change(
             w.charge(
                 1,
                 0,
-                (pre.deposits.len() as u64 + pre.front_ends.len() as u64) * 192
-                    + pre.pool.history.len() as u64 * 64
-                    + 512,
+                (pre.deposits.len() as u64 + pre.front_ends.len() as u64) * 224
+                    + pre.pool.history.len() as u64 * 96
+                    + 640,
             )?;
             let mut book = pre.clone();
             let at = book.front_ends.partition_point(|f| f.owner < actor);
@@ -620,7 +641,7 @@ pub fn change(
                 .flatten()
             {
                 for v in inventory {
-                    w.charge(1, 1, 256)?;
+                    w.charge(1, 1, 288)?;
                     if v.status == vaults::Status::Active {
                         let v = vaults::effective(*v, system, w)?;
                         if vaults::ratio(v.collateral, v.debt, p, w)? < vaults::MCR {
@@ -646,9 +667,9 @@ pub fn change(
         w.charge(
             1,
             0,
-            (pre.deposits.len() as u64 + pre.front_ends.len() as u64) * 192
-                + pre.pool.history.len() as u64 * 64
-                + 512,
+            (pre.deposits.len() as u64 + pre.front_ends.len() as u64) * 224
+                + pre.pool.history.len() as u64 * 96
+                + 640,
         )?;
         let mut book = pre.clone();
         issue(&mut book.pool, issuance, w)?;

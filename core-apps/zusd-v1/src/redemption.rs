@@ -1,6 +1,6 @@
 //! Native redemption over bytes32 vault identities. No epoch conversion is selected.
 use crate::{
-    Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, fees,
+    Accumulator256, Evaluation, Failure, Id, Limits, NICR_Q, Q, Work, add, fees,
     liquidation::{self, Book},
     muldiv, run, stability, sub,
     vaults::{self, MCR, Parameters, Prices, Status, Vault},
@@ -93,7 +93,13 @@ pub(crate) fn cut(
                 ),
             }
         };
-    if let Some(at) = valid(u, l, w)? {
+    // V1 tests the original hints before discarding missing/self anchors.
+    let original_present = (upper.is_none() || u.is_some()) && (lower.is_none() || l.is_some());
+    if let Some(at) = if original_present {
+        valid(u, l, w)?
+    } else {
+        None
+    } {
         book.order.insert(at, id);
         return Ok(());
     }
@@ -249,8 +255,8 @@ pub fn redeem(
                     debt: 0,
                     reserve: 0,
                     stake: 0,
-                    snapshot_c: 0,
-                    snapshot_d: 0,
+                    snapshot_c: Accumulator256::ZERO,
+                    snapshot_d: Accumulator256::ZERO,
                     ..v
                 };
                 book.order.remove(at);

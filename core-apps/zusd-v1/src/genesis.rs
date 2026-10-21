@@ -1,6 +1,9 @@
 //! Conditional mathematical genesis. Existing balance facts are explicit inputs;
 //! no asset is created and no funding/authentication/publication receipt is issued.
-use crate::{Evaluation, Failure, Id, Limits, Q, Work, ledger, parameters, run, stability, wire};
+use crate::{
+    Accumulator256, Evaluation, Failure, Id, Limits, Q, Work, ledger, parameters, run, stability,
+    wire,
+};
 use alloc::{vec, vec::Vec};
 use zeno_fcis_value::{Field, MapEntry, Value, ValueRef};
 /// Roles: Active, Default, SP, Gas, Surplus, Staking, Issuance, Rail.
@@ -149,6 +152,7 @@ pub fn reference(policy: &wire::Policy, input: Input<'_>, limits: Limits) -> Eva
                 2..=10 => bytes(input.roots[id as usize - 2])?,
                 11 | 12 => Value::unsigned(input.deployment_epoch as u128),
                 14 => Value::unsigned(input.parameter_version as u128),
+                21..=24 | 30..=32 | 34..=35 => Accumulator256::ZERO.to_value()?,
                 27 => Value::unsigned(Q),
                 36 => Value::unsigned(funded.amount),
                 41 => Value::unsigned(input.last_trigger_epoch as u128),
@@ -162,7 +166,10 @@ pub fn reference(policy: &wire::Policy, input: Input<'_>, limits: Limits) -> Eva
             vec![(
                 Value::tuple(vec![Value::unsigned(0), Value::unsigned(0)])
                     .map_err(|_| Failure::Canonical)?,
-                record(vec![(1, Value::unsigned(0)), (2, Value::unsigned(0))])?,
+                record(vec![
+                    (1, Accumulator256::ZERO.to_value()?),
+                    (2, Accumulator256::ZERO.to_value()?),
+                ])?,
             )],
             w,
         )?;

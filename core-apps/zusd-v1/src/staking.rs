@@ -1,18 +1,18 @@
 //! LQTYStaking 94..212: cumulative F with no feedback error or lock.
-use crate::{Evaluation, Failure, Id, Limits, Q, Work, add, muldiv, run, sub, wide::Wide};
+use crate::{Accumulator256, Evaluation, Failure, Id, Limits, Q, Work, add, run, sub, wide::Wide};
 use alloc::vec::Vec;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Position {
     pub owner: Id,
     pub stake: u128,
-    pub snapshot_z: u128,
-    pub snapshot_a: u128,
+    pub snapshot_z: Accumulator256,
+    pub snapshot_a: Accumulator256,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
     pub total: u128,
-    pub f_z: u128,
-    pub f_a: u128,
+    pub f_z: Accumulator256,
+    pub f_a: Accumulator256,
     pub custody_z: u128,
     pub custody_a: u128,
     pub zero_z: u128,
@@ -35,8 +35,14 @@ pub struct Outcome {
 }
 fn gains(s: &State, p: Position, w: &mut Work) -> Result<(u128, u128), Failure> {
     Ok((
-        muldiv(p.stake, sub(s.f_z, p.snapshot_z, w)?, Q, w)?,
-        muldiv(p.stake, sub(s.f_a, p.snapshot_a, w)?, Q, w)?,
+        Wide::from(s.f_z.sub(p.snapshot_z, w)?)
+            .mul(p.stake, w)?
+            .quotient(Wide::from(Q), w)?
+            .0,
+        Wide::from(s.f_a.sub(p.snapshot_a, w)?)
+            .mul(p.stake, w)?
+            .quotient(Wide::from(Q), w)?
+            .0,
     ))
 }
 fn validate(s: &State, capacity: u32, w: &mut Work) -> Result<(), Failure> {
@@ -46,7 +52,7 @@ fn validate(s: &State, capacity: u32, w: &mut Work) -> Result<(), Failure> {
     w.charge(
         s.positions.len() as u64,
         s.positions.len() as u64,
-        s.positions.len() as u64 * 96,
+        s.positions.len() as u64 * 128,
     )?;
     if s.positions.windows(2).any(|p| p[0].owner >= p[1].owner) {
         return Err(Failure::Canonical);
@@ -80,7 +86,7 @@ pub fn fee_event(
 ) -> Evaluation<State> {
     run(limits, |w| {
         validate(pre, capacity, w)?;
-        w.charge(1, 0, pre.positions.len() as u64 * 96 + 128)?;
+        w.charge(1, 0, pre.positions.len() as u64 * 128 + 160)?;
         let mut s = pre.clone();
         s.custody_z = add(s.custody_z, zusd, w)?;
         s.custody_a = add(s.custody_a, agrs, w)?;
@@ -88,8 +94,22 @@ pub fn fee_event(
             s.zero_z = add(s.zero_z, zusd, w)?;
             s.zero_a = add(s.zero_a, agrs, w)?;
         } else {
-            s.f_z = add(s.f_z, muldiv(zusd, Q, s.total, w)?, w)?;
-            s.f_a = add(s.f_a, muldiv(agrs, Q, s.total, w)?, w)?;
+            s.f_z = s.f_z.add(
+                Wide::from(zusd)
+                    .mul(Q, w)?
+                    .quotient_wide(Wide::from(s.total), w)?
+                    .0
+                    .accumulator()?,
+                w,
+            )?;
+            s.f_a = s.f_a.add(
+                Wide::from(agrs)
+                    .mul(Q, w)?
+                    .quotient_wide(Wide::from(s.total), w)?
+                    .0
+                    .accumulator()?,
+                w,
+            )?;
         }
         validate(&s, capacity, w)?;
         Ok(s)
@@ -133,7 +153,7 @@ pub fn change(
             0
         };
         let next = sub(add(stake, input, w)?, output, w)?;
-        w.charge(1, 0, pre.positions.len() as u64 * 96 + 128)?;
+        w.charge(1, 0, pre.positions.len() as u64 * 128 + 160)?;
         let mut s = pre.clone();
         if let Ok(i) = at {
             s.positions.remove(i);

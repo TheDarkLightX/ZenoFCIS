@@ -1,5 +1,5 @@
 {
-  "schema_id": "zenofcis.zusd.v1.native-review.1",
+  "schema_id": "zenofcis.zusd.v1.native-review.2",
   "status": "Executable closed schema and scoped native/wire review candidate; complete application dispatch/law binding is not mounted",
   "authority": "No activation, funding, mint, authentication, usage receipt or publication authority",
   "nominal_ids": {
@@ -519,7 +519,7 @@
     "generator": "tools/schema.py",
     "definitions": "src/schema_generated.rs",
     "stable_ids": "schema-ids.json",
-    "types": 118,
+    "types": 119,
     "old_state_type": 57,
     "old_command_type": 83
   },
@@ -537,5 +537,6 @@
     "sp_positions": 153,
     "staking": 432,
     "domain_note": "Witness rows are component domains; unbound rows are excluded from lawful decision counts; not the step-5 atlas or an all-input proof"
-  }
+  },
+  "accumulator_wire": "LA/LZ/S/G/FZ/FA, their snapshots and five feedback errors: exact uint256 as tuple(high U128, low U128), big-endian limbs; no new library kind"
 }

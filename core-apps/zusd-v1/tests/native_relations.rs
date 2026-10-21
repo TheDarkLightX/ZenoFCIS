@@ -50,8 +50,8 @@ fn system() -> v::System {
         stakes: 0,
         stakes_snapshot: 0,
         collateral_snapshot: 0,
-        reward_c: 0,
-        reward_d: 0,
+        reward_c: Accumulator256::from(0),
+        reward_d: Accumulator256::from(0),
     }
 }
 fn vault(x: u8, c: u128, d: u128, reserve: u128) -> v::Vault {
@@ -64,8 +64,8 @@ fn vault(x: u8, c: u128, d: u128, reserve: u128) -> v::Vault {
         debt: d,
         reserve,
         stake: c,
-        snapshot_c: 0,
-        snapshot_d: 0,
+        snapshot_c: Accumulator256::from(0),
+        snapshot_d: Accumulator256::from(0),
     }
 }
 fn book(vaults: Vec<v::Vault>, order: Vec<Id>) -> l::Book {
@@ -95,8 +95,8 @@ fn book(vaults: Vec<v::Vault>, order: Vec<Id>) -> l::Book {
         system: s,
         default_collateral: 0,
         default_debt: 0,
-        error_c: 0,
-        error_d: 0,
+        error_c: Accumulator256::from(0),
+        error_d: Accumulator256::from(0),
         gas_balance,
         surplus: vec![],
         pool: sp::State::reference_genesis(sp::FUNDED_CAP).unwrap(),
@@ -311,8 +311,8 @@ fn d3_debt_only_pending_is_strictly_better_on_complete_lag_domain() {
                 let mut v = vault(1, 10, 10, 1);
                 v.stake = stake;
                 let s = v::System {
-                    reward_c: c * Q,
-                    reward_d: d * Q,
+                    reward_c: Accumulator256::from(c * Q),
+                    reward_d: Accumulator256::from(d * Q),
                     ..system()
                 };
                 let out = v::apply_pending(v, s, limits());
@@ -593,8 +593,8 @@ fn stability_both_price_principal_guard_and_history_integrity() {
 fn staking_temporal_f_and_zero_weight_are_exact() {
     let s = st::State {
         total: 0,
-        f_z: 0,
-        f_a: 0,
+        f_z: Accumulator256::from(0),
+        f_a: Accumulator256::from(0),
         custody_z: 0,
         custody_a: 0,
         zero_z: 0,
@@ -615,7 +615,7 @@ fn staking_temporal_f_and_zero_weight_are_exact() {
         .result()
         .unwrap()
         .clone();
-    assert_eq!(s.f_z, Q / 2);
+    assert_eq!(s.f_z, Accumulator256::from(Q / 2));
     let s = st::fee_event(&s, 1, 0, 2, limits())
         .result()
         .unwrap()
@@ -768,7 +768,7 @@ fn common_guards_earned_claim_frames_and_independent_wrong_outcomes() {
     );
     let v = vault(1, 10, 10, 1);
     let s = v::System {
-        reward_d: Q,
+        reward_d: Accumulator256::from(Q),
         ..system()
     };
     let expected = v::apply_pending(v, s, limits()).result().copied();
@@ -1104,8 +1104,8 @@ fn fee_rejection_classes_and_zero_stake_entitlements() {
     );
     let pre = st::State {
         total: 0,
-        f_z: 0,
-        f_a: 0,
+        f_z: Accumulator256::from(0),
+        f_a: Accumulator256::from(0),
         custody_z: 0,
         custody_a: 0,
         zero_z: 0,
@@ -1116,7 +1116,10 @@ fn fee_rejection_classes_and_zero_stake_entitlements() {
         .result()
         .unwrap()
         .clone();
-    assert_eq!((paid.f_z, paid.f_a, paid.zero_z, paid.zero_a), (0, 0, 5, 7));
+    assert_eq!(
+        (paid.f_z, paid.f_a, paid.zero_z, paid.zero_a),
+        (Accumulator256::ZERO, Accumulator256::ZERO, 5, 7)
+    );
     let joined = st::change(&paid, id(1), st::Command::Stake(1), 1, 1, limits())
         .result()
         .unwrap()
@@ -1305,8 +1308,8 @@ fn common_reason_precedence_and_exact_pending_owner_outcome() {
         debt: 2000 * Q,
         active: 2,
         stakes: 2000 * Q,
-        reward_c: Q / 10,
-        reward_d: Q / 10,
+        reward_c: Accumulator256::from(Q / 10),
+        reward_d: Accumulator256::from(Q / 10),
         ..system()
     };
     let out = v::adjust(
@@ -1329,8 +1332,8 @@ fn common_reason_precedence_and_exact_pending_owner_outcome() {
                 collateral: 1100 * Q,
                 debt: 650 * Q,
                 stake: 1100 * Q,
-                snapshot_c: Q / 10,
-                snapshot_d: Q / 10,
+                snapshot_c: Accumulator256::from(Q / 10),
+                snapshot_d: Accumulator256::from(Q / 10),
                 ..old
             },
             system: v::System {
@@ -1599,15 +1602,29 @@ fn sp_offset_full_state_matches_independent_integer_reference() {
             );
             continue;
         }
-        let e: Vec<u128> = fields[5].split(',').map(|s| s.parse().unwrap()).collect();
+        let cells: Vec<_> = fields[5].split(',').collect();
+        let e: Vec<u128> = cells
+            .iter()
+            .map(|s| {
+                if s.contains(':') {
+                    0
+                } else {
+                    s.parse().unwrap()
+                }
+            })
+            .collect();
+        let acc = |i: usize| {
+            let (high, low) = cells[i].split_once(':').unwrap();
+            Accumulator256::from_limbs(high.parse().unwrap(), low.parse().unwrap())
+        };
         let mut expected = pre.clone();
         expected.total = e[0];
         expected.p = e[1];
         expected.epoch = e[2] as u64;
         expected.scale = e[3] as u64;
-        expected.error_s = e[4];
-        expected.error_loss = e[5];
-        expected.error_g = e[6];
+        expected.error_s = acc(4);
+        expected.error_loss = acc(5);
+        expected.error_g = acc(6);
         expected.collateral = e[7];
         expected.stock = sp::Stock {
             remaining: e[8],
@@ -1616,8 +1633,8 @@ fn sp_offset_full_state_matches_independent_integer_reference() {
             missed: e[11],
             paid: e[12],
         };
-        expected.history[0].s = e[13];
-        expected.history[0].g = e[14];
+        expected.history[0].s = acc(13);
+        expected.history[0].g = acc(14);
         if expected.epoch == 1 {
             expected.epochs[0].sealed = true;
             expected.epochs.push(sp::Epoch {
@@ -1628,16 +1645,16 @@ fn sp_offset_full_state_matches_independent_integer_reference() {
             expected.history.push(sp::Cell {
                 epoch: 1,
                 scale: 0,
-                s: 0,
-                g: 0,
+                s: Accumulator256::from(0),
+                g: Accumulator256::from(0),
             });
         } else if expected.scale == 1 {
             expected.epochs[0].last_scale = 1;
             expected.history.push(sp::Cell {
                 epoch: 0,
                 scale: 1,
-                s: 0,
-                g: 0,
+                s: Accumulator256::from(0),
+                g: Accumulator256::from(0),
             });
         }
         assert_eq!(out.result(), Ok(&expected), "{line}");

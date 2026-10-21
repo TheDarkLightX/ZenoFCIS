@@ -1,5 +1,5 @@
-//! Private exact 384-bit scratch. No persisted wide values or implicit downcasts.
-use crate::{Failure, Work};
+//! Private exact 384-bit scratch. Persisting a value requires checked narrowing.
+use crate::{Accumulator256, Failure, Work};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Wide(pub(crate) [u64; 6]);
 impl From<u128> for Wide {
@@ -7,7 +7,62 @@ impl From<u128> for Wide {
         Self([x as u64, (x >> 64) as u64, 0, 0, 0, 0])
     }
 }
+impl From<Accumulator256> for Wide {
+    fn from(x: Accumulator256) -> Self {
+        let (high, low) = x.limbs();
+        Self([
+            low as u64,
+            (low >> 64) as u64,
+            high as u64,
+            (high >> 64) as u64,
+            0,
+            0,
+        ])
+    }
+}
 impl Wide {
+    pub(crate) fn accumulator(self) -> Result<Accumulator256, Failure> {
+        if self.0[4..].iter().any(|v| *v != 0) {
+            return Err(Failure::Arithmetic);
+        }
+        Ok(Accumulator256::from_limbs(
+            u128::from(self.0[2]) | (u128::from(self.0[3]) << 64),
+            u128::from(self.0[0]) | (u128::from(self.0[1]) << 64),
+        ))
+    }
+    /// Binary long division. r<d before each iteration. The shifted remainder
+    /// may use one carry bit; subtracting d then yields r<d within 384 bits.
+    pub(crate) fn quotient_wide(self, d: Self, w: &mut Work) -> Result<(Self, Self), Failure> {
+        w.charge(1, 0, 0)?;
+        if d == Self::from(0) {
+            return Err(Failure::Arithmetic);
+        }
+        let mut q = Self::from(0);
+        let mut r = Self::from(0);
+        for bit in (0..384).rev() {
+            w.charge(19, 0, 0)?;
+            let mut carry = (self.0[bit / 64] >> (bit % 64)) & 1;
+            for limb in &mut r.0 {
+                let next = *limb >> 63;
+                *limb = (*limb << 1) | carry;
+                carry = next;
+            }
+            if carry != 0 || r.cmp(d).is_ge() {
+                let mut borrow = false;
+                for (i, limb) in r.0.iter_mut().enumerate() {
+                    let (a, b) = limb.overflowing_sub(d.0[i]);
+                    let (a, c) = a.overflowing_sub(u64::from(borrow));
+                    *limb = a;
+                    borrow = b || c;
+                }
+                if borrow != (carry != 0) {
+                    return Err(Failure::Arithmetic);
+                }
+                q.0[bit / 64] |= 1u64 << (bit % 64);
+            }
+        }
+        Ok((q, r))
+    }
     pub(crate) fn cmp(self, b: Self) -> core::cmp::Ordering {
         self.0.iter().rev().cmp(b.0.iter().rev())
     }
@@ -91,5 +146,41 @@ impl Wide {
             return Err(Failure::Arithmetic);
         }
         Ok((q, remainder))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Limits;
+    fn parse(text: &str) -> Wide {
+        let mut out = [0; 6];
+        for (i, limb) in out.iter_mut().enumerate() {
+            *limb = u64::from_str_radix(&text[96 - 16 * (i + 1)..96 - 16 * i], 16).unwrap();
+        }
+        Wide(out)
+    }
+    #[test]
+    fn full_width_division_matches_independent_bigints() {
+        for row in include_str!("../tests/test-data/wide_division.tsv").lines() {
+            let mut cells = row.split('\t');
+            let n = parse(cells.next().unwrap());
+            let d = parse(cells.next().unwrap());
+            let q = cells.next().unwrap();
+            let mut w = Work::new(Limits {
+                steps: 100_000,
+                reads: 0,
+                bytes: 0,
+            });
+            if q == "refuse" {
+                assert_eq!(n.quotient_wide(d, &mut w), Err(Failure::Arithmetic));
+            } else {
+                assert_eq!(
+                    n.quotient_wide(d, &mut w),
+                    Ok((parse(q), parse(cells.next().unwrap()))),
+                    "{row}"
+                );
+            }
+        }
     }
 }

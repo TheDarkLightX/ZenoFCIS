@@ -3,6 +3,8 @@
 #![no_std]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod accumulator;
+pub use accumulator::Accumulator256;
 pub mod common;
 pub mod composition;
 pub mod fees;
