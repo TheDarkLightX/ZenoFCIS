@@ -130,6 +130,7 @@ impl ProjectSpecBuilder {
                     .collect(),
                 merge_order: self.merge_order,
                 diagnostic_limit: crate::MAX_RETAINED_DIAGNOSTICS,
+                collections: crate::CollectionsSpec::default(),
             },
             limits,
         )

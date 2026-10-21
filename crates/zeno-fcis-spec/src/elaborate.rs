@@ -24,6 +24,7 @@ pub fn elaborate_project(
         declarations,
         merge_order,
         diagnostic_limit,
+        collections,
     } = parsed;
     let mut diagnostics = Vec::new();
     if version != ZENO_DSL_VERSION {
@@ -792,6 +793,7 @@ pub fn elaborate_project(
         laws: laws.into_boxed_slice(),
         claims: claims.into_boxed_slice(),
         random_inputs: random_inputs.into_boxed_slice(),
+        collections,
         distributions: distributions.into_boxed_slice(),
         rewards: rewards.into_boxed_slice(),
     };

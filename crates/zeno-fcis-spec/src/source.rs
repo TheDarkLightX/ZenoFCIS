@@ -22,6 +22,7 @@ pub const SOURCE_FILES: &[(&str, &[u8])] = &[
     ("Cargo.toml", include_bytes!("../Cargo.toml")),
     ("src/ast.rs", include_bytes!("ast.rs")),
     ("src/builder.rs", include_bytes!("builder.rs")),
+    ("src/collections.rs", include_bytes!("collections.rs")),
     ("src/diagnostic.rs", include_bytes!("diagnostic.rs")),
     ("src/distribution.rs", include_bytes!("distribution.rs")),
     ("src/elaborate.rs", include_bytes!("elaborate.rs")),

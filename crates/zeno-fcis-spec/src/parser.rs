@@ -1,13 +1,16 @@
 //! Recovering parser for language version 1.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::ast::*;
+use crate::collections::{
+    CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, Scan, SummaryDecl, SummaryKind,
+};
 use crate::diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
 };
@@ -56,6 +59,9 @@ fn parse_with_tables(
     let (tokens, diagnostics) = lex(source, limits);
     let mut parser = Parser {
         tables: tables::prescan(&tokens),
+        scan: Scan::read(&tokens),
+        entry_bound: Vec::new(),
+        drafts: Drafts::default(),
         tokens,
         index: 0,
         diagnostics,
@@ -81,6 +87,16 @@ fn parse_with_tables(
             limits.max_diagnostics(),
         ))
     }
+}
+
+/// Collection declarations as written, with their source extents, until the
+/// whole file is parsed and their view can be emitted.
+#[derive(Default)]
+struct Drafts {
+    keys: Vec<(StableId, Identifier, SourceSpan, u32)>,
+    maps: Vec<(MapDecl, SourceSpan, u32)>,
+    entries: Vec<(EntryDecl, SourceSpan, u32)>,
+    summaries: Vec<(SummaryDecl, SourceSpan)>,
 }
 
 struct Parser {
@@ -109,6 +125,11 @@ struct Parser {
     table_spans: Vec<(u32, u32, SourceSpan)>,
     /// Count forms by source offset.
     counts: BTreeMap<u32, CountInfo>,
+    /// Maps, entries and record fields declared anywhere in the file.
+    scan: Scan,
+    /// Bound entry variables, innermost last, with the entry each names.
+    entry_bound: Vec<(Box<str>, u32)>,
+    drafts: Drafts,
 }
 
 impl Parser {
@@ -164,6 +185,14 @@ impl Parser {
             } else if self.take_keyword("table") {
                 self.parse_table();
                 None
+            } else if self.take_keyword("map") {
+                self.parse_map();
+                None
+            } else if self.take_keyword("entry") {
+                self.parse_entry();
+                None
+            } else if self.take_keyword("summary") {
+                self.parse_summary().map(Declaration::Field)
             } else if self.take_keyword("variant") {
                 self.parse_variant().map(Declaration::Variant)
             } else if self.take_keyword("reason") {
@@ -202,10 +231,12 @@ impl Parser {
             }
         }
         self.refuse_table_collisions(project_id);
+        let collections = self.finish_collections();
         ParsedProject {
             version,
             project_id,
             name,
+            collections,
             declarations: core::mem::take(&mut self.declarations),
             merge_order: core::mem::take(&mut self.merge_order),
             diagnostic_limit,
@@ -223,6 +254,15 @@ impl Parser {
         let kind_name = self.take_identifier("type.kind")?;
         if kind_name.as_str() == "index" {
             return self.parse_index_type(id);
+        }
+        if kind_name.as_str() == "key" {
+            let name = self.take_identifier("type.name")?;
+            self.expect_symbol(TokenKind::Semicolon, "type");
+            let end = self.last_end();
+            self.drafts
+                .keys
+                .push((id, name, self.declaration_start, end));
+            return None;
         }
         let kind = match kind_name.as_str() {
             "state" => TypeKind::State,
@@ -519,6 +559,334 @@ impl Parser {
         self.expect_symbol(TokenKind::Semicolon, "table");
         Some((id, owner, name, field_type, size))
     }
+    /// Validates the collection declarations, emits their view declarations
+    /// and rewrites, checks how formulas use keys and maps, and returns the
+    /// collections metadata. See [`crate::CollectionsSpec`].
+    fn finish_collections(&mut self) -> CollectionsSpec {
+        let drafts = core::mem::take(&mut self.drafts);
+        if drafts.keys.is_empty()
+            && drafts.maps.is_empty()
+            && drafts.entries.is_empty()
+            && drafts.summaries.is_empty()
+        {
+            return CollectionsSpec::default();
+        }
+        let mut kinds: BTreeMap<u32, (TypeKind, Option<IntRange>)> = BTreeMap::new();
+        let mut fields: BTreeMap<u32, Vec<(StableId, Identifier, StableId, SourceSpan)>> =
+            BTreeMap::new();
+        let mut variants: BTreeMap<u32, Vec<bool>> = BTreeMap::new();
+        for spanned in &self.declarations {
+            match &spanned.declaration {
+                Declaration::Type(t) => {
+                    kinds.insert(t.id().get(), (t.kind(), t.range()));
+                }
+                Declaration::Field(f) => fields.entry(f.owner().get()).or_default().push((
+                    f.id(),
+                    f.name().clone(),
+                    f.field_type(),
+                    spanned.span,
+                )),
+                Declaration::Variant(v) => variants
+                    .entry(v.owner().get())
+                    .or_default()
+                    .push(v.payload_type().is_some()),
+                _ => {}
+            }
+        }
+        for list in fields.values_mut() {
+            list.sort_by_key(|(id, ..)| *id);
+        }
+        let key_types: BTreeSet<u32> = drafts.keys.iter().map(|(id, ..)| id.get()).collect();
+        let root = |kind: TypeKind| {
+            kinds
+                .iter()
+                .find(|(_, (k, _))| *k == kind)
+                .map(|(id, _)| *id)
+        };
+        let (state, command, context) = (
+            root(TypeKind::State),
+            root(TypeKind::Command),
+            root(TypeKind::Context),
+        );
+        let scalar = |type_id: u32| {
+            key_types.contains(&type_id)
+                || match kinds.get(&type_id) {
+                    Some((TypeKind::Int, Some(_)) | (TypeKind::Bool, _)) => true,
+                    Some((TypeKind::Data, _)) => variants
+                        .get(&type_id)
+                        .is_some_and(|v| v.iter().all(|payload| !payload)),
+                    _ => false,
+                }
+        };
+        let mut problems: Vec<(SourceSpan, &'static str, &'static str, String)> = Vec::new();
+        let mut emitted: Vec<(Declaration, SourceSpan)> = Vec::new();
+        let mut key_paths = KeyPaths::default();
+
+        // Maps: their presence type is the map's ID.
+        let mut maps = Vec::new();
+        for (mut map, span, end) in drafts.maps {
+            let record = map.value_type.get();
+            let value = fields.get(&record).cloned().unwrap_or_default();
+            let refusal = if Some(map.owner.get()) != state {
+                Some(("map.owner", "the state record"))
+            } else if !key_types.contains(&map.key_type.get()) {
+                Some(("map.key", "a key type"))
+            } else if !matches!(kinds.get(&record), Some((TypeKind::Data, _)))
+                || variants.contains_key(&record)
+            {
+                Some(("map.value", "a record type"))
+            } else if value.iter().any(|(_, _, t, _)| !scalar(t.get())) {
+                Some((
+                    "map.value",
+                    "record fields of ranged int, bool, enumerated or key types",
+                ))
+            } else if map.capacity == 0 {
+                Some(("map.capacity", "at least one entry"))
+            } else {
+                None
+            };
+            let present = Identifier::try_new(format!("{}_present", map.name.as_str()));
+            let presence = present.clone().and_then(|name| {
+                TypeDecl::new(map.id, TypeKind::Int, name).with_range(IntRange::try_new(0, 1)?)
+            });
+            match (refusal, present, presence) {
+                (None, Some(present), Some(presence)) => {
+                    map.value_fields = value.iter().map(|(id, _, t, _)| (*id, *t)).collect();
+                    emitted.push((Declaration::Type(presence), span));
+                    self.rewrites.push(Rewrite {
+                        start: span.start(),
+                        end,
+                        text: format!("type {} int {} in 0..=1;", map.id.get(), present.as_str()),
+                    });
+                    key_paths.maps.insert((map.owner.get(), map.id.get()));
+                    maps.push(map);
+                }
+                (refusal, ..) => {
+                    let (path, expected) =
+                        refusal.unwrap_or(("map.name", "a name of at most 120 bytes"));
+                    problems.push((span, path, expected, text(map.id.get()).into()));
+                }
+            }
+        }
+
+        // Entries: presence field, then one field per value field.
+        let mut entries = Vec::new();
+        let mut stored: BTreeMap<u32, u32> = BTreeMap::new();
+        for (entry, span, end) in drafts.entries {
+            let Some(map) = maps.iter().find(|m| m.id == entry.map) else {
+                problems.push((
+                    span,
+                    "entry.map",
+                    "a declared map",
+                    text(entry.map.get()).into(),
+                ));
+                continue;
+            };
+            let segments = entry.key.segments();
+            let owner = match entry.key.root() {
+                ProjectionRoot::Command => command,
+                ProjectionRoot::Context => context,
+                _ => None,
+            };
+            let key_type = (segments.len() == 2 && Some(segments[0].get()) == owner)
+                .then(|| fields.get(&segments[0].get()))
+                .flatten()
+                .and_then(|list| list.iter().find(|(id, ..)| *id == segments[1]))
+                .map(|(_, _, t, _)| *t);
+            if key_type != Some(map.key_type) {
+                problems.push((
+                    span,
+                    "entry.key",
+                    "a command or context field of the map's key type",
+                    text(entry.id.get()).into(),
+                ));
+                continue;
+            }
+            let record = fields
+                .get(&map.value_type.get())
+                .cloned()
+                .unwrap_or_default();
+            let mut lines = vec![format!(
+                "field {} {} {} {};",
+                entry.id.get(),
+                map.owner.get(),
+                entry.name.as_str(),
+                map.id.get()
+            )];
+            let mut views = vec![(entry.id, entry.name.clone(), map.id)];
+            for (j, (_, field_name, field_type, _)) in record.iter().enumerate() {
+                let view = u32::try_from(j + 1)
+                    .ok()
+                    .and_then(|j| entry.id.get().checked_add(j))
+                    .and_then(StableId::new);
+                let name =
+                    Identifier::try_new(format!("{}_{}", entry.name.as_str(), field_name.as_str()));
+                let (Some(view), Some(name)) = (view, name) else {
+                    problems.push((
+                        span,
+                        "entry.id",
+                        "view field IDs within u32 and names of at most 128 bytes",
+                        text(entry.id.get()).into(),
+                    ));
+                    continue;
+                };
+                if key_types.contains(&field_type.get()) {
+                    key_paths.keys.insert(
+                        (ProjectionRoot::Pre, vec![map.owner.get(), view.get()]),
+                        field_type.get(),
+                    );
+                    *stored.entry(field_type.get()).or_default() += 1;
+                }
+                lines.push(format!(
+                    "field {} {} {} {};",
+                    view.get(),
+                    map.owner.get(),
+                    name.as_str(),
+                    field_type.get()
+                ));
+                views.push((view, name, *field_type));
+            }
+            for (id, name, field_type) in views {
+                emitted.push((
+                    Declaration::Field(FieldDecl::new(id, map.owner, name, field_type)),
+                    span,
+                ));
+            }
+            self.rewrites.push(Rewrite {
+                start: span.start(),
+                end,
+                text: lines.join("\n"),
+            });
+            entries.push(entry);
+        }
+
+        // Key fields live only in the command, the context and map records.
+        let value_records: BTreeSet<u32> = maps.iter().map(|m| m.value_type.get()).collect();
+        let mut inputs: BTreeMap<u32, u32> = BTreeMap::new();
+        for (owner, list) in &fields {
+            for (id, _, field_type, span) in list {
+                if !key_types.contains(&field_type.get()) {
+                    continue;
+                }
+                let input = if Some(*owner) == command {
+                    Some(ProjectionRoot::Command)
+                } else if Some(*owner) == context {
+                    Some(ProjectionRoot::Context)
+                } else {
+                    None
+                };
+                match input {
+                    Some(root) => {
+                        key_paths
+                            .keys
+                            .insert((root, vec![*owner, id.get()]), field_type.get());
+                        *inputs.entry(field_type.get()).or_default() += 1;
+                    }
+                    None if value_records.contains(owner) => {}
+                    None => problems.push((
+                        *span,
+                        "field.type",
+                        "a key held by the command, the context or a map's record",
+                        text(id.get()).into(),
+                    )),
+                }
+            }
+        }
+
+        // Key types: one class per key position of the type.
+        let mut keys = Vec::new();
+        for (id, name, span, end) in drafts.keys {
+            let positions = inputs.get(&id.get()).copied().unwrap_or(0)
+                + stored.get(&id.get()).copied().unwrap_or(0);
+            let max = i128::from(positions.max(1) - 1);
+            if let Some(view) = IntRange::try_new(0, max)
+                .and_then(|range| TypeDecl::new(id, TypeKind::Int, name.clone()).with_range(range))
+            {
+                emitted.push((Declaration::Type(view), span));
+                self.rewrites.push(Rewrite {
+                    start: span.start(),
+                    end,
+                    text: format!("type {} int {} in 0..={max};", id.get(), name.as_str()),
+                });
+            }
+            keys.push(KeyTypeDecl {
+                id,
+                name,
+                positions,
+            });
+        }
+
+        // Summaries: a ranged integer field over a declared map.
+        let mut summaries = Vec::new();
+        for (summary, span) in drafts.summaries {
+            let map = maps.iter().find(|m| m.id == summary.map);
+            let ranged = |type_id: StableId| {
+                matches!(kinds.get(&type_id.get()), Some((TypeKind::Int, Some(_))))
+            };
+            let refusal = match (map, summary.kind) {
+                (None, _) => Some(("summary.map", "a declared map")),
+                (Some(map), _) if map.owner != summary.owner => {
+                    Some(("summary.owner", "the record that holds the map"))
+                }
+                (Some(map), SummaryKind::Sum(field))
+                    if !map.value_fields.iter().any(|(id, t)| {
+                        *id == field && ranged(*t) && !key_types.contains(&t.get())
+                    }) =>
+                {
+                    Some(("summary.field", "a ranged int field of the map's record"))
+                }
+                _ if !ranged(summary.value_type) => Some(("summary.type", "a ranged int type")),
+                _ => None,
+            };
+            match refusal {
+                Some((path, expected)) => {
+                    problems.push((span, path, expected, text(summary.id.get()).into()))
+                }
+                None => summaries.push(summary),
+            }
+        }
+
+        // Formulas compare keys only with keys, by equality, and read maps
+        // only through named entries.
+        for spanned in &self.declarations {
+            let mut formulas = Vec::new();
+            match &spanned.declaration {
+                Declaration::Law(law) => formulas.push(law.formula()),
+                Declaration::Claim(claim) => match claim.formula() {
+                    ClaimFormula::Relational(formula) => formulas.push(formula),
+                    ClaimFormula::Temporal(formula) => temporal_atoms(formula, &mut formulas),
+                },
+                _ => {}
+            }
+            if let Some(message) = formulas.iter().find_map(|f| key_paths.misuse(f)) {
+                problems.push((spanned.span, "formula.key", message, "refused".into()));
+            }
+        }
+        for (span, path, expected, actual) in problems {
+            self.error_at(
+                span,
+                DiagnosticCode::InvalidDeclaration,
+                path,
+                expected,
+                actual,
+                "see the contract collections reference for the allowed forms",
+            );
+        }
+        for (declaration, span) in emitted {
+            self.declarations
+                .push(SpannedDeclaration { declaration, span });
+        }
+        keys.sort_by_key(|key| key.id);
+        maps.sort_by_key(|map| map.id);
+        entries.sort_by_key(|entry| entry.id);
+        summaries.sort_by_key(|summary| summary.id);
+        CollectionsSpec {
+            keys: keys.into_boxed_slice(),
+            maps: maps.into_boxed_slice(),
+            entries: entries.into_boxed_slice(),
+            summaries: summaries.into_boxed_slice(),
+        }
+    }
     /// Refuses a table whose entry IDs, `ID` to `ID + N - 1`, meet the ID of
     /// any other declaration, of any kind, or of the project.
     fn refuse_table_collisions(&mut self, project: StableId) {
@@ -547,6 +915,243 @@ impl Parser {
                 );
             }
         }
+    }
+    /// The end offset of the last token consumed.
+    fn last_end(&self) -> u32 {
+        self.tokens[self.index.saturating_sub(1)].span.end()
+    }
+    /// Parses `map ID OWNER name KEY VALUE capacity N;`. The map has no view
+    /// field; its presence type is emitted once the file is parsed.
+    fn parse_map(&mut self) {
+        let start = self.declaration_start;
+        let Some(map) = self.parse_map_header() else {
+            self.recover_top();
+            return;
+        };
+        let end = self.last_end();
+        self.drafts.maps.push((map, start, end));
+    }
+    fn parse_map_header(&mut self) -> Option<MapDecl> {
+        let id = self.take_id("map.id")?;
+        let owner = self.take_id("map.owner")?;
+        let name = self.take_identifier("map.name")?;
+        let key_type = self.take_id("map.key")?;
+        let value_type = self.take_id("map.value")?;
+        self.expect_keyword("capacity", "map.capacity");
+        let capacity = self.take_number("map.capacity")?;
+        self.expect_symbol(TokenKind::Semicolon, "map");
+        Some(MapDecl {
+            id,
+            owner,
+            name,
+            key_type,
+            value_type,
+            capacity,
+            value_fields: Box::new([]),
+        })
+    }
+    /// Parses `entry ID name of MAP at ROOT.TYPE.FIELD;`.
+    fn parse_entry(&mut self) {
+        let start = self.declaration_start;
+        let Some(entry) = self.parse_entry_header() else {
+            self.recover_top();
+            return;
+        };
+        let end = self.last_end();
+        self.drafts.entries.push((entry, start, end));
+    }
+    fn parse_entry_header(&mut self) -> Option<EntryDecl> {
+        let id = self.take_id("entry.id")?;
+        let name = self.take_identifier("entry.name")?;
+        self.expect_keyword("of", "entry.map");
+        let map = self.take_id("entry.map")?;
+        self.expect_keyword("at", "entry.key");
+        let ValueExpr::Projection(key) = self.parse_value() else {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "entry.key",
+                "a command or context key field",
+                self.describe_current(),
+                "write ROOT.TYPE.FIELD",
+            );
+            return None;
+        };
+        self.expect_symbol(TokenKind::Semicolon, "entry");
+        Some(EntryDecl { id, name, map, key })
+    }
+    /// Parses `summary ID OWNER name TYPE sum MAP.FIELD;` or
+    /// `summary ID OWNER name TYPE count MAP;`: an ordinary state field whose
+    /// meaning the collections checker binds.
+    fn parse_summary(&mut self) -> Option<FieldDecl> {
+        let start = self.declaration_start;
+        let id = self.take_id("summary.id")?;
+        let owner = self.take_id("summary.owner")?;
+        let name = self.take_identifier("summary.name")?;
+        let value_type = self.take_id("summary.type")?;
+        let (map, kind) = if self.take_keyword("count") {
+            (self.take_id("summary.map")?, SummaryKind::Count)
+        } else {
+            self.expect_keyword("sum", "summary.kind");
+            let map = self.take_id("summary.map")?;
+            self.expect_symbol(TokenKind::Dot, "summary.field");
+            (map, SummaryKind::Sum(self.take_id("summary.field")?))
+        };
+        self.expect_symbol(TokenKind::Semicolon, "summary");
+        self.rewrite_declaration(format!(
+            "field {} {} {} {};",
+            id.get(),
+            owner.get(),
+            name.as_str(),
+            value_type.get()
+        ));
+        self.drafts.summaries.push((
+            SummaryDecl {
+                id,
+                owner,
+                name: name.clone(),
+                value_type,
+                map,
+                kind,
+            },
+            start,
+        ));
+        Some(FieldDecl::new(id, owner, name, value_type))
+    }
+    /// The entry a bound entry variable names.
+    fn entry_variable(&self, name: &str) -> Option<u32> {
+        self.entry_bound
+            .iter()
+            .rev()
+            .find(|(bound, _)| bound.as_ref() == name)
+            .map(|(_, entry)| *entry)
+    }
+    /// `ROOT.OWNER.ENTRY.FIELD` is the entry's view copy of a value field.
+    fn entry_path(&mut self, start: SourceSpan, segments: &mut Vec<StableId>) {
+        if segments.len() != 3 || !self.scan.entries.contains_key(&segments[1].get()) {
+            return;
+        }
+        match self
+            .scan
+            .entry_field(segments[1].get(), segments[2].get())
+            .and_then(StableId::new)
+        {
+            Some(view) => {
+                segments.pop();
+                segments[1] = view;
+                self.table_values += 1;
+            }
+            None => self.error_at(
+                start,
+                DiagnosticCode::InvalidDeclaration,
+                "entry.field",
+                "a field of the map's record",
+                text(segments[2].get()),
+                "name a field of the record type the map declares",
+            ),
+        }
+    }
+    /// True when `IDENT in entries` starts `offset` tokens ahead.
+    fn entries_form_ahead(&self, offset: usize) -> bool {
+        let word = |at: usize, expected: Option<&str>| {
+            matches!(self.tokens.get(self.index + offset + at).map(|t| &t.kind),
+                Some(TokenKind::Ident(value)) if expected.is_none_or(|e| value.as_ref() == e))
+        };
+        word(0, None) && word(1, Some("in")) && word(2, Some("entries"))
+    }
+    /// Skips to the end of the current declaration, after a refused form.
+    fn skip_to_declaration_end(&mut self) {
+        let mut depth = 0usize;
+        loop {
+            match self.current().kind {
+                TokenKind::Eof => return,
+                TokenKind::Semicolon if depth == 0 => return,
+                TokenKind::LBrace | TokenKind::LParen => depth += 1,
+                TokenKind::RBrace | TokenKind::RParen => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            self.advance();
+        }
+    }
+    /// A `count` or `sum` over a map's entries: a map's aggregate is a
+    /// declared summary, whose every change the checker binds.
+    fn refuse_entries_aggregate(&mut self, start: SourceSpan) {
+        self.error_at(
+            start,
+            DiagnosticCode::InvalidDeclaration,
+            "entries.aggregate",
+            "a declared summary",
+            "an aggregate over a map's entries",
+            "declare `summary ID OWNER name TYPE sum MAP.FIELD;` or `... count MAP;` and read that field",
+        );
+        self.skip_to_declaration_end();
+    }
+    /// `forall|exists VAR in entries MAP [where C] { F }`: F at each named
+    /// entry of MAP, joined as the table forms are.
+    fn parse_entries_formula(&mut self) -> RelExpr {
+        let start = self.current().span;
+        let keyword = self
+            .take_identifier("entries.form")
+            .unwrap_or_else(fallback_identifier);
+        if keyword.as_str() == "count" {
+            self.refuse_entries_aggregate(start);
+            return RelExpr::Bool(false);
+        }
+        let Some(variable) = self.take_identifier("entries.variable") else {
+            return RelExpr::Bool(false);
+        };
+        self.expect_keyword("in", "entries.variable");
+        self.expect_keyword("entries", "entries.variable");
+        let Some(map) = self.take_id("entries.map") else {
+            return RelExpr::Bool(false);
+        };
+        let entries = self.scan.entries_of(map.get());
+        if entries.is_empty() {
+            self.error_at(
+                start,
+                DiagnosticCode::UnknownReference,
+                "entries.map",
+                "a map with named entries",
+                text(map.get()),
+                "declare `entry ID name of MAP at ROOT.TYPE.FIELD;` for this map",
+            );
+            self.skip_to_declaration_end();
+            return RelExpr::Bool(false);
+        }
+        let universal = keyword.as_str() == "forall";
+        self.table_depth += 1;
+        let body_start = self.index;
+        let mut parts = Vec::new();
+        for entry in entries {
+            self.index = body_start;
+            self.entry_bound.push((variable.as_str().into(), entry));
+            let condition = self
+                .take_keyword("where")
+                .then(|| self.nested("entries.where", RelExpr::Bool(false), |p| p.parse_rel()));
+            self.expect_symbol(TokenKind::LBrace, "entries.body");
+            let body = self.nested("entries.body", RelExpr::Bool(false), |p| p.parse_rel());
+            self.expect_symbol(TokenKind::RBrace, "entries.body");
+            self.entry_bound.pop();
+            parts.push(match (condition, universal) {
+                (Some(c), true) => RelExpr::Implies(Box::new(c), Box::new(body)),
+                (Some(c), false) => RelExpr::And(Box::new(c), Box::new(body)),
+                (None, _) => body,
+            });
+        }
+        let nodes = parts.iter().map(|part| formula_shape_rel(part).0).sum();
+        let formula = if self.charge(start, nodes) {
+            tables::chain(
+                parts,
+                if universal { RelExpr::And } else { RelExpr::Or },
+                universal,
+            )
+        } else {
+            RelExpr::Bool(false)
+        };
+        self.table_depth -= 1;
+        if self.table_depth == 0 {
+            self.rewrite_from(start, format!("({})", tables::rel_text(&formula)));
+        }
+        formula
     }
     /// Records that the declaration just parsed expands to `text`.
     fn rewrite_declaration(&mut self, text: String) {
@@ -1249,6 +1854,13 @@ impl Parser {
         if (self.peek_keyword("forall")
             || self.peek_keyword("exists")
             || self.peek_keyword("count"))
+            && self.entries_form_ahead(1)
+        {
+            return self.parse_entries_formula();
+        }
+        if (self.peek_keyword("forall")
+            || self.peek_keyword("exists")
+            || self.peek_keyword("count"))
             && self.table_form_ahead(1)
         {
             return self.parse_table_formula();
@@ -1526,6 +2138,11 @@ impl Parser {
         if name.as_str() == "sum" && self.table_form_ahead(0) {
             return self.parse_table_sum();
         }
+        if matches!(name.as_str(), "sum" | "count") && self.entries_form_ahead(0) {
+            let start = self.tokens[self.index.saturating_sub(1)].span;
+            self.refuse_entries_aggregate(start);
+            return ValueExpr::Int(0);
+        }
         if name.as_str() == "count" && self.table_form_ahead(0) {
             self.error(
                 DiagnosticCode::InvalidDeclaration,
@@ -1561,15 +2178,25 @@ impl Parser {
             };
         }
         if let Some(root) = projection_root(name.as_str()) {
+            let start = self.tokens[self.index.saturating_sub(1)].span;
             let mut segments = Vec::new();
             while self.take_symbol(&TokenKind::Dot) {
-                if let Some(id) = self.take_id("projection.segment") {
+                let bound = match &self.current().kind {
+                    TokenKind::Ident(word) => self.entry_variable(word),
+                    _ => None,
+                };
+                if let Some(entry) = bound.and_then(StableId::new) {
+                    self.advance();
+                    self.table_values += 1;
+                    segments.push(entry);
+                } else if let Some(id) = self.take_id("projection.segment") {
                     segments.push(id)
                 }
             }
             if matches!(self.current().kind, TokenKind::LBracket) {
                 self.table_entry(&mut segments);
             }
+            self.entry_path(start, &mut segments);
             if let Some(path) = ProjectionPath::try_new(root, segments) {
                 return ValueExpr::Projection(path);
             }
@@ -2254,6 +2881,21 @@ impl Parser {
             self.advance();
         }
         if self.take_symbol(&TokenKind::Semicolon) {}
+    }
+}
+
+/// The relational atoms of a temporal formula.
+fn temporal_atoms<'a>(formula: &'a TemporalFormula, out: &mut Vec<&'a RelExpr>) {
+    match formula {
+        TemporalFormula::Atom(atom) => out.push(atom),
+        TemporalFormula::Not(a)
+        | TemporalFormula::Next(a)
+        | TemporalFormula::Always(a)
+        | TemporalFormula::Eventually(a) => temporal_atoms(a, out),
+        TemporalFormula::And(a, b) | TemporalFormula::Or(a, b) | TemporalFormula::Until(a, b) => {
+            temporal_atoms(a, out);
+            temporal_atoms(b, out);
+        }
     }
 }
 

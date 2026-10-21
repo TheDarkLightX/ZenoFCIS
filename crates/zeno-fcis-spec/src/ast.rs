@@ -1277,6 +1277,7 @@ pub struct ParsedProject {
     pub(crate) declarations: Vec<SpannedDeclaration>,
     pub(crate) merge_order: Vec<StableId>,
     pub(crate) diagnostic_limit: usize,
+    pub(crate) collections: crate::CollectionsSpec,
 }
 impl ParsedProject {
     /// Returns the source language version.
@@ -1339,6 +1340,7 @@ pub struct ProjectSpec {
     pub(crate) random_inputs: Box<[crate::RandomInputDecl]>,
     pub(crate) distributions: Box<[crate::DistributionDecl]>,
     pub(crate) rewards: Box<[crate::RewardDecl]>,
+    pub(crate) collections: crate::CollectionsSpec,
 }
 
 impl ProjectSpec {
@@ -1419,6 +1421,20 @@ impl ProjectSpec {
     pub const fn rewards(&self) -> &[crate::RewardDecl] {
         &self.rewards
     }
+    /// Keyed collections: key types, maps, named entries and summaries.
+    pub const fn collections(&self) -> &crate::CollectionsSpec {
+        &self.collections
+    }
+    /// The view contract: this project without its collection declarations,
+    /// whose maps it already holds as named entries and summaries. It is the
+    /// project `expand_tables` prints.
+    #[must_use]
+    pub fn view(&self) -> Self {
+        Self {
+            collections: crate::CollectionsSpec::default(),
+            ..self.clone()
+        }
+    }
     /// Finds a claim by stable identifier.
     #[must_use]
     pub fn claim(&self, id: StableId) -> Option<&ClaimDecl> {
@@ -1447,7 +1463,9 @@ impl ProjectSpec {
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        let format = if !self.random_inputs.is_empty()
+        let format = if !self.collections.is_empty() {
+            5u16
+        } else if !self.random_inputs.is_empty()
             || !self.distributions.is_empty()
             || !self.rewards.is_empty()
         {
@@ -1541,6 +1559,9 @@ impl ProjectSpec {
                 }
             }
         }
+        if format >= 5 {
+            crate::collections::encode(&self.collections, output)?;
+        }
         Ok(())
     }
 
@@ -1552,7 +1573,7 @@ impl ProjectSpec {
     }
 }
 
-fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
+pub(crate) fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
     let length = u32::try_from(length).map_err(|_| EncodeError::LengthOverflow)?;
     output.extend_from_slice(&length.to_be_bytes());
     Ok(())
@@ -1664,7 +1685,7 @@ fn encode_port(value: &PortDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.name.encode_to(out)?;
     value.payload_type.encode_to(out)
 }
-fn encode_path(value: &ProjectionPath, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+pub(crate) fn encode_path(value: &ProjectionPath, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     out.push(value.root.tag());
     put_ids(out, &value.segments)
 }

@@ -11,6 +11,7 @@ extern crate alloc;
 
 mod ast;
 mod builder;
+mod collections;
 mod diagnostic;
 mod distribution;
 mod elaborate;
@@ -26,6 +27,7 @@ mod views;
 
 pub use ast::*;
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
+pub use collections::{CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, SummaryDecl, SummaryKind};
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
