@@ -527,9 +527,9 @@ impl Parser {
             }
         }
         for (table, size, span) in self.table_spans.clone() {
-            let entries = table..table.saturating_add(size);
+            let entries = u64::from(table)..u64::from(table) + u64::from(size);
             let clash = owners.iter().find(|(id, kind, at)| {
-                entries.contains(id) && !(*kind == "field" && *at == Some(span))
+                entries.contains(&u64::from(*id)) && !(*kind == "field" && *at == Some(span))
             });
             if let Some((id, kind, _)) = clash {
                 self.error_at(

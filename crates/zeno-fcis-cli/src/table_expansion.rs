@@ -87,7 +87,7 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
             "tables": expansion.tables.iter().map(|table| json!({
                 "id": table.id, "owner": table.owner, "name": table.name,
                 "field_type": table.field_type, "size": table.size,
-                "fields": [table.id, table.id + table.size - 1],
+                "fields": [table.id, table.id + (table.size - 1)],
             })).collect::<Vec<_>>(),
             "inputs": inputs.iter().map(|(name, size)| json!({
                 "input": name, "values": size.map(|n| n.to_string()),

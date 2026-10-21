@@ -140,3 +140,43 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
     assert_eq!(value["lemmas"][0]["states"]["reachable"], 2074);
     std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));
 }
+
+#[test]
+fn contract_tables_json_expansion_handles_the_maximum_stable_id()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = scratch("max-id");
+    let path = dir.join("project.zeno");
+    let header = "zeno 1; project 1 tables; namespace 2 tables; type 100 state S; type 101 command C; type 102 context X; type 105 int V in 0..=3; field 120 101 pick 105; variant 130 102 Desk none; component 400 c { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 64; } merge [400];\n";
+    for size in [1, 2, 64] {
+        let first = u32::MAX - (size - 1);
+        let source = format!("{header}table {first} 100 slot 105 size {size};\n");
+        std::fs::write(&path, &source)?;
+        let output = cli(&["check", "--expand", "--format", "json"], &[&path]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let value: Value = serde_json::from_slice(&output.stdout)?;
+        assert_eq!(value["canonical_match"], true);
+        assert_eq!(
+            value["tables"][0]["fields"],
+            serde_json::json!([first, u32::MAX])
+        );
+        std::fs::write(
+            &path,
+            format!("{source}type {} int Spare in 0..=1;\n", u32::MAX),
+        )?;
+        let refused = cli(&["check", "--expand", "--format", "json"], &[&path]);
+        assert_eq!(refused.status.code(), Some(1));
+        let value: Value = serde_json::from_slice(&refused.stdout)?;
+        assert!(
+            !value["diagnostics"]
+                .as_array()
+                .ok_or("diagnostics missing")?
+                .is_empty()
+        );
+    }
+    std::fs::remove_dir_all(dir)?;
+    Ok(())
+}

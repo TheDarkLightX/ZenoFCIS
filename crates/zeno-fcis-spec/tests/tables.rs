@@ -446,3 +446,32 @@ claim 600 c lean relational = forall count in 0..3 {{ count + table <= index }};
     assert!(text.contains("Var(Identifier(\"count\"))"));
     assert!(text.contains("Var(Identifier(\"table\"))"));
 }
+
+#[test]
+fn tables_include_the_maximum_stable_id_in_collision_checks() {
+    for size in 1..=64 {
+        let first = u32::MAX - (size - 1);
+        let table = format!("table {first} 100 slot 105 size {size};\n");
+        assert!(parse_project(&format!("{HEADER}{table}"), SourceLimits::default()).is_ok());
+        for before in [false, true] {
+            let other = format!("type {} int Spare in 0..=1;\n", u32::MAX);
+            let source = if before {
+                format!("{HEADER}{other}{table}")
+            } else {
+                format!("{HEADER}{table}{other}")
+            };
+            let refused = parse_project(&source, SourceLimits::default())
+                .err()
+                .unwrap_or_else(|| panic!("upper endpoint must collide"));
+            assert!(
+                refused
+                    .diagnostics()
+                    .iter()
+                    .any(|d| d.code() == DiagnosticCode::DuplicateId
+                        && d.path().as_str() == "table.id"
+                        && d.actual() == format!("type {}", u32::MAX)),
+                "size={size} before={before}: {refused:?}"
+            );
+        }
+    }
+}
