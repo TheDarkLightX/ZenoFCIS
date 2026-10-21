@@ -88,7 +88,9 @@ def main():
     if out.exists() and any(out.iterdir()): parser.error('retain previous attempts; choose a new directory')
     if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT): parser.error('commit final source before binding evidence')
     out.mkdir(parents=True,exist_ok=True)
-    scratch=ROOT.parent; target=scratch/'tmp/build'; temporary=scratch/'tmp'; temporary.mkdir(exist_ok=True)
+    scratch=ROOT.parent
+    target=Path(os.environ.get('CARGO_TARGET_DIR', scratch/'tmp/build')).resolve()
+    temporary=Path(os.environ.get('TMPDIR', scratch/'tmp')).resolve(); temporary.mkdir(parents=True,exist_ok=True)
     env=dict(os.environ,CARGO_TARGET_DIR=str(target),TMPDIR=str(temporary),CARGO_PROFILE_DEV_DEBUG='0',
              CARGO_PROFILE_TEST_DEBUG='0',CARGO_PROFILE_DEV_OPT_LEVEL='1',CARGO_PROFILE_TEST_OPT_LEVEL='1',
              CARGO_BUILD_JOBS='2',CARGO_NET_OFFLINE='true',CARGO_TERM_COLOR='never',
