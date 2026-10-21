@@ -175,8 +175,9 @@ forwards a commit or an acknowledgement twice. The
 independent protocol model from the SQLite fault simulation. After every
 step they compare a complete snapshot of every `v2_*` table and the
 receiver. They cover:
-- every fault schedule of two commit programs on two handles, and of
-  delivery to a deduplicating receiver;
+- every fault schedule of two commit programs on two handles at retry
+  budgets 0 and 1, and of delivery to a deduplicating receiver at budgets
+  0 to 2 (commit at budget 2 is checked only in the simulation);
 - an interruption at each of the eight statement boundaries of a commit,
   followed by recovery;
 - a real busy store;

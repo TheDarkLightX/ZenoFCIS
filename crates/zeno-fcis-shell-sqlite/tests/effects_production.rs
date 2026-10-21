@@ -1,8 +1,8 @@
 //! The production SQLite handler behind the shell-effects ports, checked
 //! against the independent protocol model and its complete `v2_*` snapshot
-//! comparator: every fault schedule of the frozen profile that applies to
-//! SQLite, every statement boundary, a real busy store, and ten real
-//! process aborts with recovery by the original key.
+//! comparator: every fault schedule of commit at retry budgets 0 and 1 and of
+//! delivery at budgets 0 to 2, every statement boundary, a real busy store,
+//! and ten real process aborts with recovery by the original key.
 #[allow(dead_code, unused_imports)]
 mod sim;
 
