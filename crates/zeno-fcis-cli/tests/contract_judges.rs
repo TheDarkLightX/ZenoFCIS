@@ -267,10 +267,12 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
 fn proposal_summary_retains_both_measures_and_prints_the_effect() {
     let root = TempRoot::new("proposal-summary");
     let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/guide-counter");
-    let project_before = fs::read(app.join("project.zeno")).unwrap();
-    let policy_before = fs::read(app.join("v2/policy.json")).unwrap();
+    let project_before =
+        fs::read(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"));
+    let policy_before =
+        fs::read(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}"));
     let laws = root.path().join("proposed.zeno");
-    fs::write(&laws, "law 9000 rejects_only_when_needed on reject = context.102.130 == 0 || (command.101.120 == 150 && pre.100.110 == 2) || (command.101.120 == 151 && pre.100.110 == 0);\n").unwrap();
+    fs::write(&laws, "law 9000 rejects_only_when_needed on reject = context.102.130 == 0 || (command.101.120 == 150 && pre.100.110 == 2) || (command.101.120 == 151 && pre.100.110 == 0);\n").unwrap_or_else(|error| panic!("{error}"));
     let out = root.path().join("review.json");
     let args = [
         "contract",
@@ -296,7 +298,9 @@ fn proposal_summary_retains_both_measures_and_prints_the_effect() {
     let mut json_args = args.to_vec();
     json_args.extend(["--format", "json"]);
     let summary = run(&json_args, 0);
-    let packet: Value = serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    let packet: Value =
+        serde_json::from_slice(&fs::read(&out).unwrap_or_else(|error| panic!("{error}")))
+            .unwrap_or_else(|error| panic!("{error}"));
     let base = &summary["summary"]["gaps"];
     let after = &base["with_proposals"];
     assert_eq!(base["full"]["determined"], 0);
@@ -332,8 +336,14 @@ fn proposal_summary_retains_both_measures_and_prints_the_effect() {
         );
     }
     assert_eq!(packet["authority"], "none");
-    assert_eq!(project_before, fs::read(app.join("project.zeno")).unwrap());
-    assert_eq!(policy_before, fs::read(app.join("v2/policy.json")).unwrap());
+    assert_eq!(
+        project_before,
+        fs::read(app.join("project.zeno")).unwrap_or_else(|error| panic!("{error}"))
+    );
+    assert_eq!(
+        policy_before,
+        fs::read(app.join("v2/policy.json")).unwrap_or_else(|error| panic!("{error}"))
+    );
     let plain = run(
         &[
             "contract",
@@ -348,7 +358,8 @@ fn proposal_summary_retains_both_measures_and_prints_the_effect() {
         0,
     );
     assert!(plain["summary"]["gaps"].get("with_proposals").is_none());
-    fs::write(&laws, "law 9000 false_proposal on any = false;\n").unwrap();
+    fs::write(&laws, "law 9000 false_proposal on any = false;\n")
+        .unwrap_or_else(|error| panic!("{error}"));
     let alarm = run(&json_args, 1);
     assert_eq!(alarm["summary"]["gaps"]["status"], "proposal-false-alarm");
     assert!(alarm["summary"]["gaps"].get("with_proposals").is_none());
