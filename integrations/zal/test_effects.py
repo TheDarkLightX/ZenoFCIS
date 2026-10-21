@@ -178,7 +178,7 @@ class ShellRegistryTests(unittest.TestCase):
         self.assertFalse("Any drift" in text, "documentation overstates the selected drift coverage")
         self.assertIn("Sixteen selected single edits", text)
         baseline = effects.parse(EXAMPLE)
-        frame_edit = edited(("refused unchanged", "refused applied"))
+        frame_edit = edited(("frame Outcome: ok applied, refused unchanged", "frame Outcome: ok applied, refused applied"))
         self.assertEqual(effects.check(frame_edit)["status"], "pass-with-scope")
         self.assertEqual(effects.lower(frame_edit), effects.lower(baseline))
         self.assertEqual(declarations(frame_edit), declarations(baseline))
