@@ -236,23 +236,27 @@ impl Scan {
         let word = |token: &Token, expected: &str| matches!(&token.kind, TokenKind::Ident(value) if value.as_ref() == expected);
         for (index, token) in tokens.iter().enumerate() {
             let rest = &tokens[index..];
-            if word(token, "map") && rest.len() >= 6 {
-                if let (Some(id), Some(value)) = (number(&rest[1]), number(&rest[5])) {
-                    scan.maps.entry(id).or_insert(value);
-                }
-            } else if word(token, "entry") && rest.len() >= 5 && word(&rest[3], "of") {
-                if let (Some(id), Some(map)) = (number(&rest[1]), number(&rest[4])) {
-                    scan.entries.entry(id).or_insert(map);
-                }
-            } else if word(token, "field") && rest.len() >= 6 {
-                if let (Some(id), Some(owner), Some(_), TokenKind::Semicolon) = (
+            if word(token, "map")
+                && rest.len() >= 6
+                && let (Some(id), Some(value)) = (number(&rest[1]), number(&rest[5]))
+            {
+                scan.maps.entry(id).or_insert(value);
+            } else if word(token, "entry")
+                && rest.len() >= 5
+                && word(&rest[3], "of")
+                && let (Some(id), Some(map)) = (number(&rest[1]), number(&rest[4]))
+            {
+                scan.entries.entry(id).or_insert(map);
+            } else if word(token, "field")
+                && rest.len() >= 6
+                && let (Some(id), Some(owner), Some(_), TokenKind::Semicolon) = (
                     number(&rest[1]),
                     number(&rest[2]),
                     number(&rest[4]),
                     &rest[5].kind,
-                ) {
-                    scan.record_fields.entry(owner).or_default().push(id);
-                }
+                )
+            {
+                scan.record_fields.entry(owner).or_default().push(id);
             }
         }
         for fields in scan.record_fields.values_mut() {
