@@ -108,18 +108,17 @@ def exchange(port: int, parts, *, pause: float = 0.0, half_close: bool = True, l
                 stream.sendall(part)
             if half_close:
                 stream.shutdown(socket.SHUT_WR)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+        except OSError:
+            pass  # The server closed first: a refusal before it read everything.
         try:
             while True:
                 chunk = stream.recv(65536)
                 if not chunk:
                     break
                 reply += chunk
-        except ConnectionResetError:
-            pass
-        except socket.timeout:
-            return "hang", reply, time.monotonic() - started
+        except OSError as error:  # a reset ends the reply; a timeout is a hang
+            if isinstance(error, socket.timeout):
+                return "hang", reply, time.monotonic() - started
     elapsed = time.monotonic() - started
     # An interim 100 Continue precedes the final response.
     while reply.startswith(b"HTTP/1.1 100 ") and b"\r\n\r\n" in reply:
