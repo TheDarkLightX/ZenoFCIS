@@ -60,6 +60,23 @@ class Documentation(unittest.TestCase):
                 body.append(line[2:] if line.startswith("# ") else line)
             self.assertEqual(block.code, "\n".join(body) + "\n")
 
+    def test_hidden_metadata_preserves_every_comment_block_and_line(self):
+        text = ('/// A visible example.\n/// ```\n/// let value = 1;\n/// ```\n'
+                '#[doc(hidden)]\npub struct Internal;\n'
+                '/// Another example.\n/// ```\n/// let other = 2;\n/// ```\n')
+        expected = gate.extract(text.replace('#[doc(hidden)]', ''), 'sample.rs')
+        found = gate.extract(text, 'sample.rs')
+        self.assertEqual(found, expected)
+        self.assertEqual(len(found), 2)
+        self.assertEqual([block.line for block in found], [2, 8])
+
+    def test_hidden_metadata_does_not_allow_other_documentation_forms(self):
+        for form in ('#[doc = "extra text"]', '#[doc(alias = "other")]',
+                     '#[doc = include_str!("guide.md")]', '#[doc(hidden, alias = "other")]',
+                     '#![doc(hidden)]', '/** block documentation */', '/*! inner documentation */'):
+            with self.subTest(form=form), self.assertRaises(gate.CheckError):
+                gate.extract('#[doc(hidden)]\n' + form, 'sample.rs')
+
     def test_refuses_drift_between_prose_fence_and_pairing(self):
         end_of_first = ("///         pending.deliver(destination)?.acknowledge()?;\n"
                         "///     }\n///     Ok(())\n/// }\n/// ```\n")

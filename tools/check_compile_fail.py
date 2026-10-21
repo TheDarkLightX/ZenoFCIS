@@ -155,7 +155,10 @@ def doc_line(line: str) -> str:
 def extract(text: str, file: str) -> list[Block]:
     """The Rust examples of one source file, in order, with their prose."""
 
-    if re.search(r"/\*\*|/\*!|#!?\[doc\b", text):
+    # This exact visibility attribute contains no documentation text. Keep
+    # parsing every comment in the original source, with unchanged line numbers;
+    # all other doc attributes and the rustdoc-list equality check stay strict.
+    if re.search(r"/\*\*|/\*!|#!?\[doc\b", text.replace("#[doc(hidden)]", "")):
         raise CheckError(f"{file}: only `///` and `//!` doc comments are supported")
     blocks: list[Block] = []
     for group, lines in doc_comments(text):
