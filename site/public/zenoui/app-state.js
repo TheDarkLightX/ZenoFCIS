@@ -10,6 +10,8 @@ export function initial(description, contract, epoch='0') {
     drafts:Object.fromEntries(app.commands.map(c=>[c.id,app.fields.map(f=>f.index===app.action?c.id:f.initial)])),previews:{},consent:null,review:null,active:null,
     preferences:{width:1440,theme:'light',motion:'reduce'},phase:'idle',message:'Waiting for the core.',evidence:{checked:'0',total:'1'},ledger:[]});
 }
+// A party's view hides state values: the server sends null and supplies them itself.
+const usable=(app,i,v)=>inDomain(app.fields[i],v)||(v===null&&app.fields[i]?.source==='state');
 export function inputFor(s,id) {
   let i=0; return s.app.fields.map(f=>f.source==='state'?s.values[i++]:s.drafts[id][f.index]);
 }
@@ -29,12 +31,13 @@ export function validReply(app, input, reply) {
   if(reply.class==='Refused' && reply.reason!==null)return false;
   const fields=app.fields.filter(f=>f.source==='state');
   if(['Reject','Refused'].includes(reply.class))return reply.post.length===0;
-  return reply.post.length===fields.length && fields.every((f,i)=>inDomain(f,reply.post[i]));
+  const hidden=app.fields.flatMap((f,i)=>f.source==='state'?[input[i]===null]:[]);
+  return reply.post.length===fields.length && fields.every((f,i)=>inDomain(f,reply.post[i])||(hidden[i]&&reply.post[i]===null));
 }
 export function enabled(s,id) {
   const p=s.previews[id];
   const accepted=p?.reply.class==='Accept';
-  const ready=validPrincipal(s) && !s.active && !!p && same(p.binding,binding(s,id)) && inputFor(s,id).every((v,i)=>inDomain(s.app.fields[i],v));
+  const ready=validPrincipal(s) && !s.active && !!p && same(p.binding,binding(s,id)) && inputFor(s,id).every((v,i)=>usable(s.app,i,v));
   return s.app.enablement[Number(accepted)*2+Number(ready)]===true;
 }
 function message(s,reply) {
@@ -42,7 +45,7 @@ function message(s,reply) {
 }
 function previews(s) {
   if(s.active||!validPrincipal(s))return [];
-  return s.app.commands.filter(c=>inputFor(s,c.id).every((v,i)=>inDomain(s.app.fields[i],v))).map(c=>({kind:'preview',binding:binding(s,c.id)}));
+  return s.app.commands.filter(c=>inputFor(s,c.id).every((v,i)=>usable(s.app,i,v))).map(c=>({kind:'preview',binding:binding(s,c.id)}));
 }
 export function step(before,event) {
   const s=clone(before); let intents=[];
@@ -57,7 +60,7 @@ export function step(before,event) {
       if(typeof event.value!=='string')return {state:before,intents:[]};
       s.principal=event.value.length<=100?event.value:'';s.message=validPrincipal(s)?'Choose a command to review.':'Enter a principal name of at most 100 characters.';s.previews={};s.consent=null;s.review=null;s.run=next(s.run);intents=previews(s);break;
     case 'Snapshot':
-      if(typeof event.revision!=='string'||!/^(0|[1-9][0-9]*)$/.test(event.revision)||!Array.isArray(event.values)||event.values.length!==s.values.length||!s.app.fields.filter(f=>f.source==='state').every((f,i)=>inDomain(f,event.values[i])))return {state:before,intents:[]};
+      if(typeof event.revision!=='string'||!/^(0|[1-9][0-9]*)$/.test(event.revision)||!Array.isArray(event.values)||event.values.length!==s.values.length||!s.app.fields.filter(f=>f.source==='state').every((f,i)=>event.values[i]===null||inDomain(f,event.values[i])))return {state:before,intents:[]};
       s.values=clone(event.values);s.revision=event.revision;s.active=null;s.consent=null;s.review=null;s.previews={};s.run=next(s.run);intents=previews(s);break;
     case 'Preview': {
       const id=event.binding?.command;
@@ -99,8 +102,8 @@ export function view(s) {
   // Adaptation changes order only. No semantic function reads preferences.
   if(s.preferences.width<500) [order[0],order[1]]=[order[1],order[0]];
   return freeze({layout:order,phase:s.phase,message:s.message,evidence:clone(s.evidence),
-    state:s.app.fields.filter(f=>f.source==='state').map((f,i)=>({label:f.label,type:f.type_name,unit:f.unit,value:display(f,s.values[i])})),
-    actions:s.app.commands.map(c=>({id:c.id,label:c.label,enabled:enabled(s,c.id),explanation:s.previews[c.id]?message(s,s.previews[c.id].reply):inputFor(s,c.id).every((v,i)=>inDomain(s.app.fields[i],v))?'Waiting for the core.':'Enter values within the declared bounds.'})),
-    confirmation:s.review?{label:s.app.commands.find(c=>c.id===s.review.command).label,principal:s.review.principal,revision:s.review.revision,contract:s.review.contract,fields:s.review.shown.map((f,i)=>({label:f.label,type:f.type,value:display(s.app.fields[i],f.value)}))}:null,
+    state:s.app.fields.filter(f=>f.source==='state').flatMap((f,i)=>s.values[i]===null?[]:[{label:f.label,type:f.type_name,unit:f.unit,value:display(f,s.values[i])}]),
+    actions:s.app.commands.map(c=>({id:c.id,label:c.label,enabled:enabled(s,c.id),explanation:s.previews[c.id]?message(s,s.previews[c.id].reply):inputFor(s,c.id).every((v,i)=>usable(s.app,i,v))?'Waiting for the core.':'Enter values within the declared bounds.'})),
+    confirmation:s.review?{label:s.app.commands.find(c=>c.id===s.review.command).label,principal:s.review.principal,revision:s.review.revision,contract:s.review.contract,fields:s.review.shown.flatMap((f,i)=>f.value===null?[]:[{label:f.label,type:f.type,value:display(s.app.fields[i],f.value)}])}:null,
     ledger:clone(s.ledger)});
 }

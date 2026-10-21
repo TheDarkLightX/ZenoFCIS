@@ -1,7 +1,7 @@
 {
   "parties": [
     {"name": "buyer", "context": ["170"]},
-    {"name": "seller", "context": ["171"]},
+    {"name": "seller", "context": ["171"], "view": ["status", "held", "paid_to_seller"]},
     {"name": "operator", "context": ["172"]}
   ],
   "steps": [

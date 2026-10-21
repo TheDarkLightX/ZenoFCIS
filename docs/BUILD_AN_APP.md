@@ -156,6 +156,7 @@ Instead of `ZENO_APP_SECRET_FILE`, `ZENO_APP_PRINCIPAL` and
 | `credential` | A private file holding 64 lowercase hexadecimal digits, as for `ZENO_APP_SECRET_FILE`; unique and not all zero. |
 | `principal` | 64 lowercase hexadecimal digits; unique. `/state` shows it, and replay keys are scoped to it. |
 | `context` | A file with this party's context values, in the form of `context.json`. |
+| `view` | Optional: the names of the state fields this party sees, such as `["status", "held"]`. Without it the party sees every field. |
 
 Relative paths resolve against the parties file's directory. The server
 names the reason and refuses to start when the parties file or any file it
@@ -174,6 +175,14 @@ principal or context, and a preview whose inputs carry another context is
 refused. Replay keys stay scoped to the principal, so one party cannot
 recover or read another party's request, even with the same key and bytes.
 Every party sees the same store state, with its own principal and context.
+
+A view hides the other state fields from that party: `/state` and every
+reply give `null` in their place, the interface shows only the fields the
+view lists, and the server supplies the hidden values a preview needs,
+whatever the request holds there. The credential, never the request, selects
+the view. This is display filtering, not privacy. Decisions, refusals and
+previews can still reveal facts about hidden fields, and each `/command`
+reply packet carries the complete successor state.
 
 The interface still shows every command to every party; the contract refuses
 the ones a party's context does not permit. Credentials are fixed at
@@ -231,8 +240,8 @@ are refused, and an `Origin` header, when present, must equal
 
 | Endpoint | Request | Reply on success |
 |---|---|---|
-| `GET /state` | No body. | JSON: `contract`, the hexadecimal SHA-256 of the Authority identity; `principal`; `revision`, the commits so far; `values`, the state fields; `context`, this party's context values; and `pending`, the undelivered outbox entries. Integers are decimal strings. |
-| `POST /preview` | A command body whose payload is the JSON list of every input as decimal strings: the state `values`, then the command fields, then this party's `context`. | JSON: `reply`, the decision the Authority would make (`class`, `reason`, `post`), and `command`, the framed command in hexadecimal. Nothing is committed. |
+| `GET /state` | No body. | JSON: `contract`, the hexadecimal SHA-256 of the Authority identity; `principal`; `revision`, the commits so far; `values`, the state fields, `null` where the party's view hides one; `context`, this party's context values; and `pending`, the undelivered outbox entries. Integers are decimal strings. |
+| `POST /preview` | A command body whose payload is the JSON list of every input as decimal strings: the state `values` (a hidden one may stay `null`), then the command fields, then this party's `context`. | JSON: `reply`, the decision the Authority would make (`input`, `class`, `reason`, `post`, with hidden state values `null`), and `command`, the framed command in hexadecimal. Nothing is committed. |
 | `POST /command` | A command body whose payload is the framed command bytes from the preview. | JSON: `packet`, the reply packet in hexadecimal, `revision` and `reply`. |
 | `GET /` and the other assets | No body; no credential is needed. | The public, immutable interface files, including `/app.json`. |
 

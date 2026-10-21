@@ -253,6 +253,23 @@ fn same_party(
         None => configured == stored,
     }
 }
+// A party's view hides state values as null. This filters what is displayed;
+// decisions, refusals and reply packets can still reveal hidden values.
+fn hide(view: Option<&[bool]>, values: &mut [Value]) {
+    for (value, seen) in values.iter_mut().zip(view.unwrap_or_default()) {
+        if !seen {
+            *value = Value::Null;
+        }
+    }
+}
+fn masked(view: Option<&[bool]>, mut reply: Value) -> Value {
+    for key in ["input", "post"] {
+        if let Some(values) = reply[key].as_array_mut() {
+            hide(view, values);
+        }
+    }
+    reply
+}
 /// Exclusive shell endpoint. The authenticated principal alone selects its copied
 /// context; HTTP cannot select one. With a server clock, the server sets that
 /// context's clock field when it admits a new request.
@@ -263,6 +280,7 @@ pub struct Application<'a, 'p, H> {
     path: PathBuf,
     clock: Option<ServerClock>,
     last: Option<i128>,
+    views: Vec<(Hash32, Vec<bool>)>,
 }
 impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
     /// Bind the immutable configuration and the exclusive terminal once.
@@ -298,6 +316,7 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
             path: path.to_owned(),
             clock: None,
             last: None,
+            views: Vec::new(),
         })
     }
     /// Set the clock field at admission. The latest committed time, read back
@@ -315,9 +334,23 @@ impl<'a, 'p, H: Terminal> Application<'a, 'p, H> {
         self.clock = Some(clock);
         Ok(self)
     }
+    /// Show each listed principal only the state fields its mask marks; other
+    /// principals see every field.
+    #[must_use]
+    pub fn with_views(mut self, views: Vec<(Hash32, Vec<bool>)>) -> Self {
+        self.views = views;
+        self
+    }
     /// Return the exclusively owned terminal for restart and test inspection.
     pub fn into_terminal(self) -> H {
         self.durable.into_terminal()
+    }
+    // The authenticated principal's view; never chosen by the request.
+    fn view(&self, principal: Hash32) -> Option<&[bool]> {
+        self.views
+            .iter()
+            .find(|(owner, _)| *owner == principal)
+            .map(|(_, mask)| mask.as_slice())
     }
 }
 impl<H: Terminal> Endpoint for Application<'_, '_, H> {
@@ -334,8 +367,10 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
         )
         .map_err(failed)?;
         let context = context_numbers(self.authority, &context)?;
+        let mut values: Vec<Value> = strings(&values).into_iter().map(Value::from).collect();
+        hide(self.view(principal), &mut values);
         encoded(
-            json!({"contract":hex(RustCryptoSha256::hash(self.authority.identity()).as_bytes()),"principal":hex(principal.as_bytes()),"revision":history.snapshot.version().to_string(),"values":strings(&values),"context":strings(&context),"pending":history.snapshot.pending().to_string()}),
+            json!({"contract":hex(RustCryptoSha256::hash(self.authority.identity()).as_bytes()),"principal":hex(principal.as_bytes()),"revision":history.snapshot.version().to_string(),"values":values,"context":strings(&context),"pending":history.snapshot.pending().to_string()}),
         )
     }
     fn preview(&mut self, request: &Command) -> Result<Vec<u8>, Refusal> {
@@ -351,8 +386,23 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
         if request.expected() != history.snapshot.version() {
             return Err(Refusal::Conflict);
         }
-        let values: Value =
+        let mut values: Value =
             serde_json::from_slice(request.bytes()).map_err(|_| Refusal::Malformed)?;
+        let view = self.view(request.principal());
+        // The server supplies hidden state values, whatever the request holds there.
+        let state = crate::session::root_numbers(
+            self.authority.descriptor().state,
+            history.snapshot.state(),
+        )
+        .map_err(failed)?;
+        let items = values.as_array_mut().ok_or(Refusal::Malformed)?;
+        if let Some(view) = view {
+            for ((item, seen), actual) in items.iter_mut().zip(view).zip(&state) {
+                if !seen {
+                    *item = Value::from(actual.to_string());
+                }
+            }
+        }
         let inputs = numbers(&values)?;
         let mut frames =
             crate::wire(self.authority.descriptor(), &inputs).map_err(|_| Refusal::Malformed)?;
@@ -364,9 +414,11 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
         }
         // The server, not the request, sets the clock.
         frames[2] = admit(self.authority, clock, self.last, &configured)?;
-        encoded(
-            json!({"reply":decision(self.authority, &frames[0], &frames[1], &frames[2])?,"command":hex(&frames[1])}),
-        )
+        let reply = masked(
+            view,
+            decision(self.authority, &frames[0], &frames[1], &frames[2])?,
+        );
+        encoded(json!({"reply":reply,"command":hex(&frames[1])}))
     }
     fn execute(&mut self, request: &Command, sink: &mut dyn TraceSink) -> Result<Vec<u8>, Refusal> {
         let (authority, clock, last) = (self.authority, self.clock.as_ref(), self.last);
@@ -389,8 +441,17 @@ impl<H: Terminal> Endpoint for Application<'_, '_, H> {
             let time = clock_of(self.authority, clock, &original.context)?;
             self.last = Some(self.last.map_or(time, |last| last.max(time)));
         }
+        let reply = masked(
+            self.view(request.principal()),
+            decision(
+                self.authority,
+                &original.prestate,
+                &original.command,
+                &original.context,
+            )?,
+        );
         encoded(
-            json!({"packet":hex(&packet),"revision":original.sequence.to_string(),"reply":decision(self.authority, &original.prestate, &original.command, &original.context)?}),
+            json!({"packet":hex(&packet),"revision":original.sequence.to_string(),"reply":reply}),
         )
     }
 }
@@ -562,6 +623,8 @@ pub struct Party {
     pub principal: Hash32,
     /// Context values, in the form of `context.json`.
     pub context: Vec<i128>,
+    /// Names of the state fields this party sees; `None` sees every field.
+    pub view: Option<Vec<String>>,
 }
 /// Read a `zeno-fcis/app-parties/1` file. Each entry names a party, its private
 /// credential file, its 64-digit principal and its context file; relative files
@@ -586,14 +649,31 @@ pub fn load_parties(path: &Path) -> AppResult<Vec<Party>> {
     for entry in entries {
         let entry = entry.as_object().ok_or("party entry")?;
         let text = |key: &str| entry.get(key).and_then(Value::as_str);
-        let (Some(name), Some(secret), Some(principal), Some(context), 4) = (
+        let view = match entry.get("view") {
+            None => None,
+            Some(names) => Some(
+                names
+                    .as_array()
+                    .and_then(|names| {
+                        names
+                            .iter()
+                            .map(|name| name.as_str().map(str::to_owned))
+                            .collect::<Option<Vec<_>>>()
+                    })
+                    .ok_or("a party's view lists state field names")?,
+            ),
+        };
+        let (Some(name), Some(secret), Some(principal), Some(context), true) = (
             text("name"),
             text("credential"),
             text("principal"),
             text("context"),
-            entry.len(),
+            entry.len() == 4 + usize::from(view.is_some()),
         ) else {
-            return Err("each party has exactly name, credential, principal and context".into());
+            return Err(
+                "each party has exactly name, credential, principal and context, and may have a view"
+                    .into(),
+            );
         };
         if name.is_empty()
             || name.len() > 32
@@ -629,6 +709,7 @@ pub fn load_parties(path: &Path) -> AppResult<Vec<Party>> {
             secret,
             principal: Hash32::new(principal),
             context,
+            view,
         });
     }
     Ok(parties)
@@ -660,6 +741,38 @@ pub fn party_contexts(
         table.push((party.principal, framed));
     }
     Ok(table)
+}
+/// Each party's view as a mask over the state fields, in field order. Refuses a
+/// name that is not a state field or that repeats.
+pub fn party_views(parties: &[Party]) -> AppResult<Vec<(Hash32, Vec<bool>)>> {
+    let bundle: Value =
+        serde_json::from_slice(include_bytes!("../www/app.json")).map_err(|_| "UI bundle")?;
+    let names: Vec<&str> = bundle["description"]["fields"]
+        .as_array()
+        .ok_or("UI fields")?
+        .iter()
+        .filter(|f| f["source"] == "state")
+        .map(|f| f["name"].as_str().unwrap_or_default())
+        .collect();
+    let mut views = Vec::new();
+    for party in parties {
+        let mut mask = vec![party.view.is_none(); names.len()];
+        for name in party.view.iter().flatten() {
+            let index = names
+                .iter()
+                .position(|field| field == name)
+                .ok_or_else(|| format!("party {}: {name} is not a state field", party.name))?;
+            if mask[index] {
+                return Err(format!(
+                    "party {}: {name} is repeated in its view",
+                    party.name
+                ));
+            }
+            mask[index] = true;
+        }
+        views.push((party.principal, mask));
+    }
+    Ok(views)
 }
 /// The ingress configuration for these parties at a loopback origin.
 pub fn ingress_config(parties: &[Party], contract: Hash32, origin: String) -> AppResult<Config> {
@@ -694,6 +807,7 @@ fn configured_parties() -> AppResult<Vec<Party>> {
             secret: credential(Path::new(&secret_file))?,
             principal,
             context: context_values(Path::new(&context))?,
+            view: None,
         }]);
     };
     if [
@@ -747,6 +861,7 @@ pub fn run() -> AppResult<()> {
                 .with_clock(clock)
                 .map_err(|_| "read the clock history")?;
         }
+        let endpoint = endpoint.with_views(party_views(&parties)?);
         let config = ingress_config(
             &parties,
             RustCryptoSha256::hash(authority.identity()),

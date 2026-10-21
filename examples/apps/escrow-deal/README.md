@@ -91,7 +91,9 @@ epoch by its system clock, so after 2026-11-15 every new request is refused
 with `Clock`.
 
 Adjust the `cp` source to where your checkout is. Give each person their own
-credential. The credential a request presents selects that party's
+credential. The example gives the seller a view without the buyer's refunds:
+the seller's page and replies leave that field out, as display filtering
+only. The credential a request presents selects that party's
 principal and context; nothing in the request can choose another party.
 [Build an app](../../../docs/BUILD_AN_APP.md#several-parties-on-one-server)
 describes the parties file and the HTTP API.

@@ -418,6 +418,32 @@ fn parties_file_start_up_refusals() {
     assert!(refusal(application::app::load_parties(&path)).contains("exceeds limit"));
     ok(std::fs::write(&path, json!({"schema":"zeno-fcis/app-parties/1","parties":[{"name":"a","credential":"c","principal":"p","context":"x","role":"r"}]}).to_string()));
     assert!(refusal(application::app::load_parties(&path)).contains("exactly name"));
+    // A view lists state field names; an unknown or repeated name is refused.
+    let path = parties_file(&root, &[("a", 0, 0, json!([]))]);
+    let mut file: Value = ok(serde_json::from_slice(&ok(std::fs::read(&path))));
+    file["parties"][0]["view"] = json!("all");
+    ok(std::fs::write(&path, file.to_string()));
+    assert!(refusal(application::app::load_parties(&path)).contains("view"));
+    let bundle: Value = ok(serde_json::from_slice(include_bytes!("../www/app.json")));
+    let first = bundle["description"]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["source"] == "state")
+        .unwrap()["name"]
+        .clone();
+    for (view, expected) in [
+        (json!(["no_such_field"]), "not a state field"),
+        (json!([first, first]), "repeated"),
+    ] {
+        file["parties"][0]["view"] = view;
+        ok(std::fs::write(&path, file.to_string()));
+        let parties = ok(application::app::load_parties(&path));
+        match application::app::party_views(&parties) {
+            Ok(_) => panic!("unknown view field accepted"),
+            Err(error) => assert!(error.contains(expected), "{error}"),
+        }
+    }
     for address in ["0.0.0.0:8080", "192.0.2.10:80", "[::]:8080"] {
         assert!(
             application::app::listen_address(address).is_err(),
@@ -496,9 +522,21 @@ impl Journey {
         ok(std::fs::create_dir(&root));
         let path = root.join("app.sqlite");
         ok(application::init(&path));
-        let parties = ok(application::app::load_parties(&parties_file(
-            &root, &entries,
-        )));
+        let file = parties_file(&root, &entries);
+        // A fixture party may list the state fields it sees.
+        let mut written: Value = ok(serde_json::from_slice(&ok(std::fs::read(&file))));
+        for (entry, party) in written["parties"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(fixture["parties"].as_array().unwrap())
+        {
+            if !party["view"].is_null() {
+                entry["view"] = party["view"].clone();
+            }
+        }
+        ok(std::fs::write(&file, written.to_string()));
+        let parties = ok(application::app::load_parties(&file));
         Some(Self {
             receiver: root.join("received"),
             path,
@@ -554,6 +592,7 @@ fn serve<'a, 'p>(
     if let Some(clock) = journey.clock() {
         endpoint = ok(endpoint.with_clock(clock));
     }
+    let endpoint = endpoint.with_views(ok(application::app::party_views(&journey.parties)));
     let config = ok(application::app::ingress_config(
         &journey.parties,
         RustCryptoSha256::hash(authority.identity()),
@@ -676,6 +715,51 @@ fn parties_journey() {
             state["principal"],
             application::app::hex(party.principal.as_bytes())
         );
+    }
+    // A party's view hides state values in its snapshots and replies, chosen by
+    // its credential, whatever its request holds.
+    let state = ok(application::current(&journey.path)).state;
+    let views = ok(application::app::party_views(&journey.parties));
+    for (party, (_, view)) in journey.parties.iter().zip(&views) {
+        let (_, snapshot) = snapshot(&mut server, &journey.credential(&party.name));
+        for (index, seen) in view.iter().enumerate() {
+            assert_eq!(
+                snapshot["values"][index].is_null(),
+                !seen,
+                "a hidden field appears in /state"
+            );
+        }
+        if view.iter().all(|seen| *seen) {
+            continue;
+        }
+        let mut input: Vec<Value> = state.iter().map(|v| json!(v.to_string())).collect();
+        input.extend(steps[0]["command"].as_array().unwrap().iter().cloned());
+        input.extend(snapshot["context"].as_array().unwrap().iter().cloned());
+        let contract = Hash32::new(ok(<[u8; 32]>::try_from(ok(application::app::unhex(
+            snapshot["contract"].as_str().unwrap(),
+        )))));
+        let revision: u64 = ok(snapshot["revision"].as_str().unwrap().parse());
+        let body = encode_command(
+            contract,
+            Hash32::new([0xdd; 32]),
+            revision,
+            &ok(serde_json::to_vec(&input)),
+        );
+        let (status, bytes) = exchange_as(
+            &mut server,
+            "/preview",
+            &journey.credential(&party.name),
+            &body,
+        );
+        assert_eq!(status, 200);
+        let preview: Value = ok(serde_json::from_slice(&bytes));
+        for (index, seen) in view.iter().enumerate() {
+            assert_eq!(
+                preview["reply"]["input"][index].is_null(),
+                !seen,
+                "the view is chosen from the request"
+            );
+        }
     }
     drop(server);
     // After a restart the party recovers its original packet; another party cannot.

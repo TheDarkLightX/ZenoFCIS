@@ -25,6 +25,13 @@ CONTROLS = [
     ("clock-clamped", "server_clock_journey", "out-of-range clock clamped",
      "if time < self.range.0 || time > self.range.1 {",
      "let time = time.clamp(self.range.0, self.range.1);\n        if false {"),
+    ("view-hidden-in-state", "parties_journey", "a hidden field appears in /state",
+     "hide(self.view(principal), &mut values);", ""),
+    ("view-from-request", "parties_journey", "the view is chosen from the request",
+     "let view = self.view(request.principal());",
+     "let shown: Vec<bool> = serde_json::from_slice::<Value>(request.bytes()).ok()"
+     ".and_then(|v| v.as_array().map(|a| a.iter().map(|x| !x.is_null()).collect())).unwrap_or_default();"
+     "\n        let view = Some(shown.as_slice());"),
 ]
 
 

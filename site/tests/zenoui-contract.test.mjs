@@ -70,3 +70,24 @@ test('a_server_clock_field_is_checked_and_left_out_of_reply_matching',async()=>{
  const onState=raw({});onState.fields[0].clock=true;
  assert.throws(()=>describe(onState,meta),/UiInvalidClock/);
 });
+test('hidden_state_values_are_null_kept_out_of_view_and_supplied_by_the_server',async()=>{
+ const {initial,step,view,validReply,inputFor}=await import('../public/zenoui/app-state.js');
+ const raw={fields:[
+  {path:'pre.100.110',source:'state',index:0,domain:{kind:'int',min:'0',max:'3'},options:[],initial:'0'},
+  {path:'pre.100.111',source:'state',index:1,domain:{kind:'int',min:'0',max:'3'},options:[],initial:'0'},
+  {path:'command.101',source:'command',index:2,domain:{kind:'sum',type_id:101,variants:[120]},options:[{value:'120'}],initial:'120'}],
+  reasons:[],enablement:{table:[false,false,false,true]},domain:'16'};
+ const meta={format:'zenoui/metadata/1',title:'View',action:'command.101',
+  fields:{'pre.100.110':{label:'Shown',unit:'items'},'pre.100.111':{label:'Hidden',unit:'items'},'command.101':{label:'Command',unit:'unitless'}},
+  variants:{'120':'Add'},commands:{'120':{label:'Add',consequential:true}},reasons:{}};
+ const app=describe(raw,meta);
+ let s=initial(app,'a'.repeat(64));
+ s=step(s,{type:'Snapshot',values:['2',null],revision:'4'}).state;
+ assert.deepEqual(s.values,['2',null],'a hidden value is kept as null');
+ assert.deepEqual(view(s).state.map(f=>f.label),['Shown'],'a hidden field is not shown');
+ assert.deepEqual(inputFor(s,'120'),['2',null,'120']);
+ const reply=post=>({input:['2',null,'120'],class:'Accept',reason:null,post,checked:'1',total:'1'});
+ assert.ok(validReply(app,['2',null,'120'],reply(['3',null])),'the server keeps a hidden value hidden');
+ assert.equal(validReply(app,['2','1','120'],reply(['3',null])),false,'a shown value cannot vanish');
+ assert.equal(step(s,{type:'Snapshot',values:['2','9'],revision:'5'}).state,s,'values stay in their domain');
+});
