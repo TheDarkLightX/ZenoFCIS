@@ -4,15 +4,18 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod common;
+pub mod composition;
 pub mod fees;
 pub mod laws;
 pub mod ledger;
 pub mod liquidation;
+pub mod parameters;
 pub mod redemption;
 pub mod stability;
 pub mod staking;
 pub mod vaults;
 mod wide;
+pub mod wire;
 
 /// Fixed-point rate precision; quantities retain separate asset tags.
 pub const Q: u128 = 1_000_000_000_000_000_000;
@@ -91,6 +94,38 @@ impl Work {
             },
             limits,
         }
+    }
+    /// Only crate-owned pure relations may supply a sub-evaluation. The outer
+    /// invocation retains every completed charge, including a refused subcall.
+    pub(crate) fn invoke<T>(
+        &mut self,
+        call: impl FnOnce(Limits) -> Evaluation<T>,
+    ) -> Result<T, Failure> {
+        let before = self.usage;
+        let remaining = Limits {
+            steps: self.limits.steps - before.steps,
+            reads: self.limits.reads - before.reads,
+            bytes: self.limits.bytes - before.bytes,
+        };
+        let (result, used) = call(remaining).into_parts();
+        self.charge(used.steps, used.reads, used.bytes)?;
+        result.map_err(|e| match e {
+            Failure::Budget {
+                lane, attempted, ..
+            } => {
+                let (prior, limit) = match lane {
+                    0 => (before.steps, self.limits.steps),
+                    1 => (before.reads, self.limits.reads),
+                    _ => (before.bytes, self.limits.bytes),
+                };
+                Failure::Budget {
+                    lane,
+                    limit,
+                    attempted: prior.saturating_add(attempted),
+                }
+            }
+            x => x,
+        })
     }
     pub(crate) fn charge(&mut self, steps: u64, reads: u64, bytes: u64) -> Result<(), Failure> {
         for (lane, used, limit, add) in [

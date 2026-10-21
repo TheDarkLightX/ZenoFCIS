@@ -105,6 +105,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeno-fcis-schema"
+version = "2.5.0"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-value",
+]
+
+[[package]]
 name = "zeno-fcis-synthesis"
 version = "2.5.0"
 dependencies = [
@@ -124,6 +132,8 @@ name = "zenofcis-zusd-v1"
 version = "0.1.0"
 dependencies = [
  "zeno-fcis-codec",
+ "zeno-fcis-collections",
+ "zeno-fcis-schema",
  "zeno-fcis-synthesis",
  "zeno-fcis-value",
 ]

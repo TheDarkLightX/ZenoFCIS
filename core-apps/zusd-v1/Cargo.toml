@@ -9,10 +9,12 @@ publish = false
 
 [dependencies]
 zeno-fcis-value = { path = "../../crates/zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { path = "../../crates/zeno-fcis-codec", default-features = false }
+zeno-fcis-schema = { path = "../../crates/zeno-fcis-schema", default-features = false }
+zeno-fcis-collections = { path = "../../crates/zeno-fcis-collections", default-features = false }
 
 [dev-dependencies]
 zeno-fcis-synthesis = { path = "../../crates/zeno-fcis-synthesis" }
-zeno-fcis-codec = { path = "../../crates/zeno-fcis-codec" }
 
 [profile.dev]
 debug = 0

@@ -1643,3 +1643,98 @@ fn sp_offset_full_state_matches_independent_integer_reference() {
         assert_eq!(out.result(), Ok(&expected), "{line}");
     }
 }
+
+#[test]
+fn gain_to_vault_is_one_pure_successor_and_late_refusal_discards_both() {
+    let pool = sp::Book {
+        pool: sp::State::reference_genesis(sp::FUNDED_CAP).unwrap(),
+        deposits: vec![],
+        front_ends: vec![],
+    };
+    let d = sp::change(
+        &pool,
+        id(1),
+        sp::Command::Deposit {
+            amount: 10 * Q,
+            tag: None,
+        },
+        10 * Q,
+        Some(0),
+        prices(),
+        &[],
+        system(),
+        bounds(),
+        limits(),
+    );
+    let mut pool = d.result().unwrap().book.clone();
+    pool.pool = sp::offset(&pool.pool, 5 * Q, 2 * Q, Some(0), bounds(), limits())
+        .result()
+        .unwrap()
+        .clone();
+    let mut pre = book(
+        vec![
+            vault(1, 1500 * Q, 1000 * Q, 50 * Q),
+            vault(2, 1500 * Q, 1000 * Q, 50 * Q),
+        ],
+        vec![id(1), id(2)],
+    );
+    pre.pool = pool.pool.clone();
+    let frozen = (pre.clone(), pool.clone());
+    let invoke = |params, lim| {
+        composition::move_gain_to_vault(
+            &pre,
+            &pool,
+            id(1),
+            params,
+            fee(),
+            prices(),
+            Some(0),
+            None,
+            None,
+            2,
+            bounds(),
+            lim,
+        )
+    };
+    let out = invoke(v::Parameters::v1(), limits());
+    let result = out.result().unwrap();
+    let mut expected = pre.clone();
+    expected.vaults[0].collateral += 2 * Q;
+    expected.vaults[0].stake += 2 * Q;
+    expected.system.collateral += 2 * Q;
+    expected.system.stakes += 2 * Q;
+    expected.pool = result.stability.pool.clone();
+    expected.priorities[0].1 = 1502 * NICR_Q / 1000;
+    assert_eq!(result.vaults, expected);
+    assert_eq!(result.settlement.collateral, 2 * Q);
+    assert_eq!(result.stability.pool.collateral, 0);
+    assert_eq!(result.owner.pending_collateral, 0);
+    assert_eq!(result.owner.pending_debt, 0);
+    assert_eq!(result.stability.deposits[0].initial, 5 * Q - 10);
+    assert_eq!((pre.clone(), pool.clone()), frozen);
+    assert_eq!(
+        invoke(
+            v::Parameters {
+                minimum_net: 2000 * Q,
+                ..v::Parameters::v1()
+            },
+            limits()
+        )
+        .result(),
+        Err(Failure::Reject(1040))
+    );
+    for lane in 0..3 {
+        let used = out.usage();
+        let mut budget = limits();
+        match lane {
+            0 => budget.steps = used.steps() - 1,
+            1 => budget.reads = used.reads() - 1,
+            _ => budget.bytes = used.bytes() - 1,
+        };
+        let a = invoke(v::Parameters::v1(), budget);
+        let b = invoke(v::Parameters::v1(), budget);
+        assert!(matches!(a.result(),Err(Failure::Budget{lane:l,..}) if l==lane));
+        assert_eq!(a.usage(), b.usage());
+        assert_eq!((pre.clone(), pool.clone()), frozen);
+    }
+}

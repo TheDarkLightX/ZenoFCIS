@@ -50,7 +50,7 @@ pub struct Outcome {
     pub holder: Holder,
     pub trace: Trace,
 }
-fn cut(
+pub(crate) fn cut(
     book: &mut Book,
     id: Id,
     priority: u128,
