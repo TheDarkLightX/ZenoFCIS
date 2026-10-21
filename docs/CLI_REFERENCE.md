@@ -11,7 +11,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard [--source TREE]
 zeno-fcis new <dir> --contract <contract-dir> [--source TREE]
-zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
+zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths] [--expand]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis generate contract [<app-dir>] [--out <dir>] [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -49,6 +49,12 @@ zeno-fcis contract check-composition MANIFEST [--aggregate DIR | --write-aggrega
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
+`check --expand` instead prints the project with every
+[table](CONTRACT_TABLES.md) form replaced by the declarations and formulas it
+expands to, after checking that the printed text parses to the same canonical
+project, and reports the tables, the inputs and the input domain size on
+stderr (with `--format json`, in one document). It prints nothing for a
+project with errors and exits 1.
 A field name must be unique within its record; other declaration names are
 unique in the project. The summary line's `unresolved_obligations=N` counts
 evidence that the check does not establish and generated code cannot

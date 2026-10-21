@@ -67,6 +67,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "construct", "--locked", "--offline"),
          ("python3", "tools/test_priority_reference.py")),
     ),
+    "contract-tables": AcceptanceScenario(
+        "Expand fixed-size tables exactly into ordinary fields and laws",
+        (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "tables"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "contract_tables"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "contract_tables"),
+         ("python3", "tools/check_table_controls.py", "--remove-targets")),
+    ),
     # BEGIN version-space acceptance registrations
     "loop-version-space": AcceptanceScenario(
         "Count finite meanings, ask the owner and check the unique program",

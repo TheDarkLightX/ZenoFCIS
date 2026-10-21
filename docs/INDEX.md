@@ -56,6 +56,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Composed-domain composition](COMPOSED_DOMAIN_COMPOSITION.md)
 - [RC3 specification contract](RC3_AUTHORING_CONTRACT.md)
 - [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
+- [Contract tables: fixed-size collections expanded exactly](CONTRACT_TABLES.md)
 - [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
 - [Formal tools](FORMAL_TOOLS_RC3.md)
 - [Canonical bytes and admission](CANONICAL_BYTES.md)

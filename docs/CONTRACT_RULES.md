@@ -310,6 +310,10 @@ adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
 use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
+[Contract tables](CONTRACT_TABLES.md) expand while `project.zeno` is parsed,
+so a law written with `forall i in table T`, `count` or `sum` over a table
+reaches generation as the ordinary formula it stands for; the rules here name
+each table entry by its field ID.
 Signed law multiplication/division retains its existing checked i128 meaning.
 Product predicates explicitly convert nonnegative values to U128 and use the
 existing exact wide comparison, including the constant-one factors of a

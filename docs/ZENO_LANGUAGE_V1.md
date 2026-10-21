@@ -14,7 +14,9 @@ ASCII hyphens. Commitments accepted by tool manifests are lowercase hexadecimal.
 The language has no import, include, macro, interpolation, filesystem path,
 embedded command, implicit stable-ID allocation, or recursion construct.
 Shell syntax and traversal text are either invalid tokens or ordinary inert
-identifier data.
+identifier data. [Contract tables](CONTRACT_TABLES.md) are the one expanding
+form: a table's entries take the IDs that follow its explicit stable ID, by a
+fixed rule, and its formulas expand to ordinary ones while the file is parsed.
 
 ## Resource limits
 
@@ -35,6 +37,8 @@ namespace ID name;
 type ID KIND name;
 type ID int name in MIN..=MAX;
 field ID OWNER_TYPE name FIELD_TYPE;
+table ID OWNER_TYPE name FIELD_TYPE size N;
+type ID index name of TABLE;
 variant ID OWNER_TYPE name PAYLOAD_TYPE|none;
 reason ID name precedence RANK;
 effect ID name destination TYPE payload TYPE;
@@ -127,6 +131,13 @@ Bounded predicates use `forall x in START..END { FORMULA }` and
 `exists x in START..END { FORMULA }`. A call such as `host_rule(a, b)` is a
 typed named predicate supplied by the host. A missing predicate, overflow,
 division error, or exhausted evaluation limit is `Indeterminate`.
+
+Table forms range over a table's entries instead: `ROOT.OWNER.T[k]`,
+`forall i in table T [where C] { FORMULA }`, `exists i in table T [where C]
+{ FORMULA }`, `sum i in table T [where C] { VALUE }` and
+`count i in table T { FORMULA } OP K`. They expand exactly into the forms
+above while the file is parsed; [contract tables](CONTRACT_TABLES.md) gives
+the rule.
 
 ## Diagnostics
 

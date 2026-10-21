@@ -376,7 +376,6 @@ core-apps/zusd-v1/NO_FREE_VALUE.md
 core-apps/zusd-v1/tests/test-data/loop-receipts/README.md
 crates/zeno-fcis-bls/CONTRACT.md
 docs/TRACE_GAME.md
-
 docs/COMPOSED_DOMAIN_PROOF.md
 docs/zal/ladder/WITHDRAWAL_PILOT.md
 docs/BUILD_AN_APP.md
@@ -385,3 +384,6 @@ examples/distribution-laws/README.md
 examples/distribution-laws/reporter-choice/README.md
 examples/distribution-laws/modulo-bias/README.md
 examples/distribution-laws/payout-tie/README.md
+docs/CONTRACT_TABLES.md
+examples/contract-tables/README.md
+examples/contract-tables/library-loans/README.md
