@@ -28,9 +28,10 @@ PROPOSAL_SCHEMA = {
 def _disk_checker_identity():
     """Hash the source closure used by this cooperative local prototype."""
     here = Path(__file__).resolve().parent
-    digest = hashlib.sha256(b"zal/checker/2\0")
+    digest = hashlib.sha256(b"zal/checker/3\0")
     for name in ["behavior.py", "workflow.py", "factory.py", "shared.py",
-                 "terminal.py", "mcp.py", "workspace.py", "server.py", "workspace.html"]:
+                 "terminal.py", "mcp.py", "workspace.py", "server.py", "workspace.html",
+                 "explain.py", "constructs.py", "ladder_tools.py", "ladder.py", "ladder_en.json", "temporal_lowering.py"]:
         path = here / name
         digest.update(name.encode() + b"\0")
         digest.update(path.read_bytes())

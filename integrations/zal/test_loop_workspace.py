@@ -710,13 +710,15 @@ class LoopMcpTools(unittest.TestCase):
         self.assertEqual(names[:7], self.ORIGINAL)
         self.assertEqual(names[7:12], ["zal_loop_read", "zal_loop_packet", "zal_loop_submit", "zal_loop_translate",
                                      "zal_loop_legend"])
-        self.assertEqual(names[12:], ["zal_capture_read", "zal_capture_packet", "zal_capture_submit",
-                                      "zal_capture_translate", "zal_capture_legend"])
+        self.assertEqual(names[12:17], ["zal_capture_read", "zal_capture_packet", "zal_capture_submit",
+                                        "zal_capture_translate", "zal_capture_legend"])
+        self.assertTrue(all(name.startswith(("zal_why_not", "zal_what_if", "zal_narrate", "zal_guide", "zal_ladder_"))
+                            for name in names[17:]), names[17:])
         for tool in mcp.TOOLS:
             self.assertFalse(any(word in tool["name"] for word in ("answer", "say", "accept")), tool["name"])
         for tool in mcp.TOOLS[7:12]:
             self.assertIn("not the owner's agreement", tool["description"])
-        for tool in mcp.TOOLS[12:]:
+        for tool in mcp.TOOLS[12:17]:
             self.assertIn("Tool permission is not owner agreement.", tool["description"])
 
     def test_a_model_document_with_an_answer_is_refused_through_mcp(self):

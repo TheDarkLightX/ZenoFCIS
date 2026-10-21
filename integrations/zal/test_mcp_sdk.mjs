@@ -48,7 +48,9 @@ try {
   assert.equal(client.getServerVersion().name, 'zenofcis-zal');
   const expected = ['zal_read', 'zal_check', 'zal_explain', 'zal_help', 'zal_propose', 'zal_compare', 'zal_trace',
     'zal_loop_read', 'zal_loop_packet', 'zal_loop_submit', 'zal_loop_translate', 'zal_loop_legend',
-    'zal_capture_read', 'zal_capture_packet', 'zal_capture_submit', 'zal_capture_translate', 'zal_capture_legend'];
+    'zal_capture_read', 'zal_capture_packet', 'zal_capture_submit', 'zal_capture_translate', 'zal_capture_legend',
+    'zal_why_not', 'zal_what_if', 'zal_narrate', 'zal_guide', 'zal_ladder_read', 'zal_ladder_render',
+    'zal_ladder_parse', 'zal_ladder_same', 'zal_ladder_lower', 'zal_ladder_explain'];
   assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), expected.sort());
   const read = await call('zal_read', {});
   const revision = read.model.revision;
@@ -66,6 +68,35 @@ try {
     { event: 'approve', context: { authorized: true } },
   ] });
   assert.equal(trace.trace[1].outcome.state, 'approved');
+  const whyNot = await call('zal_why_not', { revision, state: 'pending', event: 'approve',
+    context: { authorized: false }, want: { class: 'Accept' } });
+  assert.equal(whyNot.schema, 'zal/why-not/1');
+  assert.deepEqual(whyNot.minimal_changes[0].changes, [{ input: 'context:authorized', from: false, to: true }]);
+  const whatIf = await call('zal_what_if', { revision, state: 'pending', event: 'approve',
+    context: { authorized: false }, change: { context: { authorized: true } } });
+  assert.equal(whatIf.after.outcome.state, 'approved');
+  assert.match(await call('zal_what_if', { revision, state: 'pending', event: 'approve',
+    context: { authorized: false }, change: { context: { unknown: true } } }, true), /undeclared context fact/);
+  const story = await call('zal_narrate', { revision, source: 'trace', inputs: [
+    { event: 'submit', context: { authorized: false } }] });
+  assert.equal(story.english.at(-1), 'After 1 step the state is pending.');
+  assert.equal((await call('zal_guide', { revision, topic: 'rule' })).forms.symbolic, 'rule ID: STATE + EVENT [GUARD] -> OUTCOME;');
+  assert.match(await call('zal_why_not', { revision: 'stale', state: 'pending', event: 'approve',
+    context: { authorized: false }, want: { class: 'Accept' } }, true), /Stale revision/);
+  const ladders = await call('zal_ladder_read', {});
+  const vault = ladders.statements.find(s => s.id === 'example:temporal/vault_drain');
+  assert.equal(vault.status, 'admitted');
+  const statement = { statement: vault.id, revision: vault.revision };
+  assert.equal((await call('zal_ladder_render', { ...statement, rung: 'plain' })).rungs.plain,
+    'No admitted operation sequence drains the vault.');
+  const ladderParse = await call('zal_ladder_parse', { ...statement, rung: 'typed', text: 'forall sigma in Traces: always(not Loss())' });
+  assert.equal(ladderParse.uniqueness.counts.normalized_meanings, 1);
+  assert.equal((await call('zal_ladder_same', { ...statement, rung: 'plain',
+    text: 'No admitted operation sequence drains the vault.' })).status, 'same');
+  const lowered = await call('zal_ladder_lower', statement);
+  assert.equal(lowered.authority, 'none');
+  assert.equal((await call('zal_ladder_explain', statement)).status, 'admitted');
+  assert.match(await call('zal_ladder_render', { ...statement, revision: 'stale' }, true), /Stale ladder revision/);
   const weakened = read.model.symbolic.replace('[authorized]', '[true]');
   assert.notEqual(weakened, read.model.symbolic);
   const compared = await call('zal_compare', { revision, syntax: 'symbolic', surface: weakened });
@@ -142,7 +173,8 @@ try {
   assert.equal(exported.owner_examples.cases.find(c => c.id === 'cancel').current.status, 'conflict');
   assert.equal(exported.authority, 'none');
   assert.equal(JSON.parse(run('workspace.py', ['verify', ...changedArguments])).status, 'verified-reviewed-declarations');
-  console.log('ZAL MCP SDK: 7 tools, supplied fixture labels, revision change, stale-corpus refusal/recovery, trace and reviewed export PASS');
+  console.log(`ZAL MCP SDK: ${expected.length} tools, supplied fixture labels, revision change, stale-corpus refusal/recovery, trace, ` +
+    'explanation and ladder tools with stale refusals, and reviewed export PASS');
 } finally {
   clearTimeout(timer);
   await client.close();
