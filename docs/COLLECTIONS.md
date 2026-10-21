@@ -136,8 +136,8 @@ on all data with the same equality pattern.
 5. *Obligations.* By coverage, every step of every run is one of the
    checked admissible views, so its decision is lawful and its writes merge.
 
-The check does not establish that the runtime keeps P4: the runtime's own
-tests and its planted controls do. Capacity is the runtime's: an insert into
+The check does not establish P4. The runtime must establish it with its own
+tests and planted controls. Capacity is the runtime's: an insert into
 a full map is refused there, outside the view. A Lean statement of step 1 is
 future work.
 
@@ -166,5 +166,6 @@ state: their state counts and reachability are about views, not maps.
   count and the copies that member holds, are not expressible; rules must
   then defend against every admissible view, as the library's return rule
   does.
-- The runtime, a SQLite store with an incremental Merkle commitment, is
-  described with the generated applications.
+- Generated applications with map storage and an incremental Merkle
+  commitment follow separately. This part provides the language and checker;
+  it does not implement runtime framing P4.

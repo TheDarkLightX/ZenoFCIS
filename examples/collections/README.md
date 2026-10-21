@@ -26,4 +26,5 @@ map enumerates only the entries a command names.
 ## Scope
 
 Each result holds over the declared view ranges, given the premises in the
-collections reference; the runtime keeps the last premise.
+collections reference, including runtime framing. This part contains the
+language and checker; the map runtime follows separately.
