@@ -3,11 +3,18 @@
 An application contract is three files:
 
 - `project.zeno` declares the types, fields, variants, reasons, channels
-  and laws;
+  and laws; the [`.zeno` language reference](ZENO_LANGUAGE_V1.md) gives its
+  syntax;
 - `v2/policy.json`, described here, holds the decision rules, the genesis
   state and the kind of every law;
 - `tests/decision-examples.txt`, optional, lists decisions the owner
   expects.
+
+An application built with `new --app` also needs `ui.json`, the labels its
+interface shows; see [UI metadata](#ui-metadata-uijson). The
+[library loans](../examples/apps/library-loans/README.md) and
+[escrow](../examples/apps/escrow-deal/README.md) examples are complete
+contracts with all four files.
 
 `zeno-fcis generate contract` turns the first two into `v2/schema.zcve`,
 `src/v2_contract.rs` and `v2/policy.zcve`, and `zeno-fcis new <dir>
@@ -435,6 +442,51 @@ IDs.
   idempotency value and payload. Each `when` is computed from the inputs
   again, not taken from the decision program. Adoption relies on this law;
   see [Contract adoption](CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+
+## UI metadata: `ui.json`
+
+`zeno-fcis new --app` reads `ui.json` beside `project.zeno`. It supplies
+labels, units, command names and refusal messages, never rules: the native
+contract supplies every field, domain, command and reason. The build refuses
+a missing or unknown key, a repeated key, metadata for an input, command or
+reason the contract does not declare, and any label that is empty, longer
+than 300 characters or contains `<`, `>` or a control character.
+
+| Key | Required | Value |
+|---|---|---|
+| `format` | yes | `"zenoui/metadata/1"`. |
+| `title` | yes | The application's title. |
+| `action` | yes | The sum input that selects the command: `command.101.F` for a command record, or `command.101` when the command is itself a sum. |
+| `fields` | yes | Input path to [field metadata](#field-metadata), for every input: `pre.100.F`, `command.101.F` or `command.101`, and `context.102.F` or `context.102`. |
+| `variants` | yes | Variant ID to its label, for every variant of every sum input. Boolean inputs are shown as No and Yes. |
+| `commands` | yes | Each command variant's ID to its [command metadata](#command-metadata). |
+| `reasons` | yes | Each reason's ID to the message shown when a decision is refused for it. |
+
+### Field metadata
+
+| Key | Required | Value |
+|---|---|---|
+| `label` | yes | The field's label, such as `Held in escrow`. |
+| `unit` | yes | The unit shown after a number, such as `units`. `unitless` shows no unit. |
+| `values` | no | For an integer input only: a decimal value to its label, such as `{"0": "on the shelf"}`. 1 to 64 entries, each within the input's declared range. A labelled value is shown by its label alone. |
+
+### Command metadata
+
+| Key | Required | Value |
+|---|---|---|
+| `label` | yes | The command's name on its form and button. |
+| `consequential` | yes | `true`: the command is sent only after the user confirms the reviewed inputs, and an edit voids that confirmation. `false`: it is sent without the confirmation step. |
+
+For example, in the library loans example a copy's holder is an integer from
+0 to 3:
+
+```json
+"pre.100.110": {"label": "Copy 1", "unit": "unitless",
+  "values": {"0": "on the shelf", "1": "with member 1"}}
+```
+
+The state line then reads "Copy 1: on the shelf." Labels change only what
+the interface shows; the contract's decisions and checks are unchanged.
 
 ## Adoptions
 

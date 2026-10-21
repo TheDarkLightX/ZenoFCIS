@@ -4,15 +4,42 @@
 without permission, and recovers a request after its reply is lost.”
 
 Start with a reviewed contract. `project.zeno` declares the types, laws and
-channels; `v2/policy.json` supplies the rules and initial state; `ui.json`
+channels, in the syntax of the [`.zeno` language reference](ZENO_LANGUAGE_V1.md);
+`v2/policy.json` supplies the rules and initial state; `ui.json`
 supplies the labels, units, command descriptions and refusal messages. The
 [contract guide](CONTRACT_RULES.md) explains how to write and review
-those files. A one-line ask starts that review; it does not replace it.
+those files, including the [`ui.json` keys](CONTRACT_RULES.md#ui-metadata-uijson).
+A one-line ask starts that review; it does not replace it. Two worked
+examples, [library loans](../examples/apps/library-loans/README.md) and a
+three-party [escrow](../examples/apps/escrow-deal/README.md), each start from
+a one-line ask.
 
-From the source checkout, build the CLI and create the app:
+From the source checkout, build the CLI:
 
 ```sh
 nice -n 19 ionice -c3 cargo +1.97.1 build --locked --offline -p zeno-fcis-cli
+```
+
+Check the contract directory before building on it:
+
+- `target/debug/zeno-fcis check DIR/project.zeno --require-substantive
+  --require-resolved-paths` parses the project and refuses laws that
+  constrain nothing or name no declared field.
+- `target/debug/zeno-fcis generate contract DIR --out SCRATCH` compiles the
+  rules and names the first entry it cannot use.
+- `target/debug/zeno-fcis contract review DIR` decides every input of a
+  small domain, or a boundary set of a large one, compares the decision
+  examples and reports the rule mutants those inputs do not distinguish.
+- The [contract judges](CONTRACT_JUDGES.md) answer narrower questions:
+  `contract lemma` whether an invariant holds on every reachable state,
+  `contract scenario` whether a written run goes as intended,
+  `contract profile` which states a store can reach, and `contract probe`
+  one exact decision.
+
+These checks observe the contract on its declared domain; they do not show
+that the rules say what the owner means. Then create the app:
+
+```sh
 nice -n 19 ionice -c3 target/debug/zeno-fcis new inventory-app \
   --contract crates/zeno-fcis-cli/templates/inventory-reservation/project.zeno --app
 ```
@@ -94,10 +121,127 @@ Restart with the same start command and configuration. SQLite keeps the
 state and pending outbox. `ZENO_APP_STORE`, `ZENO_APP_RECEIVER`,
 `ZENO_APP_CONTEXT` and `ZENO_APP_ADDRESS` select the database, local file
 receiver, context file and loopback address. The receiver stores each exact
-payload under its delivery ID and acknowledges it after syncing. It is a
-local example receiver. Other services require a reviewed transport and
+payload under its delivery ID, with `ID.json` beside it: an envelope naming
+the commit, lane, ordinal and destination. It acknowledges the delivery after
+syncing both. It is a local example receiver. Other services require a reviewed transport and
 receiver deduplication. Cleartext HTTP is confined to loopback; remote use
 needs a trusted TLS proxy and an explicitly reviewed origin configuration.
+
+## Several parties on one server
+
+“An escrow app: a buyer deposits, the seller marks it shipped, then the
+buyer releases the money or the operator refunds it.”
+
+Three people use one server, each with their own credential. The buyer
+signs in and deposits. The seller signs in from another browser and marks
+the goods shipped. The buyer releases the money. When the seller tries to
+refund, the server refuses: only the operator's context permits refunds.
+The [escrow example](../examples/apps/escrow-deal/README.md) runs this
+journey.
+
+Instead of `ZENO_APP_SECRET_FILE`, `ZENO_APP_PRINCIPAL` and
+`ZENO_APP_CONTEXT`, set `ZENO_APP_PARTIES` to a parties file:
+
+```json
+{"schema": "zeno-fcis/app-parties/1",
+ "parties": [
+  {"name": "buyer", "credential": "buyer.credential",
+   "principal": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+   "context": "buyer.context.json"}]}
+```
+
+| Key | Value |
+|---|---|
+| `name` | 1 to 32 letters, digits, `-` or `_`; unique. |
+| `credential` | A private file holding 64 lowercase hexadecimal digits, as for `ZENO_APP_SECRET_FILE`; unique and not all zero. |
+| `principal` | 64 lowercase hexadecimal digits; unique. `/state` shows it, and replay keys are scoped to it. |
+| `context` | A file with this party's context values, in the form of `context.json`. |
+
+Relative paths resolve against the parties file's directory. The server
+names the reason and refuses to start when the parties file or any file it
+names is unreadable or larger than 64 KiB; it lists no parties or more than
+64; an entry lacks a key or has another one; names, credentials or
+principals repeat; a context does not fit the contract; `ZENO_APP_PARTIES`
+is set together with a single-credential variable; or the address is not
+loopback. Without a parties file, the single-credential variables work as
+before.
+
+The ingress compares the presented credential with every configured
+credential at full width, visits every entry with no early exit, and selects
+the matched principal by mask. That principal alone selects the context the
+Authority decides with: no body field or header can choose a party,
+principal or context, and a preview whose inputs carry another context is
+refused. Replay keys stay scoped to the principal, so one party cannot
+recover or read another party's request, even with the same key and bytes.
+Every party sees the same store state, with its own principal and context.
+
+The interface still shows every command to every party; the contract refuses
+the ones a party's context does not permit. Credentials are fixed at
+start-up, so adding or rotating one needs a restart. There is no rate limit
+or lockout. The all-entry comparison is a reviewed source form checked by
+`tools/check_ingress.py`, not a timing proof of the compiled code.
+
+## HTTP API
+
+The browser interface uses these endpoints, and any client can call them.
+Each request is one HTTP/1.1 request on its own connection, with exactly one
+`Authorization: Bearer CREDENTIAL` header (64 lowercase hexadecimal digits),
+at most 4,096 header bytes and at most 65,536 body bytes. Repeated headers
+are refused, and an `Origin` header, when present, must equal
+`http://ADDRESS`.
+
+| Endpoint | Request | Reply on success |
+|---|---|---|
+| `GET /state` | No body. | JSON: `contract`, the hexadecimal SHA-256 of the Authority identity; `principal`; `revision`, the commits so far; `values`, the state fields; `context`, this party's context values; and `pending`, the undelivered outbox entries. Integers are decimal strings. |
+| `POST /preview` | A command body whose payload is the JSON list of every input as decimal strings: the state `values`, then the command fields, then this party's `context`. | JSON: `reply`, the decision the Authority would make (`class`, `reason`, `post`), and `command`, the framed command in hexadecimal. Nothing is committed. |
+| `POST /command` | A command body whose payload is the framed command bytes from the preview. | JSON: `packet`, the reply packet in hexadecimal, `revision` and `reply`. |
+| `GET /` and the other assets | No body; no credential is needed. | The public, immutable interface files, including `/app.json`. |
+
+A command body is the format version, then four fields:
+
+| Bytes | Content |
+|---|---|
+| 0 | `1`, the format version. |
+| 1 to 32 | `contract` from `/state`, as 32 bytes. |
+| 33 to 64 | A key the client chooses and keeps until the request resolves. |
+| 65 to 72 | The expected revision, `revision` from `/state`, as an unsigned 64-bit big-endian integer. |
+| 73 onwards | The payload. |
+
+Statuses: 200 done; 400 a malformed request, body or route; 401 a missing or
+unknown credential; 403 another origin, contract or context; 409 the store
+moved past the expected revision, or the key already names a different
+request; 413 too large; 422 the contract refused the command (a preview
+shows its reason); 503 storage or delivery is uncertain, so retry the same
+body. An error reply's body is the refusal's name, such as `Credential`.
+
+After a lost reply, send the identical body with the same credential: the
+server returns the original packet. A changed body under the same key is
+refused with 409. A minimal client, for the inventory example's Restock of
+3 items:
+
+```python
+import http.client, json, secrets
+
+def call(method, path, credential, body=b""):
+    connection = http.client.HTTPConnection("127.0.0.1", 8080)
+    connection.request(method, path, body or None,
+                       {"Authorization": "Bearer " + credential})
+    reply = connection.getresponse()
+    return reply.status, reply.read()
+
+def frame(state, key, payload):
+    return (b"\x01" + bytes.fromhex(state["contract"]) + key
+            + int(state["revision"]).to_bytes(8, "big") + payload)
+
+credential = open("credential").read().strip()
+state = json.loads(call("GET", "/state", credential)[1])
+key = secrets.token_bytes(32)  # keep until the request resolves
+inputs = state["values"] + ["153", "3"] + state["context"]
+status, preview = call("POST", "/preview", credential,
+                       frame(state, key, json.dumps(inputs).encode()))
+command = bytes.fromhex(json.loads(preview)["command"])
+status, reply = call("POST", "/command", credential, frame(state, key, command))
+```
 
 ## The formal model
 
@@ -114,10 +258,12 @@ only. Its finite enablement implication is checked against actual core
 decisions across the declared domain. A preview is advice: the server's
 revision guard and Authority check remain necessary at dispatch.
 
-The ingress owns its credential and admitted bytes; the shell exclusively
-owns its mutable storage and transport handles. Snapshots, prepared command
-bytes, traces and manifests cannot authorize a publication. Static assets
-are embedded under exact routes; URL paths never become filesystem reads.
+The ingress owns its credentials and admitted bytes; the presented
+credential selects one configured principal, and that principal selects its
+context. The shell exclusively owns its mutable storage and transport
+handles. Snapshots, prepared command bytes, traces and manifests cannot
+authorize a publication. Static assets are embedded under exact routes; URL
+paths never become filesystem reads.
 The optional `/state` view and `/preview` preparation require the same
 credential and origin checks as `/command`.
 
@@ -136,8 +282,9 @@ The backend supports the flat, finite, standalone scalar contracts supported
 by ZenoUI M2, with an enum command discriminator and at most 2,000,000 input
 tuples. Integers remain decimal strings in the UI. Evolved contracts,
 tables and unsupported descriptors refuse. The generated journey fixtures
-cover withdrawal queue, inventory reservation and the wide counter. The
-counter declares no deliveries, so its journey checks an empty outbox.
+cover withdrawal queue, inventory reservation, the wide counter and the
+three-party escrow example. The counter declares no deliveries, so its
+journey checks an empty outbox.
 Other contracts get an accepting genesis smoke journey and need their own
 reviewed refusal and delivery journey before adoption.
 

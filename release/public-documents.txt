@@ -311,6 +311,8 @@ docs/zal/HARNESS_INTEGRATION.md
 docs/zal/LOOPS.md
 docs/zal/README.md
 docs/zal/SPECIFICATION.md
+examples/apps/escrow-deal/README.md
+examples/apps/library-loans/README.md
 examples/arithmetic-fee/README.md
 examples/arithmetic-fused/README.md
 examples/arithmetic-quote/README.md

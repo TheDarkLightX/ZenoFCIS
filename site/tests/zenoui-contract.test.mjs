@@ -41,3 +41,13 @@ test('integer_value_labels_are_optional_checked_and_displayed',()=>{
  const extra=meta();extra.fields['pre.100.110']={label:'Holder',unit:'member',names:{}};
  assert.throws(()=>describe(raw,extra),/UiInvalidFieldMetadata/);
 });
+test('contract_guide_documents_exactly_the_metadata_keys',async()=>{
+ const guide=await readFile(new URL('../../docs/CONTRACT_RULES.md',import.meta.url),'utf8');
+ const tables=guide.split('## UI metadata: `ui.json`')[1].split('## Adoptions')[0].split(/\n#+ /);
+ const keys=table=>table.split('\n').filter(l=>/^\| `/.test(l)).map(l=>l.split('|')[1].trim().replaceAll('`',''));
+ const meta=JSON.parse(await readFile(new URL('../zenoui/test-projects/wide-counter/ui.json',import.meta.url)));
+ assert.deepEqual(keys(tables[0]).sort(),Object.keys(meta).sort());
+ for(const key of keys(tables[0])){const bad={...meta};delete bad[key];assert.throws(()=>describe({},bad),/UiInvalidMetadata/);}
+ assert.deepEqual(keys(tables[1]),['label','unit','values']);
+ assert.deepEqual(keys(tables[2]),['label','consequential']);
+});

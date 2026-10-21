@@ -16,9 +16,11 @@ examples pass:
 contract's declared domain. Each binds the contract to the library Authority as
 an application binds it, so every decision they report is the library's, and
 every law verdict comes from the library's law evaluator. Each writes an
-advisory packet with `authority: none` and changes no application file. The
-[CLI reference](CLI_REFERENCE.md#contract-judges) gives every option, field and
-exit code.
+advisory packet with `authority: none` and changes no application file.
+`zeno-fcis contract JUDGE --help` lists each judge's options, and the
+sections below describe its report. The
+[contract review](CLI_REFERENCE.md#contract-review) section of the CLI
+reference gives the review packet's fields.
 
 ## Integer values in JSON reports
 
