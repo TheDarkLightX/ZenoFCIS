@@ -49,6 +49,14 @@ pub enum ScalarDomain {
     Unsigned { min: u128, max: u128 },
 }
 
+/// One expanded computed output in program-root order, owned by the caller.
+/// Ordinary builds discard this metadata before returning their contract.
+#[derive(Clone, Debug)]
+pub struct ScalarRoot {
+    pub expression: Ast,
+    pub domain: ScalarDomain,
+}
+
 /// A typed inverse map from a scalar to an original value.
 #[derive(Clone, Debug)]
 pub enum InputLeaf {
@@ -205,6 +213,16 @@ impl<'d> Contract<'d> {
         rules: &Rules,
         commitment: [u8; 32],
     ) -> Result<Self, ContractError> {
+        Self::build_with_roots(declarations, rules, commitment).map(|(contract, _)| contract)
+    }
+
+    /// Return the ordinary contract and its expanded computed scalar roots.
+    /// Adopted programs do not retain this source metadata.
+    pub fn build_with_roots(
+        declarations: &'d Declarations,
+        rules: &Rules,
+        commitment: [u8; 32],
+    ) -> Result<(Self, Vec<ScalarRoot>), ContractError> {
         if rules.unsigned && (!rules.adoptions.is_empty() || !rules.evolutions.is_empty()) {
             return Err(ContractError::new(
                 "unsigned lineage binding",
@@ -512,7 +530,16 @@ impl<'d> Contract<'d> {
                 .unwrap_or(0)
                 .max(1),
         };
-        Ok(Self {
+        let scalar_roots = outputs
+            .entries
+            .iter()
+            .zip(&outputs.domains)
+            .map(|((expression, _), domain)| ScalarRoot {
+                expression: expression.clone(),
+                domain: *domain,
+            })
+            .collect();
+        let contract = Self {
             unsigned: rules.unsigned,
             declarations,
             commitment,
@@ -536,7 +563,8 @@ impl<'d> Contract<'d> {
             reasons,
             budgets,
             genesis,
-        })
+        };
+        Ok((contract, scalar_roots))
     }
 
     /// The decision program as the library's admitted program, whose

@@ -70,6 +70,7 @@ macro_rules! effects {
 
 effects! { crate::Command {
     leaves {
+        "construct" => Self::Construct(..) => declared((&["requirements-bundle", "owner-approval", "source-tree"], &["construction-artifacts"], true, None));
         "describe" => Self::Describe { .. } => declared((&[], &[], false, None));
         "optimize" => Self::Optimize { .. } => declared((
                 &[
@@ -356,6 +357,7 @@ effects! { crate::ContractCommand {
     flat {
         Self::Review(command) => command: crate::review_command::Command;
         Self::Judge(command) => command: crate::judge_command::Command;
+        Self::Refine(command) => command: crate::refine_command::Command;
         Self::Composition(command) => command: crate::composition_command::Command;
         Self::Draft(command) => command: crate::draft_command::Command;
         Self::Adopt(command) => command: crate::contract_adopt::Command;
@@ -363,6 +365,23 @@ effects! { crate::ContractCommand {
         Self::Evolve(command) => command: crate::contract_evolve::Command;
         Self::Symbolic(command) => command: crate::symbolic_command::Command;
         Self::Tau(command) => command: crate::tau_command::Command;
+    }
+    optional {
+    }
+}}
+
+effects! { crate::refine_command::Command {
+    leaves {
+        "refine-check" => Self::RefineCheck { .. } => declared((
+            &["abstract-contract", "concrete-contract", "abstraction-table"],
+            &[],
+            false,
+            None,
+        ));
+    }
+    groups {
+    }
+    flat {
     }
     optional {
     }

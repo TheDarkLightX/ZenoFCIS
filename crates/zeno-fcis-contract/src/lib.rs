@@ -9,7 +9,7 @@
 //! core: it reads and writes files, renders application source, replays
 //! program adoptions and runs the reviews.
 //!
-//! The supported API is [`checked_composition`] and [`ContractError`].
+//! The supported API is [`checked_composition`], [`refinement`] and [`ContractError`].
 //! [`checked_composition::check`] takes the source bytes of a composition of
 //! separately bound contracts, its manifest and each leaf's two files, and
 //! compiles and checks them itself. Its result, a
@@ -35,6 +35,10 @@ pub mod checked_composition;
 pub mod distribution;
 #[doc(hidden)]
 pub mod internals;
+pub mod refinement;
+
+#[cfg(test)]
+mod priority_construction_controls;
 
 use std::fmt;
 

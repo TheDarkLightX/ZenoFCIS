@@ -61,6 +61,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/distribution_reference.py", "--cli",
           str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"))),
     ),
+    "construction-command": AcceptanceScenario(
+        "Refuse unsupported families and preserve construction authority boundaries",
+        (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "construct", "--locked", "--offline"),
+         ("python3", "tools/test_priority_reference.py")),
+    ),
     # BEGIN version-space acceptance registrations
     "loop-version-space": AcceptanceScenario(
         "Count finite meanings, ask the owner and check the unique program",
@@ -627,6 +632,20 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
+    ),
+    "contract-refinement": AcceptanceScenario(
+        "Check all raw reservation pairs and detect refinement faults",
+        (("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--lib", "--locked", "--offline",
+          "refinement::"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--test", "contract_refinement",
+          "--locked", "--offline"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-cli", "--test", "contract_refine_check",
+          "--locked", "--offline"),
+         ("python3", "tools/test_refinement_reference.py"),
+         ("python3", "tools/make_refinement_example.py", "--check"),
+         ("python3", "tools/check_contract_refinement.py", "--self-test"),
+         ("cargo", "+1.97.1", "test", "--release", "-p", "zeno-fcis-contract", "--test", "compiler_roots",
+          "--locked", "--offline")),
     ),
     "specification-gaps": AcceptanceScenario(
         "Find the decisions and decision tables the declared laws admit",

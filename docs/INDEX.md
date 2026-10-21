@@ -26,6 +26,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Symbolic per-case checks](SYMBOLIC_CHECKS.md)
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)
+- [Construction from requirements (unreleased pilot)](CONSTRUCTION.md)
 - [Wide values and larger decisions](WIDE_VALUE_EXECUTION.md): development
   profile support, capacity and assurance boundaries
 - [Finite trace-game certificates](TRACE_GAME.md)

@@ -34,6 +34,8 @@ zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --
 zeno-fcis contract draft questions|check --session DIR
 zeno-fcis contract draft label --session DIR --revision SHA256 --examples FILE --provenance TEXT
 zeno-fcis contract draft finalize --session DIR --revision SHA256 --out NEW_DIR
+zeno-fcis construct --family priority-collection --requirement BUNDLE --owner-approval FILE --layout T|I --out DIR
+zeno-fcis contract refine-check ABSTRACT_DIR CONCRETE_DIR --abstraction FILE [--max-checks N] [--format human|json]
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--mutant-programs DIR] [--format human|json]
 zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
 zeno-fcis contract export --tau [<contract-dir>] --out DIR [--max-tuples N] [--samples N] [--format human|json]
@@ -1358,6 +1360,88 @@ fields, these two lines are the same example:
 150 161 160 140 162 | accept - 151 161 162 | 300 162 161
 150 161 160 | 140 | 162 | accept - 151 161 162 | 162 161
 ```
+
+## Contract representation refinement (2.6, unreleased)
+
+The [construction guide](CONSTRUCTION.md) describes how a frozen requirements reference and different
+implementation layouts use this gate. `construct` runs the supported priority-collection
+construction from an approved frozen requirements bundle. It returns a checked
+candidate and retained receipts, a counterexample, or an explicit incomplete/refused
+result. See the guide for input preparation, exits and finite scope.
+
+`contract refine-check` compares two rules-compiled contracts through an explicit
+abstraction table. It reads their `project.zeno` and `v2/policy.json` files and
+binds both to the library Authority. It writes no application files.
+
+```sh
+zeno-fcis contract refine-check \
+  examples/contract-refinement/reservation/abstract \
+  examples/contract-refinement/reservation/concrete \
+  --abstraction examples/contract-refinement/reservation/abstraction.json \
+  --max-checks 384 --format json
+```
+
+The bundled example specifies three reservation identities, capacity two and
+permanent retirement. The abstract state indexes 26 ternary configurations;
+the concrete state uses six bits for active and previously seen identities.
+Its declared domain has 64 raw concrete states and six commands: 384 pairs,
+including 228 pairs on invalid concrete representations. Native qualification
+checks these expectations against an independent Python semantic model.
+
+The abstraction file has schema `zeno-fcis/contract-refinement/1` and exactly:
+
+- `abstract_project_sha256`, `abstract_policy_sha256`,
+  `concrete_project_sha256`, `concrete_policy_sha256`: lowercase SHA-256 of
+  the exact UTF-8 source bytes, including whitespace;
+- `abstraction`: one abstract state ordinal or `null` per raw concrete state;
+- `invalid_state_law`: the concrete law ID that must refuse each `null` state.
+
+State ordinals enumerate the declared state fields in program order, last
+field fastest. Inputs enumerate command fields followed by context fields the
+same way. State roots must be records; the command/context layouts, type IDs
+and domains must match. Every abstract state needs a concrete representative.
+An abstract domain therefore describes the complete abstract carrier, not a
+subset inferred from state laws. Both genuine genesis states must be admitted
+and the concrete initial state must map to the abstract initial state.
+
+The checker visits every concrete state/input pair, including unreachable
+states. Committing successors must remain related. Decision class, reason,
+effects and outbox deliveries must agree exactly, including order, channel,
+canonical destination and payload bytes, and the idempotency ordinal marker.
+A rejection or refusal preserves the exact concrete state. An invalid state
+must produce `Law(Violated)` for `invalid_state_law`; a policy rejection,
+arithmetic error, or meter refusal does not substitute for that obligation.
+The law must actually hold for any mapped state whose abstract transition
+would commit. It need not be a state invariant; the example uses a pre-state
+law that applies to every transition.
+
+The result schema is `zeno-fcis/contract-refinement-result/1`. Initial-state
+and coverage failures precede pair comparisons. Otherwise a counterexample
+names the smallest state ordinal and then the smallest input ordinal; within
+a row, unchanged rejection precedes successor and then observation comparison.
+Exit codes are 0 for `refines`, 1 for `counterexample`, 2 for `inconclusive`,
+65 for malformed or unsupported intake, and 3 for a file-reading failure.
+
+`--max-checks` defaults to 262144 and counts completed pair comparisons. At
+most 4096 states per contract, 64 input tuples, and 1 MiB per source file are
+supported. Larger domain products are inconclusive before Authority evaluation;
+malformed source bounds or a comparison limit above 262144 are refused.
+Compilation and two genesis evaluations are outside the pair budget. Even a
+zero comparison budget checks genesis, initial mapping and coverage. Exhaustion
+never reports `refines`. A meter refusal stops the comparison as inconclusive
+and preserves all measured work; that incomplete row is not credited.
+Reports record Authority invocation counts and summed logical resource usage,
+including genesis and refused attempts, as decimal strings in the listed order.
+These diagnostic totals are not executable resource authority.
+
+The claim is finite contract refinement only, with `authority: none`. It does
+not cover malformed byte encodings, values outside the declared domains,
+resource equality, persisted publication subjects, derived delivery IDs,
+contextual refinement or migration of a running store. Source identities name
+the checker and its compiler/evaluator dependencies; release qualification
+must refresh and verify the evaluator source pin. Adopted programs and contract
+evolution histories are outside this profile. No successful result authorizes
+a deployment, publication, or store update.
 
 ## Contract review
 

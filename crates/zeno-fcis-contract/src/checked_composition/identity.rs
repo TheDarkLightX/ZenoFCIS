@@ -79,6 +79,8 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/internals/tables.rs",
     "src/internals/tables_review.rs",
     "src/lib.rs",
+    "src/refinement.rs",
+    "src/refinement/machine.rs",
 ];
 
 /// The digests a checker's identity combines.

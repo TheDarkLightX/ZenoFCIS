@@ -59,6 +59,9 @@ use crate::repair::first_difference;
 use crate::subject::{Subject, domain_size};
 use crate::{Refusal, Result};
 
+mod targets;
+pub use targets::{TargetProblem, TargetResult, propose_targets};
+
 /// How an output with several holes is searched.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Search {
@@ -371,10 +374,51 @@ pub fn default_candidates(
     base
 }
 
+/// Borrowed invocation inputs shared by original-based and explicit-target search.
+/// The optional original is available only to the legacy mode.
+#[derive(Clone, Copy)]
+struct TargetView<'a> {
+    vocab: &'a crate::expr::Vocabulary,
+    columns: &'a [Vec<i128>],
+    targets: &'a [Vec<i128>],
+    size: usize,
+    original: Option<&'a Subject>,
+}
+
+impl<'a> TargetView<'a> {
+    fn from_subject(subject: &'a Subject) -> Self {
+        Self {
+            vocab: &subject.vocab,
+            columns: &subject.columns,
+            targets: &subject.targets,
+            size: subject.size,
+            original: Some(subject),
+        }
+    }
+
+    fn env(self, keep: Option<usize>) -> Env<'a> {
+        Env {
+            vocab: self.vocab,
+            columns: self.columns,
+            keep: self.original.and(keep).map(|j| self.targets[j].as_slice()),
+            len: self.size,
+        }
+    }
+
+    fn output_kind(self, j: usize) -> Kind {
+        self.vocab.output_kinds()[j]
+    }
+
+    fn original_constants(self) -> Vec<i128> {
+        self.original
+            .map_or_else(Vec::new, Subject::original_constants)
+    }
+}
+
 struct Solver<'a> {
-    subject: &'a Subject,
+    subject: TargetView<'a>,
     settings: Settings,
-    synthesizer: Synthesizer<'a>,
+    synthesizer: Option<Synthesizer<'a>>,
     evaluated: usize,
     work: u64,
 }
@@ -449,6 +493,33 @@ fn constant_conflict(need: &Need) -> Vec<usize> {
 }
 
 impl Solver<'_> {
+    fn completion_limit(&self) -> usize {
+        if self.subject.original.is_some() {
+            MAX_COMPLETIONS
+        } else {
+            1
+        }
+    }
+
+    fn retain_completions(&self, found: &mut Vec<Completion>) {
+        if self.subject.original.is_some() {
+            found.sort_by_key(|c| c.nodes);
+            found.truncate(3);
+        }
+    }
+
+    /// Legacy accounting is unchanged. Explicit-target calls reserve work
+    /// before evaluation and retain all charged work when refusing a budget.
+    fn charge(&mut self, work: u64) -> Result<()> {
+        if self.subject.original.is_none()
+            && work > self.settings.max_work.saturating_sub(self.work)
+        {
+            return Err(Refusal::new("sketch-work-budget"));
+        }
+        self.work = self.work.saturating_add(work);
+        Ok(())
+    }
+
     fn full_env(&self, j: usize) -> Env<'_> {
         self.subject.env(Some(j))
     }
@@ -456,7 +527,7 @@ impl Solver<'_> {
     /// Comparisons against a hole-free integer expression, including
     /// additive offsets around a hole. Threshold neighbours represent all
     /// comparison outcomes; intersect with the eager-overflow-safe range.
-    fn comparison_ranges(&self, node: &Expr) -> Result<BTreeMap<usize, (i128, i128)>> {
+    fn comparison_ranges(&mut self, node: &Expr) -> Result<BTreeMap<usize, (i128, i128)>> {
         let mut out = BTreeMap::new();
         let env = self.subject.env(None);
         let none = BTreeMap::new();
@@ -474,8 +545,11 @@ impl Solver<'_> {
             } else {
                 continue;
             };
-            if kind_of(sibling, &self.subject.vocab)? == Some(Kind::Bool) {
+            if kind_of(sibling, self.subject.vocab)? == Some(Kind::Bool) {
                 continue;
+            }
+            if self.subject.original.is_none() {
+                self.charge((size(node) as u64).saturating_mul(env.len as u64))?;
             }
             let Some((k, offsets, safe_lo, safe_hi)) = affine_hole(hole, &env) else {
                 continue;
@@ -547,7 +621,9 @@ impl Solver<'_> {
                 Some((lo, hi)) => (nearest_zero(*lo..=*hi), true, false),
                 None => (
                     default_candidates(
-                        self.subject,
+                        self.subject
+                            .original
+                            .ok_or_else(|| Refusal::new("target-unbounded-hole"))?,
                         kinds.get(k).copied().unwrap_or(Kind::Int),
                         sketch_constants,
                     ),
@@ -565,7 +641,7 @@ impl Solver<'_> {
     }
 
     fn meet(
-        &self,
+        &mut self,
         pivot: &Expr,
         need: &Need,
         sketch_constants: &BTreeSet<i128>,
@@ -591,6 +667,9 @@ impl Solver<'_> {
                 let none = BTreeMap::new();
                 for (index, alternative) in alternatives.iter().enumerate() {
                     let resolved = self.subject.vocab.resolve_variants(alternative)?;
+                    if self.subject.original.is_none() {
+                        self.charge((size(&resolved) as u64).saturating_mul(env.len as u64))?;
+                    }
                     // An alternative that overflows cannot be a completion;
                     // it does not hide the others.
                     let Some(values) = skip_overflow(evaluate(&resolved, &env, &none))? else {
@@ -602,12 +681,14 @@ impl Solver<'_> {
                 }
                 Ok(None)
             }
-            Expr::Hole(_, Hole::Expr) => {
-                Ok(
-                    solve_expression(need, &self.synthesizer, self.settings.synth_depth)?
-                        .map(Fill::Ast),
-                )
-            }
+            Expr::Hole(_, Hole::Expr) => Ok(solve_expression(
+                need,
+                self.synthesizer
+                    .as_ref()
+                    .ok_or_else(|| Refusal::new("target-expression-hole"))?,
+                self.settings.synth_depth,
+            )?
+            .map(Fill::Ast)),
             _ => Err(Refusal::new("hole-expected")),
         }
     }
@@ -619,7 +700,8 @@ impl Solver<'_> {
         kinds: &BTreeMap<usize, Kind>,
         sketch_constants: &BTreeSet<i128>,
     ) -> Result<(Vec<Completion>, OutputSearch)> {
-        let target = &self.subject.targets[j];
+        let view = self.subject;
+        let target = &view.targets[j];
         let holes: Vec<Expr> = holes_of(node).into_iter().cloned().collect();
         let mut info = OutputSearch {
             output: j,
@@ -637,6 +719,13 @@ impl Solver<'_> {
             solved_alone: 0,
         };
         if holes.is_empty() {
+            if self.subject.original.is_none() {
+                self.charge((size(node) as u64).saturating_mul(self.subject.size as u64))?;
+                if evaluate(node, &self.full_env(j), &BTreeMap::new())? != *target {
+                    info.verdict = Some(Status::Unrealizable);
+                    return Ok((Vec::new(), info));
+                }
+            }
             return Ok((
                 vec![Completion {
                     assignment: BTreeMap::new(),
@@ -712,9 +801,9 @@ impl Solver<'_> {
             .collect();
         let sample_target: Vec<i128> = rows.iter().map(|t| target[*t]).collect();
         let sample_env = Env {
-            vocab: &self.subject.vocab,
+            vocab: self.subject.vocab,
             columns: &sample_columns,
-            keep: Some(&sample_target),
+            keep: self.subject.original.map(|_| sample_target.as_slice()),
             len: rows.len(),
         };
         let want = self.subject.output_kind(j);
@@ -731,6 +820,7 @@ impl Solver<'_> {
                 break;
             }
             tried += 1;
+            self.evaluated += 1;
             let mut assignment = BTreeMap::new();
             for (s, i) in info.searched.iter().zip(&index) {
                 let value = s.values.get(*i).copied().unwrap_or(0);
@@ -755,9 +845,7 @@ impl Solver<'_> {
             }
             let partial = fill(node, &assignment)?;
             let cost = size(&partial) as u64;
-            self.work = self
-                .work
-                .saturating_add(cost.saturating_mul(rows.len() as u64));
+            self.charge(cost.saturating_mul(rows.len() as u64))?;
             let Some(pivot) = &pivot else {
                 let Ok(got) = evaluate(&partial, &sample_env, &none) else {
                     continue;
@@ -765,9 +853,7 @@ impl Solver<'_> {
                 if got != sample_target {
                     continue;
                 }
-                self.work = self
-                    .work
-                    .saturating_add(cost.saturating_mul(self.subject.size as u64));
+                self.charge(cost.saturating_mul(self.subject.size as u64))?;
                 let Some(full) = skip_overflow(evaluate(&partial, &self.full_env(j), &none))?
                 else {
                     continue;
@@ -779,7 +865,7 @@ impl Solver<'_> {
                         expression: partial,
                         nodes,
                     });
-                    if found.len() >= MAX_COMPLETIONS {
+                    if found.len() >= self.completion_limit() {
                         break;
                     }
                 }
@@ -807,9 +893,7 @@ impl Solver<'_> {
             if need_sample_bad && !others.is_empty() {
                 continue;
             }
-            self.work = self
-                .work
-                .saturating_add(cost.saturating_mul(self.subject.size as u64));
+            self.charge(cost.saturating_mul(self.subject.size as u64))?;
             let derived = derive(
                 &partial,
                 &path,
@@ -846,12 +930,11 @@ impl Solver<'_> {
                 expression: complete,
                 nodes,
             });
-            if found.len() >= MAX_COMPLETIONS {
+            if found.len() >= self.completion_limit() {
                 break;
             }
         }
         info.tried = tried;
-        self.evaluated += tried;
         if found.is_empty() {
             let all_complete = info.searched.iter().all(|s| s.complete);
             let pivot_exact = !matches!(pivot, Some(Expr::Hole(_, Hole::Expr)));
@@ -866,8 +949,7 @@ impl Solver<'_> {
                 Status::NotFound
             });
         }
-        found.sort_by_key(|c| c.nodes);
-        found.truncate(3);
+        self.retain_completions(&mut found);
         Ok((found, info))
     }
 }
@@ -1012,8 +1094,7 @@ impl Solver<'_> {
                 Status::NotFound
             });
         }
-        found.sort_by_key(|c| c.nodes);
-        found.truncate(3);
+        self.retain_completions(&mut found);
         Ok((found, info))
     }
 
@@ -1028,7 +1109,7 @@ impl Solver<'_> {
         sketch_constants: &BTreeSet<i128>,
         state: &mut Meanings,
     ) -> Result<()> {
-        if state.found.len() >= MAX_COMPLETIONS {
+        if state.found.len() >= self.completion_limit() {
             return Ok(());
         }
         if state.tried >= self.settings.max_assignments || self.over_budget() {
@@ -1095,7 +1176,7 @@ impl Solver<'_> {
                 let mut extended = assignment.clone();
                 extended.insert(k, value);
                 self.visit(j, next, extended, depth + 1, order, sketch_constants, state)?;
-                if state.found.len() >= MAX_COMPLETIONS || state.budget {
+                if state.found.len() >= self.completion_limit() || state.budget {
                     break;
                 }
             }
@@ -1130,9 +1211,7 @@ impl Solver<'_> {
             done = fill(&done, &one)?;
             assignment.insert(k, value);
         }
-        self.work = self
-            .work
-            .saturating_add((size(&done) as u64).saturating_mul(self.subject.size as u64));
+        self.charge((size(&done) as u64).saturating_mul(self.subject.size as u64))?;
         if self.over_budget() {
             state.budget = true;
             return Ok(());
@@ -1176,9 +1255,7 @@ impl Solver<'_> {
                 continue;
             }
             let cost = size(&node) as u64;
-            self.work = self
-                .work
-                .saturating_add(cost.saturating_mul(self.subject.size as u64));
+            self.charge(cost.saturating_mul(self.subject.size as u64))?;
             // An overflow beside the hole leaves it to the branching search.
             let Some(need) =
                 skip_overflow(derive_loose(&node, &path, &root, &self.full_env(j), &none))?
@@ -1239,9 +1316,7 @@ impl Solver<'_> {
             let mut one = BTreeMap::new();
             one.insert(k, fill_value);
             let filled = fill(parent, &one)?;
-            self.work = self
-                .work
-                .saturating_add(cost.saturating_mul(self.subject.size as u64));
+            self.charge(cost.saturating_mul(self.subject.size as u64))?;
             if self.over_budget() {
                 return Err(Refusal::new("sketch-work-budget"));
             }
@@ -1305,9 +1380,9 @@ fn solve_inner(subject: &Subject, outputs: &[Expr], settings: &Settings) -> Resu
         sketch_constants.extend(constants(node));
     }
     let mut solver = Solver {
-        subject,
+        subject: TargetView::from_subject(subject),
         settings: *settings,
-        synthesizer: Synthesizer::new(subject, settings.synthesis),
+        synthesizer: Some(Synthesizer::new(subject, settings.synthesis)),
         evaluated: 0,
         work: 0,
     };

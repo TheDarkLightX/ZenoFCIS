@@ -8,6 +8,9 @@ mod binding;
 mod checker_process;
 mod compliance_gateway;
 mod composition_command;
+#[path = "../examples/construction_pilot.rs"]
+mod construction;
+use construction::build_tree;
 mod containment_policy;
 mod contract;
 mod contract_adopt;
@@ -30,6 +33,7 @@ mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
+mod refine_command;
 mod report_numbers;
 mod review_command;
 mod shell_v2;
@@ -169,6 +173,8 @@ enum ContractCommand {
     #[command(flatten)]
     Judge(judge_command::Command),
     #[command(flatten)]
+    Refine(refine_command::Command),
+    #[command(flatten)]
     Composition(composition_command::Command),
     #[command(flatten)]
     Draft(draft_command::Command),
@@ -197,6 +203,8 @@ enum ContractCommand {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Construct a checked priority collection from approved frozen requirements.
+    Construct(construction::Construct),
     /// Read-only structured usage knowledge operations.
     Kb {
         #[command(subcommand)]
@@ -529,6 +537,7 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 
 fn run(command: Command) -> u8 {
     match command {
+        Command::Construct(args) => construction::construct(args),
         Command::Kb { operation } => knowledge_command::execute(&[], operation),
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
@@ -538,6 +547,7 @@ fn run(command: Command) -> u8 {
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
             ContractCommand::Judge(command) => judge_command::run(command),
+            ContractCommand::Refine(command) => refine_command::run(command),
             ContractCommand::Composition(command) => composition_command::run(command),
             ContractCommand::Draft(command) => draft_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
@@ -2429,8 +2439,7 @@ mod tests {
 
     #[test]
     fn hostile_source_is_inert() {
-        let source =
-            "zeno 1; project 1 inert; claim 2 x cvc5 relational = $(touch /tmp/pwned) == 1;";
+        let source = "zeno 1; project 1 inert; claim 2 x cvc5 relational = $(touch pwned) == 1;";
         assert!(parse_project(source, SourceLimits::default()).is_err());
     }
 }

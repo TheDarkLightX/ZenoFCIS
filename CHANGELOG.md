@@ -17,6 +17,18 @@ embedded in ZenoFCIS values.
 - Add [Build an app with ZenoFCIS](docs/BUILD_AN_APP.md). Browser, TCP and
   release qualification remain separate gates.
 
+- Add `construct --family priority-collection --requirement BUNDLE
+  --owner-approval FILE --layout T|I --out DIR` and a
+  [construction guide](docs/CONSTRUCTION.md). The command uses frozen meaning,
+  bounded typed sketches and exhaustive native refinement; it retains candidates,
+  counterexamples and receipts. Unsupported families refuse by name. Scope is
+  capacity two with three identities, two priorities and two lifetime insertions;
+  no correctness claim for arbitrary capacities or applications is made.
+- Add `contract refine-check`, the pure representation-refinement API and the
+  reservation example. Results distinguish full finite refinement, the first
+  counterexample and inconclusive checking. Reports confer no application,
+  migration, publication or resource authority.
+
 ## 2.5.0 - 2026-10-18
 
 - **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,

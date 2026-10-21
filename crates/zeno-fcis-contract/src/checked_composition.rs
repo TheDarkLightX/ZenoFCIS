@@ -161,7 +161,7 @@ use assembly::Assembly;
 pub use compose::{CheckedAssumeGuarantee, ComposeRefusal, require_checked};
 pub use domain::{DOMAIN_CHECKER, FieldDomain, MAX_OBLIGATION, MAX_TOTAL, domain_paths};
 pub use hierarchy::{ClaimKind, Condition};
-use identity::Identity;
+pub(crate) use identity::Identity;
 pub use joint::{
     JointComposition, JointInputError, JointOutcome, JointRow, OutcomeKind, RefusedClass,
     RequestSlot, StateSlot,
