@@ -35,6 +35,7 @@ class Server:
 
     def __init__(self, app: Path, binary: Path, root: Path):
         self.root = root
+        self.app = app
         fixture = json.loads((app / "app-checks/journey.json").read_text())
         self.step = fixture["steps"][0]
         environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
@@ -314,13 +315,20 @@ class Suite:
         c("preview_deep_nesting", {"400"}, [r("POST", "/preview", b(b"[" * 5000 + b"]" * 5000))])
         c("preview_wrong_count", {"400"}, [r("POST", "/preview", b(json.dumps(self.inputs[:-1]).encode()))])
         c("preview_json_numbers", {"400"}, [r("POST", "/preview", b(json.dumps([int(v) for v in self.inputs]).encode()))])
-        state_width = len(self.state()["values"])
+        # A command field, an integer one when there is one, and a value just
+        # outside its declared domain.
+        fields = json.loads((self.server.app / "www/app.json").read_text())["description"]["fields"]
+        commands = [f for f in fields if f["source"] == "command"]
+        target = next((f for f in commands if f["domain"]["kind"] == "int"), commands[-1])
+        at = fields.index(target)
+        beyond = (int(target["domain"]["max"]) + 1 if target["domain"]["kind"] == "int"
+                  else max(int(o["value"]) for o in target["options"]) + 1)
         for label, text in [("exponent", "1e0"), ("plus_sign", "+1"), ("leading_zero", "01"), ("negative_zero", "-0"),
                             ("space", " 1"), ("separator", "1,0"), ("decimal", "1.0"), ("arabic_digits", "١"),
                             ("fullwidth_digits", "１"), ("forty_one_digits", "1" * 41), ("i128_overflow", str(2**127)),
                             ("empty", "")]:
             changed = list(self.inputs)
-            changed[state_width + 1] = text
+            changed[at] = text
             c(f"preview_number_{label}", {"400"}, [r("POST", "/preview", b(json.dumps(changed).encode()))])
         # Another party's context or a different state is refused, never decided.
         status = self.state()
@@ -335,7 +343,7 @@ class Suite:
         c("command_truncated", {"400", "422"}, [r("POST", "/command", b(self.command[:-1]))])
         c("command_preview_json", {"400", "422"}, [r("POST", "/command", b(self.preview_json))])
         outside = list(self.inputs)
-        outside[state_width + 1] = "1000"
+        outside[at] = str(beyond)
         reply = self.case("preview_outside_domain", {"200"}, [r("POST", "/preview", b(json.dumps(outside).encode()))])
         decided = json.loads(payload(reply))
         if decided["reply"]["class"] != "Refused":
