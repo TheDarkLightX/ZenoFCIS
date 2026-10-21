@@ -7,6 +7,10 @@ publish = false
 
 [workspace]
 
+[features]
+default = []
+std = []
+
 [dependencies]
 zeno-fcis-value = { path = "../../crates/zeno-fcis-value", default-features = false }
 zeno-fcis-codec = { path = "../../crates/zeno-fcis-codec", default-features = false }

@@ -1,6 +1,11 @@
 # Native zUSD review candidate
 
-Frozen RELATION revision 1 and ROUND2 in the private build folder are the
+Step 4 now has a separate conditional composition/publication API described in
+[STEP4.md](STEP4.md). Its authentication claims are conditional on ReceiptVerifierV1;
+there is no live backend or selected owner policy. The older unmounted component
+boundaries described below remain available as pure mathematical subjects.
+
+Frozen RELATION revision 2 and ROUND2 in the private build folder are the
 specification. This no_std standalone workspace has no authentication or
 publication authority. Its local lock does not modify the library workspace.
 Live clock, drip, funding, oracle, exposure and migration profiles remain unbound.

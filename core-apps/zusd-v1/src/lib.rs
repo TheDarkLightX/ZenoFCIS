@@ -1,9 +1,13 @@
-//! Unmounted native zUSD relations. No authentication, clock acquisition, drip
-//! selection, custody receipt or publication API is supplied by this crate.
+//! Native zUSD relations and conditional step-4 composition. Authentication
+//! requires a ReceiptVerifierV1 implementation meeting its complete contract;
+//! no live verifier, clock mapping, drip or owner policy is supplied.
 #![no_std]
 #![forbid(unsafe_code)]
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 pub mod accumulator;
+pub mod application;
 pub use accumulator::Accumulator256;
 pub mod common;
 pub mod composition;
