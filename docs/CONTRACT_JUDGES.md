@@ -414,8 +414,8 @@ acceptance conditions within that broader tradition.
 ## What is new here
 
 This release shares runtime genesis admission across the finite judges and
-application generation, and pairs contract decisions with bounded run
-observers. The comparative assessment of this combination is **prior-art
+application generation, pairs contract decisions with bounded run
+observers, and shares typed decision alternatives with the question loop. The comparative assessment of this combination is **prior-art
 search pending**.
 
 ## Scope

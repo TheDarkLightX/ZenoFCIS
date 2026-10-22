@@ -162,6 +162,21 @@ Expected: exit 2; {"summary.gaps.status": "inconclusive"}.
 
 ## See also
 
+**Background.** Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla,
+“Automatic Verification of Finite-State Concurrent Systems Using Temporal
+Logic Specifications,” ACM Transactions on Programming Languages and Systems
+8(2), 1986, is background for exhaustive finite-state checking.
+
+**What is new here.** This release shares a typed candidate decision space
+between gap judgments and question options, with independently checked laws
+and region-wide successor guidance. The comparative assessment is
+**prior-art search pending**.
+
+**Scope.** Determination means uniqueness under the declared laws over the
+finite domain and resource bounds; it does not establish intended behavior
+or authorize adoption.
+
+
 Sources: {"engine": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "exit_codes": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "inputs": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "limits": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "outputs": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "refusals": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "synopsis": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213", "verdicts": "docs/CONTRACT_JUDGES.md:72-130; docs/CONTRACT_JUDGES.md:189-213"}
 
 Run `zeno-fcis guide find "find missing requirements"` for related cards.

@@ -372,7 +372,8 @@ fn failure_only_reasons_cannot_keep_fully_specified_rejects_ambiguous() {
     let laws = root.path().join("closing.zeno");
     // A failure-only reason remains unavailable in a rejection law. Fixing
     // the judge must not weaken the language's independent scope check.
-    fs::write(&laws, "law 9000 wrong_scope on reject:202 = false;\n").unwrap();
+    fs::write(&laws, "law 9000 wrong_scope on reject:202 = false;\n")
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     let invalid = run(
         &[
             "contract",
@@ -390,10 +391,15 @@ fn failure_only_reasons_cannot_keep_fully_specified_rejects_ambiguous() {
     assert!(
         invalid["error"]["message"]
             .as_str()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .contains("declared Reject reason")
     );
-    fs::write(&laws, fs::read(app.join("proposed-laws.txt")).unwrap()).unwrap();
+    fs::write(
+        &laws,
+        fs::read(app.join("proposed-laws.txt"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     let out = root.path().join("review.json");
     let report = run(
         &[

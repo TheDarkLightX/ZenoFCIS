@@ -2880,3 +2880,22 @@ python3 -I integrations/commons/mcp.py --store COMMONS_DIR --actor NAME
 
 The optional synthesis MCP server exposes the same handlers. Guide lookups do
 not append Commons events, consult a private knowledge layer or read a project.
+
+## Lineage of the added judge and search behavior
+
+**Background.** Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla,
+“Automatic Verification of Finite-State Concurrent Systems Using Temporal
+Logic Specifications,” ACM Transactions on Programming Languages and Systems
+8(2), 1986, is background for exhaustive finite-state judgments. Ross Tate,
+Michael Stepp, Zachary Tatlock and Sorin Lerner, “Equality Saturation: A New
+Approach to Optimization,” ACM POPL, 2009, is background for equality-based
+proposal search.
+
+**What is new here.** The added behavior shares typed decision alternatives
+between gaps and questions, distinguishes proposal limitations from a completed
+search, and reports retained work and sequential artifact publication. The
+comparative assessment is **prior-art search pending**.
+
+**Scope.** Each judgment retains its declared finite domain, resource limits
+and independent acceptance checks. Advisory output, telemetry, search ranking
+and artifact creation do not confer runtime or adoption authority.

@@ -635,16 +635,18 @@ fn an_unsupported_original_names_its_node_instead_of_claiming_search() {
         receipt.as_os_str(),
     ]);
     assert_eq!(output.status.code(), Some(2));
-    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let report: Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     assert_eq!(report["status"], "unsupported-original");
     assert_eq!(report["authority"], "none");
     assert_eq!(report["detail"]["reason"], "unsupported-original-node");
-    let program = import_program(&read(&original)).unwrap();
+    let program = import_program(&read(&original))
+        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
     let index = program
         .nodes()
         .iter()
         .position(|op| matches!(op, zeno_fcis_synthesis::finite::Op::MulDivCeil(..)))
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected MulDivCeil instruction"));
     assert_eq!(report["detail"]["unsupported_node"]["index"], index);
     assert_eq!(report["detail"]["unsupported_node"]["opcode"], "MulDivCeil");
     assert_eq!(report["detail"]["search"]["phases_run"], 0);
@@ -667,11 +669,11 @@ fn a_checked_supplied_candidate_survives_an_unsupported_original_opcode() {
     let domain = Domain::Int { min: 0, max: 0 };
     let make = |nodes, root| {
         Program::try_new(vec![domain], vec![domain], nodes, vec![root])
-            .unwrap()
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .value()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .canonical_bytes()
-            .unwrap()
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
     };
     let original = directory.write(
         "original.zcve",

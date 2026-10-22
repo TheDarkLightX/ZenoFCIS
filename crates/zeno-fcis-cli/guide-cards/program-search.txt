@@ -210,6 +210,20 @@ Expected: exit 0; {"status": "equivalent"}.
 
 ## See also
 
+**Background.** Ross Tate, Michael Stepp, Zachary Tatlock and Sorin Lerner,
+“Equality Saturation: A New Approach to Optimization,” ACM POPL, 2009, is
+background for the equality-based proposal search.
+
+**What is new here.** This release separates unsupported proposal instructions,
+incomplete search and independently checked improvements, and preserves work
+and partial artifact publication diagnostics. The comparative assessment is
+**prior-art search pending**.
+
+**Scope.** Only the independent equivalence check and receipt replay qualify
+a candidate over its declared finite domain. Proposal search and file creation
+provide no decision or publication authority.
+
+
 Sources: {"engine": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "exit_codes": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "inputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "limits": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "outputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "refusals": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "synopsis": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "verdicts": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425"}
 
 Run `zeno-fcis guide find "search for a smaller program"` for related cards.

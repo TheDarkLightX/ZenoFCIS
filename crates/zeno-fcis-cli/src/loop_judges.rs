@@ -2627,12 +2627,16 @@ mod tests {
     fn question_and_gap_judge_share_reason_class_decision_space() {
         use crate::contract::review::gaps;
         let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
-        let project = std::fs::read_to_string(base.join("project.zeno")).unwrap();
-        let rules = std::fs::read_to_string(base.join("v2/policy.json")).unwrap();
-        let proposals = std::fs::read_to_string(base.join("proposed-laws.txt")).unwrap();
+        let project = std::fs::read_to_string(base.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+        let rules = std::fs::read_to_string(base.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+        let proposals = std::fs::read_to_string(base.join("proposed-laws.txt"))
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
         for closed in [false, true] {
             let mut project = project.clone();
-            let mut policy: Value = serde_json::from_str(&rules).unwrap();
+            let mut policy: Value = serde_json::from_str(&rules)
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
             if closed {
                 project.push('\n');
                 project.push_str(&proposals);
@@ -2641,8 +2645,11 @@ mod tests {
                 }
             }
             let rules = policy.to_string();
-            let core = Core::from_sources(project.clone(), rules.clone()).unwrap();
-            let admitted = core.admissible(&[]).unwrap();
+            let core = Core::from_sources(project.clone(), rules.clone())
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+            let admitted = core
+                .admissible(&[])
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
             let report = gaps::judge(
                 &project,
                 &rules,
@@ -2653,7 +2660,7 @@ mod tests {
                     mutants: false,
                 },
             )
-            .unwrap()
+            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
             .json();
             assert_eq!(report["status"], "measured", "{report}");
             let determined = admitted
@@ -2687,7 +2694,9 @@ mod tests {
                 })
                 .count();
             assert_eq!(
-                question(&core, &[]).unwrap()["stats"]["determined"],
+                question(&core, &[])
+                    .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))["stats"]
+                    ["determined"],
                 executable_determined
             );
         }
@@ -2700,13 +2709,20 @@ mod tests {
             let base = Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../examples")
                 .join(example);
-            let core = Core::load(&base, true).unwrap();
-            let report = question(&core, &[]).unwrap();
+            let core = Core::load(&base, true)
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+            let report = question(&core, &[])
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
             let mut questions = vec![(
                 report["question"]["where"].clone(),
-                report["question"]["options"].as_array().unwrap().clone(),
+                report["question"]["options"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("expected fixture value"))
+                    .clone(),
             )];
-            let admitted = core.admissible(&[]).unwrap();
+            let admitted = core
+                .admissible(&[])
+                .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
             let freedom = core.freedom_from(admitted, &[], &[]);
             // Exercise every eligible region, including smaller rejecting
             // branches that the first largest-region question does not show.
@@ -2716,14 +2732,16 @@ mod tests {
                 for ordinal in &region.ordinals {
                     mask[*ordinal] = true;
                 }
-                let formula = core.region_formula(&mask, Some(region.case)).unwrap();
+                let formula = core
+                    .region_formula(&mask, Some(region.case))
+                    .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
                 let current = core.core_label(region.ordinals[0]);
                 let options = region
                     .labels
                     .iter()
                     .map(|chosen| {
                         core.offered_option(*chosen, region, &freedom.admitted, current)
-                            .unwrap()
+                            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
                     })
                     .collect();
                 questions.push((json!(core.show(&formula)), options));
@@ -2735,11 +2753,15 @@ mod tests {
                         usize::from(option["class"] != "Reject" && option.get("sets").is_none());
                     let mut answer = option.clone();
                     answer["where"] = where_.clone();
-                    answer.as_object_mut().unwrap().remove("current");
+                    answer
+                        .as_object_mut()
+                        .unwrap_or_else(|| panic!("expected fixture value"))
+                        .remove("current");
                     let answers = core
                         .answers(&json!({"schema":"zeno-fcis/loop-answers/1", "answers":[answer]}))
-                        .unwrap();
-                    let submitted = question(&core, &answers).unwrap();
+                        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
+                    let submitted = question(&core, &answers)
+                        .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"));
                     assert_ne!(
                         submitted["status"], "conflict",
                         "{example}: offered={option}; submitted={submitted}"
