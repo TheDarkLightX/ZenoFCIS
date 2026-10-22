@@ -292,12 +292,28 @@ impl Parser {
                 ValueExpr::Int(0)
             });
         }
-        let copies = entries.len().saturating_sub(1);
+        // A computed singleton position still evaluates its index, including
+        // traps and work. Only the direct literal/bound path above elides it.
+        let copies = entries.len().saturating_sub(1).max(1);
         let (nodes, _) = formula_shape_value(index);
         if !self.charge(at, copies.saturating_mul(nodes.saturating_add(3))) {
             return ValueExpr::Int(0);
         }
         let mut value = entries.pop().unwrap_or(ValueExpr::Int(0));
+        if entries.is_empty() {
+            if !self.charge(at, formula_shape_value(&value).0) {
+                return ValueExpr::Int(0);
+            }
+            return ValueExpr::Select(
+                Box::new(RelExpr::Compare(
+                    CompareOp::Eq,
+                    index.clone(),
+                    self.index_number(index, 0),
+                )),
+                Box::new(value.clone()),
+                Box::new(value),
+            );
+        }
         for (k, entry) in entries.into_iter().enumerate().rev() {
             value = ValueExpr::Select(
                 Box::new(RelExpr::Compare(
@@ -333,7 +349,7 @@ impl Parser {
         let mut outputs = Vec::new();
         let last = entries.len().saturating_sub(1);
         for (k, entry) in entries.drain(..).enumerate() {
-            if k < last {
+            if k < last || last == 0 {
                 conditions.push(nodes.len() as u32);
                 nodes.push(BoolNode::Formula(RelExpr::Compare(
                     CompareOp::Eq,
@@ -345,6 +361,10 @@ impl Parser {
             nodes.push(BoolNode::Formula(entry));
         }
         let mut output = outputs.pop().unwrap_or(0);
+        if last == 0 {
+            nodes.push(BoolNode::Select(0, output, output));
+            output = nodes.len() as u32 - 1;
+        }
         for (c, a) in conditions.into_iter().zip(outputs).rev() {
             nodes.push(BoolNode::Select(c, a, output));
             output = nodes.len() as u32 - 1;

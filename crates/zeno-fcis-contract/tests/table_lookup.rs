@@ -226,3 +226,26 @@ fn derived_word_lookup_matches_explicit_whole_word_select_work() {
         }
     }
 }
+
+#[test]
+fn singleton_lookup_keeps_the_index_expression_eager() {
+    let source = PROJECT
+        .replace("size 4 [30,25,20,10]", "size 1 [10]")
+        .replace("Tier in 0..=3", "Tier in 0..=0");
+    let source = format!("{source} type 107 bool Flag; const table 210 flags 107 size 1 [true];");
+    let index = format!("choose({} + 1 == 0,0,0)", i128::MAX);
+    for expression in [
+        format!("fee_bps[{index}]"),
+        format!("choose(flags[{index}],10,20)"),
+    ] {
+        let mut policy: serde_json::Value = serde_json::from_str(&rules(&expression)).unwrap();
+        policy["leaf_bindings"]["107"] = json!(["Bool"]);
+        bound(&source, &policy.to_string(), |contract, schema| {
+            let framer = Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
+            policy::with_authority(contract,schema,|authority| {
+                let outcome=evaluate::evaluate(authority,&framer,&[30,0,140]);
+                assert!(matches!(outcome,Outcome::Refused(ref r) if r.class==evaluate::RefusalClass::Arithmetic),"the singleton index overflow must trap: {expression}: {outcome:?}");
+            }).unwrap();
+        });
+    }
+}

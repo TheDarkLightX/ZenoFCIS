@@ -2606,12 +2606,23 @@ impl Parser {
             return None;
         }
         let entries = (0..size)
-            .filter_map(|k| {
+            .map(|k| {
                 let mut path = segments.to_vec();
                 *path.last_mut()? = StableId::new(table.checked_add(k)?)?;
                 ProjectionPath::try_new(root, path).map(ValueExpr::Projection)
             })
-            .collect();
+            .collect::<Option<Vec<_>>>();
+        let Some(entries) = entries else {
+            self.error_at(
+                start,
+                DiagnosticCode::InvalidDeclaration,
+                "table.entry",
+                "valid entry projection paths",
+                "invalid table projection",
+                "use a bounded declared table path",
+            );
+            return Some(ValueExpr::Int(0));
+        };
         Some(self.select_values(start, &index, entries))
     }
     /// Reads `VAR in table T`, after the form's keyword. Returns the

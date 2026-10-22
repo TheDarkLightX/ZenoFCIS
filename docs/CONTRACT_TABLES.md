@@ -149,8 +149,11 @@ because the independent range check has already excluded every other index;
 there is no out-of-range value. Every entry and condition is eager, retaining
 the existing Select's traps and ordinary measured work. Boolean reads use the
 same eager Select in a checked Boolean circuit. No runtime table is retained.
-The selection has N entries and N-1 Selects for a one-dimensional table;
-resource limits still apply to the entries and copied index expressions.
+The selection has N entries and N-1 Selects for a one-dimensional table with
+N >= 2. A computed position on a singleton keeps one same-entry Select, so
+evaluating the index still incurs its traps and work. Literal/bound reads keep
+their direct entry.
+Resource limits still apply to the entries and copied index expressions.
 Active recursive self references retain literal or bound indices. The
 [fee-tier journey](../examples/contract-tables/fee-tiers/README.md) uses one
 constant schedule in both its law and decision rule.
