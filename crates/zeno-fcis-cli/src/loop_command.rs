@@ -102,7 +102,14 @@ pub(super) enum ProposerArg {
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 pub(super) enum Command {
-    /// Admit an original program and open a new session directory.
+    #[command(
+        about = "Admit a reference program and create a bounded proposal session.",
+        long_about = r#"Read --original as canonical program bytes (at most 65,536 bytes), admit it under --profile, and freeze the request and limits in a new or empty --session directory. No equivalence receipt is issued.
+
+Attempts/checks/model calls are capped at 8/8/4; the invocation deadline is at most 20,000 ms. Work defaults scale with the original; explicit values may only reduce those ceilings. Hosted calls, disclosure and spending are disabled.
+
+JSON schema: zeno-fcis/transform-loop/1. Exit 0: opened; 1: admission refused; 2: acquisition or containment inconclusive; 3: I/O error. No application authority."#
+    )]
     Open {
         /// Canonical original program (program.zcve encoding).
         #[arg(long)]
@@ -110,6 +117,7 @@ pub(super) enum Command {
         /// New or empty directory holding the request, ledger and artifacts.
         #[arg(long)]
         session: PathBuf,
+        /// Admission profile: Boolean programs or checked signed-i128 programs.
         #[arg(long, value_enum, default_value_t = ProfileArg::CheckedI128V1)]
         profile: ProfileArg,
         /// Attempts per session, at most 8.
@@ -136,8 +144,16 @@ pub(super) enum Command {
         #[arg(long, default_value_t = Limits::CEILING.deadline_ms)]
         deadline_ms: u64,
     },
-    /// Spend one attempt on a supplied candidate and report typed feedback.
+    #[command(
+        about = "Check one supplied program or expression proposal in an existing session.",
+        long_about = r#"Load --session and replay its retained best program and counterexamples before proposing. Supply exactly one of --candidate (canonical bytes, 65,536-byte cap), --candidate-json (inputs/outputs/nodes/roots JSON, 1,048,576-byte cap), or --expressions (zeno-fcis/loop-expressions/1, 65,536-byte cap). JSON integers in program domains and Int nodes are canonical decimal strings.
+
+One submitted proposal consumes one attempt, including malformed or duplicate proposals. Intake/replay work stays charged on earlier refusal; an unfinished expression precheck may return before an attempt. The transform checker compares all outputs or exact evaluation failures on every declared input tuple under the frozen profile/work limits. Expressions also get a confirming check and receipt replay before session submission.
+
+JSON: zeno-fcis/transform-loop/1. Exit 0: checked-improvement or equivalent-without-improvement:<reason>; 1: different, refused, duplicate-of-original or duplicate-of-attempt:<N>; 2: incomplete, closed session or failed proposal/check; 3: I/O error. A selected smaller equivalent replacement retains its receipt; equivalence alone need not replace the best program."#
+    )]
     Candidate {
+        /// Existing session directory created by loop open.
         #[arg(long)]
         session: PathBuf,
         /// Canonical candidate program.
@@ -147,7 +163,7 @@ pub(super) enum Command {
             required_unless_present_any = ["candidate_json", "expressions"]
         )]
         candidate: Option<PathBuf>,
-        /// Candidate in the fixture vocabulary (inputs, outputs, nodes, roots); encoded canonically before admission.
+        /// Finite-program JSON with inputs, outputs, nodes and roots; canonicalized before checking.
         #[arg(long, conflicts_with = "expressions")]
         candidate_json: Option<PathBuf>,
         /// Candidate as one expression per output (zeno-fcis/loop-expressions/1); a refuted one gets a region, repair sites and a checked repair.
@@ -157,10 +173,19 @@ pub(super) enum Command {
         #[arg(long)]
         provenance: Option<PathBuf>,
     },
-    /// Drive the loop with a proposer until it stops, then report.
+    #[command(
+        about = "Drive an existing session with local, scripted, or disabled hosted proposals.",
+        long_about = r#"Load --session and replay retained evidence, then submit --seed programs in order before --proposer. Local proposes deterministic rewrites; fake requires a zeno-fcis/fake-provider-script/1 --script and reserves model calls; hosted is disabled, including when --hosted-config is supplied. Script/config files are capped at 262,144 bytes; seeds at 65,536 bytes.
+
+Attempts, checks, model calls, work and the deadline use the opened request limits. Each candidate is compared with the fixed original over its full declared domain; only a smaller checked equivalent can replace the retained best program and receipt.
+
+JSON: zeno-fcis/transform-loop/1 with detail.report (zeno-fcis/transform-loop-report/1). Exit 0 completed means the driver returned, even if no improvement was found or proposals failed; read stop_reason and attempts. Setup refusal is 1, replay/acquisition/containment inconclusive is 2, I/O error is 3. No new session or application authority."#
+    )]
     Run {
+        /// Existing session directory created by loop open.
         #[arg(long)]
         session: PathBuf,
+        /// Proposal source: local rewriting, scripted fake, or disabled hosted adapter.
         #[arg(long, value_enum)]
         proposer: ProposerArg,
         /// Fake provider script (zeno-fcis/fake-provider-script/1).
@@ -175,14 +200,25 @@ pub(super) enum Command {
         #[arg(long = "seed")]
         seeds: Vec<PathBuf>,
     },
-    /// Re-admit the request, verify the ledger, replay the incumbent and report.
+    #[command(
+        about = "Verify a session ledger, replay retained evidence, and report its current best program.",
+        long_about = r#"Read the existing --session request, ledger/head, programs, receipts and counterexamples under bounded intake. Re-admit the request and verify the ledger; durably reserve replay work before rechecking the retained best program and witnesses. A failed replay exposes no trusted replacement. Replay work is never refunded.
+
+JSON: zeno-fcis/transform-loop/1. Exit 0 resumed; 2 resume-refused, resume-inconclusive or containment/acquisition inconclusive; 3 I/O error. No candidate attempt or new session is created; this does update replay reservations. Existing replacement receipts are checked again."#
+    )]
     Resume {
+        /// Existing session directory created by loop open.
         #[arg(long)]
         session: PathBuf,
     },
-    /// Encode a program given in the fixture vocabulary as canonical bytes.
+    #[command(
+        about = "Admit finite-program JSON and write its canonical bytes to a new file.",
+        long_about = r#"Read --program (at most 1,048,576 bytes) as an object with exactly inputs, outputs, nodes and roots. Domains are Bool or Int with canonical signed-i128 decimal-string bounds; Int literals are decimal strings, Bool literals are JSON booleans, and node references/roots are integer indices. Library admission precedes canonical encoding.
+
+Write --out only if the path does not exist. This command checks representation and admission, not equivalence. It creates neither a session nor a receipt. JSON: zeno-fcis/transform-loop/1. Exit 0 encoded; 1 refused or output-exists; 2 acquisition/containment inconclusive; 3 I/O error."#
+    )]
     Encode {
-        /// JSON with inputs, outputs, nodes and roots.
+        /// Program JSON with inputs, outputs, nodes and roots; at most 1,048,576 bytes.
         #[arg(long)]
         program: PathBuf,
         /// New file for the canonical bytes.

@@ -25,6 +25,35 @@ class GuideCli(unittest.TestCase):
         for purpose in ("Learn from examples", "Complete and repair", "Optimize", "Check restated rules", "Ask where laws are open", "Architecture"):
             self.assertIn(purpose + ":", help_text)
 
+    def test_every_loop_option_has_nonempty_help(self):
+        result = self.call("describe", "loop")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        def visit(command):
+            for argument in command["arguments"]:
+                with self.subTest(command=command["path"], option=argument["id"]):
+                    self.assertTrue((argument["help"] or "").strip(),
+                                    "Every loop option must explain its purpose")
+            for child in command["subcommands"]:
+                visit(child)
+
+        visit(json.loads(result.stdout)["command"])
+
+    def test_loop_summaries_fit_on_one_line(self):
+        result = self.call("describe", "loop")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        def visit(command):
+            with self.subTest(command=command["path"]):
+                summary = command["about"] or ""
+                self.assertTrue(summary.strip())
+                self.assertNotIn("\n", summary)
+                self.assertLess(len(summary), 100)
+            for child in command["subcommands"]:
+                visit(child)
+
+        visit(json.loads(result.stdout)["command"])
+
     def test_guide_is_available_without_any_workspace(self):
         with tempfile.TemporaryDirectory() as directory:
             result = self.call("guide", "list", cwd=directory)

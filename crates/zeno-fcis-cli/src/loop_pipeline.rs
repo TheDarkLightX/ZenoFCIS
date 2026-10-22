@@ -40,21 +40,28 @@ pub(super) const OPERATORS: [ProgramStage; 4] = [
 /// Shared check/time limits and per-stage proposer bounds for an invocation.
 #[derive(Args, Clone, Copy, Debug)]
 pub(crate) struct SearchLimits {
+    /// Input tuples per full-domain check, at most 131,072.
     #[arg(long, default_value_t = 131_072)]
     pub(super) max_tuples: u64,
     /// Original/candidate evaluation pairs reserved, including receipt replay.
     #[arg(long, default_value_t = 1_000_000)]
     pub(super) max_gate_pairs: u64,
+    /// Proposer work allowance per search stage, at most 100,000,000; not total CPU work.
     #[arg(long, default_value_t = 50_000_000)]
     pub(super) max_search_work: u64,
+    /// Proposer table-cell bound, at most 16,777,216.
     #[arg(long, default_value_t = 4_194_304)]
     pub(super) max_cells: u64,
+    /// Hole assignments per completion search, at most 20,000.
     #[arg(long, default_value_t = 2_000)]
     pub(super) max_assignments: usize,
+    /// Terms or rule-bank entries admitted, at most 512.
     #[arg(long, default_value_t = 128)]
     pub(super) max_terms: usize,
+    /// Shared check-and-replay requests per invocation, at most 30.
     #[arg(long, default_value_t = 24)]
     pub(super) max_checks: u32,
+    /// Invocation wall allowance in milliseconds, at most 22,000.
     #[arg(long, default_value_t = 22_000)]
     pub(super) deadline_ms: u64,
 }

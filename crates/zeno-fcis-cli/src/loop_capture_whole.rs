@@ -8,17 +8,20 @@ use zeno_fcis_synthesis::finite::Domain;
 
 #[derive(clap::Args)]
 pub(crate) struct Options {
+    /// ABI JSON with exactly inputs and outputs; at most 65,536 bytes.
     #[arg(long)]
     spec: PathBuf,
     /// A contained python-function-v1 reference, owned and read only for this call.
     #[arg(long)]
     reference: PathBuf,
+    /// Complete finite-program JSON (inputs, outputs, nodes, roots), at most 65,536 bytes.
     #[arg(
         long,
         conflicts_with = "expressions",
         required_unless_present = "expressions"
     )]
     candidate_json: Option<PathBuf>,
+    /// Complete outputs over x0..xN (zeno-fcis/capture-expressions/1), at most 65,536 bytes.
     #[arg(long)]
     expressions: Option<PathBuf>,
     /// Distinct points per acquisition page; the existing 4096 cap remains.

@@ -31,40 +31,76 @@ const FILE_LIMIT: usize = 65536;
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
-    /// Owner-side whole-domain arithmetic capture by a complete bounded cover.
-    /// Every piece needs the existing exact checker and receipt replay.
+    #[command(
+        about = "Owner: check a candidate against a complete paged arithmetic reference domain.",
+        long_about = r#"Read --spec ABI JSON, --reference Python source defining reference(point), and one of --candidate-json (finite program JSON) or --expressions (zeno-fcis/capture-expressions/1). Files are at most 65,536 bytes. Requires nonnegative Int input domains. Observe the reference six times per point; compare complete pages through transform check and exact receipt replay on bounded lookup pieces.
+
+--max-tuples is points per page (at most 4,096), not a total-domain cap. At most 20 pages fit the 62-frame budget; --node-visits bounds cumulative work (at most 10,000,000). Every point must be covered; partial coverage is inconclusive. Linux x86-64 contained Python runtime required.
+
+No session; report coverage and chained receipt digests, not one exported whole-program receipt. JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 refuted/refused; 2 inconclusive. Exactness concerns the observed finite domain under the deterministic-reference assumption."#
+    )]
     Whole {
         #[command(flatten)]
         options: whole::Options,
     },
-    /// Owner-side: freeze a complete contained executable reference into a new private session.
+    #[command(
+        about = "Owner: observe a complete executable reference and create a private capture session.",
+        long_about = r#"Read --spec as exactly inputs and outputs in finite-program JSON and --reference as python-function-v1 source defining reference(point) -> list[int]. Observe all declared input tuples six times and reject inconsistent or unsuccessful labels. Freeze the complete observed table and ABI in a new private --session directory; no candidate receipt yet. Linux x86-64 contained Python runtime required.
+
+Input files: 65,536 bytes; complete table: at most 4,096 tuples and encodable in 256 nodes; stored protocol/session: 2 MiB. Bounds may be reduced: rounds default 32/max 64, examples default/max 4,096, node visits default 2,000,000/max 10,000,000.
+
+JSON: zeno-fcis/black-box-capture/2. Exit 0 opened; 1 refused (including unsupported runtime or reference-local failure); 2 outer containment or search budget inconclusive. Keep session/status private; only packet and candidate replies are proposer-facing."#
+    )]
     Open {
+        /// ABI JSON with exactly inputs and outputs in finite-program JSON; at most 65,536 bytes.
         #[arg(long)]
         spec: PathBuf,
+        /// Owner reference source defining reference(point) -> list[int]; at most 65,536 bytes.
         #[arg(long)]
         reference: PathBuf,
+        /// Reference format; only python-function-v1 is supported.
         #[arg(long, default_value = "python-function-v1")]
         reference_format: String,
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
+        /// Maximum complete reference input tuples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_tuples: u64,
+        /// Maximum decided candidate attempts, at most 64.
         #[arg(long, default_value_t = 32)]
         rounds: u64,
+        /// Maximum retained public examples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_examples: u64,
+        /// Reserved node visits per candidate invocation, at most 10,000,000.
         #[arg(long, default_value_t = 2_000_000)]
         node_visits: u64,
     },
-    /// Public allowlisted ABI/round/examples; no reference, hidden labels or private evidence.
+    #[command(
+        about = "Public: read the capture ABI, round, and selected examples without private evidence.",
+        long_about = r#"Load --session (zeno-fcis/capture-session/1), verify its bindings, and return the allowlisted profile, ABI, round and selected examples. No reference source, path, digest, full table or receipt enters this packet. The schema is zeno-fcis/black-box-capture/2.
+
+Exit 0 packet; 1 refused; 2 outer containment inconclusive. This operation creates no session, consumes no candidate attempt, and issues no receipt. Roles rely on callers keeping owner evidence private; they are not authenticated identities."#
+    )]
     Packet {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
     },
-    /// Pre-check every exposed example, then transform check plus exact receipt replay.
+    #[command(
+        about = "Proposer: check exposed examples, then compare with the complete frozen capture table.",
+        long_about = r#"Load the existing private --session through the capture shell. Supply --candidate-json (finite-program JSON) or --expressions (zeno-fcis/capture-expressions/1: outputs over x0..xN without holes, parameters, keep or output references), at most 65,536 bytes. Match the frozen ABI.
+
+Reserve invocation work, check all exposed examples, then require full-table transform check and matching receipt replay. Decided proposals consume an attempt; early budget stops retain reservations without an attempt. A refutation can add a public counterexample; stored success keeps its receipt privately and closes further submissions. Limits come from capture open.
+
+JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 precheck-refuted, candidate-refused, refuted or refused; 2 inconclusive. Example agreement alone is never acceptance. No new session or publication authority."#
+    )]
     Candidate {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
+        /// Complete finite-program JSON (inputs, outputs, nodes, roots), at most 65,536 bytes.
         #[arg(
             long,
             conflicts_with = "expressions",
@@ -75,8 +111,14 @@ pub(crate) enum Command {
         #[arg(long)]
         expressions: Option<PathBuf>,
     },
-    /// Owner-only evidence. A previously captured program is checked and replayed afresh.
+    #[command(
+        about = "Owner: inspect private capture evidence and freshly recheck any retained success.",
+        long_about = r#"Load and validate --session. Report private identities, budgets and progress; if a captured candidate exists, repeat transform check and receipt replay and require the stored receipt to match. --full includes table rows, events, candidate and receipt only if the report fits the 1 MiB output cap. Never forward owner status to a proposer.
+
+JSON: zeno-fcis/black-box-capture/2. Exit follows stored state: opened/ready/captured-exact=0, refused/refuted/precheck-refuted/candidate-refused=1, inconclusive=2; fresh validation/replay may refuse or stop inconclusive. Creates no session, spends no candidate attempt and does not issue a new publication capability."#
+    )]
     Status {
+        /// Private capture directory; open requires a new path, other operations require an existing one.
         #[arg(long)]
         session: PathBuf,
         /// Include private table and events only if the report fits the output cap.

@@ -92,17 +92,31 @@ mod search_limits;
 #[derive(Subcommand)]
 pub(crate) enum DoorCommand {
     // BEGIN black-box capture command (additive)
-    /// Capture an executable reference from examples, with full-domain checker acceptance.
+    #[command(
+        about = "Capture references: owner whole/open/status, public packet, proposer candidate.",
+        long_about = r#"Five operations share a bounded reference-capture protocol. The owner uses whole for one complete paged arithmetic comparison, or open to freeze an executable observation table in a private capture session. Packet exposes only the ABI, round and selected examples; the proposer submits candidate. Status returns owner-only evidence and rechecks stored success. These roles are a data-separation convention, not authenticated identities.
+
+Inputs use finite-program ABI JSON or zeno-fcis/capture-expressions/1, not the ordinary loop-expressions document. Acceptance requires the existing transform checker and matching receipt replay over the complete observed finite domain. See each child for bounds and exits; results use zeno-fcis/black-box-capture/2. No runtime publication authority."#
+    )]
     Capture {
         #[command(subcommand)]
         command: capture::Command,
     },
     // END black-box capture command
     // BEGIN composable program loop commands (no session attempts).
-    /// Complete, repair and optimize a bound proposal through fixed guarded stages.
+    #[command(
+        about = "Complete, repair, and simplify a hash-bound proposal with check and receipt replay.",
+        long_about = r#"Read --original (canonical bytes) and --proposal (zeno-fcis/loop-pipeline/1), each at most 65,536 bytes. Use --packet first to obtain original_sha256 and implementation_sha256; both must match the proposal. Supply either program JSON or an expressions document, plus optional stages (at most five; default complete,repair,canonical).
+
+Stages run only when applicable: complete holes; repair refuted complete expressions; canonical or resubstitute a qualified program. Qualification always needs transform check over the full declared input domain and matching receipt replay. Shared limits bound tuples, check pairs, stages, work and time. --out writes evidence, and candidate/original bytes only on overall qualification.
+
+No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 packet or qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error. Prior successful checks do not qualify a later incomplete result."#
+    )]
     Pipeline {
+        /// Canonical reference program (.zcve), at most 65,536 bytes.
         #[arg(long)]
         original: PathBuf,
+        /// Pipeline JSON (zeno-fcis/loop-pipeline/1) bound to the reference and implementation hashes.
         #[arg(long, required_unless_present = "packet")]
         proposal: Option<PathBuf>,
         /// Print binding information without running a search.
@@ -114,13 +128,24 @@ pub(crate) enum DoorCommand {
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
-    /// Select a guarded strategy on development tasks, freeze it, then evaluate distinct tasks.
+    #[command(
+        about = "Select and evaluate stage sequences, run named strategies, or query usage knowledge.",
+        long_about = r#"Choose one mode. --tasks reads zeno-fcis/loop-strategy/1 with exactly one development and one evaluation task, distinct original bytes and hash-bound pipeline proposals. At runtime --depth must be 1: compare five sequences, freeze the development winner, then evaluate without changing it.
+
+Alternatively --kind and --problem read zeno-fcis/loop-strategy-problem/1. split-by-cases requires --original and qualifies through complete reference capture, transform check and replay. diagnose proposes weak-fault explanations/probes; ask-when-it-matters proposes answers/questions over the supplied finite readings. Neither latter mode qualifies a program.
+
+--kb-op query/check/plan/advise/explain performs bounded structural usage inference; global --kb selects external layers. It supplies no program or execution authority. Shared search limits apply; files are at most 65,536 bytes. No session or attempts.
+
+Task/named results use zeno-fcis/loop-doors/2; knowledge advice may use zeno-fcis/usage-knowledge/1. Exit 0 evaluated/qualified or completed structural inference; 1 refused/refuted; 2 inconclusive; 3 I/O error. Named question/diagnosis/answer proposals also exit 0; inconsistent knowledge exits 1 and no plan exits 2. An evaluated task report can contain unqualified programs; inspect each check."#
+    )]
     Strategy {
+        /// Task manifest (zeno-fcis/loop-strategy/1): one development task and one distinct evaluation task.
         #[arg(long, conflicts_with_all = ["problem", "kb_op"], required_unless_present_any = ["problem", "kb_op"])]
         tasks: Option<PathBuf>,
         /// Run a named strategy through the same typed plan/trace surface.
         #[arg(long, requires = "problem", value_parser = ["split-by-cases", "diagnose", "ask-when-it-matters"])]
         kind: Option<String>,
+        /// Problem JSON (zeno-fcis/loop-strategy-problem/1) for the selected --kind.
         #[arg(long, requires = "kind")]
         problem: Option<PathBuf>,
         /// Fixed full-domain reference for split-by-cases.
@@ -130,40 +155,64 @@ pub(crate) enum DoorCommand {
         /// Query, check structural code consistency, or propose a type-directed plan.
         #[arg(long, value_parser = ["query", "check", "plan", "advise", "explain"], conflicts_with_all = ["tasks", "kind", "problem", "original", "out"])]
         kb_op: Option<String>,
+        /// Query or explanation expression for --kb-op query or explain.
         #[arg(long, requires = "kb_op")]
         query: Option<String>,
+        /// Comma-separated available type names for --kb-op plan.
         #[arg(long, requires = "kb_op")]
         have: Option<String>,
+        /// Comma-separated required type names for --kb-op plan.
         #[arg(long, requires = "kb_op")]
         want: Option<String>,
+        /// Maximum plan length, at most 16; only used with --kb-op.
         #[arg(long, default_value_t = 8)]
         kb_max_steps: usize,
+        /// Maximum planning states, at most 4,096; only used with --kb-op.
         #[arg(long, default_value_t = 4096)]
         kb_max_states: usize,
         // END structural knowledge strategy options.
         /// Runtime depth is restricted to one by the invocation-wide frame budget.
         #[arg(long, default_value_t = 1)]
         depth: u8,
+        /// New directory for the result and any qualified artifacts; existing paths are refused.
         #[arg(long)]
         out: Option<PathBuf>,
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
-    /// Propose concrete cheaper rewrites and recheck rules and whole programs on the target domain.
+    #[command(
+        about = "Mine or load concrete rewrites, then recheck rules and the target program.",
+        long_about = r#"Read --original canonical bytes and optionally --terms (zeno-fcis/loop-terms/1) or --bank (zeno-fcis/loop-rule-bank/1), each at most 65,536 bytes. Without either, mine terms from the original. Terms are single-output program JSON or kind/expression objects using the corpus vocabulary.
+
+Check proposed cheaper concrete rules on this target input domain, then transform-check and replay any whole-program replacement against the fixed original. These are finite-domain rules, not universal identities. Shared search limits bound work, cells, terms, checks, tuples and time. --out exports result/bank and, only when qualified, original/candidate bytes. An unchanged original can qualify with improved:false.
+
+No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error."#
+    )]
     Rules {
+        /// Canonical reference program (.zcve), at most 65,536 bytes.
         #[arg(long)]
         original: PathBuf,
+        /// Optional term corpus (zeno-fcis/loop-terms/1); otherwise mine the original program.
         #[arg(long, conflicts_with = "bank")]
         terms: Option<PathBuf>,
+        /// Existing rule bank (zeno-fcis/loop-rule-bank/1); recheck on this target domain.
         #[arg(long)]
         bank: Option<PathBuf>,
+        /// New directory for the result and any qualified artifacts; existing paths are refused.
         #[arg(long)]
         out: Option<PathBuf>,
         #[command(flatten)]
         limits: pipeline::SearchLimits,
     },
     // END composable program loop commands.
-    /// Enumerate a declared vocabulary from examples; uniqueness stays a proposal.
+    #[command(
+        about = "Enumerate expressions fitting examples; optionally qualify against a complete reference.",
+        long_about = r#"Read --spec (ASCII zeno-fcis/loop-learn/1, at most 65,536 bytes): named Bool/Int inputs, output domains, declared vocabulary, max_size and complete examples. Integer bounds/labels here are JSON integers, unlike program JSON decimal strings. Enumerate expressions only within the declared vocabulary/size; the library evaluator independently rechecks the lowered examples. Uniqueness is an enumeration proposal.
+
+Default caps may only be reduced: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 conflict subsets. With --original, a fitting candidate must pass complete observed-table capture plus original-bound transform check and receipt replay; --out requires that reference and exports candidate bytes only when qualified. No session or attempts.
+
+JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=3, outside-vocabulary/ambiguous/refused=1, inconclusive=2. With a reference: qualified=0, refuted/refused=1, inconclusive=2; I/O errors can be 3. Example fit alone issues no equivalence receipt."#
+    )]
     Learn {
         /// Declaration and examples (zeno-fcis/loop-learn/1), at most 64 KiB.
         #[arg(long)]
@@ -176,19 +225,30 @@ pub(crate) enum DoorCommand {
         #[arg(long, requires = "original")]
         out: Option<PathBuf>,
         // END L2.
+        /// Enumeration work units, at most 2,000,000.
         #[arg(long, default_value_t = 2_000_000)]
         max_work: u64,
+        /// Enumerated input tuples, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_tuples: u64,
+        /// Raw meanings per kind, at most 4,096.
         #[arg(long, default_value_t = 4096)]
         max_meanings: usize,
+        /// Cumulative enumeration table cells, at most 1,000,000.
         #[arg(long, default_value_t = 1_000_000)]
         max_cells: u64,
+        /// Example subsets examined for a conflict, at most 10,000.
         #[arg(long, default_value_t = 10_000)]
         max_conflict_subsets: u64,
     },
-    /// Spend one attempt on a sketch: solve its holes and check the completion.
+    #[command(
+        about = "Solve finite expression holes, then check one completion in an existing session.",
+        long_about = r#"Read --sketch (zeno-fcis/loop-expressions/1, at most 65,536 bytes), including named inputs and finite constant/choice holes. Load --session, replay its retained evidence, and search for a completion within the door budgets (at most 131,072 input tuples, five-second search stages). A proposed completion needs transform check and receipt replay before the session checker independently judges it on the full original domain.
+
+One submitted completion or decided empty/malformed proposal consumes an attempt; an unfinished search or confirming check can return before submission, retaining charged preparation/replay work. JSON: zeno-fcis/transform-loop/1 with detail.door diagnostics. Exit 0 equivalent (improved or not), 1 different/refused/duplicate, 2 incomplete or failed proposal/check/closed session, 3 I/O error. Creates no session; a selected replacement retains its receipt. Unrealizable is a search finding, not a checker proof."#
+    )]
     Sketch {
+        /// Existing session directory created by loop open.
         #[arg(long)]
         session: PathBuf,
         /// Sketch document (zeno-fcis/loop-expressions/1) with holes.
@@ -198,7 +258,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         provenance: Option<PathBuf>,
     },
-    /// Judge one family program on every listed instance; no session.
+    #[command(
+        about = "Check a parameterized program or sketch on each listed finite family instance.",
+        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and parameter values. Each instance is limited to 131,072 input tuples.
+
+Lower or solve the program per instance, then require transform check plus matching receipt replay. --fit proposes affine hole values a*$P+b from instances marked for fitting and checks the lifted program on all listed instances. This establishes no unlisted-instance claim. No session or attempts; per-instance reports include receipt digests, not exported receipt files.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 accepted (all listed instances); 1 refuted or invalid input; 2 unrealizable/partial or containment inconclusive; 3 I/O error."#
+    )]
     Family {
         /// Instance manifest (zeno-fcis/loop-family-manifest/1).
         #[arg(long)]
@@ -210,7 +277,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         fit: bool,
     },
-    /// Move a program to every listed instance: directly, by sketch, then by repair; no session.
+    #[command(
+        about = "Try a source program directly, as a sketch, then by repair on listed instances.",
+        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Bind changed parameters, try direct use, open nearby constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
+
+At most 10 listed instances, 131,072 tuples per instance, and 65,536 bytes per document/program; bounded search/check stages share the invocation deadline. No session or attempts; report receipt digests without exporting receipt files. Coverage is only the listed instances.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 transferred to all; 1 failed (none) or refused; 2 partial or containment inconclusive; 3 I/O error."#
+    )]
     Transfer {
         /// Source program (zeno-fcis/loop-expressions/1) with its instance's parameters.
         #[arg(long)]
@@ -219,7 +293,12 @@ pub(crate) enum DoorCommand {
         #[arg(long = "to-instances")]
         to_instances: PathBuf,
     },
-    /// Key a program by its meaning: its observation on every declared input; no session.
+    #[command(
+        about = "Hash complete finite observations and compare them with the reference program.",
+        long_about = r#"Read --original and either canonical --candidate or --expressions (zeno-fcis/loop-expressions/1); each file is at most 65,536 bytes. Require identical input/output domains and at most 131,072 input tuples. The library evaluator computes every output or exact evaluation failure in enumeration order; hash these observations and domains under zeno-fcis/loop-meaning/1.
+
+Returns both digests and same_as_original. Digest equality is a meaning key, subject to hash collisions; it is not an independent transform verdict or receipt. No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 keyed even when the keys differ; 1 refused; 2 inconclusive; 3 I/O error."#
+    )]
     Meaning {
         /// Canonical original program (program.zcve encoding).
         #[arg(long)]
@@ -235,7 +314,12 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         candidate: Option<PathBuf>,
     },
-    /// Evaluate one expression at a declared input through the library; no verdict or receipt.
+    #[command(
+        about = "Evaluate one expression at one supplied input; produce values without an equivalence verdict.",
+        long_about = r#"Read --original for input domains and --expressions as zeno-fcis/loop-expressions/1 with vocabulary and exactly one plain output expression, no parameters or holes. Pass --input as comma-separated signed-i128 values in the original input order (use --input=-1,0 for negatives). The original domain must have at most 131,072 tuples even though this operation evaluates only one point. Files are at most 65,536 bytes.
+
+Lower the expression and use the library evaluator with a full signed-i128 or Boolean output domain. JSON: zeno-fcis/transform-loop/1, evaluated values are decimal strings. Exit 0 evaluated; 1 refused (including invalid input or arithmetic failure); 2 containment inconclusive; 3 I/O error. No session, attempts, equivalence verdict or receipt."#
+    )]
     Evaluate {
         /// Canonical program supplying the declared input domains.
         #[arg(long)]
@@ -247,7 +331,14 @@ pub(crate) enum DoorCommand {
         #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
         input: Vec<i128>,
     },
-    /// Ask about the largest region where the contract's laws leave the decision open; no session.
+    #[command(
+        about = "Find open contract decisions, or ask which finite sketch completion is intended.",
+        long_about = r#"Choose --contract (project.zeno and v2/policy.json) with optional zeno-fcis/loop-answers/1 --answers, or --specification (zeno-fcis/loop-version-space/1). Contract mode compares laws and answers with the existing core on the declared finite domain and asks about the largest ambiguous region; answers are not adopted. At most 131,072 tuples and 4,000,000 admissibility checks.
+
+Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Default ceilings: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 subsets.
+
+No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed question report, 1 conflict/inconsistent/refused, 2 incomplete/inconclusive/out-of-scope, 3 I/O error. Requirements JSON: zeno-fcis/loop-version-space/2 (early input errors can use transform-loop/1); question/no-completion/determined=0, refused=1, inconclusive=2. A question or count is not a program acceptance."#
+    )]
     Question {
         /// Existing application contract (original question mode).
         #[arg(
@@ -265,7 +356,12 @@ pub(crate) enum DoorCommand {
         #[command(flatten)]
         version_limits: version_space::Arguments,
     },
-    /// Judge restated rules against the core's decisions on the whole declared domain; no session.
+    #[command(
+        about = "Compare restated rules with the core on all declared inputs and reachable states.",
+        long_about = r#"Read --contract (project.zeno and v2/policy.json), --rule (zeno-fcis/loop-rules/1), and optional --answers (zeno-fcis/loop-answers/1). Documents are at most 65,536 bytes; the supported finite core is limited to 131,072 tuples. The door evaluator classifies rules as exact, holds, wrong or vacuous, gives regions/witnesses, and computes required/open/forbidden where its admissibility budget permits.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 judged even if a rule is wrong; 1 refused; 2 inconclusive/out-of-scope; 3 I/O error. No session, attempts or equivalence receipt, and no rule or owner answer is adopted."#
+    )]
     TeachBack {
         /// Application directory holding project.zeno and v2/policy.json.
         #[arg(long)]
@@ -277,7 +373,14 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         answers: Option<PathBuf>,
     },
-    /// Hold an architecture of components against the core: required behaviour, realizability, case tables (the door's own evaluation); no session.
+    #[command(
+        about = "Evaluate component interfaces and case tables; optionally check their full composition.",
+        long_about = r#"Read --contract and --architecture (zeno-fcis/loop-architecture/1, at most 65,536 bytes). Steps 1 to 3 use door simulation for required behavior, realizability and component case tables over the supported finite core (at most 131,072 tuples). Simulation findings are not composed-program acceptance.
+
+--compose compares the composition checker joint step with the core on every declared input and checks obligations; accepted requires both plus unblamed step-3 tables. --export requires --compose and a new directory; it writes generated contracts and the composition manifest even for a negative verdict.
+
+JSON: zeno-fcis/loop-doors/2. Exit 0 realizable/completed/meets-requirements/accepted; 1 unrealizable/refuted/refused; 2 inconclusive/out-of-scope; 3 I/O error. No loop session, attempts or transform receipt; only --compose invokes the independent composition checker."#
+    )]
     Decompose {
         /// Application directory holding project.zeno and v2/policy.json.
         #[arg(long)]

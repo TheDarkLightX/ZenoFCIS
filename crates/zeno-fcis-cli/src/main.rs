@@ -258,8 +258,14 @@ enum Command {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
     },
-    /// Propose programs, sketches, rules or restated laws; exact checkers return typed feedback. Covers capture and learning from examples, repair pipelines, rules, transfer, questions, teach-back, decomposition and optimization. See also: guide show loop-workspace.
-    #[command(help_template = guide::LOOP_HELP)]
+    /// Propose, capture, learn, search, and inspect finite programs and contract decisions.
+    #[command(help_template = guide::LOOP_HELP, long_about = r#"Propose, capture, learn, search, and inspect finite programs and contract decisions.
+
+Use each subcommand's --help for inputs, schemas, hard limits, statuses and exit codes. Session commands use a fixed admitted reference and full-domain transform checks. Capture freezes executable observations; learning and search propose candidates. Meaning/evaluate inspect observations. Questions, restated rules and component simulation have separate scopes. No report grants application or publication authority.
+
+Terms used in reports: an attempt is one proposal submitted to a session driver, including malformed and duplicate proposals. Typed feedback is structured JSON describing the checker outcome and its witness/reason. The incumbent is the retained best checked program (initially the original). Finite-program JSON, historically called fixture vocabulary, has exactly inputs, outputs, nodes and roots; Int bounds/literals are canonical decimal strings. A bound proposal names the exact reference and implementation hashes. Guarded stages run only when their input conditions hold. No session means no persistent ordinary loop directory or attempt ledger is created; a command may still write explicitly requested evidence.
+
+All commands are bounded. Session work/deadlines are frozen by open; stateless program doors have at most 131,072 tuples, 65,536-byte files and bounded search/check stages, with narrower caps documented by each command. Containment can return inconclusive before work starts. Help exits 0; invalid command-line usage exits 64. Operation-specific exits 0/1/2/3 differ: read status and detail, especially for run, meaning, teach-back, strategy and learn. See guide show loop-workspace and docs/CLI_REFERENCE.md."#)]
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
