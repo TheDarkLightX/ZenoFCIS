@@ -166,6 +166,39 @@ state: their state counts and reachability are about views, not maps.
   count and the copies that member holds, are not expressible; rules must
   then defend against every admissible view, as the library's return rule
   does.
-- Generated applications with map storage and an incremental Merkle
-  commitment follow separately. This part provides the language and checker;
-  it does not implement runtime framing P4.
+- Generated applications (`new --contract`, `--app`) do not yet run a
+  collections contract: their HTTP preview, command wire and interface carry
+  scalars only. The runtime below is the library such an application would
+  use; wiring it into the generated shell, a key picker and a list idiom in
+  the interface are follow-ups.
+
+## Runtime
+
+`zeno_fcis_shell_sqlite::collections::CollectionStore` keeps one SQLite row
+per entry and, per map, the hashes of the binary radix tree of its sorted
+32-byte keys: `EMPTY` for an empty subtree, the leaf hash of the only key
+for a subtree with one key, and `NODE` over the two halves for a subtree
+with two or more, split at the next key bit. The root depends only on the
+entries. Writing a key rehashes only the subtrees on its path that hold
+another key, as many levels as the bits it shares with its nearest
+neighbour: about log2 of the entries for unrelated keys, at most 256.
+`rebuild_root` recomputes a root from scratch for replay checks.
+
+`zeno_fcis_contract::collections::runtime::Layout` frames each decision:
+`frame` reads storage only at the keys the command and context name,
+places absent entries at their defaults and assigns each key position its
+class by first occurrence; `writes` turns the committed post-view into the
+scalar state and, per named key, the one new record its entries agree on,
+or a removal, with stored key classes mapped back to keys.
+`CollectionStore::commit` refuses any write at a key the decision did not
+name, writes the entries in one transaction, and appends a journal row that
+chains the decision, the scalar state and every named map's root before and
+after. Replaying the same commands into a fresh store reproduces the journal
+exactly.
+
+The runtime tests run the token example for 1,500 commands over 400
+account keys, and the library for 2,100 commands over 60 members and 40
+copies, through the library Authority on each framed view. After every
+committed decision the supply equals the sum of every stored balance, each
+member's loan count equals the copies it holds, every root equals its
+rebuild, and no decision reads more than its two named entries.
