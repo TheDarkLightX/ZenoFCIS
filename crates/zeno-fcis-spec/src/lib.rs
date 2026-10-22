@@ -10,6 +10,7 @@
 extern crate alloc;
 
 mod ast;
+mod bool_circuit;
 mod builder;
 mod collections;
 mod diagnostic;
@@ -26,6 +27,7 @@ mod tables;
 mod views;
 
 pub use ast::*;
+pub use bool_circuit::{BoolCircuit, BoolNode};
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
 pub use collections::{CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, SummaryDecl, SummaryKind};
 pub use diagnostic::{
@@ -41,7 +43,7 @@ pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
-pub use parser::{expand_tables, parse_formula, parse_law_formula, parse_project};
+pub use parser::{expand_tables, parse_formula, parse_law_formula, parse_project, parse_table_expression};
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
 };

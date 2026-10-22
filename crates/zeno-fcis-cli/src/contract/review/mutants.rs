@@ -610,6 +610,7 @@ fn paths(ast: &Ast) -> Vec<Vec<usize>> {
 
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
+        Ast::Circuit(_) => Vec::new(),
         Ast::U128(_) => Vec::new(),
         Ast::ToI128(v) | Ast::ToU128(v) => vec![v],
         Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => Vec::new(),
@@ -655,6 +656,7 @@ pub(super) fn render(ast: &Ast) -> String {
         _ => render(inner),
     };
     match ast {
+        Ast::Circuit(_) => super::super::expr::render(ast),
         Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => super::super::expr::render(ast),
         Ast::MulDiv(..)
         | Ast::SignedMulDivFloor(..)

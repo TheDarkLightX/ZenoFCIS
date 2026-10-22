@@ -265,6 +265,7 @@ impl Layout {
 
     fn renamed(&self, leaf: usize, ast: &Ast) -> Result<Ast, String> {
         Ok(match ast {
+            Ast::Circuit(c) => Ast::Circuit(Box::new(c.try_map(|f| self.renamed(leaf, f))?)),
             Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
                 return Err("U128SubjectUnsupported".into());
             }

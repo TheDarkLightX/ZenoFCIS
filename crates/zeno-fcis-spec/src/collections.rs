@@ -333,6 +333,13 @@ impl KeyPaths {
     /// map except through its named entries.
     pub(crate) fn misuse(&self, formula: &RelExpr) -> Option<&'static str> {
         match formula {
+            RelExpr::Circuit(c) => c.nodes().iter().find_map(|n| {
+                if let crate::BoolNode::Formula(f) = n {
+                    self.misuse(f)
+                } else {
+                    None
+                }
+            }),
             RelExpr::Bool(_) => None,
             RelExpr::Not(inner) => self.misuse(inner),
             RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
@@ -528,6 +535,13 @@ pub(crate) fn state_reads(formula: &RelExpr, owner: u32, out: &mut BTreeSet<u32>
         }
     }
     match formula {
+        RelExpr::Circuit(c) => {
+            for n in c.nodes() {
+                if let crate::BoolNode::Formula(f) = n {
+                    state_reads(f, owner, out);
+                }
+            }
+        }
         RelExpr::Bool(_) => {}
         RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
             state_reads(a, owner, out)

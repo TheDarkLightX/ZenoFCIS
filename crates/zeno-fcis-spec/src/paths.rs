@@ -221,6 +221,13 @@ fn temporal_paths<'a>(formula: &'a TemporalFormula, paths: &mut Vec<&'a Projecti
 
 fn relation_paths<'a>(expr: &'a RelExpr, paths: &mut Vec<&'a ProjectionPath>) {
     match expr {
+        RelExpr::Circuit(c) => {
+            for node in c.nodes() {
+                if let crate::BoolNode::Formula(f) = node {
+                    relation_paths(f, paths);
+                }
+            }
+        }
         RelExpr::Bool(_) => {}
         RelExpr::Not(inner) => relation_paths(inner, paths),
         RelExpr::And(left, right) | RelExpr::Or(left, right) | RelExpr::Implies(left, right) => {

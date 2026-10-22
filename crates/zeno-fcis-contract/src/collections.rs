@@ -689,6 +689,7 @@ fn refuse_key_values(rules: &Rules, keys: &BTreeMap<String, u32>) -> Result<(), 
 
 fn misuses_key(ast: &Ast, keys: &BTreeMap<String, u32>) -> bool {
     match ast {
+        Ast::Circuit(c) => c.formulas().any(|f| misuses_key(f, keys)),
         Ast::Binary(Binary::Eq | Binary::Ne, a, b) => match (a.as_ref(), b.as_ref()) {
             (Ast::Name(x), Ast::Name(y)) if keys.contains_key(x) || keys.contains_key(y) => {
                 keys.get(x).is_none() || keys.get(x) != keys.get(y)

@@ -7,6 +7,9 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
+#[path = "recursive_tables.rs"]
+mod recursive_tables;
+
 use crate::ast::*;
 use crate::collections::{
     CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, Scan, SummaryDecl, SummaryKind,
@@ -130,6 +133,40 @@ fn parse_formula_in(
     }
 }
 
+/// Parses exactly one Boolean expression using a project's table declarations
+/// and closed derived strata. Expression text cannot add declarations.
+pub fn parse_table_expression(
+    source: &str,
+    expression: &str,
+    limits: SourceLimits,
+) -> Result<RelExpr, DiagnosticSet> {
+    let (parsed, mut parser) = parse_with_tables(source, limits)?;
+    crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
+    let (tokens, diagnostics) = lex(expression, limits);
+    parser.tokens = tokens;
+    parser.index = 0;
+    parser.diagnostics = diagnostics;
+    parser.rewrites.clear();
+    let formula = parser.parse_rel();
+    if !matches!(parser.current().kind, TokenKind::Eof) {
+        parser.error(
+            DiagnosticCode::UnexpectedToken,
+            "table.expression",
+            "one complete Boolean expression",
+            parser.describe_current(),
+            "remove trailing text or declarations",
+        );
+    }
+    if parser.diagnostics.is_empty() {
+        Ok(formula)
+    } else {
+        Err(DiagnosticSet::from_vec(
+            parser.diagnostics,
+            limits.max_diagnostics(),
+        ))
+    }
+}
+
 /// Parses one source file and returns the exact expansion of its table forms:
 /// the source with each table declaration, index type and table formula
 /// replaced by what it expands to, as [`TableExpansion`] describes.
@@ -185,6 +222,8 @@ fn parse_with_tables(
         table_infos: Vec::new(),
         table_spans: Vec::new(),
         counts: BTreeMap::new(),
+        derived: BTreeMap::new(),
+        defining: None,
     };
     let parsed = parser.parse(limits.max_diagnostics());
     if parser.diagnostics.is_empty() {
@@ -240,6 +279,8 @@ struct Parser {
     drafts: Drafts,
     /// Collection restrictions retained only for standalone formula parsing.
     key_paths: KeyPaths,
+    derived: BTreeMap<String, recursive_tables::DerivedTable>,
+    defining: Option<(String, u32, usize)>,
 }
 
 impl Parser {
@@ -295,6 +336,9 @@ impl Parser {
             } else if self.take_keyword("table") {
                 self.parse_table();
                 None
+            } else if self.take_keyword("derived") {
+                self.parse_derived_table();
+                None
             } else if self.take_keyword("map") {
                 self.parse_map();
                 None
@@ -341,6 +385,7 @@ impl Parser {
             }
         }
         self.refuse_table_collisions(project_id);
+        self.refuse_derived_collisions(project_id);
         let collections = self.finish_collections();
         ParsedProject {
             version,
@@ -1920,7 +1965,21 @@ impl Parser {
     }
 
     fn parse_rel(&mut self) -> RelExpr {
-        self.parse_implies()
+        let start = self.current().span;
+        let rewrites = self.rewrites.len();
+        let formula = self.parse_implies();
+        if self.table_depth != 0 || self.nesting != 0 {
+            return formula;
+        }
+        let formula = recursive_tables::share(formula).unwrap_or_else(|| {
+            self.recursive_error(start, "shared Boolean expansion exceeds the formula limit");
+            RelExpr::Bool(false)
+        });
+        if matches!(formula, RelExpr::Circuit(_)) {
+            self.rewrites.truncate(rewrites);
+            self.rewrite_from(start, tables::rel_text(&formula));
+        }
+        formula
     }
     fn parse_implies(&mut self) -> RelExpr {
         let left = self.parse_or();
@@ -2006,6 +2065,12 @@ impl Parser {
         false
     }
     fn parse_rel_atom(&mut self) -> RelExpr {
+        if self.peek_keyword("circuit") {
+            return self.parse_circuit();
+        }
+        if let Some(value) = self.derived_atom() {
+            return value;
+        }
         if self.take_keyword("true") {
             return RelExpr::Bool(true);
         }
@@ -2097,6 +2162,9 @@ impl Parser {
                 }
             }
             self.expect_symbol(TokenKind::RParen, "predicate");
+            if self.defining.is_some() && name.as_str() == recursive_tables::SELF {
+                self.recursive_error(self.current().span, "self entries use indexed table syntax");
+            }
             return RelExpr::Predicate {
                 name,
                 arguments: arguments.into_boxed_slice(),
@@ -2595,22 +2663,44 @@ impl Parser {
                 let condition = parser
                     .take_keyword("where")
                     .then(|| parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()));
+                if parser.defining.is_some()
+                    && condition.as_ref().is_some_and(recursive_tables::reads_self)
+                {
+                    parser.recursive_error(
+                        start,
+                        "a quantifier guard cannot read the table being defined",
+                    );
+                }
                 parser.expect_symbol(TokenKind::LBrace, "table.body");
                 let body = parser.nested("table.body", RelExpr::Bool(false), |p| p.parse_rel());
                 parser.expect_symbol(TokenKind::RBrace, "table.body");
                 match (condition, universal) {
+                    (Some(c), true) if parser.defining.is_some() => {
+                        RelExpr::Or(Box::new(RelExpr::Not(Box::new(c))), Box::new(body))
+                    }
                     (Some(c), true) => RelExpr::Implies(Box::new(c), Box::new(body)),
                     (Some(c), false) => RelExpr::And(Box::new(c), Box::new(body)),
                     (None, _) => body,
                 }
             });
-            let nodes = entries.iter().map(|e| formula_shape_rel(e).0).sum();
-            if self.charge(start, nodes) {
-                tables::chain(
-                    entries,
-                    if universal { RelExpr::And } else { RelExpr::Or },
-                    universal,
-                )
+            let formula = tables::chain(
+                entries,
+                if universal { RelExpr::And } else { RelExpr::Or },
+                universal,
+            );
+            let formula = if self.defining.is_none() {
+                recursive_tables::share(formula).unwrap_or_else(|| {
+                    self.recursive_error(
+                        start,
+                        "shared Boolean expansion exceeds the formula limit",
+                    );
+                    RelExpr::Bool(false)
+                })
+            } else {
+                formula
+            };
+            if self.charge(start, formula_shape_rel(&formula).0) {
+                formula
             } else {
                 RelExpr::Bool(false)
             }
@@ -2622,7 +2712,8 @@ impl Parser {
         formula
     }
     fn count_conditions(&mut self, variable: &Identifier, size: u32) -> Vec<RelExpr> {
-        if matches!(self.current().kind, TokenKind::LBrace) {
+        let start = self.current().span;
+        let conditions = if matches!(self.current().kind, TokenKind::LBrace) {
             self.per_entry(variable, size, |parser| {
                 parser.expect_symbol(TokenKind::LBrace, "table.count");
                 let condition =
@@ -2632,7 +2723,11 @@ impl Parser {
             })
         } else {
             vec![RelExpr::Bool(true); size as usize]
+        };
+        if self.defining.is_some() && conditions.iter().any(recursive_tables::reads_self) {
+            self.recursive_error(start, "a count cannot read the table being defined");
         }
+        conditions
     }
     fn linear_count(&mut self, start: SourceSpan, conditions: Vec<RelExpr>) -> ValueExpr {
         let terms = conditions.len() as u128;

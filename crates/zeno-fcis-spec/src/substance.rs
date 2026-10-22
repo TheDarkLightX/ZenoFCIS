@@ -162,6 +162,7 @@ impl ReadScope {
 /// if syntax alone determines it and no subterm can be indeterminate.
 fn constant_relation(expr: &RelExpr) -> Option<bool> {
     match expr {
+        RelExpr::Circuit(c) => c.evaluate(constant_relation),
         RelExpr::Bool(value) => Some(*value),
         RelExpr::Not(inner) => constant_relation(inner).map(|value| !value),
         RelExpr::And(left, right) => fold_connective(left, right, false, |a, b| a && b),
@@ -231,6 +232,7 @@ const fn compare(operation: CompareOp, left: i128, right: i128) -> bool {
 /// host predicates may be missing and quantifier iterations are budgeted.
 fn relation_always_defined(expr: &RelExpr) -> bool {
     match expr {
+        RelExpr::Circuit(_) => false,
         RelExpr::Bool(_) => true,
         RelExpr::Not(inner) => relation_always_defined(inner),
         RelExpr::And(left, right) | RelExpr::Or(left, right) | RelExpr::Implies(left, right) => {
@@ -254,6 +256,10 @@ const fn value_always_defined(expr: &ValueExpr) -> bool {
 
 fn relation_reads(expr: &RelExpr, scope: ReadScope) -> bool {
     match expr {
+        RelExpr::Circuit(c) => c
+            .nodes()
+            .iter()
+            .any(|n| matches!(n, crate::BoolNode::Formula(f) if relation_reads(f, scope))),
         RelExpr::Bool(_) => false,
         RelExpr::Not(inner) => relation_reads(inner, scope),
         RelExpr::And(left, right) | RelExpr::Or(left, right) | RelExpr::Implies(left, right) => {

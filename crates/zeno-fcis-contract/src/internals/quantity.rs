@@ -173,6 +173,16 @@ fn infer(d: &Declarations, ast: &Ast, fuel: &mut usize, strict: bool) -> Result<
         .ok_or("expanded expression exceeds admission work cap")?;
     let plain = || Some(Quantity::dimensionless());
     match ast {
+        Ast::Circuit(c) => {
+            let c = c.try_map(|f| {
+                let v = infer(d, f, fuel, strict)?;
+                if !v.boolean {
+                    return Err("circuit leaves must be Boolean".to_owned());
+                }
+                Ok(v.ast)
+            })?;
+            node(Ast::Circuit(Box::new(c)), None, None, 0, false, true)
+        }
         Ast::U128(n) => mark(
             node(ast.clone(), plain(), None, 0, true, false),
             true,

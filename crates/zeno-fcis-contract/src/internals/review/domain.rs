@@ -295,9 +295,7 @@ pub fn input_set(
                         "scalar genesis binding",
                         "U128SubjectUnsupported",
                     )),
-                    Some(Constant::Int(value)) => {
-                        Ok(*value)
-                    }
+                    Some(Constant::Int(value)) => Ok(*value),
                     None => Ok(values[index][0]),
                 },
                 _ => Ok(values[index][0]),
@@ -545,6 +543,11 @@ fn collect(
         hints
     };
     match ast {
+        Ast::Circuit(c) => {
+            for f in c.formulas() {
+                collect(f, expected, positions, found);
+            }
+        }
         Ast::U128(_) => {}
         Ast::ToI128(v) | Ast::ToU128(v) => collect(v, expected, positions, found),
         Ast::Int(value) => {

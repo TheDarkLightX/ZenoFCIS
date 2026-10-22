@@ -29,6 +29,60 @@ use spec_authoring::{
 pub mod certificate;
 mod lean_inductive;
 mod model_diagnostics;
+
+#[cfg(test)]
+mod recursive_circuit_tests {
+    use super::*;
+
+    #[test]
+    fn recursive_circuit_exports_share_nodes_and_diagnostics_bound_work() {
+        let source = "zeno 1; project 1 recursion; type 100 state S; type 105 int V in 0..=1;
+            table 110 100 edge 105 size 2;
+            derived table 700 x[i] in table 110 rounds 2 {
+                when true then pre.100.110[i] == 1 || exists j in table 110 { x[j] };
+                default false;
+            };
+            claim 800 reachable z3 relational = x[0];";
+        let parsed = spec_authoring::parse_project(source, spec_authoring::SourceLimits::default())
+            .unwrap_or_else(|e| panic!("{e}"));
+        let spec =
+            spec_authoring::elaborate_project(parsed, spec_authoring::ProjectLimits::default())
+                .unwrap_or_else(|e| panic!("{e}"));
+        let claim = &spec.claims()[0];
+        let exported = export_smt(claim, ToolBackend::Z3).unwrap_or_else(|e| panic!("{e:?}"));
+        let text = std::str::from_utf8(exported.source()).unwrap_or_else(|e| panic!("{e}"));
+        assert!(text.contains("(let ((circuit_"));
+        let ClaimFormula::Relational(formula) = claim.formula() else {
+            panic!("relational claim")
+        };
+        let observations = [110, 111].map(|id| {
+            ModelObservation::new(
+                ProjectionPath::try_new(
+                    ProjectionRoot::Pre,
+                    vec![
+                        StableId::new(100).unwrap_or_else(|| unreachable!()),
+                        StableId::new(id).unwrap_or_else(|| unreachable!()),
+                    ],
+                )
+                .unwrap_or_else(|| unreachable!()),
+                i128::from(id == 111),
+            )
+        });
+        let step = ModelStep::try_new(observations.to_vec()).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            check_relation(
+                formula,
+                ModelContext::new(&step, DiagnosticLimits::default())
+            ),
+            DiagnosticOutcome::True
+        );
+        let tiny = DiagnosticLimits::try_new(1, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            check_relation(formula, ModelContext::new(&step, tiny)),
+            DiagnosticOutcome::Indeterminate(ModelReason::ResourceLimit)
+        );
+    }
+}
 pub use lean_inductive::{export_inductive_lean, export_inductive_lean_with_limits};
 use model_diagnostics::{
     DiagnosticLimits, DiagnosticOutcome, ModelContext, ModelObservation, ModelReason, ModelStep,
@@ -1460,6 +1514,30 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
         let next_depth = depth.checked_add(1).ok_or(ExportError::ResourceLimit)?;
         match node {
             ExportNode::Rel(value) => match value {
+                RelExpr::Circuit(c) => {
+                    nodes = nodes
+                        .checked_add(c.nodes().len())
+                        .ok_or(ExportError::ResourceLimit)?;
+                    operations = operations
+                        .checked_add(
+                            (c.nodes().len() as u64)
+                                .checked_mul(render_multiplier)
+                                .ok_or(ExportError::ResourceLimit)?,
+                        )
+                        .ok_or(ExportError::ResourceLimit)?;
+                    if nodes > limits.max_formula_nodes() || operations > limits.max_operations() {
+                        return Err(ExportError::ResourceLimit);
+                    }
+                    for f in c.formulas() {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Rel(f),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 RelExpr::Bool(_) => {}
                 RelExpr::Not(value) => push_export_node(
                     &mut stack,
@@ -3759,6 +3837,35 @@ fn render_rel_smt(
 ) -> Result<SmtBool, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        RelExpr::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            let mut term = String::new();
+            let mut defined = Vec::new();
+            for (i, node) in c.nodes().iter().enumerate() {
+                budget.operation()?;
+                let value = match node {
+                    BoolNode::Formula(f) => {
+                        let v = render_rel_smt(f, step, environment, budget)?;
+                        defined.push(v.defined);
+                        v.term
+                    }
+                    BoolNode::Literal(v) => v.to_string(),
+                    BoolNode::Not(a) => format!("(not circuit_{a})"),
+                    BoolNode::And(a, b) => format!("(and circuit_{a} circuit_{b})"),
+                    BoolNode::Or(a, b) => format!("(or circuit_{a} circuit_{b})"),
+                    BoolNode::Select(c, a, b) => {
+                        format!("(ite circuit_{c} circuit_{a} circuit_{b})")
+                    }
+                };
+                term.push_str(&format!("(let ((circuit_{i} {value})) "));
+            }
+            term.push_str(&format!("circuit_{}", c.output()));
+            term.extend(core::iter::repeat_n(')', c.nodes().len()));
+            SmtBool {
+                term,
+                defined: smt_and(defined),
+            }
+        }
         RelExpr::Bool(value) => SmtBool {
             term: value.to_string(),
             defined: "true".to_owned(),
@@ -4047,6 +4154,11 @@ fn collect_rel(
     predicates: &mut BTreeMap<Identifier, usize>,
 ) {
     match value {
+        RelExpr::Circuit(c) => {
+            for f in c.formulas() {
+                collect_rel(f, paths, predicates);
+            }
+        }
         RelExpr::Not(value) => collect_rel(value, paths, predicates),
         RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
             collect_rel(a, paths, predicates);

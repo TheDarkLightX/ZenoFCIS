@@ -57,6 +57,7 @@ fn preflight_export(
         let next_depth = depth.checked_add(1).ok_or(ExportError::ResourceLimit)?;
         match node {
             ExportNode::Rel(value) => match value {
+                RelExpr::Circuit(_) => return Err(ExportError::UnsupportedMode),
                 RelExpr::Bool(_) => {}
                 RelExpr::Not(value) => push_export_node(
                     &mut stack,
@@ -557,6 +558,7 @@ fn render_rel_lean(
 ) -> Result<LeanBool, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        RelExpr::Circuit(_) => return Err(ExportError::UnsupportedMode),
         RelExpr::Bool(value) => LeanBool {
             term: if *value { "True" } else { "False" }.to_owned(),
             defined: "True".to_owned(),

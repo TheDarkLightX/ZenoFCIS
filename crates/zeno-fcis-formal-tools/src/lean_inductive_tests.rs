@@ -1,6 +1,25 @@
 use super::*;
 use spec_authoring::{ProjectLimits, SourceLimits, elaborate_project, parse_project};
 
+#[test]
+fn recursive_circuit_lean_rendering_keeps_shared_bindings() {
+    use spec_authoring::{BoolCircuit, BoolNode};
+    let circuit = BoolCircuit::try_new(
+        vec![
+            BoolNode::Literal(false),
+            BoolNode::Not(0),
+            BoolNode::Or(0, 1),
+        ],
+        2,
+    )
+    .unwrap_or_else(|| unreachable!());
+    let formula = RelExpr::Circuit(Box::new(circuit));
+    let rendered = render_relation(&formula, &mut SmtRenderBudget::new(ExportLimits::default()))
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert!(rendered.term.contains("let circuit_0 : Prop := False"));
+    assert!(rendered.term.contains("(circuit_0 ∨ circuit_1)"));
+}
+
 const PILOTS: &[(&str, &str)] = &[
     (
         "durable_counter",

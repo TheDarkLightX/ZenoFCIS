@@ -21,6 +21,9 @@ use crate::ast::{ProjectionPath, ProjectionRoot, RelExpr, ValueExpr};
 #[must_use]
 pub fn invariant_at(invariant: &RelExpr, root: ProjectionRoot) -> Option<RelExpr> {
     Some(match invariant {
+        RelExpr::Circuit(c) => RelExpr::Circuit(Box::new(
+            c.try_map(|f| invariant_at(f, root).ok_or(())).ok()?,
+        )),
         RelExpr::Bool(value) => RelExpr::Bool(*value),
         RelExpr::Not(value) => RelExpr::Not(Box::new(invariant_at(value, root)?)),
         RelExpr::And(left, right) => RelExpr::And(

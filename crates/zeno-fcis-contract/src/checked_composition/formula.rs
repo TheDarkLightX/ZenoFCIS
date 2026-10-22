@@ -333,6 +333,7 @@ fn record(tuple: &[i128]) -> Vec<c::Field<'static>> {
 /// The children of one expression node.
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
+        Ast::Circuit(c) => c.formulas().collect(),
         Ast::U128(_) => Vec::new(),
         Ast::ToI128(v) | Ast::ToU128(v) => vec![v],
         Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => Vec::new(),
@@ -354,6 +355,9 @@ fn shape(ast: &Ast) -> (usize, usize) {
     let mut stack = vec![(ast, 1usize)];
     while let Some((node, depth)) = stack.pop() {
         nodes += 1;
+        if let Ast::Circuit(c) = node {
+            nodes += c.nodes().len();
+        }
         deepest = deepest.max(depth);
         stack.extend(children(node).into_iter().map(|child| (child, depth + 1)));
     }

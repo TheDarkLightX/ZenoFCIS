@@ -917,6 +917,8 @@ pub enum CompareOp {
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RelExpr {
+    /// An acyclic Boolean graph with explicit sharing between fixed-point rounds.
+    Circuit(Box<crate::BoolCircuit<RelExpr>>),
     Bool(bool),
     Not(Box<RelExpr>),
     And(Box<RelExpr>, Box<RelExpr>),
@@ -1840,6 +1842,44 @@ fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError>
 }
 fn encode_rel(value: &RelExpr, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     match value {
+        RelExpr::Circuit(circuit) => {
+            use crate::BoolNode;
+            out.push(10);
+            put_length(out, circuit.nodes().len())?;
+            out.extend_from_slice(&circuit.output().to_be_bytes());
+            for node in circuit.nodes() {
+                match node {
+                    BoolNode::Formula(f) => {
+                        out.push(0);
+                        encode_rel(f, out)?;
+                    }
+                    BoolNode::Literal(v) => {
+                        out.push(1);
+                        out.push(u8::from(*v));
+                    }
+                    BoolNode::Not(a) => {
+                        out.push(2);
+                        out.extend_from_slice(&a.to_be_bytes());
+                    }
+                    BoolNode::And(a, b) | BoolNode::Or(a, b) => {
+                        out.push(if matches!(node, BoolNode::And(..)) {
+                            3
+                        } else {
+                            4
+                        });
+                        out.extend_from_slice(&a.to_be_bytes());
+                        out.extend_from_slice(&b.to_be_bytes());
+                    }
+                    BoolNode::Select(c, a, b) => {
+                        out.push(5);
+                        for n in [c, a, b] {
+                            out.extend_from_slice(&n.to_be_bytes());
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
         RelExpr::Bool(v) => {
             out.push(if *v { 1 } else { 0 });
             Ok(())
@@ -2031,6 +2071,10 @@ impl RelExpr {
     /// Whether this formula uses an unsigned literal or explicit conversion.
     pub fn uses_u128(&self) -> bool {
         match self {
+            Self::Circuit(c) => c
+                .nodes()
+                .iter()
+                .any(|n| matches!(n, crate::BoolNode::Formula(f) if f.uses_u128())),
             Self::Not(a) | Self::ForAll { body: a, .. } | Self::Exists { body: a, .. } => {
                 a.uses_u128()
             }
@@ -2128,6 +2172,15 @@ pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(c) => {
+                nodes = nodes.saturating_add(c.nodes().len());
+                for node in c.nodes() {
+                    if let crate::BoolNode::Formula(f) = node {
+                        stack.push((f, current_depth.saturating_add(1)));
+                    }
+                }
+            }
+
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }

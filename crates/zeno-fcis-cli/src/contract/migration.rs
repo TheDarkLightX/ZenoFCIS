@@ -413,6 +413,11 @@ fn expression(
 ) -> Result<(Vec<u16>, Program), String> {
     fn names(ast: &Ast, found: &mut std::collections::BTreeSet<String>) {
         match ast {
+            Ast::Circuit(c) => {
+                for f in c.formulas() {
+                    names(f, found);
+                }
+            }
             Ast::U128(_) => {}
             Ast::ToI128(v) | Ast::ToU128(v) => names(v, found),
             Ast::Name(name) => {

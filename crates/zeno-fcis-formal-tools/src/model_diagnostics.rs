@@ -306,6 +306,32 @@ fn eval_rel<'formula>(
 ) -> Result<bool, ModelReason> {
     fuel.operation()?;
     match formula {
+        RelExpr::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            let mut values: Vec<bool> = Vec::with_capacity(c.nodes().len());
+            for n in c.nodes() {
+                fuel.operation()?;
+                let v = match n {
+                    BoolNode::Formula(f) => eval_rel(f, step, variables, fuel)?,
+                    BoolNode::Literal(v) => *v,
+                    BoolNode::Not(a) => !values[*a as usize],
+                    BoolNode::And(a, b) => values[*a as usize] & values[*b as usize],
+                    BoolNode::Or(a, b) => values[*a as usize] | values[*b as usize],
+                    BoolNode::Select(c, a, b) => {
+                        if values[*c as usize] {
+                            values[*a as usize]
+                        } else {
+                            values[*b as usize]
+                        }
+                    }
+                };
+                values.push(v);
+            }
+            values
+                .get(c.output() as usize)
+                .copied()
+                .ok_or(ModelReason::UnsupportedExpression)
+        }
         RelExpr::Bool(value) => Ok(*value),
         RelExpr::Not(value) => Ok(!eval_rel(value, step, variables, fuel)?),
         RelExpr::And(left, right) => {
@@ -605,6 +631,10 @@ fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(c) => {
+                nodes = nodes.saturating_add(c.nodes().len());
+                stack.extend(c.formulas().map(|f| (f, current_depth.saturating_add(1))));
+            }
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }

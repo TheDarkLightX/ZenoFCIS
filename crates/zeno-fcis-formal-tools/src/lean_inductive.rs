@@ -377,6 +377,34 @@ fn strict_binary(
 fn render_relation(expr: &RelExpr, budget: &mut SmtRenderBudget) -> Result<SmtBool, ExportError> {
     budget.operation()?;
     let result = match expr {
+        RelExpr::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            let mut term = String::from("(");
+            let mut defined = Vec::new();
+            for (i, node) in c.nodes().iter().enumerate() {
+                budget.operation()?;
+                let value = match node {
+                    BoolNode::Formula(f) => {
+                        let v = render_relation(f, budget)?;
+                        defined.push(v.defined);
+                        v.term
+                    }
+                    BoolNode::Literal(v) => if *v { "True" } else { "False" }.to_owned(),
+                    BoolNode::Not(a) => format!("(¬ circuit_{a})"),
+                    BoolNode::And(a, b) => format!("(circuit_{a} ∧ circuit_{b})"),
+                    BoolNode::Or(a, b) => format!("(circuit_{a} ∨ circuit_{b})"),
+                    BoolNode::Select(c, a, b) => {
+                        format!("((circuit_{c} ∧ circuit_{a}) ∨ (¬ circuit_{c} ∧ circuit_{b}))")
+                    }
+                };
+                term.push_str(&format!("let circuit_{i} : Prop := {value}; "));
+            }
+            term.push_str(&format!("circuit_{})", c.output()));
+            SmtBool {
+                term,
+                defined: conjunction(defined),
+            }
+        }
         RelExpr::Bool(value) => SmtBool {
             term: if *value { "True" } else { "False" }.to_owned(),
             defined: "True".to_owned(),

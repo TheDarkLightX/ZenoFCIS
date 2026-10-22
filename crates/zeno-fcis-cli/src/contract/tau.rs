@@ -608,6 +608,7 @@ fn ast(
     names: &BTreeMap<String, (Term, Sort)>,
 ) -> Result<(Term, Sort), ContractError> {
     Ok(match expression {
+        Ast::Circuit(_) => return Err(refused("Boolean circuits are outside this export profile")),
         Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
             return Err(refused("U128SubjectUnsupported"));
         }
@@ -850,6 +851,7 @@ fn ast_ranges(
     names: &BTreeMap<String, (i128, i128)>,
 ) -> Result<(i128, i128), ContractError> {
     let interval = match expression {
+        Ast::Circuit(_) => return Err(refused("Boolean circuits are outside this export profile")),
         Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => {
             return Err(refused("U128SubjectUnsupported"));
         }

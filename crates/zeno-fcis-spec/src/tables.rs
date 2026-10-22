@@ -315,6 +315,7 @@ fn choose(n: usize, k: usize) -> Vec<Vec<usize>> {
 /// The value of a formula over integer literals only.
 pub(crate) fn static_truth(value: &RelExpr) -> Option<bool> {
     Some(match value {
+        RelExpr::Circuit(c) => c.evaluate(static_truth)?,
         RelExpr::Bool(value) => *value,
         RelExpr::Not(inner) => !static_truth(inner)?,
         RelExpr::And(a, b) => static_truth(a)? && static_truth(b)?,
@@ -368,6 +369,34 @@ fn write_rel(value: &RelExpr, least: u8, out: &mut String) {
     }
     match value {
         RelExpr::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
+        RelExpr::Circuit(c) => {
+            use crate::BoolNode;
+            out.push_str("circuit { ");
+            for node in c.nodes() {
+                match node {
+                    BoolNode::Formula(f) => {
+                        out.push_str("formula { ");
+                        write_rel(f, 1, out);
+                        out.push_str(" }");
+                    }
+                    BoolNode::Literal(v) => out.push_str(if *v { "true" } else { "false" }),
+                    BoolNode::Not(a) => {
+                        let _ = write!(out, "not {a}");
+                    }
+                    BoolNode::And(a, b) => {
+                        let _ = write!(out, "and {a} {b}");
+                    }
+                    BoolNode::Or(a, b) => {
+                        let _ = write!(out, "or {a} {b}");
+                    }
+                    BoolNode::Select(c, a, b) => {
+                        let _ = write!(out, "select {c} {a} {b}");
+                    }
+                }
+                out.push_str("; ");
+            }
+            let _ = write!(out, "}} output {}", c.output());
+        }
         RelExpr::Not(inner) => {
             out.push_str("!(");
             write_rel(inner, 1, out);

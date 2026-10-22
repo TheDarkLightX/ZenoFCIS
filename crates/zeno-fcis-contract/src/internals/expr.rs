@@ -101,6 +101,7 @@ pub enum Rounding {
 /// are shared.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Ast {
+    Circuit(Box<zeno_fcis_spec::BoolCircuit<Ast>>),
     Bool(bool),
     Int(i128),
     U128(u128),
@@ -127,6 +128,15 @@ const MAX_DEPTH: usize = 64;
 
 /// Parses one rule expression.
 pub fn parse(text: &str) -> Result<Ast, String> {
+    if text.contains("circuit {") {
+        let formula = zeno_fcis_spec::parse_table_expression(
+            "zeno 1; project 1 expression;",
+            text,
+            zeno_fcis_spec::SourceLimits::default(),
+        )
+        .map_err(|d| d.to_string())?;
+        return law(&formula);
+    }
     parse_in(text, None)
 }
 
@@ -421,6 +431,26 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
     };
     match ast {
         Ast::U128(v) => out.push_str(&format!("u128({v})")),
+        Ast::Circuit(c) => {
+            use zeno_fcis_spec::BoolNode;
+            out.push_str("circuit { ");
+            for n in c.nodes() {
+                match n {
+                    BoolNode::Formula(f) => {
+                        out.push_str("formula { ");
+                        write(f, 0, out);
+                        out.push_str(" }");
+                    }
+                    BoolNode::Literal(v) => out.push_str(if *v { "true" } else { "false" }),
+                    BoolNode::Not(a) => out.push_str(&format!("not {a}")),
+                    BoolNode::And(a, b) => out.push_str(&format!("and {a} {b}")),
+                    BoolNode::Or(a, b) => out.push_str(&format!("or {a} {b}")),
+                    BoolNode::Select(c, a, b) => out.push_str(&format!("select {c} {a} {b}")),
+                }
+                out.push_str("; ");
+            }
+            out.push_str(&format!("}} output {}", c.output()));
+        }
         Ast::ToI128(v) => call("to_i128", &[v], out),
         Ast::ToU128(v) => call("to_u128", &[v], out),
         Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
@@ -537,6 +567,10 @@ pub fn expand_with_limits(
 /// Recognizes unsigned syntax without inspecting values through signed integers.
 pub fn uses_unsigned(ast: &Ast) -> bool {
     match ast {
+        Ast::Circuit(c) => c
+            .nodes()
+            .iter()
+            .any(|n| matches!(n, zeno_fcis_spec::BoolNode::Formula(f) if uses_unsigned(f))),
         Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
         Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
         Ast::Not(v) | Ast::Neg(v) => uses_unsigned(v),
@@ -554,6 +588,10 @@ pub fn uses_unsigned(ast: &Ast) -> bool {
 /// Recognizes the new syntax before expansion, including in unused bindings.
 pub fn uses_new_arithmetic(ast: &Ast) -> bool {
     match ast {
+        Ast::Circuit(c) => c
+            .nodes()
+            .iter()
+            .any(|n| matches!(n, zeno_fcis_spec::BoolNode::Formula(f) if uses_new_arithmetic(f))),
         Ast::ScaledMulDiv(..) | Ast::RepeatMulDiv(..) => true,
         Ast::U128(_) | Ast::ToI128(_) | Ast::ToU128(_) => true,
         Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
@@ -587,6 +625,9 @@ fn expand_with<'v>(
         expand_with(ast, variables, stack, fuel, depth + 1).map(Box::new)
     };
     Ok(match ast {
+        Ast::Circuit(c) => Ast::Circuit(Box::new(
+            c.try_map(|f| expand_with(f, variables, stack, fuel, depth + 1))?,
+        )),
         Ast::Name(name) => match variables.get_key_value(name) {
             Some((key, definition)) => {
                 if stack.contains(&key.as_str()) {
@@ -666,6 +707,7 @@ pub fn law(formula: &RelExpr) -> Result<Ast, String> {
         ))
     };
     match formula {
+        RelExpr::Circuit(c) => Ok(Ast::Circuit(Box::new(c.try_map(law)?))),
         RelExpr::Bool(value) => Ok(Ast::Bool(*value)),
         RelExpr::Not(inner) => Ok(Ast::Not(Box::new(law(inner)?))),
         RelExpr::And(left, right) => binary(Binary::And, left, right),
@@ -794,6 +836,14 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
 #[cfg(test)]
 mod signed_literal_tests {
     use super::*;
+
+    #[test]
+    fn recursive_circuit_rule_text_has_no_declaration_escape() {
+        let source = "circuit { true; } output 0";
+        let ast = parse(source).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(parse(&render(&ast)), Ok(ast));
+        assert!(parse("circuit { true; } output 0; law 3 injected = true;").is_err());
+    }
 
     #[test]
     fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {

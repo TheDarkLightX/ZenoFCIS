@@ -1,0 +1,85 @@
+//! Native invocation metering and refusal checks for shared recursive formulas.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use serde_json::json;
+use zeno_fcis_contract::internals::{
+    declarations::Declarations,
+    model::Contract,
+    policy,
+    review::{domain, evaluate::Framer},
+    rules::Rules,
+    schema, schema_commitment,
+};
+use zeno_fcis_synthesis::finite::{V2Resource, v2_composition as c, v2_laws as laws};
+
+fn execute(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
+    let source = format!("zeno 1; project 1 recursive_meter;
+        type 100 state S; type 101 command C; type 102 context X;
+        type 105 int V in 0..=1; table 110 100 flags 105 size 4;
+        field 120 101 flag 105;
+        component 400 core {{ owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 4096; }} merge [400];
+        derived table 700 x[i] in table 110 rounds 4 {{
+            when true then pre.100.110[i] == 1 || exists j in table 110 {{ x[j] }};
+            default false;
+        }};
+        law 500 domain on commit, genesis = post.100.110 >= 0;
+        law 501 query on commit = {};",if recursive { "x[0] || !x[0]" } else { "true" });
+    let raw = json!({"schema":"zeno-fcis/template-declarative-policy/2","template":"recursive-meter",
+        "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},
+        "cases":[{"when":true,"class":"Accept","reason":null,"post":{"110":"pre.100.110","111":"pre.100.111","112":"pre.100.112","113":"pre.100.113"},"outbox":[]}],
+        "genesis":{"110":0,"111":0,"112":0,"113":0},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
+    let rules = Rules::read(&raw.to_string()).unwrap();
+    let declarations = Declarations::read(&source, &rules.leaf_bindings).unwrap();
+    let schema = schema::encode(&declarations).unwrap();
+    let mut contract =
+        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    if let Some(limit) = limit {
+        contract.budgets.step = limit;
+    }
+    let positions = domain::positions(&declarations).unwrap();
+    let framer = Framer::new(&positions, &contract);
+    let tuple = vec![0; positions.len()];
+    let original = tuple.clone();
+    let frames = framer.frame(&tuple);
+    let saved = frames.clone();
+    let result = policy::with_authority(&contract, &schema, |authority| {
+        let evaluation = authority.evaluate(c::Raw {
+            state: &frames[0],
+            command: &frames[1],
+            context: &frames[2],
+        });
+        let budget = evaluation.diagnostics().iter().any(|d| {
+            d.id == 501 && matches!(d.verdict, laws::Verdict::Refused(laws::Failure::Budget(_)))
+        });
+        (
+            evaluation.result().is_ok(),
+            evaluation.usage().used(V2Resource::Step),
+            budget,
+        )
+    })
+    .unwrap();
+    assert_eq!(tuple, original);
+    assert_eq!(frames, saved);
+    result
+}
+
+#[test]
+fn recursive_round_work_uses_the_actual_invocation_meter() {
+    let (plain_ok, plain_work, _) = execute(false, None);
+    let (recursive_ok, recursive_work, _) = execute(true, None);
+    assert!(plain_ok && recursive_ok);
+    assert!(
+        recursive_work > plain_work,
+        "recursive graph work must be charged"
+    );
+    let (ok, used, at_query) = execute(true, Some(plain_work));
+    assert!(!ok, "the smaller Step limit must expose no candidate");
+    assert!(
+        at_query,
+        "the actual recursive law must report a budget refusal"
+    );
+    assert!(
+        used <= plain_work,
+        "denied work must preserve consumed-work accounting"
+    );
+}

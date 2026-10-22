@@ -239,6 +239,42 @@ pub trait Graph {
 
     fn compile_raw(&mut self, ast: &Ast) -> Result<Ref, String> {
         match ast {
+            Ast::Circuit(c) => {
+                use zeno_fcis_spec::BoolNode;
+                let mut values: Vec<Ref> = Vec::with_capacity(c.nodes().len());
+                for node in c.nodes() {
+                    let value = match node {
+                        BoolNode::Formula(f) => {
+                            let v = self.compile_raw(f)?;
+                            self.boolean(v)?
+                        }
+                        BoolNode::Literal(v) => self.bool(*v),
+                        BoolNode::Not(a) => {
+                            self.op(Op::Not(values[*a as usize].index), Kind::Bool)?
+                        }
+                        BoolNode::And(a, b) => self.op(
+                            Op::And(values[*a as usize].index, values[*b as usize].index),
+                            Kind::Bool,
+                        )?,
+                        BoolNode::Or(a, b) => {
+                            self.binary(Binary::Or, values[*a as usize], values[*b as usize])?
+                        }
+                        BoolNode::Select(c, a, b) => self.op(
+                            Op::Select(
+                                values[*c as usize].index,
+                                values[*a as usize].index,
+                                values[*b as usize].index,
+                            ),
+                            Kind::Bool,
+                        )?,
+                    };
+                    values.push(value);
+                }
+                values
+                    .get(c.output() as usize)
+                    .copied()
+                    .ok_or_else(|| "invalid Boolean circuit output".into())
+            }
             Ast::U128(value) => Ok(self.uint(*value)),
             Ast::ToI128(v) | Ast::ToU128(v) => {
                 let a = self.compile_raw(v)?;

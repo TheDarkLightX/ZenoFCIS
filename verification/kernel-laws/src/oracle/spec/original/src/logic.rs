@@ -351,6 +351,8 @@ fn eval_rel<'formula, P: PredicateProvider + ?Sized>(
 ) -> Result<bool, IndeterminateReason> {
     fuel.operation()?;
     match formula {
+        // Shared circuits are outside this retained shallow reference domain.
+        RelExpr::Circuit(_) => Err(IndeterminateReason::ResourceLimit),
         RelExpr::Bool(value) => Ok(*value),
         RelExpr::Not(value) => Ok(!eval_rel(value, step, predicates, variables, fuel)?),
         RelExpr::And(left, right) => {

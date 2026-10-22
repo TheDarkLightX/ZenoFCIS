@@ -717,6 +717,7 @@ impl Scope {
     fn renamed(&self, ast: &Ast) -> Ast {
         let recurse = |ast: &Ast| Box::new(self.renamed(ast));
         match ast {
+            Ast::Circuit(c) => Ast::Circuit(Box::new(c.map(|f| self.renamed(f)))),
             Ast::U128(v) => Ast::U128(*v),
             Ast::ToI128(v) => Ast::ToI128(recurse(v)),
             Ast::ToU128(v) => Ast::ToU128(recurse(v)),

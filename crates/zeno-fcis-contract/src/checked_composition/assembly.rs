@@ -1025,6 +1025,11 @@ fn split<'a>(ast: &'a Ast, out: &mut Vec<&'a Ast>) {
 
 fn collect_names(ast: &Ast, out: &mut Vec<String>) {
     match ast {
+        Ast::Circuit(c) => {
+            for f in c.formulas() {
+                collect_names(f, out);
+            }
+        }
         Ast::U128(_) => {}
         Ast::ToI128(v) | Ast::ToU128(v) => collect_names(v, out),
         Ast::Name(name) => out.push(name.clone()),
@@ -1058,6 +1063,7 @@ fn collect_names(ast: &Ast, out: &mut Vec<String>) {
 fn rename(ast: &Ast, names: &BTreeMap<String, String>) -> Ast {
     let recurse = |ast: &Ast| Box::new(rename(ast, names));
     match ast {
+        Ast::Circuit(c) => Ast::Circuit(Box::new(c.map(|f| rename(f, names)))),
         Ast::U128(v) => Ast::U128(*v),
         Ast::ToI128(v) => Ast::ToI128(recurse(v)),
         Ast::ToU128(v) => Ast::ToU128(recurse(v)),

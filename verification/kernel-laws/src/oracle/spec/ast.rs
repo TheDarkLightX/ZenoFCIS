@@ -54,6 +54,7 @@ pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            RelExpr::Circuit(_) => return (usize::MAX, usize::MAX),
             RelExpr::Not(inner) => {
                 stack.push((inner, current_depth.saturating_add(1)));
             }
