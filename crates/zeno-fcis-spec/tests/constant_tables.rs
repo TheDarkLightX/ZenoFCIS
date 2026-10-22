@@ -138,6 +138,23 @@ fn boolean_and_extreme_integer_literals_keep_their_types() {
 }
 
 #[test]
+fn negative_constant_table_entries_roundtrip_through_scalar_literals() {
+    for value in [i128::MIN, -3, -1, 0, 1] {
+        let source = format!(
+            "zeno 1; project 1 signed_constants; type 105 int V;
+             const table 110 values 105 size 1 [{value}];
+             law 500 matches = values[0] == {value};"
+        );
+        let expanded = expand_tables(&source, SourceLimits::default()).unwrap();
+        assert_eq!(
+            project(&source).canonical_bytes().unwrap(),
+            project(&expanded.text).canonical_bytes().unwrap(),
+            "constant entry {value} must have the scalar parser's canonical form"
+        );
+    }
+}
+
+#[test]
 fn full_width_constant_guards_fold_without_signed_casts() {
     let s=format!("zeno 1; project 1 unsigned_guard; type 100 state S; type 105 bits Word width128; const table 110 words 105 size 1 [u128({})]; derived table 700 x[i] in table 110 rounds 1 {{when words[i] == u128({}) then true; default false;}}; law 500 query = x[0];",u128::MAX,u128::MAX).replace("width128","width 128");
     assert_eq!(project(&s).laws()[0].formula(), &RelExpr::Bool(true));

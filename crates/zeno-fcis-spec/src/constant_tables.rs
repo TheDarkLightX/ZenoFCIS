@@ -13,6 +13,17 @@ pub(super) struct ConstantTable {
     pub(super) values: Box<[Constant]>,
 }
 
+fn scalar_signed_literal(value: i128) -> ValueExpr {
+    // Match parse_value_atom's form for `-n`; MIN has a dedicated literal.
+    match value.checked_neg() {
+        Some(magnitude) if value < 0 => ValueExpr::Sub(
+            Box::new(ValueExpr::Int(0)),
+            Box::new(ValueExpr::Int(magnitude)),
+        ),
+        _ => ValueExpr::Int(value),
+    }
+}
+
 pub(super) fn prescan(tokens: &[Token]) -> BTreeMap<u32, u32> {
     let mut tables = BTreeMap::new();
     for window in tokens.windows(7) {
@@ -264,7 +275,7 @@ impl Parser {
                 let values = values
                     .into_iter()
                     .map(|v| match v {
-                        Constant::Int(n) => ValueExpr::Int(n),
+                        Constant::Int(n) => scalar_signed_literal(n),
                         Constant::Unsigned(n) => ValueExpr::U128(n),
                         Constant::Bool(_) => ValueExpr::Int(0),
                     })
