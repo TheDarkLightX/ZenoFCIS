@@ -1431,6 +1431,11 @@ impl Core {
                 ))),
                 _ => return Err(at("deliveries must be a complete array or case")),
             };
+            if class != Class::Reject && self.delivery_universe.is_some() && deliveries.is_none() {
+                return Err(at(
+                    "deliveries required for a committing answer; use [] or \"case\"",
+                ));
+            }
             out.push(Answer {
                 deliveries,
                 where_,
@@ -1762,6 +1767,9 @@ impl Core {
             "reason": self.reason_name(label.1),
             "current": current == Some(label),
         });
+        if class != Class::Reject && self.delivery_universe.is_some() {
+            out["deliveries"] = json!("case");
+        }
         if class != Class::Reject
             && let Some(case) = case.and_then(|k| self.cases.get(k))
         {
@@ -2424,6 +2432,50 @@ mod tests {
                 "payload":{"132":"value"},"idempotency_ordinal":1}]);
         }
         Core::from_sources(project, rules.to_string()).unwrap_or_else(|e| panic!("{e:?}"))
+    }
+
+    #[test]
+    fn committing_answers_require_deliveries_and_empty_lists_advance() {
+        let core = Core::load(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval"),
+            true,
+        )
+        .unwrap_or_else(|e| panic!("witness: {e:?}"));
+        let mut document: Value = serde_json::from_str(include_str!(
+            "../tests/data/dual-approval-literal-answers.json"
+        ))
+        .unwrap_or_else(|e| panic!("witness answers: {e}"));
+        document["answers"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("answers"))
+            .truncate(2);
+        document["answers"][1]
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("answer"))
+            .remove("deliveries");
+        assert!(
+            matches!(core.answers(&document), Err(Stop::Invalid(reason))
+            if reason == "answer 1: deliveries required for a committing answer; use [] or \"case\""),
+            "an omitted delivery requirement must refuse instead of repeating the question"
+        );
+        document["answers"][1]["deliveries"] = json!([]);
+        let answers = core.answers(&document).unwrap_or_else(|e| panic!("{e:?}"));
+        let report = question(&core, &answers).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(report["answers"][1]["status"], "recorded");
+        assert_eq!(report["stats"]["determined"], 304);
+        assert_ne!(report["question"]["where"], document["answers"][1]["where"]);
+        let first = question(&core, &answers[..1]).unwrap_or_else(|e| panic!("{e:?}"));
+        for option in first["question"]["options"]
+            .as_array()
+            .unwrap_or_else(|| panic!("options"))
+        {
+            if option["class"] != "Reject" {
+                assert_eq!(
+                    option["deliveries"], "case",
+                    "offered options must be submittable"
+                );
+            }
+        }
     }
 
     #[test]
