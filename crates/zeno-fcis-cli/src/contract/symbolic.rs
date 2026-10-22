@@ -226,8 +226,11 @@ pub(crate) fn check(
         adoptions: rules.adoptions.len(),
     };
     policy::with_authority(&contract, &schema, |authority| {
-        context.run(authority, max_tuples, solve)
-    })
+        let initial = framer.frame(&context.genesis_tuple());
+        zeno_fcis_contract::internals::genesis::admit(authority, &initial[0])
+            .map_err(|refusal| refusal.error())?;
+        Ok(context.run(authority, max_tuples, solve))
+    })?
 }
 
 /// Each case's `rule` and `when` as the rules file writes them; the

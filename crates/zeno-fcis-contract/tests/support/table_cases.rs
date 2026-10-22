@@ -33,6 +33,36 @@ fn authority(c: &tables::Compiled) -> t::Authority {
     t::Authority::bind(&c.schema, &c.policy)
         .unwrap_or_else(|error| panic!("required result failed: {error:?}"))
 }
+
+#[test]
+fn genesis_table_judge_reports_runtime_refusal_and_law() {
+    let mut compiled = compile("map-0");
+    compiled.descriptor.laws = vec![t::Law::Predicate {
+        id: 500,
+        scope: t::Scope::State,
+        expression: t::Expr::Literal(203, Value::boolean(false)),
+    }];
+    compiled.policy = compiled
+        .descriptor
+        .policy_bytes()
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    let authority = authority(&compiled);
+    let frame = authority
+        .frame(0, &compiled.descriptor.genesis)
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(
+        authority.genesis(&frame).result().err(),
+        Some(&t::Failure::Law(500))
+    );
+    let result = tables_review::review(&compiled, 100, 100000, false);
+    assert!(result.is_err());
+    let error = result.err().unwrap_or_else(|| panic!("missing refusal"));
+    assert_eq!(error.place(), "genesis");
+    assert_eq!(
+        error.reason(),
+        "no admissible starting state: law 500: Law(500)"
+    );
+}
 fn record(xs: Vec<(u16, Value)>) -> Value {
     Value::record_canonical(xs.into_iter().map(|(id, v)| t::Field::new(id, v)).collect())
         .unwrap_or_else(|error| panic!("required result failed: {error:?}"))

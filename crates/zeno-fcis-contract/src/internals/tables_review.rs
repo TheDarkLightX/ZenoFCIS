@@ -284,14 +284,13 @@ pub fn review(
             .map_err(|e| error(format!("independent policy {e:?}")))?,
     )
     .map_err(|e| error(format!("independent bind {e:?}")))?;
-    let genesis = authority.genesis(
+    super::genesis::admit_tables(
+        &authority,
         &authority
             .frame(0, &d.genesis)
             .map_err(|e| error(format!("frame {e:?}")))?,
-    );
-    if let Err(e) = genesis.result() {
-        return Err(error(format!("genesis refused: {e:?}")));
-    }
+    )
+    .map_err(|refusal| refusal.error())?;
     let mut table = Vec::new();
     let mut total = 0;
     let mut determined = 0;
