@@ -66,14 +66,14 @@
     "contains": []
   },
   "sources": {
-    "synopsis": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "engine": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "inputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "outputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "exit_codes": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "verdicts": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "limits": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help",
-    "refusals": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help"
+    "synopsis": "integrations/zal/run.py; docs/zal/README.md",
+    "engine": "integrations/zal/run.py; docs/zal/README.md",
+    "inputs": "integrations/zal/run.py; docs/zal/README.md",
+    "outputs": "integrations/zal/run.py; docs/zal/README.md",
+    "exit_codes": "integrations/zal/run.py; docs/zal/README.md",
+    "verdicts": "integrations/zal/run.py; docs/zal/README.md",
+    "limits": "integrations/zal/run.py; docs/zal/README.md",
+    "refusals": "integrations/zal/run.py; docs/zal/README.md"
   },
   "commands": [],
   "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority.",
@@ -156,6 +156,6 @@ Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 Background: Edmund M. Clarke, Orna Grumberg and Doron A. Peled, “Model Checking”, MIT Press, 1999. These are finite model checks under the reported assumptions, without runtime publication authority.
 
-Sources: {"engine": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "exit_codes": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "inputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "limits": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "outputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "refusals": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "synopsis": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "verdicts": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help"}
+Sources: {"engine": "integrations/zal/run.py; docs/zal/README.md", "exit_codes": "integrations/zal/run.py; docs/zal/README.md", "inputs": "integrations/zal/run.py; docs/zal/README.md", "limits": "integrations/zal/run.py; docs/zal/README.md", "outputs": "integrations/zal/run.py; docs/zal/README.md", "refusals": "integrations/zal/run.py; docs/zal/README.md", "synopsis": "integrations/zal/run.py; docs/zal/README.md", "verdicts": "integrations/zal/run.py; docs/zal/README.md"}
 
 Run `zeno-fcis guide find "review intended state machine behaviour"` for related cards.

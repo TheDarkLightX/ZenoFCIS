@@ -64,14 +64,14 @@
     "contains": []
   },
   "sources": {
-    "synopsis": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "engine": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "inputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "outputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "exit_codes": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "verdicts": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "limits": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help",
-    "refusals": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help"
+    "synopsis": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "engine": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "inputs": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "outputs": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "exit_codes": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "verdicts": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "limits": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis",
+    "refusals": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis"
   },
   "commands": [
     "synth",
@@ -165,6 +165,6 @@ Expected: exit 0; [].
 
 Background: Armando Solar-Lezama et al., “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006. This card describes bounded finite enumeration and separate target conformance; it makes no new method claim.
 
-Sources: {"engine": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "exit_codes": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "inputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "limits": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "outputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "refusals": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "synopsis": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "verdicts": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help"}
+Sources: {"engine": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "exit_codes": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "inputs": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "limits": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "outputs": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "refusals": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "synopsis": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis", "verdicts": "crates/zeno-fcis-cli/src/synth/mod.rs; crates/zeno-fcis-cli/src/synth/problem.rs; docs/CLI_REFERENCE.md#finite-synthesis"}
 
 Run `zeno-fcis guide find "synthesize a finite core"` for related cards.

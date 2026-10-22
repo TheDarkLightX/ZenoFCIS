@@ -81,14 +81,14 @@
     "contains": []
   },
   "sources": {
-    "synopsis": "docs/TRACE_GAME.md:1-168",
-    "engine": "docs/TRACE_GAME.md:1-168",
-    "inputs": "docs/TRACE_GAME.md:1-168",
-    "outputs": "docs/TRACE_GAME.md:1-168",
-    "exit_codes": "docs/TRACE_GAME.md:1-168",
-    "verdicts": "docs/TRACE_GAME.md:1-168",
-    "limits": "docs/TRACE_GAME.md:1-168",
-    "refusals": "docs/TRACE_GAME.md:1-168"
+    "synopsis": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "engine": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "inputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "outputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "exit_codes": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "verdicts": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "limits": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md",
+    "refusals": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md"
   },
   "commands": [],
   "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority.",
@@ -182,6 +182,6 @@ Expected: exit 0; {"evidence": "certified safety"}.
 
 Background: Edmund M. Clarke and E. Allen Emerson, “Design and Synthesis of Synchronization Skeletons Using Branching Time Temporal Logic”, Logics of Programs, 1981. Finite graph closure and ranked reachability stay within the declared game and bounds.
 
-Sources: {"engine": "docs/TRACE_GAME.md:1-168", "exit_codes": "docs/TRACE_GAME.md:1-168", "inputs": "docs/TRACE_GAME.md:1-168", "limits": "docs/TRACE_GAME.md:1-168", "outputs": "docs/TRACE_GAME.md:1-168", "refusals": "docs/TRACE_GAME.md:1-168", "synopsis": "docs/TRACE_GAME.md:1-168", "verdicts": "docs/TRACE_GAME.md:1-168"}
+Sources: {"engine": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "exit_codes": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "inputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "limits": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "outputs": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "refusals": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "synopsis": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md", "verdicts": "tools/trace_game/game.py; tools/trace_game/game_check.py; tools/trace_game/certificate_check.py; docs/TRACE_GAME.md"}
 
 Run `zeno-fcis guide find "find an adversarial history"` for related cards.

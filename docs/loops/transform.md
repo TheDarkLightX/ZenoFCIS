@@ -70,14 +70,14 @@
     "contains": []
   },
   "sources": {
-    "synopsis": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "engine": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "inputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "outputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "exit_codes": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "verdicts": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "limits": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351",
-    "refusals": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351"
+    "synopsis": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "engine": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "inputs": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "outputs": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "exit_codes": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "verdicts": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "limits": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform",
+    "refusals": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform"
   },
   "commands": [
     "transform",
@@ -162,6 +162,6 @@ Expected: exit 0; {"status": "replayed"}.
 
 Background: Amir Pnueli, Michael Siegel and Eli Singerman, “Translation Validation”, TACAS, 1998. This route checks supplied finite programs over their declared domains; it does not prove an arbitrary optimizer.
 
-Sources: {"engine": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "exit_codes": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "inputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "limits": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "outputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "refusals": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "synopsis": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "verdicts": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351"}
+Sources: {"engine": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "exit_codes": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "inputs": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "limits": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "outputs": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "refusals": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "synopsis": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform", "verdicts": "crates/zeno-fcis-cli/src/transform_command.rs; docs/CLI_REFERENCE.md#checked-program-transform"}
 
 Run `zeno-fcis guide find "check one replacement"` for related cards.
