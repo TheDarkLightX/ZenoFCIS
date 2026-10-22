@@ -2533,3 +2533,52 @@ fn wide_domain_sampling_and_width_caps_remain_total() {
         assert!((i128::MIN..=i128::MIN + 3).contains(&row[2]));
     }
 }
+
+#[test]
+fn search_status_is_pure_for_every_run_stop_and_preserves_checked_candidates() {
+    let mut search = run(
+        artifact("boolean-kernel-original"),
+        &single(Phase::Boolean, 1),
+    );
+    let mut checked = search.best.take();
+    assert!(checked.is_some());
+    assert_eq!(
+        search.status_and_exit(),
+        ("no-checked-improvement", crate::BLOCKED)
+    );
+    for stopped in [
+        "original-exceeds-max-enodes",
+        "original-exceeds-max-classes",
+        "original-exceeds-limits",
+        "original-not-typable",
+        "supplied-exceeds-limits",
+        "supplied-not-typable",
+        "inconsistent-egraph",
+        "future-stop",
+    ] {
+        search.runs[0].stopped = Some(stopped);
+        search.runs[0].unsupported_original = None;
+        assert_eq!(
+            search.status_and_exit(),
+            ("inconclusive", crate::BLOCKED),
+            "{stopped}"
+        );
+        if stopped == "original-not-typable" {
+            search.runs[0].unsupported_original = Some(super::UnsupportedOriginalNode {
+                index: 4,
+                opcode: "MulDivCeil",
+            });
+            assert_eq!(
+                search.status_and_exit(),
+                ("unsupported-original", crate::BLOCKED)
+            );
+        }
+        search.best = checked.take();
+        assert_eq!(
+            search.status_and_exit(),
+            ("improved", crate::OK),
+            "{stopped}"
+        );
+        checked = search.best.take();
+    }
+}

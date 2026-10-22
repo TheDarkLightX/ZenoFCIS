@@ -30,7 +30,7 @@
   "verdicts": {
     "improved": "A smaller candidate passed full-domain transform checking; replay its receipt.",
     "no-checked-improvement": "Exit 2; original retained, no smaller checked result found.",
-    "inconclusive": "Domain exceeds --max-input-tuples; no search or candidate judgment.",
+    "inconclusive": "Domain exceeds --max-input-tuples, or a proposer run stopped before completion with no accepted candidate. Read cause/stop and next_step; no completed-search claim.",
     "invalid-strategy": "Repair the closed strategy document or profile.",
     "output-exists": "Choose fresh candidate/receipt paths; nothing was searched.",
     "io-error": "Repair regular input files or output access and retry.",
@@ -170,7 +170,7 @@ Expected: exit 2; {"detail.unsupported_node.index": 4, "detail.unsupported_node.
 
 `no-checked-improvement`: Exit 2; original retained, no smaller checked result found.
 
-`inconclusive`: Domain exceeds --max-input-tuples; no search or candidate judgment.
+`inconclusive`: Domain exceeds --max-input-tuples, or a proposer run stopped before completion with no accepted candidate. Read cause/stop and next_step; no completed-search claim.
 
 `invalid-strategy`: Repair the closed strategy document or profile.
 
