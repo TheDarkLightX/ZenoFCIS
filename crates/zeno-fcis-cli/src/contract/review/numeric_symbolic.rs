@@ -32,7 +32,7 @@ fn error(reason: impl Into<String>) -> ContractError {
 /// Count the exact declared input product without constructing its values.
 /// Overflow denotes an over-cap domain, never a truncated enumeration.
 pub(crate) fn over_cap(project: &str, rules: &str, cap: u64) -> Result<bool, ContractError> {
-    let rules = Rules::read(rules)?;
+    let rules = Rules::read_for_project(project, rules)?;
     let decl = Declarations::read(project, &rules.leaf_bindings)?;
     let sc = schema::encode(&decl)?;
     let c = Contract::build(&decl, &rules, schema_commitment(&sc)?)?;
@@ -333,7 +333,7 @@ pub(crate) fn review(
     solve: &mut Solve<'_>,
     include_mutants: bool,
 ) -> Result<Json, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let c = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;

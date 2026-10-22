@@ -315,3 +315,20 @@ fn generated_property_names_do_not_collide_with_existing_laws()
     }
     Ok(())
 }
+
+#[test]
+fn table_policy_preparation_reaches_the_same_declared_input_domain()
+-> Result<(), Box<dyn std::error::Error>> {
+    let result = check(
+        include_str!("../../../examples/contract-tables/fee-tiers/project.zeno"),
+        include_str!("../../../examples/contract-tables/fee-tiers/v2/policy.json"),
+        &Question::Inputs {
+            condition: "true".into(),
+        },
+        Limits::default(),
+    )?;
+    assert!(result.complete(), "{}", result.packet());
+    assert_eq!(result.packet()["result"]["count"], "124");
+    assert_eq!(result.packet()["result"]["total"], "124");
+    Ok(())
+}

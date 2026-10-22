@@ -139,7 +139,7 @@ pub fn check(
     question: &Question,
     limits: Limits,
 ) -> Result<CheckResult, ContractError> {
-    let rules = Rules::read(rules_source)?;
+    let rules = Rules::read_for_project(project, rules_source)?;
     rules.refuse_unsigned("risk scalar binding")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let positions = domain::positions(&declarations)?;

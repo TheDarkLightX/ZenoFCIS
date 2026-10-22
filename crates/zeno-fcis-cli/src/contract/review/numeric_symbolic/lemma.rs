@@ -184,7 +184,7 @@ pub(crate) fn check(
     transition: bool,
     solve: &mut Solve<'_>,
 ) -> Result<Json, ContractError> {
-    let r = Rules::read(rules)?;
+    let r = Rules::read_for_project(project, rules)?;
     if !r.adoptions.is_empty() || !r.evolutions.is_empty() {
         return Ok(
             json!({"mode":"symbolic","status":"UNKNOWN","authority":"none","reason":"symbolic numeric lemmas require a standalone contract; retained lineage replay is unsupported"}),

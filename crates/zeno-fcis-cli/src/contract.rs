@@ -464,7 +464,7 @@ pub(crate) fn generate_startable_contract(
     sources: ContractSources<'_>,
 ) -> Result<GeneratedContract, ContractError> {
     let generated = generate_contract(sources)?;
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     if rules.unsigned {
         // Numeric generation already refuses lineage. Rebuild that same model
         // and check its identity before invoking the numeric runtime Authority.
