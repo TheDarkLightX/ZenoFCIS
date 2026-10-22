@@ -12,12 +12,13 @@ are constrained to their exact variant set. Unsigned ranges above the signed
 model transport use two bounded 64-bit limbs, reconstructed without narrowing;
 smaller unsigned ranges use one integer with the same declared bounds.
 
-Let L be satisfaction of the state laws on the pre-state, C a selected and
-constructible candidate, and H_i satisfaction of applicable law i. The ordered
-law question is satisfiability of L and C and H_0 through H_(i-1) and not H_i.
-A separate question searches technical refusals from lawful pre-states. Thus
-arithmetic failures cannot make preservation vacuously pass. Rejects are checked
-under their native scopes. The native Authority checks genesis during binding.
+Contract review quantifies every declared input, including pre-states that do
+not satisfy state laws. Let C be a selected constructible candidate, and H_i
+satisfaction of applicable law i. The ordered law question is satisfiability
+of C and H_0 through H_(i-1) and not H_i. A separate question searches technical
+refusals over the same full domain, so traps cannot make law preservation pass
+vacuously. Native Authority checks genesis during binding. State lemmas retain
+their separate initiation/consecution scope from lawful pre-states.
 
 Each conclusive result needs matching answers from Z3 and cvc5. Both sat models
 must replay against the native Authority. Unknown, timeout, disagreement, failed
@@ -67,14 +68,14 @@ queries remain in the report when unrestricted search is needed. Other edges
 keep the original single search. No cache or alternative verdict rule is added.
 
 Constructibility D implies program validity P. The technical-refusal question
-L and not D is split into L and not P, and L and P and not D. Their union is
-exactly the original set. This removes the branch selector from the first
+not D is split into not P, and P and not D. Their union is exactly the
+original set. This removes the branch selector from the first
 question without removing a refusal check, changing law order or weakening
 dual-solver agreement and native replay. Every part must conclude.
 
 Program validity is a conjunction g_0 through g_n. Its failure is partitioned
-into first-failure questions L and g_0 through g_(i-1) and not g_i. Their union
-is exactly L and not P; no prefix is assumed without retaining its own failure
+into first-failure questions g_0 through g_(i-1) and not g_i. Their union
+is exactly not P; no prefix is assumed without retaining its own failure
 question. All questions must conclude. This preserves refusal coverage and
 helps a solver use established denominator predicates before division bounds.
 
@@ -84,3 +85,8 @@ undefined arithmetic and false predicate both mean failure of that law.
 Diagnostic refusal text and measured native work are not modeled as symbolic
 outputs. No complete refusal-detail or resource-usage equivalence is claimed.
 Native Authority execution and its refusal accounting remain unchanged.
+
+Each differential sample uses its own fixed-input existence and mismatch
+questions. A multi-input disjunction had timed out despite one solver agreeing;
+pointwise questions preserve every sample and both acceptance directions while
+removing that unnecessary solver choice. No timeout is treated as a pass.

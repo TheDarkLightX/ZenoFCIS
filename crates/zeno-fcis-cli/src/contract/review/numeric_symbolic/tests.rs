@@ -346,3 +346,36 @@ fn pinned_numeric_mutants_have_native_witnesses() {
         "{result}"
     );
 }
+
+#[test]
+#[ignore = "requires both qualification solver binaries"]
+fn pinned_numeric_review_checks_unlawful_declared_pre_states() {
+    let p = project("1000000000000000000000000", true)
+        .replace("post.100.110 >= u128(0)", "post.100.110 >= u128(1)")
+        .replace(
+            "post.100.110 == command.101.120",
+            "post.100.110 == pre.100.110",
+        );
+    let mut r: Json = serde_json::from_str(&rules(true, "pre.100.110")).unwrap();
+    r["genesis"]["110"] = json!("u128(1)");
+    let solvers = pinned();
+    let result = review(
+        ReviewSources {
+            project: &p,
+            rules: &r.to_string(),
+            examples: None,
+        },
+        &mut |q| solvers.solve(q),
+        false,
+    )
+    .unwrap();
+    assert_eq!(result["status"], "refuted", "{result}");
+    let failed = result["obligations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|o| o["law"] == 500 && o["status"] == "refuted")
+        .unwrap();
+    assert_eq!(failed["counterexample"]["values"][0]["value"], "0");
+    assert_eq!(failed["counterexample"]["authority"]["law"], 500);
+}

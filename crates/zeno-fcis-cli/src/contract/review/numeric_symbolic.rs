@@ -235,7 +235,10 @@ fn guard_inner(
             edge_checks.push(result);
         }
         let mut batches = Vec::new();
-        for (i, batch) in rows.chunks(8).enumerate() {
+        // A fixed input grounds the arithmetic. Combining several inputs
+        // in one disjunction needlessly makes solvers choose nonlinear cases.
+        // Per-input questions preserve both existence and mismatch checks.
+        for (i, batch) in rows.chunks(1).enumerate() {
             // A mismatch-only query could pass vacuously if auxiliary
             // constraints accidentally removed a native input. Independent
             // fixed copies must also have a model for every sampled input.
@@ -334,7 +337,7 @@ pub(crate) fn review(
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let c = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
-    let mut report = json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","scope":"all declared inputs whose pre-state satisfies the state laws; eager arithmetic and candidate construction; no reachability claim","sources":{"project_sha256":crate::transform::sha256_hex(sources.project.as_bytes()),"rules_sha256":crate::transform::sha256_hex(sources.rules.as_bytes()),"schema_sha256":crate::transform::sha256_hex(&schema)},"domain_size":size(&c).map(|n|n.to_string()),"status":"UNKNOWN"});
+    let mut report = json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","scope":"all declared inputs; eager arithmetic and candidate construction; no reachability claim","sources":{"project_sha256":crate::transform::sha256_hex(sources.project.as_bytes()),"rules_sha256":crate::transform::sha256_hex(sources.rules.as_bytes()),"schema_sha256":crate::transform::sha256_hex(&schema)},"domain_size":size(&c).map(|n|n.to_string()),"status":"UNKNOWN"});
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
         report["reason"] = json!(
             "symbolic numeric review requires a standalone contract; retained lineage replay is unsupported"
@@ -379,7 +382,7 @@ pub(crate) fn review(
     }
     let mut predicates = Vec::new();
     conjuncts(&e.program_ok, &mut predicates);
-    let mut prefix = vec![e.lawful.clone()];
+    let mut prefix = Vec::new();
     let mut failures = Vec::new();
     for (i, predicate) in predicates.into_iter().enumerate() {
         let mut failed = prefix.clone();
@@ -389,11 +392,7 @@ pub(crate) fn review(
     }
     failures.push((
         "technical-refusal-construction".into(),
-        Term::and(vec![
-            e.lawful.clone(),
-            e.program_ok.clone(),
-            Term::not(constructed),
-        ]),
+        Term::and(vec![e.program_ok.clone(), Term::not(constructed)]),
     ));
     for (label, bad) in failures {
         obligations.push(ask(
@@ -413,11 +412,7 @@ pub(crate) fn review(
         ));
     }
     for (i, case) in e.cases.iter().enumerate() {
-        let mut premise = vec![
-            e.lawful.clone(),
-            case.selected.clone(),
-            case.constructed.clone(),
-        ];
+        let mut premise = vec![case.selected.clone(), case.constructed.clone()];
         for (id, holds) in &case.laws {
             let mut bad = premise.clone();
             bad.push(Term::not(holds.clone()));
