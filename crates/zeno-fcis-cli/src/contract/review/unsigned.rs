@@ -18,7 +18,7 @@ use zeno_fcis_synthesis::finite::{
     v2_composition as c, v2_laws as l,
 };
 #[path = "../../../contract-app/src/numeric_examples.rs"]
-mod examples;
+pub(super) mod examples;
 #[path = "unsigned_probe.rs"]
 mod numeric_probe;
 pub(super) fn count_probe(
@@ -190,7 +190,7 @@ impl Space {
         })
     }
 }
-fn input_leaf<'a>(c: &'a Contract<'_>, index: usize) -> &'a InputLeaf {
+pub(super) fn input_leaf<'a>(c: &'a Contract<'_>, index: usize) -> &'a InputLeaf {
     let (source, id) = c.bindings[index];
     let root = match source {
         Source::State => 0,
@@ -208,7 +208,11 @@ fn input_leaf<'a>(c: &'a Contract<'_>, index: usize) -> &'a InputLeaf {
         }
     }
 }
-fn fields(c: &Contract<'_>, row: &[Atom<'static>], source: Source) -> Vec<c::Field<'static>> {
+pub(super) fn fields(
+    c: &Contract<'_>,
+    row: &[Atom<'static>],
+    source: Source,
+) -> Vec<c::Field<'static>> {
     c.bindings
         .iter()
         .zip(row)
@@ -226,7 +230,7 @@ fn fields(c: &Contract<'_>, row: &[Atom<'static>], source: Source) -> Vec<c::Fie
         })
         .collect()
 }
-fn view<'a>(
+pub(super) fn view<'a>(
     c: &Contract<'_>,
     index: usize,
     fields: &'a [c::Field<'static>],
@@ -237,7 +241,10 @@ fn view<'a>(
         l::RootView::Record(fields)
     }
 }
-fn frame(c: &Contract<'_>, row: &[Atom<'static>]) -> Result<[Vec<u8>; 3], ContractError> {
+pub(super) fn frame(
+    c: &Contract<'_>,
+    row: &[Atom<'static>],
+) -> Result<[Vec<u8>; 3], ContractError> {
     let mut result = [Vec::new(), Vec::new(), Vec::new()];
     for (i, source) in [Source::State, Source::Command, Source::Context]
         .into_iter()
@@ -256,7 +263,7 @@ fn frame(c: &Contract<'_>, row: &[Atom<'static>]) -> Result<[Vec<u8>; 3], Contra
     }
     Ok(result)
 }
-fn atom_json(v: Atom<'_>) -> Value {
+pub(super) fn atom_json(v: Atom<'_>) -> Value {
     match v {
         Atom::Bool(v) => json!({"kind":"bool","value":v}),
         Atom::I128(v) => json!({"kind":"i128","value":v.to_string()}),
@@ -265,7 +272,7 @@ fn atom_json(v: Atom<'_>) -> Value {
         _ => json!({"kind":"unsupported"}),
     }
 }
-fn normalized(v: &Outcome) -> Value {
+pub(super) fn normalized(v: &Outcome) -> Value {
     match v {
         Outcome::Refused(r) => json!({"class":"refused","reason":r.text,"law":r.law}),
         Outcome::Decision(d) => {
@@ -273,7 +280,7 @@ fn normalized(v: &Outcome) -> Value {
         }
     }
 }
-fn same_value(a: &evaluate::Value, b: Atom<'_>) -> bool {
+pub(super) fn same_value(a: &evaluate::Value, b: Atom<'_>) -> bool {
     match (a, b) {
         (evaluate::Value::Bool(a), Atom::Bool(b)) => *a == b,
         (evaluate::Value::I128(a), Atom::I128(b)) => *a == b,

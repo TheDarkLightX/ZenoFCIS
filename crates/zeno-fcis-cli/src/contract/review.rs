@@ -30,6 +30,7 @@ mod judge_tests;
 pub(crate) mod lemma;
 mod machine;
 mod mutants;
+pub(crate) mod numeric_symbolic;
 mod observations;
 mod packet;
 pub(crate) mod probe;

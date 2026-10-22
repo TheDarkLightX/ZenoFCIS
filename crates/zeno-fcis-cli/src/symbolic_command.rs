@@ -199,6 +199,43 @@ pub(crate) struct Solvers {
 }
 
 impl Solvers {
+    /// Fixed qualification binaries named by the environment, admitted by hash
+    /// and version through the same runner as manifest-configured checks.
+    pub(crate) fn from_environment() -> Result<Self, String> {
+        let queries = std::env::var_os("ZENO_FCIS_SYMBOLIC_QUERIES").map(PathBuf::from);
+        let mut result = Self::open(None, queries.as_deref())?;
+        for (backend, variable, version, hash) in [
+            (
+                ToolBackend::Cvc5,
+                "ZENO_FCIS_CVC5",
+                "1.3.3",
+                "e8d7870d57ab55e81619d2373b043da05ea1d37ca393931bdb5d8b9788cd64c4",
+            ),
+            (
+                ToolBackend::Z3,
+                "ZENO_FCIS_Z3",
+                "4.16.0",
+                "e583c4186a45e72411fa2cb2048401eed03f0f8e5f24694676a8f6271a50b765",
+            ),
+        ] {
+            let path = std::env::var_os(variable)
+                .ok_or_else(|| format!("{variable} is not configured"))?;
+            let config = serde_json::from_value(json!({
+                "backend": backend, "path": PathBuf::from(path), "version": version,
+                "sha256": hash, "timeout_ms": 10_000, "max_output_bytes": 16_777_216,
+                "allowed_axioms": [],
+            }))
+            .map_err(|e| format!("solver configuration: {e}"))?;
+            let session = SmtSession::open(&config)
+                .map_err(|e| format!("{} admission failed: {e:?}", backend_name(backend)))?;
+            match backend {
+                ToolBackend::Cvc5 => result.cvc5 = Some(session),
+                _ => result.z3 = Some(session),
+            }
+        }
+        Ok(result)
+    }
+
     /// Admits every CVC5 and Z3 entry of the manifest, once. Without a
     /// manifest no solver is configured.
     ///

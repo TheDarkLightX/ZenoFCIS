@@ -458,14 +458,20 @@ fn the_command_is_described_with_its_effects() {
         serde_json::json!([
             "application-contract",
             "decision-examples",
-            "optional-proposed-laws"
+            "optional-proposed-laws",
+            "optional-pinned-solvers"
         ])
     );
     assert_eq!(
         description["effects"]["writes"],
-        serde_json::json!(["optional-review-packet", "optional-seed-programs"])
+        serde_json::json!([
+            "optional-review-packet",
+            "optional-seed-programs",
+            "optional-query-directory",
+            "temporary-files"
+        ])
     );
-    assert_eq!(description["effects"]["executes_tools"], false);
+    assert_eq!(description["effects"]["executes_tools"], true);
     let output = zeno(&["describe", "contract"]);
     assert_eq!(
         json(&output.stdout)["command"]["effects"]["classification"],

@@ -64,6 +64,9 @@ fn counter(root: &TempRoot) -> PathBuf {
 fn zeno(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
         .args(args)
+        .env_remove("ZENO_FCIS_Z3")
+        .env_remove("ZENO_FCIS_CVC5")
+        .env_remove("ZENO_FCIS_SYMBOLIC_QUERIES")
         .output()
         .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"))
 }
@@ -135,7 +138,8 @@ fn transition_lemma_cli_checks_actual_swaps_and_refutes_a_decreasing_step() {
         ],
         2,
     );
-    assert_eq!(stop["status"], "inconclusive");
+    assert_eq!(stop["status"], "UNKNOWN");
+    assert_eq!(stop["mode"], "symbolic");
     write(3, 0, true);
     let refuted = run(
         &[
@@ -521,8 +525,13 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
         ],
     ] {
         let over = run(&args, 2);
-        assert_eq!(over["status"], "inconclusive", "{args:?}");
-        assert_eq!(over["reason"], "domain-over-limit", "{args:?}");
+        if args[1] == "lemma" {
+            assert_eq!(over["status"], "UNKNOWN", "{args:?}");
+            assert_eq!(over["mode"], "symbolic", "{args:?}");
+        } else {
+            assert_eq!(over["status"], "inconclusive", "{args:?}");
+            assert_eq!(over["reason"], "domain-over-limit", "{args:?}");
+        }
     }
 }
 
@@ -549,13 +558,26 @@ fn every_judge_is_described_with_its_effects() {
         let description = run(&args, 0);
         let effects = &description["command"]["effects"];
         assert_eq!(effects["classification"], "declared", "{path:?}");
+        let symbolic = path.as_slice() == ["contract", "lemma"];
+        let mut reads = reads;
+        if symbolic {
+            reads.push("optional-pinned-solvers");
+        }
         assert_eq!(effects["reads"], serde_json::json!(reads), "{path:?}");
         assert_eq!(
             effects["writes"],
-            serde_json::json!(["optional-judge-packet"]),
+            if symbolic {
+                serde_json::json!([
+                    "optional-judge-packet",
+                    "optional-query-directory",
+                    "temporary-files"
+                ])
+            } else {
+                serde_json::json!(["optional-judge-packet"])
+            },
             "{path:?}"
         );
-        assert_eq!(effects["executes_tools"], false, "{path:?}");
+        assert_eq!(effects["executes_tools"], symbolic, "{path:?}");
     }
     let group = run(&["describe", "contract", "probe"], 0);
     assert_eq!(

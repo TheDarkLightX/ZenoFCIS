@@ -392,9 +392,9 @@ effects! { crate::refine_command::Command {
 effects! { crate::review_command::Command {
     leaves {
         "review" => Self::Review { .. } => declared((
-                &["application-contract", "decision-examples", "optional-proposed-laws"],
-                &["optional-review-packet", "optional-seed-programs"],
-                false,
+                &["application-contract", "decision-examples", "optional-proposed-laws", "optional-pinned-solvers"],
+                &["optional-review-packet", "optional-seed-programs", "optional-query-directory", "temporary-files"],
+                true,
                 None,
             ));
     }
@@ -851,9 +851,9 @@ effects! { crate::judge_command::Command {
                 None,
             ));
         "lemma" => Self::Lemma { .. } => declared((
-                &["application-contract"],
-                &["optional-judge-packet"],
-                false,
+                &["application-contract", "optional-pinned-solvers"],
+                &["optional-judge-packet", "optional-query-directory", "temporary-files"],
+                true,
                 None,
             ));
         "scenario" => Self::Scenario { .. } => declared((

@@ -24,9 +24,9 @@ const PROJECT: &str = "project.zeno";
 const RULES: &str = "v2/policy.json";
 
 const ADVISORY: &str = "Advisory only. This packet grants no authority and changes no \
-application file. Every decision in it is the library Authority's on the contract bound as \
-the application binds it, and every law verdict is the library's law evaluator's. Results \
-hold over the declared domain only, and an inconclusive result claims nothing.";
+application file. Native decisions and replayed violations use the bound library Authority \
+and law evaluator. Symbolic results state their solver evidence separately. Results hold \
+over the stated declared-domain scope only; UNKNOWN and inconclusive claim nothing.";
 
 /// What every judge reads and writes.
 #[derive(Args)]
@@ -37,7 +37,7 @@ pub(super) struct Common {
     /// Write the packet to this file. Without it the packet goes to stdout and the summary to stderr.
     #[arg(long)]
     out: Option<PathBuf>,
-    /// Largest declared domain, in tuples, to enumerate; a larger one is inconclusive (exit 2).
+    /// Largest declared domain to enumerate. Lemmas use dual-solver checking above this cap; the other finite judges remain inconclusive.
     #[arg(long, default_value_t = DEFAULT_MAX_TUPLES)]
     max_tuples: u64,
     /// Summary format, used with --out.
@@ -283,6 +283,39 @@ pub(super) fn run(command: Command) -> u8 {
             None,
             true,
             |sources| {
+                if review::numeric_symbolic::over_cap(
+                    sources.project,
+                    sources.rules,
+                    common.max_tuples,
+                )? {
+                    let report = match crate::symbolic_command::Solvers::from_environment() {
+                        Ok(solvers) => {
+                            let mut result = review::numeric_symbolic::lemma::check(
+                                sources.project,
+                                sources.rules,
+                                &lemmas,
+                                transition,
+                                &mut |q| solvers.solve(q),
+                            )?;
+                            result["solver_identities"] = solvers.identities();
+                            if let Some(reason) = solvers.retention_failure() {
+                                result["status"] = json!("UNKNOWN");
+                                result["reason"] = json!(reason);
+                            }
+                            result
+                        }
+                        Err(reason) => {
+                            json!({"mode":"symbolic","status":"UNKNOWN","reason":reason,"authority":"none"})
+                        }
+                    };
+                    let (exit, status) = match report["status"].as_str() {
+                        Some("solver-checked") => (OK, "solver-checked"),
+                        Some("refuted") => (INVALID, "refuted"),
+                        Some("not-inductive") => (BLOCKED, "not-inductive"),
+                        _ => (BLOCKED, "UNKNOWN"),
+                    };
+                    return Ok(Judged::Done(report, exit, status));
+                }
                 Ok(
                     match if transition {
                         lemma::judge_transitions(

@@ -1,0 +1,28 @@
+zeno 1;
+project 1 numeric_swap;
+namespace 2 pool;
+type 100 state Pool;
+type 101 command Command;
+type 102 context Context;
+type 105 u128 Amount in 0..=1000000000000000000000000;
+type 106 data Action;
+field 110 100 reserve_a 105;
+field 111 100 reserve_b 105;
+field 120 101 action 106;
+field 121 101 amount 105;
+field 122 101 minimum 105;
+variant 150 106 SwapAForB none;
+variant 151 106 SwapBForA none;
+reason 300 unavailable precedence 0;
+component 400 pool {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+law 500 nonnegative on commit, genesis = post.100.110 >= u128(0) && post.100.111 >= u128(0);
+law 501 product on accept = products_ge(post.100.110, post.100.111, pre.100.110, pre.100.111);
+law 502 no_free_value on accept = command.101.121 > u128(0) && ((command.101.120 == 150 && post.100.110 > pre.100.110 && post.100.111 < pre.100.111) || (command.101.120 == 151 && post.100.111 > pre.100.111 && post.100.110 < pre.100.110));
+law 503 minimum_output on accept = (command.101.120 == 150 -> post.100.111 + command.101.122 <= pre.100.111) && (command.101.120 == 151 -> post.100.110 + command.101.122 <= pre.100.110);

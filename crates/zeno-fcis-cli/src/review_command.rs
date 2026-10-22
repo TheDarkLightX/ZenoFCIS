@@ -25,7 +25,7 @@ const EXAMPLES: &str = "tests/decision-examples.txt";
 
 #[derive(Subcommand)]
 pub(super) enum Command {
-    /// Review a contract: its decisions over the input domain or a boundary set, their agreement with the decision examples, and the rule mutants those inputs distinguish. Advisory; the application is not changed.
+    /// Review decisions, owner examples and rule mutants. Small domains remain exhaustive; above the cap, full-domain law checking needs both pinned solvers. A concrete native example can refuse first. Advisory; the application is not changed.
     Review {
         /// Application directory holding project.zeno, v2/policy.json and, optionally, tests/decision-examples.txt.
         #[arg(default_value = ".")]
@@ -33,7 +33,7 @@ pub(super) enum Command {
         /// Write the review packet to this file. Without it the packet goes to stdout and the summary to stderr.
         #[arg(long)]
         out: Option<PathBuf>,
-        /// Largest input set to enumerate or probe. A domain of at most this many tuples is enumerated in full.
+        /// Largest domain to enumerate in full. Larger scalar domains automatically use symbolic law checking with ZENO_FCIS_Z3 and ZENO_FCIS_CVC5.
         #[arg(long, default_value_t = DEFAULT_MAX_TUPLES)]
         max_tuples: u64,
         /// Summary format, used with --out.
@@ -169,6 +169,34 @@ fn review_directory(
             Err(failure) => report_failure(dir, failure, format),
         };
     }
+    // Preserve the existing exhaustive route at and below its exact cap.
+    // Solver acquisition belongs here in the file/process shell, never in
+    // the pure review implementation.
+    if let (Ok(project), Ok(rules)) = (read_text(dir, PROJECT), read_text(dir, RULES)) {
+        match review::numeric_symbolic::over_cap(&project, &rules, max_tuples) {
+            Ok(true) => {
+                return symbolic_directory(
+                    dir,
+                    out,
+                    format,
+                    &project,
+                    &rules,
+                    mutant_programs.is_some() || gap_settings.is_some(),
+                );
+            }
+            Ok(false) => {}
+            Err(error) => {
+                return report_failure(
+                    dir,
+                    Failure::Invalid {
+                        place: error.place().into(),
+                        reason: error.reason().into(),
+                    },
+                    format,
+                );
+            }
+        }
+    }
     let result = (|| {
         let project = read_text(dir, PROJECT)?;
         let rules = read_text(dir, RULES)?;
@@ -299,6 +327,123 @@ fn review_directory(
         Some("invalid-proposals") => MALFORMED,
         _ => OK,
     }
+}
+
+fn symbolic_directory(
+    dir: &Path,
+    out: Option<&Path>,
+    format: OutputFormat,
+    project: &str,
+    rules: &str,
+    unsupported_options: bool,
+) -> u8 {
+    let result = (|| {
+        let examples = match read_input(&dir.join(EXAMPLES)) {
+            Ok(b) => Some(text(EXAMPLES, b)?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(Failure::Read(e.to_string())),
+        };
+        let mut report = if unsupported_options {
+            json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":"symbolic gap counting and exhaustive mutant seed receipts are unsupported"})
+        } else if let Some(report) = native_example_refutation(ReviewSources {
+            project,
+            rules,
+            examples: examples.as_deref(),
+        })? {
+            report
+        } else {
+            match crate::symbolic_command::Solvers::from_environment() {
+                Ok(solvers) => {
+                    let mut report = review::numeric_symbolic::review(
+                        ReviewSources {
+                            project,
+                            rules,
+                            examples: examples.as_deref(),
+                        },
+                        &mut |q| solvers.solve(q),
+                        true,
+                    )
+                    .map_err(|e| Failure::Invalid {
+                        place: e.place().into(),
+                        reason: e.reason().into(),
+                    })?;
+                    report["solver_identities"] = solvers.identities();
+                    if let Some(reason) = solvers.retention_failure() {
+                        report["status"] = json!("UNKNOWN");
+                        report["reason"] = json!(reason);
+                    }
+                    report
+                }
+                Err(reason) => {
+                    json!({"schema":"zeno-fcis/numeric-law-review/1","authority":"none","mode":"symbolic","status":"UNKNOWN","reason":reason})
+                }
+            }
+        };
+        report["application"] = json!(review::application(rules).unwrap_or_default());
+        if let Some(path) = out {
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;
+            }
+            atomic_replace(path, crate::transform::canonical_json(&report).as_bytes())
+                .map_err(|e| Failure::Read(e.to_string()))?;
+        }
+        Ok(report)
+    })();
+    match result {
+        Err(f) => report_failure(dir, f, format),
+        Ok(report) => {
+            let status = report["status"].as_str().unwrap_or("UNKNOWN");
+            if out.is_none() || matches!(format, OutputFormat::Json) {
+                print_json(&report)
+            } else {
+                println!(
+                    "contract review: {status}; mode: {}",
+                    report["mode"].as_str().unwrap_or("unknown")
+                );
+                if status == "solver-checked" {
+                    println!("{}", review::numeric_symbolic::MODE);
+                }
+                if let Some(reason) = report["reason"].as_str() {
+                    println!("{reason}");
+                }
+            }
+            match status {
+                "solver-checked" => OK,
+                "refuted" | "disagreement" | "law-refusal" => INVALID,
+                _ => BLOCKED,
+            }
+        }
+    }
+}
+
+/// A concrete native example can refuse a review before global solver work.
+/// Reuse the existing owner-example and mutant-witness checks with one probe;
+/// its packet retains the boundary scope and issues no symbolic law verdict.
+fn native_example_refutation(sources: ReviewSources<'_>) -> Result<Option<Value>, Failure> {
+    if !sources.examples.is_some_and(|text| {
+        text.lines()
+            .any(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+    }) {
+        return Ok(None);
+    }
+    let reviewed = review::review(sources, 1).map_err(|e| Failure::Invalid {
+        place: e.place().into(),
+        reason: e.reason().into(),
+    })?;
+    if reviewed.summary().findings == 0 {
+        return Ok(None);
+    }
+    let mut packet: Value =
+        serde_json::from_str(reviewed.packet()).map_err(|e| Failure::Read(e.to_string()))?;
+    packet["mode"] = json!("native-examples");
+    packet["status"] = json!(if reviewed.summary().disagreements > 0 {
+        "disagreement"
+    } else {
+        "law-refusal"
+    });
+    packet["law_check"] =
+        json!("symbolic checking not run: a concrete native finding already refuses the review");
+    Ok(Some(packet))
 }
 
 /// Writes each seed as `<id>.zcve` into the new directory `path` and
