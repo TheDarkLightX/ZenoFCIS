@@ -13,14 +13,55 @@ use std::path::Path;
 
 use serde_json::json;
 use zeno_fcis_spec::{
-    ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, TypeKind,
-    elaborate_project, expand_tables, parse_project,
+    DiagnosticSet, ProjectLimits, ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits,
+    StableId, TableExpansion, TypeKind, elaborate_project, expand_tables, parse_project,
 };
 
 use crate::{FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, print_json};
 
 /// The input tuples a finite contract check enumerates at most by default.
 const FINITE_CHECK_CAP: u128 = 1 << 20;
+
+struct CheckedExpansion {
+    expansion: TableExpansion,
+    inputs: Vec<(String, Option<u128>)>,
+    domain: Option<u128>,
+    entries: u32,
+}
+
+enum ExpansionError {
+    Diagnostics(DiagnosticSet),
+    CanonicalMismatch,
+}
+
+fn checked_expansion(
+    source: &str,
+    limits: SourceLimits,
+) -> Result<CheckedExpansion, ExpansionError> {
+    let elaborated = |text: &str| {
+        parse_project(text, limits)
+            .and_then(|parsed| elaborate_project(parsed, ProjectLimits::default()))
+    };
+    let expansion = expand_tables(source, limits).map_err(ExpansionError::Diagnostics)?;
+    let original = elaborated(source).map_err(ExpansionError::Diagnostics)?;
+    let same = elaborated(&expansion.text).ok().and_then(|expanded| {
+        Some(expanded.canonical_bytes().ok()? == original.view().canonical_bytes().ok()?)
+    });
+    if same != Some(true) {
+        return Err(ExpansionError::CanonicalMismatch);
+    }
+    let inputs = inputs(&original);
+    let domain = inputs
+        .iter()
+        .try_fold(1u128, |product, (_, size)| product.checked_mul((*size)?));
+    let entries = expansion.tables.iter().map(|table| table.size).sum();
+    Ok(CheckedExpansion {
+        expansion,
+        inputs,
+        domain,
+        entries,
+    })
+}
 
 pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
     let limits = SourceLimits::default();
@@ -33,32 +74,24 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
                 return FAILURE;
             }
         };
-    let elaborated = |text: &str| {
-        parse_project(text, limits)
-            .and_then(|parsed| elaborate_project(parsed, ProjectLimits::default()))
-    };
-    let (expansion, original) = match expand_tables(&source, limits)
-        .and_then(|expansion| Ok((expansion, elaborated(&source)?)))
-    {
-        Ok(value) => value,
-        Err(set) => {
+    let checked = match checked_expansion(&source, limits) {
+        Ok(checked) => checked,
+        Err(ExpansionError::Diagnostics(set)) => {
             crate::print_diagnostics(path, &set, format);
             return INVALID;
         }
+        Err(ExpansionError::CanonicalMismatch) => {
+            let message = "the expanded text does not parse to the same project; nothing printed";
+            crate::print_command_error(path, "expansion-mismatch", message, format);
+            return FAILURE;
+        }
     };
-    let same = elaborated(&expansion.text).ok().and_then(|expanded| {
-        Some(expanded.canonical_bytes().ok()? == original.view().canonical_bytes().ok()?)
-    });
-    if same != Some(true) {
-        let message = "the expanded text does not parse to the same project; nothing printed";
-        crate::print_command_error(path, "expansion-mismatch", message, format);
-        return FAILURE;
-    }
-    let inputs = inputs(&original);
-    let domain = inputs
-        .iter()
-        .try_fold(1u128, |product, (_, size)| product.checked_mul((*size)?));
-    let entries: u32 = expansion.tables.iter().map(|table| table.size).sum();
+    let CheckedExpansion {
+        expansion,
+        inputs,
+        domain,
+        entries,
+    } = checked;
     match format {
         OutputFormat::Human => {
             print!("{}", expansion.text);

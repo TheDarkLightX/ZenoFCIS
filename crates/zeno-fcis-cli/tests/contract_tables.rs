@@ -25,6 +25,25 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 #[test]
+fn expand_handler_delegates_canonical_acceptance_to_pure_preparation() {
+    let source = include_str!("../src/table_expansion.rs");
+    let handler = source
+        .split_once("pub(crate) fn expand(")
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+    let handler = handler
+        .split_once("\nfn inputs(")
+        .map(|(body, _)| body)
+        .unwrap_or(handler);
+    assert!(
+        source.contains("fn checked_expansion(")
+            && !handler.contains("canonical_bytes(")
+            && !handler.contains("expand_tables("),
+        "the file handler must render a result returned by pure checked expansion"
+    );
+}
+
+#[test]
 fn contract_tables_expand_prints_the_checked_project() {
     let project = example().join("project.zeno");
     let human = cli(&["check", "--expand"], &[&project]);
