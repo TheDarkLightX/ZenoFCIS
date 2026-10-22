@@ -36,7 +36,16 @@ fn layer_path(given: &[PathBuf]) -> Result<PathBuf, &'static str> {
 }
 pub(crate) fn invoke(given: &[PathBuf], op: Operation) -> (u8, Value) {
     match execute(given, op) {
-        Ok(v) => (if v["status"] == "inconclusive" { 2 } else { 0 }, v),
+        Ok(v) => (
+            if v["status"] == "refused" {
+                1
+            } else if v["status"] == "inconclusive" {
+                2
+            } else {
+                0
+            },
+            v,
+        ),
         Err(e) => (1, S::error(e)),
     }
 }
@@ -200,11 +209,7 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                         notes,
                         path.parent().ok_or("kb-parent")?,
                     )?;
-                    let sha = S::commit(&path, Some(&binding), &next)?;
-                    let record = &next.assessments[&key];
-                    Ok(
-                        json!({"status":if record.decision==Decision::Inconclusive{"inconclusive"}else{"assessed"},"authority":"none","assessment_sha256":key,"layer_sha256":sha,"assessment":record,"aggregate":aggregate(record)}),
-                    )
+                    publish_assessment(&path, &binding, &next, &key)
                 }
                 Operation::Grow => {
                     let mut next = layer.clone();
@@ -396,6 +401,39 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
         }
     }
 }
+/// Publication is shell work; a refused publication retains the measured result.
+pub(crate) fn publish_assessment(
+    path: &std::path::Path,
+    binding: &str,
+    next: &Layer,
+    key: &str,
+) -> Result<Value, &'static str> {
+    let record = next.assessments.get(key).ok_or("kb-assessment-missing")?;
+    match S::commit(path, Some(binding), next) {
+        Ok(sha) => Ok(
+            json!({"status":if record.decision==Decision::Inconclusive{"inconclusive"}else{"assessed"},"authority":"none","publication":"confirmed","assessment_sha256":key,"layer_sha256":sha,"assessment":record,"aggregate":aggregate(record)}),
+        ),
+        Err(reason) => {
+            let recovery = match S::retain_unpublished(path, next) {
+                Ok(file) => {
+                    json!({"path":path.parent().ok_or("kb-parent")?.join(&file.path),"sha256":file.sha256,"schema":S::SCHEMA,"authority":"none","is_layer_descriptor":false})
+                }
+                Err(error) => json!({"reason":error,"authority":"none"}),
+            };
+            let mut value = S::error(reason);
+            value["assessment_sha256"] = json!(key);
+            value["assessment"] = json!(record);
+            value["aggregate"] = aggregate(record);
+            value["publication"] = json!("unconfirmed");
+            value["recovery"] = recovery;
+            value["next_step"] = json!(
+                "Inspect the retained assessment and current layer revision before retrying. The recovery snapshot is not a knowledge layer."
+            );
+            Ok(value)
+        }
+    }
+}
+
 pub(crate) fn aggregate(a: &Assessment) -> Value {
     let sum = |on: bool| {
         a.cases

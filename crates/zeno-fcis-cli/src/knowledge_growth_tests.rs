@@ -195,3 +195,45 @@ fn repeated_failure_requires_distinct_subjects_and_never_becomes_advice() {
         BTreeSet::from([hash("first"), hash("second")])
     );
 }
+
+#[test]
+fn unpublished_work_survives_a_revision_race_without_layer_authority() {
+    let root = std::env::temp_dir().join(format!("kb-unpublished-{}", std::process::id()));
+    std::fs::create_dir(&root).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let path = root.join("layer.json");
+    let original = Layer::default();
+    S::commit(&path, None, &original).unwrap();
+    let before = std::fs::read(&path).unwrap();
+    let mut next = original.clone();
+    assessed(
+        &mut next,
+        "candidate",
+        scope("counter", None),
+        vec![case("positive", scope("counter", None), 5)],
+    );
+    let key = next.assessments.keys().next().unwrap().clone();
+    let value =
+        crate::knowledge_workflow::publish_assessment(&path, &hash("wrong-revision"), &next, &key)
+            .unwrap();
+    assert_eq!(value["status"], "refused");
+    assert_eq!(value["publication"], "unconfirmed");
+    assert_eq!(value["reason"], "kb-revision-conflict");
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(value["assessment"]["assessment_work"], 62);
+    let recovered = std::path::PathBuf::from(value["recovery"]["path"].as_str().unwrap());
+    let bytes = std::fs::read(&recovered).unwrap();
+    assert_eq!(
+        crate::transform::sha256_hex(&bytes),
+        value["recovery"]["sha256"]
+    );
+    let restored: Layer = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(restored, next);
+    assert!(S::load(&recovered).is_err());
+    assert_eq!(value["recovery"]["is_layer_descriptor"], false);
+    std::fs::remove_dir_all(root).unwrap();
+}

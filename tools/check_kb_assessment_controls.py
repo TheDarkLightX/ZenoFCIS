@@ -22,6 +22,7 @@ def control(name, file, pattern, replacement, tests):
 
 
 CONTROLS = [
+    control("unpublished-work-discarded", "knowledge_store.rs", r"pub\(crate\) fn retain_unpublished\((.*?)\) -> Result<FileRef, &'static str> \{", "\\g<0> return Ok(FileRef {path: \"missing\".into(), sha256: \"a\".repeat(64)});", "knowledge_growth_tests::unpublished_work_survives_a_revision_race_without_layer_authority"),
     control("partial-refusal-work-dropped", "knowledge_assessment.rs", r"\.chain\(partial.iter\(\)\)", ".chain(partial.iter().take(0))", "knowledge_assessment::tests::partial_replay_work_survives_a_later_stop"),
     control("pareto-violation", "knowledge_assessment.rs", r"if regression \{", "if regression && false {", ["knowledge_assessment::tests::one_worse_task_cannot_be_hidden", "knowledge_assessment::tests::pareto_rejects_one_worse_measure"]),
     control("empty-evidence-promotion", "knowledge_assessment.rs", r'\(Decision::Inconclusive, "no-applicable-task"\)', '(Decision::Promote, "no-applicable-task")', "knowledge_assessment::tests::no_applicable_task_never_promotes"),
@@ -76,7 +77,9 @@ def main():
     parser.add_argument("--git-dir", type=Path, required=True)
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--only", choices=[c["name"] for c in CONTROLS])
     args = parser.parse_args()
+    selected = [c for c in CONTROLS if args.only is None or c["name"] == args.only]
     args.out.mkdir(mode=0o700, parents=True, exist_ok=False)
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target.resolve()), CARGO_BUILD_JOBS="3", CARGO_INCREMENTAL="0")
     with tempfile.TemporaryDirectory(prefix="kb-controls-") as scratch:
@@ -90,13 +93,13 @@ def main():
         code, executable = build(work, env, args.out / "baseline-build.log")
         if code or not executable:
             raise SystemExit("control baseline did not build")
-        tests = sorted({test for spec in CONTROLS for test in spec["tests"]})
+        tests = sorted({test for spec in selected for test in spec["tests"]})
         for index, test in enumerate(tests):
             result = command([executable, test, "--exact"], work, env, args.out / f"baseline-{index}.log")
             if result.returncode or b"1 passed" not in result.stdout:
                 raise SystemExit("control baseline test failed")
         rows = []
-        for spec in CONTROLS:
+        for spec in selected:
             path = work / spec["file"]
             before = path.read_text()
             after, count = re.subn(spec["pattern"], spec["replacement"], before, count=1, flags=re.DOTALL)

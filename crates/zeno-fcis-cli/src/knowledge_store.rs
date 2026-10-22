@@ -570,6 +570,33 @@ enum Fault {
     Descriptor,
     Swap,
 }
+/// Retain an owned diagnostic snapshot. No layer descriptor or publication authority.
+pub(crate) fn retain_unpublished(path: &Path, layer: &Layer) -> Result<FileRef, &'static str> {
+    let parent = path.parent().ok_or("kb-parent")?;
+    private_root(parent)?;
+    let bytes = serde_json::to_vec(layer).map_err(|_| "kb-encoding")?;
+    if bytes.len() > 16 * 1024 * 1024 {
+        return Err("kb-state-budget");
+    }
+    let sha256 = sha256_hex(&bytes);
+    let name = format!("unpublished-state-{sha256}-{}.json", std::process::id());
+    let file = parent.join(&name);
+    if file.exists() {
+        if read(&file, 16 * 1024 * 1024)? != bytes {
+            return Err("kb-state-collision");
+        }
+    } else {
+        durable(&file, &bytes)?;
+    }
+    std::fs::File::open(parent)
+        .and_then(|f| f.sync_all())
+        .map_err(|_| "kb-directory-sync")?;
+    Ok(FileRef {
+        path: name.into(),
+        sha256,
+    })
+}
+
 pub(crate) fn commit(
     path: &Path,
     expected: Option<&str>,
