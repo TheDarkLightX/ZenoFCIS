@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 
@@ -19,7 +20,8 @@ def run(cli, root, name, arguments, expected=0):
     (root / (name + ".json")).write_bytes(result.stdout)
     (root / (name + ".stderr")).write_bytes(result.stderr)
     value = json.loads(result.stdout)
-    if result.returncode != expected:
+    accepted_exits = (expected,) if type(expected) is int else expected
+    if result.returncode not in accepted_exits:
         raise AssertionError(f"{name}: exit {result.returncode}, expected {expected}; {value.get('reason')}")
     print(json.dumps({"check": name, "exit": result.returncode, "status": value.get("status")}), flush=True)
     return value
@@ -60,53 +62,91 @@ def development(cli, root, suite):
     return episodes, tasks
 
 
-def examples(cli, root):
+def examples(cli, root, resume_from=None, attempts=1):
+    if root.is_relative_to(ROOT):
+        raise ValueError("private output must be outside checkout")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     suite = json.loads(SUITE.read_text())
-    initial_path = SUITE.with_name("initial-resource-suite.json")
-    initial = json.loads(initial_path.read_text())
-    earlier_initial = json.loads(SUITE.with_name("initial-suite.json").read_text())
-    episodes, development_tasks = development(cli, root, suite)
     layer = root / "layer.json"
-    run(cli, root, "init", ["init", "--out", str(layer)])
-    episode_file = root / "development-episodes.json"
-    episode_file.write_text(json.dumps(episodes))
-    run(cli, root, "development-episodes", ["ingest-episodes", "--source", str(episode_file), "--kb", str(layer)])
+    if resume_from is not None:
+        if resume_from.is_symlink() or not resume_from.is_file() or resume_from.stat().st_size > 65536 or resume_from.parent.stat().st_mode & 0o077:
+            raise ValueError("private resume layer required")
+        descriptor_bytes = resume_from.read_bytes()
+        descriptor = json.loads(descriptor_bytes)
+        state_hash = descriptor["state"]["sha256"]
+        if type(state_hash) is not str or len(state_hash) != 64 or any(c not in "0123456789abcdef" for c in state_hash):
+            raise ValueError("resume state digest")
+        state_name = "state-" + state_hash + ".json"
+        state_path = resume_from.parent / state_name
+        if descriptor["schema"] != "zeno-fcis/kb-layer/2" or descriptor["state"]["path"] != state_name or state_path.is_symlink() or not state_path.is_file() or state_path.stat().st_size > 16*1024*1024:
+            raise ValueError("resume descriptor binding")
+        state_bytes = state_path.read_bytes()
+        if hashlib.sha256(state_bytes).hexdigest() != state_hash:
+            raise ValueError("resume state hash")
+        (root / state_name).write_bytes(state_bytes)
+        layer.write_bytes(descriptor_bytes)
+        state = json.loads(state_bytes)
+        rejected = {"assessment_sha256": next(c["assessment"] for c in state["candidates"] if c["id"] == "broad-shortcut")}
+        (root / "resume.json").write_text(json.dumps({"source_descriptor_sha256":hashlib.sha256(descriptor_bytes).hexdigest(),"state_sha256":state_hash,"history_preserved":True}) + "\n")
+        run(cli, root, "resume-check", ["check", "--kb", str(layer)])
+    else:
+        initial_path = SUITE.with_name("initial-resource-suite.json")
+        initial = json.loads(initial_path.read_text())
+        earlier_initial = json.loads(SUITE.with_name("initial-suite.json").read_text())
+        episodes, development_tasks = development(cli, root, suite)
+        run(cli, root, "init", ["init", "--out", str(layer)])
+        episode_file = root / "development-episodes.json"
+        episode_file.write_text(json.dumps(episodes))
+        run(cli, root, "development-episodes", ["ingest-episodes", "--source", str(episode_file), "--kb", str(layer)])
 
-    def proposal(name, stage, scope, subjects, tasks):
-        families = [{"subject": subject, "session": "proposing-subject-" + str(i), "actor": "controlled-native-run",
-                     "tool": "v250", "environment": "sandbox"} for i, subject in enumerate(subjects)]
-        return {"id": name, "statement_sha256": "", "subject": "pipeline", "claim": "", "scope": scope, "effect": "helps",
-                "action": {"skip": [stage], "order": []}, "proposing_tasks": tasks, "families": families,
-                "episodes": [], "parents": [], "dependencies": {}, "state": "proposed", "assessment": None,
-                "observed_work": 0, "origin": "development-proposal"}
+        def proposal(name, stage, scope, subjects, tasks):
+            families = [{"subject": subject, "session": "proposing-subject-" + str(i), "actor": "controlled-native-run",
+                         "tool": "v250", "environment": "sandbox"} for i, subject in enumerate(subjects)]
+            return {"id": name, "statement_sha256": "", "subject": "pipeline", "claim": "", "scope": scope, "effect": "helps",
+                    "action": {"skip": [stage], "order": []}, "proposing_tasks": tasks, "families": families,
+                    "episodes": [], "parents": [], "dependencies": {}, "state": "proposed", "assessment": None,
+                    "observed_work": 0, "origin": "development-proposal"}
 
-    def curate(name, candidates):
-        path = root / (name + "-candidates.json")
-        path.write_text(json.dumps({"schema": "zeno-fcis/kb-candidates/1", "candidates": candidates, "isa": []}))
-        return run(cli, root, name, ["curate", "--source", str(path), "--kb", str(layer)])
+        def curate(name, candidates):
+            path = root / (name + "-candidates.json")
+            path.write_text(json.dumps({"schema": "zeno-fcis/kb-candidates/1", "candidates": candidates, "isa": []}))
+            return run(cli, root, name, ["curate", "--source", str(path), "--kb", str(layer)])
 
-    broad = proposal("broad-shortcut", "resubstitute", {"capability": ["immutable-proposal"]}, initial["proposing_subjects"], development_tasks)
-    curate("curate-initial", [broad])
-    rejected = run(cli, root, "initial-negative", ["assess", "--suite", str(initial_path), "--candidate", "broad-shortcut", "--kb", str(layer)])
-    assert rejected["assessment"]["decision"] == "reject"
-    parent = next(iter(rejected["assessment"]["candidates"]))
-    candidates = []
-    for name, stage, scope in (("helpful", "canonical", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
-                                ("harmful", "resubstitute", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
-                                ("inapplicable", "canonical", {"family": ["absent-class"]})):
-        row = proposal(name, stage, scope, suite["proposing_subjects"], development_tasks + [t["sha256"] for t in initial["tasks"] + earlier_initial["tasks"]])
-        if name == "helpful":
-            row["scope"]["family"] = [" bounded-counter "]
-        row["parents"] = [parent]
-        candidates.append(row)
-    curate("curate", candidates)
+        broad = proposal("broad-shortcut", "resubstitute", {"capability": ["immutable-proposal"]}, initial["proposing_subjects"], development_tasks)
+        curate("curate-initial", [broad])
+        rejected = run(cli, root, "initial-negative", ["assess", "--suite", str(initial_path), "--candidate", "broad-shortcut", "--kb", str(layer)])
+        assert rejected["assessment"]["decision"] == "reject"
+        parent = next(iter(rejected["assessment"]["candidates"]))
+        candidates = []
+        for name, stage, scope in (("helpful", "canonical", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
+                                    ("harmful", "resubstitute", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
+                                    ("inapplicable", "canonical", {"family": ["absent-class"]})):
+            row = proposal(name, stage, scope, suite["proposing_subjects"], development_tasks + [t["sha256"] for t in initial["tasks"] + earlier_initial["tasks"]])
+            if name == "helpful":
+                row["scope"]["family"] = [" bounded-counter "]
+            row["parents"] = [parent]
+            candidates.append(row)
+        curate("curate", candidates)
+    def assess(name, candidate=None):
+        args = ["assess", "--suite", str(SUITE), "--kb", str(layer)]
+        if candidate is not None:
+            args += ["--candidate", candidate]
+        for attempt in range(1, attempts+1):
+            report = run(cli, root, f"{name}-attempt-{attempt}", args, (0, 2))
+            stop = report["assessment"]["resource_stop"]
+            if stop is None:
+                shutil.copyfile(root / f"{name}-attempt-{attempt}.json", root / f"{name}.json")
+                return report
+            if stop not in {"kb-task-refused", "kb-task-timeout"}:
+                raise AssertionError(f"{name}: {stop}")
+        raise AssertionError(f"{name}: operational attempts exhausted; every stop remains inconclusive")
+
     results = {}
-    for name, decision, exit_code in (("helpful", "promote", 0), ("harmful", "reject", 0), ("inapplicable", "inconclusive", 2)):
-        report = run(cli, root, name, ["assess", "--suite", str(SUITE), "--candidate", name, "--kb", str(layer)], exit_code)
+    for name, decision in (("helpful", "promote"), ("harmful", "reject"), ("inapplicable", "inconclusive")):
+        report = assess(name, name)
         assert report["assessment"]["decision"] == decision, (name, report["assessment"]["reason"])
         results[name] = report
-    aggregate = run(cli, root, "aggregate", ["assess", "--suite", str(SUITE), "--kb", str(layer)])
+    aggregate = assess("aggregate")
     assert aggregate["aggregate"]["on"]["solved"] == aggregate["aggregate"]["off"]["solved"]
     assert aggregate["aggregate"]["on"]["work"] < aggregate["aggregate"]["off"]["work"]
     assert aggregate["aggregate"]["prior_assessment_work"] > 0
@@ -150,8 +190,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--resume-from", type=Path, help="Copy this example's private layer, retaining prior work and inconclusive records")
+    parser.add_argument("--attempts", type=int, choices=range(1, 4), default=1, help="Bounded whole-assessment retries for operational refusals; every attempt is recorded")
     args = parser.parse_args()
-    examples(args.cli.resolve(), args.out.resolve())
+    examples(args.cli.resolve(), args.out.resolve(), args.resume_from, args.attempts)
 
 
 if __name__ == "__main__":
