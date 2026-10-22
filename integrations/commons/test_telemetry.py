@@ -67,6 +67,14 @@ class TelemetryImportTests(unittest.TestCase):
         self.assertIsNone(incomplete["check"]["iterations_to_accept"])
         self.assertEqual(incomplete["check"]["accepted_episodes"], 0)
 
+    def test_other_factory_events_are_not_telemetry_records(self):
+        self.store.emit("cli", "note", "unknown", {"note": "telemetry mentioned without a record"})
+        head = self.store.head()
+        summary = loops(self.store)
+        self.assertEqual(summary["episodes"], 0)
+        self.assertEqual(summary["commands"], [])
+        self.assertEqual(self.store.head(), head)
+
     def test_malformed_line_does_not_append(self):
         self.write([{**run(), "inputs": [{"contents": "private source"}]}])
         head = self.store.head()

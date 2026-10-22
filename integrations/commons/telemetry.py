@@ -131,7 +131,9 @@ def loops(store):
     rows = []
     for event in store.export_events(with_archive=True):
         event = json.loads(event)
-        if event["kind"].startswith("factory.cli.") and "telemetry" in event["body"]:
-            body = json.loads(event["body"]) if isinstance(event["body"], str) else event["body"]
+        if not event["kind"].startswith("factory.cli."):
+            continue
+        body = json.loads(event["body"]) if isinstance(event["body"], str) else event["body"]
+        if isinstance(body, dict) and "telemetry" in body:
             rows.append(validate(body["telemetry"]))
     return summarize(rows)
