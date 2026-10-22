@@ -1,0 +1,7 @@
+# LLM-generated expected outcomes for review, not an independent oracle.
+# charged_bps | tier | session | class reason successor | deliveries
+30 | 3 | 140 | accept - 10 | -
+30 | 0 | 140 | accept - 30 | -
+30 | 1 | 140 | accept - 25 | -
+30 | 2 | 140 | accept - 20 | -
+10 | 0 | 140 | accept - 30 | -

@@ -151,7 +151,9 @@ the existing Select's traps and ordinary measured work. Boolean reads use the
 same eager Select in a checked Boolean circuit. No runtime table is retained.
 The selection has N entries and N-1 Selects for a one-dimensional table;
 resource limits still apply to the entries and copied index expressions.
-Active recursive self references retain literal or bound indices.
+Active recursive self references retain literal or bound indices. The
+[fee-tier journey](../examples/contract-tables/fee-tiers/README.md) uses one
+constant schedule in both its law and decision rule.
 
 ## Recursive tables
 

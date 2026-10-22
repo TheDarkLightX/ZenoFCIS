@@ -1,0 +1,32 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "fee-tiers",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "fee": "fee_bps[command.101.120]"
+  },
+  "cases": [
+    {
+      "rule": "quote the declared tier",
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "fee"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "130": 30
+  },
+  "law_kinds": {
+    "500": "FeeAndRounding",
+    "501": "StateInvariant"
+  }
+}

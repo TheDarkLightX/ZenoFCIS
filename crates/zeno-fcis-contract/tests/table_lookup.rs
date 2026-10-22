@@ -45,7 +45,7 @@ fn quote_policy(source: &str, policy_text: &str, expected: [i128; 4]) {
         let framer = Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
         let verify = |actual: Outcome, tier: usize, fee: i128| {
             assert!(
-                matches!(&actual, Outcome::Decision(d) if d.post[0].1.number()==Some(fee)),
+                matches!(&actual, Outcome::Decision(d) if d.post.first().and_then(|(_, v)| v.number())==Some(fee)),
                 "tier={tier} expected fee={fee}, actual={actual:?}"
             );
         };
@@ -136,7 +136,8 @@ fn policy_lookups_match_scalar_encoding_and_eager_work() {
 fn policy_reads_closed_boolean_and_word_derived_entries() {
     let source=format!("{PROJECT}
         derived table 700 flags[i] in table 110 rounds 4 {{ when true then fee_bps[i] < 30; default false; }};
-        derived table 701 words[i] in table 110 bits 2 rounds 8 {{ when fee_bps[i] < 30 then u128(3); default u128(0); }};");
+        derived table 701 words[i] in table 110 bits 2 rounds 8 {{ when fee_bps[i] < 30 then u128(3); default u128(0); }};
+        derived table 702 live[i] in table 110 rounds 4 {{ when true then command.101.120 == i; default false; }};");
     quote(
         &source,
         "choose(flags[3 - command.101.120],1,0)",
@@ -165,5 +166,14 @@ fn policy_lookup_refuses_unproved_range_and_keeps_work_guard() {
             "fee_bps[command.101.120] }; law 999 injected = true;"
         )
         .is_err()
+    );
+}
+
+#[test]
+fn fee_tier_example_quotes_all_declared_tiers() {
+    quote_policy(
+        include_str!("../../../examples/contract-tables/fee-tiers/project.zeno"),
+        include_str!("../../../examples/contract-tables/fee-tiers/v2/policy.json"),
+        [30, 25, 20, 10],
     );
 }
