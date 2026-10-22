@@ -179,8 +179,13 @@ using an arithmetic extension has profile `zeno-fcis/finite-i128/3` within the
 original 256-node, 16-output, 32-input caps, or `/4` beyond those caps. Old
 operation-only graphs keep `/1` or `/2` and their canonical program bytes.
 Program-file commands admit `/1` and `/3`; they refuse the larger `/2` and `/4`
-profiles. Legacy search, optimizer, migration and linear certificate consumers
-refuse the arithmetic extension. See
+profiles. Admission does not imply proposal support: `optimize` can admit `/3`
+then exit 2 as `no-checked-improvement`, with `detail.search.stopped` equal to
+`original-not-typable` and zero search phases. Loop check/replay can compare
+these programs while a selected proposer or rule miner cannot type their nodes.
+In particular, `loop rules` can qualify the unchanged original using only its
+baseline check/replay, with no rule checks and `improved: false`. Migration
+expressions and linear certificate consumers have narrower operation sets. See
 [Contract program export](CLI_REFERENCE.md#contract-program-export).
 
 Units and scales are development specification features, with source-proof
@@ -305,11 +310,13 @@ law 500 funds_conserved on commit, genesis = post.100.111 + post.100.113 == post
 ```
 
 The scope is `on any`, `on accept`, `on reject`, `on failure` (committed
-failures) or `on commit` (accepts and committed failures). `on reject:R`
-selects a rejection with declared reason ID R; failure-only reasons cannot
-label that scope. Reject and failure laws can read `decision_reason`, for
-example `law 9000 selected_reason on reject = decision_reason != 201;`.
-The `, genesis` suffix adds the genesis state. A law that applies at genesis reads only `post`
+failures) or `on commit` (accepts and committed failures). `on reject:ID`
+selects a declared rejection reason; failure-only reasons cannot label that
+scope. Its formula reads only the original input (`pre`, `command`, `context`).
+The law-only numeric term `decision_reason` is available with `on reject` or
+`on failure`, without genesis, for example
+`law 9000 selected_reason on reject = decision_reason != 201;`.
+The optional `, genesis` suffix adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
 use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
@@ -695,3 +702,12 @@ of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
 background for the exhaustive finite checks described here. Shared determination
 reporting covers the declared finite domains and retains the runtime Authority;
 its comparative prior-art search is pending.
+
+## Method background and scope
+
+C. A. R. Hoare, “An Axiomatic Basis for Computer Programming”, Communications
+of the ACM, 1969 ([paper](https://doi.org/10.1145/363235.363259)), supplies the
+background for explicit program assertions. The contract syntax and finite
+compiler are implementation choices; no new proof method is claimed here.
+Generation checks supported declarations and binding. Exhaustive review and
+transform checks cover only their declared finite domains and limits.

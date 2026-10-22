@@ -409,9 +409,13 @@ zeno-fcis contract adopt . --candidate candidate.zcve --receipt receipt.json --u
 Arithmetic development graphs within 256 nodes, 16 outputs and 32 inputs use
 `zeno-fcis/finite-i128/3`. `contract export-program`, finite `transform check`
 and `transform replay` carry that profile and its exact arithmetic. Older
-readers refuse it. Legacy `optimize` and loop/search proposal profiles refuse
-the new opcodes; symbolic and independent-certificate program encoders also
-report unsupported. Native and proof requalification on this changed source
+readers refuse it. Program-file admission is distinct from proposal support:
+`optimize` can admit `/3` but return `no-checked-improvement` (exit 2), with
+`detail.search.stopped: original-not-typable` and zero phases run. Inspect that
+stop reason before claiming search ran. Loop check/replay can compare `/3`
+programs even when a selected proposer or rule miner cannot type their nodes.
+Symbolic and independent-certificate program encoders report unsupported.
+Native and proof requalification on this changed source
 is pending; parser acceptance is not that qualification.
 
 `transform`, `optimize` and `contract review` enumerate input domains, and a
@@ -430,7 +434,7 @@ and `new --contract` refuse a contract past any of these limits and name the
 counts. `export-program` writes either profile, and an application built
 from either decides through the library Authority. The commands that read a
 `program.zcve` file, `transform`, `optimize` and `loop`, read it with the
-library importer, which admits profile 1 only. `transform check` and
+library importer, which admits profiles `/1` and `/3`. `transform check` and
 `optimize` refuse a file over 64 KiB as `program-too-large` before decoding
 it, and a smaller profile 2 program with status `refused`, detail `{"code":
 "program-encoding", "reason": "original-not-admitted"}` and exit 1. No
@@ -1275,7 +1279,7 @@ guide is
 | `loop family --instances MANIFEST --program FILE [--fit]` | No session. Judges a program over family parameters on every instance of a `zeno-fcis/loop-family-manifest/1` manifest (at most 10) with `transform check` and `transform replay`; reports nodes against each instance's optimize result when listed, and the smallest failing instance. Only a checker counterexample makes a row `refuted`; a row whose sketch the doors find unrealizable is labelled `unrealizable`. `--fit` fits each hole to `a * $P + b` on the instances not marked `"fit": false` and checks the lifted program on every instance, including those. The top-level verdict/exit summarizes the initial per-instance checks; `detail.lifted_check` reports the fitted template separately and does not change that exit. Manifest parameter values are signed-64-bit JSON integers. Coverage is stated as "checked on these N instances". |
 | `loop transfer --from FILE --to-instances MANIFEST` | No session. Moves a program written for one instance (whose parameters the document gives) to each listed instance: directly, then with the constants near a changed parameter opened as choice holes, then by repair. Each result is checked as above. Source expressions use literal constants with signed-64-bit JSON parameter metadata; `$PARAMETERS` are refused in source expressions. If no target transfers, `failed` exits 1, including per-target budget stops; partial transfer exits 2. |
 | `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. The key includes the domains and the complete observations used by `transform check`; digest equality is subject to hash collisions and is not a checker verdict or receipt. Exit 0 (`keyed`) also covers unequal keys. The loop workspace uses it to answer a refuted program written another way from memory. |
-| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons are pinned with reason-scoped laws, with answer provenance retained. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
+| `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons have law forms: the door excludes other case-used reasons with `on reject:ID`; `decision_reason` is also available in `on reject` and `on failure` laws. Both doors use the same full-outcome and native-agreement test for determination. Literal delivery requirements remain separate from exported law-only constraints; reports name their basis and uncovered delivery components. Committing answers must give deliveries (`[]` or `"case"`). A completed report can contain disagreeing answers and still exit 0; inspect every answer status. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
 
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
 | `loop decompose --contract DIR --architecture FILE [--compose [--export DIR]]` | No session. Steps 1 to 3 for components in merge order (`zeno-fcis/loop-architecture/1`): required behaviour per component, interface counterexamples with suggested reads (and reads owned by a later component), unowned reasons, failures that must change a later-owned field, case tables projected from the core or tabulated for components without cases, and blame with regions for components with cases. Verdicts: `refused`, `unrealizable` (also whenever a structure problem or interface counterexample is found), `realizable`, `completed`, `meets-requirements`, `refuted`. Steps 1 to 3 are the door's own evaluation of the tables (`decided_by: door-simulation`), not a checker's, and do not claim that the composed architecture behaves as the core. With `--compose`, a realizable architecture whose components all have case tables becomes a `zeno-fcis/checked-composition/3` composition of generated contracts, every submitted guard kept (a catch-all reject with its own reason is appended where a last guard is not `true`); the composition checker's joint step is compared with the core on every declared input and its obligation check runs (`detail.compose`, `decided_by: composition-checker`). The verdict is the weaker of steps 1 to 3 and the composed check: `accepted` only when step 3 blames nothing, the joint step equals the core and the obligations are proved; `refuted` when either differs. `--export DIR` writes the manifest and contracts to a new directory (an existing one is refused), whatever the verdict. |
@@ -2696,8 +2700,10 @@ zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
 
 This is an alternative to `loop question --contract DIR [--answers FILE]`.
 The specification mode reads no prior core and refuses `--contract` or
-`--answers` together with `--specification`. Existing contract mode is
-unchanged. The bounded ASCII JSON document (64 KiB maximum, unique properties,
+`--answers` together with `--specification`. The five `--max-*` flags above
+apply only to specification mode: contract mode accepts but ignores them,
+using its own 131,072-tuple and 4,000,000-admissibility-check limits.
+The bounded ASCII JSON document (64 KiB maximum, unique properties,
 integral numbers) has exactly these fields:
 
 ```json
@@ -2957,7 +2963,13 @@ has `lhs` and `rhs` finite term programs. Bank metadata is advisory. Rules are
 requalified on the target domain, and every changed whole program is checked
 against the fixed original, both with replay. An unchanged qualified result has
 `improved: false` and `result_kind: unchanged-original`; its exported bytes are
-the original and ZAL records a fact. Exact all-failure originals can be checked
+the original and ZAL records a fact. Even if rule mining cannot type the
+original's arithmetic, the command can qualify the unchanged original:
+`detail.checks: []` means no rule/replacement checks, while
+`detail.baseline_check` still records the original-versus-itself full-domain
+transform check and matching receipt replay. Read `improved`, `claim` and
+`rules_requalified`; qualification alone does not establish search support or
+an improving rule. Exact all-failure originals can be checked
 as unchanged; this makes no successful-output or improvement claim. Rules are
 concrete finite-domain proposals, not universal arithmetic identities.
 

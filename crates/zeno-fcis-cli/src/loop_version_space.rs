@@ -26,19 +26,19 @@ const RESULT_SCHEMA: &str = "zeno-fcis/loop-version-space/2";
 
 #[derive(Args, Clone, Copy, Default)]
 pub(crate) struct Arguments {
-    /// Requirements-only enumeration work units, at most 2,000,000.
+    /// Specification enumeration work units, at most 2,000,000; ignored with --contract.
     #[arg(long, requires = "specification")]
     max_work: Option<u64>,
-    /// Requirements-only input tuples, at most 4,096.
+    /// Specification input tuples, at most 4,096; ignored with --contract.
     #[arg(long, requires = "specification")]
     max_domain: Option<u64>,
-    /// Requirements-only complete meanings, at most 4,096.
+    /// Specification complete meanings, at most 4,096; ignored with --contract.
     #[arg(long, requires = "specification")]
     max_meanings: Option<usize>,
-    /// Requirements-only cumulative table cells, at most 1,000,000.
+    /// Specification cumulative table cells, at most 1,000,000; ignored with --contract.
     #[arg(long, requires = "specification")]
     max_cells: Option<u64>,
-    /// Requirements subsets examined for a conflict, at most 10,000.
+    /// Specification conflict subsets, at most 10,000; ignored with --contract.
     #[arg(long, requires = "specification")]
     max_conflict_subsets: Option<u64>,
 }

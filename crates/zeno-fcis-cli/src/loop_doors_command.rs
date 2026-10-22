@@ -184,7 +184,9 @@ Task/named results use zeno-fcis/loop-doors/2; knowledge advice may use zeno-fci
         about = "Mine or load concrete rewrites, then recheck rules and the target program.",
         long_about = r#"Read --original canonical bytes and optionally --terms (zeno-fcis/loop-terms/1) or --bank (zeno-fcis/loop-rule-bank/1), each at most 65,536 bytes. Without either, mine terms from the original. Terms are single-output program JSON or kind/expression objects using the corpus vocabulary.
 
-Check proposed cheaper concrete rules on this target input domain, then transform-check and replay any whole-program replacement against the fixed original. These are finite-domain rules, not universal identities. Shared search limits bound work, cells, terms, checks, tuples and time. --out exports result/bank and, only when qualified, original/candidate bytes. An unchanged original can qualify with improved:false.
+Check proposed cheaper concrete rules on this target input domain, then transform-check and replay any whole-program replacement against the fixed original. These are finite-domain rules, not universal identities. Shared search limits bound work, cells, terms, checks, tuples and time. --out exports result/bank and, only when qualified, original/candidate bytes.
+
+An unchanged original can qualify with improved:false, including when mining cannot type its arithmetic nodes and proposes no rules. An empty detail.checks means no rule/replacement checks; detail.baseline_check still records the original-versus-itself transform check and matching replay. This qualifies only original equivalence, not search support or improvement.
 
 No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error."#
     )]
@@ -335,7 +337,9 @@ Lower the expression and use the library evaluator with a full signed-i128 or Bo
         about = "Find open contract decisions, or ask which finite sketch completion is intended.",
         long_about = r#"Choose --contract (project.zeno and v2/policy.json) with optional zeno-fcis/loop-answers/1 --answers, or --specification (zeno-fcis/loop-version-space/1). Contract mode compares laws and answers with the existing core on the declared finite domain and asks about the largest ambiguous region; answers are not adopted. At most 131,072 tuples and 4,000,000 admissibility checks.
 
-Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Default ceilings: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 subsets.
+Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Default ceilings: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 subsets. The five --max-* flags apply only to --specification; contract mode accepts but ignores them and uses its own limits above.
+
+Contract determination includes the door's reason and delivery constraints; it need not equal a separate gaps-judge result on exported answer laws. Completed reports can include disagreeing answers and exit 0; inspect detail.answers as well as status.
 
 No session or attempts. Contract JSON: zeno-fcis/loop-doors/2; exit 0 completed question report, 1 conflict/inconsistent/refused, 2 incomplete/inconclusive/out-of-scope, 3 I/O error. Requirements JSON: zeno-fcis/loop-version-space/2 (early input errors can use transform-loop/1); question/no-completion/determined=0, refused=1, inconclusive=2. A question or count is not a program acceptance."#
     )]

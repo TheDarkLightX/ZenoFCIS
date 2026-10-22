@@ -183,6 +183,13 @@ Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
 `teach-back` can exit 0 with wrong rules, `strategy --tasks` can exit 0 with
 unqualified evaluation tasks, and `learn` uses exit 3 for an open question.
 Containment may return inconclusive, exit 2, before application work starts.
+`rules` can qualify an unchanged original with no rewrite checks: inspect
+`baseline_check`, `checks`, `improved` and `claim`. Unsupported rule-mining
+arithmetic does not prevent the independent baseline check/replay.
+Question's five `--max-*` flags apply only to `--specification`; contract
+mode accepts but ignores them. Contract determination includes reason and
+delivery constraints, so it need not match the gaps judge on exported laws;
+a completed report can also contain disagreeing answers.
 Neither a proposer, a hash, a role label nor a session file grants publication
 authority. Capture owner/proposer roles are conventions, not authenticated users.
 
