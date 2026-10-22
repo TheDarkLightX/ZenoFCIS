@@ -58,6 +58,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/test_app_factory.py"),
          ("python3", "tools/check_app_factory.py")),
     ),
+    "quantitative-risk": AcceptanceScenario(
+        "Count declared inputs and bounded states and compute both exact reward extremes",
+        (("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "risk"),
+         ("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "risk"),
+         ("nice", "-n", "19", "ionice", "-c3", "python3", "tools/risk_reference.py", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug" / "zeno-fcis"),
+          "--scratch", str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "risk-reference"))),
+    ),
     "distribution-laws": AcceptanceScenario(
         "Check exact finite distributions given uniform independent random bits",
         (("nice", "-n", "19", "ionice", "-c3", "cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "distribution"),

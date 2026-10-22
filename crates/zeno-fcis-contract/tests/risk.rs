@@ -51,7 +51,7 @@ fn max_plus_uses_maximum_fee() -> Result<(), Box<dyn std::error::Error>> {
 }
 #[test]
 fn horizon_includes_length_k() -> Result<(), Box<dyn std::error::Error>> {
-    for k in 0..=3 {
+    for k in [3, 0, 1, 2] {
         let r = answer(extremes(k))?;
         assert_eq!(r["worst"]["value"]["numerator"], (2 * k).to_string());
         assert_eq!(r["worst"]["length"], k);
