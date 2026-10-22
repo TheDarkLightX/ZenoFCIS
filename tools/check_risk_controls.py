@@ -45,7 +45,11 @@ def mutate(text, name):
         parsed = '''    let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let mut occupied: BTreeSet<u32> = declarations.laws.iter().map(|law| law.id).collect();
     occupied.extend([990, 991, 909, rules.failure_law, rules.reject_law]);
-    let names: BTreeSet<&str> = declarations.laws.iter().map(|law| law.name.as_str()).collect();
+    let names: BTreeSet<&str> = declarations
+        .laws
+        .iter()
+        .map(|law| law.name.as_str())
+        .collect();
 
     let mut candidate = 992;
     while occupied.contains(&candidate)
