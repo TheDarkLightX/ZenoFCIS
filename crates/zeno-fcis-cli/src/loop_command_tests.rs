@@ -533,6 +533,32 @@ fn the_transcript_is_bounded_and_labels_its_truncation() {
 }
 
 #[test]
+fn the_engine_preserves_an_unsupported_original_stop() {
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::{Domain, Op, Program};
+    let program = Program::try_new(
+        vec![Domain::Int { min: 1, max: 2 }],
+        vec![Domain::Int { min: 1, max: 2 }],
+        vec![Op::Input(0), Op::Int(1), Op::MulDivCeil(0, 1, 1)],
+        vec![2],
+    )
+    .unwrap_or_else(|error| panic!("witness program: {error}"));
+    let bytes = program
+        .value()
+        .and_then(|value| value.canonical_bytes())
+        .unwrap_or_else(|error| panic!("witness encoding: {error}"));
+    let document: Value = serde_json::from_str(DEFAULT_STRATEGY_JSON)
+        .unwrap_or_else(|error| panic!("default strategy: {error}"));
+    let strategy = Strategy::from_json(&document).unwrap_or_else(|error| panic!("{error:?}"));
+    let report = OptimizeEngine.run(&bytes, &strategy, Profile::CheckedI128V1, &[]);
+    assert!(
+        matches!(&report, SearchReport::Unavailable { reason }
+            if reason.contains("unsupported-original") && reason.contains("original-not-typable")),
+        "an unrepresentable original did not run a completed search: {report:?}"
+    );
+}
+
+#[test]
 fn the_wired_engine_is_the_optimizer_and_admits_exactly_its_phases() {
     let engine = strategy_engine();
     assert_eq!(engine.identity(), "zeno-fcis/optimize/1");

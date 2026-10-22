@@ -338,22 +338,33 @@ impl StrategyEngine for OptimizeEngine {
         // optimizer judges them again before using them.
         let plan = optimize::strategy::Plan::single(strategy);
         match optimize::optimize_plan(original, &plan, checked, ENGINE_MAX_INPUT_TUPLES) {
-            optimize::Outcome::Searched(search) => match search.best {
-                Some(optimize::Accepted {
-                    bytes,
-                    source: optimize::Source::Phase { phase_index, .. },
-                    ..
-                }) => SearchReport::Candidate {
-                    bytes,
-                    extraction: format!("engine-accepted:phase-{phase_index}"),
-                },
-                // Nothing better than what the loop already holds.
-                _ => SearchReport::Failed {
-                    reason: format!(
-                        "engine:no-checked-improvement; bounded-search:{search_bounds}; request a supported lowerable primitive or sketch for the same requirements"
-                    ),
-                },
-            },
+            optimize::Outcome::Searched(search) => {
+                let (status, _) = search.status_and_exit();
+                if search.best.is_none() && status != "no-checked-improvement" {
+                    return SearchReport::Unavailable {
+                        reason: format!(
+                            "engine:{status}; reason:{}; bounded-search:{search_bounds}",
+                            search.stopped.unwrap_or("search-incomplete")
+                        ),
+                    };
+                }
+                match search.best {
+                    Some(optimize::Accepted {
+                        bytes,
+                        source: optimize::Source::Phase { phase_index, .. },
+                        ..
+                    }) => SearchReport::Candidate {
+                        bytes,
+                        extraction: format!("engine-accepted:phase-{phase_index}"),
+                    },
+                    // Nothing better than what the loop already holds.
+                    _ => SearchReport::Failed {
+                        reason: format!(
+                            "engine:no-checked-improvement; bounded-search:{search_bounds}; request a supported lowerable primitive or sketch for the same requirements"
+                        ),
+                    },
+                }
+            }
             optimize::Outcome::Refused(refused) => SearchReport::Failed {
                 reason: format!("engine-refused:{refused:?}"),
             },
