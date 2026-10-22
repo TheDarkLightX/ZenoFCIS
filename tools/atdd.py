@@ -54,6 +54,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Generate and run the checked core, shell, ingress and UI together",
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "template"),
          ("python3", "tools/test_zenoui_text.py"),
+         ("python3", "tools/test_zenoui_refusal.py"),
          ("python3", "tools/test_app_factory.py"),
          ("python3", "tools/check_app_factory.py")),
     ),
