@@ -60,6 +60,23 @@ Type 100 is the state, type 101 the command and type 102 the context, as
 ...` and `type 102 context ...`. The state must be a record; the command and
 context may be records or single values.
 
+A stateless contract declares `type 100 state NoState;` with no fields,
+variants or leaf binding. This is the singleton empty record: `genesis` is
+`{}`, and committing cases use an empty `post` object. It contributes zero
+program inputs and zero state writes; its framed state and schema remain
+canonical. No declared `StateInvariant` law is required for this empty state.
+The generator supplies law 907 (`true`, `on commit, genesis`) when none is
+declared, retaining the runtime law-kind check. Declared
+laws, genesis admission, decision conformance, rejection rules and resource
+limits still apply. Every finite judge enumerates one empty state, then the
+declared command/context product. An ordinary state with fields still needs
+a `StateInvariant` law. Statelessness grants no external-effect authority.
+
+Background: Benjamin C. Pierce, *Types and Programming Languages*, MIT Press
+(2002), describes unit types and singleton values. Here the existing empty
+record represents that singleton; prior-art search pending. The scope is
+the contract state, not storage or external services.
+
 <!-- policy-keys: roots -->
 | Key | Value |
 |---|---|
@@ -333,13 +350,13 @@ every decision, and a decision that breaks one is not committed.
 ### Law kinds
 
 `law_kinds` gives each declared law one of these kinds. Five kinds fix the
-scope the law must be declared with; at least one law must be a
-`StateInvariant`.
+scope the law must be declared with; a state with fields needs at least one
+declared `StateInvariant`. An empty state uses framework law 907 when omitted.
 
 <!-- policy-keys: law-kinds -->
 | Kind | Required declaration | Use |
 |---|---|---|
-| `StateInvariant` | `on commit, genesis` | A property of every committed state and of genesis. At least one is required. |
+| `StateInvariant` | `on commit, genesis` | A property of every committed state and of genesis. Required for a state with fields; supplied for an empty state when omitted. |
 | `AssetConservation` | any scope | Amounts are conserved. |
 | `MintBurnAuthorization` | any scope | Who may create or destroy amounts. |
 | `DebitCreditEffectEquality` | any scope | Debits, credits and effects agree. |

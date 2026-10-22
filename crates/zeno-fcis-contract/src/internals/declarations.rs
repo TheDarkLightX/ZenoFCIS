@@ -247,6 +247,9 @@ impl Declarations {
                 (Some(leaf), true, true) => Form::Leaf(leaf),
                 (None, false, true) => Form::Record(fields),
                 (None, true, false) => Form::Sum(variants),
+                (None, true, true) if id == 100 && declared.kind() == TypeKind::State => {
+                    Form::Record(fields)
+                }
                 (None, true, true) => {
                     return Err(ContractError::new(
                         place(),
