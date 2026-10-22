@@ -2243,8 +2243,8 @@ mod tests {
             .count();
         assert_eq!(
             contained,
-            loop_commands + 1,
-            "every loop command and the parallel check"
+            loop_commands + 2,
+            "every loop command, parallel check and assessment task"
         );
         // Leaves whose required arguments alone do not parse; none is a loop
         // command or a check, so none can be contained.

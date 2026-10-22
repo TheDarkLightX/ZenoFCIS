@@ -937,7 +937,7 @@ effects! { crate::knowledge_command::Operation {
         "facts" => Self::Facts {..} => declared((&["explicit-knowledge-layers"], &[], false, None));
         "reuse" => Self::Reuse {..} => declared((&["explicit-knowledge-layers", "bound-subject"], &[], false, None));
         "assessment-view" => Self::AssessmentView => declared((&["explicit-knowledge-layers"], &[], false, None));
-        "assessment-task" => Self::AssessmentTask { .. } => declared((&["bound-task-request"], &["new-private-task-output"], false, None));
+        "assessment-task" => Self::AssessmentTask { .. } => declared((&["bound-task-request", "caller-cpu-limits"], &["new-private-task-output", "transient-user-unit"], true, None));
         "advise" => Self::Advise { .. } => declared((
                 &["explicit-knowledge-layers", "explicit-validation-records"],
                 &[],

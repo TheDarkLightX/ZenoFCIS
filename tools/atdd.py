@@ -381,6 +381,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked", "--offline", "--bin", "zeno-fcis", "kb_usage_"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked", "--offline", "--test", "kb_usage"),
          ("python3", "-B", "tools/test_usage_knowledge_reference.py"),
+         ("python3", "-B", "integrations/knowledge/test_import_sources.py"),
          ("python3", "-B", "-m", "unittest", "discover", "-s", "integrations/mcp", "-p", "test_knowledge_tools.py")),
     ),
     # END bounded knowledge acceptance.
