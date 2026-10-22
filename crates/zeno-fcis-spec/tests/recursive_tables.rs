@@ -1,5 +1,4 @@
 //! Requirement-linked recursive table controls and expansion checks.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use zeno_fcis_spec::{
     CompareOp, ProjectLimits, RelExpr, SourceLimits, ValueExpr, elaborate_project, expand_tables,
@@ -10,10 +9,11 @@ const HEADER: &str = "zeno 1; project 1 recursive; type 100 state S; type 101 co
 
 fn laws(source: &str) -> Vec<RelExpr> {
     elaborate_project(
-        parse_project(source, SourceLimits::default()).unwrap(),
+        parse_project(source, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
         ProjectLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
     .laws()
     .iter()
     .map(|l| l.formula().clone())
@@ -28,14 +28,20 @@ fn holds(f: &RelExpr, fields: &[i128]) -> bool {
             ValueExpr::Sub(a, b) => value(a, fields) - value(b, fields),
             ValueExpr::Mul(a, b) => value(a, fields) * value(b, fields),
             ValueExpr::Projection(p) => {
-                let id = p.segments().last().unwrap().get();
+                let id = p
+                    .segments()
+                    .last()
+                    .unwrap_or_else(|| panic!("projection must have a field"))
+                    .get();
                 fields[(id - if id >= 210 { 210 } else { 110 }) as usize]
             }
             _ => panic!("unexpected value {v:?}"),
         }
     }
     match f {
-        RelExpr::Circuit(c) => c.evaluate(|f| Some(holds(f, fields))).unwrap(),
+        RelExpr::Circuit(c) => c
+            .evaluate(|f| Some(holds(f, fields)))
+            .unwrap_or_else(|| panic!("circuit reference must evaluate")),
         RelExpr::Bool(v) => *v,
         RelExpr::Not(f) => !holds(f, fields),
         RelExpr::And(a, b) => holds(a, fields) & holds(b, fields),
@@ -132,7 +138,8 @@ fn lower_negation_prior_strata_and_expansion_are_exact() {
     let s = format!("{HEADER} derived table 700 x[i] in table 110 rounds 4 {{ when !(pre.100.110[i] == 0) then true; default x[i]; }};
     derived table 701 y[i] in table 110 rounds 4 {{ when !x[i] then true; default false; }};
     law 500 reads = forall i in table 110 {{ !y[i] || !x[i] }};");
-    let expanded = expand_tables(&s, SourceLimits::default()).unwrap();
+    let expanded = expand_tables(&s, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(laws(&s), laws(&expanded.text));
     assert!(holds(&laws(&s)[0], &[0, 1, 2, 3]));
 }
@@ -152,7 +159,8 @@ fn constant_recursive_rules_fold_once_and_rows_keep_priority() {
     }}; law 500 end = constant[3];"
     );
     assert_eq!(laws(&source), vec![RelExpr::Bool(true)]);
-    let expanded = expand_tables(&source, SourceLimits::default()).unwrap();
+    let expanded = expand_tables(&source, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert!(!expanded.text.contains("circuit"));
     assert_eq!(laws(&expanded.text), laws(&source));
 
@@ -174,8 +182,8 @@ fn project_bound_expression_parser_consumes_exactly_one_formula() {
     let source = format!(
         "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{ when true then pre.100.110[i] == 1 || x[i]; default false; }};"
     );
-    let formula =
-        parse_table_expression(&source, "x[0] || !x[1]", SourceLimits::default()).unwrap();
+    let formula = parse_table_expression(&source, "x[0] || !x[1]", SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(
         formula,
         laws(&format!("{source} law 500 query = x[0] || !x[1];"))[0]
@@ -244,4 +252,26 @@ fn guard_checks_precede_folding_and_leave_positive_values_eligible() {
         parse_project(&source, SourceLimits::default()).is_ok(),
         "a positive body remains allowed"
     );
+}
+
+#[test]
+fn value_table_forms_cannot_hide_recursive_self_reads() {
+    for formula in [
+        "choose(x[i], 0, 1) == 1",
+        "count j in table 110 { x[j] } <= pre.100.110[i]",
+    ] {
+        let source = format!(
+            "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{ when true then {formula}; default false; }};"
+        );
+        let refused = parse_project(&source, SourceLimits::default())
+            .err()
+            .unwrap_or_else(|| panic!("self-read must be refused: {formula}"));
+        assert!(
+            refused
+                .diagnostics()
+                .iter()
+                .any(|d| d.path().as_str() == "derived.table"),
+            "{formula}: {refused:?}"
+        );
+    }
 }

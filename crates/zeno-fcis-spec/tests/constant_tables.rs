@@ -1,15 +1,15 @@
 //! Constant-table specialization and finite closure checks.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 use zeno_fcis_spec::{
     CompareOp, ProjectLimits, RelExpr, SourceLimits, ValueExpr, elaborate_project, expand_tables,
     parse_project,
 };
 fn project(s: &str) -> zeno_fcis_spec::ProjectSpec {
     elaborate_project(
-        parse_project(s, SourceLimits::default()).unwrap(),
+        parse_project(s, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
         ProjectLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
 }
 fn closure(parents: [usize; 3]) -> String {
     let mut s = format!(
@@ -58,11 +58,15 @@ fn constant_closure_becomes_literal_lookup_without_state_fields() {
                         );
                     }
                 }
-                let expanded = expand_tables(&source, SourceLimits::default()).unwrap();
+                let expanded = expand_tables(&source, SourceLimits::default())
+                    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
                 assert!(!expanded.text.contains("const table"));
                 assert_eq!(
-                    p.canonical_bytes().unwrap(),
-                    project(&expanded.text).canonical_bytes().unwrap()
+                    p.canonical_bytes()
+                        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+                    project(&expanded.text)
+                        .canonical_bytes()
+                        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
                 );
             }
         }
@@ -81,10 +85,15 @@ fn constant_words_and_prior_strata_fold_before_the_checked_project() {
         &RelExpr::Compare(CompareOp::Eq, ValueExpr::U128(7), ValueExpr::U128(7))
     );
     assert_eq!(
-        p.canonical_bytes().unwrap(),
-        project(&expand_tables(s, SourceLimits::default()).unwrap().text)
-            .canonical_bytes()
-            .unwrap()
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+        project(
+            &expand_tables(s, SourceLimits::default())
+                .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
+                .text
+        )
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
     );
 }
 #[test]
@@ -117,10 +126,14 @@ fn boolean_and_extreme_integer_literals_keep_their_types() {
         i128::MIN
     );
     let p = project(&s);
-    let expanded = expand_tables(&s, SourceLimits::default()).unwrap();
+    let expanded = expand_tables(&s, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(
-        p.canonical_bytes().unwrap(),
-        project(&expanded.text).canonical_bytes().unwrap()
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+        project(&expanded.text)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
     );
 }
 

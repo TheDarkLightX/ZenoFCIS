@@ -24,6 +24,22 @@ The example is the six-copy version of a contract that, without tables, would
 list six fields and repeat each law six times.
 Recursive examples replace repeated bounded path checks with a closure rule.
 
+## Background
+
+Maarten H. van Emden and Robert A. Kowalski, “The Semantics of Predicate
+Logic as a Programming Language,” Journal of the ACM 23(4), 1976, studies
+fixed-point semantics for logic programs. Krzysztof R. Apt, Howard A. Blair
+and Adrian Walker, “Towards a Theory of Declarative Knowledge,” in
+*Foundations of Deductive Databases and Logic Programming*, Morgan Kaufmann,
+1988, covers stratified logic programs. These are background for the bounded
+positive rules; the compiler, meters and finite tests qualify this implementation.
+
+## What is new here
+
+This release adds bounded recursive table declarations, shared Boolean rounds
+and their contract-judge integration. The comparative assessment of this
+combination is **prior-art search pending**.
+
 ## Scope
 
 Exhaustively checked over the declared finite domain of 294,912 input tuples.

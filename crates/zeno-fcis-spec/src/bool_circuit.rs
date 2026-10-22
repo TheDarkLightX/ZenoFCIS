@@ -34,7 +34,9 @@ impl<F> BoolNode<F> {
     }
 }
 
-/// An immutable bounded circuit, evaluated in node order with invocation-local scratch.
+/// An immutable bounded circuit topology with invocation-local evaluation scratch.
+/// Formula leaves retain the ownership contract of `F`; authoritative instantiations
+/// use transitively immutable formulas. This topology is not a publication capability.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BoolCircuit<F> {
     nodes: Arc<[BoolNode<F>]>,
@@ -117,7 +119,9 @@ impl<F> BoolCircuit<F> {
         })
     }
 
-    /// Pure eager evaluation. The caller supplies each lower formula's truth value.
+    /// Eager callback evaluation with exclusively owned invocation scratch.
+    /// The caller supplies each lower formula's semantics; this diagnostic utility
+    /// grants no decision, measured-work or publication authority.
     /// Runtime authorities compile these operations into their metered graph instead.
     pub fn evaluate(&self, formula: impl FnMut(&F) -> Option<bool>) -> Option<bool> {
         self.evaluate_all(formula)?

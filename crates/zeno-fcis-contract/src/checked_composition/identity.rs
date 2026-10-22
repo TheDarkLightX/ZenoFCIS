@@ -42,6 +42,7 @@ const VERSION: u32 = 1;
 /// bytes, in path order.
 pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "Cargo.toml",
+    "examples/recursive_table_vectors.rs",
     "examples/trace_game_input.rs",
     "src/checked_composition.rs",
     "src/checked_composition/aggregate.rs",

@@ -1,5 +1,4 @@
 //! Native invocation metering and refusal checks for shared recursive formulas.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use serde_json::json;
 use zeno_fcis_contract::internals::{
@@ -28,15 +27,24 @@ fn execute(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
         "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},
         "cases":[{"when":true,"class":"Accept","reason":null,"post":{"110":"pre.100.110","111":"pre.100.111","112":"pre.100.112","113":"pre.100.113"},"outbox":[]}],
         "genesis":{"110":0,"111":0,"112":0,"113":0},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
-    let rules = Rules::read(&raw.to_string()).unwrap();
-    let declarations = Declarations::read(&source, &rules.leaf_bindings).unwrap();
-    let schema = schema::encode(&declarations).unwrap();
-    let mut contract =
-        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    let rules = Rules::read(&raw.to_string())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let declarations = Declarations::read(&source, &rules.leaf_bindings)
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let schema = schema::encode(&declarations)
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let mut contract = Contract::build(
+        &declarations,
+        &rules,
+        schema_commitment(&schema)
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     if let Some(limit) = limit {
         contract.budgets.step = limit;
     }
-    let positions = domain::positions(&declarations).unwrap();
+    let positions = domain::positions(&declarations)
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     let framer = Framer::new(&positions, &contract);
     let tuple = vec![0; positions.len()];
     let original = tuple.clone();
@@ -57,7 +65,7 @@ fn execute(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
             budget,
         )
     })
-    .unwrap();
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(tuple, original);
     assert_eq!(frames, saved);
     result
@@ -92,11 +100,19 @@ fn execute_bits(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
       derived table 700 x[i] in table 110 bits 2 rounds 4 {{ when true then join(pre.100.110[i],join j in table 110 {{x[j]}}); default u128(0); }};
       law 500 domain on commit, genesis = post.100.110 >= u128(0); law 501 query on commit = {};",if recursive {"subset(2,x[0],x[0])"}else{"true"});
     let raw = json!({"schema":"zeno-fcis/template-declarative-policy/4","template":"bits-meter","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},"cases":[{"when":true,"class":"Accept","reason":null,"post":{"110":"pre.100.110","111":"pre.100.111"},"outbox":[]}],"genesis":{"110":"u128(0)","111":"u128(0)"},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
-    let rules = Rules::read(&raw.to_string()).unwrap();
-    let declarations = Declarations::read(&source, &rules.leaf_bindings).unwrap();
-    let schema = schema::encode(&declarations).unwrap();
-    let mut contract =
-        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    let rules = Rules::read(&raw.to_string())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let declarations = Declarations::read(&source, &rules.leaf_bindings)
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let schema = schema::encode(&declarations)
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    let mut contract = Contract::build(
+        &declarations,
+        &rules,
+        schema_commitment(&schema)
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     if let Some(limit) = limit {
         contract.budgets.step = limit;
     }
@@ -125,9 +141,9 @@ fn execute_bits(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
         } else {
             output::encode_record(&roots[i], max)
         }
-        .unwrap();
-        frames[i] =
-            output::encode_envelope(100 + i as u32, &contract.commitment, &body, max).unwrap();
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+        frames[i] = output::encode_envelope(100 + i as u32, &contract.commitment, &body, max)
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     }
     let saved = frames.clone();
     let result = policy::with_numeric_authority(&contract, &schema, |a| {
@@ -144,7 +160,7 @@ fn execute_bits(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
             }),
         )
     })
-    .unwrap();
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(frames, saved);
     result
 }
@@ -173,12 +189,21 @@ fn constant_lookup_is_bound_into_policy_identity_without_extra_inputs() {
           derived table 700 reach[i][j] in table 110 rounds 4 {{when true then i==j || exists k in table 110 {{parents[i]==k+1 && reach[k][j]}}; default false;}};
           law 500 domain on commit, genesis = post.100.210 >= 0; law 501 query on commit = reach[1][0] || pre.100.210==0;");
         let raw = json!({"schema":"zeno-fcis/template-declarative-policy/2","template":"constant-identity","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},"cases":[{"when":true,"class":"Accept","reason":null,"post":{"210":"pre.100.210"},"outbox":[]}],"genesis":{"210":0},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
-        let rules = Rules::read(&raw.to_string()).unwrap();
-        let d = Declarations::read(&source, &rules.leaf_bindings).unwrap();
-        let schema = schema::encode(&d).unwrap();
-        let contract = Contract::build(&d, &rules, schema_commitment(&schema).unwrap()).unwrap();
-        let identity =
-            policy::with_authority(&contract, &schema, |a| a.identity().to_vec()).unwrap();
+        let rules = Rules::read(&raw.to_string())
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+        let d = Declarations::read(&source, &rules.leaf_bindings)
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+        let schema = schema::encode(&d)
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+        let contract = Contract::build(
+            &d,
+            &rules,
+            schema_commitment(&schema)
+                .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+        let identity = policy::with_authority(&contract, &schema, |a| a.identity().to_vec())
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
         (schema, identity, contract.bindings.len())
     }
     let (schema_a, a, inputs_a) = identity(0);

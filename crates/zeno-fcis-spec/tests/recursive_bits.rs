@@ -1,5 +1,4 @@
 //! Finite algebra boundary checks and atom-lifting equivalence.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 use zeno_fcis_spec::{
     CompareOp, ProjectLimits, RelExpr, SourceLimits, ValueExpr, elaborate_project, expand_tables,
     parse_formula, parse_project,
@@ -7,17 +6,24 @@ use zeno_fcis_spec::{
 
 fn project(source: &str) -> zeno_fcis_spec::ProjectSpec {
     elaborate_project(
-        parse_project(source, SourceLimits::default()).unwrap(),
+        parse_project(source, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
         ProjectLimits::default(),
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
 }
 fn value(v: &ValueExpr, fields: &[u128]) -> u128 {
     match v {
-        ValueExpr::Int(n) => u128::try_from(*n).unwrap(),
+        ValueExpr::Int(n) => {
+            u128::try_from(*n).unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
+        }
         ValueExpr::U128(n) => *n,
         ValueExpr::Projection(p) => {
-            let id = p.segments().last().unwrap().get();
+            let id = p
+                .segments()
+                .last()
+                .unwrap_or_else(|| panic!("projection must have a field"))
+                .get();
             fields[if id >= 210 {
                 3 + (id - 210) as usize
             } else {
@@ -28,9 +34,15 @@ fn value(v: &ValueExpr, fields: &[u128]) -> u128 {
             let (a, b) = (value(a, fields), value(b, fields));
             if holds(c, fields) { a } else { b }
         }
-        ValueExpr::Add(a, b) => value(a, fields).checked_add(value(b, fields)).unwrap(),
-        ValueExpr::Sub(a, b) => value(a, fields).checked_sub(value(b, fields)).unwrap(),
-        ValueExpr::Mul(a, b) => value(a, fields).checked_mul(value(b, fields)).unwrap(),
+        ValueExpr::Add(a, b) => value(a, fields)
+            .checked_add(value(b, fields))
+            .unwrap_or_else(|| panic!("reference arithmetic must be defined")),
+        ValueExpr::Sub(a, b) => value(a, fields)
+            .checked_sub(value(b, fields))
+            .unwrap_or_else(|| panic!("reference arithmetic must be defined")),
+        ValueExpr::Mul(a, b) => value(a, fields)
+            .checked_mul(value(b, fields))
+            .unwrap_or_else(|| panic!("reference arithmetic must be defined")),
         ValueExpr::Div(_, a, b) => value(a, fields) / value(b, fields),
         _ => panic!("unexpected value {v:?}"),
     }
@@ -38,7 +50,9 @@ fn value(v: &ValueExpr, fields: &[u128]) -> u128 {
 fn holds(f: &RelExpr, fields: &[u128]) -> bool {
     match f {
         RelExpr::Bool(b) => *b,
-        RelExpr::Circuit(c) => c.evaluate(|f| Some(holds(f, fields))).unwrap(),
+        RelExpr::Circuit(c) => c
+            .evaluate(|f| Some(holds(f, fields)))
+            .unwrap_or_else(|| panic!("circuit reference must evaluate")),
         RelExpr::Not(a) => !holds(a, fields),
         RelExpr::And(a, b) => holds(a, fields) & holds(b, fields),
         RelExpr::Or(a, b) => holds(a, fields) | holds(b, fields),
@@ -126,10 +140,14 @@ fn full_width_constants_complement_and_round_bound_are_exact() {
        law 503 ordering = !subset(128,u128(2),u128(1));");
     let p = project(&s);
     assert!(p.laws().iter().all(|l| holds(l.formula(), &[])));
-    let expanded = expand_tables(&s, SourceLimits::default()).unwrap();
+    let expanded = expand_tables(&s, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(
-        p.canonical_bytes().unwrap(),
-        project(&expanded.text).canonical_bytes().unwrap()
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+        project(&expanded.text)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
     );
     assert!(
         parse_project(
@@ -158,10 +176,14 @@ fn self_complement_is_refused() {
 fn algebra_widths_guards_and_strata_are_checked() {
     let good = source(2);
     let p = project(&good);
-    let expansion = expand_tables(&good, SourceLimits::default()).unwrap();
+    let expansion = expand_tables(&good, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert_eq!(
-        p.canonical_bytes().unwrap(),
-        project(&expansion.text).canonical_bytes().unwrap()
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
+        project(&expansion.text)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
     );
     assert!(
         parse_formula(
@@ -186,9 +208,14 @@ fn nested_algebra_expansion_preserves_binding_and_negation() {
     let mut s = source(2);
     s += "law 950 nested = choose(subset(2, u128(1), permissions[0]), complement(2, permissions[1]), meet(2, permissions[1],permissions[2])) == join(2,permissions[0],u128(0));";
     let p = project(&s);
-    let expansion = expand_tables(&s, SourceLimits::default()).unwrap();
+    let expansion = expand_tables(&s, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
     assert!(
-        p.canonical_bytes().unwrap() == project(&expansion.text).canonical_bytes().unwrap(),
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
+            == project(&expansion.text)
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}")),
         "nested algebra must reparse identically"
     );
     for invalid in [
@@ -207,8 +234,15 @@ fn full_width_variable_bits_do_not_overflow_at_the_top_atom() {
       law 501 complement = join(128,pre.100.110[0],complement(pre.100.110[0])) == u128(340282366920938463463374607431768211455);";
     // Within an explicit-width helper, inner algebra operations inherit that width.
     let p = project(s);
-    let expansion = expand_tables(s, SourceLimits::default()).unwrap();
-    assert!(p.canonical_bytes().unwrap() == project(&expansion.text).canonical_bytes().unwrap());
+    let expansion = expand_tables(s, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"));
+    assert!(
+        p.canonical_bytes()
+            .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
+            == project(&expansion.text)
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("recursive fixture failed: {error:?}"))
+    );
     for n in [0, 1, 1u128 << 63, 1u128 << 127, u128::MAX] {
         let fields = [n];
         assert_eq!(

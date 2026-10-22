@@ -301,10 +301,19 @@ Science*, second edition, Addison-Wesley, 1994, covers finite sums and
 binomial coefficients. These are the background for finite expansion and
 indicator sums; they do not qualify an implementation of this feature.
 
+Maarten H. van Emden and Robert A. Kowalski, “The Semantics of Predicate
+Logic as a Programming Language,” Journal of the ACM 23(4), 1976, studies
+fixed-point semantics for logic programs. Krzysztof R. Apt, Howard A. Blair
+and Adrian Walker, “Towards a Theory of Declarative Knowledge,” in
+*Foundations of Deductive Databases and Logic Programming*, Morgan Kaufmann,
+1988, covers stratified logic programs. These are background for the bounded
+positive rules; the compiler, meters and finite tests qualify this implementation.
+
 ## What is new here
 
 This release adds table syntax, standalone table-form formulas and
 project-aware policy preparation to the existing checked scalar language.
+Recursive Boolean/word tables and constant-policy preparation join those additions.
 The comparative assessment of that combination is **prior-art search pending**.
 Ordinary table forms keep the existing scalar formula encoding. Recursive
 tables add a shared circuit formula, which lowers to existing metered graph
