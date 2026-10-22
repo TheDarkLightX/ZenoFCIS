@@ -513,7 +513,7 @@ fn roots_bytes(roots: &BTreeMap<u32, Digest>) -> Vec<u8> {
 }
 
 fn roots_of(bytes: &[u8]) -> Result<BTreeMap<u32, Digest>, Error> {
-    if bytes.len() % 36 != 0 {
+    if !bytes.len().is_multiple_of(36) {
         return Err(Error::Corrupt("journal roots".into()));
     }
     Ok(bytes

@@ -52,6 +52,9 @@ struct Outcomes {
     most_reads: u64,
 }
 
+/// A check of the store and the scalar state after a committed decision.
+type Check<'a> = dyn FnMut(&CollectionStore, &BTreeMap<u16, i128>, &Framed) + 'a;
+
 /// Runs steps through the Authority and the store, calling `check` after
 /// every committed decision with the store and the scalar state.
 fn run(
@@ -60,7 +63,7 @@ fn run(
     store: &mut CollectionStore,
     state: &mut BTreeMap<u16, i128>,
     steps: &[Step],
-    check: &mut dyn FnMut(&CollectionStore, &BTreeMap<u16, i128>, &Framed),
+    check: &mut Check<'_>,
 ) -> Outcomes {
     let layout = Layout::read(project, rules_text).unwrap();
     let rules = Rules::read(rules_text).unwrap();
@@ -137,12 +140,12 @@ fn token_steps(accounts: &[Key], stream: &mut Stream, count: usize) -> Vec<Step>
         // Senders come from a few funded accounts, receivers from all, so
         // transfers keep opening new accounts.
         let from = accounts[(stream.next() % 4) as usize];
-        let to = if i % 9 == 0 {
+        let to = if i.is_multiple_of(9) {
             from
         } else {
             accounts[(stream.next() % accounts.len() as u64) as usize]
         };
-        let mint = i < 4 || stream.next() % 10 == 0;
+        let mint = i < 4 || stream.next().is_multiple_of(10);
         let (from, to) = if i < 4 {
             (accounts[i], accounts[i])
         } else {

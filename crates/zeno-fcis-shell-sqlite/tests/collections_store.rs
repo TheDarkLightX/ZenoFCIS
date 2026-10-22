@@ -57,7 +57,7 @@ fn collection_roots_match_a_rebuild_after_every_write() {
     let mut model: BTreeMap<Key, Vec<u8>> = BTreeMap::new();
     for step in 0..900u64 {
         let key = keys[(stream.next() % keys.len() as u64) as usize];
-        let record = (stream.next() % 4 != 0).then(|| step.to_be_bytes().to_vec());
+        let record = (!stream.next().is_multiple_of(4)).then(|| step.to_be_bytes().to_vec());
         commit(&mut store, &[(7, key, record.clone())]);
         match record {
             Some(record) => {
