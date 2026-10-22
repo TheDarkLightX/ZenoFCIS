@@ -26,6 +26,7 @@
 //!
 //! This module is LLM-generated.
 
+use crate::contract::review::decision_space::DecisionSpace;
 use crate::contract::review::deliveries::{self, DeliveryUniverse};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -999,15 +1000,15 @@ impl Core {
         previous: Option<&[Vec<Candidate>]>,
         mask: Option<&[i128]>,
     ) -> Result<Vec<Vec<Candidate>>> {
-        let per_tuple =
-            self.reasons.len() as u64 + self.states as u64 * (1 + self.reasons.len() as u64);
+        let decisions = DecisionSpace::new(&self.rules);
+        let per_tuple = decisions.count(self.states);
         let checks = if self.delivery_universe.is_some() {
             per_tuple.saturating_mul(2).saturating_add(1)
         } else {
             per_tuple
         }
-        .saturating_mul(self.tuples() as u64);
-        if checks > MAX_CHECKS {
+        .saturating_mul(self.tuples() as u128);
+        if checks > u128::from(MAX_CHECKS) {
             return Err(Stop::Inconclusive(format!(
                 "admissibility-over-limit: {checks} law checks, limit {MAX_CHECKS}"
             )));
@@ -1086,7 +1087,6 @@ impl Core {
             let table = (0..self.tuples())
                 .map(|ordinal| {
                     let tuple = self.tuple(ordinal);
-                    let pre = &states[ordinal / self.inputs];
                     let admits = |class: Class,
                                   reason: Option<u32>,
                                   post: &[i128]|
@@ -1141,33 +1141,14 @@ impl Core {
                         return Ok(out);
                     }
                     let mut out = Vec::new();
-                    for (reason, _) in &self.reasons {
-                        if admits(Class::Reject, Some(*reason), pre)? {
+                    for (class, reason, successor) in decisions.candidates(self.states) {
+                        let next = successor.unwrap_or(ordinal / self.inputs);
+                        if admits(class, reason, &states[next])? {
                             out.push(Candidate {
-                                class: Class::Reject,
-                                reason: Some(*reason),
-                                next: ordinal / self.inputs,
-                            });
-                        }
-                    }
-                    for (next, post) in states.iter().enumerate() {
-                        if admits(Class::Accept, None, post)? {
-                            out.push(Candidate {
-                                class: Class::Accept,
-                                reason: None,
+                                class,
+                                reason,
                                 next,
                             });
-                        }
-                    }
-                    for (reason, _) in &self.reasons {
-                        for (next, post) in states.iter().enumerate() {
-                            if admits(Class::CommittedFailure, Some(*reason), post)? {
-                                out.push(Candidate {
-                                    class: Class::CommittedFailure,
-                                    reason: Some(*reason),
-                                    next,
-                                });
-                            }
                         }
                     }
                     Ok(out)
@@ -1527,8 +1508,6 @@ pub(super) struct Region {
     pub(super) case: usize,
     pub(super) labels: Vec<Label>,
     pub(super) ordinals: Vec<usize>,
-    /// Distinct successors an accept may give on the first input.
-    pub(super) successors: usize,
 }
 
 impl Core {
@@ -1673,12 +1652,6 @@ impl Core {
                             case,
                             labels: ordered,
                             ordinals: vec![ordinal],
-                            successors: candidates
-                                .iter()
-                                .filter(|c| c.class == Class::Accept)
-                                .map(|c| c.next)
-                                .collect::<BTreeSet<_>>()
-                                .len(),
                         }),
                     }
                 }
@@ -1711,7 +1684,6 @@ impl Core {
                     case,
                     labels: common.into_iter().collect(),
                     ordinals,
-                    successors: members.first().map_or(0, |m| m.successors),
                 });
             }
         }
@@ -1767,6 +1739,48 @@ impl Core {
             );
         }
         out
+    }
+
+    /// Labels come from the shared law-checked universe. A case's successor
+    /// expressions are optional guidance and may describe another class: keep
+    /// them only when that exact successor is admitted on the whole region.
+    fn offered_option(
+        &self,
+        chosen: Label,
+        region: &Region,
+        admitted: &[Vec<Candidate>],
+        current: Option<Label>,
+    ) -> Result<Value> {
+        let bare = self.option_json(chosen, None, current);
+        if class_of(chosen.0) == Class::Reject {
+            return Ok(bare);
+        }
+        let Some(case) = self.cases.get(region.case) else {
+            return Ok(bare);
+        };
+        let columns = (0..self.state_width)
+            .map(|k| {
+                case.post
+                    .get(&k)
+                    .map_or_else(|| Ok(self.columns[k].clone()), |expr| self.eval(expr))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let lawful = region.ordinals.iter().all(|ordinal| {
+            admitted[*ordinal].iter().any(|candidate| {
+                label(candidate.class, candidate.reason) == chosen && {
+                    let post = self.state(candidate.next);
+                    columns
+                        .iter()
+                        .enumerate()
+                        .all(|(k, values)| values[*ordinal] == post[k])
+                }
+            })
+        });
+        Ok(if lawful {
+            self.option_json(chosen, Some(region.case), current)
+        } else {
+            bare
+        })
     }
 }
 
@@ -1906,13 +1920,18 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         let formula = core.region_formula(&mask, Some(region.case))?;
         let witness = region.ordinals[0];
         let current = core.core_label(witness);
+        let options = region
+            .labels
+            .iter()
+            .map(|chosen| core.offered_option(*chosen, region, &freedom.admitted, current))
+            .collect::<Result<Vec<_>>>()?;
         out["question"] = json!({
             "case": region.case,
             "tuples": region.ordinals.len(),
             "where": core.show(&formula),
             "where_law": core.law_text(&formula)?,
             "example": core.shown(witness),
-            "options": region.labels.iter().map(|l| core.option_json(*l, (region.successors > 0).then_some(region.case), current)).collect::<Vec<_>>(),
+            "options": options,
             "core": current.map(|l| core.option_json(l, Some(region.case), current)),
         });
         if let Some(universe) = &core.delivery_universe
@@ -2604,6 +2623,102 @@ mod tests {
         ]}"#,
         );
     }
+    #[test]
+    fn question_and_gap_judge_share_reason_class_decision_space() {
+        use crate::contract::review::gaps;
+        let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+        let project = std::fs::read_to_string(base.join("project.zeno")).unwrap();
+        let rules = std::fs::read_to_string(base.join("v2/policy.json")).unwrap();
+        let proposals = std::fs::read_to_string(base.join("proposed-laws.txt")).unwrap();
+        for closed in [false, true] {
+            let mut project = project.clone();
+            let mut policy: Value = serde_json::from_str(&rules).unwrap();
+            if closed {
+                project.push('\n');
+                project.push_str(&proposals);
+                for id in 9000..=9004 {
+                    policy["law_kinds"][id.to_string()] = json!(ADDED_KIND.name());
+                }
+            }
+            let rules = policy.to_string();
+            let core = Core::from_sources(project.clone(), rules.clone()).unwrap();
+            let admitted = core.admissible(&[]).unwrap();
+            let report = gaps::judge(
+                &project,
+                &rules,
+                gaps::Options {
+                    max_tuples: MAX_TUPLES,
+                    max_work: 100_000_000,
+                    proposals: None,
+                    mutants: false,
+                },
+            )
+            .unwrap()
+            .json();
+            assert_eq!(report["status"], "measured", "{report}");
+            let determined = admitted
+                .iter()
+                .filter(|decisions| core.outcome_count(decisions, false) == 1)
+                .count();
+            assert_eq!(determined, if closed { 300 } else { 0 });
+            assert_eq!(report["admissible"]["full"]["determined"], determined);
+            let lines = admitted
+                .iter()
+                .enumerate()
+                .map(|(ordinal, decisions)| {
+                    if core.decisions[ordinal].is_none() {
+                        "-\n".to_owned()
+                    } else {
+                        format!("{}\n", core.outcome_count(decisions, false))
+                    }
+                })
+                .collect::<String>();
+            assert_eq!(
+                report["tables"]["admissible_sha256"],
+                sha256_hex(lines.as_bytes()),
+                "closed={closed}"
+            );
+            // Question completion also requires successful native execution.
+            let executable_determined = admitted
+                .iter()
+                .zip(&core.decisions)
+                .filter(|(decisions, native)| {
+                    core.outcome_count(decisions, false) == 1 && native.is_some()
+                })
+                .count();
+            assert_eq!(
+                question(&core, &[]).unwrap()["stats"]["determined"],
+                executable_determined
+            );
+        }
+    }
+
+    #[test]
+    fn every_offered_question_option_can_be_submitted_without_conflict() {
+        for example in ["dual-approval", "guide-counter"] {
+            let base = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../examples")
+                .join(example);
+            let core = Core::load(&base, true).unwrap();
+            let report = question(&core, &[]).unwrap();
+            let offered = report["question"]["options"].as_array().unwrap();
+            assert!(!offered.is_empty(), "{example}: {report}");
+            for option in offered {
+                let mut answer = option.clone();
+                answer["where"] = report["question"]["where"].clone();
+                answer.as_object_mut().unwrap().remove("current");
+                let answers = core
+                    .answers(&json!({"schema":"zeno-fcis/loop-answers/1", "answers":[answer]}))
+                    .unwrap();
+                let submitted = question(&core, &answers).unwrap();
+                assert_ne!(
+                    submitted["status"], "conflict",
+                    "{example}: offered={option}; submitted={submitted}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn rejection_answers_do_not_bind_failure_only_reasons() {
         let base =

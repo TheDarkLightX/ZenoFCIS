@@ -88,20 +88,6 @@ impl Loaded {
     pub(super) fn declared_laws(&self) -> Vec<u32> {
         self.declarations.laws.iter().map(|law| law.id).collect()
     }
-
-    /// Reasons of this decision class, ascending. Contract::build validates
-    /// that every declared reason is used with exactly one class before the
-    /// gap judge calls this for work estimation or measurement.
-    pub(super) fn reasons(&self, class: Class) -> Vec<u32> {
-        self.rules
-            .cases
-            .iter()
-            .filter(|case| case.class == class)
-            .filter_map(|case| case.reason)
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .collect()
-    }
 }
 
 /// Why a judge did not run to the end: the domain or the work exceeds the

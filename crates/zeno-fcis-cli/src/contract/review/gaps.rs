@@ -310,10 +310,7 @@ fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
     )?
     .laws
     .len() as u128;
-    let rejects = loaded.reasons(Class::Reject).len() as u128;
-    let failures = loaded.reasons(Class::CommittedFailure).len() as u128;
-    let states = space.states as u128;
-    let candidates = rejects + states * (1 + failures);
+    let candidates = super::decision_space::DecisionSpace::new(&loaded.rules).count(space.states);
     let candidates = if DeliveryUniverse::new(&loaded.declarations, &loaded.rules).is_some() {
         2 * candidates + 1
     } else {
@@ -498,8 +495,7 @@ fn measure(
 ) -> Result<Measured, Stop> {
     let delivery_universe = DeliveryUniverse::new(&loaded.declarations, &loaded.rules);
     let declared = loaded.declared_laws();
-    let rejects = loaded.reasons(Class::Reject);
-    let failures = loaded.reasons(Class::CommittedFailure);
+    let decisions = super::decision_space::DecisionSpace::new(&loaded.rules);
     let Some((machine, valid, state_laws, gaps)) =
         loaded.bind(&loaded.rules, |authority, framer| {
             let descriptor = authority.descriptor();
@@ -539,7 +535,7 @@ fn measure(
                     &laws,
                     framer,
                     &machine,
-                    (&states, &rejects, &failures),
+                    (&states, &decisions),
                     ordinal,
                     delivery_universe.as_ref(),
                 )
@@ -631,11 +627,11 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    domains: (&[Vec<i128>], &[u32], &[u32]),
+    domains: (&[Vec<i128>], &super::decision_space::DecisionSpace),
     ordinal: usize,
     universe: Option<&DeliveryUniverse>,
 ) -> TupleGap {
-    let (states, rejects, failures) = domains;
+    let (states, decisions) = domains;
     let space = &machine.space;
     let tuple = space.at(ordinal);
     let state = ordinal / space.inputs;
@@ -674,18 +670,6 @@ fn tuple_gap(
             })
         })
         .collect();
-    let mut candidates: Vec<(Class, Option<u32>, Option<usize>)> = rejects
-        .iter()
-        .map(|reason| (Class::Reject, Some(*reason), None))
-        .collect();
-    for successor in 0..space.states {
-        candidates.push((Class::Accept, None, Some(successor)));
-    }
-    for reason in failures {
-        for successor in 0..space.states {
-            candidates.push((Class::CommittedFailure, Some(*reason), Some(successor)));
-        }
-    }
     let own = decided
         .map(|(class, reason, next)| (class, reason, (class != Class::Reject).then_some(next)));
     let mut witness_mismatch = false;
@@ -694,7 +678,7 @@ fn tuple_gap(
     let mut reject_reasons = BTreeSet::new();
     let mut successors = BTreeSet::new();
     let mut also = Vec::new();
-    for candidate in candidates {
+    for candidate in decisions.candidates(space.states) {
         let (class, reason, successor) = candidate;
         let post = successor.map_or(&states[state][..], |successor| &states[successor][..]);
         if !check(class, reason, post, &[]).0 {
