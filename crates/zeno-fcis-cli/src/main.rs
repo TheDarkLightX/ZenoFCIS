@@ -575,10 +575,13 @@ fn execute() -> u8 {
         Err(error) => {
             let exit = clap_error_exit(&error);
             let _ = error.print();
-            if std::env::args_os()
-                .collect::<Vec<_>>()
-                .windows(2)
-                .any(|pair| pair[0] == "kb" && pair[1] == "assess")
+            if Cli::command()
+                .find_subcommand("kb")
+                .is_some_and(|kb| kb.find_subcommand("assess").is_none())
+                && std::env::args_os()
+                    .collect::<Vec<_>>()
+                    .windows(2)
+                    .any(|pair| pair[0] == "kb" && pair[1] == "assess")
             {
                 eprintln!(
                     "next: kb assess is unavailable in this build; run zeno-fcis kb --help for supported operations and zeno-fcis guide show knowledge for the assessment boundary"
