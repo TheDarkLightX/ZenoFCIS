@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import sys
 import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,7 +65,16 @@ def save(path, value):
 
 
 def run(command, **kwargs):
-    return subprocess.run(list(map(str, command)), check=True, **kwargs)
+    try:
+        return subprocess.run(list(map(str, command)), check=True, **kwargs)
+    except subprocess.CalledProcessError as error:
+        details = error.stderr or str(error)
+        if isinstance(details, bytes):
+            details = details.decode("utf-8", errors="replace")
+        if "U128SubjectUnsupported" in details:
+            raise ValueError("UiOracleRefused:U128SubjectUnsupported") from None
+        lines = [line.strip() for line in details.splitlines() if line.strip()]
+        raise ValueError("UiOracleRefused:" + " ".join((lines[-1] if lines else "checker refused").split())) from None
 
 
 def hashes(directory):
@@ -153,11 +163,14 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
     from commons_hook import failure, report
     subject = Path(sys.argv[1]).name if len(sys.argv) > 1 else "unnamed"
     try:
         main()
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        report("zenoui", "refused", subject, failure(error))
+        print(f"UI build refused: {error}", file=sys.stderr)
+        sys.exit(1)
     except BaseException as error:
         report("zenoui", "refused", subject, failure(error))
         raise

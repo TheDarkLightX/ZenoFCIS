@@ -3,10 +3,67 @@
 import subprocess
 import tempfile
 import unittest
+import io
+import json
+import hashlib
+import sys
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
 import app_factory
+
+class NumericRefusalTests(unittest.TestCase):
+    def test_policy_changed_after_review_cannot_receive_the_review_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "v2").mkdir()
+            records = [("project.zeno", "project_sha256"), ("v2/policy.json", "rules_sha256"), ("v2/schema.zcve", "schema_sha256")]
+            sources = {}
+            for name, key in records:
+                (root / name).write_text(name)
+                sources[key] = hashlib.sha256(name.encode()).hexdigest()
+            app_factory.verify_review_subject({"sources":sources}, root)
+            (root / "v2/policy.json").write_text("changed policy")
+            with self.assertRaisesRegex(ValueError, "AppContractChangedAfterReview:v2/policy.json"):
+                app_factory.verify_review_subject({"sources":sources}, root)
+
+    def test_checked_numeric_contract_cannot_emit_an_unbound_durable_app(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = root / "contract"
+            (contract / "v2").mkdir(parents=True)
+            (contract / "v2/policy.json").write_text(json.dumps({"schema":"zeno-fcis/template-declarative-policy/4"}))
+            (contract / "ui.json").write_text("{}")
+            output = root / "app"
+            errors = io.StringIO()
+            with patch.object(sys, "argv", ["app_factory", "--cli", "test-cli", "--contract", str(contract), "--out", str(output)]), patch.object(app_factory.subprocess, "check_output", return_value="v22.0.0"), patch.object(app_factory, "contract_review", return_value={"mode":"symbolic","status":"solver-checked"}), patch.object(app_factory, "prepare_library") as prepare, redirect_stderr(errors):
+                self.assertEqual(app_factory.entrypoint(), 1)
+            self.assertIn("AppNumericDurableUnsupported", errors.getvalue())
+            self.assertEqual(len(errors.getvalue().splitlines()), 1)
+            prepare.assert_not_called()
+            self.assertFalse(output.exists())
+
+    def test_u128_refusal_is_one_line_without_traceback(self):
+        child = subprocess.CalledProcessError(1, ["checker"], stderr="Traceback (most recent call last):\nContractError U128SubjectUnsupported\nmore context\n")
+        output = io.StringIO()
+        with patch.object(app_factory, "main", side_effect=child), redirect_stderr(output):
+            self.assertEqual(app_factory.entrypoint(), 1)
+        self.assertEqual(output.getvalue(), "app build refused: U128SubjectUnsupported: the native UI binding does not support U128\n")
+
+    def test_child_ui_refusal_cannot_produce_a_successful_build(self):
+        child = subprocess.CalledProcessError(1, ["checker"], stderr="U128SubjectUnsupported")
+        with patch.object(app_factory, "run", side_effect=child):
+            with self.assertRaisesRegex(ValueError, "U128SubjectUnsupported"):
+                app_factory.build_ui("checker")
+
+    def test_symbolic_review_unknown_is_not_admitted(self):
+        def review(*command, **kwargs):
+            packet = Path(command[command.index("--out") + 1])
+            packet.write_text('{"mode":"symbolic","status":"UNKNOWN"}')
+        with patch.object(app_factory, "run", side_effect=review):
+            with self.assertRaisesRegex(ValueError, "AppContractLawsUnknownOrRefuted"):
+                app_factory.contract_review(Path("test-cli"), Path("test-contract"))
 
 
 class LibraryPreparationTests(unittest.TestCase):
