@@ -204,6 +204,8 @@ fn optimize_files(arguments: &Arguments) -> (u8, Value) {
                     detail["indexed_branches"] = indexed;
                 }
                 let (status, exit) = search.status_and_exit();
+                // Preserve observed work even if publishing a file fails.
+                crate::telemetry::observe(&detail);
                 if let Some(best) = &search.best {
                     let receipt_bytes = best.equivalence.receipt();
                     if let Some(path) = candidate_out

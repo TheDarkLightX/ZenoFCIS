@@ -117,6 +117,22 @@ class CliTelemetryTests(TelemetryTests):
         self.assertEqual(second["work_units"]["gaps.work"], work)
         self.assertEqual(second["verdict"], "refused")
 
+    def test_cli_optimizer_work_survives_output_refusal(self):
+        source = Path(__file__).resolve().parents[1] / "crates/zeno-fcis-cli/tests/fixtures/i128-programs/boolean-kernel-original.zcve"
+        good = self.cli(["optimize", "--program", str(source)], self.log)
+        self.assertEqual(good.returncode, 0, good.stdout + good.stderr)
+        work = json.loads(good.stdout)["detail"]["search"]["runs"][0]["work"]
+        blocked_parent = self.root / "blocked"
+        blocked_parent.write_bytes(b"retained")
+        refused = self.cli(["optimize", "--program", str(source), "--candidate-out", str(blocked_parent / "candidate.zcve")], self.log)
+        self.assertEqual(refused.returncode, 3, refused.stdout + refused.stderr)
+        row = json.loads(self.log.read_text().splitlines()[-1])
+        self.assertIsInstance(row["work_units"], dict)
+        self.assertIn("search.runs.0.work", row["work_units"])
+        self.assertEqual(row["work_units"]["search.runs.0.work"], work)
+        self.assertEqual(row["verdict"], "refused")
+        self.assertEqual(blocked_parent.read_bytes(), b"retained")
+
     def test_cli_optimizer_records_run_work(self):
         source = Path(__file__).resolve().parents[1] / "crates/zeno-fcis-cli/tests/fixtures/i128-programs/boolean-kernel-candidate.zcve"
         result = self.cli(["optimize", "--program", str(source)], self.log)
