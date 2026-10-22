@@ -29,7 +29,8 @@
   "verdicts": {
     "pass-with-scope": "Only reported finite checks hold; inspect missing invariants and factory:not-run.",
     "counterexample": "Inspect the retained witness, revise requirements, then check.",
-    "unfinished / fail": "Finite/typed checks did not pass; inspect profile and failed checks.",
+    "unfinished": "Finite/typed checks did not pass; inspect profile and failed checks.",
+    "fail": "Finite/typed checks did not pass; inspect profile and failed checks.",
     "unsupported": "The selected profile/operation has no supported implementation.",
     "refused": "Repair grammar, profile or input access."
   },
@@ -118,7 +119,9 @@ Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 `counterexample`: Inspect the retained witness, revise requirements, then check.
 
-`unfinished / fail`: Finite/typed checks did not pass; inspect profile and failed checks.
+`unfinished`: Finite/typed checks did not pass; inspect profile and failed checks.
+
+`fail`: Finite/typed checks did not pass; inspect profile and failed checks.
 
 `unsupported`: The selected profile/operation has no supported implementation.
 

@@ -34,9 +34,12 @@
     "no-solution": "No candidate in the complete admitted search space satisfied the finite relation.",
     "contract-trap": "A finite contract observation failed; inspect input/output.",
     "artifact-drift": "Recomputed files differ from the supplied artifacts.",
-    "incomplete / limit-exceeded / indeterminate": "Budget or checker stop; no complete result.",
-    "conformance-unknown / conformance-failed": "Target execution incomplete or observations disagreed.",
-    "invalid-problem / refused": "Inspect the admission diagnostic; no synthesis acceptance."
+    "incomplete": "Budget or checker stop; no complete result.",
+    "limit-exceeded": "Budget or checker stop; no complete result.",
+    "indeterminate": "Budget or checker stop; no complete result.",
+    "conformance-unknown": "Target execution incomplete or observations disagreed.",
+    "conformance-failed": "Target execution incomplete or observations disagreed.",
+    "invalid-problem": "Inspect the admission diagnostic; no synthesis acceptance."
   },
   "limits": {
     "all_defaults_and_caps": "unknown"
@@ -127,11 +130,17 @@ Expected: exit 0; [].
 
 `artifact-drift`: Recomputed files differ from the supplied artifacts.
 
-`incomplete / limit-exceeded / indeterminate`: Budget or checker stop; no complete result.
+`incomplete`: Budget or checker stop; no complete result.
 
-`conformance-unknown / conformance-failed`: Target execution incomplete or observations disagreed.
+`limit-exceeded`: Budget or checker stop; no complete result.
 
-`invalid-problem / refused`: Inspect the admission diagnostic; no synthesis acceptance.
+`indeterminate`: Budget or checker stop; no complete result.
+
+`conformance-unknown`: Target execution incomplete or observations disagreed.
+
+`conformance-failed`: Target execution incomplete or observations disagreed.
+
+`invalid-problem`: Inspect the admission diagnostic; no synthesis acceptance.
 
 Exit codes: {"0": "discover completed, run selected/current, or verify passed", "1": "invalid-problem, unrealizable, no-solution, contract-trap, artifact-drift or conformance-failed", "2": "incomplete, limit-exceeded, indeterminate or conformance-unknown", "3": "I/O failure", "64": "invalid command-line usage"}
 

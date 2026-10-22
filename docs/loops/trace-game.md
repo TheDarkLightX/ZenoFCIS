@@ -38,7 +38,8 @@
     "certified reachability": "Checked ranks force the target against every permitted event.",
     "no guard in class": "Every declared user-game fixed guard was refuted; game.py exits 0.",
     "exhausted fixed grammar": "Legacy fixed-guard checker exhausted its declared grammar.",
-    "certified guard / certified winning strategy": "Legacy fixed or reactive controller passed the certificate checker.",
+    "certified guard": "Legacy fixed or reactive controller passed the certificate checker.",
+    "certified winning strategy": "Legacy fixed or reactive controller passed the certificate checker.",
     "certified unrealizability": "Legacy declared controller class cannot satisfy the requirement.",
     "UNKNOWN": "No safety/impossibility claim; certificate_check may accept only the diagnostic binding."
   },
@@ -144,7 +145,9 @@ Expected: exit 0; ["withdrawal-safety"].
 
 `exhausted fixed grammar`: Legacy fixed-guard checker exhausted its declared grammar.
 
-`certified guard / certified winning strategy`: Legacy fixed or reactive controller passed the certificate checker.
+`certified guard`: Legacy fixed or reactive controller passed the certificate checker.
+
+`certified winning strategy`: Legacy fixed or reactive controller passed the certificate checker.
 
 `certified unrealizability`: Legacy declared controller class cannot satisfy the requirement.
 
