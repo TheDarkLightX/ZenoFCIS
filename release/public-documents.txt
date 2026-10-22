@@ -345,6 +345,7 @@ docs/zal/HARNESS_INTEGRATION.md
 docs/zal/LOOPS.md
 docs/zal/LOWERING.md
 docs/zal/README.md
+docs/zal/REFINEMENT.md
 docs/zal/SPECIFICATION.md
 docs/zal/ladder/BUILD_SPEC_M0.md
 docs/zal/ladder/EXAMPLES.md

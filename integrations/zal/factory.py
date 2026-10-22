@@ -19,21 +19,36 @@ import behavior2
 from workflow import checker_identity
 
 
-CORRESPONDENCE_TEST = '''//! Exhaustive ZAL reference decisions versus the actual library Authority.
+CORRESPONDENCE_TEST = '''//! ZAL initial state and finite reference decisions versus the library Authority.
 #[test]
 fn zal_whole_declared_domain_matches_authority() {
     let contract = application::v2_contract::Contract::new();
     let descriptor = contract.descriptor();
     let authority = application::authority(&descriptor).unwrap_or_else(|e| panic!("{e}"));
-    let rows = application::examples(include_str!("zal-authority-examples.txt"))
+    let expected_initial: &[i128] = &@INITIAL@;
+    assert_eq!(application::genesis_numbers().unwrap_or_else(|e| panic!("{e}")),
+               expected_initial, "contract genesis differs from the ZAL initial state");
+    // This literal comes from the ZAL interpreter, independently of the contract emitter.
+    // Bind the entire table, including refusals, before claiming whole-domain coverage.
+    let reference = @REFERENCE@;
+    assert_eq!(include_str!("zal-authority-examples.txt"), reference,
+               "ZAL reference table changed: missing, repeated or altered decisions");
+    let rows = application::examples(reference)
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(!rows.is_empty());
     for row in &rows {
-        application::check(&authority, row).unwrap_or_else(|e| panic!("{e}"));
+        let checked = application::check(&authority, row);
+        assert!(checked.is_ok(), "ZAL decision differs at inputs {:?}: {:?}", row.inputs, checked);
     }
     println!("ZAL whole-domain tuples checked: {}", rows.len());
 }
 '''
+
+
+def correspondence_test(table, initial):
+    """Bind owned reference text and initial values; no contract policy is read here."""
+    return (CORRESPONDENCE_TEST.replace("@INITIAL@", json.dumps(initial))
+            .replace("@REFERENCE@", json.dumps("\n".join(table) + "\n")))
 
 
 def lower(model: Model) -> dict[str, str]:
@@ -124,7 +139,7 @@ def lower(model: Model) -> dict[str, str]:
                if s == state and model.decide(s, event, context)["class"] == "Reject"]
     if rejects:
         journey.append(example(state, *rejects[0]))
-    correspondence = CORRESPONDENCE_TEST
+    correspondence = correspondence_test(table, [states[model.initial]])
     mapping = {"schema": "zal/factory-source-map/1", "revision": model.revision,
                "states": states, "events": events, "context_fields": facts, "reasons": reasons,
                "case_ids": [r.id for r in model.rules] + ["default"],
@@ -353,7 +368,9 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     return {"project.zeno": "\n".join(project) + "\n", "v2/policy.json": json.dumps(policy, indent=2) + "\n",
             "tests/decision-examples.txt": "\n".join(journey) + "\n",
             "tests/zal-authority-examples.txt": "\n".join(table) + "\n",
-            "tests/zal_correspondence.rs": CORRESPONDENCE_TEST, "zal-source-map.json": json.dumps(mapping, indent=2) + "\n"}
+            "tests/zal_correspondence.rs": correspondence_test(
+                table, [states[model.initial], *[v.initial for v in model.variables]]),
+            "zal-source-map.json": json.dumps(mapping, indent=2) + "\n"}
 
 
 def write_new(files: dict[str, str], destination: Path):

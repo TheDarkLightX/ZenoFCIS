@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import hashlib
 import itertools
 import re
+from types import MappingProxyType
 
 from behavior import FUTURE, NAME, Refusal, at_source, canonical, grammar_refusal, source_lines
 
@@ -579,8 +580,10 @@ class Machine:
         index = {}
         for rule in self.rules:
             index.setdefault((rule.source, rule.event), []).append(rule)
-        object.__setattr__(self, "_index", index)
-        object.__setattr__(self, "_ranges", {v.name: (v.low, v.high) for v in self.variables})
+        # These derived indexes bind decision behavior just as the declared rules do.
+        # Own their backing dictionaries; neither rule lists nor ranges may change.
+        object.__setattr__(self, "_index", MappingProxyType({key: tuple(rules) for key, rules in index.items()}))
+        object.__setattr__(self, "_ranges", MappingProxyType({v.name: (v.low, v.high) for v in self.variables}))
 
     @property
     def declarations(self):
