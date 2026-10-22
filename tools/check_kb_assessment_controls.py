@@ -22,6 +22,7 @@ def control(name, file, pattern, replacement, tests):
 
 
 CONTROLS = [
+    control("specialization-keeps-known-harm", "knowledge_growth.rs", r"if covers_harm \{", "if covers_harm && false {", "knowledge_growth_tests::specialization_must_exclude_a_harmful_capability_superset"),
     control("partial-proof-receipt-lost", "knowledge_replay.rs", r"let receipt = if proven", "let receipt = if accepted", "knowledge_growth_tests::a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve"),
     control("artifact-refusal-work-discarded", "knowledge_replay.rs", r"Err\(reason\) => \{\s*next.assessments.remove", "Err(reason) => { return Err(reason); next.assessments.remove", "knowledge_growth_tests::artifact_refusal_keeps_measured_work_and_never_qualifies_advice"),
     control("unpublished-work-discarded", "knowledge_store.rs", r"pub\(crate\) fn retain_unpublished\((.*?)\) -> Result<FileRef, &'static str> \{", "\\g<0> return Ok(FileRef {path: \"missing\".into(), sha256: \"a\".repeat(64)});", "knowledge_growth_tests::unpublished_work_survives_a_revision_race_without_layer_authority"),

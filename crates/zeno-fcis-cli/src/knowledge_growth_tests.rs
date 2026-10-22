@@ -281,3 +281,25 @@ fn artifact_refusal_keeps_measured_work_and_never_qualifies_advice() {
     assert!(next.facts.is_empty());
     assert_eq!(next.assessments[&key], record);
 }
+
+#[test]
+fn specialization_must_exclude_a_harmful_capability_superset() {
+    let mut layer = Layer::default();
+    let mut positive = scope("counter", None);
+    positive.insert("capability".into(), BTreeSet::from(["a".into()]));
+    let mut negative = positive.clone();
+    negative.get_mut("capability").unwrap().insert("b".into());
+    assessed(
+        &mut layer,
+        "mixed",
+        scope("counter", None),
+        vec![
+            case("positive", positive, 5),
+            case("negative", negative, 15),
+        ],
+    );
+    assert!(
+        G::grow(&layer).unwrap().is_empty(),
+        "a narrower proposal must exclude every known harmful case"
+    );
+}

@@ -821,14 +821,14 @@ pub(crate) fn grow(layer: &Layer) -> Result<Vec<Candidate>, &'static str> {
                 let Some(values) = positive.scope.get(dimension) else {
                     continue;
                 };
-                if hurts
-                    .iter()
-                    .any(|negative| negative.scope.get(dimension) == Some(values))
-                {
-                    continue;
-                }
                 let mut narrow = c.clone();
                 narrow.scope.insert(dimension.into(), values.clone());
+                let covers_harm = hurts
+                    .iter()
+                    .any(|negative| applies(&narrow.scope, &negative.scope, &layer.isa));
+                if covers_harm {
+                    continue;
+                }
                 narrow.parents = BTreeSet::from([c.statement_sha256.clone()]);
                 for case in &a.cases {
                     narrow.proposing_tasks.insert(case.task.clone());
