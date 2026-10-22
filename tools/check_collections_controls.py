@@ -14,9 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 WRAP = ["nice", "-n", "19", "ionice", "-c3"]
 SPEC = ("zeno-fcis-spec", "collections")
 CONTRACT = ("zeno-fcis-contract", "collections")
+STORE = ("zeno-fcis-shell-sqlite", "collections_store")
 PARSER = "crates/zeno-fcis-spec/src/parser.rs"
 SPEC_COLLECTIONS = "crates/zeno-fcis-spec/src/collections.rs"
 CHECKER = "crates/zeno-fcis-contract/src/collections.rs"
+STORAGE = "crates/zeno-fcis-shell-sqlite/src/collections.rs"
 CONTROLS = (
     ("unnamed-entry-read", SPEC, SPEC_COLLECTIONS,
      "if self.reads_map(value) {",
@@ -34,6 +36,14 @@ CONTROLS = (
      "if class > *seen + 1 {",
      "if class > *seen + 1 || class <= *seen {",
      "collections_self_transfer_that_mints_is_refuted_on_the_aliased_pattern"),
+    ("framing-check-removed", STORE, STORAGE,
+     "if !named.get(map).is_some_and(|keys| keys.contains(key)) {",
+     "if false && !named.get(map).is_some_and(|keys| keys.contains(key)) {",
+     "collection_writes_outside_the_named_entries_are_refused"),
+    ("merkle-level-skipped", STORE, STORAGE,
+     "for depth in (0..=shared).rev() {",
+     "for depth in (0..=shared).rev().skip(1) {",
+     "collection_roots_match_a_rebuild_after_every_write"),
 )
 
 

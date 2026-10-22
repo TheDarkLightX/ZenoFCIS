@@ -105,6 +105,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-spec", "--test", "collections"),
          ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-contract", "--test", "collections"),
          ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "collections"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-shell-sqlite", "--test", "collections_store"),
+         ("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--test", "collections_runtime"),
          ("python3", "tools/check_collections_controls.py", "--remove-targets")),
     ),
     "contract-tables": AcceptanceScenario(
