@@ -691,7 +691,7 @@ def gaps(contract: Contract, machine: Machine) -> dict:
                 if reference is not None:
                     for law in contract.laws:
                         activation[domain][str(law["id"])] += contract.law_applies(law, reference[0], reference[1])
-                if len(admitted) == 1:
+                if reference is not None and admitted == [reference]:
                     counts["determined"] += 1
                     continue
                 freedom = counts["freedom"]

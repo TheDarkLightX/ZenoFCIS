@@ -128,6 +128,7 @@ QUESTION_TIMING_LIMIT_SECONDS = 2.5
 def question_timing_passes(row: dict) -> bool:
     return (row["status"] == "determined" and row["answers"] == 8 and row["tuples"] == 432
             and row["determined_with_reasons"] == 432 and row["inconsistent"] == 0
+            and row["answers_recorded"] == row["answers"]
             and row["gaps"] == "measured" and row["identical_repeat"] is True
             and row["seconds"] < QUESTION_TIMING_LIMIT_SECONDS)
 
@@ -144,6 +145,7 @@ def question_timing_control(cli: Path, contract: Path, scratch: Path) -> dict:
     stats = detail.get("stats") or {}
     row = {"instance": "approval-queue-k1", "seconds": elapsed, "limit_seconds": QUESTION_TIMING_LIMIT_SECONDS,
            "status": report.get("status"), "answers": len(detail.get("answers") or []),
+           "answers_recorded": sum(answer.get("status") == "recorded" for answer in detail.get("answers") or []),
            "tuples": stats.get("tuples"), "determined_with_reasons": stats.get("determined_with_reasons"),
            "inconsistent": stats.get("inconsistent"), "gaps": (detail.get("gaps") or {}).get("status"),
            "identical_repeat": code == repeat_code == 0 and detail == (repeat.get("detail") or {})}

@@ -57,6 +57,17 @@ class Grammar(unittest.TestCase):
 
 
 class Judges(unittest.TestCase):
+    def test_determined_requires_the_unique_outcome_to_match_native_execution(self):
+        files = core.source("bounded-counter", {"C": 1}, include_proof=False)
+        policy = json.loads(files["v2/policy.json"])
+        policy["cases"][0]["when"] = "true"
+        contract = reference.Contract(files["project.zeno"].decode(), policy)
+        machine = reference.Machine(contract)
+        measured = reference.gaps(contract, machine)["admissible"]["full"]
+        self.assertEqual(measured["tuples"], 8)
+        self.assertEqual(measured["reference_refused"], 4)
+        self.assertEqual(measured["determined"], 4)
+
     def test_counter_variants_preserve_partial_decisions_and_measure_refused_frames(self):
         recorded = json.loads(judges.KNOWN.read_text())["instances"]
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-judge-variants-") as raw:
