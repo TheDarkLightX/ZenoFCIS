@@ -57,6 +57,7 @@ def main():
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
     options = parser.parse_args()
+    source = ""
     try:
         with options.source.open(encoding="ascii") as stream:
             source = stream.read(MAX_SOURCE + 1)
@@ -125,7 +126,9 @@ def main():
         print(json.dumps(result, indent=2))
         return 1 if result.get("status") in {"counterexample", "unfinished"} else 3 if result.get("status") == "unsupported" else 0
     except (ValueError, OSError) as error:
-        print(json.dumps({"status": "refused", "diagnostic": str(error), "authority": "none"}), file=sys.stderr)
+        from diagnostics import describe
+        print(json.dumps({"status": "refused", "diagnostic": str(error),
+                          "source_diagnostic": describe(error, source, options.source), "authority": "none"}), file=sys.stderr)
         return 2
 
 

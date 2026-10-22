@@ -379,8 +379,17 @@ def refine_check(model, contract: Path, cli: Path, max_checks=262144):
             states *= variable.high - variable.low + 1
     pins = {"schema": "zeno-fcis/contract-refinement/1", "abstraction": list(range(states)),
             "invalid_state_law": 500}
+
+    def bounded_source(path):
+        # The native refinement profile admits at most 1 MiB per source.
+        with path.open("rb") as stream:
+            data = stream.read((1 << 20) + 1)
+        if len(data) > 1 << 20:
+            raise Refusal("Contract refinement source exceeds 1 MiB")
+        return data
+
     for side, project, policy in [("abstract", files["project.zeno"].encode("ascii"), files["v2/policy.json"].encode("ascii")),
-                                  ("concrete", (contract / "project.zeno").read_bytes(), (contract / "v2/policy.json").read_bytes())]:
+                                  ("concrete", bounded_source(contract / "project.zeno"), bounded_source(contract / "v2/policy.json"))]:
         pins[f"{side}_project_sha256"] = hashlib.sha256(project).hexdigest()
         pins[f"{side}_policy_sha256"] = hashlib.sha256(policy).hexdigest()
     with tempfile.TemporaryDirectory(prefix="zal-refinement-") as temporary:
@@ -390,7 +399,10 @@ def refine_check(model, contract: Path, cli: Path, max_checks=262144):
         mapping.write_text(json.dumps(pins), encoding="ascii")
         command = [str(cli.resolve()), "contract", "refine-check", str(work / "abstract"), str(contract.resolve()),
                    "--abstraction", str(mapping), "--max-checks", str(max_checks), "--format", "json"]
-        checked = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+        try:
+            checked = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+        except subprocess.TimeoutExpired as error:
+            raise Refusal("Native refinement did not finish within 120 seconds; no refinement result") from error
     result = json.loads(checked.stdout)
     return {"schema": "zal/contract-refinement/1", "revision": model.revision, "checker": checker_identity(),
             "status": result.get("verdict", result.get("status")), "contract_check": result,

@@ -343,6 +343,7 @@ docs/zal/EFFECTS.md
 docs/zal/GRAMMAR.md
 docs/zal/HARNESS_INTEGRATION.md
 docs/zal/LOOPS.md
+docs/zal/LOWERING.md
 docs/zal/README.md
 docs/zal/SPECIFICATION.md
 docs/zal/ladder/BUILD_SPEC_M0.md

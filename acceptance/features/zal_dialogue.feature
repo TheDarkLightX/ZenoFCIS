@@ -22,3 +22,5 @@ Feature: Finite behavior dialogue with deterministic meaning help
     And the shipped shell ports written in ZAL lower byte for byte to the built shell registry and drift fails
     And finite types count their values exactly and typed machines elaborate to unchanged profile 2 machines
     And every planted types, typed-machine and effects defect fails its named test
+    And context-free profile 2 lowering and safety-property laws pass native refinement while a buildable weakened contract fails its named assertion
+    And ten recurring source mistakes report a reason, physical location and suggested fix in both syntaxes

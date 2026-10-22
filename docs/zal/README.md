@@ -514,8 +514,15 @@ their properties are finite checked over the declared machine only.
 Weakening its approval guard to `true` now fails with a requirement
 counterexample.
 
-`export` and `qualify` refuse a model with temporal properties or fairness as
-unsupported lowering. The review terminal, MCP tools and browser workspace
+`lower --out DIRECTORY`, `export` and `qualify` use the existing factory
+lowerer. Step safety properties `always(P)` and `never(P)` become contract
+laws when they hold on every admissible step. Other temporal properties and
+fairness still refuse as unsupported lowering. `refine-check SOURCE CONTRACT
+--cli PATH` delegates to the existing native refinement checker. See the
+[lowering guide](LOWERING.md), including its lineage in Baier and Katoen,
+*Principles of Model Checking* (MIT Press, 2008), and Abadi and Lamport,
+*The Existence of Refinement Mappings* (Theoretical Computer Science, 1991).
+The review terminal, MCP tools and browser workspace
 still use profile 1; `run.py ui` refuses a profile 2 model.
 
 The explanations work on profile 2 models from a file, through `run.py`:

@@ -2,7 +2,7 @@
 
 No eval, model calls, I/O, authority capabilities or production effect execution.
 The symbolic and controlled-English parsers build exactly the same value.
-Profile 1 stays in behavior.py unchanged; this module reuses only its names.
+Profile 1 keeps its canonical model; parser source-position helpers are shared.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import hashlib
 import itertools
 import re
 
-from behavior import FUTURE, NAME, Refusal, canonical
+from behavior import FUTURE, NAME, Refusal, at_source, canonical, grammar_refusal, source_lines
 
 
 PROFILE = "zal/finite-fsm/2"
@@ -902,36 +902,41 @@ def parse(text: str, syntax="symbolic") -> Machine:
     if syntax not in {"symbolic", "english"}:
         raise Refusal("Choose symbolic or english syntax")
     english = syntax == "english"
-    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    lines = source_lines(text)
     if len(lines) > MAX_STATEMENTS:
         raise Refusal(f"Source exceeds {MAX_STATEMENTS} statements")
     singletons, repeated = grammar_patterns(english), statement_patterns(english)
-    fields, found = {}, {key: [] for key in repeated}
-    for number, line in enumerate(lines, 1):
+    fields, found, locations = {}, {key: [] for key in repeated}, {}
+    for number, (physical, column, line) in enumerate(lines, 1):
         for key, pattern in singletons.items():
             match = re.fullmatch(pattern, line)
             if match:
                 if key in fields:
-                    raise Refusal(f"Statement {number}: duplicate {key}")
+                    raise Refusal(f"Statement {number}: duplicate {key}", location=(physical, column))
                 fields[key] = match.group(1) if match.groups() else True
+                locations[key] = (physical, column)
                 break
         else:
             for key, pattern in repeated.items():
                 match = re.fullmatch(pattern, line)
                 if match and (key != "unresolved" or match[1] in FUTURE):
                     found[key].append(match.groups())
+                    locations[(key, match[1])] = (physical, column)
                     break
             else:
-                raise Refusal(f"Statement {number}: not in the controlled grammar; clarify this statement")
+                raise grammar_refusal(number, line, english, (physical, column))
     missing = set(singletons) - set(fields)
     if missing:
-        raise Refusal("Missing explicit declarations: " + ", ".join(sorted(missing)))
+        raise Refusal("Missing explicit declarations: " + ", ".join(sorted(missing)),
+                      location=(len(text.splitlines()) + 1, 1))
 
     def names(key, maximum, empty=False):
         raw = [] if empty and fields[key] == "none" else [x.strip() for x in fields[key].split(",")]
+        if any(len(name) > 32 for name in raw):
+            raise Refusal(f"{key}: identifier exceeds 32 characters", location=locations[key])
         if (not (0 if empty else 1) <= len(raw) <= maximum or len(set(raw)) != len(raw)
                 or any(not re.fullmatch(NAME, x) for x in raw)):
-            raise Refusal(f"{key} needs {'0' if empty else '1'}..{maximum} distinct names")
+            raise Refusal(f"{key} needs {'0' if empty else '1'}..{maximum} distinct names", location=locations[key])
         return tuple(sorted(raw))
 
     states, events, facts = names("states", 8), names("events", 8), names("facts", 4, True)
@@ -940,9 +945,12 @@ def parse(text: str, syntax="symbolic") -> Machine:
                              key=lambda v: v.name))
     declared = [*states, *events, *facts, *[i.name for i in inputs], *[v.name for v in variables]]
     if RESERVED & set(declared):
-        raise Refusal("A declaration uses a reserved word: " + ", ".join(sorted(RESERVED & set(declared))))
+        groups = [(locations[key], values) for key, values in [("states", states), ("events", events), ("facts", facts)]]
+        groups.extend((locations[(key, item.name)], (item.name,)) for key, values in [("input", inputs), ("var", variables)] for item in values)
+        location = next(location for location, names in groups if RESERVED & set(names))
+        raise Refusal("A declaration uses a reserved word: " + ", ".join(sorted(RESERVED & set(declared))), location=location)
     if fields["initial"] not in states:
-        raise Refusal("Initial state is undeclared or empty")
+        raise Refusal("Initial state is undeclared or empty", location=locations["initial"])
     if (len(found["rule"]) > 32 or len(found["invariant"]) > 8 or len(found["require"]) > 8
             or len(found["fairness"]) > 4 or len(found["property"]) > 8 or len(found["unresolved"]) > 8
             or len(inputs) > 2 or len(variables) > 4):
@@ -952,22 +960,36 @@ def parse(text: str, syntax="symbolic") -> Machine:
                     "variables": {v.name for v in variables}, "states": set(states), "events": set(events)}
     rules = []
     for rid, source, event, guard, outcome in found["rule"]:
-        if source not in states or event not in events:
-            raise Refusal(f"Rule {rid} refers to an undeclared state or event")
-        target, reason, updates = _outcome_parts(rid, outcome, english, declarations, states)
-        rules.append(Rule(rid, source, event, parse_formula(guard, declarations, "guard", english),
-                          target, reason, updates))
+        with at_source(locations[("rule", rid)]):
+            if source not in states or event not in events:
+                raise Refusal(f"Rule {rid} refers to an undeclared state or event")
+            target, reason, updates = _outcome_parts(rid, outcome, english, declarations, states)
+            rules.append(Rule(rid, source, event, parse_formula(guard, declarations, "guard", english),
+                              target, reason, updates))
     collections = {}
     for key, scope in [("invariant", "invariant"), ("require", "step"), ("fairness", "step"), ("property", "property")]:
-        collections[key] = tuple(sorted((name, parse_formula(body, declarations, scope, english))
-                                        for name, body in found[key]))
-    return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
-                   tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
-                   collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])))
+        formulas = []
+        for name, body in found[key]:
+            with at_source(locations[(key, name)]):
+                formulas.append((name, parse_formula(body, declarations, scope, english)))
+        collections[key] = tuple(sorted(formulas))
+    try:
+        return Machine(fields["name"], states, events, facts, inputs, variables, fields["initial"], fields["default"],
+                       tuple(sorted(rules, key=lambda r: r.id)), collections["invariant"], collections["require"],
+                       collections["fairness"], collections["property"], tuple(sorted(found["unresolved"])))
+    except Refusal as error:
+        # Admission is still the single validator of ranges and the owned IR.
+        # Add the declaration's physical position without changing its verdict.
+        match = re.match(r"(Integer|Variable|Property) ([a-z][a-z0-9_]*)", str(error))
+        if match:
+            keys = ["property"] if match[1] == "Property" else ["var", "input"]
+            location = next((locations[(key, match[2])] for key in keys if (key, match[2]) in locations), None)
+            raise Refusal(str(error), location=location) from error
+        raise
 
 
 def parse_any(text: str, syntax="symbolic"):
-    """Select the finite-FSM profile by its exact header statement; profile 1 parsing is unchanged."""
+    """Select the finite-FSM profile by its exact header; profile 1 admission is unchanged."""
     import behavior
     if not isinstance(text, str):
         raise Refusal("Source must be ASCII text at most 64 KiB")

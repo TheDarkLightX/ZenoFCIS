@@ -316,7 +316,8 @@ The checker identity version `zal/checker/3` hashes `behavior.py`,
 `temporal_lowering.py`, the withdrawal pilot's checker `withdrawal_pilot.py`
 with its Lean templates `withdrawal_pilot.lean` and
 `withdrawal_pilot_refutation.lean`, and the finite types, typed-machine and
-effects modules `adt.py`, `typed2.py`, `effects.py` and `effects_guide.py`.
+effects modules `adt.py`, `typed2.py`, `effects.py` and `effects_guide.py`,
+and the file CLI and source diagnostics `run.py` and `diagnostics.py`.
 
 Reviewed workspace export reruns supported-profile checks and requires the last
 human agreement to match the current revision, meaning and checker, with no
@@ -436,7 +437,9 @@ not sealed resource usage, budget-refusal or publication-identity equivalence.
 
 Profile 2 is a separate executable profile in `behavior2.py`. The header
 statement selects it: `zal 2;` or `ZAL version 2.`. Profile 1 sources keep
-their parser, revision, verdicts and renderings; `behavior.py` is unchanged.
+their revision, admission semantics, verdicts and renderings. Both finite
+parsers attach physical source positions to common refusals; those positions
+are outside the canonical IR and do not affect model identity.
 The grammar is in [GRAMMAR.md](GRAMMAR.md#profile-zalfinite-fsm2). Both
 surfaces build one frozen typed model, with the same round-trip laws and a
 revision over its canonical AST, which now names profile 2.
@@ -609,10 +612,22 @@ requirement becomes an `on accept` law (kind `AuthoritySubjectRecipient`) and
 an `on reject` law (kind `RejectNoAuthority`), with the outcome class folded
 in and, for a rejection, post-state reads replaced by the unchanged
 pre-state; a side that folds to true is omitted. The law kinds are review
-categories, not inferred meaning. Temporal properties, fairness declarations
-and unresolved obligations have no contract form and refuse as
-`unsupported lowering: temporal property ID`, `unsupported lowering: fairness
-assumption ID` or `unsupported lowering: unresolved KIND`.
+categories, not inferred meaning. Safety properties `always(P)` and `never(P)`
+use the same step-law translation, with P and its negation respectively.
+The goal must also hold on every admissible step, including unreachable
+pre-states, or lowering refuses the stronger contract scope. Property IDs and
+their law IDs are retained in the source map. Other temporal properties,
+fairness declarations and unresolved obligations refuse as `unsupported
+lowering: temporal property ID`, `unsupported lowering: fairness assumption
+ID` or `unsupported lowering: unresolved KIND`.
+
+The [lowering guide](LOWERING.md) describes CLI lowering, native refinement
+and source diagnostics. Its methods follow Baier and Katoen, *Principles of
+Model Checking* (MIT Press, 2008), Abadi and Lamport, *The Existence of
+Refinement Mappings* (Theoretical Computer Science, 1991), and Aho, Lam,
+Sethi and Ullman, *Compilers: Principles, Techniques, and Tools*, second
+edition (Pearson, 2006). The finite checking scope is separate from external
+observations and application publication; prior-art search pending.
 
 The reference table covers every input tuple from an admissible
 configuration. Pre-states that break an invariant are excluded, because the
