@@ -324,6 +324,7 @@ docs/loops/contract-distribution.md
 docs/loops/contract-gaps.md
 docs/loops/contract-lemma.md
 docs/loops/contract-review.md
+docs/loops/contract-risk.md
 docs/loops/contract-scenario.md
 docs/loops/generate.md
 docs/loops/knowledge.md
