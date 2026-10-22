@@ -1095,6 +1095,23 @@ owner-only temporary file in that same directory and renamed atomically into
 its final name. Readers select the invocation before decoding; malformed
 matching records still fail their checks.
 
+Retention runs on each record write. Defaults are 64 MiB of completed records
+and 24 hours, removing the oldest eligible records. Size counts the larger of
+logical bytes and allocated file blocks, so small files count toward the cap.
+`ZENO_FCIS_OPERATOR_MAX_BYTES` and `ZENO_FCIS_OPERATOR_MAX_AGE_SECONDS` accept
+unsigned decimal overrides; zero disables that cap. Invalid settings use the
+stderr diagnostic fallback. Live writers and live parent readers are exempt
+from both caps, including partial or malformed records of a live writer;
+therefore active diagnostics can temporarily exceed the size limit. Cleanup
+resumes on subsequent writes; no background service is installed. Unrelated
+files and symlinks are left alone. Retention supplies no checker authority.
+
+The retention method follows size and age rotation as described by Red Hat,
+*logrotate(8)*, logrotate manual (2024); process-lifetime observations follow
+Michael Kerrisk, *proc_pid_stat(5)*, Linux man-pages (2024). This applies only
+to these optional operator records; prior-art search pending.
+
+
 A zero-remaining stage records a timeout
 without starting work. Durable session records can retain earlier completed
 checks even if a later stage fails; resume independently rechecks them.
