@@ -8,6 +8,8 @@ use zeno_fcis_spec::{
 pub(in crate::internals) struct TableDeclarations {
     tables: Vec<TableInfo>,
     project: ProjectSpec,
+    source: String,
+    index_sets: std::collections::BTreeMap<u32, u32>,
 }
 
 impl TableDeclarations {
@@ -21,12 +23,25 @@ impl TableDeclarations {
             ProjectLimits::default(),
         )
         .map_err(|e| e.to_string())?;
-        Ok(Self { tables, project })
+        let index_sets =
+            zeno_fcis_spec::table_index_sets(source, limits).map_err(|e| e.to_string())?;
+        Ok(Self {
+            tables,
+            project,
+            source: source.to_owned(),
+            index_sets,
+        })
     }
     fn table(&self, id: u32) -> Result<&TableInfo, String> {
         self.tables
             .iter()
             .find(|t| t.id == id)
+            .ok_or_else(|| format!("table {id} is not declared"))
+    }
+    fn table_size(&self, id: u32) -> Result<u32, String> {
+        self.index_sets
+            .get(&id)
+            .copied()
             .ok_or_else(|| format!("table {id} is not declared"))
     }
     fn projection(&self, name: &str) -> Result<(&TableInfo, String), String> {
@@ -128,7 +143,7 @@ impl TableDeclarations {
 }
 
 impl<'t> Parser<'t> {
-    pub(super) fn table_name(&mut self, name: &'t str) -> Result<Ast, String> {
+    pub(super) fn table_name(&mut self, name: &'t str, depth: usize) -> Result<Ast, String> {
         self.expansion_work(name.len())?;
         if self.tokens.get(self.index) != Some(&"[") {
             return Ok(self
@@ -138,35 +153,64 @@ impl<'t> Parser<'t> {
                 .find(|(n, _)| *n == name)
                 .map_or_else(|| Ast::Name(name.to_owned()), |(_, k)| Ast::Int(*k)));
         }
-        self.index += 1;
-        let index = self.next()?;
-        self.expect("]")?;
+        let mut indices = Vec::new();
+        while self.tokens.get(self.index) == Some(&"[") {
+            self.index += 1;
+            indices.push(self.expression(0, depth + 1)?);
+            self.expect("]")?;
+            if indices.len() > 2 {
+                return Err("a table read has at most two indices".to_owned());
+            }
+        }
         let declarations = self
             .tables
             .ok_or("table reads require project declarations")?;
-        let (table, prefix) = declarations.projection(name)?;
-        let index = match self.bound.iter().rev().find(|(n, _)| *n == index) {
-            Some((_, k)) => declarations.index(&k.to_string(), table.size)?,
-            None => declarations.index(index, table.size)?,
+        // Preserve the old direct stored-read path and its scalar identity.
+        if indices.len() == 1
+            && matches!(&indices[0], Ast::Int(_) | Ast::Name(_))
+            && let Ok((table, prefix)) = declarations.projection(name)
+        {
+            let index = declarations.index(&super::render(&indices[0]), table.size)?;
+            let field = |k| Ast::Name(format!("{prefix}.{}", table.id + k));
+            if let Ast::Int(k) = index {
+                return Ok(field(k as u32));
+            }
+            self.expansion_work(table.size as usize * 4)?;
+            let mut read = field(table.size - 1);
+            for k in (0..table.size - 1).rev() {
+                read = Ast::Choose(
+                    Box::new(Ast::Binary(
+                        Binary::Eq,
+                        Box::new(index.clone()),
+                        Box::new(Ast::Int(i128::from(k))),
+                    )),
+                    Box::new(field(k)),
+                    Box::new(read),
+                );
+            }
+            return Ok(read);
+        }
+        // Only an indexed read uses the shared parser. The native parser has
+        // already charged and checked every index expression; no fallback can
+        // bypass table forms, nesting or the existing per-expression work cap.
+        self.expansion_work(declarations.source.len())?;
+        let mut read = name.to_owned();
+        for index in indices {
+            let text = super::render(&index);
+            self.expansion_work(text.len().saturating_add(2))?;
+            read.push('[');
+            read.push_str(&text);
+            read.push(']');
+        }
+        let expanded =
+            zeno_fcis_spec::parse_table_read(&declarations.source, &read, SourceLimits::default())
+                .map_err(|e| e.to_string())?;
+        let ast = match expanded {
+            zeno_fcis_spec::TableReadExpression::Value(v) => super::value(&v)?,
+            zeno_fcis_spec::TableReadExpression::Formula(f) => super::law(&f)?,
         };
-        let field = |k| Ast::Name(format!("{prefix}.{}", table.id + k));
-        if let Ast::Int(k) = index {
-            return Ok(field(k as u32));
-        }
-        self.expansion_work(table.size as usize * 4)?;
-        let mut read = field(table.size - 1);
-        for k in (0..table.size - 1).rev() {
-            read = Ast::Choose(
-                Box::new(Ast::Binary(
-                    Binary::Eq,
-                    Box::new(index.clone()),
-                    Box::new(Ast::Int(i128::from(k))),
-                )),
-                Box::new(field(k)),
-                Box::new(read),
-            );
-        }
-        Ok(read)
+        self.expansion_work(super::render(&ast).len())?;
+        Ok(ast)
     }
     pub(super) fn table_form(&mut self, form: &str, depth: usize) -> Result<Ast, String> {
         let variable = self.next()?;
@@ -189,8 +233,7 @@ impl<'t> Parser<'t> {
         let size = self
             .tables
             .ok_or("table forms require project declarations")?
-            .table(id)?
-            .size;
+            .table_size(id)?;
         let start = self.index;
         let mut total = None;
         for k in 0..size {

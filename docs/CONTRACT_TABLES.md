@@ -371,9 +371,12 @@ finite domains, with the existing resource limits.
 Project-aware policy loading expands these forms in expression strings:
 
 - `pre.100.110[command.101.121]` reads the entry named by the input index.
-  A literal or bound index selects that field directly. An input index
-  expands into the existing nested `choose` chain, with the final field as
-  its last arm; its declared domain must lie wholly in 0..N-1.
+  A literal or bound index selects that field directly. A checked computed
+  position, such as `pre.100.110[3 - command.101.121]`, uses the same eager
+  Select expansion and declared-range check as a law.
+- Named constant and completed derived reads use their project names:
+  `fee_bps[command.101.120]` or `allowed[command.101.120]`. Boolean results
+  can be rule conditions; numeric results can be scalar rule values.
 - The post key `"110[command.101.121]": "member"` writes only the selected
   entry. Each expanded field is `choose(index == k, member, pre.100.FIELD)`.
   Overlapping table/scalar writes are refused. A literal-index write emits
@@ -384,15 +387,37 @@ Project-aware policy loading expands these forms in expression strings:
   `sum` joins values with `+`; its filter is eager `choose(C, V, 0)`.
   Variable names must be fresh, and nested forms preserve their bindings.
 
-Indices here are literals, bound variables or direct input projections.
-Computed expressions require separate range analysis and are refused.
+Read positions admit the checked integer expressions described above, using
+bounded project projections rather than untyped policy aliases. Indexed post
+keys retain literal, bound-variable or direct-input indices.
 Expansion is preparation: it owns local scratch and returns owned scalar
 expressions, with no new runtime state, indexing or decision authority. The
 existing native evaluator supplies traps and measured work. Expansion has a
 65,536 work cap per expression, including copied identifier bytes, and a
-1 MiB text budget; existing scalar policy
+1 MiB text budget. Shared indexed-read parsing additionally charges the project
+source and resulting scalar text against that work cap. This path cannot
+bypass the policy parser's index depth, table-form or work checks. Existing scalar policy
 loads retain their original path and limits.
 
 The [state-limit library example](../examples/contract-tables/library-limits/README.md)
 combines a state bound, a conditional sum and policy table forms. Its finite
 domain is twice the fixed-limit example's; linear syntax does not shrink it.
+
+## Background
+
+Alfred V. Aho, Ravi Sethi and Jeffrey D. Ullman, *Compilers: Principles,
+Techniques, and Tools*, Addison-Wesley, 1986, describes compiler translation
+and intermediate representations. The table forms here lower to the existing
+scalar and graph operations rather than introducing a runtime table evaluator.
+Patrick Cousot and Radhia Cousot, *Abstract Interpretation: A Unified Lattice
+Model for Static Analysis of Programs by Construction or Approximation of
+Fixpoints*, Proceedings of the 4th ACM SIGACT-SIGPLAN Symposium on Principles
+of Programming Languages, 1977, supplies the abstract-interpretation framework.
+The index analysis here uses conservative integer intervals. Recursive-model
+references are given above; these background citations are not a claim that
+the sources establish this implementation's behavior or work accounting.
+
+## What is new here
+
+prior-art search pending. No priority claim is made for the combination of
+bounded table syntax, eager scalar lowering and exact logical work accounting.

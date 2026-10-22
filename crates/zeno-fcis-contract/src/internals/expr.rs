@@ -145,16 +145,17 @@ pub(super) fn parse_tables(text: &str, tables: &TableDeclarations) -> Result<Ast
 }
 
 fn parse_in(text: &str, tables: Option<&TableDeclarations>) -> Result<Ast, String> {
-    if text.contains("circuit {") {
-        let formula = zeno_fcis_spec::parse_table_expression(
+    // Retain the accepted scalar Boolean circuit spelling and its canonical
+    // tree. This fixed empty context cannot resolve any project table forms.
+    if text.contains("circuit {")
+        && let Ok(formula) = zeno_fcis_spec::parse_table_expression(
             "zeno 1; project 1 expression;",
             text,
             zeno_fcis_spec::SourceLimits::default(),
         )
-        .map_err(|d| d.to_string())?;
+    {
         return law(&formula);
     }
-
     let tokens = tokenize(text)?;
     let mut parser = Parser {
         tokens: &tokens,
@@ -180,7 +181,7 @@ fn tokenize(text: &str) -> Result<Vec<&str>, String> {
             .any(|operator| rest.starts_with(operator))
         {
             2
-        } else if b"!<>()+*,-[]{}".contains(&bytes[0]) {
+        } else if b"!<>()+*,-[]{};".contains(&bytes[0]) {
             1
         } else if bytes[0].is_ascii_alphabetic() || bytes[0] == b'_' {
             bytes
@@ -210,6 +211,50 @@ struct Parser<'t> {
 }
 
 impl<'t> Parser<'t> {
+    /// A circuit is one Boolean atom, including inside numeric Select values.
+    fn circuit(&mut self) -> Result<Ast, String> {
+        let start = self.index - 1;
+        let mut braces = 0usize;
+        let mut seen = false;
+        while let Some(token) = self.tokens.get(self.index) {
+            self.expansion_work(token.len().saturating_add(1))?;
+            match *token {
+                "{" => {
+                    braces += 1;
+                    seen = true;
+                }
+                "}" => {
+                    braces = braces.checked_sub(1).ok_or("unmatched circuit brace")?;
+                }
+                _ => {}
+            }
+            self.index += 1;
+            if seen && braces == 0 {
+                break;
+            }
+        }
+        if !seen || braces != 0 {
+            return Err("circuit needs balanced braces".to_owned());
+        }
+        self.expect("output")?;
+        let output = self.next()?;
+        self.expansion_work(output.len().saturating_add(7))?;
+        let text = self.tokens[start..self.index].join(" ");
+        let formula = zeno_fcis_spec::parse_table_expression(
+            "zeno 1; project 1 expression;",
+            &text,
+            zeno_fcis_spec::SourceLimits::default(),
+        )
+        .map_err(|d| d.to_string())?;
+        let ast = law(&formula)?;
+        let bound = self
+            .bound
+            .iter()
+            .map(|(name, value)| (name.to_string(), Ast::Int(*value)))
+            .collect();
+        expand(&ast, &bound)
+    }
+
     fn next(&mut self) -> Result<&'t str, String> {
         let token = *self
             .tokens
@@ -236,6 +281,7 @@ impl<'t> Parser<'t> {
         }
         let token = self.next()?;
         let mut left = match token {
+            "circuit" => self.circuit()?,
             "forall" | "exists" | "sum"
                 if self.tables.is_some() && self.tokens.get(self.index) != Some(&"(") =>
             {
@@ -292,7 +338,7 @@ impl<'t> Parser<'t> {
                 call(&name, arguments)?
             }
             _ if token.as_bytes()[0].is_ascii_alphabetic() || token.starts_with('_') => {
-                self.table_name(token)?
+                self.table_name(token, depth)?
             }
             _ => return Err(format!("unexpected `{token}`")),
         };

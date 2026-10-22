@@ -15,6 +15,7 @@ mod constant_tables;
 mod recursive_tables;
 #[path = "table_lookup.rs"]
 mod table_lookup;
+pub use table_lookup::{TableReadExpression, parse_table_read, table_index_sets};
 
 use crate::ast::*;
 use crate::collections::{
@@ -148,6 +149,7 @@ pub fn parse_table_expression(
     limits: SourceLimits,
 ) -> Result<RelExpr, DiagnosticSet> {
     let (parsed, mut parser) = parse_with_tables(source, limits)?;
+    parser.declarations = parsed.declarations.clone();
     crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
     let (tokens, diagnostics) = lex(expression, limits);
     parser.tokens = tokens;

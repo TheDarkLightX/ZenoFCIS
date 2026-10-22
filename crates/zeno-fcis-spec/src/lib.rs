@@ -44,7 +44,8 @@ pub use mini_determinator::{
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
 pub use parser::{
-    expand_tables, parse_formula, parse_law_formula, parse_project, parse_table_expression,
+    TableReadExpression, expand_tables, parse_formula, parse_law_formula, parse_project,
+    parse_table_expression, parse_table_read, table_index_sets,
 };
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,

@@ -2,6 +2,108 @@
 use super::*;
 use crate::{BoolCircuit, BoolNode};
 
+/// One owned scalar or Boolean table read, after bounded source expansion.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TableReadExpression {
+    /// Numeric entry, lowered to the ordinary value language.
+    Value(ValueExpr),
+    /// Boolean entry, lowered to an ordinary formula or checked circuit.
+    Formula(RelExpr),
+}
+
+/// Owned sizes of stored and constant table index sets, after project checks.
+pub fn table_index_sets(
+    source: &str,
+    limits: SourceLimits,
+) -> Result<BTreeMap<u32, u32>, DiagnosticSet> {
+    let (parsed, parser) = parse_with_tables(source, limits)?;
+    crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
+    Ok(parser.tables)
+}
+
+/// Parses one indexed read against a project's declarations and closed strata.
+/// This owns fresh preparation scratch and grants no evaluation authority.
+pub fn parse_table_read(
+    source: &str,
+    read: &str,
+    limits: SourceLimits,
+) -> Result<TableReadExpression, DiagnosticSet> {
+    let (parsed, mut parser) = parse_with_tables(source, limits)?;
+    parser.declarations = parsed.declarations.clone();
+    let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
+    let (tokens, diagnostics) = lex(read, limits);
+    parser.tokens = tokens;
+    parser.index = 0;
+    parser.diagnostics = diagnostics;
+    parser.rewrites.clear();
+    let starts_read = matches!(&parser.current().kind, TokenKind::Ident(name)
+        if parser.constants.contains_key(name.as_ref()) || parser.derived.contains_key(name.as_ref()) || projection_root(name).is_some());
+    if !starts_read || !parser.tokens.iter().any(|t| t.kind == TokenKind::LBracket) {
+        parser.error(
+            DiagnosticCode::ExpectedToken,
+            "table.read",
+            "one indexed table read",
+            "another expression",
+            "supply a declared table followed by its indices",
+        );
+    }
+    let boolean = parser.constant_bool().or_else(|| parser.derived_atom());
+    let numeric = boolean.is_none();
+    let formula = boolean.unwrap_or_else(|| {
+        RelExpr::Compare(CompareOp::Eq, parser.parse_value_atom(), ValueExpr::Int(0))
+    });
+    if !matches!(parser.current().kind, TokenKind::Eof) {
+        parser.error(
+            DiagnosticCode::ExpectedToken,
+            "table.read",
+            "end of one indexed read",
+            parser.describe_current(),
+            "remove trailing text or declarations",
+        );
+    }
+    let (nodes, depth) = formula_shape_rel(&formula);
+    if nodes > MAX_FORMULA_NODES || depth > MAX_FORMULA_DEPTH {
+        parser.error(
+            DiagnosticCode::ResourceLimit,
+            "table.read",
+            "a bounded table read",
+            format!("{nodes} nodes and depth {depth}"),
+            "use a smaller table read",
+        );
+    }
+    let law = LawDecl::new(project.project_id(), fallback_identifier(), formula);
+    for path in crate::law_paths(&law) {
+        if crate::resolve_path(&project, path).is_unresolved() {
+            parser.error(
+                DiagnosticCode::UnknownReference,
+                "table.read",
+                "a declared projection",
+                format!("{path:?}"),
+                "use the project's declared fields",
+            );
+        }
+    }
+    if let Some(reason) = parser.key_paths.misuse(law.formula()) {
+        parser.error(
+            DiagnosticCode::InvalidDeclaration,
+            "table.read",
+            "valid collection use",
+            reason,
+            "read collections through their declared entries",
+        );
+    }
+    if !parser.diagnostics.is_empty() {
+        return Err(DiagnosticSet::from_vec(
+            parser.diagnostics,
+            limits.max_diagnostics(),
+        ));
+    }
+    Ok(match law.formula {
+        RelExpr::Compare(_, value, _) if numeric => TableReadExpression::Value(value),
+        formula => TableReadExpression::Formula(formula),
+    })
+}
+
 #[derive(Clone, Copy)]
 struct Bounds {
     lo: i128,

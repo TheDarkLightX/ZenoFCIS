@@ -107,3 +107,39 @@ fn computed_positions_do_not_hide_active_self_references() {
     );
     assert!(parse_project(&source, SourceLimits::default()).is_err());
 }
+
+#[test]
+fn shared_read_parser_checks_paths_trailing_text_and_index_sets() {
+    use zeno_fcis_spec::{parse_table_expression, parse_table_read, table_index_sets};
+    assert_eq!(
+        table_index_sets(BASE, SourceLimits::default()).unwrap()[&110],
+        4
+    );
+    assert!(
+        parse_table_read(
+            BASE,
+            "fee_bps[command.101.120 + 0]",
+            SourceLimits::default()
+        )
+        .is_ok()
+    );
+    assert!(
+        parse_table_expression(
+            BASE,
+            "fee_bps[command.101.120] == post.100.130",
+            SourceLimits::default()
+        )
+        .is_ok()
+    );
+    for text in [
+        "fee_bps[command.101.120] }; law 999 injected = true;",
+        "fee_bps[command.101.120] + 1",
+        "choose(true,1,0)",
+        "fee_bps[choose(command.101.999 == 0,0,1)]",
+    ] {
+        assert!(
+            parse_table_read(BASE, text, SourceLimits::default()).is_err(),
+            "{text}"
+        );
+    }
+}
