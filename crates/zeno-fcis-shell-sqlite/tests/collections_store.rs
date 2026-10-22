@@ -1,5 +1,4 @@
 //! The keyed-collection store: incremental Merkle roots, framing and replay.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -37,13 +36,14 @@ fn commit(store: &mut CollectionStore, writes: &[Write]) -> u64 {
     }
     store
         .commit(&maps, writes, b"decision", b"scalars")
-        .unwrap()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
         .rehashed
 }
 
 #[test]
 fn collection_roots_match_a_rebuild_after_every_write() {
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut stream = Stream(0x9e37_79b9_7f4a_7c15);
     // Random keys, plus keys that share all but their last bits, so that
     // the tree has both shallow and 255-bit-deep branches.
@@ -69,24 +69,39 @@ fn collection_roots_match_a_rebuild_after_every_write() {
         }
         let entries: Vec<(Key, Vec<u8>)> = model.iter().map(|(k, v)| (*k, v.clone())).collect();
         assert_eq!(
-            store.root(7).unwrap(),
+            store
+                .root(7)
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
             rebuild_root(&entries),
             "step {step}"
         );
-        assert_eq!(store.entries(7).unwrap(), entries);
+        assert_eq!(
+            store
+                .entries(7)
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+            entries
+        );
     }
     // Another map is untouched and empty.
-    assert_eq!(store.root(8).unwrap(), rebuild_root(&[]));
+    assert_eq!(
+        store
+            .root(8)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        rebuild_root(&[])
+    );
 }
 
 #[test]
 fn collection_writes_outside_the_named_entries_are_refused() {
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let (a, b) = ([1u8; 32], [2u8; 32]);
     store
         .commit(&named(7, &[a]), &[(7, a, Some(vec![1]))], b"d1", b"s1")
-        .unwrap();
-    let root = store.root(7).unwrap();
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let root = store
+        .root(7)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     // A decision that names only `a` but writes `b` too.
     let refused = store
         .commit(
@@ -95,17 +110,40 @@ fn collection_writes_outside_the_named_entries_are_refused() {
             b"d2",
             b"s2",
         )
-        .unwrap_err();
+        .err()
+        .unwrap_or_else(|| panic!("unnamed write must fail"));
     assert!(matches!(refused, Error::Framing { map: 7, key } if key == b));
-    assert_eq!(store.root(7).unwrap(), root);
-    assert_eq!(store.get(7, &a).unwrap(), Some(vec![1]));
-    assert_eq!(store.get(7, &b).unwrap(), None);
-    assert_eq!(store.commits().unwrap().len(), 1);
+    assert_eq!(
+        store
+            .root(7)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        root
+    );
+    assert_eq!(
+        store
+            .get(7, &a)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        Some(vec![1])
+    );
+    assert_eq!(
+        store
+            .get(7, &b)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        None
+    );
+    assert_eq!(
+        store
+            .commits()
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
+            .len(),
+        1
+    );
 }
 
 #[test]
 fn collection_journal_chains_and_replays_exactly() {
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut stream = Stream(7);
     let keys: Vec<Key> = (0..40).map(|_| stream.key()).collect();
     let mut decisions = Vec::new();
@@ -116,18 +154,21 @@ fn collection_journal_chains_and_replays_exactly() {
         let decision = step.to_be_bytes().to_vec();
         store
             .commit(&named(3, &[a, b]), &writes, &decision, &[step as u8])
-            .unwrap();
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
         decisions.push((writes, decision, vec![step as u8], vec![a, b]));
     }
-    let journal = store.commits().unwrap();
+    let journal = store
+        .commits()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     assert_eq!(journal.len(), 60);
     // Replaying the decisions into a fresh store gives the same journal.
-    let mut replay = CollectionStore::in_memory().unwrap();
+    let mut replay = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut previous = [0u8; 32];
     for (row, (writes, decision, scalars, keys)) in journal.iter().zip(&decisions) {
         let again = replay
             .commit(&named(3, keys), writes, decision, scalars)
-            .unwrap();
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
         assert_eq!(again.chain, row.chain);
         assert_eq!(again.post_roots, row.post_roots);
         assert_eq!(
@@ -143,12 +184,20 @@ fn collection_journal_chains_and_replays_exactly() {
         );
         previous = row.chain;
     }
-    assert_eq!(replay.root(3).unwrap(), store.root(3).unwrap());
+    assert_eq!(
+        replay
+            .root(3)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        store
+            .root(3)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
+    );
 }
 
 #[test]
 fn collection_writes_rehash_only_the_shared_prefix() {
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut stream = Stream(0x5eed);
     // The first key rehashes nothing: it is the root's only leaf.
     assert_eq!(commit(&mut store, &[(1, stream.key(), Some(vec![0]))]), 0);
@@ -156,7 +205,12 @@ fn collection_writes_rehash_only_the_shared_prefix() {
     for _ in 0..4000 {
         deepest = deepest.max(commit(&mut store, &[(1, stream.key(), Some(vec![1]))]));
     }
-    assert_eq!(store.len(1).unwrap(), 4001);
+    assert_eq!(
+        store
+            .len(1)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        4001
+    );
     // About log2(4001) = 12 for random keys; far below the 256 key bits.
     assert!(deepest <= 48, "{deepest}");
     // Two keys that differ only in the last bit share 255 bits: the bound.

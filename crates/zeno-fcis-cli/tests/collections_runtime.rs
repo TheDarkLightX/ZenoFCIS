@@ -1,6 +1,5 @@
 //! Keyed collections at run time: real keys, the library Authority on the
 //! view, and the SQLite store under its Merkle roots.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -36,7 +35,9 @@ struct Reader<'a> {
 impl Entries for Reader<'_> {
     fn record(&self, map: u32, key: &Key) -> Option<Vec<u8>> {
         self.reads.set(self.reads.get() + 1);
-        self.store.get(map, key).unwrap()
+        self.store
+            .get(map, key)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
     }
 }
 
@@ -65,13 +66,23 @@ fn run(
     steps: &[Step],
     check: &mut Check<'_>,
 ) -> Outcomes {
-    let layout = Layout::read(project, rules_text).unwrap();
-    let rules = Rules::read(rules_text).unwrap();
-    let declarations = Declarations::read(project, &rules.leaf_bindings).unwrap();
-    let positions = domain::positions(&declarations).unwrap();
-    let schema = schema::encode(&declarations).unwrap();
-    let contract =
-        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    let layout = Layout::read(project, rules_text)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let rules = Rules::read(rules_text)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let declarations = Declarations::read(project, &rules.leaf_bindings)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let positions = domain::positions(&declarations)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let schema = schema::encode(&declarations)
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
+    let contract = Contract::build(
+        &declarations,
+        &rules,
+        schema_commitment(&schema)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let framer = Framer::new(&positions, &contract);
     policy::with_authority(&contract, &schema, |authority| {
         let mut outcomes = Outcomes {
@@ -86,7 +97,7 @@ fn run(
             };
             let framed = layout
                 .frame(state, &step.command, &step.context, &reader)
-                .unwrap();
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
             outcomes.most_reads = outcomes.most_reads.max(reader.reads.get());
             let decision = match evaluate::evaluate(authority, &framer, &framed.tuple) {
                 Outcome::Decision(decision) => decision,
@@ -99,21 +110,29 @@ fn run(
             let post: BTreeMap<u16, i128> = decision
                 .post
                 .iter()
-                .map(|(id, v)| (*id, v.number().unwrap()))
+                .map(|(id, v)| {
+                    (
+                        *id,
+                        v.number()
+                            .unwrap_or_else(|| panic!("post field must be numeric")),
+                    )
+                })
                 .collect();
-            let writes = layout.writes(&framed, &post).unwrap();
+            let writes = layout
+                .writes(&framed, &post)
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
             let bytes = format!("{:?}{:?}", framed.tuple, post).into_bytes();
             let scalars = format!("{:?}", writes.scalars).into_bytes();
             store
                 .commit(&framed.named, &writes.entries, &bytes, &scalars)
-                .unwrap();
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
             *state = writes.scalars;
             outcomes.committed += 1;
             check(store, state, &framed);
         }
         outcomes
     })
-    .unwrap()
+    .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
 }
 
 struct Stream(u64);
@@ -169,7 +188,7 @@ fn token_steps(accounts: &[Key], stream: &mut Stream, count: usize) -> Vec<Step>
 }
 
 fn balance(record: &[u8]) -> i128 {
-    match decode_record(record).unwrap()[0] {
+    match decode_record(record).unwrap_or_else(|| panic!("stored record must decode"))[0] {
         RecordValue::Number(n) => n,
         RecordValue::Key(_) => panic!("balance is a number"),
     }
@@ -180,7 +199,8 @@ fn collections_runtime_keeps_the_supply_equal_to_every_balance() {
     let mut stream = Stream(0x00c0_ffee);
     let accounts: Vec<Key> = (0..400).map(|_| stream.key()).collect();
     let steps = token_steps(&accounts, &mut stream, 1500);
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut state = BTreeMap::from([(120u16, 0i128)]);
     let outcomes = run(
         TOKENS,
@@ -191,19 +211,36 @@ fn collections_runtime_keeps_the_supply_equal_to_every_balance() {
         &mut |store, state, framed| {
             // Every named key is at most the two the command holds.
             assert!(framed.named[&110].len() <= 2);
-            let entries = store.entries(110).unwrap();
+            let entries = store
+                .entries(110)
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
             let total: i128 = entries.iter().map(|(_, r)| balance(r)).sum();
             assert_eq!(state[&120], total, "the supply is the sum of every balance");
-            assert_eq!(store.root(110).unwrap(), rebuild_root(&entries));
+            assert_eq!(
+                store
+                    .root(110)
+                    .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+                rebuild_root(&entries)
+            );
         },
     );
     // Reads stay at the two named entries while the map grows to hundreds.
     assert_eq!(outcomes.most_reads, 2);
-    assert!(store.len(110).unwrap() > 150, "{}", store.len(110).unwrap());
+    assert!(
+        store
+            .len(110)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
+            > 150,
+        "{}",
+        store
+            .len(110)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
+    );
     let counts = (outcomes.committed, outcomes.rejected);
     assert!(counts.0 > 300 && counts.1 > 0, "{counts:?}");
     // Replaying the same commands into a fresh store gives the same journal.
-    let mut again = CollectionStore::in_memory().unwrap();
+    let mut again = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut state = BTreeMap::from([(120u16, 0i128)]);
     run(
         TOKENS,
@@ -215,13 +252,13 @@ fn collections_runtime_keeps_the_supply_equal_to_every_balance() {
     );
     let first: Vec<_> = store
         .commits()
-        .unwrap()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
         .into_iter()
         .map(|c| c.chain)
         .collect();
     let second: Vec<_> = again
         .commits()
-        .unwrap()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
         .into_iter()
         .map(|c| c.chain)
         .collect();
@@ -255,7 +292,8 @@ fn collections_runtime_records_holders_as_keys() {
         let copy = copies[(stream.next() % 40) as usize];
         steps.push(step(152 + (stream.next() % 2) as i128, member, copy));
     }
-    let mut store = CollectionStore::in_memory().unwrap();
+    let mut store = CollectionStore::in_memory()
+        .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"));
     let mut state = BTreeMap::new();
     let outcomes = run(
         LIBRARY,
@@ -267,25 +305,42 @@ fn collections_runtime_records_holders_as_keys() {
             // Across the two maps: each member's count is the copies it holds.
             let held: BTreeMap<Key, i128> = store
                 .entries(115)
-                .unwrap()
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
                 .iter()
-                .filter_map(|(_, record)| match decode_record(record).unwrap()[..] {
-                    [RecordValue::Number(1), RecordValue::Key(holder)] => Some(holder),
-                    _ => None,
+                .filter_map(|(_, record)| {
+                    match decode_record(record)
+                        .unwrap_or_else(|| panic!("stored record must decode"))[..]
+                    {
+                        [RecordValue::Number(1), RecordValue::Key(holder)] => Some(holder),
+                        _ => None,
+                    }
                 })
                 .fold(BTreeMap::new(), |mut counts, holder| {
                     *counts.entry(holder).or_default() += 1;
                     counts
                 });
-            for (member, record) in store.entries(110).unwrap() {
+            for (member, record) in store
+                .entries(110)
+                .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}"))
+            {
                 let loans = balance(&record);
                 assert_eq!(loans, held.get(&member).copied().unwrap_or(0));
                 assert!(loans <= 2);
             }
         },
     );
-    assert_eq!(store.len(110).unwrap(), 60);
-    assert_eq!(store.len(115).unwrap(), 40);
+    assert_eq!(
+        store
+            .len(110)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        60
+    );
+    assert_eq!(
+        store
+            .len(115)
+            .unwrap_or_else(|error| panic!("collection fixture failed: {error:?}")),
+        40
+    );
     let counts = (outcomes.committed, outcomes.rejected);
     assert!(counts.0 > 150 && counts.1 > 150, "{counts:?}");
 }
