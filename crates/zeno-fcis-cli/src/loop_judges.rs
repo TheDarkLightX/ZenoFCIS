@@ -26,7 +26,9 @@
 //!
 //! This module is LLM-generated.
 
-use crate::contract::review::decision_space::DecisionSpace;
+use crate::contract::review::decision_space::{
+    DecisionSpace, DeliveryChoices, Determination, determination,
+};
 use crate::contract::review::deliveries::{self, DeliveryUniverse};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -536,16 +538,35 @@ impl Core {
     }
 
     fn outcome_count(&self, candidates: &[Candidate], fixed: bool) -> usize {
-        candidates
-            .iter()
-            .map(|c| {
-                if c.class != Class::Reject && self.delivery_universe.is_some() && !fixed {
-                    2
-                } else {
-                    1
-                }
-            })
-            .sum()
+        determination(
+            candidates.iter().map(|c| (c.class, c.reason, c.next)),
+            None,
+            &[],
+            if self.delivery_universe.is_some() && !fixed {
+                DeliveryChoices::Unrestricted
+            } else {
+                DeliveryChoices::Fixed(&[])
+            },
+        )
+        .outcomes
+    }
+
+    fn determination(
+        &self,
+        ordinal: usize,
+        candidates: &[Candidate],
+        fixed: Option<&[library::Delivery]>,
+    ) -> Determination {
+        determination(
+            candidates.iter().map(|c| (c.class, c.reason, c.next)),
+            self.decisions[ordinal].map(|d| (d.class, d.reason, d.next)),
+            self.native_outbox(ordinal),
+            match fixed {
+                Some(wanted) => DeliveryChoices::Fixed(wanted),
+                None if self.delivery_universe.is_some() => DeliveryChoices::Unrestricted,
+                None => DeliveryChoices::Fixed(&[]),
+            },
+        )
     }
 
     /// The values of the tuple at `ordinal`.
@@ -1499,6 +1520,7 @@ pub(super) struct Freedom {
     /// (`None` where the Authority refuses), determined tuples included.
     pub(super) admitted: Vec<Vec<Candidate>>,
     pub(super) residual_witnesses: Vec<Value>,
+    pub(super) disagreement_witnesses: Vec<Value>,
 }
 
 /// Open inputs of one case that admit the same decisions, or the inputs of
@@ -1591,9 +1613,7 @@ impl Core {
         let determined_by_laws = admissible
             .iter()
             .enumerate()
-            .filter(|(ordinal, c)| {
-                self.outcome_count(c, false) == 1 && self.decisions[*ordinal].is_some()
-            })
+            .filter(|(ordinal, c)| self.determination(*ordinal, c, None).determined)
             .count();
         // A recorded reason requirement removes rejects with other reasons
         // where it applies.
@@ -1608,12 +1628,13 @@ impl Core {
         let determined_with_reasons = admissible
             .iter()
             .enumerate()
-            .filter(|(o, c)| self.outcome_count(c, false) == 1 && self.decisions[*o].is_some())
+            .filter(|(o, c)| self.determination(*o, c, None).determined)
             .count();
         let mut refused = 0usize;
         let mut determined = 0usize;
         let mut inconsistent = 0usize;
         let mut residual_witnesses = Vec::new();
+        let mut disagreement_witnesses = Vec::new();
         let mut groups: Vec<Region> = Vec::new();
         for (ordinal, candidates) in admissible.iter().enumerate() {
             let refusal = self.refusals.get(&ordinal);
@@ -1634,26 +1655,37 @@ impl Core {
                 }));
                 continue;
             }
-            match self.outcome_count(candidates, fixed.get(ordinal).is_some_and(Option::is_some)) {
-                1 => determined += 1,
-                _ => {
-                    let set: BTreeSet<Label> = candidates
-                        .iter()
-                        .map(|c| label(c.class, c.reason))
-                        .collect();
-                    let case = self.case_of[ordinal];
-                    let ordered: Vec<Label> = set.iter().copied().collect();
-                    match groups
-                        .iter_mut()
-                        .find(|g| g.case == case && g.labels == ordered)
-                    {
-                        Some(group) => group.ordinals.push(ordinal),
-                        None => groups.push(Region {
-                            case,
-                            labels: ordered,
-                            ordinals: vec![ordinal],
-                        }),
-                    }
+            let wanted = fixed.get(ordinal).and_then(Option::as_deref);
+            let measure = self.determination(ordinal, candidates, wanted);
+            if measure.disagreement {
+                disagreement_witnesses.push(json!({
+                    "input_ordinal": ordinal,
+                    "row": self.shown(ordinal),
+                    "reason": "answer-disagreement",
+                    "core": self.decisions[ordinal].map(|d| self.decision_json(d.class, d.reason, Some(d.next))),
+                    "core_deliveries": deliveries::shown(self.native_outbox(ordinal)),
+                    "required_deliveries": wanted.map(deliveries::shown),
+                }));
+            }
+            if measure.determined {
+                determined += 1;
+            } else if !measure.disagreement {
+                let set: BTreeSet<Label> = candidates
+                    .iter()
+                    .map(|c| label(c.class, c.reason))
+                    .collect();
+                let case = self.case_of[ordinal];
+                let ordered: Vec<Label> = set.iter().copied().collect();
+                match groups
+                    .iter_mut()
+                    .find(|g| g.case == case && g.labels == ordered)
+                {
+                    Some(group) => group.ordinals.push(ordinal),
+                    None => groups.push(Region {
+                        case,
+                        labels: ordered,
+                        ordinals: vec![ordinal],
+                    }),
                 }
             }
         }
@@ -1698,6 +1730,7 @@ impl Core {
             "determined_with_delivery_requirements": determined,
             "determined_rate": if tuples == 0 { 0.0 } else { determined as f64 / tuples as f64 },
             "inconsistent": inconsistent,
+            "disagreements": disagreement_witnesses.len(),
             "residual": residual_witnesses.len(),
             "open": tuples - determined - residual_witnesses.len(),
             "regions": regions.len(),
@@ -1707,6 +1740,7 @@ impl Core {
             regions,
             admitted: admissible,
             residual_witnesses,
+            disagreement_witnesses,
         }
     }
 
@@ -1907,6 +1941,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
             else { "open" },
         "stats": freedom.stats,
         "residual_witnesses": freedom.residual_witnesses,
+        "disagreement_witnesses": freedom.disagreement_witnesses,
         "answers": records,
     });
     if let Some(universe) = &core.delivery_universe {
@@ -2389,6 +2424,42 @@ mod tests {
                 "payload":{"132":"value"},"idempotency_ordinal":1}]);
         }
         Core::from_sources(project, rules.to_string()).unwrap_or_else(|e| panic!("{e:?}"))
+    }
+
+    #[test]
+    fn literal_delivery_disagreements_remain_open_on_the_reported_dual_approval_inputs() {
+        let core = Core::load(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval"),
+            true,
+        )
+        .unwrap_or_else(|e| panic!("witness: {e:?}"));
+        let document: Value = serde_json::from_str(include_str!(
+            "../tests/data/dual-approval-literal-answers.json"
+        ))
+        .unwrap_or_else(|e| panic!("witness answers: {e}"));
+        let answers = core.answers(&document).unwrap_or_else(|e| panic!("{e:?}"));
+        let report = question(&core, &answers).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(report["answers"][3]["disagreement"]["inputs"], 20);
+        assert_eq!(report["stats"]["determined"], 364, "{report}");
+        assert_eq!(report["stats"]["open"], 20);
+        assert_eq!(report["status"], "open");
+        let witnesses = report["disagreement_witnesses"]
+            .as_array()
+            .expect("witnesses");
+        assert_eq!(witnesses.len(), 20);
+        for witness in witnesses {
+            assert_ne!(witness["required_deliveries"], witness["core_deliveries"]);
+            assert_eq!(witness["reason"], "answer-disagreement");
+            assert!(witness["row"].is_object());
+        }
+        let document: Value = serde_json::from_str(include_str!(
+            "../tests/data/dual-approval-case-answers.json"
+        ))
+        .unwrap_or_else(|e| panic!("case answers: {e}"));
+        let answers = core.answers(&document).unwrap_or_else(|e| panic!("{e:?}"));
+        let report = question(&core, &answers).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(report["stats"]["determined"], 384);
+        assert_eq!(report["status"], "determined");
     }
 
     #[test]

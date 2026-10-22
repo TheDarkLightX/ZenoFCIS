@@ -4,6 +4,58 @@
 use std::collections::BTreeSet;
 
 use super::super::rules::{Class, Rules};
+use super::evaluate::Delivery;
+
+/// Scalar outcome with the actual successor index, including the unchanged
+/// pre-state for a reject. Candidates must be distinct and law-checked.
+pub(crate) type ScalarDecision = (Class, Option<u32>, usize);
+
+/// Delivery alternatives left by the checked requirements. Unrestricted is
+/// valid only after the caller checks complete coverage and law independence.
+#[derive(Clone, Copy)]
+pub(crate) enum DeliveryChoices<'a> {
+    Fixed(&'a [Delivery]),
+    Unrestricted,
+}
+
+pub(crate) struct Determination {
+    /// Exact zero/one/multiple classification; unrestricted counts are lower bounds.
+    pub(crate) outcomes: usize,
+    pub(crate) determined: bool,
+    pub(crate) disagreement: bool,
+}
+
+/// One definition for both judges: exactly one complete lawful outcome, and
+/// it agrees with the successfully executed Authority outcome in every field.
+/// No decision authority is created here. Inputs are borrowed immutably, and
+/// the returned counts contain no references to invocation scratch.
+pub(crate) fn determination(
+    candidates: impl IntoIterator<Item = ScalarDecision>,
+    reference: Option<ScalarDecision>,
+    native_deliveries: &[Delivery],
+    deliveries: DeliveryChoices<'_>,
+) -> Determination {
+    let mut outcomes = 0;
+    let mut agrees = false;
+    for candidate in candidates {
+        let count = match (candidate.0, deliveries) {
+            (Class::Reject, DeliveryChoices::Fixed(wanted)) if !wanted.is_empty() => 0,
+            (Class::Reject, _) | (_, DeliveryChoices::Fixed(_)) => 1,
+            (_, DeliveryChoices::Unrestricted) => 2,
+        };
+        outcomes += count;
+        let delivery_agrees = match deliveries {
+            DeliveryChoices::Fixed(wanted) => wanted == native_deliveries,
+            DeliveryChoices::Unrestricted => true,
+        };
+        agrees |= count > 0 && Some(candidate) == reference && delivery_agrees;
+    }
+    Determination {
+        outcomes,
+        determined: outcomes == 1 && agrees,
+        disagreement: reference.is_some() && outcomes > 0 && !agrees,
+    }
+}
 
 /// Invocation-owned reason IDs; no decision or application authority.
 pub(crate) struct DecisionSpace {

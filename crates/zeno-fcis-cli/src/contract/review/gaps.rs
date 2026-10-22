@@ -39,6 +39,7 @@ use serde_json::{Value, json};
 use super::super::ContractError;
 use super::super::declarations::Declarations;
 use super::super::rules::{Class, LawKind, Rules};
+use super::decision_space::{DeliveryChoices, determination};
 use super::deliveries::{self, DeliveryUniverse};
 use super::evaluate::{self, Framer, LawSet, Proposed};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed, Space};
@@ -478,6 +479,7 @@ impl Example {
 struct TupleGap {
     refused: bool,
     admissible: usize,
+    determined: bool,
     classes: usize,
     reasons: usize,
     successors: usize,
@@ -568,7 +570,7 @@ fn measure(
                 *count += usize::from(*active);
             }
             counts.zero += usize::from(gap.admissible == 0);
-            if gap.admissible == 1 {
+            if gap.determined {
                 counts.determined += 1;
                 continue;
             }
@@ -673,16 +675,15 @@ fn tuple_gap(
     let own = decided
         .map(|(class, reason, next)| (class, reason, (class != Class::Reject).then_some(next)));
     let mut witness_mismatch = false;
-    let mut admissible = 0;
     let mut classes = BTreeSet::new();
     let mut reject_reasons = BTreeSet::new();
     let mut successors = BTreeSet::new();
     let mut also = Vec::new();
-    for candidate in decisions.candidates(space.states) {
+    let candidates = decisions.candidates(space.states).filter_map(|candidate| {
         let (class, reason, successor) = candidate;
         let post = successor.map_or(&states[state][..], |successor| &states[successor][..]);
         if !check(class, reason, post, &[]).0 {
-            continue;
+            return None;
         }
         if class != Class::Reject
             && let Some(u) = universe
@@ -692,11 +693,6 @@ fn tuple_gap(
                 || !u.allows(&witness)
                 || !check(class, reason, post, &witness).0;
         }
-        admissible += if universe.is_some() && class != Class::Reject {
-            2
-        } else {
-            1
-        };
         classes.insert(class.code());
         match successor {
             None => {
@@ -709,10 +705,22 @@ fn tuple_gap(
         if Some(candidate) != own && also.len() < EXAMPLES {
             also.push(candidate);
         }
-    }
+        Some((class, reason, successor.unwrap_or(state)))
+    });
+    let measure = determination(
+        candidates,
+        decided,
+        machine.outbox_at(ordinal),
+        if universe.is_some() {
+            DeliveryChoices::Unrestricted
+        } else {
+            DeliveryChoices::Fixed(&[])
+        },
+    );
     TupleGap {
         refused: decided.is_none(),
-        admissible,
+        admissible: measure.outcomes,
+        determined: measure.determined,
         classes: classes.len(),
         reasons: reject_reasons.len(),
         successors: successors.len(),
