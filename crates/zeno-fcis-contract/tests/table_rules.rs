@@ -136,7 +136,9 @@ fn table_rules_refuse_unknown_tables_overlapping_writes_and_broad_indices() {
         "type 106 index CopyNumber of 110;",
         "type 106 int CopyNumber in 0..=6;",
     );
-    let error = Rules::read_for_project(&broad, TABLED).unwrap_err();
+    let error = Rules::read_for_project(&broad, TABLED)
+        .err()
+        .unwrap_or_else(|| panic!("policy must be refused"));
     assert!(error.reason().contains("index range"), "{error}");
     for (holder, post) in [
         ("pre.100.999[command.101.121]", json!({})),
@@ -163,7 +165,8 @@ fn table_rules_refuse_unknown_tables_overlapping_writes_and_broad_indices() {
     );
     assert!(
         Rules::read_for_project(PROJECT, &r.to_string())
-            .unwrap_err()
+            .err()
+            .unwrap_or_else(|| panic!("policy must be refused"))
             .reason()
             .contains("work cap")
     );
@@ -177,7 +180,9 @@ fn table_rule_work_bounds_identifier_copy_amplification() {
     rules["variables"]["large"] = json!(format!(
         "sum a in table 110 {{ sum b in table 110 {{ sum c in table 110 {{ {long_name} }} }} }}"
     ));
-    let error = Rules::read_for_project(PROJECT, &rules.to_string()).unwrap_err();
+    let error = Rules::read_for_project(PROJECT, &rules.to_string())
+        .err()
+        .unwrap_or_else(|| panic!("policy must be refused"));
     assert!(
         error.reason().contains("work cap"),
         "identifier copies must stop at the work cap: {error}"

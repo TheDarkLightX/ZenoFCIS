@@ -29,6 +29,22 @@ domain and decisions. Its table-form policy expands to the same policy bytes.
 This example adds a state field and conditional count, so its source and policy
 identities differ. Changing the limit changes when the third rule rejects.
 
+## Background
+
+Alfred V. Aho, Ravi Sethi and Jeffrey D. Ullman, *Compilers: Principles,
+Techniques, and Tools*, Addison-Wesley, 1986, describes syntax-directed
+translation and intermediate representations. Ronald L. Graham, Donald E.
+Knuth and Oren Patashnik, *Concrete Mathematics: A Foundation for Computer
+Science*, second edition, Addison-Wesley, 1994, covers finite sums and
+binomial coefficients. These are the background for finite expansion and
+indicator sums; they do not qualify an implementation of this feature.
+
+## What is new here
+
+This release adds table syntax, standalone table-form formulas and
+project-aware policy preparation to the existing checked scalar language.
+The comparative assessment of that combination is **prior-art search pending**.
+
 ## Scope
 
 The declared domain is 8,192 states, 36 commands and 2 desks: 589,824 input

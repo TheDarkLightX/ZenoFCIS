@@ -151,6 +151,21 @@ map. The existing judges, `contract review`, `lemma` and `scenario`, decide
 the view contract too, but they treat the view's entry fields as ordinary
 state: their state counts and reachability are about views, not maps.
 
+## Background
+
+Peter Wolper, “Expressing Interesting Properties of Programs in Propositional
+Temporal Logic,” ACM Symposium on Principles of Programming Languages, 1986,
+is the data-independence background for equality-only keys. Ralph C. Merkle,
+“Protocols for Public Key Cryptosystems,” IEEE Symposium on Security and
+Privacy, 1980, is background for hash-tree authentication. These references
+do not establish this reduction's premises or this store's implementation.
+
+## What is new here
+
+This release connects named-entry views, checked summary deltas and an
+incremental keyed-store journal. The comparative assessment of that
+combination is **prior-art search pending**.
+
 ## Scope
 
 - A check enumerates scalars, summaries and each named entry's record

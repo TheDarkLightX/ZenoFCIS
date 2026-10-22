@@ -136,6 +136,22 @@ new scalar encoding tag, leaving earlier tags intact; projects that use it
 have the identity of that expanded formula. It uses the existing library
 Select evaluator. Finite results remain scoped to the declared domain.
 
+## Background
+
+Alfred V. Aho, Ravi Sethi and Jeffrey D. Ullman, *Compilers: Principles,
+Techniques, and Tools*, Addison-Wesley, 1986, describes syntax-directed
+translation and intermediate representations. Ronald L. Graham, Donald E.
+Knuth and Oren Patashnik, *Concrete Mathematics: A Foundation for Computer
+Science*, second edition, Addison-Wesley, 1994, covers finite sums and
+binomial coefficients. These are the background for finite expansion and
+indicator sums; they do not qualify an implementation of this feature.
+
+## What is new here
+
+This release adds table syntax, standalone table-form formulas and
+project-aware policy preparation to the existing checked scalar language.
+The comparative assessment of that combination is **prior-art search pending**.
+
 ## Scope
 
 - A table is a fixed number of fields. Its entries count toward the 64

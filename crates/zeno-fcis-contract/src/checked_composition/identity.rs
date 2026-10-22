@@ -42,6 +42,7 @@ const VERSION: u32 = 1;
 /// bytes, in path order.
 pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "Cargo.toml",
+    "examples/trace_game_input.rs",
     "src/checked_composition.rs",
     "src/checked_composition/aggregate.rs",
     "src/checked_composition/assembly.rs",
@@ -78,6 +79,8 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/internals/review/evaluate.rs",
     "src/internals/rules.rs",
     "src/internals/schema.rs",
+    "src/internals/table_expr.rs",
+    "src/internals/table_rules.rs",
     "src/internals/tables.rs",
     "src/internals/tables_review.rs",
     "src/lib.rs",
