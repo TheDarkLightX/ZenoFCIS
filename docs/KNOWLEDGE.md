@@ -35,16 +35,19 @@ checker and engine identities, policy and both observations. No elapsed-time
 measurement enters usefulness.
 
 A helpful candidate is promoted only when no applicable task gets worse and at least
-one gets strictly better. A harmful candidate is rejected. An absent applicability
-scope or unchanged result is inconclusive and leaves the candidate proposed. A
+one gets strictly better. A harmful candidate is rejected. No applicable task
+or an unchanged result is inconclusive and leaves the candidate proposed. A
 resource stop cannot pass. A reviewer may veto or ask for a narrower scope with
 episode references; approval supplies no promotion capability.
 
 Continuing the example, assessed sibling lessons with the same effect and compatible
 scopes can propose their declared `isa` parent. Their assessed members become
 proposing members for that new item: the class lesson must be assessed on different
-members. Mixed positive and negative episodes can instead propose specialisations
-along one declared scope dimension. Growth creates proposals, not evidence for those
+members. In this illustrative story, that fresh class assessment passes and
+justifies the class lesson. Mixed positive and negative episodes can instead
+propose specialisations along one declared scope dimension. A proposed scope must
+exclude the known harmful cases under the same applicability relation, including
+capability sets and `isa` inheritance. Growth creates proposals, not evidence for those
 proposals. When a tool version changes, the affected justification and its
 descendants move to pending; unrelated branches remain available. This is an
 illustrative workflow, not a claim that a mined rule generalises before its own
@@ -138,7 +141,13 @@ The suite and record declare all per-task limits and the total reserved work bud
 Assessment records retain consumed loop counters and assessment comparison charges,
 including the repeated independent replay. Reserved work is recorded separately.
 Curation work and all earlier assessment work at the KB revision are retained too;
-failed and inconclusive learning is not free. These are declared deterministic
+failed and inconclusive learning is not free. Completed runs in an interrupted
+comparison remain bound as partial observations, with their counters and episodes.
+They are observational, outside comparable complete-suite profiles. Replaying such
+a record checks its completed observations; it does not reproduce a historical
+scheduler timeout. Missing worker consumption stays unknown behind the reservation.
+Artifact validation can also refuse: the measured assessment stays inconclusive,
+without new certified facts or promotion. These are declared deterministic
 accounting units, not CPU instructions.
 
 ### Exact facts and reuse
@@ -173,8 +182,11 @@ native loop-door, core-component and template-derived tasks. The retained initia
 suite also includes counter-template completion. Every task has a digest, input
 digest, scope, fixed seed and budgets. Capacities one and two are development
 subjects; the current revision uses capacities four, six and seven and three other
-pinned programs as held-out subjects. The retained initial revision used capacities
-three, five and eight; after its broad shortcut was rejected, all its subjects
+pinned programs as held-out subjects. The current resource revision declares a
+22-second process allowance; the earlier 10-second suite and its safe inconclusive
+attempts are retained. The proposing split, seeds, work limits and actions stayed
+the same across that operational revision. The retained initial revision used
+capacities three, five and eight; after its broad shortcut was rejected, all its subjects
 became proposing subjects for the next revision. The engine refuses a task or
 subject revision used to propose the candidate, including parent cases used for
 generalisation. Renaming a subject does not make it held out. Cases retain their
@@ -197,6 +209,22 @@ learning and recorded proposing-run work, and the ON cost with that overhead. A
 reduction in loop work alone does not establish a net saving or a benefit on other
 tasks.
 
+The recorded six-task example has these outcomes:
+
+| Candidate | Held-out outcome | Reason |
+| --- | --- | --- |
+| Skip the canonical stage for bounded counters | Promoted | Three applicable tasks use 138→92, 186→124 and 210→140 work units with unchanged accepted program costs |
+| Skip resubstitution for bounded counters | Rejected | Work falls, but accepted programs grow from 20→23 nodes and 22→24 nodes, with larger encoded sizes |
+| Scope absent from the suite | Inconclusive; stays proposed | No applicable task |
+
+With only the helpful lesson promoted, ALL versus NONE solves 5/6 tasks in both
+modes: total loop work is 6,983 versus 7,161, a reduction of 178 units (about 2.49%).
+The aggregate records 28,480 assessment units, 91,834 prior assessment units and
+268 curation units, making the learning-inclusive ON total 127,565. Completed
+work from an earlier inconclusive attempt remains in that history. These figures
+describe this frozen revision; they establish neither a net saving nor an effect
+on a representative deployment population.
+
 ### How to read a loop's value
 
 ```sh
@@ -212,14 +240,20 @@ ascending, closed gap descending, then lexical. Profiles and points are descript
 trial menus, never strategy advice or acceptance gates. Their selection bias remains
 visible.
 
-For a worked arithmetic example, take a two-task class with budget 100 per task. A
-loop solving one task in 20 work units and stopping on the other after 80 has solve
-rate 1/2, PAR-2 sum `20 + 2*100 = 220`, and ERT `(20 + 80)/1 = 100`. A refusal is
-outside scope and is omitted from that loop's PAR-2 denominator; it still reduces
-applicability. If exactly two loops solve a task, its coverage-game Shapley credit
-is 1/2 each. Unique solves and marginal coverage count tasks lost on removal. These
-definitions are also computed on the frozen suite; unavailable observations are
-`null`.
+On the frozen example's three bounded counters, OFF and the helpful ON
+configuration each solve 3/3. Their PAR-2 sums are 534 and 356; since every task
+solves, these are also their total solution work. Median/p90 work is 186/210
+versus 124/140; ERT is 534/3 versus 356/3. VBS and SBS both have PAR-2 sum 356,
+so closed gap is undefined. Four recorded configurations each solve all three
+tasks: each receives coverage-game Shapley credit 3/4, with zero unique solves
+and zero marginal coverage. All receive 79 points, grade B: rounded points do not
+distinguish their small budget-relative efficiency differences. The harmful
+configuration has the same lower work and points as the helpful one, yet fails
+assessment on program cost.
+
+For an unsolved applicable task, PAR-2 charges twice its declared work budget. A
+refusal is outside scope and is omitted from that loop's PAR-2 denominator; it
+still reduces applicability. Unavailable observations are `null`.
 
 | Metric | Definition or interpretation |
 | --- | --- |
@@ -251,7 +285,7 @@ et al. (AAAI 2016), Shapley portfolio analysis; and the VBS/SBS closed-gap
 convention. The formulas above are the implementation contract; the bibliographic
 attributions require verification before use as publication evidence.
 
-## Difference from the earlier knowledge engine
+## Difference from 2.4 and the earlier knowledge engine
 
 The earlier engine provided typed Datalog applicability, provenance, replayed
 positive/boundary cases, layering, automatic consultation and inbox outcomes. It did
@@ -296,6 +330,14 @@ verify the descriptor and snapshot; a half-written data file is never published 
 the current layer. Locks are process-owned; immutable old snapshots support
 recovery. This is local filesystem durability, not distributed consensus or
 authenticated provenance.
+
+If assessment publication loses a lock or revision race, the command refuses and
+retains an unpublished private state snapshot with a path and hash. The response
+keeps its assessment and measured work. The recovery snapshot is not a layer
+descriptor and cannot activate advice. Inspect it and the current revision before
+retrying. A filesystem failure can also prevent retention; that refusal is returned
+with the assessment, without a durability claim. Unpublished attempts remain
+separate recovery evidence, outside the published revision history.
 
 All acquisition uses explicit files outside a checkout. Private text, scope,
 episodes and traces stay in those private layers and inboxes. Ordinary loop logs and
