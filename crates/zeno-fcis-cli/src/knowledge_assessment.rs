@@ -514,7 +514,7 @@ mod tests {
                 };
                 assert_eq!(
                     decide(&[a.clone(), b], &BTreeSet::new(), &Policy::default(), &[])
-                        .unwrap()
+                        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                         .0,
                     expected
                 );
@@ -530,7 +530,7 @@ mod tests {
         b.on.task = b.task.clone();
         assert_eq!(
             decide(&[a, b], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Reject
         );
@@ -557,7 +557,7 @@ mod tests {
         c.on.result_cost = Some([3, 30]);
         assert_eq!(
             decide(&[c], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Reject
         );
@@ -566,7 +566,7 @@ mod tests {
     fn no_applicable_task_never_promotes() {
         assert_eq!(
             decide(&[], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Inconclusive
         );
@@ -575,13 +575,13 @@ mod tests {
     fn work_counters_determine_usefulness() {
         assert_eq!(
             decide(&[case(10, 9)], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Promote
         );
         assert_eq!(
             decide(&[case(9, 10)], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Reject
         );
@@ -604,7 +604,7 @@ mod tests {
         c.on.budget_stop = true;
         assert_eq!(
             decide(&[c], &BTreeSet::new(), &Policy::default(), &[])
-                .unwrap()
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
                 .0,
             Decision::Inconclusive
         );
@@ -622,7 +622,7 @@ mod tests {
                     text: "approved".into()
                 }]
             )
-            .unwrap()
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
             .0,
             Decision::Inconclusive
         );

@@ -410,8 +410,14 @@ mod tests {
             facts: BTreeMap::from([("a".into(), fact("a", "door", Verdict::Accepted, "held-out"))]),
             ..Layer::default()
         };
-        let values = profiles(&layer, "checker", "engine", "held-out").unwrap();
-        assert!(!values["leaderboards"].as_array().unwrap().is_empty());
+        let values = profiles(&layer, "checker", "engine", "held-out")
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+        assert!(
+            !values["leaderboards"]
+                .as_array()
+                .unwrap_or_else(|| panic!("expected knowledge fixture value"))
+                .is_empty()
+        );
         let current =
             crate::knowledge_store::current(&layer, "engine", "checker", "v", &BTreeMap::new());
         use zeno_fcis_loop_doors::strategy_knowledge::{Fact, Value as K};
@@ -430,7 +436,8 @@ mod tests {
             ]),
             ..Layer::default()
         };
-        let out = profiles(&layer, "checker", "engine", "held-out").unwrap();
+        let out = profiles(&layer, "checker", "engine", "held-out")
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let p = &out["leaderboards"][0]["profiles"][0];
         assert_eq!(p["applicable"], 1);
         assert_eq!(p["recorded_runs"], 2);
@@ -451,8 +458,11 @@ mod tests {
             ]),
             ..Layer::default()
         };
-        let out = profiles(&layer, "checker", "engine", "held-out").unwrap();
-        let rows = out["leaderboards"][0]["profiles"].as_array().unwrap();
+        let out = profiles(&layer, "checker", "engine", "held-out")
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+        let rows = out["leaderboards"][0]["profiles"]
+            .as_array()
+            .unwrap_or_else(|| panic!("expected knowledge fixture value"));
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["door"], "held-out-door");
         assert_eq!(rows[0]["marginal_contribution"], 1);

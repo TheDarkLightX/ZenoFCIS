@@ -730,7 +730,8 @@ mod tests {
             evidence_refs: BTreeSet::new(),
             origin: "test".into(),
         };
-        c.statement_sha256 = statement(&c).unwrap();
+        c.statement_sha256 =
+            statement(&c).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         c
     }
     #[test]
@@ -916,19 +917,31 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         }
         let p = root.join("layer.json");
         let _ = std::fs::remove_file(&p);
         let old = Layer::default();
-        let sha = commit(&p, None, &old).unwrap();
-        let before = read(&p, 65_536).unwrap();
+        let sha = commit(&p, None, &old)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+        let before =
+            read(&p, 65_536).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         for fault in [Fault::Data, Fault::Descriptor, Fault::Swap] {
             let mut next = old.clone();
             next.generation = 1;
             assert!(commit_inner(&p, Some(&sha), &next, fault).is_err());
-            assert_eq!(read(&p, 65_536).unwrap(), before);
-            assert_eq!(load(&p).unwrap().0, old);
+            assert_eq!(
+                read(&p, 65_536)
+                    .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
+                before
+            );
+            assert_eq!(
+                load(&p)
+                    .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+                    .0,
+                old
+            );
         }
         assert_eq!(
             commit(&p, Some(&"f".repeat(64)), &old),

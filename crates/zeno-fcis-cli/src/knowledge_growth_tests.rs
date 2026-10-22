@@ -6,7 +6,7 @@ use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn hash(value: &str) -> String {
-    S::hash(&value).unwrap()
+    S::hash(&value).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
 }
 fn scope(family: &str, environment: Option<&str>) -> Scope {
     let mut scope = BTreeMap::from([("family".into(), BTreeSet::from([family.into()]))]);
@@ -45,9 +45,11 @@ fn assessed(layer: &mut Layer, id: &str, scope: Scope, cases: Vec<Case>) {
         json!({"id":id,"subject":"pipeline","scope":scope,"effect":"helps",
         "action":{"skip":["canonical"],"order":[]},"proposing_tasks":[],"families":[]}),
     )
-    .unwrap();
-    candidate.statement_sha256 = S::statement(&candidate).unwrap();
-    let (decision, reason) = decide(&cases, &BTreeSet::new(), &Policy::default(), &[]).unwrap();
+    .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+    candidate.statement_sha256 = S::statement(&candidate)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+    let (decision, reason) = decide(&cases, &BTreeSet::new(), &Policy::default(), &[])
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     let assessment = Assessment {
         schema: "zeno-fcis/kb-assessment/1".into(),
         suite_sha256: hash("suite"),
@@ -61,7 +63,8 @@ fn assessed(layer: &mut Layer, id: &str, scope: Scope, cases: Vec<Case>) {
         checker_sha256: hash("checker"),
         tool_version: "v1".into(),
         policy: Policy::default(),
-        assessment_work: recorded_work(&cases, &[]).unwrap(),
+        assessment_work: recorded_work(&cases, &[])
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
         cases,
         partial_runs: vec![],
         annotations: vec![],
@@ -72,7 +75,8 @@ fn assessed(layer: &mut Layer, id: &str, scope: Scope, cases: Vec<Case>) {
         prior_assessment_work: 0,
         curation_work: 0,
     };
-    let key = S::hash(&assessment).unwrap();
+    let key =
+        S::hash(&assessment).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     layer.assessments.insert(key.clone(), assessment);
     candidate.assessment = Some(key);
     candidate.state = if decision == Decision::Promote {
@@ -97,7 +101,8 @@ fn generalization_carries_parents_and_reserves_all_parent_cases_for_proposing() 
             vec![case(family, scope(family, None), 5)],
         );
     }
-    let grown = G::grow(&layer).unwrap();
+    let grown =
+        G::grow(&layer).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(grown.len(), 1);
     let proposal = &grown[0];
     assert_eq!(proposal.scope, scope("class", None));
@@ -137,12 +142,20 @@ fn generalization_requires_promoted_compatible_siblings() {
         );
     }
     layer.candidates[1].state = State::Proposed;
-    assert!(G::grow(&layer).unwrap().is_empty());
+    assert!(
+        G::grow(&layer)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+            .is_empty()
+    );
     layer.candidates[1].state = State::Promoted;
     layer.candidates[1]
         .scope
         .insert("environment".into(), BTreeSet::from(["different".into()]));
-    assert!(G::grow(&layer).unwrap().is_empty());
+    assert!(
+        G::grow(&layer)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+            .is_empty()
+    );
 }
 #[test]
 fn specialization_uses_a_declared_dimension_and_retains_both_signs_as_proposing() {
@@ -156,7 +169,8 @@ fn specialization_uses_a_declared_dimension_and_retains_both_signs_as_proposing(
             case("negative", scope("counter", Some("slow")), 15),
         ],
     );
-    let grown = G::grow(&layer).unwrap();
+    let grown =
+        G::grow(&layer).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(grown.len(), 1);
     let proposal = &grown[0];
     assert_eq!(proposal.scope, scope("counter", Some("fast")));
@@ -177,15 +191,29 @@ fn repeated_failure_requires_distinct_subjects_and_never_becomes_advice() {
         serde_json::from_value(json!({"schema":"zeno-fcis/kb-episode/1","task":hash(subject),"subject":hash(subject),
         "scope":{"family":["counter"]},"door":"pipeline","steps":[],"advice":[],"counterexamples":[],"stopping_bound":"stage-budget","verdict":"inconclusive",
         "receipt_sha256":hash("receipt"),"work":{"control_frames":62},"checker_sha256":hash("checker"),"engine_sha256":hash("engine"),
-        "family":{"subject":hash(subject),"session":"session","actor":"contributor","tool":"v1","environment":"sandbox"}})).unwrap()
+        "family":{"subject":hash(subject),"session":"session","actor":"contributor","tool":"v1","environment":"sandbox"}})).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
     };
     let first = episode("first");
-    let mut episodes = BTreeMap::from([(S::hash(&first).unwrap(), first.clone())]);
-    episodes.insert(S::hash(&first).unwrap(), first);
-    assert!(G::mine(&episodes).unwrap().is_empty());
+    let mut episodes = BTreeMap::from([(
+        S::hash(&first).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
+        first.clone(),
+    )]);
+    episodes.insert(
+        S::hash(&first).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
+        first,
+    );
+    assert!(
+        G::mine(&episodes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+            .is_empty()
+    );
     let second = episode("second");
-    episodes.insert(S::hash(&second).unwrap(), second);
-    let mined = G::mine(&episodes).unwrap();
+    episodes.insert(
+        S::hash(&second).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
+        second,
+    );
+    let mined =
+        G::mine(&episodes).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(mined.len(), 1);
     assert_eq!(mined[0].state, State::Proposed);
     assert_eq!(mined[0].families.len(), 2);
@@ -199,16 +227,20 @@ fn repeated_failure_requires_distinct_subjects_and_never_becomes_advice() {
 #[test]
 fn unpublished_work_survives_a_revision_race_without_layer_authority() {
     let root = std::env::temp_dir().join(format!("kb-unpublished-{}", std::process::id()));
-    std::fs::create_dir(&root).unwrap();
+    std::fs::create_dir(&root)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     }
     let path = root.join("layer.json");
     let original = Layer::default();
-    S::commit(&path, None, &original).unwrap();
-    let before = std::fs::read(&path).unwrap();
+    S::commit(&path, None, &original)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
+    let before =
+        std::fs::read(&path).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     let mut next = original.clone();
     assessed(
         &mut next,
@@ -216,33 +248,49 @@ fn unpublished_work_survives_a_revision_race_without_layer_authority() {
         scope("counter", None),
         vec![case("positive", scope("counter", None), 5)],
     );
-    let key = next.assessments.keys().next().unwrap().clone();
+    let key = next
+        .assessments
+        .keys()
+        .next()
+        .unwrap_or_else(|| panic!("expected knowledge fixture value"))
+        .clone();
     let value =
         crate::knowledge_workflow::publish_assessment(&path, &hash("wrong-revision"), &next, &key)
-            .unwrap();
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(value["status"], "refused");
     assert_eq!(value["publication"], "unconfirmed");
     assert_eq!(value["reason"], "kb-revision-conflict");
-    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(
+        std::fs::read(&path).unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}")),
+        before
+    );
     assert_eq!(value["assessment"]["assessment_work"], 62);
-    let recovered = std::path::PathBuf::from(value["recovery"]["path"].as_str().unwrap());
-    let bytes = std::fs::read(&recovered).unwrap();
+    let recovered = std::path::PathBuf::from(
+        value["recovery"]["path"]
+            .as_str()
+            .unwrap_or_else(|| panic!("expected knowledge fixture value")),
+    );
+    let bytes = std::fs::read(&recovered)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(
         crate::transform::sha256_hex(&bytes),
         value["recovery"]["sha256"]
     );
-    let restored: Layer = serde_json::from_slice(&bytes).unwrap();
+    let restored: Layer = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(restored, next);
     assert!(S::load(&recovered).is_err());
     assert_eq!(value["recovery"]["is_layer_descriptor"], false);
-    std::fs::remove_dir_all(root).unwrap();
+    std::fs::remove_dir_all(root)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
 }
 
 #[test]
 fn a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve() {
     let bytes =
         include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c1.original.zcve");
-    let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+    let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     output["detail"]["status"] = json!("inconclusive");
     output["detail"]["reason"] = json!("gate-budget");
     let run = crate::knowledge_replay::measure(
@@ -252,7 +300,7 @@ fn a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve() {
         1000,
         crate::transform::sha256_hex(bytes),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(run.verdict, Verdict::Inconclusive);
     assert!(run.budget_stop);
     assert!(run.result_cost.is_none());
@@ -260,7 +308,8 @@ fn a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve() {
         run.receipt_sha256,
         output["detail"]["best_check"]["receipt_sha256"]
     );
-    G::replay_proof(&output, &run).unwrap();
+    G::replay_proof(&output, &run)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
 }
 #[test]
 fn artifact_refusal_keeps_measured_work_and_never_qualifies_advice() {
@@ -271,10 +320,16 @@ fn artifact_refusal_keeps_measured_work_and_never_qualifies_advice() {
         scope("counter", None),
         vec![case("positive", scope("counter", None), 5)],
     );
-    let assessment = layer.assessments.values().next().unwrap().clone();
+    let assessment = layer
+        .assessments
+        .values()
+        .next()
+        .unwrap_or_else(|| panic!("expected knowledge fixture value"))
+        .clone();
     // The model deliberately omits its suite/artifacts; it cannot supply evidence.
     layer.assessments.clear();
-    let (next, record, key) = crate::knowledge_replay::record_artifacts(layer, assessment).unwrap();
+    let (next, record, key) = crate::knowledge_replay::record_artifacts(layer, assessment)
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
     assert_eq!(record.assessment_work, 62);
     assert_eq!(record.decision, Decision::Inconclusive);
     assert_eq!(record.resource_stop.as_deref(), Some("artifact-validation"));
@@ -288,7 +343,10 @@ fn specialization_must_exclude_a_harmful_capability_superset() {
     let mut positive = scope("counter", None);
     positive.insert("capability".into(), BTreeSet::from(["a".into()]));
     let mut negative = positive.clone();
-    negative.get_mut("capability").unwrap().insert("b".into());
+    negative
+        .get_mut("capability")
+        .unwrap_or_else(|| panic!("expected knowledge fixture value"))
+        .insert("b".into());
     assessed(
         &mut layer,
         "mixed",
@@ -299,7 +357,9 @@ fn specialization_must_exclude_a_harmful_capability_superset() {
         ],
     );
     assert!(
-        G::grow(&layer).unwrap().is_empty(),
+        G::grow(&layer)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+            .is_empty(),
         "a narrower proposal must exclude every known harmful case"
     );
 }

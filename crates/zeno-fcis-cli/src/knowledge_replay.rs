@@ -682,13 +682,16 @@ mod tests {
     #[test]
     fn renamed_proposing_subject_is_not_held_out() {
         let mut suite: Suite =
-            serde_json::from_str(include_str!("../tests/data/knowledge-suite/suite.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/data/knowledge-suite/suite.json"))
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         assert!(suite.check().is_ok());
         suite
             .proposing_subjects
             .insert(suite.tasks[0].subject.sha256.clone());
         suite.tasks[0].name = "renamed".into();
-        suite.tasks[0].sha256 = suite.tasks[0].digest().unwrap();
+        suite.tasks[0].sha256 = suite.tasks[0]
+            .digest()
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         assert_eq!(suite.check(), Err("kb-suite-task"));
     }
 }

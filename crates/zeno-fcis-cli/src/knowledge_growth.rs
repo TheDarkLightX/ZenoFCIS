@@ -926,13 +926,20 @@ mod tests {
         assert_eq!(rows[0].counterexample_eliminated, Some(false));
         assert_eq!(rows[0].candidate_space_after, Some(8));
         assert_eq!(rows[0].constraints_satisfied, None);
-        assert_eq!(rows[0].work.as_ref().unwrap()["work"], 12);
+        assert_eq!(
+            rows[0]
+                .work
+                .as_ref()
+                .unwrap_or_else(|| panic!("expected knowledge fixture value"))["work"],
+            12
+        );
     }
     #[test]
     fn proved_artifact_requires_replay_and_exact_limits() {
         let bytes =
             include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
-        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let run = crate::knowledge_replay::measure(
             &output,
             "a".repeat(64),
@@ -940,7 +947,7 @@ mod tests {
             100000,
             crate::transform::sha256_hex(bytes),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         assert!(replay_proof(&output, &run).is_ok());
         let mut changed = output.clone();
         changed["detail"]["checker_limits"]["input_tuples"] =
@@ -954,7 +961,8 @@ mod tests {
     fn proof_property_does_not_claim_a_within_budget_solve() {
         let bytes =
             include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
-        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let run = crate::knowledge_replay::measure(
             &output,
             "a".repeat(64),
@@ -962,11 +970,13 @@ mod tests {
             1,
             crate::transform::sha256_hex(bytes),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         assert_eq!(run.verdict, Verdict::Inconclusive);
         assert!(run.budget_stop);
         assert_eq!(
-            artifact_property(&output, &run).unwrap().0,
+            artifact_property(&output, &run)
+                .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"))
+                .0,
             FactStatus::Proved
         );
     }
@@ -974,7 +984,8 @@ mod tests {
     fn proved_status_requires_a_replaying_artifact() {
         let bytes =
             include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
-        let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let run = crate::knowledge_replay::measure(
             &output,
             "a".repeat(64),
@@ -982,7 +993,7 @@ mod tests {
             100000,
             crate::transform::sha256_hex(bytes),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         output["detail"]["best"]["program"] = Value::Null;
         assert!(replay_proof(&output, &run).is_err());
     }
@@ -990,7 +1001,8 @@ mod tests {
     fn reused_result_must_replay_receipt() {
         let bytes =
             include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
-        let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let run = crate::knowledge_replay::measure(
             &output,
             "a".repeat(64),
@@ -998,7 +1010,7 @@ mod tests {
             100000,
             crate::transform::sha256_hex(bytes),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let fact = CertifiedFact {
             subject: run.inputs.clone(),
             checker_sha256: "checker".into(),
@@ -1021,7 +1033,8 @@ mod tests {
     fn tier_one_proof_is_bound_to_its_subject() {
         let bytes =
             include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
-        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes)
+            .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         let mut run = crate::knowledge_replay::measure(
             &output,
             "a".repeat(64),
@@ -1029,7 +1042,7 @@ mod tests {
             100000,
             crate::transform::sha256_hex(bytes),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("knowledge fixture failed: {error:?}"));
         run.inputs = "e".repeat(64);
         assert_eq!(replay_proof(&output, &run), Err("kb-proof-subject"));
     }
