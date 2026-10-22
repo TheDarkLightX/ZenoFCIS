@@ -89,11 +89,18 @@ impl Loaded {
         self.declarations.laws.iter().map(|law| law.id).collect()
     }
 
-    /// The reasons `project.zeno` declares, ascending.
-    pub(super) fn reasons(&self) -> Vec<u32> {
-        let mut reasons = self.declarations.reasons.clone();
-        reasons.sort_unstable();
-        reasons
+    /// Reasons of this decision class, ascending. Contract::build validates
+    /// that every declared reason is used with exactly one class before the
+    /// gap judge calls this for work estimation or measurement.
+    pub(super) fn reasons(&self, class: Class) -> Vec<u32> {
+        self.rules
+            .cases
+            .iter()
+            .filter(|case| case.class == class)
+            .filter_map(|case| case.reason)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
     }
 }
 

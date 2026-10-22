@@ -310,10 +310,10 @@ fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
     )?
     .laws
     .len() as u128;
-    let reasons = loaded.reasons().len() as u128;
+    let rejects = loaded.reasons(Class::Reject).len() as u128;
+    let failures = loaded.reasons(Class::CommittedFailure).len() as u128;
     let states = space.states as u128;
-    let failure = 1;
-    let candidates = reasons + states * (1 + failure * reasons);
+    let candidates = rejects + states * (1 + failures);
     let candidates = if DeliveryUniverse::new(&loaded.declarations, &loaded.rules).is_some() {
         2 * candidates + 1
     } else {
@@ -391,7 +391,7 @@ impl Measured {
             "completeness": {
                 "status": if self.admissible[0].determined == space.tuples() && self.admissible[0].refused == 0 && self.machine.observed.iter().any(|o| matches!(o, Observed::Decided { class: Class::Accept, .. })) { "complete-finite" } else { "incomplete" },
                 "law_991_used": false,
-                "decision_universe": if self.delivery_universe.is_some() { "all declared scalar successors, reasons and schema-valid outboxes; exact determination by delivery independence; unrestricted delivery counts are lower bounds" } else { "all declared scalar successors with canonical difference patches, every declared reason, Accept/Reject/CommittedFailure; effects and channels structurally excluded by the scalar profile" },
+                "decision_universe": if self.delivery_universe.is_some() { "all declared scalar successors, reasons restricted to their catalog decision class, and schema-valid outboxes; exact determination by delivery independence; unrestricted delivery counts are lower bounds" } else { "all declared scalar successors with canonical difference patches, every declared reason restricted to its catalog decision class, Accept/Reject/CommittedFailure; effects and channels structurally excluded by the scalar profile" },
                 "exactly_one": self.admissible[0].determined,
                 "zero_outcome": self.admissible[0].zero,
                 "execution_refusals": self.admissible[0].refused,
@@ -498,8 +498,8 @@ fn measure(
 ) -> Result<Measured, Stop> {
     let delivery_universe = DeliveryUniverse::new(&loaded.declarations, &loaded.rules);
     let declared = loaded.declared_laws();
-    let reasons = loaded.reasons();
-    let failure = true;
+    let rejects = loaded.reasons(Class::Reject);
+    let failures = loaded.reasons(Class::CommittedFailure);
     let Some((machine, valid, state_laws, gaps)) =
         loaded.bind(&loaded.rules, |authority, framer| {
             let descriptor = authority.descriptor();
@@ -539,8 +539,7 @@ fn measure(
                     &laws,
                     framer,
                     &machine,
-                    (&states, &reasons),
-                    failure,
+                    (&states, &rejects, &failures),
                     ordinal,
                     delivery_universe.as_ref(),
                 )
@@ -632,12 +631,11 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    domains: (&[Vec<i128>], &[u32]),
-    failure: bool,
+    domains: (&[Vec<i128>], &[u32], &[u32]),
     ordinal: usize,
     universe: Option<&DeliveryUniverse>,
 ) -> TupleGap {
-    let (states, reasons) = domains;
+    let (states, rejects, failures) = domains;
     let space = &machine.space;
     let tuple = space.at(ordinal);
     let state = ordinal / space.inputs;
@@ -676,18 +674,16 @@ fn tuple_gap(
             })
         })
         .collect();
-    let mut candidates: Vec<(Class, Option<u32>, Option<usize>)> = reasons
+    let mut candidates: Vec<(Class, Option<u32>, Option<usize>)> = rejects
         .iter()
         .map(|reason| (Class::Reject, Some(*reason), None))
         .collect();
     for successor in 0..space.states {
         candidates.push((Class::Accept, None, Some(successor)));
     }
-    if failure {
-        for reason in reasons {
-            for successor in 0..space.states {
-                candidates.push((Class::CommittedFailure, Some(*reason), Some(successor)));
-            }
+    for reason in failures {
+        for successor in 0..space.states {
+            candidates.push((Class::CommittedFailure, Some(*reason), Some(successor)));
         }
     }
     let own = decided

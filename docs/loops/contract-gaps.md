@@ -53,6 +53,16 @@
         "schema": "zeno-fcis/contract-review/4"
       },
       "contains": []
+    },
+    {
+      "command": "zeno-fcis contract review examples/dual-approval --gaps --gaps-laws examples/dual-approval/proposed-laws.txt --out \"$WORK/dual-review.json\" --format json",
+      "exit": 0,
+      "expected": {
+        "summary.gaps.full.determined": 0,
+        "summary.gaps.with_proposals.full.determined": 300,
+        "summary.gaps.with_proposals.valid.determined": 220
+      },
+      "contains": []
     }
   ],
   "example": {
@@ -107,6 +117,12 @@ zeno-fcis contract review examples/guide-counter --gaps --format json
 ```
 
 Expected: exit 0; {"schema": "zeno-fcis/contract-review/4"}.
+
+```sh
+zeno-fcis contract review examples/dual-approval --gaps --gaps-laws examples/dual-approval/proposed-laws.txt --out "$WORK/dual-review.json" --format json
+```
+
+Expected: exit 0; {"summary.gaps.full.determined": 0, "summary.gaps.with_proposals.full.determined": 300, "summary.gaps.with_proposals.valid.determined": 220}.
 
 ## Verdicts
 

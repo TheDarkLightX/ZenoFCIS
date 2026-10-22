@@ -96,9 +96,11 @@ gaps: 0 of 12 tuples determined by the declared laws (0 of 12 on valid pre-state
 ```
 
 For each input the judge proposes every decision a contract of this schema
-could make: a reject with each declared reason, an accept with each state as
-successor, and a committed failure with each reason and state when the
-contract has one. The declared laws admit several of them on every input. For
+could make: a reject with each declared rejection reason, an accept with each
+state as successor, and a committed failure with each declared failure reason
+and state. A reason belongs to the one class its cases use, as the
+[contract language reference](CONTRACT_RULES.md#cases) requires; a failure-only
+reason is never proposed as a reject. The declared laws admit several of them on every input. For
 an authorized `Inc` at 0 the contract accepts and moves to 1, but the laws also
 admit a reject with any of the three reasons: nothing in them says when the
 counter must accept, or which reason a reject gives.
@@ -110,6 +112,23 @@ declared laws admit a counter that refuses every authorized increment. The
 packet gives a witness for each, an input with both decisions. The
 reject-everything core, a contract of the same declarations whose only firing
 case rejects, is admitted on every input for the same reason.
+
+Reason dispositions also constrain the alternatives. In the
+[dual-approval example](../examples/dual-approval/project.zeno), reason 202
+belongs to committed failures and cannot label a reject; `on reject:202`
+remains invalid. These [proposed laws](../examples/dual-approval/proposed-laws.txt)
+pin rejection eligibility and exclude accepting or failing on a rejecting
+input:
+
+```text
+zeno-fcis contract review examples/dual-approval --gaps --gaps-laws examples/dual-approval/proposed-laws.txt --out review.json --format json
+```
+
+The original laws determine 0 of 384 inputs. With these proposals, 300 inputs
+have one admissible decision: 256 closed-request rejects, 32 unauthorized
+rejects and 12 repeated-officer rejects. On valid pre-states the count is 220
+of 304. The remaining committing decisions can still vary; the proposals do
+not establish complete specification or change the contract.
 
 A proposed law can be checked before it goes into `project.zeno`. This one, in
 `proposed.zeno`, says that the counter rejects only an unauthorized change or

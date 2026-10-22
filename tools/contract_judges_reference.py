@@ -649,11 +649,16 @@ def state_lines(contract: Contract, valid, parent, classes) -> list[str]:
 
 
 def candidates(contract: Contract, state):
-    found = [("Reject", reason, tuple(state)) for reason in contract.reasons]
+    # The independent reference derives each reason partition from the case
+    # declarations, not from the production judge's candidate list.
+    reasons = {kind: sorted({case["reason"] for case in contract.cases
+                            if case["class"] == kind})
+               for kind in ("Reject", "CommittedFailure")}
+    found = [("Reject", reason, tuple(state)) for reason in reasons["Reject"]]
     found += [("Accept", None, successor) for successor in contract.states]
     if contract.failure:
         found += [("CommittedFailure", reason, successor)
-                  for reason in contract.reasons for successor in contract.states]
+                  for reason in reasons["CommittedFailure"] for successor in contract.states]
     return found
 
 

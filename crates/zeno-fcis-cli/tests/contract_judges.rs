@@ -366,6 +366,61 @@ fn proposal_summary_retains_both_measures_and_prints_the_effect() {
 }
 
 #[test]
+fn failure_only_reasons_cannot_keep_fully_specified_rejects_ambiguous() {
+    let root = TempRoot::new("reason-classes");
+    let app = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let laws = root.path().join("closing.zeno");
+    // A failure-only reason remains unavailable in a rejection law. Fixing
+    // the judge must not weaken the language's independent scope check.
+    fs::write(&laws, "law 9000 wrong_scope on reject:202 = false;\n").unwrap();
+    let invalid = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--gaps-laws",
+            text(&laws),
+            "--format",
+            "json",
+        ],
+        1,
+    );
+    assert_eq!(invalid["status"], "error");
+    assert!(
+        invalid["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("declared Reject reason")
+    );
+    fs::write(&laws, fs::read(app.join("proposed-laws.txt")).unwrap()).unwrap();
+    let out = root.path().join("review.json");
+    let report = run(
+        &[
+            "contract",
+            "review",
+            text(&app),
+            "--gaps",
+            "--gaps-laws",
+            text(&laws),
+            "--out",
+            text(&out),
+            "--format",
+            "json",
+        ],
+        0,
+    );
+    let gaps = &report["summary"]["gaps"];
+    assert_eq!(gaps["full"]["determined"], 0);
+    // 32 non-pending states * 8 inputs, 16 pending states * 2
+    // unauthorized inputs, plus 12 repeated-officer approvals: 300.
+    assert_eq!(gaps["with_proposals"]["full"]["determined"], 300);
+    // Ten invalid Approved states remove 10*8 closed rejects.
+    assert_eq!(gaps["with_proposals"]["valid"]["determined"], 220);
+    assert_eq!(report["authority"], "none");
+}
+
+#[test]
 fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
     let root = TempRoot::new("judges");
     let app = counter(&root);
