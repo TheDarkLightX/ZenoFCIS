@@ -69,7 +69,9 @@ application. At most eight attempts and eight checks are available per session;
 duplicates and malformed proposals consume attempts but do not necessarily use a
 full checker call. Replay and preparation use their own retained work reservations.
 `checked-improvement` and `equivalent-without-improvement:<reason>` exit 0;
-`different`, `refused` and duplicate outcomes exit 1; incomplete or closed sessions
+`different`, `refused` and canonical/JSON duplicate outcomes exit 1. Expression
+and sketch duplicates with independent check/replay confirmation exit 0; failed
+expression/sketch proposals exit 1. Incomplete or closed sessions
 exit 2; I/O errors exit 3. `loop run` returning 0 means the driver completed,
 including runs with no improvement or failed proposals.
 

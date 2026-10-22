@@ -43,7 +43,8 @@
     "equivalent-without-improvement:<reason>": "Equivalent but not selected; exit 0 does not imply improvement.",
     "completed": "Run driver returned; inspect attempts and stop reason, including failures and no improvement.",
     "encoded": "Program JSON admitted and encoded; no equivalence check or receipt.",
-    "resumed": "Ledger/request validated and retained evidence replayed; replay reservation stays charged."
+    "resumed": "Ledger/request validated and retained evidence replayed; replay reservation stays charged.",
+    "duplicate-of-original / duplicate-of-attempt:<N>": "Canonical/JSON duplicates exit 1; expression/sketch duplicates independently confirmed by check/replay exit 0. Both consume an attempt."
   },
   "limits": {
     "attempts_cap": 8,
@@ -212,6 +213,8 @@ Expected: exit 0; {"status": "opened"}.
 `encoded`: Program JSON admitted and encoded; no equivalence check or receipt.
 
 `resumed`: Ledger/request validated and retained evidence replayed; replay reservation stays charged.
+
+`duplicate-of-original / duplicate-of-attempt:<N>`: Canonical/JSON duplicates exit 1; expression/sketch duplicates independently confirmed by check/replay exit 0. Both consume an attempt.
 
 Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 

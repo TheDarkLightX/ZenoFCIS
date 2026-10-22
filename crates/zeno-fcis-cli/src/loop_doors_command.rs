@@ -245,7 +245,7 @@ JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=3, o
         about = "Solve finite expression holes, then check one completion in an existing session.",
         long_about = r#"Read --sketch (zeno-fcis/loop-expressions/1, at most 65,536 bytes), including named inputs and finite constant/choice holes. Load --session, replay its retained evidence, and search for a completion within the door budgets (at most 131,072 input tuples, five-second search stages). A proposed completion needs transform check and receipt replay before the session checker independently judges it on the full original domain.
 
-One submitted completion or decided empty/malformed proposal consumes an attempt; an unfinished search or confirming check can return before submission, retaining charged preparation/replay work. JSON: zeno-fcis/transform-loop/1 with detail.door diagnostics. Exit 0 equivalent (improved or not), 1 different/refused/duplicate, 2 incomplete or failed proposal/check/closed session, 3 I/O error. Creates no session; a selected replacement retains its receipt. Unrealizable is a search finding, not a checker proof."#
+One submitted completion or decided empty/malformed proposal consumes an attempt; an unfinished search or confirming check can return before submission, retaining charged preparation/replay work. JSON: zeno-fcis/transform-loop/1 with detail.door diagnostics. Exit 0 equivalent (improved or not) or duplicate with independent check/replay confirmation; 1 different/refused/unconfirmed duplicate or failed proposal; 2 incomplete, failed check or closed session; 3 I/O error. Creates no session; a selected replacement retains its receipt. Unrealizable is a search finding, not a checker proof."#
     )]
     Sketch {
         /// Existing session directory created by loop open.
@@ -260,7 +260,7 @@ One submitted completion or decided empty/malformed proposal consumes an attempt
     },
     #[command(
         about = "Check a parameterized program or sketch on each listed finite family instance.",
-        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and parameter values. Each instance is limited to 131,072 input tuples.
+        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Parameter values belong in the manifest; the family program must not supply its own. Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and parameter values. Each instance is limited to 131,072 input tuples.
 
 Lower or solve the program per instance, then require transform check plus matching receipt replay. --fit proposes affine hole values a*$P+b from instances marked for fitting and checks the lifted program on all listed instances. This establishes no unlisted-instance claim. No session or attempts; per-instance reports include receipt digests, not exported receipt files.
 
@@ -279,7 +279,7 @@ JSON: zeno-fcis/loop-doors/2. Exit 0 accepted (all listed instances); 1 refuted 
     },
     #[command(
         about = "Try a source program directly, as a sketch, then by repair on listed instances.",
-        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Bind changed parameters, try direct use, open nearby constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
+        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Source expressions must be plain and use literal constants, not $PARAMETERS. Use the supplied source parameter values to locate constants near changed target parameters; try direct use, open those constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
 
 At most 10 listed instances, 131,072 tuples per instance, and 65,536 bytes per document/program; bounded search/check stages share the invocation deadline. No session or attempts; report receipt digests without exporting receipt files. Coverage is only the listed instances.
 

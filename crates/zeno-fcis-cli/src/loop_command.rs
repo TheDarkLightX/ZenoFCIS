@@ -150,7 +150,7 @@ JSON schema: zeno-fcis/transform-loop/1. Exit 0: opened; 1: admission refused; 2
 
 One submitted proposal consumes one attempt, including malformed or duplicate proposals. Intake/replay work stays charged on earlier refusal; an unfinished expression precheck may return before an attempt. The transform checker compares all outputs or exact evaluation failures on every declared input tuple under the frozen profile/work limits. Expressions also get a confirming check and receipt replay before session submission.
 
-JSON: zeno-fcis/transform-loop/1. Exit 0: checked-improvement or equivalent-without-improvement:<reason>; 1: different, refused, duplicate-of-original or duplicate-of-attempt:<N>; 2: incomplete, closed session or failed proposal/check; 3: I/O error. A selected smaller equivalent replacement retains its receipt; equivalence alone need not replace the best program."#
+JSON: zeno-fcis/transform-loop/1. Exit 0: checked-improvement or equivalent-without-improvement:<reason>; 1: different, refused, or duplicate outcomes for byte/JSON candidates; expression proposals also return 1 on proposal failure. Expressions return 0 for a duplicate independently confirmed by check/replay. Exit 2: incomplete, closed session or other failed proposal/check; 3: I/O error. A selected smaller equivalent replacement retains its receipt; equivalence alone need not replace the best program."#
     )]
     Candidate {
         /// Existing session directory created by loop open.

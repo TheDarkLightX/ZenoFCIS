@@ -1073,8 +1073,10 @@ Results use schema `zeno-fcis/transform-loop/1` with `authority: none`.
 existing output path (`output-exists`).
 `candidate` exits 0 for an equivalent candidate (`checked-improvement` or
 `equivalent-without-improvement:<reason>`), 1 for a
-difference, refusal or duplicate, and 2 for an inconclusive check or a closed
-session. `run` exits 0 (`completed`) when the driver returns, including proposal
+difference, refusal or duplicate for canonical/JSON proposals, and 2 for an
+inconclusive check or a closed session. Expression/sketch submissions return 0
+for duplicates independently confirmed by transform check and receipt replay;
+their failed proposals return 1. Their attempt count still increases. `run` exits 0 (`completed`) when the driver returns, including proposal
 failures and no improvement; `resume` exits 0 with a
 replayed incumbent and 2 (`resume-refused`, `resume-inconclusive`) otherwise.
 Containment/acquisition can stop any invocation inconclusive (2).
