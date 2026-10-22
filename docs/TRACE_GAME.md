@@ -173,3 +173,65 @@ argument domains, real schedulers or markets, native recipient/delivery
 completeness, or the deployed shell. Composition callers and recipients are
 model labels. They grant no FCIS authorization, application-law exemption,
 automatic adoption, deployment permission or release qualification.
+
+## Explicit partial-observation safety games
+
+`arena.py` accepts `zeno-fcis/arena/1`: a total finite directed graph, roots,
+node owners (0 controller, 1 environment), observation strings, and labelled
+edges `[action, target]`. At a controller node its action selects an edge;
+at an environment node the environment selects an edge. No random choices are
+implicit. Equal observations must reveal the same owner and enabled controller
+actions. Environment actions are unobserved; introduce intermediate observation
+nodes when an event is visible before the response. Represent terminal outcomes
+by explicit absorbing self-loops. The objective is `{"kind":"safety","states":[...]}`,
+where `states` lists Bad. Set `observation` to `partial` or `perfect`.
+
+The partial route computes the exact knowledge-based subset game. A memory
+state contains all concrete states consistent with the observed history.
+Controller actions update this belief; the environment selects the next
+observation. A belief is unsafe if it contains any Bad state. Strategies read
+only the belief obtained from observations and their own preceding actions.
+This permits finite observation memory, beyond the legacy observation-table/1
+grammar described above. The legacy `reactive` API retains that narrower grammar;
+use the explicit arena route for complete sure-safety synthesis.
+
+```sh
+python3 -B tools/trace_game/arena.py solve --game arena.json --out ../arena-evidence
+python3 -B tools/trace_game/arena.py check --out ../arena-evidence
+```
+
+The independent checker verifies every subset transition, initial belief,
+winning closure, observation strategy, losing attractor rank and full certificate
+state coverage. It does not run a winning-set solver. Default bounds are 10,000
+knowledge vertices (including action vertices), 100,000 edges, 1,000,000 work
+units and 30 seconds. Lower them with `--max-states`, `--max-edges`, `--work`,
+`--seconds`; exceeding any bound returns UNKNOWN. This route checks the declared
+arena; it supplies no native transition provenance or application authority.
+Partial-observation omega objectives require richer constructions and are refused.
+
+## Background
+
+The finite-game methods build on these published sources:
+
+- Alonzo Church, “Applications of Recursive Arithmetic to the Problem of Circuit
+  Synthesis,” Summaries of the Summer Institute of Symbolic Logic, 1957.
+- J. Richard Büchi and Lawrence H. Landweber, “Solving Sequential Conditions by
+  Finite-State Strategies,” Transactions of the American Mathematical Society
+  138, 1969.
+- Peter J. Ramadge and W. Murray Wonham, “Supervisory Control of a Class of
+  Discrete Event Processes,” SIAM Journal on Control and Optimization 25, 1987.
+- Amir Pnueli and Roni Rosner, “On the Synthesis of a Reactive Module,” POPL, 1989.
+- Robert McNaughton, “Infinite Games Played on Finite Graphs,” Annals of Pure
+  and Applied Logic 65, 1993.
+- Wiesław Zielonka, “Infinite Games on Finitely Coloured Graphs with Applications
+  to Automata on Infinite Trees,” Theoretical Computer Science 200, 1998.
+- John H. Reif, “The Complexity of Two-Player Games of Incomplete Information,”
+  Journal of Computer and System Sciences 29, 1984.
+- Krishnendu Chatterjee, Laurent Doyen, Thomas A. Henzinger and Jean-François
+  Raskin, “Algorithms for Omega-Regular Games with Imperfect Information,”
+  Logical Methods in Computer Science 3(3:4), 2007.
+
+What is new here: bounded input, evidence packaging and independent local
+checks for these established algorithms; no new synthesis algorithm is claimed.
+Scope: finite declared arenas and sure safety under the stated observation
+model. This is separate from native contract execution and release qualification.
