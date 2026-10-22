@@ -391,7 +391,7 @@ fn failure_only_reasons_cannot_keep_fully_specified_rejects_ambiguous() {
     assert!(
         invalid["error"]["message"]
             .as_str()
-            .unwrap_or_else(|error| panic!("experience fixture failed: {error:?}"))
+            .unwrap_or_else(|| panic!("expected refusal message"))
             .contains("declared Reject reason")
     );
     fs::write(
