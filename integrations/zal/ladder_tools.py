@@ -269,12 +269,7 @@ def same(statement, revision, other_statement=None, other_revision=None, rung=No
         other_tree, other_ctx = l.parse(text, rung, a.ctx), a.ctx
         result.update(other={"rung": rung, "text": text})
     left, right = l.normal(a.tree, a.ctx), l.normal(other_tree, other_ctx)
-    if temporal(a.ctx):
-        scope = {"left": l.scope_identity(a.ctx), "right": l.scope_identity(other_ctx)}
-    else:
-        vocabulary = lambda ctx: canonical(l.plain_data({key: ctx.data[key] for key in ("domains", "symbols", "definitions")}))
-        scope = {"left": hashlib.sha256(vocabulary(a.ctx).encode()).hexdigest(),
-                 "right": hashlib.sha256(vocabulary(other_ctx).encode()).hexdigest()}
+    scope = {"left": l.scope_identity(a.ctx), "right": l.scope_identity(other_ctx)}
     scope_kind = "scope identity" if temporal(a.ctx) else "declared vocabulary"
     if left == right and scope["left"] == scope["right"]:
         status, summary = "same", f"Same meaning: the expanded normal forms are identical and the {scope_kind} is identical."

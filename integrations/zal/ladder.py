@@ -172,6 +172,8 @@ class Context:
                 raise Refusal('context:argument-domain')
             if s['kind'] not in ('function', 'predicate'):
                 raise Refusal('context:symbol-kind')
+            if s['kind'] == 'predicate' and s.get('state'):
+                raise Refusal('context:state-predicate-needs-integer-definition')
             if s['kind'] == 'predicate':
                 slots = [field for _, field, _, _ in Formatter().parse(s['clause']) if field is not None]
                 if slots != [str(i) for i in range(s['arity'])] or (s['arity'] and not s['clause'].startswith('{0}')) or (not s['arity'] and data['theory'] != TEMPORAL_THEORY):
@@ -267,6 +269,8 @@ def validate(n, ctx, env=None):
             d = ctx.definition(n[1])
             if not d or prime(expand(d[1], ctx), ctx) == expand(d[1], ctx):
                 raise Refusal('type:prime-needs-state')
+        if n[2] and s['kind'] == 'predicate' and ctx.definition(n[1]) is None:
+            raise Refusal('type:state-predicate-needs-integer-definition')
         return 'bool' if s['kind'] == 'predicate' else 'int'
     kinds = [validate(c, ctx, env) for c in children(n)]
     if tag in TEMPORAL and ctx.data['theory'] == TEMPORAL_THEORY and all(k == 'bool' for k in kinds):
@@ -364,7 +368,9 @@ def _fold(n, ctx):
         params = [p['name'] for p in d['params']]
         body = expand(body, ctx, derived=False)
         for primed in (False, True):
-            if primed and prime(body, ctx) == body:
+            # Boolean clauses do not have an after-state template. Keep their
+            # primed integer expansion visible instead of dropping the prime.
+            if primed and (d.get('clause') or prime(body, ctx) == body):
                 continue
             bindings = {}
             if match(prime(body, ctx) if primed else body, n, params, bindings) and all(p in bindings for p in params):
@@ -561,11 +567,20 @@ def render(n, rung, ctx):
         raise Refusal('unknown-rung')
     if validate(n,ctx) != 'bool':
         raise Refusal('type:formula-required')
+    if rung not in ('formula','typed'):
+        n = reading_tree(n, ctx)
     if rung == 'question':
         return question(n,ctx)
     tree = fold(n,ctx) if rung == 'plain' else n
     text = body_text(tree,rung,ctx)
     return text if rung in ('formula','typed') else sentence(text)
+
+
+def reading_tree(n, ctx):
+    """Expand primed Boolean definitions before choosing English grouping or idioms."""
+    if n[0] == 'call' and n[2] and ctx.symbol(n[1])['kind'] == 'predicate':
+        return reading_tree(expand(n, ctx, derived=False), ctx)
+    return rebuild(n, [reading_tree(c, ctx) for c in children(n)])
 
 
 # Grammar preparation retains immutable productions only. Every Earley chart and
@@ -1116,6 +1131,8 @@ def legend(n,ctx):
             read=nm+(' prime' if p else '')+' of '+(', '.join(body_text(a,'formula',ctx) for a in args) if args else 'no arguments' if ctx.data['theory']==TEMPORAL_THEORY else '')
             if s['kind']=='predicate':
                 meaning=s['clause'].format(*(body_text(a,'formula',ctx) for a in args))
+                if p:
+                    meaning=body_text(reading_tree(n,ctx),'precise',ctx)
             else:
                 value=', '.join((ctx.domain(dm)['member']+' '+body_text(a,'formula',ctx)) for dm,a in zip(s['args'],args))
                 meaning=s['noun']+(' before ' if is_state(nm,ctx) else ' of ')+value
@@ -1211,7 +1228,7 @@ def file_theory(path):
 def meaning_file(path):
     ctx=load(path)
     tree=normal(parse(ctx.data['formula'],'typed',ctx),ctx)
-    return (scope_identity(ctx),tree) if ctx.data['theory']==TEMPORAL_THEORY else tree
+    return (scope_identity(ctx),tree)
 
 
 def main(argv=None):
@@ -1246,7 +1263,9 @@ def main(argv=None):
             if file_theory(args.a)!=file_theory(args.b):
                 print('different theories, not compared');return 2
             a,b=meaning_file(args.a),meaning_file(args.b);diff=first_difference(a,b)
-            print('same meaning' if diff is None else 'different; first differing subtree: '+repr(diff))
+            print('same meaning' if diff is None else
+                  'different; first differing subtree: '+repr(diff)+
+                  '\nDifferent scope or normal form; this does not establish different meanings.')
         else:
             theory=file_theory(args.a);a=meaning_file(args.a) if theory in REGISTRY['theories'] else None;status=0
             for path in sorted(Path(args.corpus).glob('*.json')):
