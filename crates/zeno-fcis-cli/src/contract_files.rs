@@ -430,7 +430,13 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read ui.json: {error}"))),
         };
-        let generated = inputs.generate()?;
+        let adoptions = inputs.adoption_sources();
+        let evolutions = inputs.evolution_sources();
+        let generated = crate::contract::generate_startable_contract(inputs.sources(
+            &inputs.rules,
+            &adoptions,
+            &evolutions,
+        ))?;
         // The contract version is part of the package name, so two versions
         // of one application never share a cached build of its library.
         let package = format!(

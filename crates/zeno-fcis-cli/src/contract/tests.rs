@@ -34,6 +34,67 @@ const TEMPLATES: [&str; 8] = [
     "compliance-gateway",
 ];
 
+#[test]
+fn genesis_factory_refuses_law_500() {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps/library-loans");
+    let project = fs::read_to_string(base.join("project.zeno")).unwrap_or_else(|e| panic!("{e}"));
+    let mut rules: Value = serde_json::from_str(
+        &fs::read_to_string(base.join("v2/policy.json")).unwrap_or_else(|e| panic!("{e}")),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    rules["genesis"] = serde_json::json!({"110":1,"111":1,"112":1});
+    let rules = rules.to_string();
+    let sources = ContractSources {
+        project: &project,
+        rules: &rules,
+        schema_origin: None,
+        adoptions: &[],
+        replayed: &[],
+        evolutions: &[],
+    };
+    let result = super::generate_startable_contract(sources);
+    assert!(
+        result.is_err(),
+        "assertion failed: factory must refuse invalid genesis"
+    );
+    let error = result.err().unwrap_or_else(|| panic!("missing refusal"));
+    assert_eq!(error.place(), "genesis");
+    assert_eq!(
+        error.reason(),
+        "no admissible starting state: law 500: Core(Law(Violated))"
+    );
+}
+
+#[test]
+fn genesis_factory_accepts_valid_scalar_and_numeric_contracts() {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let project = fs::read_to_string(base.join("project.zeno")).unwrap_or_else(|e| panic!("{e}"));
+    let rules = fs::read_to_string(base.join("v2/policy.json")).unwrap_or_else(|e| panic!("{e}"));
+    let sources = ContractSources {
+        project: &project,
+        rules: &rules,
+        schema_origin: None,
+        adoptions: &[],
+        replayed: &[],
+        evolutions: &[],
+    };
+    let generated = super::generate_startable_contract(sources).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(
+        generated.policy(),
+        generate_contract(sources)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .policy()
+    );
+    let mut rules: Value = serde_json::from_str(&rules).unwrap_or_else(|e| panic!("{e}"));
+    rules["schema"] = serde_json::json!("zeno-fcis/template-declarative-policy/4");
+    let rules = rules.to_string();
+    let sources = ContractSources {
+        rules: &rules,
+        ..sources
+    };
+    assert!(super::generate_startable_contract(sources).is_ok());
+}
+
 struct Template {
     project: String,
     rules: String,

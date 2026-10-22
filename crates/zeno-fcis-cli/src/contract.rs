@@ -49,8 +49,8 @@ mod u128_tests;
 
 // The compiler core lives in the `zeno-fcis-contract` library; these
 // re-exports keep its modules at their former paths for this module's files.
-pub(crate) use zeno_fcis_contract::ContractError;
 use zeno_fcis_codec::CanonicalEncode;
+pub(crate) use zeno_fcis_contract::ContractError;
 use zeno_fcis_contract::internals::{
     declarations, expr, graph, model, policy, program_bytes, rules, schema, schema_commitment,
 };
@@ -455,6 +455,36 @@ pub(crate) fn generate_contract(
         });
     }
     generate(sources, Receipts::Replay)
+}
+
+/// Generate an application only when the exact current contract can start.
+/// Compilation alone remains available for diagnosing contracts whose genesis
+/// is refused. This gate belongs to the pure factory path, before any file write.
+pub(crate) fn generate_startable_contract(
+    sources: ContractSources<'_>,
+) -> Result<GeneratedContract, ContractError> {
+    let generated = generate_contract(sources)?;
+    let rules = Rules::read(sources.rules)?;
+    if rules.unsigned {
+        // Numeric generation already refuses lineage. Rebuild that same model
+        // and check its identity before invoking the numeric runtime Authority.
+        let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
+        let schema = schema::encode(&declarations)?;
+        let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+        if schema != generated.schema() || policy::encode(&contract, &schema)? != generated.policy()
+        {
+            return Err(ContractError::new(
+                "v2/policy.zcve",
+                "the startup contract differs from the generated one",
+            ));
+        }
+        policy::check_genesis(&contract, &schema)?;
+    } else {
+        with_current(sources, &generated, |current| {
+            policy::check_genesis(current.contract, current.schema)
+        })?;
+    }
+    Ok(generated)
 }
 
 /// How generation treats each adoption's retained receipt.
@@ -1188,10 +1218,15 @@ fn generate_era(
     let mut previous = Vec::new();
     let mut adoptions = Vec::new();
     let mut replays = Vec::new();
-    let mut historical_versions = placement.previous.iter().enumerate()
+    let mut historical_versions = placement
+        .previous
+        .iter()
+        .enumerate()
         .filter(|(_, previous)| previous.source.contains("pub fn with_released_24<R>"))
-        .map(|(index, _)| u32::try_from(index + 1)
-            .map_err(|_| ContractError::new("lineage", "too many historical versions")))
+        .map(|(index, _)| {
+            u32::try_from(index + 1)
+                .map_err(|_| ContractError::new("lineage", "too many historical versions"))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let mut released_compilation = false;
     for (index, (adoption, files)) in rules.adoptions.iter().zip(sources.adoptions).enumerate() {
@@ -1238,8 +1273,11 @@ fn generate_era(
         let current_bytes = if released_compilation && released_receipt {
             zeno_fcis_synthesis::finite_runtime::i64_program_value(&current)
                 .map_err(|e| ContractError::new(&place, format!("released program: {e}")))?
-                .canonical_bytes().map_err(|e| ContractError::new(&place, format!("released encoding: {e}")))?
-        } else { program_bytes(&current)? };
+                .canonical_bytes()
+                .map_err(|e| ContractError::new(&place, format!("released encoding: {e}")))?
+        } else {
+            program_bytes(&current)?
+        };
         if files.candidate == current_bytes.as_slice() {
             return Err(unchanged(&place, &directory, version));
         }
@@ -1305,15 +1343,15 @@ fn generate_era(
         let version_number = u32::try_from(offset + version)
             .map_err(|_| ContractError::new("v2/policy.json adoptions", "too many adoptions"))?;
         let mut retained_source = render::source(
-                &contract,
-                render::Options {
-                    schema: &schema_file(version_number),
-                    policy: &format!("../v2/policy_v{version_number}.zcve"),
-                    version: version_number,
-                    receipts: &[],
-                    evolutions: &[],
-                },
-            )?;
+            &contract,
+            render::Options {
+                schema: &schema_file(version_number),
+                policy: &format!("../v2/policy_v{version_number}.zcve"),
+                version: version_number,
+                receipts: &[],
+                evolutions: &[],
+            },
+        )?;
         if released_compilation && released_receipt {
             render::attach_released_24(&mut retained_source);
             historical_versions.push(version_number);
@@ -1326,7 +1364,10 @@ fn generate_era(
         // Replay admitted the candidate; this import gives its nodes.
         let candidate = if released_compilation && released_receipt {
             zeno_fcis_synthesis::finite_runtime::import_i64_program_data(files.candidate)
-        } else { import_program(files.candidate) }.map_err(|error| {
+        } else {
+            import_program(files.candidate)
+        }
+        .map_err(|error| {
             ContractError::new(
                 &place,
                 format!("the library refuses the candidate: {error}"),

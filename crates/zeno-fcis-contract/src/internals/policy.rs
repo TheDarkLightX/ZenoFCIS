@@ -25,6 +25,38 @@ pub fn encode(contract: &Contract<'_>, schema: &[u8]) -> Result<Vec<u8>, Contrac
     bound(contract, schema, EncodeUse)
 }
 
+/// Check the application's original record genesis with its bound runtime Authority.
+/// Framing scratch is owned here; only an owned refusal can leave the invocation.
+///
+/// # Errors
+/// The catalog, Authority or starting-state refusal, including the refusing law.
+pub fn check_genesis(contract: &Contract<'_>, schema: &[u8]) -> Result<(), ContractError> {
+    use zeno_fcis_synthesis::finite::canonical_v2::output;
+    let max = usize::try_from(contract.frame_bytes[0]).unwrap_or(usize::MAX);
+    let fields: Vec<_> = contract
+        .genesis
+        .iter()
+        .map(|(id, value)| c::Field {
+            id: *id,
+            value: atom(value),
+        })
+        .collect();
+    let state = output::encode_record(&fields, max)
+        .and_then(|payload| {
+            output::encode_envelope(ROOTS[0].1, &contract.commitment, &payload, max)
+        })
+        .unwrap_or_default();
+    if contract.unsigned {
+        with_numeric_authority(contract, schema, |authority| {
+            super::genesis::admit(authority, &state).map_err(|refusal| refusal.error())
+        })?
+    } else {
+        with_authority(contract, schema, |authority| {
+            super::genesis::admit(authority, &state).map_err(|refusal| refusal.error())
+        })?
+    }
+}
+
 /// Binds the library Authority of a contract, after the same catalog binding
 /// `encode` checks, and runs `use_authority` on it. Nothing is written.
 ///
