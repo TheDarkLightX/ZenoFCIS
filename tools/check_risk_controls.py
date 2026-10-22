@@ -43,14 +43,14 @@ def replace_once(text, before, after):
 def mutate(text, name):
     if name == 'text-scans-property-id':
         parsed = '''    let declarations = Declarations::read(project, &rules.leaf_bindings)?;
-    let mut occupied: BTreeSet<u32> = declarations.laws.into_iter().map(|law| law.id).collect();
+    let mut occupied: BTreeSet<u32> = declarations.laws.iter().map(|law| law.id).collect();
     occupied.extend([990, 991, 909, rules.failure_law, rules.reject_law]);
+    let names: BTreeSet<&str> = declarations.laws.iter().map(|law| law.name.as_str()).collect();
 
     let mut candidate = 992;
-    for id in occupied.range(candidate..) {
-        if *id > candidate {
-            break;
-        }
+    while occupied.contains(&candidate)
+        || names.contains(format!("risk_property_{candidate}").as_str())
+    {
         candidate = candidate
             .checked_add(1)
             .ok_or_else(|| invalid("no free property ID"))?;
@@ -66,6 +66,10 @@ def mutate(text, name):
         .ok_or_else(|| invalid("no free property ID"))?;
     Ok(id)'''
         return replace_once(text, parsed, text_scan)
+    if name == 'property-name-collision':
+        return replace_once(text,
+                            '|| names.contains(format!("risk_property_{candidate}").as_str())',
+                            '|| { let _ = &names; false }')
     if name == 'reachable-for-inputs':
         text = replace_once(text, 'engine.inputs()', 'engine.inputs(&rules)')
         text = replace_once(text, 'fn inputs(&mut self) -> Answer {',
@@ -79,6 +83,10 @@ def mutate(text, name):
     return replace_once(text, 'for _depth in 0..steps {', 'for _depth in 0..steps.saturating_sub(1) {')
 
 CONTROLS = [
+    ('property-name-collision',
+     'generated_property_names_do_not_collide_with_existing_laws',
+     'input=120/120,state=1/1', 'duplicate generated law name',
+     'law505 named risk_property_992; adjacent occupied names and IDs'),
     ('text-scans-property-id',
      'comments_and_numeric_laws_do_not_occupy_property_ids_for_input_or_state_queries',
      'comment/law input=120/120; comment/law state=1/1',

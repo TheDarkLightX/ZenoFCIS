@@ -298,14 +298,18 @@ fn property_contract(
 
 fn next_property_id(project: &str, rules: &Rules) -> Result<u32, ContractError> {
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
-    let mut occupied: BTreeSet<u32> = declarations.laws.into_iter().map(|law| law.id).collect();
+    let mut occupied: BTreeSet<u32> = declarations.laws.iter().map(|law| law.id).collect();
     occupied.extend([990, 991, 909, rules.failure_law, rules.reject_law]);
+    let names: BTreeSet<&str> = declarations
+        .laws
+        .iter()
+        .map(|law| law.name.as_str())
+        .collect();
 
     let mut candidate = 992;
-    for id in occupied.range(candidate..) {
-        if *id > candidate {
-            break;
-        }
+    while occupied.contains(&candidate)
+        || names.contains(format!("risk_property_{candidate}").as_str())
+    {
         candidate = candidate
             .checked_add(1)
             .ok_or_else(|| invalid("no free property ID"))?;

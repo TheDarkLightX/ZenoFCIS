@@ -269,3 +269,49 @@ fn comments_and_numeric_laws_do_not_occupy_property_ids_for_input_or_state_queri
     }
     Ok(())
 }
+
+#[test]
+fn generated_property_names_do_not_collide_with_existing_laws()
+-> Result<(), Box<dyn std::error::Error>> {
+    for declarations in [
+        vec![(505_u32, "risk_property_992"), (506, "risk_property_993")],
+        vec![(992_u32, "risk_property_993")],
+    ] {
+        let mut project = PROJECT.to_owned();
+        let mut policy: Value = serde_json::from_str(POLICY)?;
+        for (id, name) in declarations {
+            project.push_str(&format!(
+                "\nlaw {id} {name} on commit, genesis = post.100.110 <= 4;\n"
+            ));
+            policy["law_kinds"][id.to_string()] = json!("StateInvariant");
+        }
+        let policy = serde_json::to_string(&policy)?;
+        for (question, total) in [
+            (
+                Question::Inputs {
+                    condition: "true".into(),
+                },
+                "120",
+            ),
+            (
+                Question::States {
+                    condition: "true".into(),
+                    steps: 0,
+                },
+                "1",
+            ),
+        ] {
+            let result = check(&project, &policy, &question, Limits::default());
+            assert_eq!(
+                result.as_ref().ok().map(|value| value.complete()),
+                Some(true),
+                "a generated property name must be fresh: {result:?}"
+            );
+            let result = result?;
+            assert_eq!(result.packet()["status"], "checked");
+            assert_eq!(result.packet()["result"]["count"], total);
+            assert_eq!(result.packet()["result"]["total"], total);
+        }
+    }
+    Ok(())
+}
