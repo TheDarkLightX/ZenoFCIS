@@ -981,7 +981,76 @@ covers three inputs, and an accepted candidate changes Step usage, so adopting
 one into an application remains a separate reviewed step that this command
 does not perform.
 
-## Bounded optimization loop
+## Loop commands
+
+### Which loop to use
+
+| Task | Subcommand | Checker that decides |
+| --- | --- | --- |
+| Admit a reference and freeze proposal budgets | `loop open` | Program/profile/request admission; no equivalence verdict |
+| Check one supplied program or expression | `loop candidate` | Session transform checker on every declared input; expressions also require check/replay |
+| Drive local, fake, or disabled hosted proposals | `loop run` | Same session checker for every submitted candidate |
+| Recover retained evidence | `loop resume` | Request/ledger validation and reserved checker replay |
+| Convert finite-program JSON to canonical bytes | `loop encode` | Library program admission and codec; no equivalence verdict |
+| Compare a candidate with a complete paged arithmetic reference | `loop capture whole` | Transform checker and receipt replay on every complete lookup piece |
+| Freeze an executable observation table | `loop capture open` | Repeated observations plus table/evaluator consistency; no candidate acceptance |
+| Obtain public capture examples | `loop capture packet` | Session-binding validation; no program verdict |
+| Submit a capture proposal | `loop capture candidate` | Exposed-example precheck, then full-table transform check and replay |
+| Inspect private capture evidence | `loop capture status` | Session validation and fresh check/replay of retained success |
+| Complete, repair or simplify a proposal | `loop pipeline` | Transform check and matching replay against the fixed original |
+| Select stage sequences on development, then evaluate | `loop strategy --tasks` | Pipeline check/replay per task; ranking selects a sequence, not program acceptance |
+| Assemble by cases, diagnose faults, or ask about readings | `loop strategy --kind` | Split: capture plus original-bound check/replay; other modes: advisory finite inference |
+| Query or plan from structural usage facts | `loop strategy --kb-op` | Bounded knowledge/type inference; no program acceptance |
+| Discover or reuse concrete finite-domain rewrites | `loop rules` | Target-domain rule check/replay and whole-program check/replay |
+| Learn expressions from complete examples | `loop learn` | Library evaluator checks examples; with `--original`, capture plus original-bound check/replay |
+| Fill finite holes in an existing proposal session | `loop sketch` | Confirming check/replay, then the session transform checker |
+| Check a parameterized program or fit finite hole values | `loop family` | Transform check/replay on each listed instance only |
+| Try direct use, sketching, then repair on new instances | `loop transfer` | Transform check/replay on each listed target only |
+| Compute finite observation hashes | `loop meaning` | Library evaluator over the full domain; no independent transform verdict |
+| Evaluate one expression at one input | `loop evaluate` | Library evaluator at that point; no equivalence verdict |
+| Ask where contract decisions remain open | `loop question --contract` | Door admissibility computation and gaps judge where applicable; answers remain advisory |
+| Distinguish finite requirement/sketch completions | `loop question --specification` | Enumeration proposes; singleton needs law evaluator plus transform check/replay |
+| Check restated rules against the core | `loop teach-back` | Door evaluator over declared inputs and reachable states; wrong rules still give a completed report |
+| Evaluate component interfaces/tables | `loop decompose` | Door simulation; `--compose` additionally uses the composition checker and obligation check |
+
+All reports have `authority: none`. A session is a persistent directory holding
+a frozen request and charged attempt/check/replay ledger. An **attempt** is one
+proposal submitted to its driver, including malformed or duplicate proposals;
+intake or an unfinished preliminary stage may return before submission.
+**Typed feedback** means structured JSON checker outcomes, witnesses and reasons.
+The **incumbent** is the retained best checked program, initially the original.
+**Finite-program JSON** (historically “fixture vocabulary”) has exactly
+`inputs`, `outputs`, `nodes`, `roots`; Int bounds/literals are canonical decimal
+strings. A **bound proposal** names the exact reference and implementation
+hashes. **Guarded stages** run only when their input conditions hold.
+**No session** means no ordinary session directory or attempt ledger is created;
+explicitly requested evidence files can still be written. Capture has its own
+private session schema and protocol, distinct from ordinary proposal sessions.
+
+Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
+0; malformed command-line usage exits 64. Operation exits are not interchangeable:
+`run` can exit 0 without improvement, `meaning` can exit 0 with different keys,
+`teach-back` can exit 0 with wrong rules, `strategy --tasks` can exit 0 with
+unqualified evaluation tasks, and `learn` uses exit 3 for an open question.
+Containment may return inconclusive, exit 2, before application work starts.
+Neither a proposer, a hash, a role label nor a session file grants publication
+authority. Capture owner/proposer roles are conventions, not authenticated users.
+
+### Loop method background and scope
+
+Background: Armando Solar-Lezama, Liviu Tancau, Rastislav Bodik, Sanjit Seshia and
+Vijay Saraswat, “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006
+(counterexample-guided synthesis); Dana Angluin, “Learning Regular Sets from
+Queries and Counterexamples”, Information and Computation, 1987 (query and
+counterexample learning); Ross Tate, Michael Stepp, Zachary Tatlock and Sorin
+Lerner, “Equality Saturation: A New Approach to Optimization”, POPL, 2009
+(equality-based optimization). These sources describe background methods, not
+proofs of this implementation. This reference adds no new algorithm or priority
+claim. Scope: full-domain checking is limited to each command's declared finite
+domains, admitted profile and resource limits; enumeration, ranking and
+suggested questions retain their stated advisory status.
+
+### Bounded optimization loop
 
 `zeno-fcis loop` runs a bounded adaptive loop: a proposer suggests
 complete candidate programs and `transform check` judges every one against the
@@ -993,17 +1062,22 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 | Command | Effect |
 | --- | --- |
 | `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i128-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i128-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
-| `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
+| `loop candidate --session DIR (--candidate C \| --candidate-json J \| --expressions E) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the finite-program JSON `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
 | `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
-| `loop encode --program J --out P` | Encodes a fixture-vocabulary program as canonical bytes after library admission; the output file is never overwritten. |
+| `loop encode --program J --out P` | Encodes finite-program JSON as canonical bytes after library admission; the output file is never overwritten. |
 
 Results use schema `zeno-fcis/transform-loop/1` with `authority: none`.
-`open` exits 0 when the request is admitted and 1 when it is refused.
-`candidate` exits 0 for an equivalent candidate (improvement or not), 1 for a
+`open` exits 0 (`opened`) when the request is admitted and 1 when it is refused.
+`encode` exits 0 (`encoded`) on success and 1 for malformed programs or an
+existing output path (`output-exists`).
+`candidate` exits 0 for an equivalent candidate (`checked-improvement` or
+`equivalent-without-improvement:<reason>`), 1 for a
 difference, refusal or duplicate, and 2 for an inconclusive check or a closed
-session. `run` exits 0 when the loop completed; `resume` exits 0 with a
+session. `run` exits 0 (`completed`) when the driver returns, including proposal
+failures and no improvement; `resume` exits 0 with a
 replayed incumbent and 2 (`resume-refused`, `resume-inconclusive`) otherwise.
+Containment/acquisition can stop any invocation inconclusive (2).
 I/O failures exit 3. The report (`zeno-fcis/transform-loop-report/1`) states
 `no-checked-improvement` or `best-checked-so-far`, the actual stop reason, the
 receipt status, every attempt's outcome and cost, the accounting (attempts,
@@ -1198,7 +1272,7 @@ guide is
 | `loop sketch --session DIR --sketch FILE [--provenance FILE]` | Spends one attempt. Solves the holes (several holes in an output: holes alone on their route derived exactly, the rest branched over effect classes; `detail.door.searched[].search` is `meanings`); a completion goes through an in-process `transform check` with replay and then the session's check. If that confirming check does not complete, the result is `inconclusive` (exit 2) with `detail.door.status` `completion-not-confirmed`, and no attempt is spent; a search that stops on its budget is `inconclusive` (exit 2, `door-search-not-completed`) and spends no attempt either. Otherwise `detail.door.status` is `completed`, `unrealizable` (with a witness input, or after a listed complete candidate space was exhausted), `not-found` (claims nothing), `inconclusive` (a budget ran out) or `refused`. |
 | `loop family --instances MANIFEST --program FILE [--fit]` | No session. Judges a program over family parameters on every instance of a `zeno-fcis/loop-family-manifest/1` manifest (at most 10) with `transform check` and `transform replay`; reports nodes against each instance's optimize result when listed, and the smallest failing instance. Only a checker counterexample makes a row `refuted`; a row whose sketch the doors find unrealizable is labelled `unrealizable`. `--fit` fits each hole to `a * $P + b` on the instances not marked `"fit": false` and checks the lifted program on every instance, including those. Coverage is stated as "checked on these N instances". |
 | `loop transfer --from FILE --to-instances MANIFEST` | No session. Moves a program written for one instance (whose parameters the document gives) to each listed instance: directly, then with the constants near a changed parameter opened as choice holes, then by repair. Each result is checked as above. |
-| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. Two programs get equal keys exactly when `transform check` finds them equivalent, within its limits. The loop workspace uses it to answer a refuted program written another way from memory. |
+| `loop meaning --original FILE (--expressions FILE \| --candidate FILE)` | No session. Keys a complete program by its observation on every declared input (every output, or the evaluator's exact failure), computed by the library evaluator as `transform check` observes it, and reports whether it means what the original means. The key includes the domains and the complete observations used by `transform check`; digest equality is subject to hash collisions and is not a checker verdict or receipt. Exit 0 (`keyed`) also covers unequal keys. The loop workspace uses it to answer a refuted program written another way from memory. |
 | `loop question --contract DIR [--answers FILE]` | No session. Groups the inputs where the declared laws and the recorded answers (`zeno-fcis/loop-answers/1`) admit more than one decision, by the case that fires there, and asks about the largest group: a formula checked to hold on exactly its inputs, an example, the decisions still admitted and the core's own. Each answer's class and successor constraints become laws over exactly its inputs (`detail.answers[].laws`), checked by the gaps judge against the core (a text with no exact law form, such as a truth value compared with a number, is refused); an answer that differs from the core in class, reason or, for a committing answer that gives one, successor is a `disagreement`, never adopted. An answer that leaves some input with no admissible decision is refused (`conflict`, exit 1). Reject reasons are pinned with reason-scoped laws, with answer provenance retained. In practice, on the 5-second stage deadline, a question with answers can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples, and admissibility is refused as inconclusive above 4,000,000 law checks. |
 
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
@@ -1301,8 +1375,9 @@ characters, excluding reserved words, output names and macro names. The
 vocabulary defaults to constants `[1,2,3]` and arithmetic `["+","-"]`;
 other operation lists default to empty and `conditional` to false. Listed
 operations must be distinct. Only the fixed `min`, `max`, `abs` macros are
-available. Multiplication, custom macro objects, opaque primitives and
-nonzero `misses` are refused.
+available. Arithmetic also admits `*`, `div_floor`, `div_ceil`, `mul_div_floor` and
+`mul_div_ceil`; compare also admits `products_ge` (two- or three-factor forms).
+Custom macro objects, opaque primitives and nonzero `misses` are refused.
 
 Expressions grow by size. A leaf costs one; an operation or standard macro
 costs one plus its arguments. `min`, `max` and `abs` expand to checked IR
@@ -2638,10 +2713,14 @@ every input. An example names a complete input and output tuple. Names and
 requirement IDs are unique; at most 16 independent holes, 16 outputs,
 32 input/output fields combined and 64 requirements are supported.
 The grammar is the loop expression grammar with finite constant/choice holes
-and strict kinds. No `keep`, parameters or multiplication are supported.
+and strict kinds. No `keep` or parameters are supported. Checked multiplication and the
+closed division/product operations of the expression grammar are supported.
 An unbounded integer constant or expression hole returns inconclusive.
 
-Reports carry `authority: none` and `attempts_spent: 0`. `question` contains
+Reports use `zeno-fcis/loop-version-space/2`, with `authority: none` and
+`attempts_spent: 0`. Completed `question`, `determined` and `no-completion`
+reports all exit 0; refusal exits 1 and an incomplete computation exits 2.
+Early document-read errors can use `zeno-fcis/transform-loop/1`. `question` contains
 an exact proposed count, the chosen input and all output buckets with survivor
 counts. `determined` contains a single representative, its full-domain law
 check and replayed transform receipts. `no-completion` contains a minimum
@@ -2663,6 +2742,9 @@ budgets, both surfaces and explicit nonclaims.
 ### Black-box capture (2.5.0)
 
 ```text
+zeno-fcis loop capture whole --spec FILE --reference FILE
+  (--candidate-json FILE | --expressions FILE)
+  [--max-tuples 4096] [--node-visits 2000000]
 zeno-fcis loop capture open --spec FILE --reference FILE --session NEW_DIR
   [--reference-format python-function-v1] [--max-tuples 4096] [--rounds 32]
   [--max-examples 4096] [--node-visits 2000000]
@@ -2672,7 +2754,23 @@ zeno-fcis loop capture candidate --session DIR
 zeno-fcis loop capture status --session DIR [--full]
 ```
 
-`open` is owner-side. It accepts Python 3.11+ source defining
+`whole`, `open` and `status` are owner-side; `packet` is public and
+`candidate` is proposer-facing. `whole` creates no session: it compares a
+complete candidate over nonnegative Int inputs with a paged complete reference
+cover. `--max-tuples` bounds each page, not the whole domain (at most 20 pages
+fit the shared 62-frame limit). Each lookup piece requires transform checking
+and exact receipt replay; the report has chained receipt digests and complete
+coverage, not one exported whole-program receipt. Partial coverage is
+inconclusive. It exits 0 `captured-exact`, 1 `refuted`/`refused`, or 2
+`inconclusive`.
+
+All five operations use `zeno-fcis/black-box-capture/2`. `open` succeeds as
+`opened` (0), and `packet` as `packet` (0). `status` preserves the stored
+state's exit class (ready/success 0, decided refusal/refutation 1,
+inconclusive 2), subject to fresh validation/replay. Role names do not
+authenticate callers; keep private sessions and status outside proposer access.
+
+`open` accepts Python 3.11+ source defining
 `reference(point) -> list[int]`, and an ABI object containing exactly `inputs`
 and `outputs` in the finite-program fixture vocabulary. Six observations per
 input freeze a complete successful table inside the existing contained runtime.
@@ -2712,7 +2810,8 @@ outer supervisor exhaustion is inconclusive with unknown child accounting.
 Work fields record reservations and complete observations, not actual CPU usage;
 partial worker progress on a failed schedule is unknown.
 
-The hard bounds are 4,096 tuples/examples, 64 attempts, 10,000,000 node visits per
+For session capture, the hard bounds are 4,096 tuples/examples, 64 attempts,
+10,000,000 node visits per
 invocation, 64 KiB input files and 2 MiB protocol/session data. The table encoding
 must fit the existing checker's 256-node profile; inability to encode within it
 is inconclusive. Exactness is only against the complete observed finite table;

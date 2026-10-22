@@ -66,7 +66,24 @@ reasoning as advisory: a replayed counterexample names the first differing
 tuple, a refusal names the admission rule, and `best-checked-so-far` means
 equal on the declared domain and no larger, not optimal and not adopted by any
 application. At most eight attempts and eight checks are available per session;
-duplicates and malformed proposals consume them.
+duplicates and malformed proposals consume attempts but do not necessarily use a
+full checker call. Replay and preparation use their own retained work reservations.
+`checked-improvement` and `equivalent-without-improvement:<reason>` exit 0;
+`different`, `refused` and duplicate outcomes exit 1; incomplete or closed sessions
+exit 2; I/O errors exit 3. `loop run` returning 0 means the driver completed,
+including runs with no improvement or failed proposals.
+
+Run `zeno-fcis loop --help`, `zeno-fcis loop COMMAND --help` and
+`zeno-fcis guide show loop-workspace` to choose the exact surface. The CLI
+reference's “Which loop to use” table distinguishes capture, learning, session
+checks, pipelines, rules, strategy modes, family/transfer, meaning/evaluate,
+questions, restated rules and decomposition. Capture owner `whole`/`open`/`status`
+are separate from public `packet` and proposer `candidate`; keep owner evidence
+private. Example fit, meaning hashes, structural knowledge and simulation do not
+supply a transform verdict. `learn --original` and split-by-cases additionally
+need complete-reference capture and original-bound check/replay. `loop duel`
+does not exist; the duel guide describes a protocol and a small-model solver
+example, not an executable alternating driver.
 
 Use the local [MCP server](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/integrations/mcp/zeno_fcis_synthesis.py) or the same
 CLI directly. Installation and tool usage are documented in

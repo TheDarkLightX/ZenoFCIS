@@ -1,7 +1,7 @@
 ```json
 {
   "name": "loop-workspace",
-  "title": "Drive checked proposals in a durable session",
+  "title": "Choose a loop and drive checked proposal sessions",
   "synopsis": [
     "zeno-fcis loop open --original PROGRAM --session DIR",
     "zeno-fcis loop candidate --session DIR --candidate PROGRAM",
@@ -9,7 +9,7 @@
     "zeno-fcis loop resume --session DIR",
     "zeno-fcis loop encode --program JSON --out PROGRAM"
   ],
-  "engine": "Durable proposal ledger with full-domain transform checking, typed feedback and replayed incumbents.",
+  "engine": "Session mode: durable proposal ledger, full-domain transform checking, structured feedback and replay of the retained best program.",
   "use_when": [
     "propose and revise a program",
     "drive a checked optimization loop",
@@ -22,7 +22,7 @@
     "turning provenance into acceptance"
   ],
   "inputs": [
-    "Canonical finite scalar PROGRAM <= 65536 bytes; encode JSON vocabulary inputs/outputs/nodes/roots; session is created by open. Other file caps: unknown."
+    "Canonical Bool/signed-i128 PROGRAM <= 65,536 bytes; finite-program JSON (inputs/outputs/nodes/roots) <= 1,048,576 bytes, with Int bounds/literals as canonical decimal strings. Expression documents <= 65,536 bytes; script/config/provenance <= 262,144 bytes. Open creates the session."
   ],
   "outputs": [
     "zeno-fcis/transform-loop/1; read status, detail, accounting and report; session ledger, receipts, witnesses and artifacts"
@@ -36,10 +36,14 @@
   },
   "verdicts": {
     "opened": "Request admitted; submit candidate or run proposer.",
-    "equivalent": "Full-domain checker accepted; inspect selection and actual usage.",
     "different": "Counterexample retained; revise candidate against all witnesses.",
     "inconclusive": "No new accepted incumbent; inspect reason and remaining work, then resume.",
-    "resume-refused": "No trusted incumbent; repair integrity or reopen from original."
+    "resume-refused": "No trusted incumbent; repair integrity or reopen from original.",
+    "checked-improvement": "Equivalent and smaller; selected replacement and its receipt are retained.",
+    "equivalent-without-improvement:<reason>": "Equivalent but not selected; exit 0 does not imply improvement.",
+    "completed": "Run driver returned; inspect attempts and stop reason, including failures and no improvement.",
+    "encoded": "Program JSON admitted and encoded; no equivalence check or receipt.",
+    "resumed": "Ledger/request validated and retained evidence replayed; replay reservation stays charged."
   },
   "limits": {
     "attempts_cap": 8,
@@ -52,7 +56,11 @@
     "memory_mib": 64,
     "minimum_check_work": 1000000,
     "max_check_work": 268435456,
-    "other_defaults": "unknown"
+    "session_work_hard_cap": 4329447424,
+    "transcript_bytes": 524288,
+    "storage_bytes": 2097152,
+    "program_json_bytes": 1048576,
+    "script_config_provenance_bytes": 262144
   },
   "refusals": {
     "work-policy-changed": "Open a fresh session with this checker; do not rewrite request identity.",
@@ -83,14 +91,14 @@
     ]
   },
   "sources": {
-    "synopsis": "docs/CLI_REFERENCE.md:961-1145",
-    "engine": "docs/CLI_REFERENCE.md:961-1145",
-    "inputs": "docs/CLI_REFERENCE.md:961-1145",
-    "outputs": "docs/CLI_REFERENCE.md:961-1145",
-    "exit_codes": "docs/CLI_REFERENCE.md:961-1145",
-    "verdicts": "docs/CLI_REFERENCE.md:961-1145",
-    "limits": "docs/CLI_REFERENCE.md:961-1145",
-    "refusals": "docs/CLI_REFERENCE.md:961-1145"
+    "synopsis": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "engine": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "inputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "outputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "exit_codes": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "verdicts": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "limits": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs",
+    "refusals": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs"
   },
   "commands": [
     "loop",
@@ -100,11 +108,11 @@
     "loop resume",
     "loop encode"
   ],
-  "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority."
+  "pitfalls": "Read the operation-specific status, not only the exit. Encode/resume do not submit proposals; run can complete without improvement; meaning can return unequal keys; teach-back can report wrong rules. No report grants runtime or publication authority."
 }
 ```
 
-# Drive checked proposals in a durable session
+# Choose a loop and drive checked proposal sessions
 
 ## Use when
 
@@ -116,13 +124,66 @@ hosted execution in this build; global optimality; turning provenance into accep
 
 ## Inputs
 
-Canonical finite scalar PROGRAM <= 65536 bytes; encode JSON vocabulary inputs/outputs/nodes/roots; session is created by open. Other file caps: unknown.
+Canonical Bool/signed-i128 PROGRAM <= 65,536 bytes; finite-program JSON (inputs/outputs/nodes/roots) <= 1,048,576 bytes, with Int bounds/literals as canonical decimal strings. Expression documents <= 65,536 bytes; script/config/provenance <= 262,144 bytes. Open creates the session.
 
-Engine: Durable proposal ledger with full-domain transform checking, typed feedback and replayed incumbents.
+Engine: Session mode: durable proposal ledger, full-domain transform checking, structured feedback and replay of the retained best program.
 
 Synopsis: ["zeno-fcis loop open --original PROGRAM --session DIR", "zeno-fcis loop candidate --session DIR --candidate PROGRAM", "zeno-fcis loop run --session DIR --proposer local", "zeno-fcis loop resume --session DIR", "zeno-fcis loop encode --program JSON --out PROGRAM"]
 
 Set WORK to a fresh writable directory outside the source tree. Run commands from the repository root with zeno-fcis on PATH.
+
+### Which loop to use
+
+| Task | Subcommand | Checker that decides |
+| --- | --- | --- |
+| Admit a reference and freeze proposal budgets | `loop open` | Program/profile/request admission; no equivalence verdict |
+| Check one supplied program or expression | `loop candidate` | Session transform checker on every declared input; expressions also require check/replay |
+| Drive local, fake, or disabled hosted proposals | `loop run` | Same session checker for every submitted candidate |
+| Recover retained evidence | `loop resume` | Request/ledger validation and reserved checker replay |
+| Convert finite-program JSON to canonical bytes | `loop encode` | Library program admission and codec; no equivalence verdict |
+| Compare a candidate with a complete paged arithmetic reference | `loop capture whole` | Transform checker and receipt replay on every complete lookup piece |
+| Freeze an executable observation table | `loop capture open` | Repeated observations plus table/evaluator consistency; no candidate acceptance |
+| Obtain public capture examples | `loop capture packet` | Session-binding validation; no program verdict |
+| Submit a capture proposal | `loop capture candidate` | Exposed-example precheck, then full-table transform check and replay |
+| Inspect private capture evidence | `loop capture status` | Session validation and fresh check/replay of retained success |
+| Complete, repair or simplify a proposal | `loop pipeline` | Transform check and matching replay against the fixed original |
+| Select stage sequences on development, then evaluate | `loop strategy --tasks` | Pipeline check/replay per task; ranking selects a sequence, not program acceptance |
+| Assemble by cases, diagnose faults, or ask about readings | `loop strategy --kind` | Split: capture plus original-bound check/replay; other modes: advisory finite inference |
+| Query or plan from structural usage facts | `loop strategy --kb-op` | Bounded knowledge/type inference; no program acceptance |
+| Discover or reuse concrete finite-domain rewrites | `loop rules` | Target-domain rule check/replay and whole-program check/replay |
+| Learn expressions from complete examples | `loop learn` | Library evaluator checks examples; with `--original`, capture plus original-bound check/replay |
+| Fill finite holes in an existing proposal session | `loop sketch` | Confirming check/replay, then the session transform checker |
+| Check a parameterized program or fit finite hole values | `loop family` | Transform check/replay on each listed instance only |
+| Try direct use, sketching, then repair on new instances | `loop transfer` | Transform check/replay on each listed target only |
+| Compute finite observation hashes | `loop meaning` | Library evaluator over the full domain; no independent transform verdict |
+| Evaluate one expression at one input | `loop evaluate` | Library evaluator at that point; no equivalence verdict |
+| Ask where contract decisions remain open | `loop question --contract` | Door admissibility computation and gaps judge where applicable; answers remain advisory |
+| Distinguish finite requirement/sketch completions | `loop question --specification` | Enumeration proposes; singleton needs law evaluator plus transform check/replay |
+| Check restated rules against the core | `loop teach-back` | Door evaluator over declared inputs and reachable states; wrong rules still give a completed report |
+| Evaluate component interfaces/tables | `loop decompose` | Door simulation; `--compose` additionally uses the composition checker and obligation check |
+
+All reports have `authority: none`. A session is a persistent directory holding
+a frozen request and charged attempt/check/replay ledger. An **attempt** is one
+proposal submitted to its driver, including malformed or duplicate proposals;
+intake or an unfinished preliminary stage may return before submission.
+**Typed feedback** means structured JSON checker outcomes, witnesses and reasons.
+The **incumbent** is the retained best checked program, initially the original.
+**Finite-program JSON** (historically “fixture vocabulary”) has exactly
+`inputs`, `outputs`, `nodes`, `roots`; Int bounds/literals are canonical decimal
+strings. A **bound proposal** names the exact reference and implementation
+hashes. **Guarded stages** run only when their input conditions hold.
+**No session** means no ordinary session directory or attempt ledger is created;
+explicitly requested evidence files can still be written. Capture has its own
+private session schema and protocol, distinct from ordinary proposal sessions.
+
+Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
+0; malformed command-line usage exits 64. Operation exits are not interchangeable:
+`run` can exit 0 without improvement, `meaning` can exit 0 with different keys,
+`teach-back` can exit 0 with wrong rules, `strategy --tasks` can exit 0 with
+unqualified evaluation tasks, and `learn` uses exit 3 for an open question.
+Containment may return inconclusive, exit 2, before application work starts.
+Neither a proposer, a hash, a role label nor a session file grants publication
+authority. Capture owner/proposer roles are conventions, not authenticated users.
 
 ## Steps
 
@@ -136,13 +197,21 @@ Expected: exit 0; {"status": "opened"}.
 
 `opened`: Request admitted; submit candidate or run proposer.
 
-`equivalent`: Full-domain checker accepted; inspect selection and actual usage.
-
 `different`: Counterexample retained; revise candidate against all witnesses.
 
 `inconclusive`: No new accepted incumbent; inspect reason and remaining work, then resume.
 
 `resume-refused`: No trusted incumbent; repair integrity or reopen from original.
+
+`checked-improvement`: Equivalent and smaller; selected replacement and its receipt are retained.
+
+`equivalent-without-improvement:<reason>`: Equivalent but not selected; exit 0 does not imply improvement.
+
+`completed`: Run driver returned; inspect attempts and stop reason, including failures and no improvement.
+
+`encoded`: Program JSON admitted and encoded; no equivalence check or receipt.
+
+`resumed`: Ledger/request validated and retained evidence replayed; replay reservation stays charged.
 
 Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
@@ -152,7 +221,7 @@ Outputs: ["zeno-fcis/transform-loop/1; read status, detail, accounting and repor
 
 {"example_wall_ms": "unknown", "measured_units": "unknown", "telemetry": "PENDING: populate from source-bound invocation telemetry"}
 
-Limits: {"attempts_cap": 8, "check_stage_cpu_ms": 2000, "checks_cap": 8, "deadline_ms_cap": 20000, "max_check_work": 268435456, "memory_mib": 64, "minimum_check_work": 1000000, "model_calls_cap": 4, "other_defaults": "unknown", "search_stage_cpu_ms": 5000, "worker_ms_cap": 25000}
+Limits: {"attempts_cap": 8, "check_stage_cpu_ms": 2000, "checks_cap": 8, "deadline_ms_cap": 20000, "max_check_work": 268435456, "memory_mib": 64, "minimum_check_work": 1000000, "model_calls_cap": 4, "program_json_bytes": 1048576, "script_config_provenance_bytes": 262144, "search_stage_cpu_ms": 5000, "session_work_hard_cap": 4329447424, "storage_bytes": 2097152, "transcript_bytes": 524288, "worker_ms_cap": 25000}
 
 ## Coordinate
 
@@ -160,7 +229,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 ## Pitfalls
 
-Read the result scope before revising the input. No report grants runtime or publication authority.
+Read the operation-specific status, not only the exit. Encode/resume do not submit proposals; run can complete without improvement; meaning can return unequal keys; teach-back can report wrong rules. No report grants runtime or publication authority.
 
 Refusals and remedies: {"output-exists": "Use a new output file for encode.", "work-infeasible": "Choose a smaller declared domain or supported checker budget.", "work-policy-changed": "Open a fresh session with this checker; do not rewrite request identity."}
 
@@ -174,6 +243,18 @@ Expected: exit 0; ["zeno-fcis/transform-loop/1"].
 
 ## See also
 
-Sources: {"engine": "docs/CLI_REFERENCE.md:961-1145", "exit_codes": "docs/CLI_REFERENCE.md:961-1145", "inputs": "docs/CLI_REFERENCE.md:961-1145", "limits": "docs/CLI_REFERENCE.md:961-1145", "outputs": "docs/CLI_REFERENCE.md:961-1145", "refusals": "docs/CLI_REFERENCE.md:961-1145", "synopsis": "docs/CLI_REFERENCE.md:961-1145", "verdicts": "docs/CLI_REFERENCE.md:961-1145"}
+Background: Armando Solar-Lezama, Liviu Tancau, Rastislav Bodik, Sanjit Seshia and
+Vijay Saraswat, “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006
+(counterexample-guided synthesis); Dana Angluin, “Learning Regular Sets from
+Queries and Counterexamples”, Information and Computation, 1987 (query and
+counterexample learning); Ross Tate, Michael Stepp, Zachary Tatlock and Sorin
+Lerner, “Equality Saturation: A New Approach to Optimization”, POPL, 2009
+(equality-based optimization). These sources describe background methods, not
+proofs of this implementation. This reference adds no new algorithm or priority
+claim. Scope: full-domain checking is limited to each command's declared finite
+domains, admitted profile and resource limits; enumeration, ranking and
+suggested questions retain their stated advisory status.
+
+Sources: {"engine": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "exit_codes": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "inputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "limits": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "outputs": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "refusals": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "synopsis": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs", "verdicts": "docs/CLI_REFERENCE.md#loop-commands; crates/zeno-fcis-cli/src/loop_command.rs"}
 
 Run `zeno-fcis guide find "propose and revise a program"` for related cards.
