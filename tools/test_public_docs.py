@@ -67,6 +67,14 @@ class PublicDocsTests(unittest.TestCase):
         (self.root / "docs/API.md").symlink_to(self.root / "README.md")
         self.assertTrue(any("nonregular" in item for item in check(self.root)))
 
+    def test_notice_requires_review_and_has_its_links_checked(self):
+        (self.root / "NOTICE").write_text("Public attribution\n")
+        self.assertIn("unreviewed public document: NOTICE", check(self.root))
+        self.inventory.write_text("README.md\ndocs/API.md\nNOTICE\n")
+        self.assertEqual(check(self.root), [])
+        (self.root / "NOTICE").write_text("https://chatgpt.com/share/private-record")
+        self.assertIn("private workspace link in public document: NOTICE", check(self.root))
+
 
 if __name__ == "__main__":
     unittest.main()

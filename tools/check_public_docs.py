@@ -13,6 +13,7 @@ DOCUMENT_SUFFIXES = {".md", ".pdf", ".tex"}
 # Published documents without a document suffix: the agent index, the README
 # copied into every `zeno-fcis new --contract` application, and the Pages site.
 EXTRA_DOCUMENTS = frozenset({
+    "NOTICE",
     "llms.txt",
     "crates/zeno-fcis-cli/contract-app/README.md.in",
     "site/public/index.html",
@@ -55,7 +56,8 @@ def check(root: Path) -> list[str]:
         failures.append(f"unreviewed public document: {name}")
     for name in sorted(actual):
         path = root / name
-        if path.suffix not in LINK_SCAN_SUFFIXES or path.is_symlink() or not path.is_file():
+        if (path.suffix not in LINK_SCAN_SUFFIXES and name not in EXTRA_DOCUMENTS) \
+                or path.is_symlink() or not path.is_file():
             continue
         if PRIVATE_LINK.search(path.read_text(encoding="utf-8")):
             failures.append(f"private workspace link in public document: {name}")

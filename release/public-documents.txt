@@ -1,6 +1,7 @@
 AGENTS.md
 CHANGELOG.md
 CONTRIBUTING.md
+NOTICE
 README.md
 SECURITY.md
 core-apps/api-quota/README.md
