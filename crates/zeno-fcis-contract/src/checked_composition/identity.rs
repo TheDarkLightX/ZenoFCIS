@@ -88,6 +88,7 @@ pub(crate) const CHECKER_SOURCES: &[(&str, &[u8])] = checker_sources![
     "src/lib.rs",
     "src/refinement.rs",
     "src/refinement/machine.rs",
+    "src/risk.rs",
 ];
 
 /// The digests a checker's identity combines.

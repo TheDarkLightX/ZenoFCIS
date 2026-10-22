@@ -9,7 +9,8 @@
 //! core: it reads and writes files, renders application source, replays
 //! program adoptions and runs the reviews.
 //!
-//! The supported API is [`checked_composition`], [`refinement`] and [`ContractError`].
+//! The supported API includes [`checked_composition`], [`refinement`],
+//! [`distribution`], [`risk`] and [`ContractError`].
 //! [`checked_composition::check`] takes the source bytes of a composition of
 //! separately bound contracts, its manifest and each leaf's two files, and
 //! compiles and checks them itself. Its result, a
@@ -37,6 +38,7 @@ pub mod distribution;
 #[doc(hidden)]
 pub mod internals;
 pub mod refinement;
+pub mod risk;
 
 #[cfg(test)]
 mod priority_construction_controls;
