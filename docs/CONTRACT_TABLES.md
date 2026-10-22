@@ -64,6 +64,8 @@ the same identity and the same checks. The rules are:
   entry is `(C_k -> F_k)`.
 - `exists i in table T { F }` is `F_0 || ... || F_N-1`; with `where C`, each
   entry is `(C_k && F_k)`.
+- Parenthesized scalar expressions retain arithmetic precedence in comparisons.
+  A table sum or value count can be multiplied on either side of a factor.
 - `choose(C, A, B)` is a scalar Select value: evaluate C, A and B eagerly,
   then select A when C is true and B otherwise. Both arms use the existing
   scalar-kind checks. An overflow, bad cast or division trap in the unselected

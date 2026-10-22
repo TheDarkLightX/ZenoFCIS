@@ -1969,6 +1969,42 @@ impl Parser {
             self.parse_rel_atom()
         }
     }
+    /// A parenthesized scalar followed by arithmetic or a comparison.
+    fn value_group_ahead(&self) -> bool {
+        if !matches!(self.current().kind, TokenKind::LParen) {
+            return false;
+        }
+        let mut depth = 0usize;
+        for (offset, token) in self.tokens[self.index..].iter().enumerate() {
+            match token.kind {
+                TokenKind::LParen => depth += 1,
+                TokenKind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return self
+                            .tokens
+                            .get(self.index + offset + 1)
+                            .is_some_and(|next| {
+                                matches!(
+                                    next.kind,
+                                    TokenKind::Plus
+                                        | TokenKind::Minus
+                                        | TokenKind::Star
+                                        | TokenKind::EqEq
+                                        | TokenKind::NotEq
+                                        | TokenKind::Less
+                                        | TokenKind::LessEq
+                                        | TokenKind::Greater
+                                        | TokenKind::GreaterEq
+                                )
+                            });
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
     fn parse_rel_atom(&mut self) -> RelExpr {
         if self.take_keyword("true") {
             return RelExpr::Bool(true);
@@ -1976,7 +2012,7 @@ impl Parser {
         if self.take_keyword("false") {
             return RelExpr::Bool(false);
         }
-        if self.take_symbol(&TokenKind::LParen) {
+        if !self.value_group_ahead() && self.take_symbol(&TokenKind::LParen) {
             let value = self.nested("formula.group", RelExpr::Bool(false), |parser| {
                 parser.parse_rel()
             });
@@ -2117,20 +2153,7 @@ impl Parser {
         value
     }
     fn parse_term(&mut self) -> ValueExpr {
-        let sum_ahead = self.peek_keyword("sum") && self.table_form_ahead(1);
         let mut value = self.parse_value_atom();
-        if sum_ahead
-            && matches!(self.current().kind, TokenKind::Star)
-            && matches!(value, ValueExpr::Add(..))
-        {
-            self.error(
-                DiagnosticCode::InvalidDeclaration,
-                "table.sum",
-                "a table sum after its factor",
-                "a table sum before `*`",
-                "write the factor first, as in `2 * sum i in table T { ... }`",
-            );
-        }
         let mut operators = 0usize;
         while matches!(self.current().kind, TokenKind::Star) {
             if !self.chain_available("value.multiplicative", operators) {
@@ -2821,7 +2844,7 @@ impl Parser {
             });
             self.expect_symbol(TokenKind::RParen, "temporal.atom");
             TemporalFormula::Atom(rel)
-        } else if self.take_symbol(&TokenKind::LParen) {
+        } else if !self.value_group_ahead() && self.take_symbol(&TokenKind::LParen) {
             let value = self.nested("temporal.group", temporal_false(), |parser| {
                 parser.parse_temporal()
             });

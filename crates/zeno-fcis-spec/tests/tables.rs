@@ -593,3 +593,20 @@ fn table_count_sizes_before_and_after_linear_values() {
         );
     }
 }
+
+#[test]
+fn grouped_table_values_roundtrip_through_arithmetic() {
+    for formula in [
+        "count j in table 110 { post.100.110[j] == command.101.120 } * 2 <= command.101.121",
+        "sum j in table 110 { choose(post.100.110[j] == command.101.120, 1, 0) } * 2 <= command.101.121",
+        "(post.100.110 + post.100.111) * 2 <= command.101.121",
+        "((post.100.110 + post.100.111)) <= command.101.121",
+        "(post.100.110 == 0) && (post.100.111 == 0)",
+    ] {
+        let source = format!(
+            "{HEADER}table 110 100 slot 105 size 6;\nlaw 500 arithmetic on commit = {formula};\n"
+        );
+        let expansion = expand_tables(&source, SourceLimits::default()).unwrap();
+        assert_eq!(bytes(&source), bytes(&expansion.text), "{formula}");
+    }
+}
