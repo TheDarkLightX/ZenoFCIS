@@ -1086,10 +1086,30 @@ fn status_loaded(
     result["detail"]["assumption"] =
         json!("reference is a pure deterministic function of all declared inputs");
     result["detail"]["exact_subject"] = json!("complete frozen observed table");
-    if serde_json::to_vec_pretty(&result).map_or(true, |bytes| bytes.len() + 1 > 1024 * 1024) {
+    // Count the pretty output instead of buffering it: near the bound, a
+    // buffer of it would itself need twice the bound inside the contained
+    // worker's address space.
+    let mut output = OutputBound(1024 * 1024 - 1);
+    if serde_json::to_writer_pretty(&mut output, &result).is_err() {
         return refused("capture-full-status-output-bound");
     }
     (code, result)
+}
+
+/// A writer that accepts at most the given number of bytes.
+struct OutputBound(usize);
+
+impl std::io::Write for OutputBound {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 = self
+            .0
+            .checked_sub(bytes.len())
+            .ok_or_else(|| std::io::Error::other("output bound"))?;
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 pub(super) fn run(command: Command) -> (u8, Value) {
