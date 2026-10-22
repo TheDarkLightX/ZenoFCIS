@@ -370,6 +370,7 @@ fn symbolic_directory(
                     report["solver_identities"] = solvers.identities();
                     if let Some(reason) = solvers.retention_failure() {
                         report["status"] = json!("UNKNOWN");
+                        report["evidence"] = json!("none");
                         report["reason"] = json!(reason);
                     }
                     report

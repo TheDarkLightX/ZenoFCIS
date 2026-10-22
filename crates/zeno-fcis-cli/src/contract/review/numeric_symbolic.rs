@@ -186,19 +186,42 @@ fn guard_inner(
         }
         for (i, edge) in e.edges.iter().enumerate() {
             let found = std::cell::RefCell::new(Vec::new());
-            let result = ask(
-                &e.script,
-                edge.clone(),
-                &format!("{}-arithmetic-edge-{i}", e.label),
-                solve,
-                |model| {
-                    let row = decode(c, model)?;
-                    let actual = evaluate(&row).map_err(|e| e.to_string())?;
-                    let result = witness(c, &row, &actual);
-                    found.borrow_mut().push(row);
-                    Ok(result)
-                },
-            );
+            let replay = |model: &BTreeMap<String, i128>| {
+                let row = decode(c, model)?;
+                let actual = evaluate(&row).map_err(|e| e.to_string())?;
+                let result = witness(c, &row, &actual);
+                found.borrow_mut().push(row);
+                Ok(result)
+            };
+            // A known input can cheaply realize a branch-selection edge.
+            // A miss for one input never proves an edge globally unreachable.
+            let probe = if matches!(edge, Term::Eq(a, _) if **a == e.outputs[0].term) {
+                Some(ask(
+                    &e.script,
+                    Term::and(vec![edge.clone(), assignment(e, &rows[0])]),
+                    &format!("{}-arithmetic-edge-{i}-sample", e.label),
+                    solve,
+                    &replay,
+                ))
+            } else {
+                None
+            };
+            let result = match probe {
+                Some(probe) if probe["status"] != "holds" => probe,
+                probe => {
+                    let mut result = ask(
+                        &e.script,
+                        edge.clone(),
+                        &format!("{}-arithmetic-edge-{i}", e.label),
+                        solve,
+                        replay,
+                    );
+                    if let Some(probe) = probe {
+                        result["sample_probe"] = probe;
+                    }
+                    result
+                }
+            };
             if result["status"] == "UNKNOWN" {
                 return Ok(
                     json!({"status":"UNKNOWN","reason":"arithmetic edge generation did not complete with solver agreement","failure":result}),
@@ -340,10 +363,55 @@ pub(crate) fn review(
             .map(|b| Term::and(vec![b.selected.clone(), b.constructed.clone()]))
             .collect(),
     );
-    obligations.push(ask(&e.script,Term::and(vec![e.lawful.clone(),Term::not(constructed)]),"technical-refusal",solve,|model|{
-        let row=decode(&c,model)?;let actual=native::evaluate(&c,&schema,&row).map_err(|e|e.to_string())?;
-        if matches!(&actual,evaluate::Outcome::Refused(r) if r.class!=evaluate::RefusalClass::Law) {Ok(witness(&c,&row,&actual))} else {Err("native Authority did not confirm a technical refusal".into())}
-    }));
+    // Constructibility implies program_ok. Its complement is either a
+    // first failed execution predicate or failed construction after success.
+    // Prefixes only partition the original failure set; they cannot erase an
+    // earlier failed/UNKNOWN obligation or supply new admission assumptions.
+    fn conjuncts(term: &Term, out: &mut Vec<Term>) {
+        match term {
+            Term::And(terms) => {
+                for term in terms {
+                    conjuncts(term, out);
+                }
+            }
+            _ => out.push(term.clone()),
+        }
+    }
+    let mut predicates = Vec::new();
+    conjuncts(&e.program_ok, &mut predicates);
+    let mut prefix = vec![e.lawful.clone()];
+    let mut failures = Vec::new();
+    for (i, predicate) in predicates.into_iter().enumerate() {
+        let mut failed = prefix.clone();
+        failed.push(Term::not(predicate.clone()));
+        failures.push((format!("technical-refusal-program-{i}"), Term::and(failed)));
+        prefix.push(predicate);
+    }
+    failures.push((
+        "technical-refusal-construction".into(),
+        Term::and(vec![
+            e.lawful.clone(),
+            e.program_ok.clone(),
+            Term::not(constructed),
+        ]),
+    ));
+    for (label, bad) in failures {
+        obligations.push(ask(
+            &e.script,
+            bad,
+            &label,
+            solve,
+            |model| {
+                let row = decode(&c, model)?;
+                let actual = native::evaluate(&c, &schema, &row).map_err(|e| e.to_string())?;
+                if matches!(&actual, evaluate::Outcome::Refused(r) if r.class != evaluate::RefusalClass::Law) {
+                    Ok(witness(&c, &row, &actual))
+                } else {
+                    Err("native Authority did not confirm a technical refusal".into())
+                }
+            },
+        ));
+    }
     for (i, case) in e.cases.iter().enumerate() {
         let mut premise = vec![
             e.lawful.clone(),

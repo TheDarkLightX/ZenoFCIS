@@ -318,3 +318,31 @@ fn pinned_numeric_law_overflow_above_two_to_100_has_native_witness() {
         max.to_string()
     );
 }
+
+#[test]
+#[ignore = "requires both qualification solver binaries"]
+fn pinned_numeric_mutants_have_native_witnesses() {
+    let p = project("1000000000000000000000000", true);
+    let mut r: Json = serde_json::from_str(&rules(true, "command.101.120")).unwrap();
+    r["cases"][0]["when"] = json!("command.101.120 == u128(0)");
+    let solvers = pinned();
+    let result = review(
+        ReviewSources {
+            project: &p,
+            rules: &r.to_string(),
+            examples: None,
+        },
+        &mut |q| solvers.solve(q),
+        true,
+    )
+    .unwrap();
+    assert_eq!(result["status"], "solver-checked", "{result}");
+    let mutants = result["mutants"].as_array().unwrap();
+    assert!(!mutants.is_empty());
+    assert!(
+        mutants.iter().any(|m| m["status"] == "refuted"
+            && m["counterexample"]["input"]["authority"]
+                != m["counterexample"]["mutant_authority"]),
+        "{result}"
+    );
+}

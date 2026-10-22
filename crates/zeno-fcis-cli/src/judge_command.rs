@@ -300,6 +300,7 @@ pub(super) fn run(command: Command) -> u8 {
                             result["solver_identities"] = solvers.identities();
                             if let Some(reason) = solvers.retention_failure() {
                                 result["status"] = json!("UNKNOWN");
+                                result["evidence"] = json!("none");
                                 result["reason"] = json!(reason);
                             }
                             result

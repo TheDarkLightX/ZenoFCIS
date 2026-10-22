@@ -59,3 +59,28 @@ and its owner-example mutant witnesses. Such a finding refuses early, in
 that the emitted project, rules and schema hashes match the retained review.
 Numeric durable applications remain explicitly refused until their native
 server adapter exists; bounded UI evidence cannot replace that adapter.
+
+Branch-selection edges first try the first existing concrete guard input.
+A matching SAT pair supplies a witness; a matching UNSAT pair for that one input
+still requires the unrestricted edge query. UNKNOWN refuses immediately. Both
+queries remain in the report when unrestricted search is needed. Other edges
+keep the original single search. No cache or alternative verdict rule is added.
+
+Constructibility D implies program validity P. The technical-refusal question
+L and not D is split into L and not P, and L and P and not D. Their union is
+exactly the original set. This removes the branch selector from the first
+question without removing a refusal check, changing law order or weakening
+dual-solver agreement and native replay. Every part must conclude.
+
+Program validity is a conjunction g_0 through g_n. Its failure is partitioned
+into first-failure questions L and g_0 through g_(i-1) and not g_i. Their union
+is exactly L and not P; no prefix is assumed without retaining its own failure
+question. All questions must conclude. This preserves refusal coverage and
+helps a solver use established denominator predicates before division bounds.
+
+The differential observation is the decision class, reason, post and outbox;
+refusals distinguish arithmetic, domain and the first failing law ID. A law's
+undefined arithmetic and false predicate both mean failure of that law.
+Diagnostic refusal text and measured native work are not modeled as symbolic
+outputs. No complete refusal-detail or resource-usage equivalence is claimed.
+Native Authority execution and its refusal accounting remain unchanged.
