@@ -17,10 +17,10 @@ statement does not authenticate the caller or establish where that fact came fro
 Choose the view you prefer, export the contract, then check it:
 
 ```sh
-python3 -I integrations/zal/run.py render integrations/zal/examples/order.zal --to english
-python3 -I integrations/zal/run.py check integrations/zal/examples/order.zal
-python3 -I integrations/zal/run.py export integrations/zal/examples/order.zal --out order-contract
-python3 -I integrations/zal/run.py qualify integrations/zal/examples/order.zal --out order-check.json
+python3 integrations/zal/run.py render integrations/zal/examples/order.zal --to english
+python3 integrations/zal/run.py check integrations/zal/examples/order.zal
+python3 integrations/zal/run.py export integrations/zal/examples/order.zal --out order-contract
+python3 integrations/zal/run.py qualify integrations/zal/examples/order.zal --out order-check.json
 ```
 
 `qualify` needs a built `zeno-fcis` CLI; its `--cli` option selects that binary.

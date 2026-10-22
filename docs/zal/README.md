@@ -1,10 +1,42 @@
-# ZAL: terminal-first behavior review
+# ZAL: state the intent, then check the contract
 
-ZAL is an additive research prototype for discussing a small, precise behavior
-before realizing it through ZenoFCIS. Two deterministic surfaces, symbolic and
-controlled English, describe one `zal/finite-fsm/1` model. Start in a terminal;
-the browser is optional. Built-in help, translation and input-specific
-explanations work locally without an LLM. This is not a released ZenoFCIS API.
+ZAL states what must hold. A contract and its code must refine that statement.
+Start with the requirement and its declared theory, then choose the reading
+that is easiest to understand. The [progression ladder](ladder/README.md)
+presents one formula as symbols, English or a question without changing its
+declared meaning. Its legend explains the symbols; shorter readings keep the
+same definitions and assumptions.
+
+Ask: **Approve an order only when the supplied authorization fact is true.**
+
+The [order example](../../integrations/zal/examples/order.zal) is a finite
+behavior model for that requirement. Its English rule says:
+
+> Rule approve_order: when the state is pending and the event is approve, if authorized, move to approved.
+
+Its `zal 1` header selects the finite-machine theory `zal/finite-fsm/1`.
+The explicit default rejects other inputs and keeps the state unchanged.
+Inspect the statement, export the contract, then run the comparison:
+
+```sh
+python3 integrations/zal/run.py render integrations/zal/examples/order.zal --to english
+python3 integrations/zal/run.py export integrations/zal/examples/order.zal --out order-contract
+python3 integrations/zal/run.py qualify integrations/zal/examples/order.zal --out order-check.json
+```
+
+The contract is `order-contract/project.zeno` plus `v2/policy.json`.
+`qualify` needs the built CLI and checks the ZAL initial state and every declared
+input against the generated application's Authority. A mismatch names the
+input and differing result. See the [exact refinement relation](REFINEMENT.md)
+for scope, limits and refusal examples. The supplied `authorized` fact is not
+itself authentication.
+
+Finite machine profiles have symbolic and controlled-English views; they are
+explicit behavior models, not descriptions of core implementation structure.
+The formula ladder and those machine profiles remain separate. Built-in help,
+translation and input explanations work locally without an LLM. These are
+experimental interfaces, not a released ZenoFCIS API. A terminal or browser is
+optional for the file-based journey above.
 
 Read the [specification](SPECIFICATION.md), [exact grammar](GRAMMAR.md),
 and [factory source map](../ZAL_SOURCE_MAP.md).
@@ -282,57 +314,16 @@ unsolicited model turns, change subscriptions or auto-refresh into a conversatio
 Neither the shared store nor the bridge calls a provider. The harness controls
 what it sends to its model, using its existing account and permissions.
 
-### Project addon for Codex and Claude Code
+### Optional tool integration
 
 The [2.3 addon guide](HARNESS_INTEGRATION.md) provides persistent project-local
 MCP entries and a shared specification skill. Run `integrations/zal/setup.py` from a
 stable source checkout, first without `--apply` to inspect the plan. It preserves
 unrelated configuration and pending work, and refuses a differing existing ZAL
-entry or skill. The older per-invocation instructions below remain available.
-Installation does not change tool approval policies or call a model.
-
-### Codex: per-invocation configuration
-
-In a second shell at the repository root, set `ZAL_WORKSPACE` to the exact path
-printed above. These overrides use the installed Codex 0.159.2 `--config`
-interface and the documented [stdio MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
-They do not write a registration to `config.toml` or widen approval policy.
-
-```sh
-export ZAL_WORKSPACE=/absolute/path/printed/by/the/review/setup/workspace.json
-ZAL_ARGS=$(python3 -c 'import json,sys; print(json.dumps([sys.argv[1], "--workspace", sys.argv[2]]))' \
-  "$PWD/integrations/zal/mcp.py" "$ZAL_WORKSPACE")
-codex \
-  -c 'mcp_servers.zal.command="python3"' \
-  -c "mcp_servers.zal.args=$ZAL_ARGS" \
-  -c 'mcp_servers.zal.enabled_tools=["zal_read","zal_check","zal_help","zal_explain","zal_propose","zal_compare","zal_trace","zal_why_not","zal_what_if","zal_narrate","zal_guide","zal_ladder_read","zal_ladder_render","zal_ladder_parse","zal_ladder_same","zal_ladder_lower","zal_ladder_explain"]'
-```
-
-Before starting the interactive session, the same command with `mcp get zal
---json` appended inspects the effective entry without running a model. That
-configuration check was observed on 0.159.2. Use an unused server name if your
-existing configuration already defines `zal`; other configured integrations
-remain governed by your existing setup.
-
-**Interoperability limit:** the earlier stock Codex probe discovered `zal_read`
-but its permission layer cancelled both calls. No read/check/proposal completed.
-An explicitly approved, narrowly scoped cloud retry on 0.159.2 stopped during
-runtime initialization with a read-only-filesystem error, before any model or
-MCP tool execution was observed. The demo workspace and configuration remained
-unchanged. Neither attempt establishes an end-to-end stock-CLI pass.
-Keep required approvals visible; a
-blocked call is not a reason to bypass policy or install persistent permissions.
-
-### Claude Code: documented adapter, not live-validated
-
-The same seven tools fit Claude Code's documented [local stdio MCP
-interface](https://code.claude.com/docs/en/mcp). Its [CLI reference](https://code.claude.com/docs/en/cli-reference)
-documents `--mcp-config` for per-session JSON, with `mcpServers.zal` containing
-`type: "stdio"`, `command: "python3"` and the same absolute-path argument array.
-An installed Claude executable was not available in the cloud validation
-environment. Verify that installed version's flags, configuration loading and
-ordinary tool approval flow before use. No Claude model was invoked, no content
-was sent to Claude, and no persistent Claude configuration was installed.
+entry or skill. Installation does not change tool approval policies or call a
+model. A connected coding tool must refresh the exact revision before checking
+or proposing a change. Tool permission and human acceptance of the statement
+remain separate actions.
 
 ## Workspace boundary
 
@@ -349,7 +340,7 @@ lock contention refuses after two seconds. Keep sensitive model content in an
 appropriately protected workspace. This prototype has no shared multi-user
 access control or production durability guarantee.
 
-## Optional browser and separate Codex custom client
+## Optional browser and provider conversation
 
 To view and review the same existing terminal/MCP workspace:
 
@@ -362,7 +353,7 @@ is a disclosed fixture, not a live model. It provides paired rule views, graph
 and table selection, traces, witnesses, built-in contextual help and
 exact-revision review. `Explain next input` evaluates the current trace state,
 selected event and every Boolean checkbox; `Why this recorded step?` explains
-the exact input at the trace cursor. `Ask Codex` is the separate provider
+the exact input at the trace cursor. The provider control opens a separate
 conversation. `Help ?` opens the topic overview; `Meaning of this object ?`
 opens help for the selected typed ID. Mouse/pen pointer or keyboard focus on
 objects/topics loads a persistent Context help preview. Visible controls also
@@ -380,10 +371,10 @@ For an independent disposable demo, omit `--workspace`:
 in-memory session, is not synchronized with the terminal/MCP file, and loses
 its session when restarted. The UI state labels which workspace mode is active.
 
-The browser's explicit Codex connection uses the separate
+The browser's optional provider connection uses the separate
 [`codex_transport.py`](../../integrations/zal/codex_transport.py) app-server
-client. That mode owns a Codex conversation; it does not attach a pane or send
-events into your stock Codex CLI session. It uses stdio, an ephemeral read-only
+client. That mode owns a conversation; it does not attach a pane or send
+events into an existing terminal session. It uses stdio, an ephemeral read-only
 thread, structured final output and exact turn IDs, and refuses execution
 approval requests. Actual permitted read-only tools must still be observed;
 an instruction to avoid tools is not a physical isolation guarantee.
@@ -465,9 +456,8 @@ The Node command runs the actual UI script with minimal DOM doubles and fixtures
 generated by the Python domain. Its deterministic checks need no browser,
 Playwright, network or provider; they do not test native rendering, focus behavior
 or the browser-to-server HTTP path. Use the final run's output for the current
-check count. Final cloud browser QA remains blocked before page creation by a
-local socket restriction; the supported browser also refused loopback access.
-No new native pointer, keyboard, touch or accessibility pass is claimed.
+check count. A pass of the DOM-double tests does not establish native pointer,
+keyboard, touch or accessibility behavior.
 
 The repository's registered acceptance scenario runs the Python suite,
 deterministic Node UI checks, pinned CLI build and actual sample-model factory
@@ -592,5 +582,25 @@ ladder lower example:temporal/vault_drain
 `ladder explain` without a rung tries every rung, names the rungs that admit
 the text and gives the parse counts behind its uniqueness. `same` reports
 "same" only for identical expanded normal forms with an identical scope
-identity (temporal) or declared vocabulary (`zal/ladder/0`). Different normal
-forms do not prove different meanings.
+identity in either profile. The identity binds all declarations except the
+display ID, formula text and fixtures. Different normal forms do not prove
+different meanings.
+
+## Lineage and scope
+
+**Background.** Niklaus Wirth, “Program Development by Stepwise Refinement,”
+*Communications of the ACM* 14(4), 1971, describes successive program refinement.
+Matthew B. Dwyer, George S. Avrunin and James C. Corbett, “Patterns in Property
+Specifications for Finite-State Verification,” *ICSE*, 1999, organizes recurring
+temporal requirements as patterns. Tobias Kuhn, “A Survey and Classification of
+Controlled Natural Languages,” *ACM Computing Surveys* 46(3), article 41, 2014,
+surveys constrained natural-language systems.
+
+**What is new here.** This integration connects declared statements and readable
+views to existing finite checks and generated-application comparisons.
+Prior-art search pending.
+
+**Scope.** A check covers its named finite domain or explicitly stated proof
+obligation. Reading, review and human acceptance grant no runtime, publication
+or authentication authority. A readable requirement still needs a checked
+refinement before its implementation can claim to satisfy it.
