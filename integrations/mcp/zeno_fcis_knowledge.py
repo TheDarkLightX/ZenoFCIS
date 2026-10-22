@@ -12,7 +12,7 @@ class KnowledgeToolError(ValueError):
 
 
 def _invoke(operation, paths, task, **fields):
-    if operation not in {"advise", "plan", "explain"}:
+    if operation not in {"advise", "plan", "explain", "assessment-view", "assessment-queue", "leaderboard", "telemetry"}:
         raise KnowledgeToolError("kb-operation-refused")
     if type(paths) is not list or len(paths) > 7 or any(type(p) is not str or not p or len(p) > 4096 for p in paths):
         raise KnowledgeToolError("kb-paths")
@@ -27,7 +27,13 @@ def _invoke(operation, paths, task, **fields):
         if type(query) is not str or not query or len(query.encode()) > 4096:
             raise KnowledgeToolError("kb-query")
         arguments.append(query)
-    arguments += ["--task", task]
+    if operation in {"advise", "plan", "explain"}:
+        arguments += ["--task", task]
+    if operation == "leaderboard":
+        population = fields.get("population", "held-out")
+        if population not in {"held-out", "observational"}:
+            raise KnowledgeToolError("kb-population")
+        arguments += ["--population", population]
     for p in paths:
         arguments += ["--kb", p]
     if operation == "plan":
@@ -40,7 +46,7 @@ def _invoke(operation, paths, task, **fields):
     environment.pop("ZENO_FCIS_KB", None)  # Only explicit paths are disclosed to an MCP caller.
     try:
         result = subprocess.run(arguments, stdin=subprocess.DEVNULL, capture_output=True,
-                                timeout=10, check=False, env=environment)
+                                timeout=60, check=False, env=environment)
         if len(result.stdout) > 2_000_000:
             raise KnowledgeToolError("kb-output-bound")
         report = json.loads(result.stdout)
@@ -67,5 +73,13 @@ def kb_explain(paths: list[str], task: str, query: str) -> dict:
     return _invoke("explain", paths, task, query=query)
 
 
-TOOLS = (kb_advise, kb_plan, kb_explain)
+def kb_assessment_view(paths: list[str], view: str = "assessments", population: str = "held-out") -> dict:
+    """Read-only assessment, queue, telemetry or loop values; never runs an assessment."""
+    operations = {"assessments": "assessment-view", "queue": "assessment-queue", "leaderboard": "leaderboard", "telemetry": "telemetry"}
+    if view not in operations:
+        raise KnowledgeToolError("kb-view")
+    return _invoke(operations[view], paths, "", population=population)
+
+
+TOOLS = (kb_advise, kb_plan, kb_explain, kb_assessment_view)
 ANNOTATIONS = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}

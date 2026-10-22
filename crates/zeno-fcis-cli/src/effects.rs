@@ -926,7 +926,15 @@ effects! { crate::knowledge_command::Operation {
         "migrate" => Self::Migrate { .. } => declared((&["explicit-legacy-layer"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
         "curate" => Self::Curate { .. } => declared((&["explicit-candidates", "explicit-knowledge-layers"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
         "assess" => Self::Assess { .. } => declared((&["frozen-suite", "explicit-knowledge-layers", "bound-inputs"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock", "temporary-checker-files"], true, None));
-        "assessment-queue" => Self::AssessmentQueue => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "assessment-queue" => Self::AssessmentQueue{..} => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "grow" => Self::Grow => declared((&["explicit-knowledge-layers", "private-case-base"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "ingest-episodes" => Self::IngestEpisodes {..} => declared((&["explicit-episode-records"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "refresh" => Self::Refresh => declared((&["explicit-knowledge-layers", "explicit-dependencies"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "leaderboard" => Self::Leaderboard{..} => declared((&["private-certified-facts"], &[], false, None));
+        "telemetry" => Self::Telemetry => declared((&["private-episode-records"], &[], false, None));
+        "certify" => Self::Certify{..} => declared((&["bound-subject", "bound-candidate"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "facts" => Self::Facts {..} => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "reuse" => Self::Reuse {..} => declared((&["explicit-knowledge-layers", "bound-subject"], &[], false, None));
         "assessment-view" => Self::AssessmentView => declared((&["explicit-knowledge-layers"], &[], false, None));
         "assessment-task" => Self::AssessmentTask { .. } => declared((&["bound-task-request"], &["new-private-task-output"], false, None));
         "advise" => Self::Advise { .. } => declared((

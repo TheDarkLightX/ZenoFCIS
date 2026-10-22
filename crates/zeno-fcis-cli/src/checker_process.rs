@@ -2240,7 +2240,10 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
                     ..
                 },
         } => Some((true, workers.unwrap_or(4))),
-        crate::Command::Loop { .. } => loop_profile(),
+        crate::Command::Loop { .. }
+        | crate::Command::Kb {
+            operation: crate::knowledge_command::Operation::AssessmentTask { .. },
+        } => loop_profile(),
         _ => None,
     }
 }
@@ -2318,6 +2321,9 @@ fn required_profile(command: &crate::Command) -> Result<Profile, String> {
     use crate::loop_command::doors::capture::Command as C;
     use crate::loop_command::{Command as L, doors::DoorCommand as D};
     match command {
+        crate::Command::Kb {
+            operation: crate::knowledge_command::Operation::AssessmentTask { .. },
+        } => Ok(Profile::FiniteData),
         crate::Command::Loop { command } => match command {
             L::Open { .. } | L::Encode { .. } => Ok(Profile::FiniteData),
             L::Candidate { session, .. } | L::Run { session, .. } | L::Resume { session } => {

@@ -59,6 +59,8 @@ pub(crate) struct Candidate {
     pub id: String,
     pub statement_sha256: String,
     pub subject: String,
+    #[serde(default)]
+    pub claim: String,
     pub scope: Scope,
     pub effect: String,
     pub action: Action,
@@ -160,6 +162,10 @@ pub(crate) struct Assessment {
     pub suite_sha256: String,
     pub revision_sha256: String,
     pub candidates: BTreeSet<String>,
+    pub proposing_tasks: BTreeSet<String>,
+    pub proposing_subjects: BTreeSet<String>,
+    pub total_budget: u64,
+    pub justifications: BTreeMap<String, String>,
     pub engine_sha256: String,
     pub checker_sha256: String,
     pub tool_version: String,
@@ -170,6 +176,8 @@ pub(crate) struct Assessment {
     pub reason: String,
     pub resource_stop: Option<String>,
     pub assessment_work: u64,
+    pub reserved_work: u64,
+    pub prior_assessment_work: u64,
     pub curation_work: u64,
 }
 pub(crate) fn digest(s: &str) -> bool {
@@ -221,6 +229,11 @@ pub(crate) fn member(child: &str, parent: &str, isa: &BTreeSet<(String, String)>
     false
 }
 fn validate_run(run: &Run, task: &str) -> Result<(), &'static str> {
+    let total_work = run
+        .work
+        .values()
+        .try_fold(0u64, |a, b| a.checked_add(*b))
+        .ok_or("kb-work-overflow")?;
     if run.task != task
         || !digest(task)
         || !digest(&run.inputs)
@@ -243,12 +256,7 @@ fn validate_run(run: &Run, task: &str) -> Result<(), &'static str> {
         })
         || (run.verdict.solved() && run.result_cost.is_none())
         || (!run.verdict.solved() && run.result_cost.is_some())
-        || run
-            .work
-            .values()
-            .try_fold(0u64, |a, b| a.checked_add(*b))
-            .is_none_or(|w| w > run.budget)
-            && !run.budget_stop
+        || total_work > run.budget && !run.budget_stop
     {
         return Err("kb-run-binding");
     }
@@ -395,6 +403,111 @@ mod tests {
         }
     }
     #[test]
+    fn pareto_matches_finite_product_order() {
+        let mut cases = Vec::new();
+        for off_solved in [false, true] {
+            for on_solved in [false, true] {
+                for ow in [2u64, 3] {
+                    for nw in [2u64, 3] {
+                        for oc in [1u64, 2] {
+                            for nc in [1u64, 2] {
+                                let mut c = case(ow, nw);
+                                c.off.verdict = if off_solved {
+                                    Verdict::Accepted
+                                } else {
+                                    Verdict::NotFound
+                                };
+                                c.on.verdict = if on_solved {
+                                    Verdict::Accepted
+                                } else {
+                                    Verdict::NotFound
+                                };
+                                c.off.result_cost = off_solved.then_some([oc, 30]);
+                                c.on.result_cost = on_solved.then_some([nc, 30]);
+                                let off = [
+                                    i128::from(off_solved),
+                                    -i128::from(ow),
+                                    if off_solved && on_solved {
+                                        -i128::from(oc)
+                                    } else {
+                                        0
+                                    },
+                                ];
+                                let on = [
+                                    i128::from(on_solved),
+                                    -i128::from(nw),
+                                    if off_solved && on_solved {
+                                        -i128::from(nc)
+                                    } else {
+                                        0
+                                    },
+                                ];
+                                let comparisons = on
+                                    .iter()
+                                    .zip(off)
+                                    .map(|(n, o)| n.cmp(&o))
+                                    .collect::<Vec<_>>();
+                                cases.push((c, comparisons));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (a, ac) in &cases {
+            for (b, bc) in &cases {
+                let mut b = b.clone();
+                b.task = "b".repeat(64);
+                b.off.task = b.task.clone();
+                b.on.task = b.task.clone();
+                let orders = ac.iter().chain(bc);
+                let expected = if orders.clone().any(|x| *x == core::cmp::Ordering::Less) {
+                    Decision::Reject
+                } else if orders.clone().any(|x| *x == core::cmp::Ordering::Greater) {
+                    Decision::Promote
+                } else {
+                    Decision::Inconclusive
+                };
+                assert_eq!(
+                    decide(&[a.clone(), b], &BTreeSet::new(), &Policy::default(), &[])
+                        .unwrap()
+                        .0,
+                    expected
+                );
+            }
+        }
+    }
+    #[test]
+    fn one_worse_task_cannot_be_hidden() {
+        let a = case(10, 5);
+        let mut b = case(3, 4);
+        b.task = "b".repeat(64);
+        b.off.task = b.task.clone();
+        b.on.task = b.task.clone();
+        assert_eq!(
+            decide(&[a, b], &BTreeSet::new(), &Policy::default(), &[])
+                .unwrap()
+                .0,
+            Decision::Reject
+        );
+    }
+    #[test]
+    fn wall_time_is_not_a_work_counter() {
+        let mut c = case(10, 9);
+        c.on.work.insert("wall_time".into(), 1);
+        c.off.work.insert("wall_time".into(), 100);
+        assert!(decide(&[c], &BTreeSet::new(), &Policy::default(), &[]).is_err());
+    }
+    #[test]
+    fn points_are_not_policy() {
+        assert!(
+            serde_json::from_str::<Policy>(
+                r#"{"minimum_effect_bps":0,"rule":"held-out-pareto-v1","points":100}"#
+            )
+            .is_err()
+        );
+    }
+    #[test]
     fn pareto_rejects_one_worse_measure() {
         let mut c = case(10, 9);
         c.on.result_cost = Some([3, 30]);
@@ -476,6 +589,7 @@ mod tests {
             id: "a".into(),
             statement_sha256: "a".repeat(64),
             subject: "pipeline".into(),
+            claim: String::new(),
             scope: Scope::new(),
             effect: "helps".into(),
             action: Action {

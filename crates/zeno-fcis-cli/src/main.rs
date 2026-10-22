@@ -26,6 +26,8 @@ mod judge_command;
 mod knowledge_assessment;
 mod knowledge_command;
 mod knowledge_evidence;
+mod knowledge_growth;
+mod knowledge_metrics;
 mod knowledge_replay;
 mod knowledge_store;
 mod knowledge_workflow;
@@ -477,8 +479,15 @@ fn execute() -> u8 {
             if let Command::Commons { args } = &cli.command {
                 return run_commons(args);
             }
-            if let Command::Kb { operation } = cli.command {
-                return knowledge_command::execute(&cli.kb, operation);
+            if !matches!(
+                &cli.command,
+                Command::Kb {
+                    operation: knowledge_command::Operation::AssessmentTask { .. }
+                }
+            ) {
+                if let Command::Kb { operation } = cli.command {
+                    return knowledge_command::execute(&cli.kb, operation);
+                }
             }
             let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {

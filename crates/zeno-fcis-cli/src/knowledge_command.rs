@@ -38,9 +38,51 @@ pub(crate) enum Operation {
         annotations: Option<PathBuf>,
     },
     /// Pending candidates ordered by observational value; no promotion authority.
-    AssessmentQueue,
+    AssessmentQueue {
+        #[arg(long)]
+        suite: Option<PathBuf>,
+    },
     /// Read-only assessment and retraction history.
     AssessmentView,
+    /// Propose only declared inheritance lifts and episode-guided narrower scopes.
+    Grow,
+    /// Import bounded private episode records as observations, never as advice.
+    IngestEpisodes {
+        #[arg(long)]
+        source: PathBuf,
+    },
+    /// Persist minimal pending retractions after dependency or version changes.
+    Refresh,
+    /// Summarise private outcome records; observations never promote.
+    Telemetry,
+    /// Descriptive loop value profiles. Points carry no promotion authority.
+    Leaderboard {
+        #[arg(long,default_value="held-out",value_parser=["held-out","observational"])]
+        population: String,
+    },
+    /// Replay an exact finite proof or counterexample; no assessment is needed for this fact.
+    Certify {
+        #[arg(long)]
+        original: PathBuf,
+        #[arg(long)]
+        candidate: PathBuf,
+        #[arg(long, default_value = "{}")]
+        scope: String,
+        #[arg(long)]
+        refutes: Option<String>,
+    },
+    /// Exact-subject certified results. Receipt replay is required before reuse.
+    Facts {
+        #[arg(long)]
+        subject: String,
+    },
+    /// Recheck a recorded equivalence receipt for exactly this subject.
+    Reuse {
+        #[arg(long)]
+        fact: String,
+        #[arg(long)]
+        subject: PathBuf,
+    },
     #[command(hide = true)]
     AssessmentTask {
         #[arg(long)]
@@ -76,7 +118,7 @@ pub(crate) enum Operation {
     /// A query and its complete finite derivation in this task context.
     Explain {
         query: String,
-        #[arg(long)]
+        #[arg(long, default_value = "")]
         task: String,
     },
     /// Check the catalog, lesson evidence and unresolved conflicts.
@@ -184,9 +226,20 @@ fn load_with_checker(
                     .ok()
                     .is_some_and(|v| v["schema"] == "zeno-fcis/kb-layer/2")
                 {
-                    let (layer, _) = crate::knowledge_store::live(&resolved).map_err(fail)?;
-                    loaded.preparation_work =
-                        loaded.preparation_work.saturating_add(data.len() as u64);
+                    let (layer, _) = crate::knowledge_store::live_with_checker(
+                        &resolved,
+                        checker_sha.as_deref(),
+                    )
+                    .map_err(fail)?;
+                    loaded.preparation_work = loaded.preparation_work.saturating_add(
+                        serde_json::to_vec(&layer)
+                            .map_err(|_| fail("kb-encoding"))?
+                            .len() as u64,
+                    );
+                    if let Some(binding) = loaded.bindings.last_mut() {
+                        binding["effective_sha256"] =
+                            json!(crate::knowledge_store::hash(&layer).map_err(fail)?);
+                    }
                     loaded.assessed.push(layer);
                     loaded.paths.push(resolved);
                     loaded.sources.push(String::new());
@@ -279,6 +332,17 @@ pub(crate) fn run(
     result
         .map(|mut r| {
             r.work = r.work.saturating_add(loaded.preparation_work);
+            if crate::knowledge_workflow::layer_conflict(&loaded.assessed) {
+                match &mut r.outcome {
+                    K::Outcome::Checked(problems) => problems.push("kb-assessed-layer-conflict"),
+                    K::Outcome::Advised(advice) => {
+                        advice.problems.push("kb-assessed-layer-conflict");
+                        advice.lessons.clear();
+                        advice.facts.clear();
+                    }
+                    _ => {}
+                }
+            }
             r
         })
         .map_err(|mut e| {
@@ -362,7 +426,11 @@ pub(crate) fn report(
         }
         K::Outcome::Advised(a) => {
             v["status"] = json!("advised");
-            let assessed = crate::knowledge_workflow::advice(&loaded.assessed, &a.task_facts);
+            let assessed = if a.problems.is_empty() {
+                crate::knowledge_workflow::advice(&loaded.assessed, &a.task_facts)
+            } else {
+                vec![]
+            };
             v["assessed_advice"] = json!(assessed);
             v["lessons"] = json!(
                 a.lessons

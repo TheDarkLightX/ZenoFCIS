@@ -13,10 +13,18 @@ pub(crate) fn handles(op: &Operation) -> bool {
             | Operation::Migrate { .. }
             | Operation::Curate { .. }
             | Operation::Assess { .. }
-            | Operation::AssessmentQueue
+            | Operation::AssessmentQueue { .. }
             | Operation::AssessmentView
             | Operation::AssessmentTask { .. }
-    )
+            | Operation::Grow
+            | Operation::IngestEpisodes { .. }
+            | Operation::Refresh
+            | Operation::Telemetry
+            | Operation::Leaderboard { .. }
+            | Operation::Facts { .. }
+            | Operation::Certify { .. }
+            | Operation::Reuse { .. }
+    ) || matches!(op,Operation::Explain{query,..} if !query.contains('('))
 }
 fn layer_path(given: &[PathBuf]) -> Result<PathBuf, &'static str> {
     let paths = crate::knowledge_command::paths(given).map_err(|_| "kb-paths")?;
@@ -171,9 +179,188 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                         json!({"status":if record.decision==Decision::Inconclusive{"inconclusive"}else{"assessed"},"authority":"none","assessment_sha256":key,"layer_sha256":sha,"assessment":record,"aggregate":aggregate(record)}),
                     )
                 }
-                Operation::AssessmentQueue => Ok(
-                    json!({"status":"assessment-queue","authority":"none","queue":queue(&layer,None),"scores_have_promotion_authority":false}),
+                Operation::Grow => {
+                    let mut next = layer.clone();
+                    let mut proposals = crate::knowledge_growth::grow(&layer)?;
+                    proposals.extend(crate::knowledge_growth::mine(&layer.episodes)?);
+                    let mut inserted = BTreeSet::new();
+                    for c in proposals {
+                        if !next
+                            .candidates
+                            .iter()
+                            .any(|x| x.statement_sha256 == c.statement_sha256)
+                        {
+                            inserted.insert(c.statement_sha256.clone());
+                            next.candidates.push(c);
+                        }
+                    }
+                    next.curation_work = next.curation_work.saturating_add(inserted.len() as u64);
+                    next.generation += 1;
+                    next.history.push(S::Change {
+                        kind: "growth-proposals".into(),
+                        subjects: inserted,
+                        evidence: S::hash(&layer)?,
+                    });
+                    let sha = S::commit(&path, Some(&binding), &next)?;
+                    Ok(
+                        json!({"status":"proposed","authority":"none","sha256":sha,"queue":queue(&next,None)}),
+                    )
+                }
+                Operation::IngestEpisodes { source } => {
+                    let bytes = S::read(&source, 2 * 1024 * 1024)?;
+                    let value: Value =
+                        serde_json::from_slice(&bytes).map_err(|_| "kb-episode-source")?;
+                    let episodes: Vec<crate::knowledge_growth::Episode> = if value.is_array() {
+                        serde_json::from_value(value).map_err(|_| "kb-episode-source")?
+                    } else {
+                        vec![serde_json::from_value(value).map_err(|_| "kb-episode-source")?]
+                    };
+                    if episodes.len() > 512 {
+                        return Err("kb-episode-budget");
+                    }
+                    let mut next = layer.clone();
+                    for e in episodes {
+                        e.evidence()?;
+                        let observed_work = e.work.values().copied().sum::<u64>();
+                        let fresh = next.episodes.insert(S::hash(&e)?, e).is_none();
+                        next.curation_work = next
+                            .curation_work
+                            .checked_add(1 + if fresh { observed_work } else { 0 })
+                            .ok_or("kb-work-overflow")?;
+                    }
+                    next.generation += 1;
+                    next.history.push(S::Change {
+                        kind: "observational-episodes".into(),
+                        subjects: BTreeSet::new(),
+                        evidence: crate::transform::sha256_hex(&bytes),
+                    });
+                    let sha = S::commit(&path, Some(&binding), &next)?;
+                    Ok(
+                        json!({"status":"observed","authority":"none","sha256":sha,"telemetry":crate::knowledge_growth::telemetry(&next)}),
+                    )
+                }
+                Operation::Refresh => {
+                    let mut next = layer.clone();
+                    next.generation += 1;
+                    let sha = S::commit(&path, Some(&binding), &next)?;
+                    Ok(
+                        json!({"status":"pending-refreshed","authority":"none","sha256":sha,"history":next.history}),
+                    )
+                }
+                Operation::Leaderboard { population } => {
+                    let (engine, checker, _) = S::identity()?;
+                    crate::knowledge_metrics::profiles(&layer, &checker, &engine, &population)
+                }
+                Operation::Telemetry => Ok(
+                    json!({"status":"observational","authority":"none","telemetry":crate::knowledge_growth::telemetry(&layer)}),
                 ),
+                Operation::Certify {
+                    original,
+                    candidate,
+                    scope,
+                    refutes,
+                } => {
+                    let original = S::read(&original, 1_048_576)?;
+                    let candidate = S::read(&candidate, 1_048_576)?;
+                    let scope =
+                        serde_json::from_str::<Scope>(&scope).map_err(|_| "kb-fact-scope")?;
+                    let output =
+                        crate::loop_command::doors::assessment_certificate(&original, &candidate)?;
+                    let (next, key) = crate::knowledge_growth::certify(
+                        &layer,
+                        &output,
+                        scope,
+                        refutes.as_deref(),
+                    )?;
+                    let sha = S::commit(&path, Some(&binding), &next)?;
+                    Ok(
+                        json!({"status":"artifact-replayed","authority":"none","fact_sha256":key,"layer_sha256":sha}),
+                    )
+                }
+                Operation::Facts { subject } => {
+                    if !digest(&subject) {
+                        return Err("kb-exact-subject-required");
+                    }
+                    let (_, checker, _) = S::identity()?;
+                    let facts = layer
+                        .facts
+                        .iter()
+                        .filter(|(_, f)| f.subject == subject && f.checker_sha256 == checker)
+                        .map(|(k, f)| json!({"sha256":k,"fact":f,"requires_receipt_replay":true}))
+                        .collect::<Vec<_>>();
+                    Ok(
+                        json!({"status":"certified-facts","authority":"none","facts":facts,"strategy_advice":false}),
+                    )
+                }
+                Operation::Reuse { fact, subject } => {
+                    let f = layer.facts.get(&fact).ok_or("kb-fact-missing")?;
+                    let data = S::read(&subject, 1_048_576)?;
+                    let (_, checker, _) = S::identity()?;
+                    crate::knowledge_growth::replay_for_reuse(
+                        f,
+                        layer
+                            .outputs
+                            .get(&f.output_sha256)
+                            .ok_or("kb-fact-artifact")?,
+                        &data,
+                        &checker,
+                    )?;
+                    Ok(
+                        json!({"status":"receipt-replayed","authority":"none","fact_sha256":fact,"subject_sha256":f.subject,"receipt_sha256":f.run.receipt_sha256}),
+                    )
+                }
+                Operation::Explain { query, .. } => {
+                    let c = layer
+                        .candidates
+                        .iter()
+                        .find(|c| c.id == query || c.statement_sha256 == query)
+                        .ok_or("kb-candidate-missing")?;
+                    let mut parents = BTreeSet::new();
+                    let mut todo = c.parents.iter().cloned().collect::<Vec<_>>();
+                    while let Some(p) = todo.pop() {
+                        if parents.insert(p.clone()) {
+                            if let Some(parent) =
+                                layer.candidates.iter().find(|c| c.statement_sha256 == p)
+                            {
+                                todo.extend(parent.parents.iter().cloned());
+                            }
+                        }
+                    }
+                    let episodes = c
+                        .episodes
+                        .iter()
+                        .filter_map(|id| {
+                            layer
+                                .episodes
+                                .get(id)
+                                .map(|e| json!({"sha256":id,"episode":e}))
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(
+                        json!({"status":"explained","authority":"none","candidate":c,"assessment":c.assessment.as_ref().and_then(|a|layer.assessments.get(a)),"episodes":episodes,"justification_chain":parents.into_iter().filter_map(|p|layer.candidates.iter().find(|c|c.statement_sha256==p)).collect::<Vec<_>>(),"derived_memberships":layer.isa.iter().filter(|(_,p)|c.scope.values().any(|v|v.contains(p))).map(|(child,parent)|json!({"conclusion":[child,parent],"witness":"declared-isa-edge"})).collect::<Vec<_>>()}),
+                    )
+                }
+                Operation::AssessmentQueue { suite } => {
+                    let given = if let Some(file) = suite {
+                        let s: crate::knowledge_replay::Suite =
+                            serde_json::from_slice(&S::read(&file, 1_048_576)?)
+                                .map_err(|_| "kb-suite-schema")?;
+                        s.check()?;
+                        Some(s)
+                    } else {
+                        None
+                    };
+                    let stored = layer
+                        .assessments
+                        .values()
+                        .filter_map(|a| layer.outputs.get(&a.suite_sha256))
+                        .find_map(|v| {
+                            serde_json::from_value::<crate::knowledge_replay::Suite>(v.clone()).ok()
+                        });
+                    Ok(
+                        json!({"status":"assessment-queue","authority":"none","queue":queue(&layer,given.as_ref().or(stored.as_ref())),"scores_have_promotion_authority":false}),
+                    )
+                }
                 Operation::AssessmentView => Ok(
                     json!({"status":"assessments","authority":"none","assessments":layer.assessments,"history":layer.history}),
                 ),
@@ -196,7 +383,7 @@ pub(crate) fn aggregate(a: &Assessment) -> Value {
     };
     let off = sum(false);
     let on = sum(true);
-    json!({"scope":"recorded-frozen-suite-only","off":{"solved":off.0,"work":off.1},"on":{"solved":on.0,"work":on.1},"assessment_work_reserved":a.assessment_work,"curation_work":a.curation_work,"on_total_with_assessment_and_curation":on.1.saturating_add(a.assessment_work).saturating_add(a.curation_work),"wall_time_used":false})
+    json!({"scope":"recorded-frozen-suite-only","off":{"solved":off.0,"work":off.1},"on":{"solved":on.0,"work":on.1},"assessment_work":a.assessment_work,"assessment_work_reserved":a.reserved_work,"prior_assessment_work":a.prior_assessment_work,"curation_work":a.curation_work,"on_total_with_assessment_and_curation":on.1.saturating_add(a.assessment_work).saturating_add(a.prior_assessment_work).saturating_add(a.curation_work),"wall_time_used":false})
 }
 pub(crate) fn queue(layer: &Layer, suite: Option<&crate::knowledge_replay::Suite>) -> Value {
     let mut rows = layer
@@ -221,7 +408,7 @@ pub(crate) fn queue(layer: &Layer, suite: Option<&crate::knowledge_replay::Suite
             .then(b.2.cmp(&a.2))
             .then(a.3.statement_sha256.cmp(&b.3.statement_sha256))
     });
-    json!(rows.into_iter().map(|(families,applicable,work,c)|json!({"id":c.id,"statement_sha256":c.statement_sha256,"state":c.state,"strength":if c.assessment.is_some(){"measured"}else if families>=2{"observed"}else{"proposed"},"independent_families":families,"applicable_tasks":applicable,"observed_work":work,"conflicts":layer.candidates.iter().filter(|other|other.statement_sha256!=c.statement_sha256 && other.subject==c.subject && other.scope==c.scope && other.action!=c.action).map(|c|&c.id).collect::<Vec<_>>()})).collect::<Vec<_>>())
+    json!(rows.into_iter().map(|(families,applicable,work,c)|json!({"id":c.id,"statement_sha256":c.statement_sha256,"state":c.state,"strength":if c.assessment.is_some(){"measured"}else if families>=2{"observed"}else{"proposed"},"independent_families":families,"applicable_tasks":applicable,"observed_work":work,"conflicts":layer.candidates.iter().filter(|other|other.statement_sha256!=c.statement_sha256 && S::conflicts(c,other,&layer.isa)).map(|c|&c.id).collect::<Vec<_>>()})).collect::<Vec<_>>())
 }
 pub(crate) fn task_scope(facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact]) -> Scope {
     use zeno_fcis_loop_doors::strategy_knowledge::Value as V;
@@ -240,6 +427,21 @@ pub(crate) fn task_scope(facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact
     }
     scope
 }
+pub(crate) fn layer_conflict(layers: &[Layer]) -> bool {
+    let isa = layers.iter().flat_map(|l| l.isa.iter().cloned()).collect();
+    let candidates = layers
+        .iter()
+        .flat_map(|l| l.candidates.iter())
+        .collect::<Vec<_>>();
+    candidates.iter().enumerate().any(|(i, a)| {
+        candidates.iter().skip(i + 1).any(|b| {
+            a.id == b.id && a.statement_sha256 != b.statement_sha256
+                || a.state == State::Promoted
+                    && b.state == State::Promoted
+                    && S::conflicts(a, b, &isa)
+        })
+    })
+}
 pub(crate) fn advice<'a>(
     layers: &'a [Layer],
     facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact],
@@ -249,6 +451,9 @@ pub(crate) fn advice<'a>(
         f.predicate == "task"
             && f.arguments == vec![V::Text("subject".into()), V::Text("pipeline".into())]
     }) {
+        return vec![];
+    }
+    if layer_conflict(layers) {
         return vec![];
     }
     let scope = task_scope(facts);

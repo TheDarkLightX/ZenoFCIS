@@ -27,6 +27,10 @@ pub(crate) struct Layer {
     pub isa: BTreeSet<(String, String)>,
     pub history: Vec<Change>,
     pub legacy: Option<String>,
+    #[serde(default)]
+    pub episodes: BTreeMap<String, crate::knowledge_growth::Episode>,
+    #[serde(default)]
+    pub facts: BTreeMap<String, crate::knowledge_growth::CertifiedFact>,
 }
 impl Default for Layer {
     fn default() -> Self {
@@ -40,6 +44,8 @@ impl Default for Layer {
             isa: BTreeSet::new(),
             history: vec![],
             legacy: None,
+            episodes: BTreeMap::new(),
+            facts: BTreeMap::new(),
         }
     }
 }
@@ -61,7 +67,7 @@ pub(crate) fn hash<T: Serialize>(value: &T) -> Result<String, &'static str> {
         .map_err(|_| "kb-encoding")
 }
 pub(crate) fn statement(c: &Candidate) -> Result<String, &'static str> {
-    hash(&(&c.subject, &c.scope, &c.effect, &c.action))
+    hash(&(&c.subject, &c.claim, &c.scope, &c.effect, &c.action))
 }
 pub(crate) fn error(reason: &str) -> Value {
     json!({"schema":SCHEMA,"status":"refused","authority":"none","reason":reason})
@@ -71,6 +77,9 @@ pub(crate) fn engine() -> String {
         include_str!("knowledge_assessment.rs"),
         include_str!("knowledge_store.rs"),
         include_str!("knowledge_replay.rs"),
+        include_str!("knowledge_growth.rs"),
+        include_str!("knowledge_metrics.rs"),
+        include_str!("knowledge_workflow.rs"),
         include_str!("knowledge_command.rs"),
         include_str!("loop_knowledge.rs"),
     ];
@@ -116,6 +125,7 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
                 .id
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            || c.claim.len() > 4096
             || c.subject != "pipeline"
             || !valid_scope(&c.scope)
             || !matches!(
@@ -140,12 +150,17 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
                 .as_ref()
                 .and_then(|h| layer.assessments.get(h))
                 .ok_or("kb-unassessed-promotion")?;
+            if a.justifications.get(&c.statement_sha256)
+                != Some(&hash(&(&c.parents, &c.dependencies))?)
+            {
+                return Err("kb-assessment-justification");
+            }
             if a.candidates != BTreeSet::from([c.statement_sha256.clone()])
                 || a.decision != Decision::Promote
             {
                 return Err("kb-unassessed-promotion");
             }
-            let (decision, _) = assessed_decision(a, &c.proposing_tasks)?;
+            let (decision, _) = assessed_decision(a, &a.proposing_tasks)?;
             if decision != Decision::Promote {
                 return Err("kb-unassessed-promotion");
             }
@@ -177,15 +192,11 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             || !digest(&a.suite_sha256)
             || !digest(&a.engine_sha256)
             || !digest(&a.checker_sha256)
+            || a.reserved_work > a.total_budget
         {
             return Err("kb-assessment-binding");
         }
-        let proposing = layer
-            .candidates
-            .iter()
-            .filter(|c| a.candidates.contains(&c.statement_sha256))
-            .flat_map(|c| c.proposing_tasks.iter().cloned())
-            .collect();
+        let proposing = &a.proposing_tasks;
         let suite: crate::knowledge_replay::Suite = serde_json::from_value(
             layer
                 .outputs
@@ -218,14 +229,11 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             {
                 return Err("kb-assessment-task");
             }
-            if layer.candidates.iter().any(|c| {
-                a.candidates.contains(&c.statement_sha256)
-                    && c.families.iter().any(|f| f.subject == task.subject.sha256)
-            }) {
+            if a.proposing_subjects.contains(&task.subject.sha256) {
                 return Err("kb-held-out-split");
             }
         }
-        let (decision, reason) = assessed_decision(a, &proposing)?;
+        let (decision, reason) = assessed_decision(a, proposing)?;
         if decision != a.decision || reason != a.reason {
             return Err("kb-assessment-decision");
         }
@@ -249,6 +257,16 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             }
         }
     }
+    for (i, a) in layer.candidates.iter().enumerate() {
+        for b in layer.candidates.iter().skip(i + 1) {
+            if a.state == State::Promoted
+                && b.state == State::Promoted
+                && conflicts(a, b, &layer.isa)
+            {
+                return Err("kb-assessed-conflict");
+            }
+        }
+    }
     // An unrelated pending record cannot preserve a promoted dependent.
     for c in layer
         .candidates
@@ -256,14 +274,16 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
         .filter(|c| c.state == State::Promoted)
     {
         if c.parents.iter().any(|p| {
-            layer
-                .candidates
-                .iter()
-                .any(|x| &x.statement_sha256 == p && x.state != State::Promoted)
+            layer.candidates.iter().any(|x| {
+                &x.statement_sha256 == p
+                    && (matches!(x.state, State::Pending | State::Refuted)
+                        || x.assessment.is_none())
+            })
         }) {
             return Err("kb-pending-justification");
         }
     }
+    crate::knowledge_growth::validate(layer)?;
     Ok(())
 }
 fn assessed_decision(
@@ -290,7 +310,8 @@ pub(crate) fn current(
         .candidates
         .iter()
         .filter(|c| {
-            c.state == State::Promoted
+            c.state != State::Refuted
+                && c.assessment.is_some()
                 && (c
                     .assessment
                     .as_ref()
@@ -308,7 +329,75 @@ pub(crate) fn current(
         .collect();
     let mut next = layer.clone();
     next.candidates = retract(&layer.candidates, &roots);
+    for c in &mut next.candidates {
+        if c.state == State::Pending {
+            for (p, expected) in &mut c.dependencies {
+                if let Some(actual) = dependencies.get(p) {
+                    if digest(actual) {
+                        *expected = actual.clone();
+                    }
+                }
+            }
+        }
+    }
+    if !roots.is_empty() && next.candidates != layer.candidates {
+        next.history.push(Change {
+            kind: "justification-invalidated".into(),
+            subjects: roots.clone(),
+            evidence: hash(&(engine, checker, version, dependencies)).unwrap_or_default(),
+        });
+    }
+    let telemetry = crate::knowledge_growth::telemetry(&next);
+    let regressed = telemetry["rows"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|r| r["outcomes"]["reassessment_required"] == true)
+        .filter_map(|r| r["lesson"].as_str())
+        .filter_map(|id| {
+            next.candidates
+                .iter()
+                .find(|c| c.id == id || c.statement_sha256 == id)
+        })
+        .map(|c| c.statement_sha256.clone())
+        .collect::<BTreeSet<_>>();
+    if !regressed.is_empty() {
+        let before = next.candidates.clone();
+        next.candidates = retract(&before, &regressed);
+        if before != next.candidates {
+            next.history.push(Change {
+                kind: "telemetry-reassessment-required".into(),
+                subjects: regressed,
+                evidence: hash(&telemetry).unwrap_or_default(),
+            });
+        }
+    }
     next
+}
+pub(crate) fn conflicts(a: &Candidate, b: &Candidate, isa: &BTreeSet<(String, String)>) -> bool {
+    if a.statement_sha256 == b.statement_sha256 || a.subject != b.subject || a.action == b.action {
+        return false;
+    }
+    for k in ["tool", "version", "family", "environment"] {
+        if let (Some(av), Some(bv)) = (
+            a.scope.get(k).and_then(|v| v.first()),
+            b.scope.get(k).and_then(|v| v.first()),
+        ) {
+            if av != "any"
+                && bv != "any"
+                && av != bv
+                && !(matches!(k, "tool" | "family")
+                    && (member(av, bv, isa)
+                        || member(bv, av, isa)
+                        || isa
+                            .iter()
+                            .any(|(child, _)| member(child, av, isa) && member(child, bv, isa))))
+            {
+                return false;
+            }
+        }
+    }
+    true
 }
 pub(crate) fn read(path: &Path, max: u64) -> Result<Vec<u8>, &'static str> {
     let meta = std::fs::symlink_metadata(path).map_err(|_| "kb-read")?;
@@ -360,8 +449,22 @@ pub(crate) fn load(path: &Path) -> Result<(Layer, String), &'static str> {
     Ok((layer, sha256_hex(&data)))
 }
 pub(crate) fn live(path: &Path) -> Result<(Layer, String), &'static str> {
+    live_with_checker(path, None)
+}
+pub(crate) fn live_with_checker(
+    path: &Path,
+    checker: Option<&str>,
+) -> Result<(Layer, String), &'static str> {
     let (layer, binding) = load(path)?;
-    let (e, c, v) = identity()?;
+    let (e, c, v) = if let Some(checker) = checker {
+        (
+            engine(),
+            checker.to_owned(),
+            env!("CARGO_PKG_VERSION").to_owned(),
+        )
+    } else {
+        identity()?
+    };
     let deps = layer
         .candidates
         .iter()
@@ -378,7 +481,8 @@ pub(crate) fn live(path: &Path) -> Result<(Layer, String), &'static str> {
     Ok((current(&layer, &e, &c, &v, &deps), binding))
 }
 pub(crate) fn private_root(root: &Path) -> Result<(), &'static str> {
-    if crate::knowledge_command::checkout(root) {
+    let resolved = std::fs::canonicalize(root).map_err(|_| "kb-private-parent")?;
+    if crate::knowledge_command::checkout(&resolved) {
         return Err("kb-path-must-be-outside-checkout");
     }
     let meta = std::fs::symlink_metadata(root).map_err(|_| "kb-private-parent")?;
@@ -524,6 +628,180 @@ fn commit_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn candidate(id: &str) -> Candidate {
+        let mut c = Candidate {
+            id: id.into(),
+            statement_sha256: String::new(),
+            subject: "pipeline".into(),
+            claim: id.into(),
+            scope: Scope::new(),
+            effect: "helps".into(),
+            action: Action {
+                skip: BTreeSet::new(),
+                order: vec![],
+            },
+            proposing_tasks: BTreeSet::new(),
+            families: BTreeSet::new(),
+            episodes: BTreeSet::new(),
+            parents: BTreeSet::new(),
+            dependencies: BTreeMap::new(),
+            state: State::Proposed,
+            assessment: None,
+            observed_work: 0,
+            origin: "test".into(),
+        };
+        c.statement_sha256 = statement(&c).unwrap();
+        c
+    }
+    #[test]
+    fn generalized_and_mined_records_cannot_self_promote() {
+        for origin in ["isa-generalization", "failure-mining"] {
+            let mut c = candidate(origin);
+            c.origin = origin.into();
+            c.state = State::Promoted;
+            let layer = Layer {
+                candidates: vec![c],
+                ..Layer::default()
+            };
+            assert_eq!(check(&layer), Err("kb-unassessed-promotion"));
+        }
+    }
+    #[test]
+    fn corroboration_and_telemetry_cannot_promote() {
+        let mut c = candidate("observed");
+        for actor in ["one", "two"] {
+            c.families.insert(EvidenceFamily {
+                subject: actor.repeat(64),
+                session: actor.into(),
+                actor: actor.into(),
+                tool: "v".into(),
+                environment: "e".into(),
+            });
+        }
+        c.observed_work = u64::MAX / 2;
+        let layer = Layer {
+            candidates: vec![c],
+            ..Layer::default()
+        };
+        let next = current(&layer, "e", "c", "v", &BTreeMap::new());
+        assert_eq!(next.candidates[0].state, State::Proposed);
+        assert!(crate::knowledge_workflow::advice(&[next], &[]).is_empty());
+    }
+    #[test]
+    fn dependency_change_retracts_only_justified_items() {
+        let mut c = candidate("a");
+        c.state = State::Promoted;
+        c.assessment = Some("old".into());
+        c.dependencies.insert("dependency".into(), "a".repeat(64));
+        let mut b = candidate("b");
+        b.state = State::Promoted;
+        b.assessment = Some("old".into());
+        b.parents.insert(c.statement_sha256.clone());
+        let mut d = candidate("d");
+        d.state = State::Promoted;
+        d.assessment = Some("old".into());
+        let a = Assessment {
+            schema: "zeno-fcis/kb-assessment/1".into(),
+            suite_sha256: "a".repeat(64),
+            revision_sha256: "b".repeat(64),
+            candidates: BTreeSet::new(),
+            proposing_tasks: BTreeSet::new(),
+            proposing_subjects: BTreeSet::new(),
+            total_budget: 0,
+            justifications: BTreeMap::new(),
+            engine_sha256: "e".into(),
+            checker_sha256: "c".into(),
+            tool_version: "v".into(),
+            policy: Policy::default(),
+            cases: vec![],
+            annotations: vec![],
+            decision: Decision::Inconclusive,
+            reason: "no-applicable-task".into(),
+            resource_stop: None,
+            assessment_work: 0,
+            reserved_work: 0,
+            prior_assessment_work: 0,
+            curation_work: 0,
+        };
+        let layer = Layer {
+            candidates: vec![c, b, d],
+            assessments: BTreeMap::from([("old".into(), a)]),
+            ..Layer::default()
+        };
+        let next = current(
+            &layer,
+            "e",
+            "c",
+            "v",
+            &BTreeMap::from([("dependency".into(), "z".repeat(64))]),
+        );
+        assert_eq!(
+            next.candidates.iter().map(|c| c.state).collect::<Vec<_>>(),
+            vec![State::Pending, State::Pending, State::Promoted]
+        );
+        assert!(
+            next.history
+                .iter()
+                .any(|h| h.kind == "justification-invalidated")
+        );
+    }
+    #[test]
+    fn unassessed_sources_never_become_advice() {
+        use zeno_fcis_loop_doors::strategy_knowledge::{Fact, Value};
+        let facts = [Fact {
+            predicate: "task".into(),
+            arguments: vec![
+                Value::Text("subject".into()),
+                Value::Text("pipeline".into()),
+            ],
+        }];
+        for origin in ["failure-mining", "isa-generalization", "inbox"] {
+            let mut c = candidate("candidate");
+            c.origin = origin.into();
+            let layers = [Layer {
+                candidates: vec![c],
+                ..Layer::default()
+            }];
+            assert!(crate::knowledge_workflow::advice(&layers, &facts).is_empty());
+        }
+    }
+    #[test]
+    fn duplicate_corroboration_family_has_one_queue_vote() {
+        let mut c = candidate("candidate");
+        let f = EvidenceFamily {
+            subject: "s".into(),
+            session: "session".into(),
+            actor: "contributor".into(),
+            tool: "v".into(),
+            environment: "e".into(),
+        };
+        c.families.extend([f.clone(), f]);
+        let layer = Layer {
+            candidates: vec![c],
+            ..Layer::default()
+        };
+        assert_eq!(
+            crate::knowledge_workflow::queue(&layer, None)[0]["independent_families"],
+            1
+        );
+    }
+    #[test]
+    fn refuted_record_is_never_advice() {
+        let mut c = candidate("refuted");
+        c.state = State::Refuted;
+        let layers = [Layer {
+            candidates: vec![c],
+            ..Layer::default()
+        }];
+        let task = zeno_fcis_loop_doors::strategy_knowledge::Fact {
+            predicate: "task".into(),
+            arguments: vec![
+                zeno_fcis_loop_doors::strategy_knowledge::Value::Text("subject".into()),
+                zeno_fcis_loop_doors::strategy_knowledge::Value::Text("pipeline".into()),
+            ],
+        };
+        assert!(crate::knowledge_workflow::advice(&layers, &[task]).is_empty());
+    }
     #[test]
     fn atomic_failure_preserves_complete_layer() {
         let root = std::env::temp_dir().join(format!("kb-atomic-{}", std::process::id()));

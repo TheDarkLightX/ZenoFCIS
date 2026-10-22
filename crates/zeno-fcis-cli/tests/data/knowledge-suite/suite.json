@@ -1,0 +1,267 @@
+{
+  "schema": "zeno-fcis/kb-suite/1",
+  "proposing_subjects": [
+    "04270561ad3b395c9c1252b7216092c70b406333c9a0438085c2e8f159c25aed",
+    "388affcd1b87419028978f0f85f223d5d28d89ab36f7071818f58359ce7aa39f",
+    "48e4b237ce1d41dfa80cadfefc36582c8c7e656f904cfada243a904fe6b03520",
+    "655160153a3c7121d4d3b61a5dc0e8917d9aab4012154072adf94f679c247dcd",
+    "712956ec375349dfd3d5cd2de067affb72b35e36fd67266ef296c79bfd3fb198",
+    "cf561f98efe6550d6eebc14331f0c36d2562dc3f376d79b2b4b5591d22d30987",
+    "e118df3fb976c2e5bc30c39d02fb192f6adca48fc2c1d0772279d3a637b63f1e",
+    "f5989719cbd8995a984872ae9508e2f4395e800c52c5e29d4982c38287723863"
+  ],
+  "tasks": [
+    {
+      "name": "counter-c4",
+      "subject": {
+        "path": "subjects/counter-c4.zcve",
+        "sha256": "55c6ae082b8e096b3a31be430ac3edfec23104f8f9bf03dc0d34a52e7de0e169"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "5d54ba909e61ea28bf9a5833c3d170352248f1148baf8e1a6c97162fd9222019"
+    },
+    {
+      "name": "counter-c6",
+      "subject": {
+        "path": "subjects/counter-c6.zcve",
+        "sha256": "aeff1ea8cba833ab35240ca2db19c7a86d37439ebed3979f084a3717a5aea435"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "a867e1944b39b3bdf1560c80fd982f9e7ca982aaaecb9c448fd68f4b9440da51"
+    },
+    {
+      "name": "counter-c7",
+      "subject": {
+        "path": "subjects/counter-c7.zcve",
+        "sha256": "62108dc11247a3d79e1be7d1d384d49eabbee43d40c0143a8b6b47605f26e880"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "bounded-counter"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "969c050a2802b981d874a078d9bb6b743f67ca3187981d1074c47171d5d52819"
+    },
+    {
+      "name": "rate-limiter",
+      "subject": {
+        "path": "subjects/rate-limiter.zcve",
+        "sha256": "d55c9461111fc6003ca277e12c65105e5f9e2dcdcbabf74747c1ed8a5c8d3b47"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "core-component"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "35f9e4cf492af5c40a889e2e386e89c5fe93a74f5412c7e780142db6fed9f04c"
+    },
+    {
+      "name": "idempotency-slot",
+      "subject": {
+        "path": "subjects/idempotency-slot.zcve",
+        "sha256": "188c3cbff92ebb2917e8b06a21712d4e3af7fc5aff6ae221c1a05973256a8868"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "core-component"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "e31f6e575aa5b78bc4939a1f67707820fb61c8a99786a2a241620d1ff3436453"
+    },
+    {
+      "name": "inventory-template",
+      "subject": {
+        "path": "subjects/inventory-template.zcve",
+        "sha256": "69361bba420314863e152f8114ee9c6238f38e9aaf87eb075e36a7853d80010c"
+      },
+      "scope": {
+        "capability": [
+          "finite-domain",
+          "immutable-proposal"
+        ],
+        "environment": [
+          "sandbox"
+        ],
+        "family": [
+          "template-synthesis"
+        ],
+        "tool": [
+          "zeno-fcis"
+        ],
+        "version": [
+          "v250"
+        ]
+      },
+      "seed": 17,
+      "budget": {
+        "work": 1000000,
+        "tuples": 4096,
+        "gate_pairs": 100000,
+        "checks": 12,
+        "search_work": 500000,
+        "timeout_ms": 10000
+      },
+      "proposal": {
+        "program": "identity",
+        "stages": [
+          "canonical",
+          "resubstitute"
+        ]
+      },
+      "sha256": "b35a858e9123f7021eed54f1139fb6727c7a34e7e5aabf220bda9f796625e710"
+    }
+  ]
+}

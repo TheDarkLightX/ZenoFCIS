@@ -319,6 +319,13 @@ pub(crate) fn assess(
     if candidates.len() != selected.len() || candidates.iter().any(|c| c.state == State::Refuted) {
         return Err("kb-assessment-selection");
     }
+    for c in &candidates {
+        for (path, expected) in &c.dependencies {
+            if sha256_hex(&S::read(Path::new(path), 64 * 1024 * 1024)?) != *expected {
+                return Err("kb-dependency-changed");
+            }
+        }
+    }
     let proposing = candidates
         .iter()
         .flat_map(|c| c.proposing_tasks.iter().cloned())
@@ -345,6 +352,7 @@ pub(crate) fn assess(
     let mut next = layer.clone();
     let mut cases = Vec::new();
     let mut reserved = 0u64;
+    let mut assessment_work = 0u64;
     let mut stop = None;
     let suite_sha = S::hash(suite)?;
     next.outputs.insert(
@@ -375,7 +383,11 @@ pub(crate) fn assess(
                     stop = Some(e.into());
                     break;
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    stop = Some(e.into());
+                    assessment_work = assessment_work.saturating_add(t.budget.work);
+                    break;
+                }
             }
         }
         if results.len() != 4 {
@@ -394,6 +406,17 @@ pub(crate) fn assess(
         )?;
         let on = measure(&results[1], t.sha256.clone(), t.seed, t.budget.work, inputs)?;
         for r in &results {
+            let measured = measure(
+                r,
+                t.sha256.clone(),
+                t.seed,
+                t.budget.work,
+                t.subject.sha256.clone(),
+            )?;
+            assessment_work = assessment_work
+                .checked_add(measured.work.values().copied().sum::<u64>())
+                .and_then(|n| n.checked_add(8))
+                .ok_or("kb-work-overflow")?;
             next.outputs.insert(S::hash(r)?, r.clone());
         }
         cases.push(Case {
@@ -414,6 +437,21 @@ pub(crate) fn assess(
         suite_sha256: suite_sha,
         revision_sha256: S::hash(layer)?,
         candidates: selected.clone(),
+        proposing_tasks: proposing,
+        proposing_subjects: candidates
+            .iter()
+            .flat_map(|c| c.families.iter().map(|f| f.subject.clone()))
+            .collect(),
+        total_budget,
+        justifications: candidates
+            .iter()
+            .map(|c| {
+                Ok((
+                    c.statement_sha256.clone(),
+                    S::hash(&(&c.parents, &c.dependencies))?,
+                ))
+            })
+            .collect::<Result<_, &'static str>>()?,
         engine_sha256: engine,
         checker_sha256: checker,
         tool_version: version,
@@ -423,7 +461,9 @@ pub(crate) fn assess(
         decision,
         reason: reason.into(),
         resource_stop: stop,
-        assessment_work: reserved,
+        assessment_work,
+        reserved_work: reserved,
+        prior_assessment_work: layer.assessments.values().map(|a| a.assessment_work).sum(),
         curation_work: layer.curation_work,
     };
     let key = S::hash(&a)?;
@@ -461,6 +501,24 @@ pub(crate) fn assess(
         subjects: selected.clone(),
         evidence: key.clone(),
     });
+    next = crate::knowledge_growth::add_cases(&next, &key)?;
     S::check(&next)?;
     Ok((next, key))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn renamed_proposing_subject_is_not_held_out() {
+        let mut suite: Suite =
+            serde_json::from_str(include_str!("../tests/data/knowledge-suite/suite.json")).unwrap();
+        assert!(suite.check().is_ok());
+        suite
+            .proposing_subjects
+            .insert(suite.tasks[0].subject.sha256.clone());
+        suite.tasks[0].name = "renamed".into();
+        suite.tasks[0].sha256 = suite.tasks[0].digest().unwrap();
+        assert_eq!(suite.check(), Err("kb-suite-task"));
+    }
 }
