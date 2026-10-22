@@ -5,6 +5,7 @@ CONTRIBUTING.md
 NOTICE
 README.md
 SECURITY.md
+THIRD_PARTY_NOTICES
 core-apps/api-quota/README.md
 core-apps/document-release/README.md
 core-apps/equipment-booking/README.md

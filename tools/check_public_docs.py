@@ -10,11 +10,11 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = Path("release/public-documents.txt")
 DOCUMENT_SUFFIXES = {".md", ".pdf", ".tex"}
-# Published documents without a document suffix: the agent index, the README
-# copied into every `zeno-fcis new --contract` application, and the Pages site.
+# Published documents without a document suffix, including attribution records.
 EXTRA_DOCUMENTS = frozenset({
     "CITATION.cff",
     "NOTICE",
+    "THIRD_PARTY_NOTICES",
     "llms.txt",
     "crates/zeno-fcis-cli/contract-app/README.md.in",
     "site/public/index.html",

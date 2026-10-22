@@ -112,6 +112,9 @@ class MergeHostsTest(unittest.TestCase):
         members = {"zeno-fcis": (executable, 0o755), "README.md": (self.source.blob("README.md"), 0o644),
                    "LICENSE-APACHE": (self.source.blob("LICENSE-APACHE"), 0o644),
                    "LICENSE-MIT": (self.source.blob("LICENSE-MIT"), 0o644),
+                   "NOTICE": (self.source.blob("NOTICE"), 0o644),
+                   "THIRD_PARTY_NOTICES": (self.source.blob("THIRD_PARTY_NOTICES"), 0o644),
+                   "CITATION.cff": (self.source.blob("CITATION.cff"), 0o644),
                    "INSTALLATION.md": (self.source.blob("docs/INSTALLATION.md"), 0o644)}
         members_change(members)
         archive_with(path, prefix, members)
@@ -124,6 +127,9 @@ class MergeHostsTest(unittest.TestCase):
             "drifted document": lambda members: members.update({"README.md": (b"# Drifted\n", 0o644)}),
             "executable mode": lambda members: members.update({"zeno-fcis": (members["zeno-fcis"][0], 0o644)}),
         }
+        for name in ("NOTICE", "THIRD_PARTY_NOTICES", "CITATION.cff"):
+            controls[f"missing {name}"] = lambda members, name=name: members.pop(name)
+            controls[f"drifted {name}"] = lambda members, name=name: members.update({name: (b"drift\n", 0o644)})
         for label, change in controls.items():
             with self.subTest(label):
                 self.renew()

@@ -604,6 +604,8 @@ class RepairedRegistryTests(unittest.TestCase):
 # test file imports every TestCase the file defines, so the host's
 # unittest.main() runs them.
 RUN_INSIDE = {
+    "tools/test_third_party_notices.py": ("tools/rc_package.py", "runs", ("self-test",),
+                                         "`rc_package.py self-test` runs it"),
     "tools/test_composed_domain_runtime_controls.py": ("tools/atdd.py", "runs", ("run",),
         "composed-domain-reference runs its complete CLI control set with the required --out; it is not a unittest selector"),
     "tools/test_atdd_registry.py": ("tools/atdd.py", "runs", ("run",),

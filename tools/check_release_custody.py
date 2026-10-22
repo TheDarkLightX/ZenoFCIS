@@ -31,7 +31,7 @@ C5  Every publish_order .crate: safe members; Cargo.toml.orig and every other me
     no path; a packaged Cargo.lock has exactly one entry for the crate itself, as cargo
     writes it (no source, no checksum), and every other entry is one of the set's
     crates or equals the workspace lock.
-C6  Every binary archive: exactly the executable and the four committed documents,
+C6  Every binary archive: exactly the executable and the seven committed documents,
     ustar, normalized headers; the executable equals its host record, holds no
     build path, and its headers state the documented platform floor (ELF:
     interpreter and highest non-weak GLIBC version; Mach-O: arm64 only, macOS 11.0,
@@ -87,7 +87,9 @@ BUILD_PATH_MARKERS = (b"/home/runner/work/", b"/Users/runner/work/", b"/private/
                       b"/tmp/zeno-fcis-rc/", b".cargo-target/")
 HOME_PATH = check_release_privacy.PATTERNS["personal-home-path"]
 DOCUMENT_MEMBERS = (("README.md", "README.md"), ("LICENSE-APACHE", "LICENSE-APACHE"),
-                    ("LICENSE-MIT", "LICENSE-MIT"), ("INSTALLATION.md", "docs/INSTALLATION.md"))
+                    ("LICENSE-MIT", "LICENSE-MIT"), ("INSTALLATION.md", "docs/INSTALLATION.md"),
+                    ("NOTICE", "NOTICE"), ("THIRD_PARTY_NOTICES", "THIRD_PARTY_NOTICES"),
+                    ("CITATION.cff", "CITATION.cff"))
 CARGO_FILES = {"Cargo.toml", "Cargo.toml.orig", ".cargo_vcs_info.json", "Cargo.lock"}
 DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 EXCLUDED_FROM_INDEX = {"RC-MANIFEST.json", "SHA256SUMS"}
