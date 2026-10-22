@@ -23,6 +23,7 @@ mod effects;
 mod guide;
 mod inventory_reservation;
 mod judge_command;
+mod knowledge_assessment;
 mod knowledge_command;
 mod knowledge_evidence;
 mod loop_command;
