@@ -68,8 +68,13 @@ def planted(logs):
     live = ZAL / 'behavior2.py'
     before = hashlib.sha256(live.read_bytes()).hexdigest()
     with tempfile.TemporaryDirectory(prefix='zal2-defects-') as directory:
-        work = Path(directory) / 'zal'
+        work = Path(directory) / 'integrations' / 'zal'
         shutil.copytree(ZAL, work, ignore=shutil.ignore_patterns('__pycache__', 'node_modules'))
+        # The CLI's optional examples import its repository-local help module.
+        # Keep that dependency inside the isolated copy, at its real layout.
+        tools = Path(directory) / 'tools'
+        tools.mkdir()
+        shutil.copyfile(ZAL.parents[1] / 'tools/guide_help.py', tools / 'guide_help.py')
         original = (work / 'behavior2.py').read_text()
         for label, anchor, defect, test in DEFECTS:
             if original.count(anchor) != 1:

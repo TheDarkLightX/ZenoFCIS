@@ -3,11 +3,10 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
-
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TEST = "test_lowering.NativeLoweringTests.test_revoked_mail_contract_refines"
@@ -21,7 +20,7 @@ def run(cli, logs):
     for label, target, control in [("normal", "test_lowering", False), ("weakened", TEST, True), ("restored", TEST, False)]:
         current = {**env, **({"ZAL_LOWERING_CONTROL": "weaken-revocation"} if control else {})}
         checked = subprocess.run([sys.executable, "-B", "-m", "unittest", target, "-q"], cwd=HERE, env=current,
-                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120, check=False)
         (logs / f"{label}.log").write_text(checked.stdout)
         if control:
             if checked.returncode != 1 or "FAIL: test_revoked_mail_contract_refines" not in checked.stdout or "AssertionError" not in checked.stdout:

@@ -3,16 +3,15 @@
 import dataclasses
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import behavior2
 import factory
-
 
 HERE = Path(__file__).resolve().parent
 RUN = [sys.executable, "-B", str(HERE / "run.py")]
@@ -29,7 +28,7 @@ class LoweringTests(unittest.TestCase):
                     source.write_text(model.render(english))
                     output = work / "contract"
                     checked = subprocess.run(RUN + ["lower", str(source), "--syntax", "english" if english else "symbolic",
-                                                    "--out", str(output)], capture_output=True, text=True)
+                                                    "--out", str(output)], capture_output=True, text=True, check=False)
                     self.assertEqual(checked.returncode, 0, checked.stderr)
                     self.assertEqual(json.loads(checked.stdout)["revision"], model.revision)
                     expected = factory.lower(model)
@@ -39,7 +38,7 @@ class LoweringTests(unittest.TestCase):
                         self.assertIn("field 160 102 unit 106;", expected["project.zeno"])
                         self.assertEqual(json.loads(expected["zal-source-map.json"])["context_fields"], {})
                     refused = subprocess.run(RUN + ["lower", str(source), "--syntax", "english" if english else "symbolic",
-                                                    "--out", str(output)], capture_output=True, text=True)
+                                                    "--out", str(output)], capture_output=True, text=True, check=False)
                     self.assertEqual(refused.returncode, 2)
                     self.assertIn("absent or an empty directory", refused.stderr)
 
@@ -99,10 +98,10 @@ class NativeLoweringTests(unittest.TestCase):
                 contract = Path(tmp) / "contract"
                 factory.write_new(factory.lower(model), contract)
                 generated = subprocess.run([str(cli), "generate", "contract", str(contract), "--format", "json"],
-                                           capture_output=True, text=True)
+                                           capture_output=True, text=True, check=False)
                 self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
                 checked = subprocess.run(RUN + ["refine-check", str(HERE / f"examples/{name}.zal"), str(contract),
-                                                "--cli", str(cli)], capture_output=True, text=True)
+                                                "--cli", str(cli)], capture_output=True, text=True, check=False)
                 self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
                 result = json.loads(checked.stdout)
                 self.assertEqual(result["status"], "refines")
@@ -120,7 +119,7 @@ class NativeLoweringTests(unittest.TestCase):
             contract = Path(tmp) / "contract"
             factory.write_new(files, contract)
             generated = subprocess.run([str(cli), "generate", "contract", str(contract), "--format", "json"],
-                                       capture_output=True, text=True)
+                                       capture_output=True, text=True, check=False)
             self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
             result, code = factory.refine_check(model, contract, cli)
             print(json.dumps(result, sort_keys=True), flush=True)

@@ -1,16 +1,15 @@
 """Ten recurring source mistakes, physical positions and advisory repair text."""
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import behavior
 import behavior2
 from diagnostics import describe
-
 
 HERE = Path(__file__).resolve().parent
 ORDER = (HERE / "examples/order2.zal").read_text()
@@ -93,7 +92,7 @@ class DiagnosticTests(unittest.TestCase):
             text = PREFIX + bad
             source.write_text(text)
             run = subprocess.run([sys.executable, "-B", str(HERE / "run.py"), "check", str(source)],
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True, check=False)
             self.assertEqual(run.returncode, 2, run.stderr)
             self.assertEqual(run.stdout, "")
             result = json.loads(run.stderr)
