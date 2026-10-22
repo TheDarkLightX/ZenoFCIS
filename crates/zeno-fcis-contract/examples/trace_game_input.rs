@@ -46,10 +46,16 @@ fn run(request: Request) -> Result<Value, String> {
     let started = Instant::now();
     let rules = Rules::read(&request.policy).map_err(|e| e.to_string())?;
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
-        return Err("retained lineages unsupported; export a scalar contract first".into());
+        return Err("retained-lineage acquisition requires the retained programs and receipt chain; base-policy replay is not exact".into());
+    }
+    if rules.refuse_unsigned("trace-game acquisition").is_err() {
+        return Err("unsigned/typed acquisition requires typed Authority frames; scalar i128 frames are not exact".into());
     }
     let declarations =
         Declarations::read(&request.project, &rules.leaf_bindings).map_err(|e| e.to_string())?;
+    if declarations.unsigned() {
+        return Err("unsigned/typed acquisition requires typed Authority frames; scalar i128 frames are not exact".into());
+    }
     let positions = domain::positions(&declarations).map_err(|e| e.to_string())?;
     let width = positions
         .iter()
@@ -255,5 +261,61 @@ fn main() {
             eprintln!("{reason}");
             std::process::exit(2);
         }
+    }
+}
+
+#[cfg(test)]
+mod acquisition_profiles {
+    use super::*;
+
+    fn request() -> Request {
+        Request {
+            project: include_str!("../../../test-data/trace-games/escrow-safe/project.zeno").into(),
+            policy: include_str!("../../../test-data/trace-games/escrow-safe/v2/policy.json")
+                .into(),
+            events: Vec::new(),
+            formula: String::new(),
+            guards: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn typed_policy_refuses_before_scalar_frames() {
+        let mut input = request();
+        input.policy = input.policy.replace("policy/2", "policy/4");
+        let reason = run(input).unwrap_err();
+        assert_eq!(
+            reason,
+            "unsigned/typed acquisition requires typed Authority frames; scalar i128 frames are not exact"
+        );
+        assert!(!reason.contains('\n'));
+    }
+
+    #[test]
+    fn unsigned_declaration_refuses_before_scalar_frames() {
+        let mut input = request();
+        input
+            .project
+            .push_str("\ntype 999 u128 Wide in 0..=340282366920938463463374607431768211455;\n");
+        let reason = run(input).unwrap_err();
+        assert_eq!(
+            reason,
+            "unsigned/typed acquisition requires typed Authority frames; scalar i128 frames are not exact"
+        );
+    }
+
+    #[test]
+    fn retained_lineage_refuses_before_base_policy_replay() {
+        let mut input = request();
+        let mut policy: Value = serde_json::from_str(&input.policy).unwrap();
+        policy["evolutions"] =
+            json!([{"superseded_policy_sha256":"0".repeat(64),"review_sha256":"1".repeat(64)}]);
+        input.policy = policy.to_string();
+        let reason = run(input).unwrap_err();
+        assert_eq!(
+            reason,
+            "retained-lineage acquisition requires the retained programs and receipt chain; base-policy replay is not exact"
+        );
+        assert!(!reason.contains('\n'));
     }
 }

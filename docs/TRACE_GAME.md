@@ -237,6 +237,27 @@ a direct GR(1) syntax, and partial-observation omega objectives remain unsupport
 a supplied deterministic parity-monitor product can express omega-regular
 requirements with perfect information. No LTL-to-monitor compiler is provided.
 
+## Native acquisition profiles
+
+`game.py` acquires signed scalar contracts through immutable Authority inputs,
+including signed 128-bit values encoded as decimal strings. Unsigned or typed
+policy profiles return UNKNOWN with this one-line reason:
+`unsigned/typed acquisition requires typed Authority frames; scalar i128 frames are not exact`.
+The scalar table framer has no unsigned atom/domain path; converting unsigned
+values to signed values would change the declared program, including values
+above the signed maximum. The general typed runtime remains a separate route.
+
+Retained adoptions or evolutions return UNKNOWN with:
+`retained-lineage acquisition requires the retained programs and receipt chain; base-policy replay is not exact`.
+The acquisition request snapshots the project and current policy, not the
+retained candidate bytes and their equivalence/evolution evidence. Replaying
+only the base policy cannot certify the retained program. These refusals occur
+before table generation or publication replay; no fallback certificate is issued.
+A future exact route must acquire and bind that full lineage and use typed
+frames without narrowing. Explicit arena certificates do not remove this native
+provenance requirement. This follows the supervisory-control separation between
+a declared plant model and its controller, cited in Background.
+
 ## Background
 
 The finite-game methods build on these published sources:
