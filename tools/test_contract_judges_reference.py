@@ -2,6 +2,8 @@
 
 import copy
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -180,6 +182,70 @@ class ReviewPackets(unittest.TestCase):
             with self.subTest(packet=packet), patch.object(judges, "cli", return_value=packet):
                 with self.assertRaises(judges.Mismatch):
                     judges.cli_answers(Path("unused"), Path("unused"), {"review_exit": 0}, Path("unused"))
+
+
+@unittest.skipUnless(os.environ.get("ZENO_FCIS_CLI"), "set ZENO_FCIS_CLI for native agreement")
+class ReasonClassAgreement(unittest.TestCase):
+    def native_gaps(self, app, work, proposals=None):
+        packet = work / "review.json"
+        args = [os.environ["ZENO_FCIS_CLI"], "contract", "review", str(app), "--gaps",
+                "--out", str(packet), "--format", "json"]
+        if proposals is not None:
+            path = work / "laws.zeno"
+            path.write_text(proposals)
+            args += ["--gaps-laws", str(path)]
+        run = subprocess.run(args, capture_output=True, text=True, check=False)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        result = json.loads(packet.read_text())["gaps"]
+        self.assertEqual(result["status"], "measured")
+        return result["proposals"]["after"] if proposals is not None else result
+
+    def test_one_tuple_reason_classes_determine_one_reject_in_both_checkers(self):
+        fixture = core.ROOT / "tools/test_data/contract_judges/reason-classes"
+        project = (fixture / "project.zeno").read_text()
+        policy = json.loads((fixture / "policy.json").read_text())
+        contract = reference.Contract(project, policy)
+        measured = reference.gaps(contract, reference.Machine(contract))
+        self.assertEqual(measured["admissible"]["full"]["determined"], 1)
+        self.assertEqual(measured["admissible_lines"], ["1"])
+        self.assertEqual([d for d in reference.candidates(contract, (0,))
+                          if contract.admits((0,), (0, 0), d)], [("Reject", 200, (0,))])
+        with tempfile.TemporaryDirectory(prefix="reason-classes-") as raw:
+            work = Path(raw)
+            app = work / "app"
+            judges.write(app, {"project.zeno": project, "v2/policy.json": json.dumps(policy)})
+            native = self.native_gaps(app, work)
+            self.assertEqual(native["admissible"]["full"]["determined"], 1)
+            self.assertEqual(native["tables"]["admissible_sha256"], measured["admissible_sha256"])
+
+    def test_dual_approval_reject_requirement_determines_one_tuple_in_both_checkers(self):
+        app = core.ROOT / "examples/dual-approval"
+        project = (app / "project.zeno").read_text()
+        policy = json.loads((app / "v2/policy.json").read_text())
+        target = "pre.100.110 == 151 && pre.100.111 == 161 && pre.100.112 == 162 && command.101 == 140 && context.102.120 == 161"
+        proposals = "".join(f"law {9000+i} closed_choice_{i} on {scope} = !({target});\n"
+                            for i, scope in enumerate(["reject:201", "reject:203", "accept", "failure"]))
+        # The reference deliberately does not interpret deliveries. Project only
+        # outboxes and their declarations away, preserving all scalar domains,
+        # laws and reason classes. The chosen Reject cannot emit an outbox.
+        scalar_project = "\n".join(line for line in project.splitlines() if not line.startswith(
+            ("type 103 ", "type 104 ", "field 130 ", "field 131 ", "channel ")))
+        scalar_policy = copy.deepcopy(policy)
+        scalar_policy["leaf_bindings"].pop("103")
+        for case in scalar_policy["cases"]:
+            case["outbox"] = []
+        scalar_policy["law_kinds"].update({str(i): "AuthoritySubjectRecipient" for i in range(9000, 9004)})
+        contract = reference.Contract(scalar_project + "\n" + proposals, scalar_policy)
+        admitted = [d for d in reference.candidates(contract, (151, 161, 162))
+                    if contract.admits((151, 161, 162), (140, 161), d)]
+        self.assertEqual(admitted, [("Reject", 200, (151, 161, 162))])
+        measured = reference.gaps(contract, reference.Machine(contract))
+        # Every other input still admits all three Reject reasons. On the
+        # chosen input only reason 200 remains; failure-only 202 is not a Reject.
+        self.assertEqual(measured["admissible"]["full"]["determined"], 1)
+        with tempfile.TemporaryDirectory(prefix="approval-reason-classes-") as raw:
+            native = self.native_gaps(app, Path(raw), proposals)
+            self.assertEqual(native["admissible"]["full"]["determined"], 1)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,19 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "reason-classes",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {},
+  "variables": {},
+  "cases": [
+    {"when": false, "class": "CommittedFailure", "reason": 201,
+     "post": {"110": "pre.100.110"}, "outbox": []},
+    {"when": true, "class": "Reject", "reason": 200, "post": {}, "outbox": []}
+  ],
+  "genesis": {"110": 0},
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "FeeAndRounding",
+    "502": "CommittedFailureEffects",
+    "503": "RejectNoAuthority"
+  }
+}
