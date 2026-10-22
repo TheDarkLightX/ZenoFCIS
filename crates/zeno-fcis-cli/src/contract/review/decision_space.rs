@@ -48,3 +48,61 @@ impl DecisionSpace {
             }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contract::{declarations::Declarations, model::Contract, schema, schema_commitment};
+
+    #[test]
+    fn every_counted_reason_matches_the_language_catalog_and_has_a_law_scope() {
+        let project = include_str!("../../../../../examples/dual-approval/project.zeno");
+        let rules = Rules::read(include_str!(
+            "../../../../../examples/dual-approval/v2/policy.json"
+        ))
+        .unwrap_or_else(|error| panic!("witness rules: {error:?}"));
+        let declarations = Declarations::read(project, &rules.leaf_bindings)
+            .unwrap_or_else(|error| panic!("witness declarations: {error:?}"));
+        let schema = schema::encode(&declarations)
+            .unwrap_or_else(|error| panic!("witness schema: {error:?}"));
+        let commitment = schema_commitment(&schema)
+            .unwrap_or_else(|error| panic!("witness commitment: {error:?}"));
+        let catalog = Contract::build(&declarations, &rules, commitment)
+            .unwrap_or_else(|error| panic!("witness contract: {error:?}"));
+        let space = DecisionSpace::new(&rules);
+        let candidates: Vec<_> = space.candidates(2).collect();
+        assert_eq!(candidates.len() as u128, space.count(2));
+        assert!(catalog.reasons.contains(&(202, Class::CommittedFailure)));
+        let mut scoped_rules = rules.clone();
+        scoped_rules
+            .law_kinds
+            .insert(9000, super::super::super::rules::LawKind::FeeAndRounding);
+        for (class, reason, _) in candidates {
+            let scope = match (class, reason) {
+                (Class::Accept, None) => "accept".to_owned(),
+                (Class::Reject, Some(reason)) => {
+                    assert!(
+                        catalog.reasons.contains(&(reason, class)),
+                        "Reject {reason}"
+                    );
+                    format!("reject:{reason}")
+                }
+                (Class::CommittedFailure, Some(reason)) => {
+                    assert!(
+                        catalog.reasons.contains(&(reason, class)),
+                        "Failure {reason}"
+                    );
+                    "failure".to_owned()
+                }
+                other => panic!("invalid candidate class and reason: {other:?}"),
+            };
+            let extended = format!("{project}\nlaw 9000 exclude_candidate on {scope} = false;\n");
+            let declarations = Declarations::read(&extended, &rules.leaf_bindings)
+                .unwrap_or_else(|error| panic!("candidate law: {error:?}"));
+            assert!(
+                Contract::build(&declarations, &scoped_rules, commitment).is_ok(),
+                "a counted alternative must have an accepted law scope: {scope}"
+            );
+        }
+    }
+}

@@ -704,7 +704,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "contract::review::judge_tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "contract::review::run_properties::tests::"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_judges", "--locked")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::review::decision_space::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_judges", "--locked"),
+         ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"),
+          "python3", "tools/test_judge_doc_commands.py")),
     ),
     "core-profile": AcceptanceScenario(
         "Agree with an independent reference on all 77 core-component instances",
