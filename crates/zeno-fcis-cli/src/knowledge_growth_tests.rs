@@ -237,3 +237,47 @@ fn unpublished_work_survives_a_revision_race_without_layer_authority() {
     assert_eq!(value["recovery"]["is_layer_descriptor"], false);
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve() {
+    let bytes =
+        include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c1.original.zcve");
+    let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+    output["detail"]["status"] = json!("inconclusive");
+    output["detail"]["reason"] = json!("gate-budget");
+    let run = crate::knowledge_replay::measure(
+        &output,
+        hash("task"),
+        7,
+        1000,
+        crate::transform::sha256_hex(bytes),
+    )
+    .unwrap();
+    assert_eq!(run.verdict, Verdict::Inconclusive);
+    assert!(run.budget_stop);
+    assert!(run.result_cost.is_none());
+    assert_eq!(
+        run.receipt_sha256,
+        output["detail"]["best_check"]["receipt_sha256"]
+    );
+    G::replay_proof(&output, &run).unwrap();
+}
+#[test]
+fn artifact_refusal_keeps_measured_work_and_never_qualifies_advice() {
+    let mut layer = Layer::default();
+    assessed(
+        &mut layer,
+        "candidate",
+        scope("counter", None),
+        vec![case("positive", scope("counter", None), 5)],
+    );
+    let assessment = layer.assessments.values().next().unwrap().clone();
+    // The model deliberately omits its suite/artifacts; it cannot supply evidence.
+    layer.assessments.clear();
+    let (next, record, key) = crate::knowledge_replay::record_artifacts(layer, assessment).unwrap();
+    assert_eq!(record.assessment_work, 62);
+    assert_eq!(record.decision, Decision::Inconclusive);
+    assert_eq!(record.resource_stop.as_deref(), Some("artifact-validation"));
+    assert!(next.facts.is_empty());
+    assert_eq!(next.assessments[&key], record);
+}

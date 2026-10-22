@@ -340,6 +340,9 @@ fn assessed_decision(
     proposing: &BTreeSet<String>,
 ) -> Result<(Decision, &'static str), &'static str> {
     let (decision, reason) = decide(&a.cases, proposing, &a.policy, &a.annotations)?;
+    if a.resource_stop.as_deref() == Some("artifact-validation") {
+        return Ok((Decision::Inconclusive, "artifact-validation"));
+    }
     Ok(
         if a.resource_stop.is_some() && decision != Decision::Reject {
             (Decision::Inconclusive, "assessment-resource-stop")

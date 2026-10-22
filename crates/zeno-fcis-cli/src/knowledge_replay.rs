@@ -113,9 +113,9 @@ pub(crate) fn measure(
     inputs: String,
 ) -> Result<Run, &'static str> {
     let d = output.get("detail").ok_or("kb-task-output")?;
-    let accepted = d["status"] == "qualified"
-        && d["best_check"]["verdict"] == "equivalent"
-        && d["best_check"]["replay"] == "matched";
+    let proven =
+        d["best_check"]["verdict"] == "equivalent" && d["best_check"]["replay"] == "matched";
+    let accepted = d["status"] == "qualified" && proven;
     let mut work = BTreeMap::new();
     for key in [
         "check_requests",
@@ -165,7 +165,7 @@ pub(crate) fn measure(
     } else {
         None
     };
-    let receipt = if accepted {
+    let receipt = if proven {
         d["best_check"]["receipt_sha256"]
             .as_str()
             .filter(|s| digest(s))
@@ -310,6 +310,15 @@ pub(crate) fn assess(
     private_parent: &Path,
 ) -> Result<(Layer, String), &'static str> {
     suite.check()?;
+    if layer.assessments.len() >= 128
+        || layer
+            .outputs
+            .len()
+            .saturating_add(suite.tasks.len() * 4 + 1)
+            > 4096
+    {
+        return Err("kb-assessment-capacity");
+    }
     S::check(layer)?;
     let candidates = layer
         .candidates
@@ -483,8 +492,8 @@ pub(crate) fn assess(
         prior_assessment_work: layer.assessments.values().map(|a| a.assessment_work).sum(),
         curation_work: layer.curation_work,
     };
-    let key = S::hash(&a)?;
-    next.assessments.insert(key.clone(), a.clone());
+    let (mut next, a, key) = record_artifacts(next, a)?;
+    let decision = a.decision;
     if selected.len() == 1 {
         for c in &mut next.candidates {
             if selected.contains(&c.statement_sha256) {
@@ -518,9 +527,39 @@ pub(crate) fn assess(
         subjects: selected.clone(),
         evidence: key.clone(),
     });
-    next = crate::knowledge_growth::add_cases(&next, &key)?;
     S::check(&next)?;
     Ok((next, key))
+}
+
+/// Retain diagnostic observations when artifact validation cannot certify them.
+pub(crate) fn record_artifacts(
+    mut next: Layer,
+    mut assessment: Assessment,
+) -> Result<(Layer, Assessment, String), &'static str> {
+    let mut key = S::hash(&assessment)?;
+    next.assessments.insert(key.clone(), assessment.clone());
+    match crate::knowledge_growth::add_cases(&next, &key).and_then(|checked| {
+        crate::knowledge_growth::validate(&checked)?;
+        Ok(checked)
+    }) {
+        Ok(checked) => next = checked,
+        Err(reason) => {
+            next.assessments.remove(&key);
+            assessment.resource_stop = Some("artifact-validation".into());
+            assessment.decision = Decision::Inconclusive;
+            assessment.reason = "artifact-validation".into();
+            if assessment.annotations.len() < 64 {
+                assessment.annotations.push(Annotation {
+                    kind: "note".into(),
+                    evidence: key,
+                    text: reason.into(),
+                });
+            }
+            key = S::hash(&assessment)?;
+            next.assessments.insert(key.clone(), assessment.clone());
+        }
+    }
+    Ok((next, assessment, key))
 }
 
 /// Re-execute a frozen record without changing the knowledge layer.

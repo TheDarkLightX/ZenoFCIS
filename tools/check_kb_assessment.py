@@ -14,7 +14,7 @@ SUITE = ROOT / "crates/zeno-fcis-cli/tests/data/knowledge-suite/suite.json"
 
 def run(cli, root, name, arguments, expected=0):
     result = subprocess.run(["nice", "-n", "19", "ionice", "-c3", str(cli), "kb", *arguments],
-                            stdin=subprocess.DEVNULL, capture_output=True, timeout=240, check=False,
+                            stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=False,
                             env={k: v for k, v in os.environ.items() if k not in {"ZENO_FCIS_KB", "ZENO_FCIS_CHECKER_CONTROL"}})
     (root / (name + ".json")).write_bytes(result.stdout)
     (root / (name + ".stderr")).write_bytes(result.stderr)

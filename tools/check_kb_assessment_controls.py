@@ -22,6 +22,8 @@ def control(name, file, pattern, replacement, tests):
 
 
 CONTROLS = [
+    control("partial-proof-receipt-lost", "knowledge_replay.rs", r"let receipt = if proven", "let receipt = if accepted", "knowledge_growth_tests::a_partial_program_proof_keeps_its_receipt_without_claiming_a_solve"),
+    control("artifact-refusal-work-discarded", "knowledge_replay.rs", r"Err\(reason\) => \{\s*next.assessments.remove", "Err(reason) => { return Err(reason); next.assessments.remove", "knowledge_growth_tests::artifact_refusal_keeps_measured_work_and_never_qualifies_advice"),
     control("unpublished-work-discarded", "knowledge_store.rs", r"pub\(crate\) fn retain_unpublished\((.*?)\) -> Result<FileRef, &'static str> \{", "\\g<0> return Ok(FileRef {path: \"missing\".into(), sha256: \"a\".repeat(64)});", "knowledge_growth_tests::unpublished_work_survives_a_revision_race_without_layer_authority"),
     control("partial-refusal-work-dropped", "knowledge_assessment.rs", r"\.chain\(partial.iter\(\)\)", ".chain(partial.iter().take(0))", "knowledge_assessment::tests::partial_replay_work_survives_a_later_stop"),
     control("pareto-violation", "knowledge_assessment.rs", r"if regression \{", "if regression && false {", ["knowledge_assessment::tests::one_worse_task_cannot_be_hidden", "knowledge_assessment::tests::pareto_rejects_one_worse_measure"]),
