@@ -98,8 +98,7 @@ impl Parser {
             } else {
                 1
             };
-            let atoms = self.bits_entry(width);
-            let value = pack(atoms);
+            let value = self.word_value(width);
             self.table_values += 1;
             return Some(value);
         }
@@ -333,7 +332,7 @@ impl Parser {
             _ => None,
         })
     }
-    fn bits_entry(&mut self, width: u8) -> Vec<RelExpr> {
+    fn word_position(&mut self, width: u8) -> Option<WordPosition> {
         let at = self.current().span;
         let name = self
             .take_identifier("bits.entry")
@@ -351,7 +350,7 @@ impl Parser {
         });
         let Some((size, rank, actual)) = dimensions else {
             self.recursive_error(at, "unknown or later-declared bit table");
-            return vec![RelExpr::Bool(false); width as usize];
+            return None;
         };
         let mut indices = Vec::new();
         while self.take_symbol(&TokenKind::LBracket) {
@@ -368,79 +367,121 @@ impl Parser {
                     "bit entry width and index count must match its declaration",
                 );
             }
-            return vec![RelExpr::Bool(false); width as usize];
+            return None;
         }
         let indices: Vec<_> = indices.into_iter().flatten().collect();
-        let literal_indices = indices
-            .iter()
-            .map(table_lookup::literal)
-            .collect::<Option<Vec<_>>>();
-        if literal_indices.is_none() {
-            if own {
-                self.recursive_error(at, "active recursive entries use literal or bound indices");
-                return vec![RelExpr::Bool(false); width as usize];
-            }
-            let mut atoms = Vec::new();
-            for atom in 0..width as usize {
-                let mut entries = Vec::new();
-                for entry in 0..size.pow(rank as u32) as usize {
-                    let d = &self.derived[name.as_str()];
-                    let k = entry * width as usize + atom;
-                    let f = if let Some(constants) = &d.constants {
-                        RelExpr::Bool(constants[k])
-                    } else {
-                        d.circuit
-                            .at_output(d.outputs[k])
-                            .map(|c| RelExpr::Circuit(Box::new(c)))
-                            .unwrap_or(RelExpr::Bool(false))
-                    };
-                    if !self.charge(at, formula_shape_rel(&f).0) {
-                        return vec![RelExpr::Bool(false); width as usize];
-                    }
-                    entries.push(f);
-                }
-                for index in indices.iter().rev() {
-                    entries = entries
-                        .chunks(size as usize)
-                        .map(|chunk| self.select_formulas(at, index, chunk.to_vec()))
-                        .collect();
-                }
-                atoms.push(entries.pop().unwrap_or(RelExpr::Bool(false)));
-            }
-            return atoms;
-        }
-        let entry = literal_indices
-            .unwrap_or_default()
-            .iter()
-            .fold(0u32, |n, i| n * size + *i as u32);
+        let position = WordPosition {
+            at,
+            name,
+            size,
+            width,
+            own,
+            indices,
+        };
         if own {
+            if position.fixed_entry().is_none() {
+                self.recursive_error(at, "active recursive entries use literal or bound indices");
+                return None;
+            }
             if let Some(reason) = self.self_refusal {
                 self.recursive_error(at, reason);
             }
-            return (0..width)
-                .map(|k| RelExpr::Predicate {
-                    name: Identifier::try_new(recursive_tables::SELF)
-                        .unwrap_or_else(fallback_identifier),
-                    arguments: vec![ValueExpr::Int(
-                        i128::from(entry) * i128::from(width) + i128::from(k),
-                    )]
-                    .into_boxed_slice(),
-                })
-                .collect();
         }
-        let d = &self.derived[name.as_str()];
+        Some(position)
+    }
+    fn word_atom(&self, position: &WordPosition, entry: usize, atom: u8) -> RelExpr {
+        if position.own {
+            return RelExpr::Predicate {
+                name: Identifier::try_new(recursive_tables::SELF)
+                    .unwrap_or_else(fallback_identifier),
+                arguments: vec![ValueExpr::Int(
+                    entry as i128 * i128::from(position.width) + i128::from(atom),
+                )]
+                .into_boxed_slice(),
+            };
+        }
+        let d = &self.derived[position.name.as_str()];
+        let k = entry * position.width as usize + atom as usize;
         if let Some(constants) = &d.constants {
-            return (0..width)
-                .map(|k| RelExpr::Bool(constants[entry as usize * width as usize + k as usize]))
+            RelExpr::Bool(constants[k])
+        } else {
+            d.circuit
+                .at_output(d.outputs[k])
+                .map(|c| RelExpr::Circuit(Box::new(c)))
+                .unwrap_or(RelExpr::Bool(false))
+        }
+    }
+    fn word_atoms(&self, position: &WordPosition, entry: usize) -> Vec<RelExpr> {
+        (0..position.width)
+            .map(|atom| self.word_atom(position, entry, atom))
+            .collect()
+    }
+    /// Scalar reads select complete words, so packing precedes the Select.
+    fn word_value(&mut self, width: u8) -> ValueExpr {
+        let Some(position) = self.word_position(width) else {
+            return ValueExpr::U128(0);
+        };
+        if let Some(entry) = position.fixed_entry() {
+            return pack(self.word_atoms(&position, entry));
+        }
+        let mut entries = Vec::new();
+        for entry in 0..position.size.pow(position.indices.len() as u32) as usize {
+            let value = pack(self.word_atoms(&position, entry));
+            if !self.charge(position.at, formula_shape_value(&value).0) {
+                return ValueExpr::U128(0);
+            }
+            entries.push(value);
+        }
+        for index in position.indices.iter().rev() {
+            entries = entries
+                .chunks(position.size as usize)
+                .map(|chunk| self.select_values(position.at, index, chunk.to_vec()))
                 .collect();
         }
-        (0..width)
-            .map(|k| {
-                d.circuit
-                    .at_output(d.outputs[entry as usize * width as usize + k as usize])
-                    .map(|c| RelExpr::Circuit(Box::new(c)))
-                    .unwrap_or(RelExpr::Bool(false))
-            })
-            .collect()
+        entries.pop().unwrap_or(ValueExpr::U128(0))
+    }
+    /// Algebra operations retain their existing atom-level representation.
+    fn bits_entry(&mut self, width: u8) -> Vec<RelExpr> {
+        let Some(position) = self.word_position(width) else {
+            return vec![RelExpr::Bool(false); width as usize];
+        };
+        if let Some(entry) = position.fixed_entry() {
+            return self.word_atoms(&position, entry);
+        }
+        let mut atoms = Vec::new();
+        for atom in 0..width {
+            let mut entries = Vec::new();
+            for entry in 0..position.size.pow(position.indices.len() as u32) as usize {
+                let f = self.word_atom(&position, entry, atom);
+                if !self.charge(position.at, formula_shape_rel(&f).0) {
+                    return vec![RelExpr::Bool(false); width as usize];
+                }
+                entries.push(f);
+            }
+            for index in position.indices.iter().rev() {
+                entries = entries
+                    .chunks(position.size as usize)
+                    .map(|chunk| self.select_formulas(position.at, index, chunk.to_vec()))
+                    .collect();
+            }
+            atoms.push(entries.pop().unwrap_or(RelExpr::Bool(false)));
+        }
+        atoms
+    }
+}
+
+struct WordPosition {
+    at: SourceSpan,
+    name: Identifier,
+    size: u32,
+    width: u8,
+    own: bool,
+    indices: Vec<ValueExpr>,
+}
+impl WordPosition {
+    fn fixed_entry(&self) -> Option<usize> {
+        self.indices.iter().try_fold(0usize, |n, index| {
+            Some(n * self.size as usize + table_lookup::literal(index)?)
+        })
     }
 }

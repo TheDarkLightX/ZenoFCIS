@@ -177,3 +177,52 @@ fn fee_tier_example_quotes_all_declared_tiers() {
         [30, 25, 20, 10],
     );
 }
+
+#[test]
+fn derived_word_lookup_matches_explicit_whole_word_select_work() {
+    for guard in ["fee_bps[i] < 30", "pre.100.130 > i"] {
+        let source = format!(
+            "{PROJECT} derived table 701 words[i] in table 110 bits 2 rounds 8 {{ when {guard} then u128(3); default u128(0); }};"
+        );
+        let observations = |expression: &str| {
+            let policy = rules(expression).replace(
+                "template-declarative-policy/2",
+                "template-declarative-policy/4",
+            );
+            bound(&source, &policy, |contract, schema| {
+                let framer =
+                    Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
+                policy::with_numeric_authority(contract, schema, |authority| {
+                    let mut results = Vec::new();
+                    for pre in 0..=30 {
+                        for tier in [3, 0, 1, 2] {
+                            let frames = framer.frame(&[pre, tier, 140]);
+                            let result = authority.evaluate(
+                                zeno_fcis_synthesis::finite::v2_composition::Raw {
+                                    state: &frames[0],
+                                    command: &frames[1],
+                                    context: &frames[2],
+                                },
+                            );
+                            results.push((evaluate::from_evaluation(&result), result.usage()));
+                        }
+                    }
+                    results
+                })
+                .unwrap()
+            })
+        };
+        let lookup = observations("to_i128(words[command.101.120])");
+        let explicit = observations(
+            "to_i128(choose(command.101.120 == 0,words[0],choose(command.101.120 == 1,words[1],choose(command.101.120 == 2,words[2],words[3]))))",
+        );
+        assert_eq!(lookup.len(), 124);
+        for ((actual, usage), (expected, reference)) in lookup.into_iter().zip(explicit) {
+            assert_eq!(actual, expected);
+            assert_eq!(
+                usage, reference,
+                "word lookup must select complete eager word entries: {guard}"
+            );
+        }
+    }
+}
