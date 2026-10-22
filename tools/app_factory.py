@@ -211,20 +211,19 @@ def main():
     print("Application ready. Review context.json, then start app-server as documented in README.md.")
 
 def entrypoint():
-    try:
-        main()
-    except (ValueError, OSError, subprocess.CalledProcessError) as error:
-        print(f"app build refused: {refusal(error)}", file=sys.stderr)
-        return 1
-    return 0
-
-if __name__ == "__main__":
     from commons_hook import failure, report
     subject = Path(sys.argv[1]).name if len(sys.argv) > 1 else "unnamed"
     try:
-        result = entrypoint()
+        main()
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        report("app-factory", "failed", subject, failure(error))
+        print(f"app build refused: {refusal(error)}", file=sys.stderr)
+        return 1
     except BaseException as error:
         report("app-factory", "failed", subject, failure(error))
         raise
-    report("app-factory", "built" if result == 0 else "refused", subject, {})
-    sys.exit(result)
+    report("app-factory", "built", subject, {})
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(entrypoint())

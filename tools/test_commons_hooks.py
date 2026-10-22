@@ -92,6 +92,22 @@ class HookTests(unittest.TestCase):
         self.assertEqual(event["subject"], "a" * 64)
         self.assertEqual(event["body"]["verdicts"], ["refuted", "accepted"])
 
+    def test_concise_factory_refusals_retain_the_original_failure(self):
+        import contextlib
+        import io
+        import app_factory
+
+        diagnostic = io.StringIO()
+        with mock.patch.dict(os.environ, {"ZENO_FCIS_COMMONS": self.store}), \
+                mock.patch.object(app_factory, "main", side_effect=ValueError("bounded refusal")), \
+                mock.patch.object(sys, "argv", ["app_factory.py", "fixture"]), \
+                contextlib.redirect_stderr(diagnostic):
+            self.assertEqual(app_factory.entrypoint(), 1)
+        self.assertEqual(diagnostic.getvalue(), "app build refused: bounded refusal\n")
+        [event] = self.events("factory.app-factory.failed")
+        self.assertEqual(event["subject"], "fixture")
+        self.assertEqual(event["body"], {"error": "ValueError", "detail": "bounded refusal"})
+
 
 if __name__ == "__main__":
     unittest.main()
