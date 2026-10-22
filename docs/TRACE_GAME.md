@@ -209,6 +209,10 @@ units and 30 seconds. Lower them with `--max-states`, `--max-edges`, `--work`,
 `--seconds`; exceeding any bound returns UNKNOWN. This route checks the declared
 arena; it supplies no native transition provenance or application authority.
 Partial-observation omega objectives require richer constructions and are refused.
+The solver checks its deadline on entry and after certificate assembly, including
+paths needing no fixed-point iterations. `--seconds 0` therefore returns UNKNOWN
+with exit code 2 and writes no binding or certified verdict. These checkpoints
+do not add fixed-point work units; the independent checker has its own deadline.
 
 ## Explicit omega objectives
 

@@ -2,6 +2,7 @@
 import copy
 import itertools
 import unittest
+from unittest.mock import patch
 from arena_spec import parse
 from arena_check import check
 from omega import solve
@@ -87,6 +88,32 @@ class Omega(unittest.TestCase):
         arena=objective(game([0],[[('stay',0)]],partial=False),'parity',[0])
         for budget in (Budget(states=0),Budget(edges=0),Budget(work=0),Budget(seconds=0)):
             self.assertEqual(solve(arena,budget)['status'],'UNKNOWN')
+
+    def test_zero_seconds_all_target_reachability(self):
+        arena=objective(game([0],[[('stay',0)]],roots=[0],partial=False),'reachability',[0])
+        result=solve(arena,Budget(seconds=0))
+        self.assertEqual(result.get('status'),'UNKNOWN')
+        self.assertEqual(result['stop'],'solver time bound')
+        self.assertEqual(result['work'],0)
+        self.assertEqual(check(solve(arena),arena)['evidence'],'certified winning strategy')
+
+    def test_deadline_on_entry_and_after_packet_assembly(self):
+        for partial,kind in ((False,'safety'),(True,'safety'),(False,'reachability'),
+                             (False,'buchi'),(False,'co-buchi'),(False,'parity')):
+            with self.subTest(partial=partial,kind=kind):
+                arena=objective(game([0],[[('stay',0)]],partial=partial),kind,[0])
+                self.assertEqual(solve(arena,Budget(seconds=0))['stop'],'solver time bound')
+                clock=[0]; wire=type(arena).wire
+                def expire(subject):
+                    packet=wire(subject); clock[0]=2
+                    return packet
+                with patch('knowledge.time.monotonic',side_effect=lambda:clock[0]), \
+                     patch.object(type(arena),'wire',expire):
+                    budget=Budget(seconds=1)
+                    result=solve(arena,budget)
+                self.assertEqual(result.get('status'),'UNKNOWN')
+                self.assertEqual(result['stop'],'solver time bound')
+                self.assertEqual(result['work'],budget.work)
 
     def test_partial_omega_refused(self):
         arena=game([0],[[('stay',0)]])

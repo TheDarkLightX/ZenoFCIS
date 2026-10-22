@@ -47,6 +47,19 @@ class ArenaCLI(unittest.TestCase):
             self.assertEqual(json.loads(result.stdout)['status'],'UNKNOWN')
             self.assertFalse((out/'arena-binding.json').exists())
 
+    def test_zero_seconds_all_target_reachability_has_no_binding(self):
+        value=game([0],[[('stay',0)]],roots=[0],partial=False).wire()
+        value['objective']={'kind':'reachability','states':[0]}
+        with tempfile.TemporaryDirectory() as folder:
+            base=Path(folder); source=base/'game.json'; out=base/'evidence'
+            source.write_text(json.dumps(value))
+            result=run(ROOT/'tools/trace_game/arena.py','solve','--game',source,'--out',out,'--seconds',0)
+            self.assertEqual(result.returncode,2,result.stdout+result.stderr)
+            self.assertEqual(json.loads(result.stdout),{'status':'UNKNOWN','stop':'solver time bound','work':0})
+            self.assertEqual(json.loads((out/'certificate.json').read_text()),json.loads(result.stdout))
+            self.assertFalse((out/'arena-binding.json').exists())
+            self.assertFalse((out/'verdict.json').exists())
+
     def test_partial_visibility_and_totality(self):
         value=game([0,0],[[('a',0)],[('b',1)]],partial=False).wire(); value['observation']='partial'
         for node in value['nodes']: node['observation']='same'

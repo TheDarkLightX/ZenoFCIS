@@ -69,6 +69,7 @@ def solve(arena,budget=None):
     if arena.kind=='safety': return safety_solve(arena,budget)
     budget=budget or Budget()
     try:
+        budget.charge(0)  # Check even when the attractor needs no iterations.
         n=len(arena.owners)
         if n>budget.states or sum(map(len,arena.edges))>budget.edges: raise Limit('arena bound')
         if arena.kind=='reachability': cert=reachability(arena,budget)
@@ -77,6 +78,8 @@ def solve(arena,budget=None):
             cert=dict(kind=arena.kind,winning=sorted(W[0]),
                       strategy=sorted(map(list,sigma[0].items())),
                       counterstrategy=sorted(map(list,sigma[1].items())))
-        return dict(schema='zeno-fcis/arena-certificate/1',game=arena.wire(),knowledge=None,certificate=cert)
+        packet=dict(schema='zeno-fcis/arena-certificate/1',game=arena.wire(),knowledge=None,certificate=cert)
+        budget.charge(0)  # Include certificate assembly in the solver deadline.
+        return packet
     except (Limit,RecursionError) as error:
         return dict(status='UNKNOWN',stop=str(error) or 'recursion bound',work=budget.work)

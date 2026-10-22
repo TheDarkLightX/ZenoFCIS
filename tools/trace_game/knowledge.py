@@ -81,13 +81,16 @@ def safety_certificate(owners, edges, bad, budget):
 def solve(arena, budget=None):
     budget = budget or Budget()
     try:
+        budget.charge(0)
         if arena.kind != 'safety': raise ValueError('safety objective required')
         graph = construct(arena, budget) if arena.partial else dict(
             owners=list(arena.owners), edges=[[list(e) for e in row] for row in arena.edges],
             roots=list(arena.roots), bad=[i in arena.marks for i in range(len(arena.owners))])
         if len(graph['owners']) > budget.states or sum(map(len, graph['edges'])) > budget.edges: raise Limit('arena bound')
         cert = safety_certificate(graph['owners'], graph['edges'], graph['bad'], budget)
-        return dict(schema='zeno-fcis/arena-certificate/1', game=arena.wire(),
+        packet = dict(schema='zeno-fcis/arena-certificate/1', game=arena.wire(),
                     knowledge=graph if arena.partial else None, certificate=cert)
+        budget.charge(0)  # Include certificate assembly in the solver deadline.
+        return packet
     except (Limit, RecursionError) as error:
         return dict(status='UNKNOWN', stop=str(error) or 'recursion bound', work=budget.work)
