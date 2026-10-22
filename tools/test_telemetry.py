@@ -55,8 +55,8 @@ class TelemetryTests(unittest.TestCase):
     def test_reported_measured_work_is_observed_without_result_data(self):
         import io
         observer = telemetry.ObservationStream(io.StringIO())
-        observer.write(json.dumps({"status": "UNKNOWN", "measured": {"work": "17", "source": "private"}}) + "\n")
-        self.assertEqual(observer.work, {"measured.work": 17})
+        observer.write(json.dumps({"status": "UNKNOWN", "measured": {"work": "17", "source": "private"}, "search": {"runs": [{"work": "9", "input": "private"}]}}) + "\n")
+        self.assertEqual(observer.work, {"measured.work": 17, "search.runs.0.work": 9})
         self.assertEqual(observer.verdict, "unknown")
 
     def test_python_concurrent_lines(self):
@@ -101,6 +101,30 @@ class CliTelemetryTests(TelemetryTests):
         self.assertEqual(row["verdict"], "unknown")
         self.assertIsInstance(row["work_units"], dict)
         self.assertEqual(row["work_units"]["measured.work"], report["measured"]["work"])
+
+    def test_cli_gap_work_survives_a_packet_write_refusal(self):
+        source = Path(__file__).resolve().parents[1] / "examples/guide-counter"
+        packet = self.root / "review.json"
+        args = ["contract", "review", str(source), "--gaps", "--format", "json", "--out"]
+        good = self.cli([*args, str(packet)], self.log)
+        self.assertEqual(good.returncode, 0, good.stdout + good.stderr)
+        work = int(json.loads(packet.read_text())["gaps"]["work"])
+        first = json.loads(self.log.read_text().splitlines()[-1])
+        self.assertEqual(first["work_units"]["gaps.work"], work)
+        refused = self.cli([*args, str(self.root)], self.log)
+        self.assertEqual(refused.returncode, 3, refused.stdout + refused.stderr)
+        second = json.loads(self.log.read_text().splitlines()[-1])
+        self.assertEqual(second["work_units"]["gaps.work"], work)
+        self.assertEqual(second["verdict"], "refused")
+
+    def test_cli_optimizer_records_run_work(self):
+        source = Path(__file__).resolve().parents[1] / "crates/zeno-fcis-cli/tests/fixtures/i128-programs/boolean-kernel-candidate.zcve"
+        result = self.cli(["optimize", "--program", str(source)], self.log)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        report = json.loads(result.stdout)
+        row = json.loads(self.log.read_text())
+        self.assertIsInstance(row["work_units"], dict)
+        self.assertEqual(row["work_units"]["detail.search.runs.0.work"], report["detail"]["search"]["runs"][0]["work"])
 
     def test_cli_concurrent_lines(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:

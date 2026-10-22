@@ -13,7 +13,7 @@ import time
 
 SCHEMA = "zeno-fcis/telemetry/1"
 WORK_KEYS = frozenset(("work", "work_units", "search_work", "check_work", "session_work", "used_work", "reserved_work", "steps"))
-CONTAINERS = frozenset(("accounting", "usage", "detail", "report", "result", "session", "totals", "spent", "measured"))
+CONTAINERS = frozenset(("accounting", "usage", "detail", "report", "result", "session", "totals", "spent", "measured", "search", "runs", "phases", "gaps", "proposals", "after"))
 
 
 class ObservationStream:
@@ -44,6 +44,10 @@ class ObservationStream:
         return count
 
     def observe(self, value, path=""):
+        if isinstance(value, list):
+            for index, child in enumerate(value):
+                self.observe(child, f"{path}.{index}" if path else str(index))
+            return
         if not isinstance(value, dict):
             return
         if not path:

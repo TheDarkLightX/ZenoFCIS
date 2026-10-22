@@ -268,10 +268,20 @@ pub(crate) fn observe(value: &Value) {
                         | "totals"
                         | "spent"
                         | "measured"
-                ) && child.is_object()
+                        | "search"
+                        | "runs"
+                        | "phases"
+                        | "gaps"
+                        | "proposals"
+                        | "after"
+                ) && (child.is_object() || child.is_array())
                 {
                     numbers(child, &name, found);
                 }
+            }
+        } else if let Some(array) = value.as_array() {
+            for (index, child) in array.iter().enumerate() {
+                numbers(child, &format!("{path}.{index}"), found);
             }
         }
     }
