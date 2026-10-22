@@ -465,7 +465,7 @@ fn judge(
             place: error.place().to_owned(),
             reason: error.reason().to_owned(),
         };
-        let application = review::application(&rules).map_err(invalid)?;
+        let application = review::application(&project, &rules).map_err(invalid)?;
         let judged = work(&sources).map_err(invalid)?;
         let sha256 = |text: &str| hex(&digest(text.as_bytes()));
         Ok((

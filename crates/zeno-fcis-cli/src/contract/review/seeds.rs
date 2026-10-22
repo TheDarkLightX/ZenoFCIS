@@ -47,7 +47,7 @@ pub(crate) fn equivalent_mutant_programs(
         .filter(|mutant| mutant["classification"] == "equivalent-over-full-domain")
         .filter_map(|mutant| mutant["id"].as_str())
         .collect();
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let commitment = schema_commitment(&schema)?;

@@ -7,6 +7,10 @@
 //! operators associate left except `->`. Law formulas come from the
 //! `zeno-fcis-spec` parser and convert to the same tree.
 
+#[path = "table_expr.rs"]
+mod table_expr;
+pub(super) use table_expr::TableDeclarations;
+
 use std::collections::BTreeMap;
 
 use zeno_fcis_spec::{CompareOp, DivisionMode, ProjectionRoot, RelExpr, ValueExpr};
@@ -123,10 +127,30 @@ const MAX_DEPTH: usize = 64;
 
 /// Parses one rule expression.
 pub fn parse(text: &str) -> Result<Ast, String> {
+    parse_in(text, None)
+}
+
+/// Parses one expression against project table declarations and returns the
+/// owned scalar expansion. This is preparation, not decision authority.
+pub fn parse_for_project(project: &str, text: &str) -> Result<Ast, String> {
+    if let Ok(ast) = parse(text) {
+        return Ok(ast);
+    }
+    parse_tables(text, &TableDeclarations::read(project)?)
+}
+
+pub(super) fn parse_tables(text: &str, tables: &TableDeclarations) -> Result<Ast, String> {
+    parse_in(text, Some(tables))
+}
+
+fn parse_in(text: &str, tables: Option<&TableDeclarations>) -> Result<Ast, String> {
     let tokens = tokenize(text)?;
     let mut parser = Parser {
         tokens: &tokens,
         index: 0,
+        tables,
+        bound: Vec::new(),
+        expanded: 0,
     };
     let ast = parser.expression(0, 0)?;
     match tokens.get(parser.index) {
@@ -145,7 +169,7 @@ fn tokenize(text: &str) -> Result<Vec<&str>, String> {
             .any(|operator| rest.starts_with(operator))
         {
             2
-        } else if b"!<>()+*,-".contains(&bytes[0]) {
+        } else if b"!<>()+*,-[]{}".contains(&bytes[0]) {
             1
         } else if bytes[0].is_ascii_alphabetic() || bytes[0] == b'_' {
             bytes
@@ -169,6 +193,9 @@ fn tokenize(text: &str) -> Result<Vec<&str>, String> {
 struct Parser<'t> {
     tokens: &'t [&'t str],
     index: usize,
+    tables: Option<&'t TableDeclarations>,
+    bound: Vec<(&'t str, i128)>,
+    expanded: usize,
 }
 
 impl<'t> Parser<'t> {
@@ -192,11 +219,17 @@ impl<'t> Parser<'t> {
 
     /// Precedence climbing: operators binding at least as tightly as `level`.
     fn expression(&mut self, level: u8, depth: usize) -> Result<Ast, String> {
+        self.expansion_work(1)?;
         if depth > MAX_DEPTH {
             return Err("expression nests too deeply".to_owned());
         }
         let token = self.next()?;
         let mut left = match token {
+            "forall" | "exists" | "sum"
+                if self.tables.is_some() && self.tokens.get(self.index) != Some(&"(") =>
+            {
+                self.table_form(token, depth + 1)?
+            }
             "(" => {
                 let inner = self.expression(0, depth + 1)?;
                 self.expect(")")?;
@@ -248,7 +281,7 @@ impl<'t> Parser<'t> {
                 call(&name, arguments)?
             }
             _ if token.as_bytes()[0].is_ascii_alphabetic() || token.starts_with('_') => {
-                Ast::Name(token.to_owned())
+                self.table_name(token)?
             }
             _ => return Err(format!("unexpected `{token}`")),
         };

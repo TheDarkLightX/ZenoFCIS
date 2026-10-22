@@ -37,7 +37,7 @@ impl Loaded {
     /// # Errors
     /// The first declaration or rule with no contract form.
     pub(super) fn read(project: &str, rules: &str) -> Result<Self, ContractError> {
-        let rules = Rules::read(rules)?;
+        let rules = Rules::read_for_project(project, rules)?;
         Self::with(project, rules)
     }
 

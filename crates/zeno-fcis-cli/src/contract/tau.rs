@@ -32,7 +32,7 @@ pub(crate) fn export(
     max_tuples: u64,
     samples: usize,
 ) -> Result<Value, ContractError> {
-    let rules = Rules::read(source)?;
+    let rules = Rules::read_for_project(project, source)?;
     rules.refuse_unsigned("Tau export")?;
     if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
         return Err(refused(
@@ -284,7 +284,7 @@ pub(crate) fn reference_queries(
     source: &str,
     metadata: &Value,
 ) -> Result<Vec<Value>, ContractError> {
-    let rules = Rules::read(source)?;
+    let rules = Rules::read_for_project(project, source)?;
     rules.refuse_unsigned("Tau export")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     declarations.refuse_unsigned("Tau export")?;

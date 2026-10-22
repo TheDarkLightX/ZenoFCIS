@@ -324,7 +324,7 @@ pub(super) fn review(
     max: u64,
     options: Option<gaps::Options<'_>>,
 ) -> Result<Review, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
@@ -970,7 +970,7 @@ pub(super) fn lemmas(
     max: u64,
     transitions: bool,
 ) -> Result<lemma::Lemmas, ContractError> {
-    let rules = Rules::read(text)?;
+    let rules = Rules::read_for_project(project, text)?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;

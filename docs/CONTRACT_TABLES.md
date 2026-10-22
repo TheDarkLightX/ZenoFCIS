@@ -36,8 +36,8 @@ the same canonical project as the original.
 
 Everything else is unchanged. `check`, `generate contract`, `contract review`,
 `contract lemma`, the other judges and `new --contract` read the table source
-and see its expansion. The rules in `v2/policy.json` and `ui.json` name the
-entry fields by their IDs, 110 to 115 in the example, as they name any field.
+and see its expansion. The policy can use table forms, expanded against the project declarations
+when it loads; `ui.json` still names entry fields by ID.
 `--lemma` accepts one table-aware formula against the project declarations,
 including braces, newlines and comments. It consumes the entire text and
 refuses trailing declarations. A table-form lemma and its printed expansion
@@ -76,7 +76,7 @@ the same identity and the same checks. The rules are:
   V_k is eager even when C_k is false.
 - A count in a value position, including one compared with a state or command
   value, is `sum i in table T { choose(C, 1, 0) }`. It has N Select terms
-  and N-1 additions, with the condition evaluated once per entry. For example:
+  and N-1 additions, with one occurrence of the condition per entry. For example:
   `count j in table 110 { post.100.110[j] == command.101.122 } <= pre.100.120`.
   Counts can also appear on the right of a comparison or inside arithmetic.
 - For compatibility, an isolated `count i in table T { C } OP K`, with OP one of `<=`, `<`, `>=`, `>`, `==`,
@@ -142,12 +142,43 @@ Select evaluator. Finite results remain scoped to the declared domain.
   cap of 1,048,576 input tuples of the finite checks. Beyond the cap,
   `contract review` reports bounded probes instead of the whole domain and
   the judges are inconclusive, as for any contract.
-- `count` grows with the number of entry sets: C(N, K+1) clauses for
-  `<= K`. It suits small tables and small bounds.
+- An isolated constant-bound `count` retains C(N, K+1) clauses for `<= K`.
+  Use the explicit Select sum for a linear constant-bound formula.
 - In law formulas an entry index is a literal or a bound index variable,
   not an input. A dynamic entry is written as a `forall` with
   `where i == command...`, as in the example.
-- `v2/policy.json` and `ui.json` have no table forms; they use entry IDs,
-  and the generated interface shows each entry as its own field.
+- Policy table forms lower into the existing scalar rules and identity
+  format. `ui.json` names entry IDs, and the interface shows each entry as a field.
 - Linear formulas reduce expansion size, not the finite input domain.
   Checking large domains without enumeration remains separate work.
+
+## Table forms in policy rules
+
+Project-aware policy loading expands these forms in expression strings:
+
+- `pre.100.110[command.101.121]` reads the entry named by the input index.
+  A literal or bound index selects that field directly. An input index
+  expands into the existing nested `choose` chain, with the final field as
+  its last arm; its declared domain must lie wholly in 0..N-1.
+- The post key `"110[command.101.121]": "member"` writes only the selected
+  entry. Each expanded field is `choose(index == k, member, pre.100.FIELD)`.
+  Overlapping table/scalar writes are refused. A literal-index write emits
+  only that field. Writes name state tables; reads may also name command or
+  context tables.
+- `forall i in table T [where C] { F }` joins the substituted conditions with
+  `&&`, using `C -> F` when filtered. `exists` uses `||` and `C && F`.
+  `sum` joins values with `+`; its filter is eager `choose(C, V, 0)`.
+  Variable names must be fresh, and nested forms preserve their bindings.
+
+Indices here are literals, bound variables or direct input projections.
+Computed expressions require separate range analysis and are refused.
+Expansion is preparation: it owns local scratch and returns owned scalar
+expressions, with no new runtime state, indexing or decision authority. The
+existing native evaluator supplies traps and measured work. Expansion has a
+65,536 work cap per expression, including copied identifier bytes, and a
+1 MiB text budget; existing scalar policy
+loads retain their original path and limits.
+
+The [state-limit library example](../examples/contract-tables/library-limits/README.md)
+combines a state bound, a conditional sum and policy table forms. Its finite
+domain is twice the fixed-limit example's; linear syntax does not shrink it.

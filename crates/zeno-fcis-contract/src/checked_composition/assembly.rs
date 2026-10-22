@@ -145,7 +145,8 @@ impl CompiledAggregate {
     /// The route's refusal, or adoptions and evolutions, which the
     /// aggregate does not have.
     pub(crate) fn read(aggregate: &AggregateSources) -> Result<Self, Refusal> {
-        let rules = Rules::read(&aggregate.rules).map_err(route_error)?;
+        let rules =
+            Rules::read_for_project(&aggregate.project, &aggregate.rules).map_err(route_error)?;
         rules
             .refuse_unsigned("checked composition")
             .map_err(route_error)?;

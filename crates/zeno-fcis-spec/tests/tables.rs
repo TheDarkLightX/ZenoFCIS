@@ -519,7 +519,7 @@ fn table_value_count_limit_includes_the_boundary_and_refuses_three_under_two() {
         "{HEADER}table 110 100 slot 105 size 6;\nlaw 500 limit on commit = count j in table 110 {{ post.100.110[j] == command.101.120 }} <= command.101.121;\n"
     );
     let formula = law(&source, 500);
-    for held in 0..=6 {
+    for held in [3, 2, 0, 1, 4, 5, 6] {
         let mut values = BTreeMap::from([
             ("Command.101.120".to_owned(), 1),
             ("Command.101.121".to_owned(), 2),
@@ -569,6 +569,27 @@ fn standalone_table_formula_consumes_all_text_and_resolves_paths() {
         assert!(
             zeno_fcis_spec::parse_formula(LIBRARY, bad, SourceLimits::default()).is_err(),
             "{bad}"
+        );
+    }
+}
+
+#[test]
+fn table_count_sizes_before_and_after_linear_values() {
+    for n in [6, 16, 64] {
+        let prefix = format!("{HEADER}table 1000 100 slot 105 size {n};\n");
+        let old = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= 2;\n"), SourceLimits::default()).unwrap();
+        let new = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= command.101.121;\n"), SourceLimits::default()).unwrap();
+        let clauses = match n {
+            6 => 20,
+            16 => 560,
+            _ => 41664,
+        };
+        assert_eq!(old.counts[0].clauses, clauses);
+        assert_eq!(new.counts[0].clauses, n as u128);
+        eprintln!(
+            "count-size N={n} old_clauses={clauses} new_terms={n} old_text_bytes={} new_text_bytes={}",
+            old.text.len(),
+            new.text.len()
         );
     }
 }

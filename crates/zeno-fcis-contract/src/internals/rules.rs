@@ -6,6 +6,9 @@
 //! Unknown and duplicate keys are refused, so no entry is silently ignored
 //! or overridden.
 
+#[path = "table_rules.rs"]
+mod table_rules;
+
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -501,6 +504,26 @@ impl Rules {
         } else {
             Ok(())
         }
+    }
+
+    /// Loads rules against declared tables, expanding table syntax once.
+    /// The result contains only the existing owned scalar expressions.
+    pub fn read_for_project(project: &str, source: &str) -> Result<Self, ContractError> {
+        if let Ok(rules) = Self::read(source) {
+            return Ok(rules);
+        }
+        Self::read(&table_rules::expand(project, source)?)
+    }
+
+    /// Returns scalar policy source for preparation tools. It carries no
+    /// decision, measured-work or publication authority.
+    pub fn expand_for_project(project: &str, source: &str) -> Result<String, ContractError> {
+        if Self::read(source).is_ok() {
+            return Ok(source.to_owned());
+        }
+        let expanded = table_rules::expand(project, source)?;
+        Self::read(&expanded)?;
+        Ok(expanded)
     }
 
     pub fn read(source: &str) -> Result<Self, ContractError> {

@@ -76,8 +76,11 @@ pub(crate) use rules::{
 ///
 /// # Errors
 /// The rules' refusal.
-pub(crate) fn listed_evolutions(rules: &str) -> Result<Vec<Evolution>, ContractError> {
-    Ok(Rules::read(rules)?.evolutions)
+pub(crate) fn listed_evolutions(
+    project: &str,
+    rules: &str,
+) -> Result<Vec<Evolution>, ContractError> {
+    Ok(Rules::read_for_project(project, rules)?.evolutions)
 }
 
 /// The directory of adoption `n`'s retained files, relative to the
@@ -369,7 +372,7 @@ fn with_current<R>(
     generated: &GeneratedContract,
     use_current: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
 ) -> Result<R, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     rules.refuse_unsigned("contract evolution binding")?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
@@ -517,7 +520,7 @@ pub(crate) fn refresh_receipts(
         .iter()
         .zip(&receipts)
         .all(|(files, receipt)| files.receipt == receipt.as_slice());
-    let bound = Rules::read(sources.rules)?
+    let bound = Rules::read_for_project(sources.project, sources.rules)?
         .adoptions
         .iter()
         .map(|adoption| &adoption.receipt_sha256)
@@ -585,7 +588,7 @@ fn generate(
     sources: ContractSources<'_>,
     receipts: Receipts,
 ) -> Result<GeneratedContract, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     if rules.unsigned && (!rules.adoptions.is_empty() || !rules.evolutions.is_empty()) {
         return Err(ContractError::new(
             "lineage binding",
@@ -633,7 +636,7 @@ fn generate(
         let within = |error: ContractError| {
             ContractError::new(format!("{directory}/{}", error.place()), error.reason())
         };
-        if !Rules::read(era.rules)
+        if !Rules::read_for_project(era.project, era.rules)
             .map_err(within)?
             .evolutions
             .is_empty()
@@ -956,7 +959,7 @@ fn checked_shortcut(
         ));
     }
     let declarations = |sources: &ContractSources<'_>| {
-        let rules = Rules::read(sources.rules)?;
+        let rules = Rules::read_for_project(sources.project, sources.rules)?;
         Declarations::read(sources.project, &rules.leaf_bindings)
     };
     let (Some(first), Some(last)) = (contracts.first(), contracts.last()) else {
@@ -1153,7 +1156,7 @@ fn generate_era(
     placement: &Placement<'_>,
 ) -> Result<GeneratedContract, ContractError> {
     let offset = placement.offset;
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     // A version a migration or rename superseded keeps its own schema.

@@ -36,13 +36,14 @@ member from 1 to 3. The command names a copy with the index type
 
 The rules in `v2/policy.json` refuse a visitor desk (200), a copy on loan
 (201), a third copy for one member (202) and a return by anyone but the
-holder (203). They name the entry fields 110 to 115 directly.
+holder (203). They read and write the selected entry with table syntax, expanded at load.
 
 ## Difference
 
 Without tables the same contract lists six fields and spells out each law per
 copy; "at most two per member" becomes a condition on every three copies.
-The expansion is that text, so the checked contract is the same.
+The expansion is that text, so the checked contract is the same. The table-form
+policy preserves the expanded scalar policy bytes, including its work behavior.
 
 ## Scope
 

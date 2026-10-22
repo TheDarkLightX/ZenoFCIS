@@ -70,7 +70,7 @@ struct Fields {
 }
 
 fn fields(core: &Core) -> Result<Fields> {
-    let rules = Rules::read(core.rules_text())?;
+    let rules = Rules::read_for_project(core.project(), core.rules_text())?;
     rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(core.project(), &rules.leaf_bindings)?;
     // Generated leaves and the core decision projection have no outbox.
@@ -530,7 +530,7 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
 /// The bound program's identity, as the composition checker pins it, and
 /// the program's node count.
 fn program_identity(project: &str, policy_text: &str) -> Result<(String, usize)> {
-    let rules = Rules::read(policy_text)?;
+    let rules = Rules::read_for_project(project, policy_text)?;
     rules.refuse_unsigned("loop composition")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;

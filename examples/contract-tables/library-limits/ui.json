@@ -1,0 +1,73 @@
+{
+  "format": "zenoui/metadata/1",
+  "title": "Library loan limits",
+  "action": "command.101.120",
+  "fields": {
+    "pre.100.110": {
+      "label": "Copy 0 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "pre.100.111": {
+      "label": "Copy 1 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "pre.100.112": {
+      "label": "Copy 2 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "pre.100.113": {
+      "label": "Copy 3 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "pre.100.114": {
+      "label": "Copy 4 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "pre.100.115": {
+      "label": "Copy 5 holder (0 = on shelf)",
+      "unit": "member"
+    },
+    "command.101.120": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "command.101.121": {
+      "label": "Copy (0 to 5)",
+      "unit": "copy"
+    },
+    "command.101.122": {
+      "label": "Member",
+      "unit": "member"
+    },
+    "context.102": {
+      "label": "Desk",
+      "unit": "unitless"
+    },
+    "pre.100.160": {
+      "label": "Loan limit per member",
+      "unit": "copy"
+    }
+  },
+  "variants": {
+    "150": "Borrow",
+    "151": "Return",
+    "130": "Librarian",
+    "131": "Visitor"
+  },
+  "commands": {
+    "150": {
+      "label": "Borrow",
+      "consequential": true
+    },
+    "151": {
+      "label": "Return",
+      "consequential": true
+    }
+  },
+  "reasons": {
+    "200": "Only the librarian desk can record loans.",
+    "201": "That copy is already on loan. Choose a copy on the shelf.",
+    "202": "This member has reached the loan limit. Return a copy first.",
+    "203": "This member does not hold that copy."
+  }
+}

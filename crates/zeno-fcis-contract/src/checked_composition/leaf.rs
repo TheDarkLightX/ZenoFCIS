@@ -208,7 +208,7 @@ pub(crate) fn bind(
             error.reason(),
         )
     };
-    let rules = Rules::read(rules).map_err(route)?;
+    let rules = Rules::read_for_project(project, rules).map_err(route)?;
     rules
         .refuse_unsigned("checked composition")
         .map_err(route)?;

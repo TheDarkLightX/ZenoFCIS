@@ -29,7 +29,7 @@ pub(super) struct Loaded {
 
 impl Loaded {
     pub(super) fn read(project: &str, policy: &str) -> Result<Self, ContractError> {
-        let rules = Rules::read(policy)?;
+        let rules = Rules::read_for_project(project, policy)?;
         if !rules.adoptions.is_empty() || !rules.evolutions.is_empty() {
             return Err(ContractError::new(
                 "refinement",

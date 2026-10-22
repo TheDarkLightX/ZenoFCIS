@@ -196,7 +196,7 @@ pub(crate) fn check(
     max_tuples: u64,
     solve: &mut Solve<'_>,
 ) -> Result<Checked, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     rules.refuse_unsigned("symbolic export")?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     declarations.refuse_unsigned("symbolic export")?;

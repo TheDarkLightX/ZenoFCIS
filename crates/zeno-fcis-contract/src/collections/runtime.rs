@@ -138,7 +138,7 @@ impl Layout {
         let spec = zeno_fcis_spec::parse_project(project, Default::default())
             .and_then(|p| zeno_fcis_spec::elaborate_project(p, Default::default()))
             .map_err(|e| invalid(e.to_string()))?;
-        let rules = Rules::read(policy)?;
+        let rules = Rules::read_for_project(project, policy)?;
         let declarations = Declarations::read(project, &rules.leaf_bindings)?;
         let positions = domain::positions(&declarations)?;
         let collections = spec.collections();

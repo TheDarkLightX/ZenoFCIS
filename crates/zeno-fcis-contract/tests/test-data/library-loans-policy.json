@@ -1,0 +1,96 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "library-loans",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.120",
+    "copy": "command.101.121",
+    "member": "command.101.122",
+    "desk": "context.102",
+    "holder": "choose(copy == 0, pre.100.110, choose(copy == 1, pre.100.111, choose(copy == 2, pre.100.112, choose(copy == 3, pre.100.113, choose(copy == 4, pre.100.114, pre.100.115)))))",
+    "held": "choose(pre.100.110 == member, 1, 0) + choose(pre.100.111 == member, 1, 0) + choose(pre.100.112 == member, 1, 0) + choose(pre.100.113 == member, 1, 0) + choose(pre.100.114 == member, 1, 0) + choose(pre.100.115 == member, 1, 0)"
+  },
+  "cases": [
+    {
+      "rule": "only the librarian records loans",
+      "when": "desk != 130",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a copy on loan cannot be lent again",
+      "when": "action == 150 && holder != 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "a member holds at most two copies",
+      "when": "action == 150 && held >= 2",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only the holder returns a copy",
+      "when": "action == 151 && holder != member",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "borrow",
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(copy == 0, member, pre.100.110)",
+        "111": "choose(copy == 1, member, pre.100.111)",
+        "112": "choose(copy == 2, member, pre.100.112)",
+        "113": "choose(copy == 3, member, pre.100.113)",
+        "114": "choose(copy == 4, member, pre.100.114)",
+        "115": "choose(copy == 5, member, pre.100.115)"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "return",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "choose(copy == 0, 0, pre.100.110)",
+        "111": "choose(copy == 1, 0, pre.100.111)",
+        "112": "choose(copy == 2, 0, pre.100.112)",
+        "113": "choose(copy == 3, 0, pre.100.113)",
+        "114": "choose(copy == 4, 0, pre.100.114)",
+        "115": "choose(copy == 5, 0, pre.100.115)"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "115": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality"
+  }
+}

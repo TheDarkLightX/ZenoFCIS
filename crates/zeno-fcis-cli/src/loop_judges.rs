@@ -216,7 +216,7 @@ impl Core {
     }
 
     fn from_sources(project: String, rules_text: String) -> Result<Self> {
-        let rules = Rules::read(&rules_text)?;
+        let rules = Rules::read_for_project(&project, &rules_text)?;
         rules.refuse_unsigned("loop binding")?;
         let declarations = Declarations::read(&project, &rules.leaf_bindings)?;
         let delivery_universe = DeliveryUniverse::new(&declarations, &rules);
@@ -231,7 +231,8 @@ impl Core {
                 )));
             }
         }
-        let policy: Value = serde_json::from_str(&rules_text)
+        let expanded_rules = Rules::expand_for_project(&project, &rules_text)?;
+        let policy: Value = serde_json::from_str(&expanded_rules)
             .map_err(|_| Stop::Invalid("v2/policy.json is not JSON".into()))?;
         let variables = variables_of(&policy);
         let paths: Vec<String> = positions.iter().map(|p| p.name.clone()).collect();

@@ -320,7 +320,7 @@ fn review_with(
     max_tuples: u64,
     gap_options: Option<gaps::Options<'_>>,
 ) -> Result<Review, ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     if rules.unsigned {
         return unsigned::review(sources, max_tuples, gap_options);
     }
@@ -534,8 +534,8 @@ fn review_with(
 ///
 /// # Errors
 /// The rules file's refusal.
-pub(crate) fn application(rules: &str) -> Result<String, ContractError> {
-    Ok(Rules::read(rules)?.template)
+pub(crate) fn application(project: &str, rules: &str) -> Result<String, ContractError> {
+    Ok(Rules::read_for_project(project, rules)?.template)
 }
 
 /// Drafting uses the same example grammar, framing and observation comparison
@@ -543,7 +543,7 @@ pub(crate) fn application(rules: &str) -> Result<String, ContractError> {
 pub(crate) fn draft_examples(
     sources: ReviewSources<'_>,
 ) -> Result<(String, Vec<DraftExample>), ContractError> {
-    let rules = Rules::read(sources.rules)?;
+    let rules = Rules::read_for_project(sources.project, sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;

@@ -143,7 +143,7 @@ pub fn check(
             "declare random inputs and at least one distribution or reward law".to_owned(),
         ));
     }
-    let rules = Rules::read(policy_source)?;
+    let rules = Rules::read_for_project(project, policy_source)?;
     rules.refuse_unsigned("finite distribution binding")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let positions = domain::positions(&declarations)?;

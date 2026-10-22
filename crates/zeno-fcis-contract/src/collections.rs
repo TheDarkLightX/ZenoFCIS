@@ -149,7 +149,7 @@ pub fn check(
     if collections.maps().is_empty() {
         return Err(invalid("declare at least one map".to_owned()));
     }
-    let rules = Rules::read(policy_source)?;
+    let rules = Rules::read_for_project(project, policy_source)?;
     rules.refuse_unsigned("collections binding")?;
     let declarations = Declarations::read(project, &rules.leaf_bindings)?;
     let positions = domain::positions(&declarations)?;
