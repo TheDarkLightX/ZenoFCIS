@@ -318,7 +318,9 @@ y(t)      | y of t                 | reserve y before step t'''
                 else:symbol=l.REGISTRY['templates']['formula'][op].replace('{a}','').replace('{b}','').strip()
                 self.assertEqual(keys.count(symbol),1)
             declared={z[1] for z in l.walk_nodes(n) if z[0]=='call'}|{z[2] for z in l.walk_nodes(n) if z[0] in l.BIND}
-            for nm in declared:self.assertTrue(any(k==nm or k.startswith(nm+'(') or k.startswith(nm+'′(') for k in keys),nm)
+            for nm in declared:
+                shown=l.formula_identifier(nm)
+                self.assertTrue(any(k==shown or k.startswith(shown+'(') or k.startswith(shown+'′(') for k in keys),nm)
         print('CHECK 9: DEX golden; every used declaration covered once per displayed form; first appearance order')
 
     def test10_missing_theory(self):

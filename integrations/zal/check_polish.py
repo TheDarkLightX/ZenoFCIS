@@ -15,6 +15,9 @@ import tempfile
 
 ZAL = Path(__file__).resolve().parent
 CONTROLS = (
+    ("greek-mapping-disabled", "ladder.py",
+     "    return GREEK_IDENTIFIERS.get(name, name)", "    return name",
+     "test_ladder_greek.GreekIdentifierTests.test_no_free_value_formula_and_legend"),
     ("scope-omitted", "ladder.py",
      "    return (scope_identity(ctx),tree)\n",
      "    return (scope_identity(ctx),tree) if ctx.data['theory']==TEMPORAL_THEORY else tree\n",

@@ -35,6 +35,21 @@ NAME = r'[A-Za-z_][A-Za-z_0-9]*'
 MAX_TEXT, MAX_TOKENS, MAX_NODES, MAX_DEPTH = 2000, 400, 1024, 80
 EARLEY_MAX_ITEMS = 250000
 
+# Exact identifier aliases, using the usual mathematical epsilon/phi variants.
+# The canonical trees and declarations retain the ASCII keys.
+GREEK_IDENTIFIERS = MappingProxyType({
+    **dict(zip('alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega'.split(),
+               'αβγδϵζηθικλμνξοπρστυϕχψω', strict=True)),
+    **dict(zip('Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu Nu Xi Omicron Pi Rho Sigma Tau Upsilon Phi Chi Psi Omega'.split(),
+               'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ', strict=True)),
+    'varepsilon': 'ε', 'varphi': 'φ', 'vartheta': 'ϑ',
+})
+ASCII_GREEK_IDENTIFIERS = MappingProxyType({glyph: name for name, glyph in GREEK_IDENTIFIERS.items()})
+
+
+def formula_identifier(name):
+    return GREEK_IDENTIFIERS.get(name, name)
+
 
 class Refusal(ValueError):
     """A named syntax/context/model refusal; exhaustion is UNKNOWN."""
@@ -477,20 +492,23 @@ def body_text(n, rung, ctx, drop=None):
     if tag == 'int':
         return templates['int'].format(value=n[1])
     if tag == 'var':
-        return n[1]
+        return formula_identifier(n[1]) if mode == 'formula' else n[1]
     if tag in BIND:
         d = ctx.domain(n[2])
         art = article(n[1],variable=True) if mode == 'formal' else article(d['member'],d.get('article'))
         body=show(n[3])
         if tag=='count' and mode=='precise' and count_body_needs_group(n[3]):
             body=templates['group'].format(a=body)
-        return templates[tag].format(v=n[1], domain=n[2], member=d['member'], plural=d['plural'], article=art, body=body)
+        return templates[tag].format(v=formula_identifier(n[1]) if mode == 'formula' else n[1],
+                                     domain=formula_identifier(n[2]) if mode == 'formula' else n[2],
+                                     member=d['member'], plural=d['plural'], article=art, body=body)
     if tag == 'call':
         name, primed, args = n[1:]
         s = ctx.symbol(name)
         rendered = [templates['group'].format(a=show(a)) if mode not in ('formula','typed') and a[0] not in ('var','int','call') else show(a) for a in args]
         if mode in ('formula','typed'):
-            return templates['prime_call' if primed else 'call'].format(name=name,args=', '.join(rendered))
+            return templates['prime_call' if primed else 'call'].format(
+                name=formula_identifier(name) if mode == 'formula' else name, args=', '.join(rendered))
         if mode == 'formal':
             key = 'atom' if s['kind'] == 'predicate' else 'prime_call' if primed else 'call'
             if not args:
@@ -595,8 +613,8 @@ class Rule:
 def tokenize(text):
     if not isinstance(text, str) or len(text) > MAX_TEXT:
         raise Refusal('input-bound at token 0; expected at most 2000 characters')
-    pattern = r"<=>|=>|!=|<=|>=|∃!|[A-Za-z_][A-Za-z_0-9]*|[0-9]+|[^\s]"
-    tokens = tuple(re.findall(pattern, text))
+    pattern = r"<=>|=>|!=|<=|>=|∃!|[^\W\d]\w*|[0-9]+|[^\s]"
+    tokens = tuple(ASCII_GREEK_IDENTIFIERS.get(token, token) for token in re.findall(pattern, text))
     if len(tokens) > MAX_TOKENS:
         raise Refusal('input-bound at token 400; expected at most 400 tokens')
     return tokens
@@ -1121,31 +1139,34 @@ def legend(n,ctx):
                 for c in children(n):walk(c)
             return
         if tag in BIND:
-            v,dm=n[1:3];key=symbols[tag].split('{body}')[0].format(v=v,domain=dm).rstrip()
+            v,dm=n[1:3];key=symbols[tag].split('{body}')[0].format(
+                v=formula_identifier(v),domain=formula_identifier(dm)).rstrip()
             if tag=='count':key='#{…}'
             read,meaning=dictionary[tag];args={'v':v,'domain':dm,'article':article(v,variable=True)}
             put(key,read.format(**args),meaning.format(**args))
-            d=ctx.domain(dm);put(dm,dm,'the '+d['plural']);walk(n[3]);return
+            if v in GREEK_IDENTIFIERS:
+                put(formula_identifier(v),v,'bound variable; its domain is stated by the quantifier')
+            d=ctx.domain(dm);put(formula_identifier(dm),dm,'the '+d['plural']);walk(n[3]);return
         if tag=='call':
             nm,p,args=n[1:];s=ctx.symbol(nm);key=body_text(n,'formula',ctx)
-            read=nm+(' prime' if p else '')+' of '+(', '.join(body_text(a,'formula',ctx) for a in args) if args else 'no arguments' if ctx.data['theory']==TEMPORAL_THEORY else '')
+            read=nm+(' prime' if p else '')+' of '+(', '.join(body_text(a,'typed',ctx) for a in args) if args else 'no arguments' if ctx.data['theory']==TEMPORAL_THEORY else '')
             if s['kind']=='predicate':
-                meaning=s['clause'].format(*(body_text(a,'formula',ctx) for a in args))
+                meaning=s['clause'].format(*(body_text(a,'typed',ctx) for a in args))
                 if p:
                     meaning=body_text(reading_tree(n,ctx),'precise',ctx)
             else:
-                value=', '.join((ctx.domain(dm)['member']+' '+body_text(a,'formula',ctx)) for dm,a in zip(s['args'],args))
+                value=', '.join((ctx.domain(dm)['member']+' '+body_text(a,'typed',ctx)) for dm,a in zip(s['args'],args))
                 meaning=s['noun']+(' before ' if is_state(nm,ctx) else ' of ')+value
                 if p:
                     entry=dictionary['prime']
-                    read=entry['read'].format(name=nm,args=', '.join(body_text(a,'formula',ctx) for a in args))
+                    read=entry['read'].format(name=nm,args=', '.join(body_text(a,'typed',ctx) for a in args))
                     meaning=entry['meaning'].format(noun=s['noun'],step=value)
                     if not args and ctx.data['theory']==TEMPORAL_THEORY:
                         read=nm+' prime of no arguments';meaning=s['noun']+' after this event'
                     if not prime_explained:
                         meaning+=entry['first_suffix'];prime_explained=True
             if s['kind']=='function' and is_state(nm,ctx) and ctx.data['theory']==TEMPORAL_THEORY:
-                meaning=s['noun']+(' of '+', '.join(body_text(a,'formula',ctx) for a in args) if args else '')+(' after this event' if p else ' before this event')
+                meaning=s['noun']+(' of '+', '.join(body_text(a,'typed',ctx) for a in args) if args else '')+(' after this event' if p else ' before this event')
                 if p and len([entry for entry in entries.values() if 'prime marks' in entry[2]])==0:
                     meaning+=dictionary['prime']['first_suffix']
             put(key,read,meaning)

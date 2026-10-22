@@ -70,7 +70,7 @@ class LadderToolTests(unittest.TestCase):
                 rendered += 1
         vault = self.call("zal_ladder_render", statement=VAULT, revision=self.revisions[VAULT])
         self.assertEqual(vault["rungs"]["plain"], "No admitted operation sequence drains the vault.")
-        self.assertEqual(vault["rungs"]["formula"], "∀sigma ∈ Traces : ∀a ∈ Assets : □(¬Loss(a))")
+        self.assertEqual(vault["rungs"]["formula"], "∀σ ∈ Traces : ∀a ∈ Assets : □(¬Loss(a))")
         self.assertEqual(vault["evidence"]["evidence"], "obligation")
         self.assertEqual([item["field"] for item in vault["scope"]][:6],
                          ["source_revision", "event_schema", "order", "projection", "mode", "horizon"])

@@ -268,7 +268,7 @@ class TemporalLadderChecks(unittest.TestCase):
         for op in BINARY:self.roundtrip((op,P,Q))
         self.roundtrip(('always',('not',P)))
         gold={
-            'formula':'∀sigma ∈ Traces : ○(P())',
+            'formula':'∀σ ∈ Traces : ○(P())',
             'typed':'forall sigma in Traces: next(P())',
             'formal':'For every sigma in Traces, next open P of no arguments is true close.',
             'precise':'For every trace sigma, there is a next event and at that event (the event is P).',
@@ -580,8 +580,8 @@ class TemporalLadderChecks(unittest.TestCase):
     def test_legend_and_old_dialects(self):
         for body in [unary(op,P) for op in UNARY]+[('until',P,Q),('always',('not',P))]:
             tree=wrap(body);legend=l.legend(tree,self.ctx);keys=[entry[0] for entry in legend]
-            self.assertEqual(len(keys),len(set(keys)));self.assertEqual(keys[0],'∀sigma ∈ Traces :')
-            self.assertEqual(keys[1],'Traces')
+            self.assertEqual(len(keys),len(set(keys)));self.assertEqual(keys[0],'∀σ ∈ Traces :')
+            self.assertEqual(keys[1:3],['σ','Traces'])
             text=l.legend_text(tree,self.ctx);self.assertIn('Theory: ordered logical events',text)
             self.assertIn('sigma',text);self.assertIn('prime',text)
             for node in l.walk_nodes(body):

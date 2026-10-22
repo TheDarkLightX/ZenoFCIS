@@ -6,6 +6,7 @@ Typed is the formula's ASCII spelling; the legend is a key, not another claim.
 Every accepted view parses to the same expanded normalized meaning in its declared
 theory. A question keeps that target and separately names a counterexample or
 witness search. Repeated adjacent readings display “same as above”.
+Formula and Legend display Greek letter names as Unicode letters (such as `sigma` → `σ` and `Sigma` → `Σ`); Typed and spoken readings keep the names, and both input spellings preserve the same canonical formula.
 
 Ask: **No accepted swap should decrease the reserve product.** Select the
 plain view of the [reserve-product example](../../../integrations/zal/examples/ladders/dex_k.json):
