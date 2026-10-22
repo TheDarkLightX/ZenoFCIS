@@ -73,6 +73,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "integrations/mcp/test_guide_tools.py"),
          ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "integrations/commons/test_guide_mcp.py"),
          ("python3", "tools/test_agent_diagnostics.py"),
+         ("python3", "tools/test_replay_run.py"),
          ("python3", "tools/test_library_doc_links.py"),
          ("env", "ZENO_FCIS_CLI=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "tools/test_telemetry.py"),
          ("python3", "integrations/commons/test_telemetry.py")),
