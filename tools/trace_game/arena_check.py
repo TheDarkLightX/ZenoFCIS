@@ -110,3 +110,78 @@ def check(packet, expected=None):
                 objective=arena.kind, winning_roots=[i for i in roots if i in W],
                 losing_roots=[i for i in roots if i not in W], states=len(owners),
                 scope='sure winning in the declared finite arena; no native execution or runtime authority')
+
+
+def cyclic_components(vertices, edges):
+    """Iterative Kosaraju; returns SCCs with a cycle, including singleton loops."""
+    seen=set(); order=[]
+    for root in sorted(vertices):
+        if root in seen: continue
+        seen.add(root); stack=[(root,iter(edges[root]))]
+        while stack:
+            i,following=stack[-1]
+            target=next(following,None)
+            if target is None:
+                order.append(i); stack.pop()
+            elif target in vertices and target not in seen:
+                seen.add(target); stack.append((target,iter(edges[target])))
+    reverse={i:[] for i in vertices}
+    for i in vertices:
+        for t in edges[i]:
+            if t in vertices: reverse[t].append(i)
+    seen=set()
+    for root in reversed(order):
+        if root in seen: continue
+        C={root}; seen.add(root); todo=[root]
+        for i in todo:
+            for t in reverse[i]:
+                if t not in seen: seen.add(t); C.add(t); todo.append(t)
+        if len(C)>1 or root in edges[root]: yield C
+
+
+def omega(arena,cert):
+    """Check positional witnesses by closure and *all* adverse priority cycles.
+
+    An SCC's largest priority alone is insufficient: it may contain a smaller
+    adverse subcycle. Check each priority-induced subgraph separately.
+    """
+    need(cert['kind']==arena.kind,'certificate objective')
+    need(set(cert)==({'kind','winning','strategy','counterstrategy','ranks'} if arena.kind=='reachability'
+                     else {'kind','winning','strategy','counterstrategy'}),'omega certificate fields')
+    n=len(arena.owners); W=cert['winning']
+    need(type(W) is list and all(type(i) is int and 0<=i<n for i in W) and W==sorted(set(W)), 'winning state coverage')
+    W=set(W); regions=[W,set(range(n))-W]
+    witnesses=[mapping(cert['strategy'],{i for i in W if arena.owners[i]==0 and
+                         (arena.kind!='reachability' or i not in arena.marks)},'controller strategy coverage'),
+               mapping(cert['counterstrategy'],{i for i in regions[1] if arena.owners[i]==1},'environment strategy coverage')]
+    if arena.kind=='parity': p=arena.marks
+    elif arena.kind=='buchi': p=tuple(2 if i in arena.marks else 1 for i in range(n))
+    elif arena.kind=='co-buchi': p=tuple(0 if i in arena.marks else 1 for i in range(n))
+    else: p=None
+    end=time.monotonic()+30; work=0
+    for player,R in enumerate(regions):
+        selected={}
+        for i in R:
+            if arena.kind=='reachability' and i in arena.marks and player==0:
+                selected[i]=[]; continue
+            choice=witnesses[player].get(i)
+            row=[t for a,t in arena.edges[i] if arena.owners[i]!=player or a==choice]
+            need(row and all(t in R for t in row),'omega winning closure')
+            selected[i]=row
+        if arena.kind=='reachability':
+            if player==0:
+                ranks=mapping(cert['ranks'],R,'reachability rank coverage')
+                need(all(type(r) is int and 0<=r<=n for r in ranks.values()),'reachability rank encoding')
+                for i in R:
+                    need((ranks[i]==0)==(i in arena.marks),'reachability target rank')
+                    need(all(ranks[t]<ranks[i] for t in selected[i]),'reachability rank decrease')
+            else: need(not R.intersection(arena.marks),'avoidance target exclusion')
+            continue
+        for d in sorted({p[i] for i in R}):
+            if d % 2 == player: continue
+            vertices={i for i in R if p[i]<=d}
+            work+=len(R)+sum(len(selected[i]) for i in vertices)
+            need(work<=1000000 and time.monotonic()<end,'omega checker bound')
+            for C in cyclic_components(vertices,selected):
+                need(not any(p[i]==d for i in C),'adverse parity cycle')
+    return W

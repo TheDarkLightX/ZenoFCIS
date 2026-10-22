@@ -209,6 +209,34 @@ units and 30 seconds. Lower them with `--max-states`, `--max-edges`, `--work`,
 arena; it supplies no native transition provenance or application authority.
 Partial-observation omega objectives require richer constructions and are refused.
 
+## Explicit omega objectives
+
+The same explicit arena input supports perfect-information reachability,
+Büchi, co-Büchi and parity. `objective.states` means the target for reachability,
+the infinitely recurring set for Büchi, or the eventual permanent set for
+co-Büchi. For parity use `{"kind":"parity","priorities":[...]}`, one integer
+0..255 per node: the **greatest** priority occurring infinitely often must be
+even. This convention must be converted explicitly when using a minimum-priority
+specification. The controller and environment have positional strategies on
+this declared arena; a monitor product can carry application history.
+
+Büchi uses priorities 2 on its recurring set and 1 elsewhere. Co-Büchi uses
+0 on its permanent set and 1 elsewhere. Zielonka's recursive attractor algorithm
+solves these parity games. Reachability uses a ranked attractor. Every returned
+certificate partitions the complete arena and gives both sides' positional
+choices. The independent checker verifies closure, reachability ranks, and the
+absence of adverse cycles at **every** priority threshold. Checking only the
+maximum priority of a whole strongly connected component would miss adverse
+subcycles. An omitted certificate state or action is refused.
+
+The state, edge, work and time bounds above also apply here; recursion exhaustion
+returns UNKNOWN. The independent checker has its own work/time limits and may
+refuse a result it cannot finish checking. Quantitative objectives (mean payoff,
+energy and discounted rewards) remain deferred to 2.7. Stochastic objectives,
+a direct GR(1) syntax, and partial-observation omega objectives remain unsupported;
+a supplied deterministic parity-monitor product can express omega-regular
+requirements with perfect information. No LTL-to-monitor compiler is provided.
+
 ## Background
 
 The finite-game methods build on these published sources:
@@ -233,5 +261,5 @@ The finite-game methods build on these published sources:
 
 What is new here: bounded input, evidence packaging and independent local
 checks for these established algorithms; no new synthesis algorithm is claimed.
-Scope: finite declared arenas and sure safety under the stated observation
-model. This is separate from native contract execution and release qualification.
+Scope: finite declared arenas, sure safety under partial observation, and
+perfect-information reachability and omega objectives under the stated conventions. This is separate from native contract execution and release qualification.

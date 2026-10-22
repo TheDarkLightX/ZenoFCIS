@@ -8,7 +8,7 @@ from arena_spec import load, need
 from arena_check import check
 
 HERE = Path(__file__).resolve().parent
-SOURCES = ('arena.py','arena_spec.py','arena_check.py','knowledge.py','game_spec.py')
+SOURCES = ('arena.py','arena_spec.py','arena_check.py','knowledge.py','omega.py','game_spec.py')
 
 
 def identities():
@@ -31,7 +31,8 @@ def main():
     args = parser.parse_args()
     try:
         if args.mode == 'solve':
-            from knowledge import solve, Budget
+            from knowledge import Budget
+            from omega import solve
             need(args.game is not None, '--game required')
             root = HERE.parents[1]
             need(not args.out.resolve().is_relative_to(root), 'evidence must be outside source')
