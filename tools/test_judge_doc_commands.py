@@ -23,6 +23,8 @@ class JudgeDocumentation(unittest.TestCase):
         blocks = re.findall(r"^```[^\n]*\n(.*?)^```", document, re.M | re.S)
         commands = [shlex.split(line) for block in blocks for line in block.splitlines()
                     if line.startswith(("zeno-fcis ", "python3 tools/instantiate_core.py "))]
+        commands += [shlex.split(command) for command in re.findall(
+            r"`(zeno-fcis contract scenario examples/[^`]+)`", document)]
         self.assertTrue(commands, "the tutorial must contain executable commands")
         proposed = next(block for block in blocks if block.startswith("law 9000 "))
         with tempfile.TemporaryDirectory(prefix="judge-doc-") as raw:
@@ -38,13 +40,15 @@ class JudgeDocumentation(unittest.TestCase):
                     output = subprocess.run(command, cwd=work, capture_output=True,
                                             text=True, timeout=120)
                     expected = 1 if command[1:3] == ["contract", "lemma"] else 0
+                    print(json.dumps({"command": command, "exit": output.returncode,
+                                      "expected": expected}))
                     self.assertEqual(output.returncode, expected,
                                      f"{shlex.join(command)}\n{output.stdout}\n{output.stderr}")
                     if command[1:3] == ["contract", "review"]:
                         packet = json.loads((work / "review.json").read_text())
                         self.assertEqual(packet["gaps"]["status"], "measured")
                         self.assertEqual(packet["authority"], "none")
-            self.assertGreaterEqual(len(commands), 7)
+            self.assertGreaterEqual(len(commands), 8)
 
 
 if __name__ == "__main__":
