@@ -341,10 +341,15 @@ decided differently.
   over `--max-work`: it claims nothing and exits 2.
 - The gap judge reads only the laws `project.zeno` declares; the framework laws
   generation adds are left out, since law 991 admits only the case table's own
-  decision. A determined input means the declared laws admit one decision
-  there, not that it is the decision the owner intends. The judge proposes
-  decisions without deliveries, so a contract that delivers is out of its
-  scope.
+  decision. A determined input means the declared laws admit exactly one full
+  outcome equal to the Authority's successfully executed decision: class,
+  reason, successor and complete ordered deliveries. This does not establish
+  the owner's intent. The question door uses the same definition, with any
+  explicit answer requirements included in its stated basis. Its law-only
+  count matches the gap judge on the exported laws. For supported channels,
+  `determination.uncovered_components` names `deliveries` that those laws
+  cannot constrain; complete outbox answers are compared separately.
+  Delivery-observing laws retain the complete-universe scope guard.
 - An admitted mutant is a witness that the laws allow a different decision
   table. A caught mutant is one the Authority refuses on at least one input
   where it decides differently from the contract; its other differences may

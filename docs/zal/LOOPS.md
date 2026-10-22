@@ -248,11 +248,16 @@ are reported, not refused: an answer that differs from the core is a
 leaves some input with no admissible decision, given the earlier answers, is
 refused, and the question and the recorded requirements stay as they were.
 
-The contract law language cannot name a reject reason. When the owner picks
-a reason, the reason is recorded beside the laws and only the question door
-applies it; the gaps judge does not see it. Stats and workspace facts report
-`determined_by_laws` beside `determined_with_reasons`. The legacy `determined`
-and `determined_rate` fields retain their meaning with recorded reasons.
+Reject reasons are expressible as `on reject:R` scopes or as
+`decision_reason == R` in reject laws. Both judges check these requirements.
+Both define determination over the complete outcome: class, reason, next state
+and ordered deliveries, with successful native agreement. Disagreements remain
+open with input witnesses. `determined_by_laws` covers the exported laws;
+`determined` also includes explicit delivery answers. The output names
+`deliveries` in `determination.uncovered_components` when the exported laws
+cannot express the complete outbox requirement. A committing answer for a
+channel-bearing contract must give `deliveries: []`, a complete list, or
+`deliveries: "case"`; omission is refused instead of repeating the question.
 Conflicts include an input and the requirements responsible; proposed-law
 false alarms include the owning answer, scope and formula beside the law ID.
 
@@ -383,9 +388,9 @@ requirement: adoption stays `zeno-fcis contract adopt`.
   `forbidden` with an admitted decision as the witness. The copy check on a
   workspace's contract is a hash comparison before each judge call, not a
   lock against a writer inside the workspace's own directory.
-- An answer's reason, which no law can state, binds only the question door.
-  The gaps judge does not see reason requirements: its counts and its
-  false-alarm checks cover the answers' laws only.
+- The gap judge sees exported reason laws. Complete delivery answer requirements
+  are not exported as laws; the named uncovered component explains the
+  difference between its law-only count and the question door's answer count.
 - A decomposition that passes steps 1 to 3 is not claimed to compose to the
   core; the composed check claims it on the core's declared domain only.
 - Steps 1 to 3 of a decomposition are the door's own evaluation of the given
@@ -1086,3 +1091,12 @@ than an irreducible subset mislabeled as a smallest one. See
   unanswered inputs remain part of its scalar meaning.
 - No source exploratory numbers, model-quality gain, adoption, publication
   or application authority is claimed. Every result carries `authority: none`.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.

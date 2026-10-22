@@ -39,7 +39,7 @@ use serde_json::{Value, json};
 use super::super::ContractError;
 use super::super::declarations::Declarations;
 use super::super::rules::{Class, LawKind, Rules};
-use super::decision_space::{DeliveryChoices, determination};
+use super::decision_space::{DeliveryChoices, determination, determination_scope};
 use super::deliveries::{self, DeliveryUniverse};
 use super::evaluate::{self, Framer, LawSet, Proposed};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed, Space};
@@ -110,7 +110,8 @@ impl Gaps {
         match self {
             Self::Measured(value) | Self::FalseAlarm(value) => value.clone(),
             Self::Inconclusive(inconclusive) => inconclusive.json(),
-            Self::OutOfScope(reason) => json!({"status": "out-of-scope", "reason": reason}),
+            Self::OutOfScope(reason) => json!({"status": "out-of-scope", "reason": reason,
+                "determination": determination_scope(true, "declared-and-proposed-laws")}),
             Self::Withheld(reason) => json!({"status": "withheld", "reason": reason}),
             Self::InvalidProposals { place, reason } => {
                 json!({"status": "invalid-proposals", "place": place, "reason": reason})
@@ -121,6 +122,9 @@ impl Gaps {
     /// The counts a summary carries.
     pub(crate) fn summary(&self) -> Value {
         let mut summary = json!({"status": self.status()});
+        if let Self::OutOfScope(_) = self {
+            summary = self.json();
+        }
         if let Self::Measured(value) = self {
             summary = measured_summary(value);
             if let Some(after) = value["proposals"].get("after").filter(|v| v.is_object()) {
@@ -133,7 +137,7 @@ impl Gaps {
 
 /// Project measured counts without changing either checked measure.
 fn measured_summary(value: &Value) -> Value {
-    let mut summary = json!({"status": "measured"});
+    let mut summary = json!({"status": "measured", "determination": value["determination"]});
     for domain in ["full", "valid"] {
         summary[domain] = json!({
             "tuples": value["admissible"][domain]["tuples"],
@@ -379,6 +383,7 @@ impl Measured {
             .collect();
         let mut report = json!({
             "status": "measured",
+            "determination": determination_scope(self.delivery_universe.is_some(), "declared-and-proposed-laws"),
             "domain": {
                 "states": space.states,
                 "inputs": space.inputs,

@@ -2299,9 +2299,12 @@ fn contract_core(
 fn stop_result(stop: judges::Stop) -> (u8, Value) {
     match stop {
         judges::Stop::Invalid(reason) => refused(&reason),
-        judges::Stop::OutOfScope(reason) => {
-            super::result(crate::BLOCKED, "out-of-scope", json!({"reason": reason}))
-        }
+        judges::Stop::OutOfScope(reason) => super::result(
+            crate::BLOCKED,
+            "out-of-scope",
+            json!({"reason": reason,
+                "determination": crate::contract::review::decision_space::determination_scope(true, "declared-laws-and-recorded-answers")}),
+        ),
         judges::Stop::Inconclusive(reason) => {
             super::result(crate::BLOCKED, "inconclusive", json!({"reason": reason}))
         }
@@ -2373,6 +2376,7 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
                     "status": "measured",
                     "determined": measured["proposals"]["determined"],
                     "inactive": measured["proposals"]["inactive"],
+                    "determination": measured["proposals"]["after"]["determination"],
                 });
             }
             Ok(Ok(Gaps::FalseAlarm(alarm))) => {

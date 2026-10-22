@@ -305,8 +305,11 @@ law 500 funds_conserved on commit, genesis = post.100.111 + post.100.113 == post
 ```
 
 The scope is `on any`, `on accept`, `on reject`, `on failure` (committed
-failures) or `on commit` (accepts and committed failures), and `, genesis`
-adds the genesis state. A law that applies at genesis reads only `post`
+failures) or `on commit` (accepts and committed failures). `on reject:R`
+selects a rejection with declared reason ID R; failure-only reasons cannot
+label that scope. Reject and failure laws can read `decision_reason`, for
+example `law 9000 selected_reason on reject = decision_reason != 201;`.
+The `, genesis` suffix adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
 use `*`, `div_floor`, `div_ceil` and the built-in `products_ge` predicate.
@@ -683,3 +686,12 @@ delivery, law or channel without which the library admits the contract, if
 one does. Passing generation does not show that the rules say what the owner
 means: the decision examples, `zeno-fcis contract review` and the laws check
 that, each within its own scope.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.

@@ -27,7 +27,7 @@
 //! This module is LLM-generated.
 
 use crate::contract::review::decision_space::{
-    DecisionSpace, DeliveryChoices, Determination, determination,
+    DecisionSpace, DeliveryChoices, Determination, determination, determination_scope,
 };
 use crate::contract::review::deliveries::{self, DeliveryUniverse};
 use std::collections::{BTreeMap, BTreeSet};
@@ -1767,9 +1767,6 @@ impl Core {
             "reason": self.reason_name(label.1),
             "current": current == Some(label),
         });
-        if class != Class::Reject && self.delivery_universe.is_some() {
-            out["deliveries"] = json!("case");
-        }
         if class != Class::Reject
             && let Some(case) = case.and_then(|k| self.cases.get(k))
         {
@@ -1793,12 +1790,15 @@ impl Core {
         admitted: &[Vec<Candidate>],
         current: Option<Label>,
     ) -> Result<Value> {
-        let bare = self.option_json(chosen, None, current);
+        let mut offered = self.option_json(chosen, None, current);
         if class_of(chosen.0) == Class::Reject {
-            return Ok(bare);
+            return Ok(offered);
+        }
+        if self.delivery_universe.is_some() {
+            offered["deliveries"] = json!("case");
         }
         let Some(case) = self.cases.get(region.case) else {
-            return Ok(bare);
+            return Ok(offered);
         };
         let columns = (0..self.state_width)
             .map(|k| {
@@ -1818,11 +1818,10 @@ impl Core {
                 }
             })
         });
-        Ok(if lawful {
-            self.option_json(chosen, Some(region.case), current)
-        } else {
-            bare
-        })
+        if lawful {
+            offered["sets"] = self.option_json(chosen, Some(region.case), current)["sets"].clone();
+        }
+        Ok(offered)
     }
 }
 
@@ -1857,6 +1856,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
                 "answer": index,
                 "reason": "answer-conflicts-with-earlier-answers",
                 "stats": freedom.stats,
+                "determination": determination_scope(core.delivery_universe.is_some(), "declared-laws-and-recorded-answers"),
                 "residual_witnesses": freedom.residual_witnesses,
                 "input_ordinal": ordinal,
                 "example": core.shown(ordinal),
@@ -1926,6 +1926,11 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
                 "core": core.decisions[*first].map(|d| core.decision_json(d.class, d.reason, Some(d.next))),
                 "owner": core.option_json(chosen, None, None),
             });
+            record["disagreement"]["core"]["deliveries"] =
+                deliveries::shown(core.native_outbox(*first));
+            if let Some(wanted) = fixed.get(*first).and_then(Option::as_deref) {
+                record["disagreement"]["owner"]["deliveries"] = deliveries::shown(wanted);
+            }
             if let Some(columns) = &successor {
                 record["disagreement"]["owner"]["sets"] = Value::Object(
                     (0..core.state_width)
@@ -1951,6 +1956,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         "residual_witnesses": freedom.residual_witnesses,
         "disagreement_witnesses": freedom.disagreement_witnesses,
         "answers": records,
+        "determination": determination_scope(core.delivery_universe.is_some(), "declared-laws-and-recorded-answers"),
     });
     if let Some(universe) = &core.delivery_universe {
         out["delivery_universe"] = universe.json();
@@ -1989,7 +1995,8 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
                 choices
                     .iter()
                     .map(|v| json!({
-                        "deliveries": deliveries::shown(v), "current": v == own,
+                        "deliveries": deliveries::shown(v),
+                        "current": region.ordinals.iter().all(|o| v == core.native_outbox(*o)),
                     }))
                     .collect::<Vec<_>>()
             );
@@ -1997,6 +2004,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
                 "Which deliveries should this decision emit? Supply a complete delivery array, or case to retain its delivery expressions."
             );
             out["question"]["core"]["deliveries"] = deliveries::shown(own);
+            out["question"]["core"]["deliveries_scope"] = json!("example-only");
         }
     }
     Ok(out)
@@ -2435,6 +2443,139 @@ mod tests {
     }
 
     #[test]
+    fn dual_approval_answer_laws_share_determination_and_name_uncovered_deliveries() {
+        use crate::contract::review::gaps;
+        let core = Core::load(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval"),
+            true,
+        )
+        .unwrap_or_else(|e| panic!("witness: {e:?}"));
+        let document: Value = serde_json::from_str(include_str!(
+            "../tests/data/dual-approval-case-answers.json"
+        ))
+        .unwrap_or_else(|e| panic!("witness answers: {e}"));
+        let answers = core.answers(&document).unwrap_or_else(|e| panic!("{e:?}"));
+        let question = question(&core, &answers).unwrap_or_else(|e| panic!("{e:?}"));
+        let (laws, _) = core
+            .pinned_lines(&answers)
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        let judge = |proposals: &str| {
+            gaps::judge(
+                core.project(),
+                core.rules_text(),
+                gaps::Options {
+                    max_tuples: MAX_TUPLES,
+                    max_work: 100_000_000,
+                    proposals: Some(proposals),
+                    mutants: false,
+                },
+            )
+            .unwrap_or_else(|e| panic!("gaps: {e:?}"))
+        };
+        let gap = judge(&laws);
+        let report = gap.json();
+        assert_eq!(report["status"], "measured", "{report}");
+        let after = &report["proposals"]["after"];
+        assert_eq!(question["stats"]["determined"], 384);
+        assert_eq!(question["stats"]["determined_by_laws"], 300);
+        assert_eq!(
+            after["admissible"]["full"]["determined"],
+            question["stats"]["determined_by_laws"]
+        );
+        for scope in [
+            &question["determination"],
+            &after["determination"],
+            &gap.summary()["with_proposals"]["determination"],
+        ] {
+            assert_eq!(scope["uncovered_components"], json!(["deliveries"]));
+            assert_eq!(scope["uncovered_scope"], "exported-laws");
+        }
+        // The reporter's direct reason law is expressible and redundant after
+        // the shared reason-class repair; it must not change the measure.
+        let extended =
+            format!("{laws}\nlaw 9998 reject_reason on reject = decision_reason != 202;\n");
+        let extra = judge(&extended).json();
+        assert_eq!(extra["status"], "measured", "{extra}");
+        assert_eq!(
+            extra["proposals"]["after"]["admissible"]["full"]["determined"],
+            300
+        );
+        // The reported delivery-law witness binds the payload observation to
+        // its channel explicitly; a channel ID is not an outbox type path.
+        let project = format!(
+            "{}\nlaw 520 only_a_release_delivers on commit = outbox.104 <= 1 && (post.100.110 == 151 -> outbox.104 == 1) && (post.100.110 != 151 -> outbox.104 == 0);\n",
+            core.project()
+        );
+        let mut rules: Value =
+            serde_json::from_str(core.rules_text()).unwrap_or_else(|e| panic!("{e}"));
+        rules["law_kinds"]["520"] = json!("DebitCreditEffectEquality");
+        rules["delivery_laws"] =
+            json!({"520":{"max_deliveries":1,"observations":{"outbox.104":{"channel":300}}}});
+        let unsupported = gaps::judge(
+            &project,
+            &rules.to_string(),
+            gaps::Options {
+                max_tuples: MAX_TUPLES,
+                max_work: 100_000_000,
+                proposals: None,
+                mutants: false,
+            },
+        )
+        .unwrap_or_else(|e| panic!("delivery-law witness: {e:?}"))
+        .json();
+        assert_eq!(unsupported["status"], "out-of-scope", "{unsupported}");
+        assert_eq!(
+            unsupported["determination"]["uncovered_components"],
+            json!(["deliveries"])
+        );
+        let question_scope = Core::from_sources(project, rules.to_string())
+            .and_then(|prepared| prepared.admissible(&[]));
+        assert!(
+            matches!(question_scope, Err(Stop::OutOfScope(_))),
+            "{question_scope:?}"
+        );
+    }
+
+    #[test]
+    fn gap_and_question_exclude_native_refusals_from_determined() {
+        use crate::contract::review::gaps;
+        let folder =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core-components/bounded-counter");
+        let read = |name: &str| {
+            std::fs::read_to_string(folder.join(name))
+                .unwrap_or_else(|e| panic!("{e}"))
+                .replace("${C}", "1")
+                .replace("${INSTANCE}", "refusal-counter")
+        };
+        let project = read("project.zeno.in");
+        let mut rules: Value =
+            serde_json::from_str(&read("policy.json.in")).unwrap_or_else(|e| panic!("{e}"));
+        rules["cases"][0]["when"] = json!("true");
+        let core = Core::from_sources(project.clone(), rules.to_string())
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        let question = question(&core, &[]).unwrap_or_else(|e| panic!("{e:?}"));
+        let gap = gaps::judge(
+            &project,
+            &rules.to_string(),
+            gaps::Options {
+                max_tuples: MAX_TUPLES,
+                max_work: 100_000_000,
+                proposals: None,
+                mutants: false,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"))
+        .json();
+        assert_eq!(gap["status"], "measured");
+        assert!(question["stats"]["reference_refused"].as_u64().unwrap_or(0) > 0);
+        assert_eq!(
+            gap["admissible"]["full"]["determined"],
+            question["stats"]["determined"]
+        );
+        assert!(question["stats"]["determined"].as_u64().unwrap_or(0) < core.tuples() as u64);
+    }
+
+    #[test]
     fn committing_answers_require_deliveries_and_empty_lists_advance() {
         let core = Core::load(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval"),
@@ -2492,12 +2633,16 @@ mod tests {
         let answers = core.answers(&document).unwrap_or_else(|e| panic!("{e:?}"));
         let report = question(&core, &answers).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(report["answers"][3]["disagreement"]["inputs"], 20);
+        assert_eq!(
+            report["answers"][3]["disagreement"]["owner"]["deliveries"],
+            document["answers"][3]["deliveries"]
+        );
         assert_eq!(report["stats"]["determined"], 364, "{report}");
         assert_eq!(report["stats"]["open"], 20);
         assert_eq!(report["status"], "open");
         let witnesses = report["disagreement_witnesses"]
             .as_array()
-            .expect("witnesses");
+            .unwrap_or_else(|| panic!("witnesses"));
         assert_eq!(witnesses.len(), 20);
         for witness in witnesses {
             assert_ne!(witness["required_deliveries"], witness["core_deliveries"]);

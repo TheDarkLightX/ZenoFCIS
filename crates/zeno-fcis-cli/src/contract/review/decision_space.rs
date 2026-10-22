@@ -5,6 +5,20 @@ use std::collections::BTreeSet;
 
 use super::super::rules::{Class, Rules};
 use super::evaluate::Delivery;
+use serde_json::{Value, json};
+
+/// Both counts use the same outcome definition; the requirements supplied to
+/// each judge can differ. Complete delivery answers are not exported as laws.
+pub(crate) fn determination_scope(has_channels: bool, basis: &str) -> Value {
+    json!({
+        "basis": basis,
+        "components": ["outcome_class", "next_state", "reason", "deliveries"],
+        "meaning": "exactly one full lawful outcome equal to the Authority's successful decision",
+        "uncovered_components": if has_channels { vec!["deliveries"] } else { vec![] },
+        "uncovered_scope": "exported-laws",
+        "uncovered_reason": has_channels.then_some("complete ordered delivery requirements have no exported law form"),
+    })
+}
 
 /// Scalar outcome with the actual successor index, including the unchanged
 /// pre-state for a reject. Candidates must be distinct and law-checked.
@@ -46,7 +60,9 @@ pub(crate) fn determination(
         outcomes += count;
         let delivery_agrees = match deliveries {
             DeliveryChoices::Fixed(wanted) => wanted == native_deliveries,
-            DeliveryChoices::Unrestricted => true,
+            DeliveryChoices::Unrestricted => {
+                candidate.0 != Class::Reject || native_deliveries.is_empty()
+            }
         };
         agrees |= count > 0 && Some(candidate) == reference && delivery_agrees;
     }
@@ -105,6 +121,62 @@ impl DecisionSpace {
 mod tests {
     use super::*;
     use crate::contract::{declarations::Declarations, model::Contract, schema, schema_commitment};
+
+    #[test]
+    fn determination_covers_every_outcome_component_and_native_refusal() {
+        use super::super::evaluate::Value as Field;
+        let own = (Class::CommittedFailure, Some(202), 1);
+        let delivery = Delivery {
+            ordinal: 0,
+            channel: 300,
+            destination: Field::Text(b"desk".to_vec()),
+            payload: vec![(130, Field::I128(1))],
+            idempotency: Field::U128(0),
+        };
+        let outbox = [delivery];
+        let fixed = DeliveryChoices::Fixed(&outbox);
+        assert!(determination([own], Some(own), &outbox, fixed).determined);
+        for alternative in [
+            (Class::Accept, None, 1),
+            (Class::CommittedFailure, Some(203), 1),
+            (Class::CommittedFailure, Some(202), 0),
+        ] {
+            let result = determination([alternative], Some(own), &outbox, fixed);
+            assert!(!result.determined);
+            assert!(result.disagreement);
+        }
+        for field in 0..6 {
+            let mut different = outbox.clone();
+            match field {
+                0 => different[0].ordinal = 1,
+                1 => different[0].channel = 301,
+                2 => different[0].destination = Field::Text(b"other".to_vec()),
+                3 => different[0].payload[0].1 = Field::I128(2),
+                4 => different[0].payload[0].0 = 131,
+                _ => different[0].idempotency = Field::U128(1),
+            }
+            let result = determination(
+                [own],
+                Some(own),
+                &outbox,
+                DeliveryChoices::Fixed(&different),
+            );
+            assert!(!result.determined, "delivery field {field}");
+            assert!(result.disagreement);
+        }
+        assert!(!determination([own], None, &outbox, fixed).determined);
+        assert!(!determination([], Some(own), &outbox, fixed).determined);
+        assert!(
+            !determination([own], Some(own), &outbox, DeliveryChoices::Unrestricted).determined
+        );
+        assert!(
+            !determination([own, (Class::Accept, None, 1)], Some(own), &outbox, fixed).determined
+        );
+        let reject = (Class::Reject, Some(200), 0);
+        assert!(
+            determination([reject], Some(reject), &[], DeliveryChoices::Unrestricted).determined
+        );
+    }
 
     #[test]
     fn every_counted_reason_matches_the_language_catalog_and_has_a_law_scope() {

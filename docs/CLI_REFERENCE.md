@@ -1194,13 +1194,35 @@ object is included only if those exact updates remain lawful throughout that
 region; otherwise the option leaves the successor unspecified. Selecting an
 option records a requirement or disagreement and grants no adoption authority.
 
+Both judges define a determined input as exactly one complete lawful outcome
+that equals the Authority's successfully executed decision: class, next state,
+reason and the full ordered delivery list. A disagreeing answer stays open;
+`disagreement_witnesses` lists its input rows. Execution refusals and conflicting
+requirements are reported separately.
+
+`determination.basis` identifies the requirements measured. The gap judge uses
+declared and proposed laws; the question door also uses recorded delivery
+requirements. Its `determined_by_laws` count matches the gap judge on the
+exported answer laws. `determination.uncovered_components` names `deliveries`
+when those laws cannot constrain the complete outbox; it describes the law
+export, even when an explicit answer covers that component. Thus answer-based
+and law-only counts can differ with the missing component stated explicitly.
+Reject reasons do have a law form: `on reject:R` selects reason R, and a law
+`on reject = CONDITION -> decision_reason == R` constrains it directly. A
+failure-only reason cannot be used as a reject scope.
+
 For supported scalar contracts with declared channels, the question includes
 complete delivery choices: channel, destination, typed payload, delivery ordinal
 and idempotency ordinal. An answer may supply `"deliveries": []`, a complete
 array of those records, or `"deliveries": "case"` to use each matching input's
 native outbox. These are advisory requirements compared with the complete
-native decision; they are not emitted as contract laws. A differing outbox is a
-`disagreement`. The judge independently checks every declared channel and both
+native decision; they are not emitted as contract laws. A committing answer
+that omits `deliveries` is refused with a one-line reason to use `[]` or
+`"case"`; rejects may omit it because they cannot deliver. Offered committing
+options include `"deliveries": "case"`. Literal delivery choices and
+`question.core.deliveries` describe an example and may differ elsewhere in the
+region; `"case"` retains the expressions at each input. A differing outbox is a
+`disagreement` and is excluded from the determined count. The judge independently checks every declared channel and both
 empty and nonempty witnesses. It uses an exact symbolic delivery family only
 when selected predicates cannot observe its contents; delivery-observing laws
 retain the complete-universe guard. Outcome counts for unrestricted families are

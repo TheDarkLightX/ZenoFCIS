@@ -54,7 +54,7 @@ component ID name { COMPONENT_ITEMS }
 wire COMPONENT.PORT -> COMPONENT.PORT;
 merge [COMPONENT, ...];
 law ID name = RELATIONAL_FORMULA;
-law ID name on any|accept|reject|failure|commit[, genesis] = RELATIONAL_FORMULA;
+law ID name on any|accept|reject|reject:REASON_ID|failure|commit[, genesis] = RELATIONAL_FORMULA;
 claim ID name BACKEND MODE = FORMULA;
 claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure [LAW, ...]] = STATE_FORMULA;
 ```
@@ -129,6 +129,10 @@ through the same validation path.
 
 ## Relational formulas
 
+Contract reject and failure laws may read the numeric `decision_reason` term.
+`on reject:REASON_ID` selects that declared reject reason; a failure-only reason
+is not a valid reject scope. See [contract laws](CONTRACT_RULES.md#laws).
+
 Boolean syntax is `!`, `not`, `&&`, `||`, and `->`. Comparisons are `==`,
 `!=`, `<`, `<=`, `>`, and `>=`. Scalar syntax includes checked `+`, `-`, `*`,
 `div_exact(a,b)`, `div_floor(a,b)`, `div_ceil(a,b)`, bounded
@@ -164,3 +168,12 @@ trace/evaluation failure.
 The accumulated-diagnostic UX reports independent actionable failures in one
 run. Recovery never invents semantic acceptance; any retained error makes
 parsing or elaboration fail.
+
+## Background and scope of determination reporting
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic Verification
+of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
+*ACM Transactions on Programming Languages and Systems* 8(2), 1986, is
+background for the exhaustive finite checks described here. Shared determination
+reporting covers the declared finite domains and retains the runtime Authority;
+its comparative prior-art search is pending.
