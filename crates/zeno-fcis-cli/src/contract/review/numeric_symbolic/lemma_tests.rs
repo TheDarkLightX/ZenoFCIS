@@ -45,7 +45,7 @@ fn pinned_transition_lemma_repairs_match_exhaustive_counts() {
         std::slice::from_ref(&formula),
         6,
     )
-    .unwrap()
+    .unwrap_or_else(|error| panic!("{error:?}"))
     {
         super::super::super::lemma::Lemmas::Judged(mut results) => results.remove(0),
         other => panic!("full native fixture must run: {other:?}"),
@@ -64,7 +64,7 @@ fn pinned_transition_lemma_repairs_match_exhaustive_counts() {
         }
         solvers.solve(q)
     })
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(symbolic["status"], "refuted", "{symbolic}");
     assert_eq!(
         symbolic["lemmas"][0]["obligations"][0]["counterexample"]["values"][0],
@@ -84,7 +84,7 @@ fn pinned_transition_lemma_repairs_match_exhaustive_counts() {
 #[test]
 #[ignore = "requires both qualification solver binaries"]
 fn pinned_transition_nonvacuity_includes_only_unlawful_repairs() {
-    let mut rules: Json = serde_json::from_str(RULES).unwrap();
+    let mut rules: Json = serde_json::from_str(RULES).unwrap_or_else(|error| panic!("{error:?}"));
     rules["cases"][0]["when"] = json!("pre.100.110 >= 1");
     let rules = rules.to_string();
     let solvers = pinned();
@@ -95,9 +95,15 @@ fn pinned_transition_nonvacuity_includes_only_unlawful_repairs() {
         }
         solvers.solve(q)
     })
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "solver-checked", "{result}");
-    assert_eq!(count_inputs(&solvers, &scope.unwrap()), 2);
+    assert_eq!(
+        count_inputs(
+            &solvers,
+            &scope.unwrap_or_else(|| panic!("missing nonvacuity query"))
+        ),
+        2
+    );
     assert_eq!(
         result["lemmas"][0]["nonvacuity"]["counterexample"]["values"][0],
         json!({"kind":"i128", "value":"0"})
@@ -107,12 +113,15 @@ fn pinned_transition_nonvacuity_includes_only_unlawful_repairs() {
 #[test]
 #[ignore = "requires both qualification solver binaries"]
 fn pinned_state_induction_keeps_lawful_and_lemma_premises() {
-    let mut rules: Json = serde_json::from_str(RULES).unwrap();
+    let mut rules: Json = serde_json::from_str(RULES).unwrap_or_else(|error| panic!("{error:?}"));
     let mut repair = rules["cases"][1].clone();
     repair["when"] = json!("pre.100.110 == 0");
     repair["post"]["110"] = json!("2");
     rules["cases"][1]["post"]["110"] = json!("pre.100.110");
-    rules["cases"].as_array_mut().unwrap().insert(1, repair);
+    rules["cases"]
+        .as_array_mut()
+        .unwrap_or_else(|| panic!("expected array"))
+        .insert(1, repair);
     let solvers = pinned();
     // pre=0 satisfies the lemma but is unlawful; pre=2 is lawful but does
     // not satisfy the lemma. Neither belongs to this induction premise.
@@ -123,6 +132,6 @@ fn pinned_state_induction_keeps_lawful_and_lemma_premises() {
         false,
         &mut |q| solvers.solve(q),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "solver-checked", "{result}");
 }

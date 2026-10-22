@@ -23,10 +23,15 @@ fn rules(unsigned: bool, post: &str) -> String {
     json!({"schema":if unsigned{"zeno-fcis/template-declarative-policy/4"}else{"zeno-fcis/template-declarative-policy/3"},"template":"numeric-scale","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},"cases":[{"when":false,"class":"Reject","reason":300,"post":{},"outbox":[]},{"when":true,"class":"Accept","reason":null,"post":{"110":post},"outbox":[]}],"genesis":{"110":if unsigned{json!("u128(0)")}else{json!(0)}},"law_kinds":{"500":"StateInvariant","501":"FeeAndRounding"}}).to_string()
 }
 fn with_contract<T>(p: &str, r: &str, f: impl FnOnce(&Contract<'_>, &[u8]) -> T) -> T {
-    let rules = Rules::read(r).unwrap();
-    let d = Declarations::read(p, &rules.leaf_bindings).unwrap();
-    let s = schema::encode(&d).unwrap();
-    let c = Contract::build(&d, &rules, schema_commitment(&s).unwrap()).unwrap();
+    let rules = Rules::read(r).unwrap_or_else(|error| panic!("{error:?}"));
+    let d = Declarations::read(p, &rules.leaf_bindings).unwrap_or_else(|error| panic!("{error:?}"));
+    let s = schema::encode(&d).unwrap_or_else(|error| panic!("{error:?}"));
+    let c = Contract::build(
+        &d,
+        &rules,
+        schema_commitment(&s).unwrap_or_else(|error| panic!("{error:?}")),
+    )
+    .unwrap_or_else(|error| panic!("{error:?}"));
     f(&c, &s)
 }
 #[test]
@@ -72,8 +77,8 @@ fn disagreement_and_unreplayed_models_are_unknown() {
 fn in_cap_contract_stays_exhaustive() {
     let p = project("1", false);
     let r = rules(false, "command.101.120");
-    assert!(!over_cap(&p, &r, 8).unwrap());
-    assert!(over_cap(&p, &r, 7).unwrap());
+    assert!(!over_cap(&p, &r, 8).unwrap_or_else(|error| panic!("{error:?}")));
+    assert!(over_cap(&p, &r, 7).unwrap_or_else(|error| panic!("{error:?}")));
     let report = super::super::review(
         ReviewSources {
             project: &p,
@@ -82,7 +87,7 @@ fn in_cap_contract_stays_exhaustive() {
         },
         8,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(report.summary().construction, "full-domain");
 }
 #[test]
@@ -100,7 +105,7 @@ fn full_unsigned_domain_uses_lossless_limb_models() {
                 ("x2".into(), 1),
             ]),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("{error:?}"));
         assert_eq!(row[0], Atom::U128(u128::MAX));
         assert_eq!(row[1], Atom::U128((1 << 127) + 1));
         assert!(size(c).is_none());
@@ -133,7 +138,7 @@ fn encoding_mismatch_refuses_symbolic_mode() {
         &mut solver,
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "UNKNOWN");
     assert_eq!(result["encoding_guard"]["status"], "UNKNOWN");
     assert!(result.get("obligations").is_none());
@@ -141,7 +146,8 @@ fn encoding_mismatch_refuses_symbolic_mode() {
 
 /// Real solvers are mandatory for this explicit qualification test group.
 fn pinned() -> crate::symbolic_command::Solvers {
-    crate::symbolic_command::Solvers::from_environment().expect("both pinned solvers must run")
+    crate::symbolic_command::Solvers::from_environment()
+        .unwrap_or_else(|error| panic!("both pinned solvers must run: {error}"))
 }
 #[test]
 #[ignore = "requires both qualification solver binaries"]
@@ -158,7 +164,7 @@ fn pinned_numeric_full_width_unsigned_laws() {
         &mut |q| solvers.solve(q),
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "solver-checked", "{result}");
     assert_eq!(result["evidence"], MODE);
 }
@@ -169,8 +175,10 @@ fn pinned_numeric_overflow_boundary_guard_matches_native() {
     let r = rules(false, "pre.100.110 + command.101.120");
     let solvers = pinned();
     with_contract(&p, &r, |c, s| {
-        let e = Encoding::new(c, "p", Script::default(), None).unwrap();
-        let result = guard(c, s, &e, &mut |q| solvers.solve(q)).unwrap();
+        let e = Encoding::new(c, "p", Script::default(), None)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let result =
+            guard(c, s, &e, &mut |q| solvers.solve(q)).unwrap_or_else(|error| panic!("{error:?}"));
         assert_eq!(result["status"], "holds", "{result}");
     });
 }
@@ -192,14 +200,14 @@ fn pinned_numeric_planted_high_range_law_has_native_witness() {
         &mut |q| solvers.solve(q),
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "refuted", "{result}");
     let broken = result["obligations"]
         .as_array()
-        .unwrap()
+        .unwrap_or_else(|| panic!("expected array"))
         .iter()
         .find(|r| r["law"] == 501 && r["status"] == "refuted")
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected refuted obligation"));
     assert_eq!(broken["counterexample"]["authority"]["law"], 501);
 }
 
@@ -210,9 +218,11 @@ fn pinned_numeric_corrupt_encoding_is_refused() {
     let r = rules(true, "command.101.120");
     let solvers = pinned();
     with_contract(&p, &r, |c, s| {
-        let mut e = Encoding::new(c, "p", Script::default(), None).unwrap();
+        let mut e = Encoding::new(c, "p", Script::default(), None)
+            .unwrap_or_else(|error| panic!("{error:?}"));
         e.cases[1].constructed = Term::Bool(false);
-        let result = guard(c, s, &e, &mut |q| solvers.solve(q)).unwrap();
+        let result =
+            guard(c, s, &e, &mut |q| solvers.solve(q)).unwrap_or_else(|error| panic!("{error:?}"));
         assert_eq!(result["status"], "UNKNOWN", "{result}");
     });
 }
@@ -230,7 +240,7 @@ fn pinned_numeric_state_and_transition_lemmas() {
         let result = lemma::check(&p, &r, &[formula.into()], transition, &mut |q| {
             solvers.solve(q)
         })
-        .unwrap();
+        .unwrap_or_else(|error| panic!("{error:?}"));
         assert_eq!(result["status"], "solver-checked", "{result}");
     }
     let result = lemma::check(
@@ -240,7 +250,7 @@ fn pinned_numeric_state_and_transition_lemmas() {
         false,
         &mut |q| solvers.solve(q),
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "not-inductive", "{result}");
 }
 
@@ -261,8 +271,10 @@ fn pinned_numeric_signed_operator_parity() {
     ] {
         let r = rules(false, expr);
         with_contract(&p, &r, |c, s| {
-            let e = Encoding::new(c, "p", Script::default(), None).unwrap();
-            let result = guard(c, s, &e, &mut |q| solvers.solve(q)).unwrap();
+            let e = Encoding::new(c, "p", Script::default(), None)
+                .unwrap_or_else(|error| panic!("{error:?}"));
+            let result = guard(c, s, &e, &mut |q| solvers.solve(q))
+                .unwrap_or_else(|error| panic!("{error:?}"));
             assert_eq!(result["status"], "holds", "{expr}: {result}");
         });
     }
@@ -283,7 +295,7 @@ fn pinned_numeric_swap_laws() {
         &mut |q| solvers.solve(q),
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "solver-checked", "{result}");
 }
 
@@ -306,14 +318,14 @@ fn pinned_numeric_law_overflow_above_two_to_100_has_native_witness() {
         &mut |q| solvers.solve(q),
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "refuted", "{result}");
     let broken = result["obligations"]
         .as_array()
-        .unwrap()
+        .unwrap_or_else(|| panic!("expected array"))
         .iter()
         .find(|r| r["law"] == 501 && r["status"] == "refuted")
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected refuted obligation"));
     assert_eq!(broken["counterexample"]["authority"]["law"], 501);
     assert_eq!(
         broken["counterexample"]["values"][1]["value"],
@@ -325,7 +337,8 @@ fn pinned_numeric_law_overflow_above_two_to_100_has_native_witness() {
 #[ignore = "requires both qualification solver binaries"]
 fn pinned_numeric_mutants_have_native_witnesses() {
     let p = project("1000000000000000000000000", true);
-    let mut r: Json = serde_json::from_str(&rules(true, "command.101.120")).unwrap();
+    let mut r: Json = serde_json::from_str(&rules(true, "command.101.120"))
+        .unwrap_or_else(|error| panic!("{error:?}"));
     r["cases"][0]["when"] = json!("command.101.120 == u128(0)");
     let solvers = pinned();
     let result = review(
@@ -337,9 +350,11 @@ fn pinned_numeric_mutants_have_native_witnesses() {
         &mut |q| solvers.solve(q),
         true,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "solver-checked", "{result}");
-    let mutants = result["mutants"].as_array().unwrap();
+    let mutants = result["mutants"]
+        .as_array()
+        .unwrap_or_else(|| panic!("expected array"));
     assert!(!mutants.is_empty());
     assert!(
         mutants.iter().any(|m| m["status"] == "refuted"
@@ -358,7 +373,8 @@ fn pinned_numeric_review_checks_unlawful_declared_pre_states() {
             "post.100.110 == command.101.120",
             "post.100.110 == pre.100.110",
         );
-    let mut r: Json = serde_json::from_str(&rules(true, "pre.100.110")).unwrap();
+    let mut r: Json = serde_json::from_str(&rules(true, "pre.100.110"))
+        .unwrap_or_else(|error| panic!("{error:?}"));
     r["genesis"]["110"] = json!("u128(1)");
     let solvers = pinned();
     let result = review(
@@ -370,14 +386,14 @@ fn pinned_numeric_review_checks_unlawful_declared_pre_states() {
         &mut |q| solvers.solve(q),
         false,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(result["status"], "refuted", "{result}");
     let failed = result["obligations"]
         .as_array()
-        .unwrap()
+        .unwrap_or_else(|| panic!("expected array"))
         .iter()
         .find(|o| o["law"] == 500 && o["status"] == "refuted")
-        .unwrap();
+        .unwrap_or_else(|| panic!("expected refuted obligation"));
     assert_eq!(failed["counterexample"]["values"][0]["value"], "0");
     assert_eq!(failed["counterexample"]["authority"]["law"], 500);
 }

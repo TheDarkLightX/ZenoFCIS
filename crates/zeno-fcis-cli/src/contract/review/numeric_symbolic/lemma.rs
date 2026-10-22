@@ -223,10 +223,8 @@ pub(crate) fn check(
         let mut differential = Vec::new();
         for row in &rows {
             let mut expected = Vec::new();
-            if !transition {
-                if let Some(v) = native_law(&c, &schema, &law, row, true)? {
-                    expected.push(Term::eq(pre.clone(), Term::Bool(v)));
-                }
+            if !transition && let Some(v) = native_law(&c, &schema, &law, row, true)? {
+                expected.push(Term::eq(pre.clone(), Term::Bool(v)));
             }
             if let Some(v) = native_law(&c, &schema, &law, row, false)? {
                 expected.push(Term::or(

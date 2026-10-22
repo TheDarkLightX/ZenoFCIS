@@ -201,7 +201,7 @@ fn guard_inner(
                     Term::and(vec![edge.clone(), assignment(e, &rows[0])]),
                     &format!("{}-arithmetic-edge-{i}-sample", e.label),
                     solve,
-                    &replay,
+                    replay,
                 ))
             } else {
                 None
@@ -281,7 +281,7 @@ fn guard_inner(
             existence["evidence"] = json!(MODE);
             existence
                 .as_object_mut()
-                .expect("query reports are objects")
+                .ok_or_else(|| error("numeric guard query report is not an object"))?
                 .remove("counterexample");
             batches.push(existence);
             let mut mismatches = Vec::new();

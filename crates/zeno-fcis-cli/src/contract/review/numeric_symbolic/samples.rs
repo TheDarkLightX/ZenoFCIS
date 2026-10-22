@@ -154,18 +154,18 @@ pub(super) fn rows(c: &Contract<'_>) -> Result<Vec<Vec<Atom<'static>>>, Contract
         }
         let mut genesis = base.clone();
         for (i, ((source, id), d)) in c.bindings.iter().zip(&c.input_domains).enumerate() {
-            if *source == Source::State {
-                if let Some((_, a)) = c.genesis.iter().find(|(field, _)| Some(*field) == *id) {
-                    genesis[i] = match a {
-                        crate::contract::graph::Atom::Bool(b) => Atom::Bool(*b),
-                        crate::contract::graph::Atom::I128(n) => Atom::I128(*n),
-                        crate::contract::graph::Atom::U128(n) => Atom::U128(*n),
-                        crate::contract::graph::Atom::Sum { variant, .. } => {
-                            Atom::I128((*variant).into())
-                        }
-                        _ => random(d, &mut seed),
-                    };
-                }
+            if *source == Source::State
+                && let Some((_, a)) = c.genesis.iter().find(|(field, _)| Some(*field) == *id)
+            {
+                genesis[i] = match a {
+                    crate::contract::graph::Atom::Bool(b) => Atom::Bool(*b),
+                    crate::contract::graph::Atom::I128(n) => Atom::I128(*n),
+                    crate::contract::graph::Atom::U128(n) => Atom::U128(*n),
+                    crate::contract::graph::Atom::Sum { variant, .. } => {
+                        Atom::I128((*variant).into())
+                    }
+                    _ => random(d, &mut seed),
+                };
             }
         }
         rows.push(genesis);
