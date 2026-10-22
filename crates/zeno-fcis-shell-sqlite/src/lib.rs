@@ -6,8 +6,10 @@
 
 #![forbid(unsafe_code)]
 
-/// Durable consumer of the mandatory library-owned V2 publication capability.
+/// Keyed-entry storage under incremental Merkle roots and a chained journal.
 pub mod collections;
+
+/// Durable consumer of the mandatory library-owned V2 publication capability.
 pub mod v2;
 
 /// Binds shell-effects publication data to the V2 Authority.
