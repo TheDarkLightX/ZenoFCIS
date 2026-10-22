@@ -10,7 +10,9 @@
 //!   fields every failing tuple shares;
 //! - the **sites**: subexpressions of the proposal where some value makes
 //!   the output right on every tuple, in the proposer's own text. Every other
-//!   position is proved unable to repair that output by inverse semantics.
+//!   position covered by the inverse is proved unable to repair that output.
+//!   Arguments of nonlinear operations without an inverse remain unexplained;
+//!   they are never counted as proved unable.
 //!   Each site gets an exact constant, a one-step edit (a negated or flipped
 //!   condition, swapped branches, an off-by-one, the other operator) or a
 //!   synthesized term. Constants and edits rank before rewrites, then by
@@ -42,7 +44,7 @@ pub const MAX_SITES: usize = 6;
 /// Viable positions per output that get a replacement attempt.
 pub const MAX_ATTEMPTS: usize = 24;
 /// A failing tuple's value in observations (no real output takes it).
-pub const IMPOSSIBLE: i64 = -(1 << 62);
+pub const IMPOSSIBLE: i128 = -(1 << 62);
 
 /// Door settings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,7 +141,7 @@ pub struct Region {
     /// one (checked on every tuple).
     pub formula: Option<Expr>,
     /// Otherwise, the fields every failing tuple shares.
-    pub shared: Vec<(usize, i64)>,
+    pub shared: Vec<(usize, i128)>,
     /// Every failing tuple, by ordinal.
     pub mask: Vec<bool>,
 }
@@ -214,10 +216,10 @@ pub struct Explanation {
 
 /// Every output of `program` on every tuple, from the library evaluator; a
 /// trap, or an output outside its declared domain, reads as [`IMPOSSIBLE`].
-pub fn observe(subject: &Subject, program: &Program) -> Result<Vec<Vec<i64>>> {
+pub fn observe(subject: &Subject, program: &Program) -> Result<Vec<Vec<i128>>> {
     let wide = widened(program)?;
     let outputs = program.outputs();
-    let mut values: Vec<Vec<i64>> = outputs
+    let mut values: Vec<Vec<i128>> = outputs
         .iter()
         .map(|_| Vec::with_capacity(subject.size))
         .collect();
@@ -515,6 +517,9 @@ pub fn localise(
         if path.is_empty() {
             continue;
         }
+        if !crate::inverse::can_derive(node, &path) {
+            continue;
+        }
         // A sibling that overflows somewhere leaves this position unexplained.
         let Some(need) = skip_overflow(derive(node, &path, &root_need, &env, &holes))? else {
             continue;
@@ -603,6 +608,19 @@ pub fn localise(
 pub fn local_edits(node: &Expr) -> Vec<Expr> {
     let mut out = Vec::new();
     match node {
+        Expr::Call(function, args) => {
+            use crate::expr::Function;
+            let other = match function {
+                Function::MulDivFloor => Some(Function::MulDivCeil),
+                Function::MulDivCeil => Some(Function::MulDivFloor),
+                Function::DivFloor => Some(Function::DivCeil),
+                Function::DivCeil => Some(Function::DivFloor),
+                Function::ProductsGe => None,
+            };
+            if let Some(other) = other {
+                out.push(Expr::Call(other, args.clone()));
+            }
+        }
         Expr::If(c, a, b) => out.push(Expr::select((**c).clone(), (**b).clone(), (**a).clone())),
         Expr::Not(a) => out.push((**a).clone()),
         _ => {}
@@ -724,6 +742,9 @@ pub fn repair_greedy(
                 if path.is_empty() {
                     continue;
                 }
+                if !crate::inverse::can_derive(&current[j], &path) {
+                    continue;
+                }
                 let Some(need) = skip_overflow(derive(&current[j], &path, &root, &env, &holes))?
                 else {
                     continue;
@@ -783,8 +804,8 @@ mod accounting_tests {
         let original = Program::try_new(
             vec![Domain::Int { min: 0, max: 3 }],
             vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             vec![Op::Input(0)],
             vec![0],

@@ -100,7 +100,7 @@ fn measure(loaded: &Loaded, observation: &Observation) -> Value {
             "inputs": space.inputs,
             "tuples": space.tuples(),
         },
-        "genesis": space.state(machine.genesis),
+        "genesis": crate::report_numbers::integers(&space.state(machine.genesis)),
         "state_laws": state_laws,
         "states": {
             "schema": space.states,

@@ -73,9 +73,7 @@ fn input_leaf(def: Definition<'_>, leaf: &InputLeaf) -> bool {
     match (def.kind, leaf) {
         (Kind::Bool, InputLeaf::Bool) => true,
         (Kind::U128 { min: a, max: b }, InputLeaf::U128 { min: c, max: d }) => a == *c && b == *d,
-        (Kind::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => {
-            a == *c as i128 && b == *d as i128
-        }
+        (Kind::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => a == *c && b == *d,
         (
             Kind::Enum(v),
             InputLeaf::Enum {

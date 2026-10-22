@@ -38,7 +38,7 @@ import check_generated_application as applications
 
 ROOT = applications.ROOT
 TEMPLATE = ROOT / "crates/zeno-fcis-cli/templates/withdrawal-queue"
-FIXTURE = ROOT / "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted"
+FIXTURE = ROOT / "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted-2.5"
 EXPECTED_JOURNEY = {"status": "passed", "bundles": 12, "pending": 0, "deliveries": 2, "balance": 0}
 
 

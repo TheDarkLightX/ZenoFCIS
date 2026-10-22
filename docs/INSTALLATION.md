@@ -1,12 +1,14 @@
 # Installation
 
-ZenoFCIS `2.4.0` is the current release; ZenoFCIS 2.3.0 introduced the first
-stable V2 line. The 2.4.0 release set includes CLI archives for **Linux x86_64 GNU**
-and **macOS on Apple silicon**, with offline Rustdoc. The signed `DOWNLOADS.sha256`
-on the [release page](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0)
-lists the assets available to install.
+ZenoFCIS `2.5.0` is the current release source. Final qualification and
+publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
+The initial 2.5.0 release set includes the **Linux x86_64 GNU** CLI archive
+and offline Rustdoc. The **macOS on Apple silicon** archive is deferred until
+native platform validation is complete. After qualification and
+publication, the signed `DOWNLOADS.sha256` on the release page will list the
+assets available to install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
-qualification boundary. The [2.4.0 release notes](RELEASE_NOTES.md) describe
+qualification boundary. The [2.5.0 release notes](RELEASE_NOTES.md) describe
 the release's scope.
 
 Applications use the V2 API from the matching source tag, as
@@ -26,8 +28,8 @@ exact source pins, signed checksum assets and qualification limits.
   need). Ubuntu 24.04, where they were built, ships glibc 2.39. On an older
   glibc, such as Ubuntu 22.04's 2.35, the dynamic loader refuses to start the
   executable and names the missing `GLIBC_2.39` version.
-- **macOS on Apple silicon** (`aarch64-apple-darwin`): the 2.4.0 release
-  workflow builds this required archive on GitHub's macOS 15 arm64 image
+- **macOS on Apple silicon** (`aarch64-apple-darwin`): deferred from the initial
+  publication. The optional release workflow builds this archive on GitHub's macOS 15 arm64 image
   (`macos-15`), with a minimum-version field of macOS 11.0. The archive joins
   the release set only if an installed-binary journey passes on that image.
   Qualification is bound to the matching workflow run, and other macOS
@@ -36,10 +38,12 @@ exact source pins, signed checksum assets and qualification limits.
   Building from the matching source tag on those hosts may work, but it is not
   qualified.
 
-## Install the 2.4.0 CLI
+## Install the 2.5.0 CLI
 
-In the directory where you want to keep the archive and the executable, set
-`export VERSION=2.4.0`, then run:
+Once the qualified 2.5.0 release is published and its signed `DOWNLOADS.sha256`
+lists the Linux archive, use the commands below. In the directory where you
+want to keep the archive and the executable, set `export VERSION=2.5.0`, then
+run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
 ```bash
@@ -61,9 +65,9 @@ CLI in later sessions.
 
 `--ignore-missing` checks the downloaded assets listed in the flat
 `DOWNLOADS.sha256`; it does not check assets you have not downloaded. Verify
-the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.4.0/DOWNLOADS.sha256.sig)
+the published release's [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/DOWNLOADS.sha256.sig)
 separately, under your trusted signing-key policy. That published release must
-also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.4.0/RELEASE-SIGNING-KEY.pub).
+also provide the [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.5.0/RELEASE-SIGNING-KEY.pub).
 Downloading it beside the artifacts does not independently establish trust, so
 confirm its fingerprint through a trusted channel. See
 [Verify downloads](#verify-downloads).
@@ -73,9 +77,9 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-The signed `DOWNLOADS.sha256` lists
-`zeno-fcis-2.4.0-aarch64-apple-darwin.tar.gz`. Set `export VERSION=2.4.0` in
-your shell and run:
+After the qualified 2.5.0 release is published, check that its signed
+`DOWNLOADS.sha256` lists `zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz`. Then set
+`export VERSION=2.5.0` in your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash
@@ -168,12 +172,14 @@ The current V2 API uses source or path dependencies on the source tag that
 matches your CLI. The historical `1.1.0` package keeps its own V1 API. Follow
 the release's source pin when you build generated applications.
 
-Clone the release's source tag into a fresh directory:
+Before publication, use an explicitly pinned, reviewed source checkout. Once
+the matching 2.5.0 release and its source tag are published, clone into a fresh
+directory:
 
 ```bash
-git clone --branch v2.4.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
+git clone --branch v2.5.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
 git -C ZenoFCIS rev-parse HEAD
-# Expected: the source commit named on the v2.4.0 release page
+# Expected: the source commit named on the v2.5.0 release page
 zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
 ```
 
@@ -183,7 +189,7 @@ lockfile to that tree; keep the source and follow the generated README. The
 historical prerelease source and binary-build revisions stay in the
 [release-candidate record](RELEASE_CANDIDATES.md).
 
-An application beside that 2.4.0 source checkout can use:
+An application beside that 2.5.0 source checkout can use:
 
 ```toml
 [dependencies]
@@ -196,7 +202,64 @@ dependency in the graph bound to the same release source.
 
 ## Contained checker runtime
 
-In the 2.4.0 source, `loop` commands and `transform check --offline-parallel`
+### Backend selection in the 2.5 integration source
+
+Automatic mode uses direct POSIX children for `finite-data/1` and never selects
+systemd. Commands requiring `python-reference/1` (capture open/whole) or
+`group-resources/1` (including offline parallel transform checks) refuse before
+work with `containment-unavailable:auto:explicit-backend-required`.
+
+Choose a backend with the global `--containment-backend systemd|posix|auto`
+flag, or set `ZENO_FCIS_CONTAINMENT_BACKEND=systemd|posix|auto`. An explicit flag
+wins over the environment variable; without either, the default is `auto`.
+Malformed environment values refuse. The `containment-result/1` record names
+the selection source: `flag`, `environment` or `default`.
+
+For example, on a host where the operator accepts a detached service:
+
+```bash
+export ZENO_FCIS_CONTAINMENT_BACKEND=systemd
+zeno-fcis --no-kb loop capture open --help
+# Or choose for one invocation:
+zeno-fcis --containment-backend systemd --no-kb loop capture open --help
+```
+
+CI and test harnesses requiring systemd capture or offline parallel checking
+should set that variable on hosts with no enclosing restrictions to escape.
+Tests for automatic selection should unset it or pass `--containment-backend auto`.
+Finite-data commands also use `--containment-backend auto` when that variable
+selects systemd; the legacy systemd launcher lacks their minimal-environment guarantee.
+POSIX currently refuses Python and group-resource profiles; selection never
+falls back to a weaker profile.
+
+A sibling service launched by a user manager does not inherit the caller's
+sandbox. Namespace and LSM equality cannot establish that roots, Landlock,
+I/O limits, CPU period ceilings or launch-time context are preserved. Automatic
+qualification cannot close this boundary, so systemd is an informed choice by
+the person running the machine. No namespace, LSM or enclosing-budget
+qualification gate is applied to that explicit choice.
+
+The explicit launcher retains its own 64 MiB memory/no-swap/64-task policy,
+affinity and nice restrictions. It carries the caller's 16 soft:hard rlimits,
+CPU scheduling policy/priority and the selected CPU quota ratio/period.
+Independent kernel readbacks must succeed before startup acknowledgement and
+work. A limit reader that observes no CPU limit refuses instead of inventing
+a default; unsupported or unrepresentable carry also refuses. Leaves tighten
+each inherited soft and hard limit separately and validate the result.
+Supervisor observations are diagnostic evidence, not proof of sandbox equality.
+Startup, owned cleanup and receipt-publication checks remain required.
+
+The detached service may escape caller namespaces, filesystem root, LSM,
+seccomp, Landlock and cgroup restrictions. Its work is not charged jointly
+with existing caller-scope usage: even one checker can exceed a shared budget.
+Copying one CPU ratio and period does not preserve every ancestor's burst
+ceiling, and enclosing I/O limits are not inherited. The result records these
+residuals. These integration-source rules establish no release qualification
+or general preservation of the caller's security context.
+
+### Historical 2.4.0 containment requirements
+
+In the historical 2.4.0 source, `loop` commands and `transform check --offline-parallel`
 require Linux, cgroup v2 with the memory and pids controllers, and a running
 systemd user manager. `systemd-run --user` and `systemctl --user` must work
 for the invoking user. On a headless host, `sudo loginctl enable-linger
@@ -273,7 +336,7 @@ compatibility and assurance boundaries.
 ## Historical host binary
 
 The core library does not require a daemon. You can install the earlier
-`1.1.0` authoring CLI for its historical workflows:
+`1.1.0` specification CLI for its historical workflows:
 
 ```bash
 cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked

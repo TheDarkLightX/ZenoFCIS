@@ -25,7 +25,7 @@ use super::strategy::{Limits, Phase};
 pub(crate) enum Term {
     Class(ClassId),
     Bool(bool),
-    Int(i64),
+    Int(i128),
     Not(Box<Term>),
     And(Box<Term>, Box<Term>),
     Eq(Box<Term>, Box<Term>),
@@ -892,7 +892,7 @@ fn complete(
         }
     }
     // Integer Eq(x, y) and Lt(x, y).
-    let compare = |xs: &Samples, ys: &Samples, op: fn(i64, i64) -> bool| -> Vec<u64> {
+    let compare = |xs: &Samples, ys: &Samples, op: fn(i128, i128) -> bool| -> Vec<u64> {
         signature::words(
             (0..xs.len()).map(|sample| match (xs.get(sample), ys.get(sample)) {
                 (Some(a), Some(b)) => op(a, b),

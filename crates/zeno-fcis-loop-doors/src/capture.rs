@@ -18,8 +18,8 @@ pub const MAX_TUPLES: u64 = 4096;
 pub struct ReferenceTable {
     inputs: Vec<Domain>,
     outputs: Vec<Domain>,
-    points: Vec<Vec<i64>>,
-    rows: Vec<Vec<i64>>,
+    points: Vec<Vec<i128>>,
+    rows: Vec<Vec<i128>>,
 }
 
 impl ReferenceTable {
@@ -44,7 +44,7 @@ impl ReferenceTable {
     }
 
     /// Owns all inputs and rejects partial, malformed or out-of-domain rows.
-    pub fn new(inputs: Vec<Domain>, outputs: Vec<Domain>, rows: Vec<Vec<i64>>) -> Result<Self> {
+    pub fn new(inputs: Vec<Domain>, outputs: Vec<Domain>, rows: Vec<Vec<i128>>) -> Result<Self> {
         if inputs.len() > 2 * MAX_FIELDS || outputs.is_empty() || outputs.len() > MAX_FIELDS {
             return Err(Refusal::new("reference-abi-bound"));
         }
@@ -87,12 +87,12 @@ impl ReferenceTable {
     }
     /// Complete points in the existing checker's last-input-fastest order.
     #[must_use]
-    pub fn points(&self) -> &[Vec<i64>] {
+    pub fn points(&self) -> &[Vec<i128>] {
         &self.points
     }
     /// Successful outputs, in the same order as points.
     #[must_use]
-    pub fn rows(&self) -> &[Vec<i64>] {
+    pub fn rows(&self) -> &[Vec<i128>] {
         &self.rows
     }
 
@@ -116,7 +116,7 @@ impl ReferenceTable {
 }
 
 /// Enumerate only within an explicitly declared tuple budget. Nullary product = 1.
-pub fn points(inputs: &[Domain], limit: u64) -> Result<Vec<Vec<i64>>> {
+pub fn points(inputs: &[Domain], limit: u64) -> Result<Vec<Vec<i128>>> {
     if inputs.len() > 2 * MAX_FIELDS || inputs.iter().any(|d| crate::subject::domain_size(*d) == 0)
     {
         return Err(Refusal::new("reference-abi-bound"));
@@ -132,7 +132,7 @@ pub fn points(inputs: &[Domain], limit: u64) -> Result<Vec<Vec<i64>>> {
         .collect())
 }
 
-fn literal(domain: Domain, value: i64) -> Op {
+fn literal(domain: Domain, value: i128) -> Op {
     if matches!(domain, Domain::Bool) {
         Op::Bool(value == 1)
     } else {
@@ -143,7 +143,7 @@ fn literal(domain: Domain, value: i64) -> Op {
 #[derive(Default)]
 struct TableBuilder {
     nodes: Vec<Op>,
-    index: BTreeMap<(u8, i64, u16, u16, u16), u16>,
+    index: BTreeMap<(u8, i128, u16, u16, u16), u16>,
 }
 
 impl TableBuilder {
@@ -151,7 +151,7 @@ impl TableBuilder {
         let key = match op {
             Op::Input(a) => (0, 0, a, 0, 0),
             Op::Int(v) => (1, v, 0, 0, 0),
-            Op::Bool(v) => (2, i64::from(v), 0, 0, 0),
+            Op::Bool(v) => (2, i128::from(v), 0, 0, 0),
             Op::Lt(a, b) => (6, 0, a, b, 0),
             Op::Select(c, a, b) => (9, 0, c, a, b),
             _ => return Err(Refusal::new("reference-encoder-operation")),
@@ -175,9 +175,9 @@ impl TableBuilder {
         &mut self,
         inputs: &[Domain],
         dim: usize,
-        values: &[i64],
+        values: &[i128],
         output: Domain,
-        range: Option<(i64, usize)>,
+        range: Option<(i128, usize)>,
     ) -> Result<u16> {
         let first = *values
             .first()
@@ -201,11 +201,9 @@ impl TableBuilder {
         }
         let half = width / 2;
         let stride = values.len() / width;
-        let pivot = i64::try_from(
-            i128::from(lo)
-                + i128::try_from(half).map_err(|_| Refusal::new("reference-domain-budget"))?,
-        )
-        .map_err(|_| Refusal::new("reference-domain-budget"))?;
+        let pivot = lo
+            .checked_add(i128::try_from(half).map_err(|_| Refusal::new("reference-domain-budget"))?)
+            .ok_or_else(|| Refusal::new("reference-domain-budget"))?;
         let (left, right) = values.split_at(half * stride);
         let a = self.branch(inputs, dim, left, output, Some((lo, half)))?;
         let b = self.branch(inputs, dim, right, output, Some((pivot, width - half)))?;
@@ -280,7 +278,7 @@ pub fn choose_counterexample(
             let distance = p.map_or(0u128, |p| {
                 p.iter()
                     .zip(&table.points[*i])
-                    .map(|(a, b)| (i128::from(*a) - i128::from(*b)).unsigned_abs())
+                    .map(|(a, b)| a.abs_diff(*b))
                     .sum()
             });
             (distance, core::cmp::Reverse(*i))
@@ -293,7 +291,7 @@ pub struct DecisionOutcome {
     /// Select instruction index.
     pub node: usize,
     /// 0 or 1.
-    pub outcome: i64,
+    pub outcome: i128,
     /// First point demonstrating the outcome, if reachable.
     pub example: Option<usize>,
     /// Whether a selected example already covers it.

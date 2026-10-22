@@ -79,6 +79,8 @@ pub mod capture;
 pub mod learn;
 
 #[cfg(test)]
+mod arithmetic_tests;
+#[cfg(test)]
 mod tests;
 
 use alloc::string::String;
@@ -105,39 +107,3 @@ impl fmt::Display for Refusal {
 
 /// Shorthand for door results.
 pub type Result<T> = core::result::Result<T, Refusal>;
-
-/// Source text for internal tool fingerprints; not a stable application API.
-/// Include `LIB` as well as leaf entries so fingerprints bind this mapping.
-#[doc(hidden)]
-pub mod source_fingerprint {
-    /// Exact source bytes owned by this crate.
-    pub const EXAMPLES_STRATEGY_EXAMPLE: &str = include_str!("../examples/strategy-example.kb");
-    /// Exact source bytes owned by this crate.
-    pub const CAPTURE: &str = include_str!("capture.rs");
-    /// Exact source bytes owned by this crate.
-    pub const EXPR: &str = include_str!("expr.rs");
-    /// Exact source bytes owned by this crate.
-    pub const INVERSE: &str = include_str!("inverse.rs");
-    /// Exact source bytes owned by this crate.
-    pub const LEARN: &str = include_str!("learn.rs");
-    /// Exact source bytes owned by this crate.
-    pub const LIB: &str = include_str!("lib.rs");
-    /// Exact source bytes owned by this crate.
-    pub const LOWER: &str = include_str!("lower.rs");
-    /// Exact source bytes owned by this crate.
-    pub const REPAIR: &str = include_str!("repair.rs");
-    /// Exact source bytes owned by this crate.
-    pub const SKETCH: &str = include_str!("sketch.rs");
-    /// Exact source bytes owned by this crate.
-    pub const STRATEGY_ALGEBRA: &str = include_str!("strategy_algebra.rs");
-    /// Exact source bytes owned by this crate.
-    pub const STRATEGY_KNOWLEDGE: &str = include_str!("strategy_knowledge.rs");
-    /// Exact source bytes owned by this crate.
-    pub const STRATEGY_KNOWLEDGE_REASONING: &str = include_str!("strategy_knowledge/reasoning.rs");
-    /// Exact source bytes owned by this crate.
-    pub const STRATEGY_QUESTIONS: &str = include_str!("strategy_questions.rs");
-    /// Exact source bytes owned by this crate.
-    pub const STRATEGY_SPLIT: &str = include_str!("strategy_split.rs");
-    /// Exact source bytes owned by this crate.
-    pub const SUBJECT: &str = include_str!("subject.rs");
-}

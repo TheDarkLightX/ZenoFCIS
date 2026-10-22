@@ -4,7 +4,7 @@ use super::Variant;
 use vstd::prelude::*;
 
 verus! {
-pub open spec fn variants_prefix(variants: Seq<Variant>, min: i64, max: i64, count: nat)
+pub open spec fn variants_prefix(variants: Seq<Variant>, min: i128, max: i128, count: nat)
     -> bool
     recommends count <= variants.len(),
     decreases count,
@@ -18,11 +18,11 @@ pub open spec fn variants_prefix(variants: Seq<Variant>, min: i64, max: i64, cou
             && variants[j].code != last.code
     }
 }
-pub open spec fn variants_valid(variants: Seq<Variant>, min: i64, max: i64) -> bool {
+pub open spec fn variants_valid(variants: Seq<Variant>, min: i128, max: i128) -> bool {
     min <= max && max as int - min as int + 1 == variants.len()
         && variants_prefix(variants, min, max, variants.len())
 }
-pub proof fn variants_failure(variants: Seq<Variant>, min: i64, max: i64,
+pub proof fn variants_failure(variants: Seq<Variant>, min: i128, max: i128,
     failed: nat, count: nat)
     requires failed <= count <= variants.len(),
         !variants_prefix(variants, min, max, failed),
@@ -39,7 +39,7 @@ verus! {
 pub open spec fn leaf_valid(leaf: super::Leaf) -> bool {
     match leaf {
         super::Leaf::I128 { min, max } => min <= max,
-        super::Leaf::U128 { min, max } => min <= max && max <= i64::MAX as u128,
+        super::Leaf::U128 { min, max } => min <= max && max <= i128::MAX as u128,
         super::Leaf::Bool => true,
         super::Leaf::Enum { min, max, variants, .. }
         | super::Leaf::Sum { min, max, variants, .. } => variants_valid(variants@, min, max),
@@ -66,7 +66,7 @@ pub proof fn schema_failure(fields: Seq<super::Field>, failed: nat, count: nat)
 {
     if count > failed { schema_failure(fields, failed, (count - 1) as nat); }
 }
-pub open spec fn lookup(variants: Seq<Variant>, id: u16, count: nat) -> Option<i64>
+pub open spec fn lookup(variants: Seq<Variant>, id: u16, count: nat) -> Option<i128>
     recommends count <= variants.len(),
     decreases count,
 {
@@ -81,7 +81,7 @@ pub open spec fn lookup(variants: Seq<Variant>, id: u16, count: nat) -> Option<i
     }
 }
 pub proof fn lookup_persists(variants: Seq<Variant>, id: u16,
-    found: nat, count: nat, code: i64)
+    found: nat, count: nat, code: i128)
     requires found <= count <= variants.len(), lookup(variants, id, found) == Some(code),
     ensures lookup(variants, id, count) == Some(code),
     decreases count - found,
@@ -92,7 +92,7 @@ pub proof fn lookup_persists(variants: Seq<Variant>, id: u16,
 
 verus! {
 pub open spec fn variant_scalar(bytes: Seq<u8>, offset: usize,
-    type_id: u32, variants: Seq<Variant>, sum: bool) -> Option<(i64, usize)> {
+    type_id: u32, variants: Seq<Variant>, sum: bool) -> Option<(i128, usize)> {
     match integer::read_unsigned(bytes, offset, 4) {
         None => None,
         Some((raw_type, after_type)) => if raw_type != type_id as u128 { None }
@@ -118,19 +118,19 @@ pub open spec fn variant_scalar(bytes: Seq<u8>, offset: usize,
     }
 }
 pub open spec fn scalar(bytes: Seq<u8>, offset: usize, leaf: super::Leaf)
-    -> Option<(i64, usize)> {
+    -> Option<(i128, usize)> {
     match integer::read_unsigned(bytes, offset, 1) {
         None => None,
         Some((tag, payload_offset)) => match leaf {
             super::Leaf::U128 { min, max } => if tag != 0x03 { None }
                 else { match integer::read_unsigned(bytes, payload_offset, 16) {
-                    None => None, Some((v, end)) => if v < min || v > max || v > i64::MAX as u128 { None } else { Some((v as i64, end)) }
+                    None => None, Some((v, end)) => if v < min || v > max || v > i128::MAX as u128 { None } else { Some((v as i128, end)) }
                 } },
             super::Leaf::I128 { min, max } => if tag != 0x04 { None }
             else {
                 match integer::read_signed(bytes, payload_offset) {
                     Some((value, end)) => if min as i128 <= value <= max as i128 {
-                        Some((value as i64, end))
+                        Some((value as i128, end))
                     } else { None },
                     None => None,
                 }
@@ -151,7 +151,7 @@ use super::super::spec as logical;
 use super::{AccessAttempt, Failure, Field};
 
 verus! {
-pub open spec fn field(bytes: Seq<u8>, offset: usize, field: Field) -> Option<(i64, usize)> {
+pub open spec fn field(bytes: Seq<u8>, offset: usize, field: Field) -> Option<(i128, usize)> {
     match integer::read_unsigned(bytes, offset, 2) {
         None => None,
         Some((id, payload_offset)) => if id != field.id as u128 { None }
@@ -171,7 +171,7 @@ pub open spec fn header(bytes: Seq<u8>, count: usize) -> Option<usize> {
 }
 pub(super) open spec fn prefix(bytes: Seq<u8>, fields: Seq<Field>, count: nat, offset: usize,
     limits: Seq<u64>, used: Seq<u64>)
-    -> (Result<(Seq<i64>, usize), Failure>, Seq<u64>, Seq<AccessAttempt>)
+    -> (Result<(Seq<i128>, usize), Failure>, Seq<u64>, Seq<AccessAttempt>)
     recommends count <= fields.len(), limits.len() == 8, used.len() == 8,
     decreases count,
 {
@@ -220,7 +220,7 @@ pub(super) proof fn prefix_usage(bytes: Seq<u8>, fields: Seq<Field>, count: nat,
     }
 }
 pub(super) open spec fn projection(bytes: Seq<u8>, fields: Seq<Field>, limits: Seq<u64>, used: Seq<u64>)
-    -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
+    -> (Result<Seq<i128>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
     if !schema_valid(fields) { (Err(Failure::Schema), used, Seq::empty()) }
     else {
         let charged = logical::charge(limits, used, Resource::Byte, bytes.len() as u64);
@@ -246,8 +246,8 @@ pub(super) open spec fn projection(bytes: Seq<u8>, fields: Seq<Field>, limits: S
 
 // Typing lemmas derived from the actual closed wire and projection models.
 verus! {
-pub proof fn lookup_in_interval(variants: Seq<Variant>, min: i64, max: i64,
-    id: u16, count: nat, code: i64)
+pub proof fn lookup_in_interval(variants: Seq<Variant>, min: i128, max: i128,
+    id: u16, count: nat, code: i128)
     requires count <= variants.len(), variants_prefix(variants, min, max, count),
         lookup(variants, id, count) == Some(code),
     ensures min <= code <= max,
@@ -263,11 +263,11 @@ pub proof fn lookup_in_interval(variants: Seq<Variant>, min: i64, max: i64,
     }
 }
 pub proof fn scalar_has_declared_type(bytes: Seq<u8>, offset: usize,
-    leaf: super::Leaf, value: i64, end: usize)
+    leaf: super::Leaf, value: i128, end: usize)
     requires leaf_valid(leaf), scalar(bytes, offset, leaf) == Some((value, end)),
     ensures match leaf {
         super::Leaf::Bool => 0 <= value <= 1,
-        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i64 <= value <= max as i64,
+        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i128 <= value <= max as i128,
         super::Leaf::I128 { min, max }
         | super::Leaf::Enum { min, max, .. }
         | super::Leaf::Sum { min, max, .. } => min <= value <= max,
@@ -302,17 +302,17 @@ pub proof fn scalar_has_declared_type(bytes: Seq<u8>, offset: usize,
 }
 
 verus! {
-pub open spec fn leaf_contains(leaf: super::Leaf, value: i64) -> bool {
+pub open spec fn leaf_contains(leaf: super::Leaf, value: i128) -> bool {
     match leaf {
         super::Leaf::Bool => 0 <= value <= 1,
-        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i64 <= value <= max as i64,
+        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i128 <= value <= max as i128,
         super::Leaf::I128 { min, max }
         | super::Leaf::Enum { min, max, .. }
         | super::Leaf::Sum { min, max, .. } => min <= value <= max,
     }
 }
 pub(super) proof fn prefix_is_typed(bytes: Seq<u8>, fields: Seq<Field>, count: nat,
-    offset: usize, limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>, end: usize)
+    offset: usize, limits: Seq<u64>, used: Seq<u64>, values: Seq<i128>, end: usize)
     requires count <= fields.len(), schema_prefix(fields, count),
         limits.len() == 8, used.len() == 8,
         prefix(bytes, fields, count, offset, limits, used).0 == Ok((values, end)),
@@ -352,7 +352,7 @@ pub(super) proof fn prefix_is_typed(bytes: Seq<u8>, fields: Seq<Field>, count: n
     }
 }
 pub(super) proof fn projection_is_typed(bytes: Seq<u8>, fields: Seq<Field>,
-    limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>)
+    limits: Seq<u64>, used: Seq<u64>, values: Seq<i128>)
     requires limits.len() == 8, used.len() == 8,
         projection(bytes, fields, limits, used).0 == Ok(values),
     ensures values.len() == fields.len(),

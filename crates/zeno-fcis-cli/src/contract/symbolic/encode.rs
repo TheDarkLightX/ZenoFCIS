@@ -166,23 +166,20 @@ impl Typed {
 fn leaf(leaf: &Leaf, code: &Term) -> Result<(Values, Typed), Unsupported> {
     let variants =
         |type_id: u32, variants: &[zeno_fcis_synthesis::finite::V2InputVariant], sum: bool| {
-            let codes: Vec<i128> = variants
-                .iter()
-                .map(|variant| i128::from(variant.code))
-                .collect();
+            let codes: Vec<i128> = variants.iter().map(|variant| variant.code).collect();
             // A variant's ID is the value its atom carries; its code is the
             // program's. A contract gives every variant its ID as its code.
             let mut id = Term::Int(0);
             for variant in variants.iter().rev() {
                 id = Term::ite(
-                    Term::eq(code.clone(), Term::Int(i128::from(variant.code))),
+                    Term::eq(code.clone(), Term::Int(variant.code)),
                     Term::Int(i128::from(variant.id)),
                     id,
                 );
             }
             if variants
                 .iter()
-                .all(|variant| i64::from(variant.id) == variant.code)
+                .all(|variant| i128::from(variant.id) == variant.code)
             {
                 id = code.clone();
             }
@@ -206,8 +203,8 @@ fn leaf(leaf: &Leaf, code: &Term) -> Result<(Values, Typed), Unsupported> {
         ),
         Leaf::I128 { min, max } => (
             Values::Range {
-                min: i128::from(*min),
-                max: i128::from(*max),
+                min: *min,
+                max: *max,
             },
             Typed::I128(code.clone()),
         ),
@@ -324,7 +321,7 @@ impl Decision {
             script.constant(&format!("x{index}"), values);
             if let Some(domain) = descriptor.program.inputs.get(index) {
                 let (min, max) = domain.bounds();
-                admitted.push(Term::within(&code, i128::from(min), i128::from(max)));
+                admitted.push(Term::within(&code, min, max));
             }
             inputs.push(typed);
             sources.push((source, field));

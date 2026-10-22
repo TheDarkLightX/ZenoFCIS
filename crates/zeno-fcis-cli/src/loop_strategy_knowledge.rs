@@ -22,18 +22,23 @@ fn constant(v: &K::Value) -> Value {
     }
 }
 fn implementation() -> String {
-    let sources = [
-        include_str!("loop_strategy_knowledge.rs"),
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE_REASONING,
-        include_str!("knowledge_command.rs"),
-        include_str!("knowledge_evidence.rs"),
-        include_str!("loop_knowledge.rs"),
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA,
-        zeno_fcis_loop_doors::source_fingerprint::EXAMPLES_STRATEGY_EXAMPLE,
-        zeno_fcis_loop_doors::source_fingerprint::LIB,
-    ];
-    sha256_hex(sources.concat().as_bytes())
+    sha256_hex(
+        concat!(
+            include_str!("loop_strategy_knowledge.rs"),
+            include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt"),
+            include_str!(
+                "../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt"
+            ),
+            include_str!("knowledge_command.rs"),
+            include_str!("knowledge_evidence.rs"),
+            include_str!("loop_knowledge.rs"),
+            include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"),
+            include_str!(
+                "../source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt"
+            ),
+        )
+        .as_bytes(),
+    )
 }
 #[allow(clippy::too_many_arguments)]
 pub(super) fn command(

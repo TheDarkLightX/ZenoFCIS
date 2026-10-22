@@ -3,7 +3,7 @@
 //!
 //! Both profiles start from the library importer's complete admission (shape,
 //! types, references, canonical re-encoding). `FunctionalBoolV1` then narrows
-//! to the total Boolean subset; `CheckedI64V1` keeps the full instruction set
+//! to the total Boolean subset; `CheckedI128V1` keeps the full instruction set
 //! with its eager checked arithmetic, bounded by F3's domain cap. Neither
 //! profile is enabled by the other's qualification.
 
@@ -17,9 +17,9 @@ pub(crate) enum Profile {
     /// 0–6 Boolean inputs, 1–16 Boolean outputs, 1–256 Input/Bool/And/Not/
     /// Select nodes; at most 64 input tuples. Total after admission.
     FunctionalBoolV1,
-    /// The original finite-i64/1 instruction set with eager traps, on a complete
+    /// The original finite-i128/1 instruction set with eager traps, on a complete
     /// declared domain of at most F3's tuple cap.
-    CheckedI64V1,
+    CheckedI128V1,
 }
 
 /// Why a program is outside a profile.
@@ -47,13 +47,13 @@ pub(crate) enum ProfileRefusal {
 }
 
 impl Profile {
-    pub(crate) const ALL: [Profile; 2] = [Profile::FunctionalBoolV1, Profile::CheckedI64V1];
+    pub(crate) const ALL: [Profile; 2] = [Profile::FunctionalBoolV1, Profile::CheckedI128V1];
 
     /// Stable profile name.
     pub(crate) fn name(self) -> &'static str {
         match self {
             Profile::FunctionalBoolV1 => "functional-bool-v1",
-            Profile::CheckedI64V1 => "checked-i64-v1",
+            Profile::CheckedI128V1 => "checked-i128-v1",
         }
     }
 
@@ -65,7 +65,7 @@ impl Profile {
     pub(crate) fn max_tuples(self) -> u64 {
         match self {
             Profile::FunctionalBoolV1 => 64,
-            Profile::CheckedI64V1 => DEFAULT_MAX_INPUT_TUPLES,
+            Profile::CheckedI128V1 => DEFAULT_MAX_INPUT_TUPLES,
         }
     }
 
@@ -105,14 +105,8 @@ impl Profile {
                 return Err(ProfileRefusal::Opcode { node, opcode });
             }
         }
-        for (node, op) in program.nodes().iter().enumerate() {
-            if op.requires_arithmetic_profile() {
-                return Err(ProfileRefusal::Opcode {
-                    node,
-                    opcode: opcode_name(op),
-                });
-            }
-        }
+        // CheckedI64V1 admits the main-route arithmetic instructions after
+        // the library has checked their types, references and canonical form.
         let size = domain_size(program.inputs())
             .map_err(|position| ProfileRefusal::EmptyInputDomain { position })?;
         let max = self.max_tuples();
@@ -140,6 +134,7 @@ pub(crate) fn opcode_name(op: &Op) -> &'static str {
         Op::DivFloor(..) => "DivFloor",
         Op::DivCeil(..) => "DivCeil",
         Op::MulDivFloor(..) => "MulDivFloor",
+        Op::SignedMulDivFloor(..) => "SignedMulDivFloor",
         Op::MulDivCeil(..) => "MulDivCeil",
         Op::ProductsGe(..) => "ProductsGe",
         _ => "Unclassified",

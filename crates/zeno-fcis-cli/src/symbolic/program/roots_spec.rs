@@ -139,12 +139,12 @@ pub(in super::super) open spec fn typed(
         }) && booleans(admitted, admitted.len(), environment)
 }
 
-pub(in super::super) open spec fn projected(values: Seq<i64>, roots: Seq<u16>, count: nat) -> Seq<i64> {
+pub(in super::super) open spec fn projected(values: Seq<i128>, roots: Seq<u16>, count: nat) -> Seq<i128> {
     Seq::new(count, |j: int| values[roots[j] as int])
 }
 
 pub(crate) open spec fn output_values(
-    outputs: Seq<Term>, values: Seq<i64>, environment: Map<Seq<char>, denotation::Value>,
+    outputs: Seq<Term>, values: Seq<i128>, environment: Map<Seq<char>, denotation::Value>,
 ) -> bool {
     outputs.len() == values.len() && forall|j: int| 0 <= j < values.len() ==>
         denotation::term(outputs[j], environment) == Some(denotation::Value::Integer(values[j] as int))
@@ -152,7 +152,7 @@ pub(crate) open spec fn output_values(
 
 pub(in super::super) open spec fn meaning(
     domains: Seq<Domain>, roots: Seq<u16>, outputs: Seq<Term>, admitted: Seq<Term>,
-    values: Seq<i64>, environment: Map<Seq<char>, denotation::Value>,
+    values: Seq<i128>, environment: Map<Seq<char>, denotation::Value>,
 ) -> bool {
     domains.len() == roots.len()
         && runtime::projection(values, roots, roots.len()) == Ok(projected(values, roots, roots.len()))
@@ -163,7 +163,7 @@ pub(in super::super) open spec fn meaning(
 }
 
 /// Includes ordered/repeated roots, with no set conversion or uniqueness premise.
-proof fn projection_ordered(values: Seq<i64>, roots: Seq<u16>, count: nat)
+proof fn projection_ordered(values: Seq<i128>, roots: Seq<u16>, count: nat)
     requires count <= roots.len(), forall|j: int| 0 <= j < count ==> roots[j] < values.len(),
     ensures runtime::projection(values, roots, count) == Ok(projected(values, roots, count)),
     decreases count,
@@ -180,7 +180,7 @@ proof fn projection_ordered(values: Seq<i64>, roots: Seq<u16>, count: nat)
     }
 }
 
-proof fn admitted_step(domains: Seq<Domain>, values: Seq<i64>, domain: Domain, value: i64)
+proof fn admitted_step(domains: Seq<Domain>, values: Seq<i128>, domain: Domain, value: i128)
     requires domains.len() == values.len(),
     ensures runtime::admitted(domains.push(domain), values.push(value))
         == (runtime::admitted(domains, values) && runtime::contains(domain, value)),
@@ -204,7 +204,7 @@ proof fn admitted_step(domains: Seq<Domain>, values: Seq<i64>, domain: Domain, v
     }
 }
 
-/// No canonical i64 premise is needed for typed totality after an eager overflow.
+/// No canonical i128 premise is needed for typed totality after an eager overflow.
 pub(in super::super) proof fn typed_refines(
     domains: Seq<Domain>, roots: Seq<u16>, terms: Seq<Term>, kinds: Seq<Kind>,
     outputs: Seq<Term>, admitted: Seq<Term>, environment: Map<Seq<char>, denotation::Value>,
@@ -280,7 +280,7 @@ proof fn typed_guards(
 /// The fixed environment and canonical prefix values are supplied, not created.
 pub(in super::super) proof fn canonical_prefix(
     domains: Seq<Domain>, roots: Seq<u16>, terms: Seq<Term>, kinds: Seq<Kind>,
-    outputs: Seq<Term>, admitted: Seq<Term>, values: Seq<i64>,
+    outputs: Seq<Term>, admitted: Seq<Term>, values: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>, count: nat,
 )
     requires domains.len() == roots.len(), count <= roots.len(),
@@ -353,7 +353,7 @@ pub(in super::super) proof fn canonical_prefix(
 /// A value returned by the actual Term::and constructor, via its owner contract.
 pub(in super::super) proof fn folded_refines(
     domains: Seq<Domain>, roots: Seq<u16>, terms: Seq<Term>, kinds: Seq<Kind>,
-    outputs: Seq<Term>, guards: Seq<Term>, admitted: Term, values: Seq<i64>,
+    outputs: Seq<Term>, guards: Seq<Term>, admitted: Term, values: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>,
 )
     requires domains.len() == roots.len(),
@@ -375,12 +375,12 @@ pub(in super::super) proof fn folded_refines(
 /// No-root raw programs are accepted by this helper even though library program
 /// admission separately requires a nonempty output list. Eager nodes still run.
 pub(in super::super) proof fn empty_folded_projection(
-    outputs: Seq<Term>, guards: Seq<Term>, admitted: Term, values: Seq<i64>,
+    outputs: Seq<Term>, guards: Seq<Term>, admitted: Term, values: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>,
 )
     requires outputs.len() == 0, guards.len() == 0,
         denotation::conjunction_result(guards, admitted),
-    ensures runtime::projection(values, Seq::empty(), 0) == Ok(Seq::<i64>::empty()),
+    ensures runtime::projection(values, Seq::empty(), 0) == Ok(Seq::<i128>::empty()),
         runtime::admitted(Seq::empty(), Seq::empty()),
         output_values(outputs, Seq::empty(), environment),
         denotation::term(admitted, environment) == Some(denotation::Value::Boolean(true)),
@@ -397,7 +397,7 @@ pub(in super::super) proof fn empty_folded_projection(
 /// is owned by the prefix proof; it is not inferred from these output guards.
 pub(in super::super) proof fn scalar_execution_after_prefix(
     input_domains: Seq<Domain>, domains: Seq<Domain>, nodes: Seq<crate::evaluation::Op>,
-    roots: Seq<u16>, input: Seq<i64>, values: Seq<i64>, terms: Seq<Term>, kinds: Seq<Kind>,
+    roots: Seq<u16>, input: Seq<i128>, values: Seq<i128>, terms: Seq<Term>, kinds: Seq<Kind>,
     outputs: Seq<Term>, guards: Seq<Term>, admitted: Term,
     environment: Map<Seq<char>, denotation::Value>,
 )

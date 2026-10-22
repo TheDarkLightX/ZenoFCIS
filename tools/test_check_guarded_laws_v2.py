@@ -356,7 +356,7 @@ class GuardedLawCoverage(unittest.TestCase):
              patch.object(gate, 'native_dependency_args', return_value=[]), \
              patch.object(gate.verifier, 'run', side_effect=lambda command, *a, **k: subprocess.CompletedProcess(command, 101, '', '') if command[0] != 'rustc' else built):
             n = gate.native_commands(Path(temporary), {}, Path(temporary), 'change_declared_law_order', exact=gate.LAW_ORDER_TEST)
-        self.assertEqual(n.args, [str(Path(temporary) / 'native-current'), '--test-threads=1', '--exact', gate.LAW_ORDER_TEST])
+        self.assertEqual(n.args, [str(Path(temporary) / 'change_declared_law_order-native'), '--test-threads=1', '--exact', gate.LAW_ORDER_TEST])
         self.assertEqual(n.returncode, 101)
 
     def test_raw_coverage_refuses_operational_identifier_change_and_omission(self):

@@ -141,7 +141,7 @@ conditions never hold together.
 - a contract, written from `rules.txt` and the reinstatement rules by
   `rules_to_synthesis.py`: for every standing, transfer, action, and reviewer
   flag, the decision, rule, and strikes after the decision;
-- a sketch: a hand-written decision program in priority order with three
+- a sketch: an LLM-generated decision program in priority order with three
   holes, the freeze threshold, the boundary of a large amount, and the verdict
   code of a hold. Its reinstatement branch has no holes.
 
@@ -314,10 +314,10 @@ using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1, Python 3.12.3, and
 Node.js v22.23.1.
 The common pinned-tool admission below was run once with the identical
 local tools manifest used by all three examples. These are local command
-observations, not release-binary qualification. Earlier native authoring
+observations, not release-binary qualification. Earlier native generation
 counterexamples and explanations below retain their historical scope.
 The current application uses library-owned Authority with `src/v2_contract.rs`;
-these authoring and synthesis records do not qualify the whole runtime.
+these generation and synthesis records do not qualify the whole runtime.
 Application commands run from this application's directory; tool admission
 is shared.
 
@@ -330,7 +330,7 @@ is shared.
    ```
 
    The current run also printed what each counted obligation asks for,
-   after the summary. These observed lines describe evidence this authoring
+   after the summary. These observed lines describe evidence this generation
    check does not establish; they are not errors:
 
    ```text
@@ -467,7 +467,7 @@ seven bitvector inputs (five features, action, reviewer) and three outputs
 (decision, screening rule or reinstatement placeholder, post-decision strikes).
 `tau/check.py` checks that the vectors cover the complete 2,880-input domain,
 then can run the specification in the Tau REPL on every vector and compare all
-three outputs. This is a separate hand-written statement of the policy, with
+three outputs. This is a separate LLM-generated statement of the policy, with
 nothing in common with `src/rules.rs`, `rules_to_synthesis.py`, or the
 synthesizer. The vector coverage preflight runs in the library's gates. Tau
 execution needs the IDNI binary (<https://github.com/IDNI/tau-lang>) under

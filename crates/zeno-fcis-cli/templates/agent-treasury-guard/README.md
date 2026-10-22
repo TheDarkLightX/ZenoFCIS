@@ -18,7 +18,7 @@ commands. It shows six patterns:
   of that invariant: law 507 checks the slippage bound on each accepted
   proposal, and under law 503 a proposal is accepted only when no swap is
   outstanding;
-- a synthesized decision: a small hand-written adapter computes the guard's
+- a synthesized decision: a small LLM-generated adapter computes the guard's
   facts with checked arithmetic, and a core that `zeno-fcis synth` selected
   and checked on every fact tuple decides which rule applies first;
 - the model's identity as an input: the context names the model the agent
@@ -49,7 +49,7 @@ constructs the complete decision, and checks the original law programs with
 one meter. The SQLite shell consumes genuine `Publication` and
 `Publication` capabilities; exact replay recomputes the same original inputs.
 
-The hand-written adapters, legacy law engines and earlier synthesis/model
+The LLM-generated adapters, legacy law engines and earlier synthesis/model
 checks described below are retained only in the repository’s nonpublished
 `verification/kernel-laws/src/oracle/templates/agent-treasury-guard` package for independent oracle
 and historical evidence tests. They do not execute the normal V2 decision.
@@ -386,10 +386,10 @@ using a dev build of `zeno-fcis 2.3.0`, Rust 1.97.1, Python 3.12.3, and
 Node.js v22.23.1.
 The common pinned-tool admission below was run once with the identical
 local tools manifest used by all three examples. These are local command
-observations, not release-binary qualification. Earlier native authoring
+observations, not release-binary qualification. Earlier native generation
 counterexamples and explanations below retain their historical scope.
 The current application uses library-owned Authority with `src/v2_contract.rs`;
-these authoring and synthesis records do not qualify the whole runtime.
+these generation and synthesis records do not qualify the whole runtime.
 Application commands run from this application's directory; tool admission
 is shared.
 
@@ -403,7 +403,7 @@ is shared.
    ```
 
    The current run also printed what each counted obligation asks for,
-   after the summary. These observed lines describe evidence this authoring
+   after the summary. These observed lines describe evidence this generation
    check does not establish; they are not errors:
 
    ```text
@@ -483,7 +483,7 @@ is shared.
    (exit 2)
    ```
 
-   In the historical 1.1.0 authoring run, before laws 500, 505, and 507 were completed, the same command on claim
+   In the historical 1.1.0 generation run, before laws 500, 505, and 507 were completed, the same command on claim
    600 printed `cvc5 claim 600: replayed counterexample retained`, with the
    scope line `a transition that satisfies the assumed laws breaks the
    invariant; its starting state may be unreachable, so strengthen the

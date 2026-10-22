@@ -41,7 +41,13 @@ impl Drop for TempRoot {
 }
 
 fn manifest(relative: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+        if relative == "tests/fixtures/withdrawal-queue-adopted" {
+            "tests/fixtures/i128-contracts/withdrawal-queue-adopted"
+        } else {
+            relative
+        },
+    )
 }
 
 fn read(path: impl AsRef<Path>) -> Vec<u8> {
@@ -407,6 +413,15 @@ fn describe_declares_contract_diff_effects() {
         .unwrap_or_default();
     assert_eq!(
         arguments,
-        ["format", "help", "kb", "kb_task", "new", "no_kb", "old"]
+        [
+            "containment_backend",
+            "format",
+            "help",
+            "kb",
+            "kb_task",
+            "new",
+            "no_kb",
+            "old"
+        ]
     );
 }

@@ -8,6 +8,7 @@ import itertools
 import json
 import operator
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -92,6 +93,37 @@ def gateway_decision_table(rules: str) -> dict:
     return expected
 
 
+def read_vectors(path: Path) -> list[dict]:
+    """Decode legacy numeric vectors and the /2 lossless report encoding.
+
+    This is syntax decoding only; the independent decision tables below still
+    compute every expected outcome without interpreter/arithmetic helpers.
+    """
+    document = json.loads(path.read_text())
+    schema = document.get("schema")
+    if schema not in ("zeno-fcis/synthesis-vectors/1", "zeno-fcis/synthesis-vectors/2"):
+        raise RuntimeError("unknown synthesis vector schema")
+    if schema.endswith("/2") and document.get("integer_encoding") != "safe-number-or-decimal-string/1":
+        raise RuntimeError("unknown synthesis integer encoding")
+    def scalar(value):
+        if type(value) is int:
+            number = value
+        elif schema.endswith("/2") and type(value) is str and len(value) <= 40:
+            try:
+                number = int(value)
+            except ValueError:
+                raise RuntimeError("replay scalar is not an exact integer") from None
+            if str(number) != value:
+                raise RuntimeError("noncanonical replay integer")
+        else:
+            raise RuntimeError("replay scalar is not an exact integer")
+        if not -(1 << 127) <= number < (1 << 127):
+            raise RuntimeError("replay integer outside i128")
+        return number
+    return [{**case, "input": [scalar(v) for v in case["input"]],
+             "output": [scalar(v) for v in case["output"]]} for case in document["cases"]]
+
+
 def check_vectors(directory: Path, domain: str, expected: dict | None = None) -> None:
     """Independent mathematical oracle, without IR/interpreter helpers.
 
@@ -99,7 +131,7 @@ def check_vectors(directory: Path, domain: str, expected: dict | None = None) ->
     the application, such as the gateway's rule base; the other domains' tables
     are written here.
     """
-    vectors = json.loads((directory / "vectors.json").read_text())["cases"]
+    vectors = read_vectors(directory / "vectors.json")
     actual = {}
     for case in vectors:
         if any(type(value) is not int for value in case["input"] + case["output"]):
@@ -348,7 +380,7 @@ def check_integer_boundaries(cli: list[str], directory: Path, environment: dict[
         ("zero-input", -(2**63), -(2**63), True),
     ]:
         field = {"name": "value", "type": {"kind": "int", "min": low, "max": high}}
-        problem = {"schema": "zeno-fcis/synthesis-problem/1", "profile": "zeno-fcis/finite-i64/1",
+        problem = {"schema": "zeno-fcis/synthesis-problem/1", "profile": "zeno-fcis/finite-i128/1",
                    "inputs": [] if constant else [field], "outputs": [field],
                    "contract": {"nodes": [["input", 0], ["int", low] if constant else ["input", 1], ["eq", 0, 1]], "roots": [2]},
                    "sketch": {"nodes": [{"hole": 1, "alternatives": [["int", 0 if constant else low],
@@ -361,7 +393,7 @@ def check_integer_boundaries(cli: list[str], directory: Path, environment: dict[
             out = directory / f"{name}-{language}"
             arguments = [str(spec), "--target", language, "--out", str(out)]
             invoke(cli, ["synth", "run"] + arguments, directory, environment)
-            cases = json.loads((out / "vectors.json").read_text())["cases"]
+            cases = read_vectors(out / "vectors.json")
             if cases != expected:
                 raise RuntimeError(f"{language} {name} lost integer precision or corpus coverage")
             record = invoke(cli, ["synth", "verify"] + arguments, directory, environment)
@@ -396,7 +428,48 @@ def check_node_environment(cli: list[str], app: Path, directory: Path, environme
     marker.unlink()
 
 
+def check_template_builders(directory: Path, environment: dict[str, str]) -> list[dict]:
+    """Require current i128 emission and reject a real i64 builder mutation."""
+    records = []
+    for name, builder in (("order-fulfillment", "decision_to_synthesis.py"),
+                          ("compliance-gateway", "rules_to_synthesis.py")):
+        source = ROOT / "crates/zeno-fcis-cli/templates" / name
+        stage = directory / (name + "-builder")
+        stage.mkdir()
+        script = stage / builder
+        shutil.copyfile(source / builder, script)
+        problem = stage / "synthesis.json"
+        arguments = []
+        if name == "compliance-gateway":
+            shutil.copyfile(source / "rules.txt", stage / "rules.txt")
+            arguments = [str(stage / "rules.txt"), str(problem)]
+        command = [sys.executable, str(script), *arguments]
+        generated = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
+        expected = (source / "synthesis.json").read_bytes()
+        if generated.returncode != 0 or problem.read_bytes() != expected:
+            raise RuntimeError(f"{name} builder differs from the accepted specification")
+        if json.loads(expected)["profile"] != "zeno-fcis/finite-i128/1":
+            raise RuntimeError(f"{name} specification downgraded from i128")
+        current = subprocess.run([*command, "--check"], env=environment,
+                                 capture_output=True, text=True, timeout=30)
+        original = script.read_text()
+        if original.count("zeno-fcis/finite-i128/1") != 1:
+            raise RuntimeError(f"{name} builder mutation anchor changed")
+        script.write_text(original.replace("zeno-fcis/finite-i128/1", "zeno-fcis/finite-i64/1"))
+        legacy = subprocess.run([*command, "--check"], env=environment,
+                                capture_output=True, text=True, timeout=30)
+        if current.returncode != 0 or legacy.returncode != 1 or "synthesis.json differs" not in legacy.stderr:
+            raise RuntimeError(f"{name} i64 emission regression was not refused normally")
+        if problem.read_bytes() != expected:
+            raise RuntimeError(f"{name} check mode changed the accepted specification")
+        records.append({"builder": name, "profile": "zeno-fcis/finite-i128/1",
+                        "check_exit": current.returncode, "i64_control_exit": legacy.returncode,
+                        "problem_sha256": hashlib.sha256(expected).hexdigest()})
+    return records
+
+
 def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
+    builders = check_template_builders(directory, environment)
     app = directory / "counter"
     # 'new' reports a human message; subsequent synthesis commands are structured.
     subprocess.run(cli + ["new", str(app), "--template", "durable-counter"], cwd=ROOT,
@@ -447,7 +520,7 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
     if missing["status"] != "conformance-unknown":
         raise RuntimeError("missing compiler did not remain unknown")
     return {"schema": "zeno-fcis/synthesis-validation/1", "status": "passed",
-            "counter": counter, "order": order, "generic": generic, "integer_boundaries": integer_boundaries,
+            "builders": builders, "counter": counter, "order": order, "generic": generic, "integer_boundaries": integer_boundaries,
             "negative_cases": ["source-and-manifest-tampering", "assignment-budget", "work-budget", "unsupported-target", "missing-tool", "receipt-location", "missing-problem", "inherited-node-environment"]}
 
 

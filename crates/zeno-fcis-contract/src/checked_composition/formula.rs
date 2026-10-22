@@ -144,6 +144,7 @@ impl Formula {
                 ScalarOp::Mul(..)
                     | ScalarOp::Div(..)
                     | ScalarOp::MulDiv(..)
+                    | ScalarOp::SignedMulDivFloor(..)
                     | ScalarOp::ProductsGe(..)
             )
         }) {
@@ -176,7 +177,7 @@ impl Formula {
         let root = graph.boolean(value)?.index;
         let predicate = Predicate::from_state_graph(graph.table.nodes, root, self.fields());
         let mut cells = Vec::with_capacity(product(&axes));
-        let values: Vec<Vec<i64>> = axes.iter().map(|axis| axis.values.clone()).collect();
+        let values: Vec<Vec<i128>> = axes.iter().map(|axis| axis.values.clone()).collect();
         for_each_tuple::<()>(&values, |tuple| {
             evaluations.set(evaluations.get() + 1);
             cells.push(match predicate.on_state(&record(tuple)) {
@@ -220,6 +221,7 @@ impl Formula {
                     ScalarOp::Mul(..)
                     | ScalarOp::Div(..)
                     | ScalarOp::MulDiv(..)
+                    | ScalarOp::SignedMulDivFloor(..)
                     | ScalarOp::ProductsGe(..) => {
                         return Err(
                             "composed-domain bindings do not support arithmetic extension opcodes"
@@ -245,15 +247,15 @@ impl Formula {
         let program = Program::try_new(
             inputs,
             vec![ProgramDomain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             ops,
             vec![index(root)?],
         )
         .map_err(|error| format!("the library refuses the binding's program: {error}"))?;
         let mut cells = Vec::with_capacity(product(&axes));
-        let values: Vec<Vec<i64>> = axes.iter().map(|axis| axis.values.clone()).collect();
+        let values: Vec<Vec<i128>> = axes.iter().map(|axis| axis.values.clone()).collect();
         for_each_tuple::<()>(&values, |tuple| {
             evaluations.set(evaluations.get() + 1);
             cells.push(
@@ -295,9 +297,10 @@ const SYNTHETIC_INTEGER: u32 = 1;
 fn integer_declarations() -> Declarations {
     let integer = Type {
         name: "Integer".to_owned(),
+        quantity: None,
         form: TypeForm::Leaf(Leaf::I128 {
-            min: i128::from(i64::MIN),
-            max: i128::from(i64::MAX),
+            min: i128::MIN,
+            max: i128::MAX,
         }),
     };
     Declarations {
@@ -315,13 +318,13 @@ fn field_id(index: usize) -> Result<u16, String> {
 }
 
 /// The record a formula is decided on: name `i`'s value as field `i + 1`.
-fn record(tuple: &[i64]) -> Vec<c::Field<'static>> {
+fn record(tuple: &[i128]) -> Vec<c::Field<'static>> {
     tuple
         .iter()
         .enumerate()
         .map(|(index, value)| c::Field {
             id: u16::try_from(index + 1).unwrap_or(u16::MAX),
-            value: c::Atom::I128(i128::from(*value)),
+            value: c::Atom::I128(*value),
         })
         .collect()
 }
@@ -329,10 +332,13 @@ fn record(tuple: &[i64]) -> Vec<c::Field<'static>> {
 /// The children of one expression node.
 fn children(ast: &Ast) -> Vec<&Ast> {
     match ast {
-        Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) => Vec::new(),
+        Ast::Name(_) | Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => Vec::new(),
         Ast::Not(inner) | Ast::Neg(inner) => vec![inner],
         Ast::Binary(_, left, right) | Ast::Div(_, left, right) => vec![left, right],
-        Ast::MulDiv(_, a, b, d) => vec![a, b, d],
+        Ast::MulDiv(_, a, b, d)
+        | Ast::SignedMulDivFloor(a, b, d)
+        | Ast::ScaledMulDiv(_, _, a, b, d, _)
+        | Ast::RepeatMulDiv(_, a, b, d, _) => vec![a, b, d],
         Ast::ProductsGe(arguments) => arguments.iter().collect(),
         Ast::Choose(condition, then, otherwise) => vec![condition, then, otherwise],
     }
@@ -365,14 +371,14 @@ fn collect(ast: &Ast, names: &mut BTreeSet<String>) {
 /// The values of one name, in enumeration order.
 #[derive(Clone, Debug)]
 pub(crate) struct Axis {
-    pub(crate) values: Vec<i64>,
+    pub(crate) values: Vec<i128>,
 }
 
 /// Mixed-radix positions of tuples over axes, the last axis fastest, as
 /// [`for_each_tuple`] enumerates them.
 #[derive(Clone, Debug)]
 pub(crate) struct Index {
-    digits: Vec<BTreeMap<i64, usize>>,
+    digits: Vec<BTreeMap<i128, usize>>,
     strides: Vec<usize>,
 }
 
@@ -399,7 +405,7 @@ impl Index {
     }
 
     /// The position of a tuple; `None` when a value is not on its axis.
-    pub(crate) fn of(&self, tuple: &[i64]) -> Option<usize> {
+    pub(crate) fn of(&self, tuple: &[i128]) -> Option<usize> {
         let mut at = 0usize;
         for ((digits, stride), value) in self.digits.iter().zip(&self.strides).zip(tuple) {
             at += digits.get(value)? * stride;
@@ -434,7 +440,7 @@ pub(crate) enum Side {
 /// A binding's value on one tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Delivered {
-    Value(i64),
+    Value(i128),
     Outside(Side),
     Undefined,
 }
@@ -449,7 +455,7 @@ pub(crate) struct TruthTable {
 impl TruthTable {
     /// The value on a tuple of the axes' values; a tuple off the axes has
     /// none.
-    pub(crate) fn cell(&self, tuple: &[i64]) -> Cell {
+    pub(crate) fn cell(&self, tuple: &[i128]) -> Cell {
         self.index
             .of(tuple)
             .and_then(|at| self.cells.get(at).copied())
@@ -457,7 +463,7 @@ impl TruthTable {
     }
 
     /// Whether the predicate holds: no value counts as false.
-    pub(crate) fn holds(&self, tuple: &[i64]) -> bool {
+    pub(crate) fn holds(&self, tuple: &[i128]) -> bool {
         self.cell(tuple) == Cell::True
     }
 }
@@ -470,7 +476,7 @@ pub(crate) struct ValueTable {
 }
 
 impl ValueTable {
-    pub(crate) fn value(&self, tuple: &[i64]) -> Delivered {
+    pub(crate) fn value(&self, tuple: &[i128]) -> Delivered {
         self.index
             .of(tuple)
             .and_then(|at| self.cells.get(at).copied())

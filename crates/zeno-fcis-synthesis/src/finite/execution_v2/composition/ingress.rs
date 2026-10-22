@@ -79,7 +79,7 @@ pub(super) enum Value<'a> {
 /// Typed actual value and scalar ABI values obtained from the same bytes.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug)]
-pub(super) struct Decoded<'a, A = i64> {
+pub(super) struct Decoded<'a, A = i128> {
     /// Complete typed original value.
     pub value: Value<'a>,
     /// Scalar codes in schema order.
@@ -112,7 +112,7 @@ pub(super) fn valid(schema: Schema<'_>) -> bool {
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::inverse(variants@,code,variants@.len()),))]
-fn inverse(variants: &[super::super::InputVariant], code: i64) -> Option<u16> {
+fn inverse(variants: &[super::super::InputVariant], code: i128) -> Option<u16> {
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost, verus_spec(invariant i<=variants.len(),spec::inverse(variants@,code,i as nat)==None::<u16>,decreases variants.len()-i,))]
     while i < variants.len() {
@@ -126,7 +126,7 @@ fn inverse(variants: &[super::super::InputVariant], code: i64) -> Option<u16> {
     None
 }
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::reify(*leaf,code),))]
-pub(super) fn reify(leaf: &InputLeaf, code: i64) -> Option<Atom<'static>> {
+pub(super) fn reify(leaf: &InputLeaf, code: i128) -> Option<Atom<'static>> {
     match leaf {
         InputLeaf::Bool => {
             if code == 0 {
@@ -146,7 +146,7 @@ pub(super) fn reify(leaf: &InputLeaf, code: i64) -> Option<Atom<'static>> {
         }
         InputLeaf::I128 { min, max } => {
             if *min <= code && code <= *max {
-                Some(Atom::I128(code as i128))
+                Some(Atom::I128(code))
             } else {
                 None
             }
@@ -166,7 +166,7 @@ pub(super) fn reify(leaf: &InputLeaf, code: i64) -> Option<Atom<'static>> {
     }
 }
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures (match result {Some(v)=>Some(v@),None=>None::<Seq<Field>>}) == spec::fields(fields@,codes@,fields@.len()),))]
-fn reify_fields(fields: &[InputField], codes: &[i64]) -> Option<Vec<Field<'static>>> {
+fn reify_fields(fields: &[InputField], codes: &[i128]) -> Option<Vec<Field<'static>>> {
     if fields.len() != codes.len() {
         return None;
     }

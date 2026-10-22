@@ -2,16 +2,16 @@ use super::*;
 use ingress::spec::{ValueView, decoded, value as value_view};
 use vstd::prelude::*;
 verus! {
-pub(in super::super) open spec fn field_code(fields:Seq<InputField>,codes:Seq<i64>,id:u16)->Option<i64>{
+pub(in super::super) open spec fn field_code(fields:Seq<InputField>,codes:Seq<i128>,id:u16)->Option<i128>{
     if exists|i:int|admission::spec::first(fields,id,i){let i=choose|i:int|admission::spec::first(fields,id,i);if i<codes.len(){Some(codes[i])}else{None}}else{None}
 }
-pub(in super::super) open spec fn scalar(schema:Schema,decoded:&ingress::Decoded,selector:Selector)->Option<i64>{scalar_data(schema,ingress::spec::decoded(*decoded),selector)}
-pub(in super::super) open spec fn scalar_data(schema:Schema,data:(ValueView,Seq<i64>),selector:Selector)->Option<i64>{match(schema,selector){
+pub(in super::super) open spec fn scalar(schema:Schema,decoded:&ingress::Decoded,selector:Selector)->Option<i128>{scalar_data(schema,ingress::spec::decoded(*decoded),selector)}
+pub(in super::super) open spec fn scalar_data(schema:Schema,data:(ValueView,Seq<i128>),selector:Selector)->Option<i128>{match(schema,selector){
     (Schema::Leaf(_),Selector::Root)=>if data.1.len()==1{Some(data.1[0])}else{None},
     (Schema::Record(fields),Selector::Field(id))=>field_code(fields@,data.1,id),_=>None,
 }}
-pub(in super::super) open spec fn tuple(d:&Descriptor,s:&ingress::Decoded,c:&ingress::Decoded,x:&ingress::Decoded,n:nat)->Option<Seq<i64>>{tuple_data(d,decoded(*s),decoded(*c),decoded(*x),n)}
-pub(in super::super) open spec fn tuple_data<'a>(d:&Descriptor,s:(ValueView<'a>,Seq<i64>),c:(ValueView<'a>,Seq<i64>),x:(ValueView<'a>,Seq<i64>),n:nat)->Option<Seq<i64>>
+pub(in super::super) open spec fn tuple(d:&Descriptor,s:&ingress::Decoded,c:&ingress::Decoded,x:&ingress::Decoded,n:nat)->Option<Seq<i128>>{tuple_data(d,decoded(*s),decoded(*c),decoded(*x),n)}
+pub(in super::super) open spec fn tuple_data<'a>(d:&Descriptor,s:(ValueView<'a>,Seq<i128>),c:(ValueView<'a>,Seq<i128>),x:(ValueView<'a>,Seq<i128>),n:nat)->Option<Seq<i128>>
     recommends n<=d.bindings@.len(),decreases n,
 {if n==0{Some(Seq::empty())}else{match tuple_data(d,s,c,x,(n-1) as nat){None=>None,Some(prior)=>{
     let b=d.bindings@[n as int-1];let v=match b.source{Source::State=>scalar_data(d.state,s,b.selector),Source::Command=>scalar_data(d.command,c,b.selector),Source::Context=>scalar_data(d.context,x,b.selector)};
@@ -20,10 +20,10 @@ pub(in super::super) open spec fn tuple_data<'a>(d:&Descriptor,s:(ValueView<'a>,
 pub(in super::super) proof fn tuple_failed(d:&Descriptor,s:&ingress::Decoded,c:&ingress::Decoded,x:&ingress::Decoded,n:nat,total:nat)
     requires n<=total<=d.bindings@.len(),tuple(d,s,c,x,n).is_none(),ensures tuple(d,s,c,x,total).is_none(),decreases total-n,
 {if total>n{tuple_failed(d,s,c,x,n,(total-1) as nat);}}
-pub(in super::super) open spec fn atoms(types:Seq<InputLeaf>,codes:Seq<i64>,n:nat)->Option<Seq<Atom<'static>>>
+pub(in super::super) open spec fn atoms(types:Seq<InputLeaf>,codes:Seq<i128>,n:nat)->Option<Seq<Atom<'static>>>
     recommends n<=types.len(),decreases n,
 {if types.len()!=codes.len(){None}else if n==0{Some(Seq::empty())}else{match atoms(types,codes,(n-1) as nat){None=>None,Some(prior)=>match ingress::spec::reify(types[n as int-1],codes[n as int-1]){None=>None,Some(v)=>Some(prior.push(v))}}}}
-pub(in super::super) proof fn atoms_failed(types:Seq<InputLeaf>,codes:Seq<i64>,n:nat,total:nat)
+pub(in super::super) proof fn atoms_failed(types:Seq<InputLeaf>,codes:Seq<i128>,n:nat,total:nat)
     requires n<=total<=types.len(),atoms(types,codes,n).is_none(),ensures atoms(types,codes,total).is_none(),decreases total-n,
 {if total>n{atoms_failed(types,codes,n,(total-1) as nat);}}
 pub(in super::super) open spec fn input_view<'a>(v:decision::RootView<'_,'a>)->ValueView<'a>{match v{decision::RootView::Leaf(a)=>ValueView::Leaf(a),decision::RootView::Record(f)=>ValueView::Record(f@),}}
@@ -47,7 +47,7 @@ pub(in super::super) open spec fn from_atoms<'a>(d:&Descriptor<'a>,state:ValueVi
         _=>finished==(Err(Failure::Output),used,t),
     }}
 }
-pub(in super::super) open spec fn after_ingress<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i64>),c:(ValueView<'a>,Seq<i64>),x:(ValueView<'a>,Seq<i64>),limits:Seq<u64>,used:Seq<u64>,t:TraceView,finished:Finished<'a>)->bool{
+pub(in super::super) open spec fn after_ingress<'a>(d:&Descriptor<'a>,s:(ValueView<'a>,Seq<i128>),c:(ValueView<'a>,Seq<i128>),x:(ValueView<'a>,Seq<i128>),limits:Seq<u64>,used:Seq<u64>,t:TraceView,finished:Finished<'a>)->bool{
     {let ingress=used;
         let tr=(t.0,t.1,Some(ingress),t.3);
         match tuple_data(d,s,c,x,d.bindings@.len()){

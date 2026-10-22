@@ -7,7 +7,7 @@ pub(super) mod spec;
 
 #[cfg(any(test, verus_keep_ghost))]
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::field_code(fields@,codes@,id),))]
-fn field_code(fields: &[InputField], codes: &[i64], id: u16) -> Option<i64> {
+fn field_code(fields: &[InputField], codes: &[i128], id: u16) -> Option<i128> {
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=fields.len(),forall|j:int|0<=j<i==>fields@[j].id!=id,decreases fields.len()-i,))]
     while i < fields.len() {
@@ -26,7 +26,7 @@ fn field_code(fields: &[InputField], codes: &[i64], id: u16) -> Option<i64> {
 }
 #[cfg(any(test, verus_keep_ghost))]
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::scalar(schema,decoded,selector),))]
-fn scalar(schema: Schema<'_>, decoded: &ingress::Decoded, selector: Selector) -> Option<i64> {
+fn scalar(schema: Schema<'_>, decoded: &ingress::Decoded, selector: Selector) -> Option<i128> {
     match (schema, selector) {
         (Schema::Leaf(_), Selector::Root) => {
             if decoded.scalars.len() == 1 {
@@ -40,13 +40,13 @@ fn scalar(schema: Schema<'_>, decoded: &ingress::Decoded, selector: Selector) ->
     }
 }
 #[cfg(any(test, verus_keep_ghost))]
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (match result{Some(v)=>Some(v@),None=>None::<Seq<i64>>})==spec::tuple(d,state,command,context,d.bindings@.len()),))]
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (match result{Some(v)=>Some(v@),None=>None::<Seq<i128>>})==spec::tuple(d,state,command,context,d.bindings@.len()),))]
 pub(super) fn tuple(
     d: &Descriptor<'_>,
     state: &ingress::Decoded,
     command: &ingress::Decoded,
     context: &ingress::Decoded,
-) -> Option<Vec<i64>> {
+) -> Option<Vec<i128>> {
     let mut output = Vec::new();
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.bindings.len(),spec::tuple(d,state,command,context,i as nat)==Some(output@),decreases d.bindings.len()-i,))]

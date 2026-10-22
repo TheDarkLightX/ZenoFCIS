@@ -53,6 +53,7 @@ fn op(a: &Op, b: &Op) -> bool {
         | (Op::And(a, b), Op::And(c, d)) => *a == *c && *b == *d,
         (Op::Select(a, b, c), Op::Select(d, e, f))
         | (Op::MulDivFloor(a, b, c), Op::MulDivFloor(d, e, f))
+        | (Op::SignedMulDivFloor(a, b, c), Op::SignedMulDivFloor(d, e, f))
         | (Op::MulDivCeil(a, b, c), Op::MulDivCeil(d, e, f)) => *a == *d && *b == *e && *c == *f,
         (Op::ProductsGe(a, b), Op::ProductsGe(c, d)) => {
             #[cfg(verus_keep_ghost)]
@@ -140,8 +141,8 @@ fn failure(a: V2ExecutionFailure, b: V2ExecutionFailure) -> bool {
     ensures result == (spec::result_view(*a) == spec::result_view(*b)),
 ))]
 pub(super) fn results(
-    a: &Result<Vec<i64>, V2ExecutionFailure>,
-    b: &Result<Vec<i64>, V2ExecutionFailure>,
+    a: &Result<Vec<i128>, V2ExecutionFailure>,
+    b: &Result<Vec<i128>, V2ExecutionFailure>,
 ) -> bool {
     match (a, b) {
         (Ok(left), Ok(right)) => {

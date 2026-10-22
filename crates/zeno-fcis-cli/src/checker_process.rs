@@ -2,22 +2,220 @@
 //! The supervisor receives output bytes, never an Equivalence/Completed/report.
 //! A fixed start/finish protocol fences terminal I/O; it is not a proof protocol.
 
+use crate::containment_policy::{Backend, Profile, Unavailable};
 use std::time::Duration;
 
+#[cfg(target_os = "linux")]
+#[path = "posix_process.rs"]
+mod posix;
+
+#[cfg(target_os = "linux")]
+#[path = "checker_limits.rs"]
+mod limits;
+
+#[cfg(target_os = "linux")]
+#[path = "containment_diagnostics.rs"]
+mod diagnostics;
+
+#[cfg(target_os = "linux")]
+#[path = "stage_budget.rs"]
+mod stage_budget;
+
+const BACKEND_ENV: &str = "ZENO_FCIS_CONTAINMENT_BACKEND";
+const EXPLICIT_BACKEND_REQUIRED: &str = "containment-unavailable:auto:explicit-backend-required";
+const BACKEND_MESSAGE: &str = "Choose --containment-backend systemd or set ZENO_FCIS_CONTAINMENT_BACKEND=systemd only when the sibling service may run outside the caller's restrictions; auto keeps finite data on POSIX.";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum SelectionSource {
+    Flag,
+    Environment,
+    Default,
+}
+
+fn select_backend(
+    flag: Option<Backend>,
+    environment: Option<&std::ffi::OsStr>,
+) -> Result<(Backend, SelectionSource), String> {
+    if let Some(backend) = flag {
+        return Ok((backend, SelectionSource::Flag));
+    }
+    let Some(environment) = environment else {
+        return Ok((Backend::Auto, SelectionSource::Default));
+    };
+    let backend = match environment.to_str() {
+        Some("systemd") => Backend::Systemd,
+        Some("posix") => Backend::Posix,
+        Some("auto") => Backend::Auto,
+        _ => {
+            return Err(format!(
+                "containment-unavailable:environment:invalid-{BACKEND_ENV}"
+            ));
+        }
+    };
+    Ok((backend, SelectionSource::Environment))
+}
+
+fn selected_backend(profile: Profile, requested: Backend) -> Result<Backend, String> {
+    match (requested, profile) {
+        (Backend::Auto, Profile::FiniteData) => Ok(Backend::Posix),
+        (Backend::Auto, _) => Err(EXPLICIT_BACKEND_REQUIRED.into()),
+        (backend, _) => Ok(backend),
+    }
+}
+
+#[cfg(test)]
+mod backend_tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn backend_flag_then_environment_then_default() {
+        assert_eq!(
+            select_backend(None, None),
+            Ok((Backend::Auto, SelectionSource::Default))
+        );
+        for (text, backend) in [
+            ("auto", Backend::Auto),
+            ("systemd", Backend::Systemd),
+            ("posix", Backend::Posix),
+        ] {
+            assert_eq!(
+                select_backend(None, Some(OsStr::new(text))),
+                Ok((backend, SelectionSource::Environment))
+            );
+            for flag in [Backend::Auto, Backend::Posix, Backend::Systemd] {
+                assert_eq!(
+                    select_backend(Some(flag), Some(OsStr::new(text))),
+                    Ok((flag, SelectionSource::Flag))
+                );
+                assert_eq!(
+                    select_backend(Some(flag), Some(OsStr::new("malformed"))),
+                    Ok((flag, SelectionSource::Flag))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_backend_environment_refuses() {
+        for text in [
+            "",
+            "SYSTEMD",
+            " systemd",
+            "systemd ",
+            "systemd|posix",
+            "invalid",
+        ] {
+            assert!(select_backend(None, Some(OsStr::new(text))).is_err());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            assert!(select_backend(None, Some(OsStr::from_bytes(b"\xff"))).is_err());
+        }
+    }
+
+    #[test]
+    fn automatic_never_selects_systemd_and_finite_data_stays_posix() {
+        assert_eq!(
+            selected_backend(Profile::FiniteData, Backend::Auto),
+            Ok(Backend::Posix)
+        );
+        for profile in [Profile::PythonReference, Profile::GroupResources] {
+            assert_eq!(
+                selected_backend(profile, Backend::Auto),
+                Err(EXPLICIT_BACKEND_REQUIRED.into())
+            );
+            assert_eq!(
+                selected_backend(profile, Backend::Systemd),
+                Ok(Backend::Systemd)
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn explicit_result_uses_supervisor_selection_and_preserves_semantics() {
+        let original = serde_json::json!({"receipt":{"canonical":"unchanged"},"authority":"none","containment":{"selection_source":"worker"}});
+        let bytes = test_ok(serde_json::to_vec(&original));
+        let wrapped = test_ok(label_systemd_output(
+            &bytes,
+            Profile::PythonReference,
+            SelectionSource::Environment,
+            serde_json::json!({"caller_nice":3}),
+        ));
+        let result: serde_json::Value = test_ok(serde_json::from_slice(&wrapped));
+        assert_eq!(result["receipt"], original["receipt"]);
+        assert_eq!(result["authority"], "none");
+        assert_eq!(result["containment"]["selection_source"], "environment");
+        assert_eq!(result["containment"]["observations"]["caller_nice"], 3);
+        assert_eq!(
+            result["containment"]["residuals"].as_array().map(Vec::len),
+            Some(3)
+        );
+        for bad in [b"not-json".as_slice(), b"[]", b"{}{}"] {
+            assert!(
+                label_systemd_output(
+                    bad,
+                    Profile::PythonReference,
+                    SelectionSource::Flag,
+                    serde_json::Value::Null
+                )
+                .is_err()
+            );
+        }
+    }
+}
+
+/// Operational supervisor evidence; worker fields cannot select a backend or
+/// grant receipt authority. Canonical semantic receipt bytes stay untouched.
+#[cfg(target_os = "linux")]
+fn label_systemd_output(
+    bytes: &[u8],
+    profile: Profile,
+    source: SelectionSource,
+    observations: serde_json::Value,
+) -> Result<Vec<u8>, String> {
+    let mut result: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| "containment-output-not-json".to_owned())?;
+    if !result.is_object() {
+        return Err("containment-output-not-object".into());
+    }
+    result["backend"] = serde_json::json!("systemd");
+    result["required_profile"] = serde_json::json!(profile);
+    result["containment"] = serde_json::json!({
+        "schema":"zeno-fcis/containment-result/1", "backend":"systemd",
+        "required_profile":profile, "selection_source":source,
+        "evidence":"explicit-systemd-resource-readback", "observations":observations,
+        "residuals":["sibling-service-does-not-inherit-caller-sandbox-or-cgroup-hierarchy",
+            "detached-work-and-existing-caller-usage-are-not-jointly-charged",
+            "copied-cpu-ratio-and-period-do-not-preserve-every-ancestor-burst-limit"]
+    });
+    let mut bytes = serde_json::to_vec(&result).map_err(|e| e.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+pub(crate) const STAGE_CPU_RESOLUTION: &str = "stage-cpu-resolution";
 const STAGING: &str = "ZENO_FCIS_CHECKER_STAGING";
 #[cfg(target_os = "linux")]
 const MAX_STAGED_RECEIPTS: usize = 16;
-/// Shell diagnostic only: neither field supplies a verdict or cleanup authority.
-#[derive(Debug, Eq, PartialEq)]
-struct SupervisorFailure {
+/// Shell diagnostics supply neither a verdict nor cleanup authority.
+#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SupervisorFailure {
     reason: String,
     cleanup: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    selection_source: Option<SelectionSource>,
 }
 impl From<String> for SupervisorFailure {
     fn from(reason: String) -> Self {
         Self {
             reason,
             cleanup: None,
+            selection_source: None,
         }
     }
 }
@@ -36,6 +234,7 @@ impl SupervisorFailure {
         Self {
             reason: primary.unwrap_or_else(|| "process-group-cleanup-incomplete".into()),
             cleanup: Some(physical),
+            selection_source: None,
         }
     }
     fn report(&self, offline: bool) -> serde_json::Value {
@@ -202,12 +401,23 @@ mod linux {
     const UNIT: &str = "ZENO_FCIS_CHECKER_UNIT";
     const CALLER_CPUS: &str = "ZENO_FCIS_CHECKER_CPUS";
     const CALLER_NICE: &str = "ZENO_FCIS_CHECKER_NICE";
+    const CALLER_SCHEDULER: &str = "ZENO_FCIS_CHECKER_SCHEDULER";
+    const CALLER_PRIORITY: &str = "ZENO_FCIS_CHECKER_PRIORITY";
+    const CALLER_QUOTA: &str = "ZENO_FCIS_CHECKER_QUOTA";
+    const CALLER_PERIOD: &str = "ZENO_FCIS_CHECKER_PERIOD";
+    const CALLER_LIMITS: &str = "ZENO_FCIS_CHECKER_LIMITS";
+    use super::limits::{CpuQuota, Scheduler};
     /// The control channel is the inherited standard input socket. It has no
     /// file system name, so TMPDIR length and other same-user processes
     /// cannot reach it; SO_PEERCRED of a socket pair names only its creator.
     const STDIN_CHANNEL: &str = "stdin";
     const OUTPUT_LIMIT: usize = 1024 * 1024;
     const MEMORY: u64 = 64 * 1024 * 1024;
+    // Host5: 30 idle +30 eight-burner same-core startups all passed; standalone
+    // manager loaded p95=98ms, max=128ms. Keep 5s (~39x observed max) for
+    // manager/scheduling/I/O tails; finite samples are no worst-case guarantee.
+    // This ceiling remains inside the unchanged whole-worker deadline.
+    const STARTUP_MANAGER_QUERY_BUDGET: Duration = Duration::from_secs(5);
     const STARTUP_HELLO: u8 = 0xA0;
     const STARTUP_ACK: u8 = 0xA1;
     const CHECK_STAGE: u8 = 1;
@@ -215,10 +425,6 @@ mod linux {
     const FINISH_STAGE: u8 = 3;
     const RECEIPT_HANDOVER: u8 = 4;
     const EXIT_REPORT: u8 = 5;
-    /// The child's own deadline starts before it requests a stage; the
-    /// supervisor kills only this long after the requested stage ends, so a
-    /// cooperative stop is recorded with its progress instead of a kill.
-    const STAGE_GRACE: Duration = Duration::from_secs(1);
     /// Whole-run caps from spawn: each deadline ceiling (60 s offline, the
     /// loop's 20 s session) plus a margin for startup, grace and teardown.
     const OFFLINE_WHOLE: Duration = Duration::from_secs(65);
@@ -239,6 +445,8 @@ mod linux {
         closing: Arc<AtomicBool>,
         monitor: Option<JoinHandle<()>>,
         active: bool,
+        // Poll scheduling hint only; never acceptance or deadline authority.
+        reply_waiting: Arc<AtomicBool>,
     }
 
     fn group() -> Result<PathBuf, String> {
@@ -247,6 +455,9 @@ mod linux {
             .lines()
             .find_map(|s| s.strip_prefix("0::"))
             .ok_or("cgroup-v2-unavailable")?;
+        if !relative.starts_with('/') || relative.split('/').any(|s| matches!(s, "." | "..")) {
+            return Err("cgroup-path-malformed".into());
+        }
         Ok(Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/')))
     }
 
@@ -338,34 +549,72 @@ mod linux {
         if own_nice < caller_nice {
             return Err(format!("nice-escaped:{own_nice}"));
         }
+        if !super::posix::is_worker() {
+            let policy = std::env::var(CALLER_SCHEDULER).map_err(|_| "missing-caller-scheduler")?;
+            let priority = std::env::var(CALLER_PRIORITY).map_err(|_| "missing-caller-priority")?;
+            Scheduler::parse(&policy, &priority)?.verify(scheduler()?)?;
+            let quota = std::env::var(CALLER_QUOTA).map_err(|_| "missing-caller-quota")?;
+            let period = std::env::var(CALLER_PERIOD).map_err(|_| "missing-caller-period")?;
+            let expected = CpuQuota {
+                quota: super::limits::decimal(&quota)?,
+                period: super::limits::decimal(&period)?,
+            };
+            expected.verify(
+                &fs::read_to_string(group()?.join("cpu.max"))
+                    .map_err(|_| "cpu-quota-readback-unavailable")?,
+            )?;
+            let caller_limits =
+                std::env::var(CALLER_LIMITS).map_err(|_| "missing-caller-rlimits")?;
+            let actual_limits = fs::read_to_string("/proc/self/limits")
+                .map_err(|_| "rlimits-readback-unavailable")?;
+            super::limits::verify_service_limits(&caller_limits, &actual_limits)?;
+        }
         Ok(())
     }
 
     fn await_startup_ack(stream: &mut UnixStream) -> Result<(), String> {
+        // Use the same monotonic, post-read deadline gate as POSIX. Restoring
+        // blocking mode precedes monitor installation; no admission is retried.
         stream
-            .set_read_timeout(Some(Duration::from_secs(1)))
-            .map_err(|e| format!("startup-ack-timeout: {e}"))?;
-        let mut byte = [0];
+            .set_nonblocking(true)
+            .map_err(|e| format!("startup-ack-mode:{e}"))?;
+        let result = super::posix::await_startup_ack(stream).map_err(|e| {
+            if e == "startup-ack-unavailable:deadline" {
+                "startup-ack-timeout:deadline".into()
+            } else {
+                e
+            }
+        });
         stream
-            .read_exact(&mut byte)
-            .map_err(|e| format!("startup-ack-unavailable: {e}"))?;
-        if byte[0] != STARTUP_ACK {
-            return Err("wrong-startup-ack".into());
+            .set_nonblocking(false)
+            .map_err(|e| format!("startup-ack-mode-reset:{e}"))?;
+        result
+    }
+
+    fn write_control(stream: &mut UnixStream, bytes: &[u8], posix: bool) -> Result<(), String> {
+        if posix {
+            super::posix::write_protocol(stream, bytes)
+        } else {
+            stream.write_all(bytes).map_err(|e| e.to_string())
         }
-        stream
-            .set_read_timeout(None)
-            .map_err(|e| format!("startup-ack-timeout-reset: {e}"))
     }
 
     pub(super) fn child() -> Result<bool, String> {
+        if CLIENT.get().is_some() {
+            return Ok(true);
+        }
         let Some(channel) = std::env::var_os(CONTROL) else {
             return Ok(false);
         };
         if channel != STDIN_CHANNEL {
             return Err("unknown-control-channel".into());
         }
-        let unit = std::env::var(UNIT).map_err(|_| "missing-contained-unit")?;
-        verify_group(&group()?, &unit)?;
+        if super::posix::is_worker() {
+            super::posix::verify_worker()?;
+        } else {
+            let unit = std::env::var(UNIT).map_err(|_| "missing-contained-unit")?;
+            verify_group(&group()?, &unit)?;
+        }
         verify_scheduling()?;
         // A duplicate of the inherited socket; a non-socket fails below.
         let mut writer = UnixStream::from(
@@ -374,18 +623,29 @@ mod linux {
                 .try_clone_to_owned()
                 .map_err(|e| e.to_string())?,
         );
-        writer
-            .set_write_timeout(Some(Duration::from_secs(1)))
-            .map_err(|e| e.to_string())?;
-        writer
-            .write_all(&[STARTUP_HELLO])
-            .map_err(|e| e.to_string())?;
+        let posix = super::posix::is_worker();
+        if posix {
+            writer
+                .set_nonblocking(true)
+                .map_err(|e| format!("control-nonblocking:{e}"))?;
+        } else {
+            writer
+                .set_write_timeout(Some(Duration::from_secs(1)))
+                .map_err(|e| e.to_string())?;
+        }
+        write_control(&mut writer, &[STARTUP_HELLO], posix)?;
         // Do not start the monitor or application until the parent has recorded
         // and validated the actual group. Fast refusal must not outrun custody.
-        await_startup_ack(&mut writer)?;
+        if posix {
+            super::posix::await_startup_ack(&mut writer)?;
+        } else {
+            await_startup_ack(&mut writer)?;
+        }
         let mut reader = writer.try_clone().map_err(|e| e.to_string())?;
         let closing = Arc::new(AtomicBool::new(false));
         let watch = Arc::clone(&closing);
+        let reply_waiting = Arc::new(AtomicBool::new(false));
+        let waiting = Arc::clone(&reply_waiting);
         let (tx, replies) = mpsc::sync_channel(1);
         // Parent death closes the control socket. Exit the execution process,
         // causing systemd's KillMode=control-group to terminate descendants.
@@ -395,12 +655,36 @@ mod linux {
             .spawn(move || {
                 loop {
                     let mut byte = [0];
-                    if reader.read_exact(&mut byte).is_err() {
+                    let read = reader.read_exact(&mut byte);
+                    if posix
+                        && read
+                            .as_ref()
+                            .is_err_and(|e| e.kind() == std::io::ErrorKind::WouldBlock)
+                    {
+                        if watch.load(Ordering::Acquire) {
+                            break;
+                        }
+                        // Keep idle monitoring from manufacturing CPU progress
+                        // in a hung stage. An exchange unparks this thread and
+                        // marks the pending reply, retaining fast2ms polling
+                        // while that reply is outstanding. No socket options,
+                        // new descriptor or sandbox network capability needed.
+                        std::thread::park_timeout(Duration::from_millis(
+                            if waiting.load(Ordering::Acquire) {
+                                2
+                            } else {
+                                100
+                            },
+                        ));
+                        continue;
+                    }
+                    if read.is_err() {
                         if !watch.load(Ordering::Acquire) {
                             std::process::exit(crate::BLOCKED.into());
                         }
                         break;
                     }
+                    waiting.store(false, Ordering::Release);
                     if tx.try_send(byte[0]).is_err() {
                         if !watch.load(Ordering::Acquire) {
                             std::process::exit(crate::BLOCKED.into());
@@ -417,6 +701,7 @@ mod linux {
                 closing,
                 monitor: Some(monitor),
                 active: false,
+                reply_waiting,
             }))
             .map_err(|_| "duplicate-control-client")?;
         Ok(true)
@@ -435,12 +720,29 @@ mod linux {
         if (kind == FINISH_STAGE) != client.active {
             return Err("control-stage-order".into());
         }
+        if matches!(kind, CHECK_STAGE | SEARCH_STAGE) && value != 0 && super::posix::is_worker() {
+            // Refusal only, after protocol-order validation and before any
+            // START frame or client-state change. The supervisor checks
+            // admission independently. Zero keeps its stage-limit refusal.
+            super::stage_budget::check_posix_resolution(value)?;
+        }
         let mut frame = [0; 9];
         frame[0] = kind;
         frame[1..].copy_from_slice(&value.to_be_bytes());
-        client.writer.write_all(&frame).map_err(|e| e.to_string())?;
-        match client.replies.recv_timeout(Duration::from_secs(1)) {
-            Ok(1) => {
+        client.reply_waiting.store(true, Ordering::Release);
+        if let Some(monitor) = &client.monitor {
+            monitor.thread().unpark();
+        }
+        write_control(&mut client.writer, &frame, super::posix::is_worker())?;
+        // A peer can be descheduled outside the accounted cgroup. Use the
+        // bounded control/ACK wait, not a one-second scheduling assumption.
+        // The independent supervisor still kills at worker25s/offline65s.
+        let reply_end = Instant::now() + super::posix::STARTUP_ACK_BUDGET;
+        match client
+            .replies
+            .recv_timeout(super::posix::STARTUP_ACK_BUDGET)
+        {
+            Ok(1) if Instant::now() < reply_end => {
                 client.active = matches!(kind, CHECK_STAGE | SEARCH_STAGE);
                 Ok(())
             }
@@ -483,6 +785,9 @@ mod linux {
             && let Ok(mut c) = client.lock()
         {
             c.closing.store(true, Ordering::Release);
+            if let Some(monitor) = &c.monitor {
+                monitor.thread().unpark();
+            }
             let _ = c.writer.shutdown(std::net::Shutdown::Both);
             if let Some(monitor) = c.monitor.take() {
                 let deadline = Instant::now() + Duration::from_secs(1);
@@ -594,14 +899,14 @@ mod linux {
     }
 
     /// Own the output socket and its bytes without a blocking reader thread.
-    struct CapturedOutput {
-        stream: UnixStream,
-        bytes: Vec<u8>,
+    pub(super) struct CapturedOutput {
+        pub(super) stream: UnixStream,
+        pub(super) bytes: Vec<u8>,
         limit: usize,
-        closed: bool,
+        pub(super) closed: bool,
     }
     impl CapturedOutput {
-        fn new(limit: usize) -> Result<(Self, Stdio), String> {
+        pub(super) fn new(limit: usize) -> Result<(Self, Stdio), String> {
             let capacity = limit.checked_add(1).ok_or("contained-output-cap")?;
             let (stream, writer) = UnixStream::pair().map_err(|e| e.to_string())?;
             stream.set_nonblocking(true).map_err(|e| e.to_string())?;
@@ -617,7 +922,7 @@ mod linux {
             ))
         }
 
-        fn read_available(&mut self, deadline: Instant) -> Result<(), String> {
+        pub(super) fn read_available(&mut self, deadline: Instant) -> Result<(), String> {
             if self.bytes.len() > self.limit {
                 return Err("contained-output-cap".into());
             }
@@ -657,7 +962,7 @@ mod linux {
         }
     }
 
-    fn reap_before(child: &mut Child, deadline: Instant) -> Result<(), String> {
+    pub(super) fn reap_before(child: &mut Child, deadline: Instant) -> Result<(), String> {
         loop {
             if child.try_wait().map_err(|e| e.to_string())?.is_some() {
                 return Ok(());
@@ -669,7 +974,7 @@ mod linux {
         }
     }
 
-    fn control_process(
+    pub(super) fn control_process(
         mut command: Command,
         deadline: Instant,
         limit: usize,
@@ -720,13 +1025,16 @@ mod linux {
         result
     }
 
-    fn manager(args: &[&str], deadline: Instant) -> Result<std::process::Output, String> {
+    pub(super) fn manager(
+        args: &[&str],
+        deadline: Instant,
+    ) -> Result<std::process::Output, String> {
         let mut command = Command::new("/usr/bin/systemctl");
         command.args(args);
         control_process(command, deadline, 8192)
     }
 
-    fn unit_loaded(output: &std::process::Output) -> Result<bool, String> {
+    pub(super) fn unit_loaded(output: &std::process::Output) -> Result<bool, String> {
         if !output.status.success() {
             return Err("manager-status-unavailable".into());
         }
@@ -839,6 +1147,7 @@ mod linux {
 
     struct OwnedUnit {
         child: Child,
+        posix: bool,
         unit: String,
         finished: bool,
         group: Option<PathBuf>,
@@ -846,7 +1155,19 @@ mod linux {
         cleanup_error: Option<String>,
     }
     impl OwnedUnit {
+        fn poll_exit(&mut self) -> Result<Option<std::process::ExitStatus>, String> {
+            if self.posix {
+                super::posix::poll_child(&self.child)
+            } else {
+                self.child.try_wait().map_err(|e| e.to_string())
+            }
+        }
         fn terminate(&mut self) {
+            if self.posix {
+                self.cleanup_error = super::posix::terminate(&mut self.child).err();
+                self.finished = true;
+                return;
+            }
             // Stopped before custody: learn the group, if the unit has one,
             // so its members can still be confirmed gone after the kill.
             if self.group.is_none()
@@ -911,76 +1232,14 @@ mod linux {
         }
     }
 
-    /// Respect the effective enclosing qualification quota when creating a
-    /// systemd sibling unit. A four-CPU benchmark therefore needs a four-CPU
-    /// parent allocation; the ordinary AUX lane remains one CPU.
-    fn quota_percent(text: &str) -> Result<Option<u64>, String> {
-        let fields: Vec<_> = text.split_whitespace().collect();
-        if fields.len() != 2 {
-            return Err("caller-cpu-quota-malformed".into());
-        }
-        let period = fields[1]
-            .parse::<u64>()
-            .ok()
-            .filter(|v| *v != 0)
-            .ok_or("caller-cpu-quota-malformed")?;
-        if fields[0] == "max" {
-            return Ok(None);
-        }
-        let quota = fields[0]
-            .parse::<u64>()
-            .ok()
-            .filter(|v| *v != 0)
-            .ok_or("caller-cpu-quota-malformed")?;
-        // Integer percentages round down conservatively. Refuse a quota
-        // smaller than our representable unit rather than rounding it up.
-        let percent = u128::from(quota) * 100 / u128::from(period);
-        if percent == 0 {
-            return Err("caller-cpu-quota-below-one-percent".into());
-        }
-        Ok(Some(u64::try_from(percent).unwrap_or(u64::MAX)))
+    pub(super) fn cpu_quota(workers: u64) -> Result<CpuQuota, String> {
+        super::limits::chain_quota(Path::new("/sys/fs/cgroup"), group()?, workers)
     }
 
-    fn cpu_percent(workers: u64) -> Result<u64, String> {
-        let path = group().map_err(|error| format!("caller-cpu-quota-unavailable:{error}"))?;
-        chain_percent(Path::new("/sys/fs/cgroup"), path, workers)
-    }
-
-    /// The tightest `cpu.max` from the caller's group up to the cgroup-v2
-    /// root, which has none. A group without the cpu controller has no
-    /// `cpu.max` and inherits its ancestors' limits; a missing group, or an
-    /// unreadable or malformed limit, refuses.
-    fn chain_percent(root: &Path, mut path: PathBuf, workers: u64) -> Result<u64, String> {
-        let mut percent = workers.clamp(1, 8) * 100;
-        while path != root {
-            if !path.starts_with(root) {
-                return Err("caller-cpu-quota-group-outside-root".into());
-            }
-            if !path.join("cgroup.procs").is_file() {
-                return Err(format!(
-                    "caller-cpu-quota-unavailable:{}:not a cgroup",
-                    path.display()
-                ));
-            }
-            match fs::read_to_string(path.join("cpu.max")) {
-                Ok(text) => {
-                    if let Some(quota) = quota_percent(&text)? {
-                        percent = percent.min(quota);
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(format!(
-                        "caller-cpu-quota-unavailable:{}:{error}",
-                        path.display()
-                    ));
-                }
-            }
-            if !path.pop() {
-                return Err("caller-cpu-quota-group-outside-root".into());
-            }
-        }
-        Ok(percent)
+    pub(super) fn scheduler() -> Result<Scheduler, String> {
+        Scheduler::read(
+            &fs::read_to_string("/proc/self/stat").map_err(|_| "cpu-scheduler-unreadable")?,
+        )
     }
 
     /// Where the contained run may stage and, for an offline check, the
@@ -990,17 +1249,78 @@ mod linux {
         pub(super) receipt: Option<&'a Path>,
     }
 
+    /// Public CLI calls supply a result label; raw protocol tests may omit it.
+    /// This diagnostic option never gates resource carry or startup readback.
     pub(super) fn supervise(
         args: &[std::ffi::OsString],
         offline: bool,
         workers: u64,
         receipts: Receipts<'_>,
+        result_label: Option<(super::Profile, super::SelectionSource)>,
     ) -> Result<u8, super::SupervisorFailure> {
-        watch_signals()?;
+        supervise_backend(args, offline, workers, receipts, None, result_label)
+    }
+
+    pub(super) fn supervise_posix(
+        args: &[std::ffi::OsString],
+        receipts: Receipts<'_>,
+        guardian: &mut super::posix::Guardian,
+    ) -> Result<u8, super::SupervisorFailure> {
+        supervise_backend(args, false, 4, receipts, Some(guardian), None)
+    }
+
+    /// The caller exclusively owns this unspawned command. Arguments are owned
+    /// copies; this preparation grants neither admission nor startup authority.
+    fn carry_service_limits(child: &mut Command, caller: &str) -> Result<(), String> {
+        child
+            .args(super::limits::limit_properties(caller)?)
+            .arg(format!("--setenv={CALLER_LIMITS}={caller}"));
+        Ok(())
+    }
+
+    fn supervise_backend(
+        args: &[std::ffi::OsString],
+        offline: bool,
+        workers: u64,
+        receipts: Receipts<'_>,
+        mut guardian: Option<&mut super::posix::Guardian>,
+        result_label: Option<(super::Profile, super::SelectionSource)>,
+    ) -> Result<u8, super::SupervisorFailure> {
+        let is_posix = guardian.is_some();
+        let mut timing = super::diagnostics::Record::new(
+            "worker-supervisor",
+            if is_posix { "posix" } else { "systemd" },
+        );
+        let preparation = Instant::now();
+        let setup_error = |error: String| {
+            if is_posix && !error.starts_with("containment-unavailable:") {
+                super::Unavailable {
+                    backend: super::Backend::Posix,
+                    missing: error,
+                }
+                .to_string()
+            } else {
+                error
+            }
+        };
+        watch_signals().map_err(setup_error)?;
         interrupted()?;
         let sequence = crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let (caller_cpus, caller_nice) = scheduling()?;
-        let cpu_quota = cpu_percent(workers)?;
+        let (caller_cpus, caller_nice) = scheduling().map_err(setup_error)?;
+        let cpu_quota = if is_posix {
+            None
+        } else {
+            Some(cpu_quota(workers)?)
+        };
+        let caller_scheduler = if is_posix { None } else { Some(scheduler()?) };
+        let caller_limits = if !is_posix {
+            let limits = fs::read_to_string("/proc/self/limits")
+                .map_err(|_| "caller-rlimits-unreadable".to_owned())?;
+            super::limits::limit_properties(&limits)?;
+            Some(limits)
+        } else {
+            None
+        };
         let mut dir = Directory {
             staging: None,
             writers_gone: true,
@@ -1025,52 +1345,110 @@ mod linux {
         let whole = if offline { OFFLINE_WHOLE } else { LOOP_WHOLE };
         let (mut stdout, output) = CapturedOutput::new(OUTPUT_LIMIT)?;
         let (mut stderr, errors) = CapturedOutput::new(8192)?;
-        let mut child = Command::new("/usr/bin/systemd-run");
+        let mut child = if is_posix {
+            super::posix::worker_command(
+                &executable,
+                args,
+                dir.staging.as_deref(),
+                &caller_cpus,
+                caller_nice,
+            )
+        } else {
+            let cpu_quota = cpu_quota.ok_or_else(|| "cpu-quota-unavailable".to_owned())?;
+            let caller_scheduler =
+                caller_scheduler.ok_or_else(|| "cpu-scheduler-unavailable".to_owned())?;
+            let mut child = Command::new("/usr/bin/systemd-run");
+            child
+                .args(cpu_quota.properties()?)
+                .args(caller_scheduler.properties());
+            if let Some(limits) = &caller_limits {
+                carry_service_limits(&mut child, limits)?;
+            }
+            child
+                .args(["--user", "--wait", "--pipe", "--quiet"])
+                .arg("--working-directory")
+                .arg(std::env::current_dir().map_err(|e| e.to_string())?)
+                .arg(format!("--unit={unit}"))
+                .args([
+                    "--property=MemoryMax=64M",
+                    "--property=MemorySwapMax=0",
+                    "--property=TasksMax=64",
+                    "--property=KillMode=control-group",
+                    "--property=TimeoutStopSec=1",
+                ])
+                .arg(format!("--property=RuntimeMaxSec={}", whole.as_secs() + 2))
+                // The user manager would otherwise run the child on every CPU
+                // at its own priority, outside the caller's scheduling policy.
+                .arg(format!("--property=CPUAffinity={caller_cpus}"))
+                .arg(format!("--setenv={CONTROL}={STDIN_CHANNEL}"))
+                .arg(format!("--setenv={UNIT}={unit}"))
+                .arg(format!(
+                    "--setenv={CALLER_SCHEDULER}={}",
+                    caller_scheduler.policy
+                ))
+                .arg(format!(
+                    "--setenv={CALLER_PRIORITY}={}",
+                    caller_scheduler.priority
+                ))
+                .arg(format!("--setenv={CALLER_QUOTA}={}", cpu_quota.quota))
+                .arg(format!("--setenv={CALLER_PERIOD}={}", cpu_quota.period))
+                .arg(format!("--setenv={CALLER_CPUS}={caller_cpus}"))
+                .arg(format!("--setenv={CALLER_NICE}={}", caller_nice.max(0)));
+            if caller_nice > 0 {
+                child.arg(format!("--property=Nice={caller_nice}"));
+            }
+            if let Some(staging) = &dir.staging {
+                child.arg(format!("--setenv={}={}", super::STAGING, staging.display()));
+            }
+            child.arg(executable).args(args);
+            child
+        };
         child
-            .args(["--user", "--wait", "--pipe", "--quiet"])
-            .arg("--working-directory")
-            .arg(std::env::current_dir().map_err(|e| e.to_string())?)
-            .arg(format!("--unit={unit}"))
-            .args([
-                "--property=MemoryMax=64M",
-                "--property=MemorySwapMax=0",
-                "--property=TasksMax=64",
-                "--property=KillMode=control-group",
-                "--property=TimeoutStopSec=1",
-            ])
-            .arg(format!("--property=RuntimeMaxSec={}", whole.as_secs() + 2))
-            .arg(format!("--property=CPUQuota={cpu_quota}%"))
-            // The user manager would otherwise run the child on every CPU
-            // at its own priority, outside the caller's scheduling policy.
-            .arg(format!("--property=CPUAffinity={caller_cpus}"))
-            .arg(format!("--setenv={CONTROL}={STDIN_CHANNEL}"))
-            .arg(format!("--setenv={UNIT}={unit}"))
-            .arg(format!("--setenv={CALLER_CPUS}={caller_cpus}"))
-            .arg(format!("--setenv={CALLER_NICE}={}", caller_nice.max(0)));
-        if caller_nice > 0 {
-            child.arg(format!("--property=Nice={caller_nice}"));
-        }
-        if let Some(staging) = &dir.staging {
-            child.arg(format!("--setenv={}={}", super::STAGING, staging.display()));
-        }
-        child
-            .arg(executable)
-            .args(args)
             .stdin(Stdio::from(std::os::fd::OwnedFd::from(channel)))
             .stdout(output)
             .stderr(errors);
+        timing.duration("preparation_ms", preparation);
+        timing.set(
+            "worker_budget_ms",
+            serde_json::json!(whole.as_millis() as u64),
+        );
+        timing.set(
+            "ack_budget_ms",
+            serde_json::json!(super::posix::STARTUP_ACK_BUDGET.as_millis() as u64),
+        );
+        timing.set(
+            "manager_query_budget_ms",
+            serde_json::json!(STARTUP_MANAGER_QUERY_BUDGET.as_millis() as u64),
+        );
         let started = Instant::now();
         let end = started + whole;
         let mut owned = OwnedUnit {
-            child: child
-                .spawn()
-                .map_err(|e| format!("containment-unavailable:systemd-run:{e}"))?,
+            posix: is_posix,
+            child: child.spawn().map_err(|e| {
+                format!(
+                    "containment-unavailable:{}:{e}",
+                    if is_posix {
+                        "posix:launch"
+                    } else {
+                        "systemd-run"
+                    }
+                )
+            })?,
             unit,
             finished: false,
             group: None,
             members: Vec::new(),
             cleanup_error: None,
         };
+        timing.set("worker_pid", serde_json::json!(owned.child.id()));
+        timing.set(
+            "worker_start_ticks",
+            serde_json::json!(super::diagnostics::process_start_ticks(owned.child.id())),
+        );
+        timing.set("unit", serde_json::json!(owned.unit));
+        if let Some(g) = guardian.as_mut() {
+            g.spawned(owned.child.id());
+        }
         // Command owns the child's socket end; only the unit may keep it.
         drop(child);
         dir.writers_gone = false;
@@ -1078,52 +1456,77 @@ mod linux {
         let mut frame = [0; 9];
         let mut used = 0;
         let mut frames = 0;
-        let mut active: Option<Instant> = None;
+        let mut active: Option<super::stage_budget::StageBudget> = None;
+        let mut stage_observations = Vec::new();
         let mut terminal = false;
         let mut handed_over: Option<u64> = None;
         let mut reported: Option<u8> = None;
         let result: Result<u8, String> = (|| {
             loop {
+                if let Some(g) = guardian.as_mut() {
+                    g.check_caller()?;
+                }
                 interrupted()?;
                 let now = Instant::now();
-                if now >= end || active.is_some_and(|deadline| now >= deadline) {
+                if now >= end {
                     return Err("contained-deadline".into());
                 }
-                let output_deadline = active.unwrap_or(end).min(end);
+                if let Some(stage) = active.as_mut() {
+                    stage.check(now)?;
+                }
+                let output_deadline = active.as_ref().map_or(end, |s| s.wall_deadline()).min(end);
                 stdout.read_available(output_deadline)?;
                 stderr.read_available(output_deadline)?;
                 if !connected {
                     let mut hello = [0];
                     match control.read(&mut hello) {
                         Ok(1) if hello[0] == STARTUP_HELLO => {
-                            let shown = manager(
-                                &[
-                                    "--user",
-                                    "show",
-                                    "--property=ControlGroup",
-                                    "--value",
-                                    &owned.unit,
-                                ],
-                                end.min(Instant::now() + Duration::from_secs(1)),
-                            )?;
-                            let relative = String::from_utf8(shown.stdout)
-                                .map_err(|_| "invalid-control-group")?;
-                            if !shown.status.success() || !relative.trim().starts_with('/') {
-                                return Err("control-group-unavailable".into());
+                            let custody = Instant::now();
+                            timing.duration("hello_observed_ms", started);
+                            if let Some(g) = guardian.as_mut() {
+                                g.accept(&owned.child).map_err(setup_error)?;
+                            } else {
+                                let query_started = Instant::now();
+                                let shown = manager(
+                                    &[
+                                        "--user",
+                                        "show",
+                                        "--property=ControlGroup",
+                                        "--value",
+                                        &owned.unit,
+                                    ],
+                                    end.min(query_started + STARTUP_MANAGER_QUERY_BUDGET),
+                                );
+                                timing.duration("manager_query_ms", query_started);
+                                let shown = shown.map_err(|e| {
+                                    if matches!(
+                                        e.as_str(),
+                                        "control-process-deadline" | "contained-output-deadline"
+                                    ) {
+                                        "manager-query-deadline".into()
+                                    } else {
+                                        format!("manager-query:{e}")
+                                    }
+                                })?;
+                                let relative = String::from_utf8(shown.stdout)
+                                    .map_err(|_| "invalid-control-group")?;
+                                if !shown.status.success() || !relative.trim().starts_with('/') {
+                                    return Err("control-group-unavailable".into());
+                                }
+                                let actual_group = owned.group.insert(
+                                    Path::new("/sys/fs/cgroup")
+                                        .join(relative.trim().trim_start_matches('/')),
+                                );
+                                verify_group(actual_group, &owned.unit)?;
                             }
-                            let actual_group = owned.group.insert(
-                                Path::new("/sys/fs/cgroup")
-                                    .join(relative.trim().trim_start_matches('/')),
-                            );
-                            verify_group(actual_group, &owned.unit)?;
                             if Instant::now() >= end {
                                 return Err("contained-deadline".into());
                             }
                             // Record custody before ACK, including on a failed write.
-                            control
-                                .write_all(&[STARTUP_ACK])
-                                .map_err(|e| e.to_string())?;
+                            write_control(&mut control, &[STARTUP_ACK], is_posix)?;
                             connected = true;
+                            timing.duration("startup_custody_ms", custody);
+                            timing.duration("ack_sent_ms", started);
                         }
                         Ok(0) => {}
                         Ok(_) => return Err("wrong-startup-hello".into()),
@@ -1162,19 +1565,29 @@ mod linux {
                                         if value == 0 || value > cap {
                                             return Err("stage-limit".into());
                                         }
-                                        active = Some(
-                                            (Instant::now()
-                                                + Duration::from_millis(value)
-                                                + STAGE_GRACE)
-                                                .min(end),
-                                        );
+                                        active = Some(super::stage_budget::StageBudget::new(
+                                            if frame[0] == SEARCH_STAGE {
+                                                "search"
+                                            } else {
+                                                "check"
+                                            },
+                                            value,
+                                            started,
+                                            end,
+                                            offline,
+                                            if is_posix {
+                                                Some(owned.child.id())
+                                            } else {
+                                                None
+                                            },
+                                            owned.group.as_deref(),
+                                        )?);
                                         terminal = false;
                                     }
                                     FINISH_STAGE if active.is_some() && value == 0 => {
-                                        if active.is_some_and(|deadline| Instant::now() >= deadline)
-                                        {
-                                            return Err("contained-deadline".into());
-                                        }
+                                        let stage = active.as_mut().ok_or("control-stage-order")?;
+                                        stage.finish()?;
+                                        stage_observations.push(stage.observation(true));
                                         active = None;
                                         terminal = true;
                                     }
@@ -1193,14 +1606,31 @@ mod linux {
                                     }
                                     _ => return Err("control-stage-order".into()),
                                 }
-                                control.write_all(&[1]).map_err(|e| e.to_string())?;
+                                write_control(&mut control, &[1], is_posix)?;
+                                if let Some(stage) = active.as_mut() {
+                                    stage.permitted();
+                                }
                             }
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                         Err(e) => return Err(e.to_string()),
                     }
                 }
-                if let Some(status) = owned.child.try_wait().map_err(|e| e.to_string())? {
+                // Read protocol progress before deciding that the stage is idle.
+                // A queued FINISH still pays CPU/rounding and absolute wall caps.
+                if let Some(stage) = active.as_mut()
+                    && let Err(reason) = stage.check_progress()
+                {
+                    timing.set(
+                        "idle_waiters",
+                        super::diagnostics::waiters(owned.group.as_deref(), owned.child.id()),
+                    );
+                    return Err(reason);
+                }
+                if let Some(status) = owned.poll_exit()? {
+                    if let Some(g) = guardian.as_mut() {
+                        g.observe_exit(status);
+                    }
                     if active.is_some() {
                         return Err(format!(
                             "worker-{}-during-stage",
@@ -1209,7 +1639,11 @@ mod linux {
                     }
                     if !connected {
                         let _ = stderr.read_available(Instant::now() + Duration::from_millis(100));
-                        return Err(startup_failure(&stderr.excerpt(), status));
+                        return Err(if is_posix {
+                            format!("containment-unavailable:posix:startup:{}", stderr.excerpt())
+                        } else {
+                            startup_failure(&stderr.excerpt(), status)
+                        });
                     }
                     // Non-checking loop commands may finish with no stage.
                     if offline && !terminal {
@@ -1221,7 +1655,21 @@ mod linux {
                 std::thread::sleep(Duration::from_millis(2));
             }
         })();
-        if result.is_err() {
+        if let Some(stage) = active.as_ref() {
+            stage_observations.push(stage.observation(false));
+        }
+        timing.set(
+            "stage_clock",
+            serde_json::json!("monotonic-ms-from-worker-spawn; CPU-microseconds"),
+        );
+        timing.set("stages", serde_json::json!(stage_observations));
+        timing.duration("worker_observed_ms", started);
+        timing.set("startup_ack_sent", serde_json::json!(connected));
+        timing.set(
+            "supervisor_reason",
+            serde_json::json!(result.as_ref().err()),
+        );
+        if result.is_err() || is_posix {
             owned.terminate();
         } else {
             owned.finished = true;
@@ -1238,42 +1686,61 @@ mod linux {
             }
             Ok::<(), String>(())
         })();
-        let status = manager(
-            &[
-                "--user",
-                "show",
-                "--property=LoadState",
-                "--property=Result",
-                "--property=ExecMainCode",
-                "--property=ExecMainStatus",
-                "--property=MemoryMax",
-                "--property=MemorySwapMax",
-                "--property=TasksMax",
-                "--property=CPUQuotaPerSecUSec",
-                "--property=CPUAffinity",
-                "--property=Nice",
-                &owned.unit,
-            ],
-            Instant::now() + Duration::from_secs(1),
-        );
-        let terminal_state = status
-            .as_ref()
-            .map_err(|error| format!("manager-status-unavailable:{error}"))
-            .and_then(unit_loaded);
-        let mut physical = if terminal_state == Ok(false) {
-            // Properties of an unloaded unit are defaults, not observations
-            // of this invocation's limits or exit. Startup custody, the
-            // child's exit report and the waited code remain checked.
-            "TerminalUnitLoadState=not-found\n".to_owned()
+        let (physical, terminal_state, reset) = if let Some(g) = guardian.as_mut() {
+            dir.writers_gone = owned.cleanup_error.is_none();
+            g.finish(result.as_ref().ok().copied(), dir.writers_gone);
+            g.observe_output(&stdout.bytes)?;
+            (
+                format!(
+                    "PosixOwnedWorker={}\nCleanupError={:?}\nWorkerDiagnostic={}\n",
+                    owned.child.id(),
+                    owned.cleanup_error,
+                    if result.is_err() {
+                        stderr.excerpt()
+                    } else {
+                        String::new()
+                    }
+                ),
+                Ok(false),
+                Ok(()),
+            )
         } else {
-            status
+            let status = manager(
+                &[
+                    "--user",
+                    "show",
+                    "--property=LoadState",
+                    "--property=Result",
+                    "--property=ExecMainCode",
+                    "--property=ExecMainStatus",
+                    "--property=MemoryMax",
+                    "--property=MemorySwapMax",
+                    "--property=TasksMax",
+                    "--property=CPUQuotaPerSecUSec",
+                    "--property=CPUAffinity",
+                    "--property=Nice",
+                    &owned.unit,
+                ],
+                Instant::now() + Duration::from_secs(1),
+            );
+            let terminal_state = status
                 .as_ref()
-                .ok()
-                .filter(|s| s.status.success())
-                .map(|s| String::from_utf8_lossy(&s.stdout).into_owned())
-                .unwrap_or_default()
-        };
-        physical.push_str(&format!(
+                .map_err(|error| format!("manager-status-unavailable:{error}"))
+                .and_then(unit_loaded);
+            let mut physical = if terminal_state == Ok(false) {
+                // Properties of an unloaded unit are defaults, not observations
+                // of this invocation's limits or exit. Startup custody, the
+                // child's exit report and the waited code remain checked.
+                "TerminalUnitLoadState=not-found\n".to_owned()
+            } else {
+                status
+                    .as_ref()
+                    .ok()
+                    .filter(|s| s.status.success())
+                    .map(|s| String::from_utf8_lossy(&s.stdout).into_owned())
+                    .unwrap_or_default()
+            };
+            physical.push_str(&format!(
             "ObservedControlGroup={}\nCallerCpusAllowed={caller_cpus}\nCallerNice={caller_nice}\n",
             owned
                 .group
@@ -1281,51 +1748,55 @@ mod linux {
                 .map(|p| p.display().to_string())
                 .unwrap_or_default()
         ));
-        if let Some(error) = &owned.cleanup_error {
-            physical.push_str(&format!("ControlCleanupError={error}\n"));
-        }
-        let reset = if terminal_state == Ok(false) {
-            Ok(())
-        } else {
-            reset_unit(&owned.unit)
-        };
-        let mut group_gone = false;
-        for _ in 0..100 {
-            group_gone = match &owned.group {
-                Some(group) => !group.exists(),
-                None => unit_stopped(&owned.unit),
+            if let Some(error) = &owned.cleanup_error {
+                physical.push_str(&format!("ControlCleanupError={error}\n"));
+            }
+            let reset = if terminal_state == Ok(false) {
+                Ok(())
+            } else {
+                reset_unit(&owned.unit)
             };
-            if group_gone
+            let mut group_gone = false;
+            for _ in 0..100 {
+                group_gone = match &owned.group {
+                    Some(group) => !group.exists(),
+                    None => unit_stopped(&owned.unit),
+                };
+                if group_gone
+                    && owned
+                        .members
+                        .iter()
+                        .all(|pid| !Path::new("/proc").join(pid.to_string()).exists())
+                {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            #[cfg(test)]
+            {
+                *super::test_ok(LAST_PHYSICAL.lock()) = Some((
+                    owned.unit.clone(),
+                    physical.clone(),
+                    group_gone,
+                    owned.members.clone(),
+                    owned
+                        .members
+                        .iter()
+                        .all(|pid| !Path::new("/proc").join(pid.to_string()).exists()),
+                ));
+            }
+            // Only remove staging after all contained writers have disappeared.
+            // A failure here keeps the public result inconclusive and names it.
+            dir.writers_gone = group_gone
                 && owned
                     .members
                     .iter()
-                    .all(|pid| !Path::new("/proc").join(pid.to_string()).exists())
-            {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        #[cfg(test)]
-        {
-            *super::test_ok(LAST_PHYSICAL.lock()) = Some((
-                owned.unit.clone(),
-                physical.clone(),
-                group_gone,
-                owned.members.clone(),
-                owned
-                    .members
-                    .iter()
-                    .all(|pid| !Path::new("/proc").join(pid.to_string()).exists()),
-            ));
-        }
-        // Only remove staging after all contained writers have disappeared.
-        // A failure here keeps the public result inconclusive and names it.
-        dir.writers_gone = group_gone
-            && owned
-                .members
-                .iter()
-                .all(|pid| !Path::new("/proc").join(pid.to_string()).exists());
+                    .all(|pid| !Path::new("/proc").join(pid.to_string()).exists());
+            (physical, terminal_state, reset)
+        };
+        timing.set("cleanup_verified", serde_json::json!(dir.writers_gone));
         if !dir.writers_gone {
+            timing.set("cleanup_detail", serde_json::json!(physical));
             return Err(super::SupervisorFailure::cleanup(result.err(), physical));
         }
         let accepted = (|| {
@@ -1333,8 +1804,32 @@ mod linux {
             drained?;
             let loaded = terminal_state?;
             reset?;
-            let code = accepted_exit(waited, reported, loaded, &physical)?;
+            let code = if is_posix {
+                if reported != Some(waited) {
+                    return Err(format!(
+                        "exit-report-mismatch:waited={waited},reported={reported:?}"
+                    ));
+                }
+                waited
+            } else {
+                accepted_exit(waited, reported, loaded, &physical)?
+            };
             interrupted()?;
+            // Only supervisor observations label the output, before publication.
+            if let Some((profile, source)) = result_label {
+                let observations = serde_json::json!({
+                    "caller_affinity":caller_cpus,"caller_nice":caller_nice,
+                    "caller_rlimits":caller_limits,
+                    "cpu_quota":cpu_quota.map(|q| (q.quota,q.period)),
+                    "cpu_scheduler":caller_scheduler.map(|s| (s.policy,s.priority)),
+                    "startup_readback":"rlimits-no-looser;scheduler-and-quota-equal"
+                });
+                stdout.bytes =
+                    super::label_systemd_output(&stdout.bytes, profile, source, observations)?;
+                if stdout.bytes.len() > OUTPUT_LIMIT {
+                    return Err("contained-output-cap".to_owned());
+                }
+            }
             match (handed_over, receipts.receipt) {
                 (Some(sequence), Some(receipt)) if code == crate::OK => {
                     dir.publish(sequence, receipt)
@@ -1390,6 +1885,18 @@ mod linux {
         use crate::checker_process::{test_err, test_ok};
 
         #[test]
+        fn systemd_command_carries_every_limit_and_the_same_snapshot() {
+            let caller = super::super::limits::limit_fixture();
+            let mut command = Command::new("/usr/bin/systemd-run");
+            test_ok(carry_service_limits(&mut command, &caller));
+            let arguments: Vec<_> = command.get_args().map(|s| s.to_string_lossy()).collect();
+            assert_eq!(arguments.len(), 17);
+            let properties = test_ok(super::super::limits::limit_properties(&caller));
+            assert_eq!(arguments[..16], properties);
+            assert_eq!(arguments[16], format!("--setenv={CALLER_LIMITS}={caller}"));
+        }
+
+        #[test]
         fn missing_user_manager_is_primary_and_cleanup_is_a_separate_unverified_failure() {
             use std::os::unix::process::ExitStatusExt;
             let primary = startup_failure(
@@ -1425,19 +1932,11 @@ mod linux {
 
         #[test]
         fn caller_cpu_quota_is_explicit_conservative_and_fail_closed() {
-            assert_eq!(test_ok(quota_percent("max 100000")), None);
-            assert_eq!(test_ok(quota_percent("400000 100000")), Some(400));
-            assert_eq!(test_ok(quota_percent("1999 100000")), Some(1));
+            assert_eq!(test_ok(CpuQuota::parse("max 100000")), (None, 100000));
             assert_eq!(
-                test_ok(quota_percent("18446744073709551615 1")),
-                Some(u64::MAX)
+                test_ok(CpuQuota::parse("50000 100000")),
+                (Some(50000), 100000)
             );
-            for text in ["1000 200000", "1000 1000000"] {
-                assert_eq!(
-                    test_err(quota_percent(text)),
-                    "caller-cpu-quota-below-one-percent"
-                );
-            }
             for text in [
                 "",
                 "max",
@@ -1448,79 +1947,63 @@ mod linux {
                 "-1 100000",
                 "oops 100000",
                 "1 2 3",
+                "1000 1000000",
             ] {
-                assert_eq!(
-                    test_err(quota_percent(text)),
-                    "caller-cpu-quota-malformed",
-                    "{text}"
-                );
+                assert!(CpuQuota::parse(text).is_err(), "{text}");
             }
+            let quota = CpuQuota {
+                quota: 50000,
+                period: 100000,
+            };
+            assert_eq!(
+                test_ok(quota.properties()),
+                [
+                    "--property=CPUQuota=50%",
+                    "--property=CPUQuotaPeriodSec=100000us"
+                ]
+            );
+            assert_eq!(quota.verify("50000 100000"), Ok(()));
+            assert!(quota.verify("50000 200000").is_err());
         }
 
         #[test]
         fn a_group_without_the_cpu_controller_inherits_its_ancestors_quota() {
             let root = std::env::temp_dir().join(format!(
-                "zeno-cgroup-chain-{}-{}",
+                "zeno-quota-{}-{}",
                 std::process::id(),
                 crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
             ));
-            // A terminal scope without the cpu controller has no cpu.max.
-            let groups = [
-                "user.slice",
-                "user.slice/app.slice",
-                "user.slice/app.slice/vte.scope",
-            ];
-            let leaf = root.join(groups[2]);
+            let leaf = root.join("caller.scope/leaf");
             test_ok(fs::create_dir_all(&leaf));
-            for group in groups {
-                test_ok(fs::write(root.join(group).join("cgroup.procs"), ""));
+            for at in [&root, &root.join("caller.scope"), &leaf] {
+                test_ok(fs::write(at.join("cgroup.procs"), ""));
             }
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 400);
-            test_ok(fs::write(
-                root.join(groups[0]).join("cpu.max"),
-                "max 100000",
-            ));
-            test_ok(fs::write(
-                root.join(groups[1]).join("cpu.max"),
-                "200000 100000",
-            ));
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 200);
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 1)), 100);
-            // Every limit that is present still has to be readable and valid.
-            test_ok(fs::write(leaf.join("cpu.max"), "oops 100000"));
             assert_eq!(
-                test_err(chain_percent(&root, leaf.clone(), 4)),
-                "caller-cpu-quota-malformed"
+                test_err(super::super::limits::chain_quota(&root, leaf.clone(), 4)),
+                "caller-cpu-quota-unobserved"
             );
-            test_ok(fs::write(leaf.join("cpu.max"), "50000 100000"));
-            assert_eq!(test_ok(chain_percent(&root, leaf.clone(), 4)), 50);
-            {
-                use std::os::unix::fs::PermissionsExt as _;
-                let limit = leaf.join("cpu.max");
-                test_ok(fs::set_permissions(
-                    &limit,
-                    fs::Permissions::from_mode(0o000),
-                ));
-                let unreadable = fs::read_to_string(&limit).is_err();
-                let refusal = chain_percent(&root, leaf.clone(), 4);
-                test_ok(fs::set_permissions(
-                    &limit,
-                    fs::Permissions::from_mode(0o600),
-                ));
-                if unreadable {
-                    assert!(test_err(refusal).starts_with("caller-cpu-quota-unavailable:"));
+            test_ok(fs::write(root.join("cpu.max"), "50000 100000"));
+            assert_eq!(
+                test_ok(super::super::limits::chain_quota(&root, leaf.clone(), 4)),
+                CpuQuota {
+                    quota: 50000,
+                    period: 100000
                 }
-            }
-            // A group that is not a cgroup, or outside the root, refuses.
-            assert!(
-                test_err(chain_percent(&root, root.join("missing.scope"), 4))
-                    .starts_with("caller-cpu-quota-unavailable:")
             );
             assert_eq!(
-                test_err(chain_percent(&root, PathBuf::from("/elsewhere"), 4)),
-                "caller-cpu-quota-group-outside-root"
+                test_ok(super::super::limits::chain_quota(&root, root.clone(), 4)),
+                CpuQuota {
+                    quota: 50000,
+                    period: 100000
+                }
             );
-            let _ = fs::remove_dir_all(&root);
+            test_ok(fs::write(leaf.join("cpu.max"), "oops 100000"));
+            assert!(super::super::limits::chain_quota(&root, leaf.clone(), 4).is_err());
+            assert!(super::super::limits::chain_quota(&root, root.join("missing"), 4).is_err());
+            assert!(
+                super::super::limits::chain_quota(&root, PathBuf::from("/elsewhere"), 4).is_err()
+            );
+            test_ok(fs::remove_dir_all(root));
         }
 
         fn python(script: &str) -> Command {
@@ -1667,17 +2150,42 @@ mod linux {
 
         #[test]
         fn startup_ack_accepts_only_the_startup_byte_and_restores_blocking_reads() {
-            let (mut child, mut parent) = test_ok(UnixStream::pair());
-            test_ok(parent.write_all(&[STARTUP_ACK]));
+            let (mut child, parent) = test_ok(UnixStream::pair());
+            test_ok(super::super::posix::write_protocol(&parent, &[STARTUP_ACK]));
             assert_eq!(await_startup_ack(&mut child), Ok(()));
-            assert_eq!(test_ok(child.read_timeout()), None);
+            let sender = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(20));
+                test_ok(super::super::posix::write_protocol(&parent, &[7]));
+            });
+            let mut followup = [0];
+            test_ok(child.read_exact(&mut followup));
+            assert_eq!(
+                followup,
+                [7],
+                "monitor must receive blocking reads after ACK"
+            );
+            test_ok(sender.join());
             assert!(CLIENT.get().is_none(), "handshake must not spawn a monitor");
+        }
+
+        #[test]
+        fn delayed_startup_ack_is_accepted_without_a_retry() {
+            let (mut child, parent) = test_ok(UnixStream::pair());
+            let sender = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(1200));
+                test_ok(super::super::posix::write_protocol(&parent, &[STARTUP_ACK]));
+            });
+            let started = Instant::now();
+            assert_eq!(await_startup_ack(&mut child), Ok(()));
+            assert!(started.elapsed() >= Duration::from_millis(1200));
+            test_ok(sender.join());
+            assert!(CLIENT.get().is_none());
         }
 
         #[test]
         fn wrong_or_closed_startup_ack_refuses_and_releases_the_socket() {
             let (mut child, mut parent) = test_ok(UnixStream::pair());
-            test_ok(parent.write_all(&[1])); // A stage permit is not startup ACK.
+            test_ok(super::super::posix::write_protocol(&parent, &[1])); // A stage permit is not startup ACK.
             assert_eq!(
                 await_startup_ack(&mut child),
                 Err("wrong-startup-ack".into())
@@ -1700,10 +2208,10 @@ mod linux {
             let (mut child, mut parent) = test_ok(UnixStream::pair());
             let started = Instant::now();
             assert!(
-                test_err(await_startup_ack(&mut child)).starts_with("startup-ack-unavailable:")
+                test_err(await_startup_ack(&mut child)).starts_with("startup-ack-timeout:deadline")
             );
-            assert!(started.elapsed() >= Duration::from_millis(900));
-            assert!(started.elapsed() < Duration::from_secs(3));
+            assert!(started.elapsed() >= super::super::posix::STARTUP_ACK_BUDGET);
+            assert!(started.elapsed() < Duration::from_secs(15));
             assert!(CLIENT.get().is_none());
             drop(child);
             assert_eq!(test_ok(parent.read(&mut [0])), 0);
@@ -1734,17 +2242,269 @@ pub(crate) fn contained_profile(command: &crate::Command) -> Option<(bool, u64)>
     }
 }
 
-/// Run the complete invocation under an externally controlled process, or
-/// initialize the child control channel before application work begins.
-pub(crate) fn dispatch(
+pub(crate) struct Admission {
+    #[cfg(target_os = "linux")]
+    backend: Backend,
+    #[cfg(target_os = "linux")]
+    required_profile: Profile,
+    #[cfg(target_os = "linux")]
+    invocation: Option<posix::Invocation>,
+    #[cfg(target_os = "linux")]
+    selection_source: SelectionSource,
+}
+
+static PUBLIC_LABEL: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+fn set_public_label(label: serde_json::Value) {
+    let _ = PUBLIC_LABEL.set(label);
+}
+pub(crate) fn label_public_result(result: &mut serde_json::Value) {
+    if let Some(label) = PUBLIC_LABEL.get()
+        && result.is_object()
+    {
+        result["backend"] = label["backend"].clone();
+        result["required_profile"] = label["required_profile"].clone();
+        result["containment"] = label.clone();
+    }
+}
+
+const SESSION_POLICY: &str = "containment-profile.json";
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionPolicy {
+    schema: String,
+    required_profile: Profile,
+    profile_sha256: String,
+}
+
+fn session_profile(path: &std::path::Path) -> Result<Profile, String> {
+    use std::io::Read;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(nix::libc::O_NONBLOCK | nix::libc::O_NOFOLLOW);
+    }
+    let file = match options.open(path.join(SESSION_POLICY)) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Profile::GroupResources),
+        Err(_) => return Err("session-policy-unavailable".into()),
+    };
+    if !file
+        .metadata()
+        .map_err(|_| "session-policy-read")?
+        .is_file()
+    {
+        return Err("session-policy-not-regular".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(1025)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "session-policy-read")?;
+    if bytes.len() > 1024 {
+        return Err("session-policy-bound".into());
+    }
+    let p: SessionPolicy = serde_json::from_slice(&bytes).map_err(|_| "session-policy-shape")?;
+    if p.schema != "zeno-fcis/containment-session/1"
+        || p.profile_sha256 != p.required_profile.hash()
+    {
+        return Err("session-policy-binding".into());
+    }
+    Ok(p.required_profile)
+}
+
+fn required_profile(command: &crate::Command) -> Result<Profile, String> {
+    use crate::loop_command::doors::capture::Command as C;
+    use crate::loop_command::{Command as L, doors::DoorCommand as D};
+    match command {
+        crate::Command::Loop { command } => match command {
+            L::Open { .. } | L::Encode { .. } => Ok(Profile::FiniteData),
+            L::Candidate { session, .. } | L::Run { session, .. } | L::Resume { session } => {
+                session_profile(session)
+            }
+            L::Doors(door) => match door {
+                D::Capture {
+                    command: C::Open { .. } | C::Whole { .. },
+                } => Ok(Profile::PythonReference),
+                D::Capture {
+                    command: C::Packet { .. } | C::Candidate { .. } | C::Status { .. },
+                } => Ok(Profile::FiniteData),
+                D::Sketch { session, .. } => session_profile(session),
+                D::Pipeline { .. }
+                | D::Strategy { .. }
+                | D::Rules { .. }
+                | D::Learn { .. }
+                | D::Family { .. }
+                | D::Transfer { .. }
+                | D::Meaning { .. }
+                | D::Question { .. }
+                | D::TeachBack { .. }
+                | D::Evaluate { .. }
+                | D::Decompose { .. } => Ok(Profile::FiniteData),
+            },
+        },
+        crate::Command::Transform {
+            command:
+                crate::transform_command::Command::Check {
+                    offline_parallel: true,
+                    ..
+                },
+        } => Ok(Profile::GroupResources),
+        _ => Err("unclassified-command".into()),
+    }
+}
+
+/// Pure injected-capability gate, shared by production admission and refusal tests.
+#[cfg(target_os = "linux")]
+fn admit_capabilities(
     command: &crate::Command,
-    knowledge_snapshot: Option<&str>,
-    knowledge_invocation: Option<&str>,
-    knowledge_task: Option<&str>,
-    knowledge_paths: Option<&[std::path::PathBuf]>,
-) -> Option<u8> {
-    let profile = contained_profile(command)?;
-    let (staging_parent, receipt) = match command {
+    backend: Backend,
+    actual: &[crate::containment_policy::Guarantee],
+) -> Result<(), Unavailable> {
+    let profile = required_profile(command).map_err(|missing| Unavailable { backend, missing })?;
+    crate::containment_policy::compare(profile, backend, cfg!(target_os = "linux"), actual)
+}
+
+pub(crate) fn preflight(
+    command: &crate::Command,
+    flag: Option<Backend>,
+) -> Result<Option<Admission>, SupervisorFailure> {
+    // Re-exec selection belongs to the supervisor. Its child still validates
+    // the inherited channel and installed controls before ACK; markers grant
+    // no authority and manager environment cannot override the bound choice.
+    if std::env::var_os("ZENO_FCIS_CHECKER_CONTROL").is_some() {
+        return Ok(None);
+    }
+    let (requested, source) = select_backend(flag, std::env::var_os(BACKEND_ENV).as_deref())
+        .map_err(|reason| SupervisorFailure {
+            reason,
+            cleanup: None,
+            selection_source: Some(SelectionSource::Environment),
+        })?;
+    preflight_selected(command, requested, source).map_err(|mut failure| {
+        failure.selection_source = Some(source);
+        failure
+    })
+}
+
+fn preflight_selected(
+    command: &crate::Command,
+    requested: Backend,
+    source: SelectionSource,
+) -> Result<Option<Admission>, SupervisorFailure> {
+    if contained_profile(command).is_none() {
+        return Ok(None);
+    }
+    let profile = required_profile(command).map_err(|missing| {
+        Unavailable {
+            backend: requested,
+            missing,
+        }
+        .to_string()
+    })?;
+    let backend = selected_backend(profile, requested)?;
+    // Injection can remove a control but cannot invent one. On POSIX the
+    // comparator consumes observations from the disposable setup/cleanup run.
+    #[cfg(target_os = "linux")]
+    let missing = std::env::var("ZENO_FCIS_CONTAINMENT_MISSING").unwrap_or_default();
+    #[cfg(target_os = "linux")]
+    let mut invocation = None;
+    #[cfg(target_os = "linux")]
+    match backend {
+        Backend::Posix if profile == Profile::FiniteData => {
+            let mut actual = posix::probe().map_err(|e| e.to_string())?;
+            actual.retain(|g| !missing.split(',').any(|s| s == g.control.name()));
+            admit_capabilities(command, backend, &actual).map_err(|e| e.to_string())?;
+            invocation = Some(
+                posix::Invocation::new(command, actual, source)
+                    .map_err(|e| format!("containment-unavailable:posix:evidence:{e}"))?,
+            );
+        }
+        Backend::Posix => {
+            return Err(Unavailable {
+                backend,
+                missing: profile.name().into(),
+            }
+            .to_string()
+            .into());
+        }
+        Backend::Systemd => {
+            if let Some(g) = crate::containment_policy::requirements(profile, true)
+                .iter()
+                .find(|g| missing.split(',').any(|s| s == g.control.name()))
+            {
+                return Err(Unavailable {
+                    backend,
+                    missing: g.control.name(),
+                }
+                .to_string()
+                .into());
+            }
+            // The legacy launcher's environment/FD policy cannot satisfy the
+            // finite-data profile, even when the backend is chosen explicitly.
+            if profile == Profile::FiniteData {
+                return Err(Unavailable {
+                    backend,
+                    missing: "environment".into(),
+                }
+                .to_string()
+                .into());
+            }
+            // Disposable, read-only prerequisite probe. Never create a unit
+            // to discover a missing bus, or repair/widen the caller's sandbox.
+            let shown = linux::manager(
+                &[
+                    "--user",
+                    "show",
+                    "--property=LoadState",
+                    "zeno-containment-preflight.service",
+                ],
+                std::time::Instant::now() + Duration::from_secs(1),
+            );
+            if !shown.as_ref().is_ok_and(|s| linux::unit_loaded(s).is_ok()) {
+                return Err("containment-unavailable:systemd:systemd-user-manager"
+                    .to_owned()
+                    .into());
+            }
+        }
+        Backend::Auto => return Err("containment-unavailable:auto:unselected".to_owned().into()),
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        // No runtime backend is qualified on this platform.
+        let _ = source;
+        Err(Unavailable {
+            backend,
+            missing: "platform-unqualified".into(),
+        }
+        .to_string()
+        .into())
+    }
+    #[cfg(target_os = "linux")]
+    Ok(Some(Admission {
+        backend,
+        required_profile: profile,
+        invocation,
+        selection_source: source,
+    }))
+}
+
+pub(crate) fn bootstrap() -> Option<u8> {
+    #[cfg(target_os = "linux")]
+    {
+        posix::bootstrap()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn receipt_paths(
+    command: &crate::Command,
+) -> (Option<std::path::PathBuf>, Option<&std::path::Path>) {
+    match command {
         crate::Command::Transform {
             command:
                 crate::transform_command::Command::Check {
@@ -1761,73 +2521,104 @@ pub(crate) fn dispatch(
                 | crate::loop_command::Command::Run { session, .. },
         } => (Some(session.join("receipts")), None),
         _ => (None, None),
-    };
-    let acquisition = match command {
-        crate::Command::Loop { command } => {
-            use crate::neural_loop::acquisition::{Acquisition, Mode};
-            let mode = match command {
-                crate::loop_command::Command::Open { .. } => Mode::Open,
-                crate::loop_command::Command::Encode { .. } => Mode::Encode,
-                _ => Mode::Resume,
-            };
-            Some(Acquisition::reserve(mode))
-        }
-        _ => None,
-    };
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn retain_run_evidence(session: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    crate::atomic_replace(&session.join("containment-run.json"), bytes)
+        .map_err(|e| format!("containment-evidence:{e}"))
+}
+
+/// Run the complete invocation under an externally controlled process, or
+/// initialize the child control channel before application work begins.
+pub(crate) fn dispatch(
+    command: &crate::Command,
+    admission: Option<Admission>,
+    knowledge_snapshot: Option<&str>,
+    knowledge_invocation: Option<&str>,
+    knowledge_task: Option<&str>,
+    knowledge_paths: Option<&[std::path::PathBuf]>,
+) -> Option<u8> {
     #[cfg(target_os = "linux")]
-    let outcome = match linux::child() {
-        Ok(true) => return None,
-        Ok(false) => linux::supervise(
-            &{
-                let mut args = std::env::args_os().skip(1).collect::<Vec<_>>();
-                if let Some(hash) = knowledge_snapshot {
+    let outcome = {
+        let profile = contained_profile(command)?;
+        let (staging_parent, receipt) = receipt_paths(command);
+        let args = {
+            let mut args = std::env::args_os().skip(1).collect::<Vec<_>>();
+            if let Some(hash) = knowledge_snapshot {
+                args.extend([
+                    std::ffi::OsString::from("--kb-snapshot"),
+                    std::ffi::OsString::from(hash),
+                ]);
+            }
+            if let Some(id) = knowledge_invocation {
+                args.extend([
+                    std::ffi::OsString::from("--kb-invocation"),
+                    std::ffi::OsString::from(id),
+                ]);
+            }
+            if let Some(task) = knowledge_task
+                && !task.is_empty()
+            {
+                args.extend([
+                    std::ffi::OsString::from("--kb-task"),
+                    std::ffi::OsString::from(task),
+                ]);
+            }
+            if let Some(paths) = knowledge_paths {
+                for p in paths {
                     args.extend([
-                        std::ffi::OsString::from("--kb-snapshot"),
-                        std::ffi::OsString::from(hash),
+                        std::ffi::OsString::from("--kb"),
+                        p.as_os_str().to_os_string(),
                     ]);
                 }
-                if let Some(id) = knowledge_invocation {
-                    args.extend([
-                        std::ffi::OsString::from("--kb-invocation"),
-                        std::ffi::OsString::from(id),
-                    ]);
-                }
-                if let Some(task) = knowledge_task
-                    && !task.is_empty()
-                {
-                    args.extend([
-                        std::ffi::OsString::from("--kb-task"),
-                        std::ffi::OsString::from(task),
-                    ]);
-                }
-                if let Some(paths) = knowledge_paths {
-                    for p in paths {
-                        args.extend([
-                            std::ffi::OsString::from("--kb"),
-                            p.as_os_str().to_os_string(),
-                        ]);
-                    }
-                }
-                args
+            }
+            args
+        };
+        match linux::child() {
+            Ok(true) => return None,
+            Ok(false) => match admission {
+                Some(Admission {
+                    backend: Backend::Posix,
+                    invocation: Some(invocation),
+                    ..
+                }) => posix::supervise(command, &args, invocation),
+                Some(Admission {
+                    backend: Backend::Systemd,
+                    required_profile,
+                    selection_source,
+                    ..
+                }) => linux::supervise(
+                    &args,
+                    profile.0,
+                    profile.1,
+                    linux::Receipts {
+                        staging_parent: staging_parent.as_deref(),
+                        receipt,
+                    },
+                    Some((required_profile, selection_source)),
+                )
+                .map_err(|mut failure| {
+                    failure.selection_source = Some(selection_source);
+                    failure
+                }),
+                _ => Err("containment-unavailable:admission-missing"
+                    .to_owned()
+                    .into()),
             },
-            profile.0,
-            profile.1,
-            linux::Receipts {
-                staging_parent: staging_parent.as_deref(),
-                receipt,
-            },
-        ),
-        Err(error) => {
-            // The supervisor quotes the child's stderr in its refusal.
-            eprintln!("zeno-fcis: contained child refused: {error}");
-            Err(error.into())
+            Err(error) => {
+                // The supervisor quotes the child's stderr in its refusal.
+                eprintln!("zeno-fcis: contained child refused: {error}");
+                Err(error.into())
+            }
         }
     };
     #[cfg(not(target_os = "linux"))]
     let outcome: Result<u8, SupervisorFailure> = {
+        contained_profile(command)?;
         let _ = (
-            staging_parent,
-            receipt,
+            admission,
             knowledge_snapshot,
             knowledge_invocation,
             knowledge_task,
@@ -1837,43 +2628,95 @@ pub(crate) fn dispatch(
     };
     Some(match outcome {
         Ok(code) => code,
-        Err(failure) => {
-            let reason = &failure.reason;
-            let mut exit_code = crate::BLOCKED;
-            let mut report = failure.report(profile.0);
-            // Capture never falls back to host execution. Sanitize supervisor
-            // diagnostics before they can reach an example-only proposer API.
-            if let crate::Command::Loop { command } = command
-                && crate::loop_command::is_capture(command)
-            {
-                let unavailable = reason.starts_with("containment-unavailable")
-                    || !cfg!(all(target_os = "linux", target_arch = "x86_64"));
-                exit_code = if unavailable {
-                    crate::INVALID
-                } else {
-                    crate::BLOCKED
-                };
-                report = serde_json::json!({"schema":"zeno-fcis/black-box-capture/1","door":"capture",
+        Err(failure) => refuse(command, failure),
+    })
+}
+
+pub(crate) fn refuse(command: &crate::Command, failure: SupervisorFailure) -> u8 {
+    let profile = contained_profile(command).unwrap_or((false, 4));
+    let acquisition = match command {
+        crate::Command::Loop { command } => {
+            use crate::neural_loop::acquisition::{Acquisition, Mode};
+            Some(Acquisition::reserve(match command {
+                crate::loop_command::Command::Open { .. } => Mode::Open,
+                crate::loop_command::Command::Encode { .. } => Mode::Encode,
+                _ => Mode::Resume,
+            }))
+        }
+        _ => None,
+    };
+
+    // Exact diagnostics stay in the owner-private operator record. Its stderr
+    // fallback also remains separate from the sanitized proposer-facing JSON.
+    #[cfg(target_os = "linux")]
+    {
+        let mut diagnostic = diagnostics::Record::new("refusal", "unqualified");
+        diagnostic.set("supervisor_reason", serde_json::json!(failure.reason));
+        diagnostic.set("cleanup_detail", serde_json::json!(failure.cleanup));
+    }
+    let reason = &failure.reason;
+    let mut exit_code = crate::BLOCKED;
+    let mut report = failure.report(profile.0);
+    // Capture never falls back to host execution. Sanitize supervisor
+    // diagnostics before they can reach an example-only proposer API.
+    if let crate::Command::Loop { command } = command
+        && crate::loop_command::is_capture(command)
+    {
+        let unavailable = reason.starts_with("containment-unavailable")
+            || !cfg!(all(target_os = "linux", target_arch = "x86_64"));
+        exit_code = if unavailable {
+            crate::INVALID
+        } else {
+            crate::BLOCKED
+        };
+        report = serde_json::json!({"schema":"zeno-fcis/black-box-capture/1","door":"capture",
                     "status":if unavailable {"refused"}else{"inconclusive"},"authority":"none",
                     "detail":{"reason":if unavailable {"capture-containment-unavailable"}else{"capture-contained-invocation-stopped"},
                         "attempt_spent":if unavailable {serde_json::json!(false)}else{serde_json::Value::Null},"accounting_complete":false}});
-                if reason.starts_with("containment-unavailable:systemd-user-manager:") {
-                    report["detail"]["prerequisite"] = serde_json::json!("systemd-user-manager");
-                }
-                failure.add_cleanup(&mut report, true);
-            }
-            if let Some(acquisition) = acquisition {
-                let mut intake = acquisition.json();
-                // A killed child's counts are unknown. Its entire allowance
-                // remains reserved; zero observed work would be misleading.
-                intake["observed_intake"] = serde_json::Value::Null;
-                intake["accounting_complete"] = serde_json::Value::Bool(false);
-                report["acquisition"] = intake;
-            }
-            crate::print_json(&report);
-            exit_code
+        if reason.starts_with("containment-unavailable:systemd-user-manager:")
+            || reason == "containment-unavailable:systemd:systemd-user-manager"
+        {
+            report["detail"]["prerequisite"] = serde_json::json!("systemd-user-manager");
         }
-    })
+        failure.add_cleanup(&mut report, true);
+    }
+    if reason == EXPLICIT_BACKEND_REQUIRED {
+        report["reason"] = serde_json::json!(EXPLICIT_BACKEND_REQUIRED);
+        report["message"] = serde_json::json!(BACKEND_MESSAGE);
+    }
+    if let Some(acquisition) = acquisition {
+        let mut intake = acquisition.json();
+        // A killed child's counts are unknown. Its entire allowance
+        // remains reserved; zero observed work would be misleading.
+        intake["observed_intake"] = serde_json::Value::Null;
+        intake["accounting_complete"] = serde_json::Value::Bool(false);
+        report["acquisition"] = intake;
+    }
+    if PUBLIC_LABEL.get().is_none() {
+        let required = required_profile(command).ok();
+        let backend = if failure.reason.contains(":posix:") {
+            Backend::Posix
+        } else if failure.reason.contains(":systemd") {
+            Backend::Systemd
+        } else {
+            Backend::Auto
+        };
+        let label = serde_json::json!({"schema":"zeno-fcis/containment-result/1",
+            "backend":backend,"required_profile":required,
+            "evidence":"inline-unqualified-refusal",
+            "startup":{"guarantees":[],"admitted":false},
+            "final":{"termination":"stopped","reason":if let crate::Command::Loop { command } = command && crate::loop_command::is_capture(command) { report["detail"]["reason"].clone() } else { serde_json::json!(failure.reason) },"application_work_started":false,
+                "cleanup":"unknown","absence_verified":false}});
+        let mut label = label;
+        label["selection_source"] = serde_json::json!(failure.selection_source);
+        if reason == EXPLICIT_BACKEND_REQUIRED {
+            label["message"] = serde_json::json!(BACKEND_MESSAGE);
+            label["final"]["reason"] = serde_json::json!(EXPLICIT_BACKEND_REQUIRED);
+        }
+        set_public_label(label);
+    }
+    crate::print_json(&report);
+    exit_code
 }
 
 pub(crate) fn start(duration: Duration, search: bool) -> Result<(), String> {
@@ -1909,6 +2752,20 @@ pub(crate) fn scheduling_evidence() -> serde_json::Value {
     }
     #[cfg(not(target_os = "linux"))]
     serde_json::Value::Null
+}
+
+/// Pool sizing in the imperative shell; this cannot decide semantic results.
+/// The POSIX worker runs one thread: under its 64 MiB address-space cap its
+/// allocator keeps one arena (`MALLOC_ARENA_MAX=1`), so more threads only
+/// contend for that arena's lock and add CPU, which every stage charges.
+/// Existing backends retain their existing pool sizes and ordered-result
+/// behavior.
+pub(crate) fn worker_thread_limit(requested: usize) -> usize {
+    #[cfg(target_os = "linux")]
+    if linux::contained() && posix::is_worker() {
+        return requested.min(1);
+    }
+    requested
 }
 
 pub(crate) fn contained() -> bool {
@@ -2106,7 +2963,7 @@ mod tests {
                 staging_parent: Some(&dir),
                 receipt: None,
             };
-            assert_eq!(linux::supervise(&args, false, 1, receipts), Ok(3));
+            assert_eq!(linux::supervise(&args, false, 1, receipts, None), Ok(3));
             let (unit, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual group and cleanup evidence required",
@@ -2168,7 +3025,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             };
-            let result = linux::supervise(&args, false, 1, receipts);
+            let result = linux::supervise(&args, false, 1, receipts, None);
             assert!(result.is_err(), "probe unexpectedly accepted: {result:?}");
             let (unit, physical, gone, members, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
@@ -2334,7 +3191,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             };
-            let error = test_err(linux::supervise(&args, offline, 1, receipts));
+            let error = test_err(linux::supervise(&args, offline, 1, receipts, None));
             let (unit, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual process status required",
@@ -2409,7 +3266,7 @@ mod tests {
                 staging_parent: Some(&dir),
                 receipt: Some(&receipt),
             };
-            let result = linux::supervise(&args, true, 1, receipts);
+            let result = linux::supervise(&args, true, 1, receipts, None);
             let (_, physical, gone, _, members_gone) = test_some(
                 test_ok(linux::LAST_PHYSICAL.lock()).take(),
                 "actual process status required",
@@ -2473,6 +3330,7 @@ mod tests {
                 staging_parent: None,
                 receipt: None,
             },
+            None,
         );
         assert_eq!(result, Ok(crate::BLOCKED));
         let (_, physical, gone, _, members_gone) = test_some(
@@ -2488,5 +3346,76 @@ mod tests {
             physical.lines().any(|line| line == "ExecMainStatus=2"),
             "{physical}"
         );
+    }
+    #[test]
+    fn probe_loop_cpu_spin() {
+        if std::env::var_os("ZENO_FCIS_CHECKER_CONTROL").is_none() {
+            return;
+        }
+        assert_eq!(linux::child(), Ok(true));
+        test_ok(start(Duration::from_secs(1), false));
+        loop {
+            std::hint::black_box(1u64.wrapping_mul(7));
+        }
+    }
+    #[test]
+    fn actual_systemd_stage_cpu_spin_is_stopped() {
+        let _guard = PHYSICAL_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let args = [
+            "--exact",
+            "checker_process::tests::probe_loop_cpu_spin",
+            "--nocapture",
+            "--test-threads=1",
+        ]
+        .map(std::ffi::OsString::from);
+        let result = linux::supervise(
+            &args,
+            false,
+            1,
+            linux::Receipts {
+                staging_parent: None,
+                receipt: None,
+            },
+            None,
+        );
+        let (unit, physical, gone, _, members_gone) = test_some(
+            test_ok(linux::LAST_PHYSICAL.lock()).take(),
+            "physical systemd CPU control",
+        );
+        assert!(gone && members_gone, "{physical}");
+        let failure = test_err(result);
+        assert!(
+            failure.reason.starts_with("contained-deadline"),
+            "{failure:?}"
+        );
+        assert!(failure.cleanup.is_none());
+        let root = std::path::Path::new("/tmp")
+            .join(format!("zeno-fcis-operator-{}", nix::unistd::geteuid()));
+        let observation = test_ok(std::fs::read_dir(root))
+            .filter_map(|p| {
+                serde_json::from_slice::<serde_json::Value>(&std::fs::read(p.ok()?.path()).ok()?)
+                    .ok()
+            })
+            .find(|r| {
+                r["observer"] == "worker-supervisor"
+                    && r["unit"] == unit
+                    && r["process_start_ticks"]
+                        == diagnostics::process_start_ticks(std::process::id())
+                            .unwrap_or_else(|| panic!("expected a value"))
+            })
+            .unwrap_or_else(|| panic!("expected a value"));
+        assert_eq!(observation["cleanup_verified"], true);
+        assert_eq!(observation["stages"][0]["stopped_by"], "cpu");
+        assert_eq!(
+            observation["stages"][0]["cpu_source"],
+            "contained-cgroup-cpu.stat"
+        );
+        assert!(
+            observation["stages"][0]["cpu_observed_us"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("expected a value"))
+                >= 1_000_000
+        );
+        println!("systemd-stage-control {observation}");
     }
 }

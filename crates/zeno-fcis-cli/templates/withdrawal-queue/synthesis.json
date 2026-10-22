@@ -1,6 +1,6 @@
 {
   "schema": "zeno-fcis/synthesis-problem/1",
-  "profile": "zeno-fcis/finite-i64/1",
+  "profile": "zeno-fcis/finite-i128/1",
   "inputs": [
     {"name": "memory.pending_a", "type": {"kind": "bool"}},
     {"name": "memory.pending_b", "type": {"kind": "bool"}},

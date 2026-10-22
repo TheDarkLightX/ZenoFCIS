@@ -12,17 +12,31 @@ use alloc::vec::Vec;
 use zeno_fcis_synthesis::finite::{Domain, Error, Op as Instruction, Program};
 
 use crate::Refusal;
-use crate::expr::{self, Expr, Kind, Op, Vocabulary};
+use crate::expr::{self, Expr, Function, Kind, Op, Vocabulary};
 use crate::lower::lower_outputs;
 use crate::subject::{columns, domain_size, tuples};
 
-/// Fixed, checked operations. No user-supplied primitive or multiplication.
+/// Fixed operations evaluated by admitted library programs; no user primitives.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Operation {
     /// Checked integer addition.
     Add,
     /// Checked integer subtraction.
     Sub,
+    /// Checked integer multiplication.
+    Mul,
+    /// Checked floor division.
+    DivFloor,
+    /// Checked ceiling division.
+    DivCeil,
+    /// Nonnegative exact product followed by floor division.
+    MulDivFloor,
+    /// Nonnegative exact product followed by ceiling division.
+    MulDivCeil,
+    /// Compare two nonnegative products of two factors.
+    ProductsGe2,
+    /// Compare two nonnegative products of three factors.
+    ProductsGe3,
     /// Integer less than.
     Lt,
     /// Integer less than or equal.
@@ -55,15 +69,24 @@ impl Operation {
             Self::Abs => &[Int],
             Self::And | Self::Or => &[Bool, Bool],
             Self::Select => &[Bool, Int, Int],
+            Self::MulDivFloor | Self::MulDivCeil => &[Int, Int, Int],
+            Self::ProductsGe2 => &[Int, Int, Int, Int],
+            Self::ProductsGe3 => &[Int, Int, Int, Int, Int, Int],
             _ => &[Int, Int],
         }
     }
 
     fn kind(self) -> Kind {
         match self {
-            Self::Lt | Self::Le | Self::Eq | Self::Ne | Self::And | Self::Or | Self::Not => {
-                Kind::Bool
-            }
+            Self::Lt
+            | Self::Le
+            | Self::Eq
+            | Self::Ne
+            | Self::And
+            | Self::Or
+            | Self::Not
+            | Self::ProductsGe2
+            | Self::ProductsGe3 => Kind::Bool,
             _ => Kind::Int,
         }
     }
@@ -71,13 +94,37 @@ impl Operation {
     fn commutative(self) -> bool {
         matches!(
             self,
-            Self::Add | Self::Eq | Self::Ne | Self::And | Self::Or | Self::Min | Self::Max
+            Self::Add
+                | Self::Mul
+                | Self::Eq
+                | Self::Ne
+                | Self::And
+                | Self::Or
+                | Self::Min
+                | Self::Max
         )
     }
 
     fn probe(self) -> Result<Program, Stop> {
         let inputs = self.arguments().iter().map(|k| full_domain(*k)).collect();
         let (nodes, root) = match self {
+            Self::MulDivFloor | Self::MulDivCeil | Self::ProductsGe2 | Self::ProductsGe3 => {
+                let mut nodes = (0..self.arguments().len())
+                    .map(|k| Instruction::Input(k as u16))
+                    .collect::<Vec<_>>();
+                let op = match self {
+                    Self::MulDivFloor => Instruction::MulDivFloor(0, 1, 2),
+                    Self::MulDivCeil => Instruction::MulDivCeil(0, 1, 2),
+                    Self::ProductsGe2 => {
+                        nodes.push(Instruction::Int(1));
+                        Instruction::ProductsGe([0, 1, 4], [2, 3, 4])
+                    }
+                    _ => Instruction::ProductsGe([0, 1, 2], [3, 4, 5]),
+                };
+                nodes.push(op);
+                let root = (nodes.len() - 1) as u16;
+                (nodes, root)
+            }
             Self::Not => (vec![Instruction::Input(0), Instruction::Not(0)], 1),
             Self::Abs => (
                 vec![
@@ -103,6 +150,9 @@ impl Operation {
                 match other {
                     Self::Add => nodes.push(Instruction::Add(0, 1)),
                     Self::Sub => nodes.push(Instruction::Sub(0, 1)),
+                    Self::Mul => nodes.push(Instruction::Mul(0, 1)),
+                    Self::DivFloor => nodes.push(Instruction::DivFloor(0, 1)),
+                    Self::DivCeil => nodes.push(Instruction::DivCeil(0, 1)),
                     Self::Lt => nodes.push(Instruction::Lt(0, 1)),
                     Self::Eq => nodes.push(Instruction::Eq(0, 1)),
                     Self::And => nodes.push(Instruction::And(0, 1)),
@@ -139,8 +189,8 @@ fn full_domain(kind: Kind) -> Domain {
     match kind {
         Kind::Bool => Domain::Bool,
         Kind::Int => Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     }
 }
@@ -149,7 +199,7 @@ fn full_domain(kind: Kind) -> Domain {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Observation {
     /// Successful scalar result.
-    Value(i64),
+    Value(i128),
     /// Eager checked-arithmetic failure, including an unselected argument.
     Arithmetic,
     /// A root value outside this output's declared domain.
@@ -160,9 +210,9 @@ pub enum Observation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Example {
     /// Complete input tuple.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Complete successful output tuple.
-    pub output: Vec<i64>,
+    pub output: Vec<i128>,
 }
 
 /// Complete owned declaration, independent of an original or hidden core.
@@ -175,7 +225,7 @@ pub struct Specification {
     /// Output domains.
     pub outputs: Vec<Domain>,
     /// Declared integer leaves; Boolean leaves come from Boolean inputs.
-    pub constants: Vec<i64>,
+    pub constants: Vec<i128>,
     /// Declared operation order breaks equal-size ties deterministically.
     pub operations: Vec<Operation>,
     /// Maximum vocabulary expression size, including leaves.
@@ -193,7 +243,7 @@ impl Specification {
             || !(1..=12).contains(&self.max_size)
             || self.constants.len() > 32
             || self.examples.len() > 64
-            || self.operations.len() > 14
+            || self.operations.len() > 20
         {
             return Err(Stop::Refused("learn-declaration-bounds".into()));
         }
@@ -354,7 +404,7 @@ impl Budget {
 #[derive(Clone, Debug)]
 enum Term {
     Input(usize),
-    Constant(i64),
+    Constant(i128),
     Apply(Operation, Vec<usize>),
 }
 struct Meaning {
@@ -372,6 +422,38 @@ fn kind_index(k: Kind) -> usize {
 }
 
 impl Pool {
+    // Positive size compositions for the new four/six-argument operations.
+    // Prefix storage is exclusively owned, at most six cells; charge visits
+    // before branching. Existing one/two/three-argument traversal is unchanged.
+    fn emit_partitions(
+        &mut self,
+        op: Operation,
+        size: usize,
+        cells: usize,
+        budget: &mut Budget,
+        remaining: usize,
+        sizes: &mut Vec<usize>,
+    ) -> Result<(), Stop> {
+        budget.spend(1)?;
+        let slots = op.arguments().len() - sizes.len();
+        if remaining < slots {
+            return Ok(());
+        }
+        if slots == 1 {
+            sizes.push(remaining);
+            let result = self.emit(op, sizes, size, cells, budget);
+            let _ = sizes.pop();
+            return result;
+        }
+        for next in 1..=remaining - slots + 1 {
+            sizes.push(next);
+            let result = self.emit_partitions(op, size, cells, budget, remaining - next, sizes);
+            let _ = sizes.pop();
+            result?;
+        }
+        Ok(())
+    }
+
     fn new(max_size: usize) -> Self {
         Self {
             entries: Vec::new(),
@@ -433,7 +515,7 @@ impl Pool {
                 budget.allocate(cells as u64)?;
                 let mut table = Vec::with_capacity(cells);
                 for j in 0..cells {
-                    let values: Option<Vec<i64>> = args
+                    let values: Option<Vec<i128>> = args
                         .iter()
                         .map(|id| match self.entries[*id].table[j] {
                             Observation::Value(v) => Some(v),
@@ -489,6 +571,33 @@ impl Pool {
                 let a = parts[0].0.clone();
                 let show_a = &parts[0].1;
                 match op {
+                    Operation::DivFloor
+                    | Operation::DivCeil
+                    | Operation::MulDivFloor
+                    | Operation::MulDivCeil
+                    | Operation::ProductsGe2
+                    | Operation::ProductsGe3 => {
+                        let function = match op {
+                            Operation::DivFloor => Function::DivFloor,
+                            Operation::DivCeil => Function::DivCeil,
+                            Operation::MulDivFloor => Function::MulDivFloor,
+                            Operation::MulDivCeil => Function::MulDivCeil,
+                            _ => Function::ProductsGe,
+                        };
+                        let text = format!(
+                            "{}({})",
+                            function.name(),
+                            parts
+                                .iter()
+                                .map(|p| p.1.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                        (
+                            Expr::Call(function, parts.into_iter().map(|p| p.0).collect()),
+                            text,
+                        )
+                    }
                     Operation::Not => (Expr::negation(a), format!("!{show_a}")),
                     Operation::Abs => (
                         Expr::select(
@@ -523,6 +632,7 @@ impl Pool {
                         let symbol = match op {
                             Operation::Add => Op::Add,
                             Operation::Sub => Op::Sub,
+                            Operation::Mul => Op::Mul,
                             Operation::Lt => Op::Lt,
                             Operation::Le => Op::Le,
                             Operation::Eq => Op::Eq,
@@ -573,7 +683,7 @@ pub struct Bucket {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Question {
     /// Complete input tuple in domain order.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Input ordinal, last input fastest.
     pub ordinal: usize,
     /// Ordered buckets per output; the joint partition is their product.
@@ -614,14 +724,12 @@ pub struct Analysis {
     pub candidate: Option<Program>,
 }
 
-fn ordinal(point: &[i64], domains: &[Domain]) -> Result<usize, Stop> {
+fn ordinal(point: &[i128], domains: &[Domain]) -> Result<usize, Stop> {
     let mut n = 0u128;
     for (v, d) in point.iter().zip(domains) {
         n = n
             .checked_mul(domain_size(*d))
-            .and_then(|n| {
-                n.checked_add(u128::try_from(i128::from(*v) - i128::from(d.bounds().0)).ok()?)
-            })
+            .and_then(|n| n.checked_add(u128::try_from(v.checked_sub(d.bounds().0)?).ok()?))
             .ok_or_else(|| Stop::Refused("learn-example-ordinal".into()))?;
     }
     usize::try_from(n).map_err(|_| Stop::Inconclusive("learn-domain-budget".into()))
@@ -683,7 +791,7 @@ fn minimum_core(
 // BEGIN typed strategy corpus producer interface (merge with strategy consumer).
 /// Owned full-domain terms for typed case composition; no checker authority.
 pub struct StrategyTermsV1 {
-    /// Integer terms with full i64 output, in declared size/tie order.
+    /// Integer terms with full i128 output, in declared size/tie order.
     pub integers: Vec<Program>,
     /// Nontrapping Boolean predicates, in declared size/tie order.
     pub predicates: Vec<Program>,
@@ -694,7 +802,7 @@ struct Enumeration {
     vocab: Vocabulary,
     cells: usize,
     pool: Pool,
-    columns: Vec<Vec<i64>>,
+    columns: Vec<Vec<i128>>,
 }
 
 fn enumerate_for_analysis(spec: &Specification, budget: &mut Budget) -> Result<Enumeration, Stop> {
@@ -761,6 +869,9 @@ fn enumerate_for_analysis(spec: &Specification, budget: &mut Budget) -> Result<E
                             pool.emit(*op, &[c, a, b], size, cells, budget)?;
                         }
                     }
+                }
+                4 | 6 => {
+                    pool.emit_partitions(*op, size, cells, budget, size - 1, &mut Vec::new())?
                 }
                 _ => return Err(Stop::Refused("learn-operation-arity".into())),
             }
@@ -1061,7 +1172,7 @@ pub enum ExampleCheck {
         /// Number evaluated, including the failing example.
         checked: usize,
         /// Successful values, or no values on library failure.
-        actual: Option<Vec<i64>>,
+        actual: Option<Vec<i128>>,
     },
 }
 
@@ -1115,8 +1226,8 @@ mod strategy_corpus_tests {
             names: vec!["x".into()],
             inputs: vec![Domain::Int { min: 0, max: 3 }],
             outputs: vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
             constants: vec![0, 2, 7],
             operations: vec![Operation::Lt, Operation::Eq],

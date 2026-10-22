@@ -62,7 +62,7 @@ pub(in super::super) open spec fn deliveries(d:&Descriptor,p:Seq<DeliveryPlan>)-
 pub(in super::super) open spec fn assignment_valid(d:&Descriptor,a:Seq<Assignment>,f:Seq<InputField>,i:int)->bool{a[i].field==f[i].id&&matches_leaf(a[i].domain,f[i].leaf)&&expression(d,a[i].value)==Some(leaf_kind(f[i].leaf))&&schema_validation::spec::expression(a[i].domain,a[i].value)}
 pub(in super::super) open spec fn assignments(d:&Descriptor,a:Seq<Assignment>,f:Seq<InputField>)->bool{a.len()==f.len()&&(forall|i:int|0<=i<f.len()==>assignment_valid(d,a,f,i))}
 pub(in super::super) open spec fn reason(d:&Descriptor,c:Class,id:Option<u32>)->bool{match(c,id){(Class::Accept,None)=>true,(Class::Reject,Some(id))|(Class::CommittedFailure,Some(id))=>exists|i:int|0<=i<d.reasons@.len()&&d.reasons@[i].id==id&&d.reasons@[i].class==c,_=>false}}
-pub(in super::super) open spec fn branch_valid(d:&Descriptor,f:Seq<InputField>,min:i64,max:i64,i:int)->bool{
+pub(in super::super) open spec fn branch_valid(d:&Descriptor,f:Seq<InputField>,min:i128,max:i128,i:int)->bool{
     let b=d.branches@[i];min as i128<=b.code<=max as i128&&(i==0||d.branches@[i-1].code<b.code)&&reason(d,b.class,b.reason)
     &&if b.class==Class::Reject{b.assignments@.len()==0&&b.effects@.len()==0&&b.outbox@.len()==0}else{assignments(d,b.assignments@,f)&&deliveries(d,b.effects@)&&deliveries(d,b.outbox@)}
 }

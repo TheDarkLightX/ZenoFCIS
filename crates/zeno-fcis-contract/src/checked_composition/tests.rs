@@ -293,7 +293,7 @@ fn a_four_register_ring_is_checked() {
 
 /// The reference ring step: Set(v) for actions 0..3, CopyNeighbor for 4,
 /// an unchanged value rejected, as kernel37 defines `ring_post`.
-fn reference(state: [i64; 2], target: usize, action: i64) -> Option<[i64; 2]> {
+fn reference(state: [i128; 2], target: usize, action: i128) -> Option<[i128; 2]> {
     let value = if action == 4 {
         state[1 - target]
     } else {
@@ -309,7 +309,7 @@ fn reference(state: [i64; 2], target: usize, action: i64) -> Option<[i64; 2]> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Joint {
-    Accept([i64; 2]),
+    Accept([i128; 2]),
     Reject,
     Refused,
 }
@@ -342,10 +342,10 @@ fn the_complete_joint_domain_agrees_with_the_compositional_result() {
         policy::with_authority(&contracts[1], &compiled[1].schema, |second| {
             let authorities = [first, second];
             let mut rows = Vec::new();
-            for x0 in 0..=7i64 {
-                for x1 in 0..=7i64 {
+            for x0 in 0..=7i128 {
+                for x1 in 0..=7i128 {
                     for target in 0..2usize {
-                        for action in 0..=4i64 {
+                        for action in 0..=4i128 {
                             let state = [x0, x1];
                             // Positions: x, action, peer.
                             let tuple = [state[target], action, state[1 - target]];
@@ -366,7 +366,7 @@ fn the_complete_joint_domain_agrees_with_the_compositional_result() {
                                         return fail(post);
                                     };
                                     let mut next = state;
-                                    next[target] = i64::try_from(value).unwrap_or_else(fail);
+                                    next[target] = value;
                                     Joint::Accept(next)
                                 }
                                 PublicationOutcome::Reject(_) => Joint::Reject,
@@ -383,7 +383,7 @@ fn the_complete_joint_domain_agrees_with_the_compositional_result() {
     .unwrap_or_else(fail)
     .unwrap_or_else(fail);
     assert_eq!(table.len(), 640);
-    let safe = |state: [i64; 2]| state.iter().all(|value| *value <= 3);
+    let safe = |state: [i128; 2]| state.iter().all(|value| *value <= 3);
     let (mut safe_rows, mut accept, mut reject) = (0, 0, 0);
     for (state, target, action, joint) in &table {
         if !safe(*state) {
@@ -422,8 +422,8 @@ fn the_complete_joint_domain_agrees_with_the_compositional_result() {
     // an unsafe peer: the assumption is operational, not decorative.
     assert!(table.contains(&([0, 4], 0, 4, Joint::Refused)));
     // Every state reachable from genesis is jointly safe, and all 16 are reachable.
-    let mut reached = vec![[0i64, 0]];
-    let mut frontier = vec![[0i64, 0]];
+    let mut reached = vec![[0i128, 0]];
+    let mut frontier = vec![[0i128, 0]];
     while let Some(state) = frontier.pop() {
         for (from, _, _, joint) in &table {
             if *from == state
@@ -586,7 +586,7 @@ fn an_eager_unused_trap_is_refused() {
     let mut ring = Ring::new(2);
     ring.leaves[0].rules = ring.leaves[0].rules.replace(
         "\"cases\": [",
-        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 9223372036854775807 - 9223372036854775807\"}, \"outbox\": []},",
+        "\"cases\": [\n    {\"rule\": \"never\", \"when\": \"pre.100.110 > 7\", \"class\": \"Accept\", \"reason\": null, \"post\": {\"110\": \"pre.100.110 + 170141183460469231731687303715884105727 - 170141183460469231731687303715884105727\"}, \"outbox\": []},",
     );
     ring.repin(0);
     let refusal = ring.refusal();

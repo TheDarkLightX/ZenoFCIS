@@ -62,7 +62,7 @@ impl Drop for Directory {
 /// `contract export-program`; shared with the loop-doors crate's tests).
 fn exported(name: &str) -> Vec<u8> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../zeno-fcis-loop-doors/tests/data")
+        .join("tests/fixtures/i128-door-programs")
         .join(format!("{name}.original.zcve"));
     fs::read(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
 }
@@ -95,7 +95,7 @@ fn document(outputs: &[&str]) -> Value {
     json!({"schema": "zeno-fcis/loop-expressions/1", "vocabulary": counter_vocabulary(), "outputs": outputs})
 }
 
-fn decimal(value: &Value) -> i64 {
+fn decimal(value: &Value) -> i128 {
     value
         .as_str()
         .and_then(|text| text.parse().ok())
@@ -129,6 +129,15 @@ fn encode(program: &Value) -> Vec<u8> {
                 "Bool" => Op::Bool(n[1].as_bool().unwrap_or_default()),
                 "Add" => Op::Add(id(&n[1]), id(&n[2])),
                 "Sub" => Op::Sub(id(&n[1]), id(&n[2])),
+                "Mul" => Op::Mul(id(&n[1]), id(&n[2])),
+                "DivFloor" => Op::DivFloor(id(&n[1]), id(&n[2])),
+                "DivCeil" => Op::DivCeil(id(&n[1]), id(&n[2])),
+                "MulDivFloor" => Op::MulDivFloor(id(&n[1]), id(&n[2]), id(&n[3])),
+                "MulDivCeil" => Op::MulDivCeil(id(&n[1]), id(&n[2]), id(&n[3])),
+                "ProductsGe" => Op::ProductsGe(
+                    [id(&n[1]), id(&n[2]), id(&n[3])],
+                    [id(&n[4]), id(&n[5]), id(&n[6])],
+                ),
                 "Eq" => Op::Eq(id(&n[1]), id(&n[2])),
                 "Lt" => Op::Lt(id(&n[1]), id(&n[2])),
                 "And" => Op::And(id(&n[1]), id(&n[2])),
@@ -200,6 +209,153 @@ fn open(directory: &Directory, name: &str) -> (String, Vec<u8>) {
     open_with(directory, name, &[])
 }
 
+#[test]
+fn main_route_arithmetic_reaches_exact_checks_replay_and_point_evaluation() {
+    for (label, instruction, text, wrong, expected, boolean) in [
+        (
+            "floor",
+            json!(["MulDivFloor", 0, 1, 2]),
+            "mul_div_floor(x, 3, 2)",
+            "mul_div_ceil(x, 3, 2)",
+            "10",
+            false,
+        ),
+        (
+            "ceil",
+            json!(["MulDivCeil", 0, 1, 2]),
+            "mul_div_ceil(x, 3, 2)",
+            "mul_div_floor(x, 3, 2)",
+            "11",
+            false,
+        ),
+        (
+            "two",
+            json!(["ProductsGe", 0, 2, 3, 1, 3, 3]),
+            "products_ge(x, 2, 3, 1)",
+            "products_ge(x, 1, 3, 1)",
+            "1",
+            true,
+        ),
+        (
+            "three",
+            json!(["ProductsGe", 0, 2, 3, 1, 3, 3]),
+            "products_ge(x, 2, 1, 3, 1, 1)",
+            "products_ge(x, 1, 1, 3, 1, 1)",
+            "1",
+            true,
+        ),
+    ] {
+        let directory = Directory::new();
+        let output = if boolean {
+            json!({"kind": "Bool"})
+        } else {
+            json!({"kind": "Int", "min": "0", "max": "100"})
+        };
+        let nodes = if boolean {
+            json!([
+                ["Input", 0],
+                ["Int", "3"],
+                ["Int", "2"],
+                ["Int", "1"],
+                instruction
+            ])
+        } else {
+            json!([["Input", 0], ["Int", "3"], ["Int", "2"], instruction])
+        };
+        let original = encode(
+            &json!({"inputs": [{"kind": "Int", "min": "0", "max": "40"}],
+            "outputs": [output], "nodes": nodes, "roots": [if boolean { 4 } else { 3 }]}),
+        );
+        let original_path = directory.write("original.zcve", &original);
+        let session = directory.path("session");
+        let (exit, report) = run(&[
+            "loop",
+            "open",
+            "--original",
+            &original_path.to_string_lossy(),
+            "--session",
+            &session,
+            "--profile",
+            "checked-i128-v1",
+        ]);
+        assert_eq!(exit, Some(0), "{label}: {report}");
+        let make_document = |expression: &str| {
+            json!({"schema": "zeno-fcis/loop-expressions/1",
+            "vocabulary": {"inputs": ["x"]}, "outputs": [expression]})
+        };
+        let right = directory.json("right.json", &make_document(text));
+        let (exit, report) = run(&[
+            "loop",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &right.to_string_lossy(),
+        ]);
+        assert_eq!(exit, Some(0), "{label}: {report}");
+        let door = &report["detail"]["door"];
+        confirm(
+            &directory,
+            &original,
+            &door["lowered"]["program"],
+            &door["check"],
+            label,
+        );
+        let (exit, observed) = run(&[
+            "loop",
+            "evaluate",
+            "--original",
+            &original_path.to_string_lossy(),
+            "--expressions",
+            &right.to_string_lossy(),
+            "--input=7",
+        ]);
+        assert_eq!(exit, Some(0), "{observed}");
+        assert_eq!(observed["detail"]["values"], json!([expected]));
+        assert_eq!(observed["authority"], "none");
+        let wrong = directory.json("wrong.json", &make_document(wrong));
+        let (exit, report) = run(&[
+            "loop",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &wrong.to_string_lossy(),
+        ]);
+        assert_eq!(exit, Some(1), "{label}: {report}");
+        assert_eq!(report["status"], "different", "{report}");
+        let comparison = |good: bool, bad: bool, compare: &dyn Fn(bool, bool) -> bool| {
+            compare(good, true) && !compare(bad, true)
+        };
+        assert!(comparison(true, false, &|a, b| a == b));
+        assert!(
+            !comparison(true, false, &|_, _| true),
+            "stubbed comparison must fail"
+        );
+        for refused in [
+            "mul_div_floor(x, 1, 0)",
+            "mul_div_ceil(x, -1, 1)",
+            "products_ge(x, 1, -1, 1)",
+        ] {
+            let path = directory.json(
+                &format!("refused-{}.json", sha256(refused.as_bytes())),
+                &make_document(refused),
+            );
+            let (exit, report) = run(&[
+                "loop",
+                "evaluate",
+                "--original",
+                &original_path.to_string_lossy(),
+                "--expressions",
+                &path.to_string_lossy(),
+                "--input=7",
+            ]);
+            assert_eq!(exit, Some(1), "{report}");
+            assert_eq!(report["status"], "refused");
+        }
+    }
+}
+
 fn open_with(directory: &Directory, name: &str, extra: &[&str]) -> (String, Vec<u8>) {
     let original = exported(name);
     let path = directory.write(&format!("{name}.zcve"), &original);
@@ -213,7 +369,7 @@ fn open_with(directory: &Directory, name: &str, extra: &[&str]) -> (String, Vec<
         "--session",
         &session,
         "--profile",
-        "checked-i64-v1",
+        "checked-i128-v1",
     ];
     arguments.extend_from_slice(extra);
     let (exit, report) = run(&arguments);
@@ -396,7 +552,7 @@ fn a_sketch_completes_or_is_unrealizable_with_a_witness() {
     );
 }
 
-fn counter_manifest(directory: &Directory, fitted: &[i64]) -> PathBuf {
+fn counter_manifest(directory: &Directory, fitted: &[i128]) -> PathBuf {
     let mut instances = Vec::new();
     for c in 1..=8 {
         let name = format!("bounded-counter-c{c}");
@@ -432,7 +588,7 @@ fn a_family_program_is_checked_on_every_instance_and_its_fit_on_unfitted_ones() 
         "--fit",
     ]);
     assert_eq!(exit, Some(0), "{report}");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     assert_eq!(report["authority"], "none");
     let detail = &report["detail"];
     assert_eq!(detail["accepted"], 8);
@@ -563,7 +719,7 @@ fn malformed_doors_are_refused_before_any_work() {
     ]);
     assert_eq!(exit, Some(1), "{report}");
     assert_eq!(report["status"], "refused");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     let unknown = directory.json(
         "u.json",
         &json!({"schema": "zeno-fcis/loop-expressions/1", "outputs": ["$K", "keep", "keep"]}),
@@ -683,6 +839,12 @@ fn a_door_that_cannot_confirm_in_time_is_inconclusive_and_spends_nothing() {
         let detail = &report["detail"];
         assert_ne!(detail["door"]["check"]["verdict"], "equivalent", "{report}");
         // no attempt spent, the incumbent unchanged and the session still open
+        assert_ne!(report["accounting_complete"], false, "{report}");
+        assert!(
+            report["acquisition"]["observed_intake"].is_object(),
+            "{report}"
+        );
+        assert_eq!(detail["report"]["accounting"]["complete"], true, "{report}");
         assert_eq!(detail["report"]["attempts"], json!([]), "{report}");
         assert_eq!(
             detail["report"]["status"], "no-checked-improvement",
@@ -714,7 +876,7 @@ fn a_sketch_search_stopped_by_its_budget_is_inconclusive_and_spends_nothing() {
         "--session",
         &session,
         "--profile",
-        "checked-i64-v1",
+        "checked-i128-v1",
     ]);
     assert_eq!(exit, Some(0), "{report}");
     let sum = ["?c[0..1]"; 16].join(" + ");
@@ -888,8 +1050,7 @@ fn a_family_sketch_stopped_by_its_budget_is_never_unrealizable() {
     // ?c = 0 and any values for the other holes, but its padded branch makes
     // the search run out of work before it can enumerate the classes.
     let directory = Directory::new();
-    let int =
-        |min: i64, max: i64| json!({"kind": "Int", "min": min.to_string(), "max": max.to_string()});
+    let int = |min: i128, max: i128| json!({"kind": "Int", "min": min.to_string(), "max": max.to_string()});
     let program = json!({
         "inputs": [int(0, 360), int(0, 360)],
         "outputs": [int(0, 720)],

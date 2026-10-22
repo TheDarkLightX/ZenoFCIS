@@ -27,8 +27,8 @@ const GENEROUS: Limits = Limits {
     input_tuples: DEFAULT_MAX_INPUT_TUPLES,
 };
 const FULL: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+    min: i128::MIN,
+    max: i128::MAX,
 };
 
 type Checked = Result<Equivalence, Rejection>;
@@ -40,12 +40,56 @@ fn limits(steps: u64) -> Limits {
     }
 }
 
+// Fresh main-route test graph; historical bytes remain admitted and unchanged
+// on their i64 route. Unconstrained output slots follow the current compiler.
+fn main_fixture(bytes: &[u8]) -> Vec<u8> {
+    if !bytes
+        .get(10..)
+        .is_some_and(|rest| rest.starts_with(b"zeno-fcis/finite-i64/"))
+    {
+        return bytes.to_vec();
+    }
+    let old = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes)
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(
+        old.value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .zcve_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}")),
+        bytes
+    );
+    let profile = old.profile();
+    let mut fresh = bytes[..10].to_vec();
+    fresh[9] += 1;
+    fresh.extend_from_slice(profile.replace("i64", "i128").as_bytes());
+    fresh.extend_from_slice(&bytes[10 + profile.len()..]);
+    let graph = import(&fresh);
+    let outputs = graph
+        .outputs()
+        .iter()
+        .map(|domain| match *domain {
+            Domain::Int { min, max }
+                if min == i128::from(i64::MIN) && max == i128::from(i64::MAX) =>
+            {
+                FULL
+            }
+            domain => domain,
+        })
+        .collect();
+    encode(&program(
+        graph.inputs().to_vec(),
+        outputs,
+        graph.nodes().to_vec(),
+        graph.roots().to_vec(),
+    ))
+}
+
 fn artifact(name: &str) -> &'static [u8] {
     macro_rules! artifacts {
         ($($name:literal),+) => {
             match name {
                 $($name => include_bytes!(concat!(
-                    "../../../docs/benchmarks/withdrawal-queue/artifacts/", $name, ".zcve"
+                    "../tests/fixtures/i128-programs/", $name, ".zcve"
                 )),)+
                 _ => panic!("unknown artifact {name}"),
             }
@@ -135,7 +179,7 @@ fn usage(max_steps: [u64; 2], candidate_uses_more: u64, usage_preserved: bool) -
     }
 }
 
-fn ok(values: &[i64], steps: u64) -> Observation {
+fn ok(values: &[i128], steps: u64) -> Observation {
     Observation {
         result: Ok(values.to_vec()),
         steps,
@@ -150,14 +194,14 @@ fn failed(failure: V2ExecutionFailure, steps: u64) -> Observation {
 }
 
 /// Independent mixed-radix decoding of an ordinal, last input fastest.
-fn decode(domains: &[Domain], mut ordinal: u128) -> Vec<i64> {
+fn decode(domains: &[Domain], mut ordinal: u128) -> Vec<i128> {
     let mut tuple = vec![0; domains.len()];
     for (slot, domain) in tuple.iter_mut().zip(domains).rev() {
         let (min, max) = domain.bounds();
-        let width = u128::from(max.abs_diff(min)) + 1;
+        let width = max.abs_diff(min) + 1;
         let offset = i128::try_from(ordinal % width).unwrap_or_else(|_| panic!("offset"));
         ordinal /= width;
-        *slot = i64::try_from(i128::from(min) + offset).unwrap_or_else(|_| panic!("value"));
+        *slot = min.checked_add(offset).unwrap_or_else(|| panic!("value"));
     }
     assert_eq!(ordinal, 0, "ordinal beyond the domain");
     tuple
@@ -192,14 +236,14 @@ fn enumeration_visits_each_tuple_once_in_declared_order() {
             Domain::Int { min: -2, max: 2 },
             Domain::Bool,
             Domain::Int {
-                min: i64::MAX - 1,
-                max: i64::MAX,
+                min: i128::MAX - 1,
+                max: i128::MAX,
             },
         ],
         vec![
             Domain::Int {
-                min: i64::MIN,
-                max: i64::MIN + 2,
+                min: i128::MIN,
+                max: i128::MIN + 2,
             },
             Domain::Int { min: 7, max: 7 },
             Domain::Bool,
@@ -218,12 +262,12 @@ fn enumeration_visits_each_tuple_once_in_declared_order() {
             .unwrap_or_else(|| panic!("small domain"));
         let product: u128 = domains
             .iter()
-            .map(|domain| u128::from(domain.bounds().1.abs_diff(domain.bounds().0)) + 1)
+            .map(|domain| domain.bounds().1.abs_diff(domain.bounds().0) + 1)
             .product();
         assert_eq!(size, product);
         let mut tuple = first_tuple(&domains);
         let first = tuple.clone();
-        let mut seen: Vec<Vec<i64>> = Vec::new();
+        let mut seen: Vec<Vec<i128>> = Vec::new();
         loop {
             assert!(
                 tuple
@@ -244,7 +288,7 @@ fn enumeration_visits_each_tuple_once_in_declared_order() {
         // Count equals the product: with distinct in-domain tuples, every
         // tuple was visited exactly once.
         assert_eq!(seen.len() as u128, size);
-        let last: Vec<i64> = domains.iter().map(|domain| domain.bounds().1).collect();
+        let last: Vec<i128> = domains.iter().map(|domain| domain.bounds().1).collect();
         assert_eq!(seen.last(), Some(&last));
         assert_eq!(tuple, first, "the odometer wraps to its first tuple");
     }
@@ -270,15 +314,24 @@ fn zero_inputs_have_exactly_one_empty_tuple() {
 #[test]
 fn domain_size_is_exact_and_overflow_safe() {
     let two_to_64 = 1_u128 << 64;
-    assert_eq!(domain_size(&[FULL]), Ok(Some(two_to_64)));
-    assert_eq!(domain_size(&[FULL, Domain::Bool]), Ok(Some(two_to_64 * 2)));
+    let old_full = Domain::Int {
+        min: i128::from(i64::MIN),
+        max: i128::from(i64::MAX),
+    };
+    assert_eq!(domain_size(&[old_full]), Ok(Some(two_to_64)));
+    assert_eq!(
+        domain_size(&[old_full, Domain::Bool]),
+        Ok(Some(two_to_64 * 2))
+    );
+    assert_eq!(domain_size(&[FULL]), Ok(None));
+    assert_eq!(domain_size(&[FULL, Domain::Bool]), Ok(None));
     // 2^128 does not fit in u128.
     assert_eq!(domain_size(&[FULL, FULL]), Ok(None));
     assert_eq!(domain_size(&[FULL; 32]), Ok(None));
     assert_eq!(
         domain_size(&[Domain::Int {
-            min: i64::MIN,
-            max: i64::MIN
+            min: i128::MIN,
+            max: i128::MIN
         }]),
         Ok(Some(1))
     );
@@ -328,7 +381,7 @@ fn domain_cap_applies_before_any_evaluation() {
     assert_eq!(
         check(&one, &one, capped(u64::MAX)),
         Err(Rejection::Inconclusive(Inconclusive::DomainTooLarge {
-            size: Some(1 << 64),
+            size: None,
             limit: u64::MAX
         }))
     );
@@ -371,7 +424,7 @@ fn receipt_is_canonical_and_deterministic() {
             "{{\"authority\":\"none\",",
             "\"candidate\":{{\"bytes\":{},\"nodes\":1,\"sha256\":\"{}\"}},",
             "\"checker\":{{\"evaluator_identity\":\"{}\",",
-            "\"semantics\":\"zeno-fcis/transform-check/3\"}},",
+            "\"semantics\":\"zeno-fcis/transform-check/4\"}},",
             "\"claim\":\"Functionally equal on the full declared input domain: every tuple ",
             "gives identical outputs or identical failures. The Step limit never binds: no ",
             "tuple needs more Steps than the limit in either program.\",",
@@ -380,10 +433,10 @@ fn receipt_is_canonical_and_deterministic() {
             "\"inputs_checked\":5,",
             "\"limits\":{{\"input_tuples\":100000000,\"steps\":256}},",
             "\"original\":{{\"bytes\":{},\"nodes\":3,\"sha256\":\"{}\"}},",
-            "\"outputs\":[{{\"kind\":\"int\",\"max\":\"9223372036854775807\",",
-            "\"min\":\"-9223372036854775808\"}}],",
+            "\"outputs\":[{{\"kind\":\"int\",\"max\":\"170141183460469231731687303715884105727\",",
+            "\"min\":\"-170141183460469231731687303715884105728\"}}],",
             "\"profile\":{{\"execution\":\"zeno-fcis/finite-instruction-meter/2\",",
-            "\"program\":\"zeno-fcis/finite-i64/1\"}},",
+            "\"program\":\"zeno-fcis/finite-i128/1\"}},",
             "\"schema\":\"zeno-fcis/transform-receipt/1\",",
             "\"usage\":{{\"candidate_uses_more\":0,\"max_steps\":{{\"candidate\":1,",
             "\"original\":3}},\"usage_preserved\":false}},",
@@ -623,7 +676,7 @@ fn a_refresh_rebinds_only_the_checker_identity() {
 }
 
 /// Reads a `cases.json` decimal string.
-fn decimal(value: &Value) -> i64 {
+fn decimal(value: &Value) -> i128 {
     value
         .as_str()
         .and_then(|text| text.parse().ok())
@@ -705,7 +758,7 @@ fn fixture_program(inputs: &[Domain], outputs: &[Domain], graph: &Value) -> Vec<
 }
 
 /// The fixtures' typed values: Bool as JSON booleans, integers as decimal strings.
-fn typed(domains: &[Domain], values: &[i64]) -> Value {
+fn typed(domains: &[Domain], values: &[i128]) -> Value {
     assert_eq!(domains.len(), values.len());
     Value::Array(
         domains
@@ -728,9 +781,12 @@ fn typed_observation(outputs: &[Domain], observation: &Observation) -> Value {
 
 #[test]
 fn benchmark_fixtures_reproduce_recorded_relations_and_witnesses() {
-    let fixtures: Value = serde_json::from_str(include_str!("../../../docs/benchmarks/cases.json"))
+    let fixtures: Value = serde_json::from_str(include_str!("../tests/fixtures/cases-i128.json"))
         .unwrap_or_else(|error| panic!("cases.json: {error}"));
-    assert_eq!(fixtures["schema_version"], "zenofcis-benchmark-seeds-v1");
+    assert_eq!(
+        fixtures["schema_version"],
+        "zenofcis-benchmark-seeds-i128-v1"
+    );
     // The fixtures were enumerated in the order this checker uses.
     assert_eq!(fixtures["enumeration"], ENUMERATION);
     let cases = fixtures["cases"]
@@ -804,7 +860,7 @@ fn benchmark_fixtures_reproduce_recorded_relations_and_witnesses() {
 #[test]
 fn withdrawal_artifacts_match_their_manifest() {
     let manifest: Value = serde_json::from_str(include_str!(
-        "../../../docs/benchmarks/withdrawal-queue/artifacts/manifest.json"
+        "../tests/fixtures/i128-programs/manifest.json"
     ))
     .unwrap_or_else(|error| panic!("manifest: {error}"));
     let entries = manifest["artifacts"]
@@ -822,10 +878,13 @@ fn withdrawal_artifacts_match_their_manifest() {
 
 #[test]
 fn withdrawal_originals_come_from_the_current_template() {
-    // The retained controller is the template's synthesized program.
+    // The main-route controller comes from the retained template program;
+    // main_fixture also checks that the original still round-trips as i64.
     assert_eq!(
         artifact("retained-controller-original"),
-        include_bytes!("../templates/withdrawal-queue/synthesized/program.zcve")
+        main_fixture(include_bytes!(
+            "../templates/withdrawal-queue/synthesized/program.zcve"
+        ))
     );
     // The current decision graph is the template descriptor's scalar program.
     let contract = withdrawal_contract::Contract::new();
@@ -983,8 +1042,8 @@ fn a_binding_limit_never_mints_an_equivalence() {
 #[test]
 fn usage_is_reported_from_full_budget_runs() {
     let near_max = Domain::Int {
-        min: i64::MAX - 1,
-        max: i64::MAX,
+        min: i128::MAX - 1,
+        max: i128::MAX,
     };
     // Both programs return x and ignore the Boolean input, so each value of x
     // is checked twice. Both trap at x = MAX; the candidate traps one
@@ -1115,8 +1174,8 @@ fn planted_swapped_outputs_are_found_at_the_first_distinguishing_tuple() {
 #[test]
 fn planted_removal_of_an_eager_overflow_trap_is_found() {
     let near_max = Domain::Int {
-        min: i64::MAX - 2,
-        max: i64::MAX,
+        min: i128::MAX - 2,
+        max: i128::MAX,
     };
     let candidate = encode(&program(
         vec![near_max],
@@ -1143,10 +1202,10 @@ fn planted_removal_of_an_eager_overflow_trap_is_found() {
         let found = counterexample(check(&original, &candidate, GENEROUS));
         assert_eq!(
             (found.ordinal, found.input.as_slice()),
-            (2, &[i64::MAX][..])
+            (2, &[i128::MAX][..])
         );
         assert_eq!(found.original, failed(V2ExecutionFailure::Arithmetic, 3));
-        assert_eq!(found.candidate, ok(&[i64::MAX], 1));
+        assert_eq!(found.candidate, ok(&[i128::MAX], 1));
     }
 }
 
@@ -1343,8 +1402,10 @@ fn the_shells_comparison_agrees_with_the_checker_on_the_known_answers_and_benchm
         "/tests/fixtures/transform-check/1"
     );
     let read = |name: &str| {
-        std::fs::read(format!("{directory}/{name}"))
-            .unwrap_or_else(|error| panic!("{name}: {error}"))
+        main_fixture(
+            &std::fs::read(format!("{directory}/{name}"))
+                .unwrap_or_else(|error| panic!("{name}: {error}")),
+        )
     };
     let vectors = parse(&read("vectors.json"));
     let vectors = vectors["vectors"]
@@ -1381,7 +1442,7 @@ fn the_shells_comparison_agrees_with_the_checker_on_the_known_answers_and_benchm
         );
     }
 
-    let fixtures = parse(include_bytes!("../../../docs/benchmarks/cases.json"));
+    let fixtures = parse(include_bytes!("../tests/fixtures/cases-i128.json"));
     let cases = fixtures["cases"]
         .as_array()
         .unwrap_or_else(|| panic!("cases"));
@@ -1460,8 +1521,10 @@ fn the_shells_comparison_agrees_with_the_checker_on_planted_defects() {
 #[test]
 fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
     let original = artifact("current-decision-scalars-original");
-    let candidate =
-        include_bytes!("../tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/program.zcve");
+    let candidate_bytes = main_fixture(include_bytes!(
+        "../tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/program.zcve"
+    ));
+    let candidate = candidate_bytes.as_slice();
     assert_eq!(
         agreed(original, candidate, DEFAULT_MAX_INPUT_TUPLES),
         Some(Verdict::Equal { tuples: 1_296_000 })
@@ -1479,3 +1542,6 @@ fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
         Some(Verdict::Counterexample { .. })
     ));
 }
+
+#[path = "transform_legacy_tests.rs"]
+mod legacy;

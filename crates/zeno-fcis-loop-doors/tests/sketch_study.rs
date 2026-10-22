@@ -65,7 +65,7 @@ fn quoted(text: &str) -> String {
     out
 }
 
-fn variants(text: &str) -> BTreeMap<String, BTreeMap<String, i64>> {
+fn variants(text: &str) -> BTreeMap<String, BTreeMap<String, i128>> {
     let mut out = BTreeMap::new();
     for field in text.split(';').filter(|f| !f.is_empty()) {
         let (name, list) = field

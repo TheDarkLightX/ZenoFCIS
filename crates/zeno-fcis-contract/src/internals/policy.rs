@@ -620,13 +620,13 @@ fn input_leaf(leaf: &model::InputLeaf) -> InputLeaf {
         },
         model::InputLeaf::Sum { type_id, variants } => InputLeaf::Sum {
             type_id: *type_id,
-            min: variants.first().copied().map_or(0, i64::from),
-            max: variants.last().copied().map_or(0, i64::from),
+            min: variants.first().copied().map_or(0, i128::from),
+            max: variants.last().copied().map_or(0, i128::from),
             variants: variants
                 .iter()
                 .map(|id| InputVariant {
                     id: *id,
-                    code: i64::from(*id),
+                    code: i128::from(*id),
                 })
                 .collect(),
         },
@@ -660,6 +660,9 @@ pub fn scalar_op(op: &ScalarOp) -> Result<Op, ContractError> {
             Rounding::Floor => Op::DivFloor(small(a)?, small(b)?),
             Rounding::Ceil => Op::DivCeil(small(a)?, small(b)?),
         },
+        ScalarOp::SignedMulDivFloor(a, b, d) => {
+            Op::SignedMulDivFloor(small(a)?, small(b)?, small(d)?)
+        }
         ScalarOp::MulDiv(r, a, b, d) => match r {
             Rounding::Floor => Op::MulDivFloor(small(a)?, small(b)?, small(d)?),
             Rounding::Ceil => Op::MulDivCeil(small(a)?, small(b)?, small(d)?),
@@ -775,6 +778,7 @@ pub fn law_op(op: &LawOp) -> l::Op<'_> {
         ),
         LawOp::ToI128(a) => l::Op::ToI128(*a),
         LawOp::ToU128(a) => l::Op::ToU128(*a),
+        LawOp::SignedMulDivFloor(a, b, d) => l::Op::SignedMulDivFloor(*a, *b, *d),
         LawOp::MulDiv(r, a, b, d) => match r {
             Rounding::Floor => l::Op::MulDivFloor(*a, *b, *d),
             Rounding::Ceil => l::Op::MulDivCeil(*a, *b, *d),

@@ -78,7 +78,8 @@ def fixture(data):
         nodes.append((OP[tag], *args))
     if type(data["roots"]) is not list or any(type(a) is not int for a in data["roots"]):
         raise ValueError("root shape")
-    p = IR.Program(inputs, outputs, tuple(nodes), tuple(data["roots"]))
+    # The capture model stays the narrower checked-i64 one (see report_rows).
+    p = IR.Program(inputs, outputs, tuple(nodes), tuple(data["roots"]), IR.I64_PROFILE)
     IR._type_check(p)
     return p
 
@@ -122,7 +123,7 @@ def policies(spec, rows, candidate, examples, anchor=None):
     for j, (tag, *args) in enumerate(p.nodes):
         if tag != 9:
             continue
-        prefix = IR.Program(p.inputs, ((True, 0, 1),), p.nodes[:j], (args[0],))
+        prefix = IR.Program(p.inputs, ((True, 0, 1),), p.nodes[:j], (args[0],), p.profile)
         values = [IR.run(prefix, point) for point in ps]
         for outcome in (0, 1):
             ordinals = [i for i, v in enumerate(values) if v == ("ok", (outcome,))]
@@ -132,13 +133,39 @@ def policies(spec, rows, candidate, examples, anchor=None):
     return {"precheck_failure": pre, "bad": bad, "chosen": chosen, "coverage": outcomes}
 
 
+def report_rows(rows):
+    """Decode /2 scalar syntax before the independent, narrower i64 replay.
+
+    This does not broaden the reference model or alter stored table hashing.
+    """
+    def scalar(value):
+        if type(value) is int:
+            number = value
+        elif type(value) is str and len(value) <= 40:
+            number = int(value)
+            if str(number) != value:
+                raise ValueError("noncanonical report integer")
+        else:
+            raise ValueError("report integer")
+        if not -(1 << 127) <= number < (1 << 127):
+            raise ValueError("report i128 bound")
+        return number
+    if type(rows) is not list or any(type(row) is not list for row in rows):
+        raise ValueError("report rows")
+    return [[scalar(value) for value in row] for row in rows]
+
+
 def check_owner_report(report):
     """Verify complete table encoding and any claimed capture independently."""
-    if report.get("schema") != "zeno-fcis/black-box-capture/1" or report.get("authority") != "none":
+    if report.get("schema") not in ("zeno-fcis/black-box-capture/1", "zeno-fcis/black-box-capture/2") or report.get("authority") != "none":
         return False
     detail = report["detail"]
     session = detail["session"]
     spec, rows = session["spec"], session["rows"]
+    if report["schema"].endswith("/2"):
+        if report.get("integer_encoding") != "safe-number-or-decimal-string/1":
+            return False
+        rows = report_rows(rows)
     table_rows(spec, rows)
     digest = hashlib.sha256(json.dumps(rows, separators=(",", ":")).encode("ascii")).hexdigest()
     if not equal(digest, session["table_sha256"]) or not replay(spec, rows, detail["table_program"]):

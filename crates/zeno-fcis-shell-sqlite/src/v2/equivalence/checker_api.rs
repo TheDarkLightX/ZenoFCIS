@@ -36,12 +36,12 @@ pub closed spec fn admission(a: &V2ScalarProgram, b: &V2ScalarProgram,
 pub closed spec fn cardinality(domains: Seq<Domain>, result: Result<Option<u128>, usize>) -> bool {
     checker::spec::size_result(domains, result)
 }
-pub closed spec fn first(domains: Seq<Domain>, result: Seq<i64>) -> bool {
+pub closed spec fn first(domains: Seq<Domain>, result: Seq<i128>) -> bool {
     checker::spec::minimum(domains, result)
     && checker::spec::rank(domains, result, domains.len() as int) == 0
     && (checker::spec::valid(domains, domains.len() as int) ==> checker::spec::tuple(domains, result))
 }
-pub closed spec fn successor(domains: Seq<Domain>, before: Seq<i64>, after: Seq<i64>, more: bool) -> bool {
+pub closed spec fn successor(domains: Seq<Domain>, before: Seq<i128>, after: Seq<i128>, more: bool) -> bool {
     after.len() == before.len()
     && (checker::spec::tuple(domains, before) ==> (
         checker::spec::tuple(domains, after)
@@ -114,7 +114,7 @@ pub fn domain_size(domains: &[Domain]) -> Result<Option<u128>, usize> {
 
 /// Construct the all-minimum tuple; zero inputs produce one empty tuple.
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures first(domains@, result@),))]
-pub fn first_tuple(domains: &[Domain]) -> Vec<i64> {
+pub fn first_tuple(domains: &[Domain]) -> Vec<i128> {
     #[cfg(verus_keep_ghost)]
     proof! { reveal(first); }
     checker::first_tuple(domains)
@@ -125,7 +125,7 @@ pub fn first_tuple(domains: &[Domain]) -> Vec<i64> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures successor(domains@, old(tuple)@, final(tuple)@, result),
 ))]
-pub fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
+pub fn advance(domains: &[Domain], tuple: &mut [i128]) -> bool {
     #[cfg(verus_keep_ghost)]
     proof! { reveal(successor); }
     checker::advance(domains, tuple)

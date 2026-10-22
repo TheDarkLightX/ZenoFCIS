@@ -7,7 +7,7 @@ system. The claim exporters described in
 [law and claim substance](CLAIM_SUBSTANCE.md) export a claim over unconstrained
 observations, so their proofs hold for every system alike.
 
-This package checks a property against an exact `finite-i64/1` transition
+This package checks a property against an exact `finite-i128/1` transition
 program. It checks every admitted input exhaustively, and it can also export
 SMT obligations that contain the transition relation. Each route checks the
 other.
@@ -67,7 +67,7 @@ synthesis checker and emitter identities.
 
 ## Trusted dependencies
 
-The exhaustive route trusts the `finite-i64/1` interpreter. The SMT route
+The exhaustive route trusts the `finite-i128/1` interpreter. The SMT route
 trusts the selected solver and this encoding. The pinned differential tests run
 both routes on the same programs and require equal verdicts.
 

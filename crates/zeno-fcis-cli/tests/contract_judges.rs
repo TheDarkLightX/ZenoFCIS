@@ -12,6 +12,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::Value;
 
+#[path = "support/cpmm.rs"]
+mod cpmm;
+
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct TempRoot(PathBuf);
@@ -86,6 +89,77 @@ fn text(path: &Path) -> &str {
 }
 
 #[test]
+fn transition_lemma_cli_checks_actual_swaps_and_refutes_a_decreasing_step() {
+    let root = TempRoot::new("transition-lemma");
+    let app = root.path().join("swap");
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|error| panic!("{error}"));
+    let write = |limit, bps, bad| {
+        fs::write(app.join("project.zeno"), cpmm::project(limit))
+            .unwrap_or_else(|error| panic!("{error}"));
+        fs::write(
+            app.join("v2/policy.json"),
+            cpmm::policy(limit, bps, bad).to_string(),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    };
+    write(40, 30, false);
+    let result = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+        ],
+        0,
+    );
+    assert_eq!(result["schema"], "zeno-fcis/contract-transition-lemma/2");
+    assert_eq!(result["status"], "checked");
+    assert_eq!(result["authority"], "none");
+    assert_eq!(result["lemmas"][0]["mode"], "transition-relation");
+    assert_eq!(result["lemmas"][0]["admitted"], 68_921);
+    assert_eq!(result["lemmas"][0]["checked"], 68_921);
+    assert_eq!(result["lemmas"][0]["undefined"], 0);
+    assert!(result["lemmas"][0].get("initiation").is_none());
+    let stop = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+            "--max-tuples",
+            "1",
+        ],
+        2,
+    );
+    assert_eq!(stop["status"], "inconclusive");
+    write(3, 0, true);
+    let refuted = run(
+        &[
+            "contract",
+            "lemma",
+            text(&app),
+            "--transition",
+            "--lemma",
+            cpmm::RELATION,
+        ],
+        1,
+    );
+    assert_eq!(refuted["status"], "refuted");
+    assert_eq!(
+        refuted["lemmas"][0]["counterexample"]["state"],
+        serde_json::json!([1, 1])
+    );
+    assert_eq!(
+        refuted["lemmas"][0]["counterexample"]["outcome"]["post"],
+        serde_json::json!([2, 0])
+    );
+}
+
+#[test]
 fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
     let root = TempRoot::new("gaps");
     let app = counter(&root);
@@ -100,7 +174,7 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
     assert_eq!(first.stdout, second.stdout);
     let packet: Value =
         serde_json::from_slice(&first.stdout).unwrap_or_else(|error| panic!("{error}"));
-    assert_eq!(packet["schema"], "zeno-fcis/contract-review/3");
+    assert_eq!(packet["schema"], "zeno-fcis/contract-review/4");
     assert_eq!(packet["authority"], "none");
     assert_eq!(packet["gaps"]["admissible"]["full"]["determined"], 0);
     let stderr = String::from_utf8_lossy(&first.stderr);
@@ -130,7 +204,7 @@ fn review_with_gaps_is_packet_version_three_and_repeats_byte_for_byte() {
         ],
         0,
     );
-    assert_eq!(summary["packet_schema"], "zeno-fcis/contract-review/3");
+    assert_eq!(summary["packet_schema"], "zeno-fcis/contract-review/4");
     assert_eq!(summary["summary"]["gaps"]["status"], "measured");
     // Without --gaps the packet stays version 2.
     let plain = run(&["contract", "review", text(&app)], 0);
@@ -195,7 +269,7 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
     let app = counter(&root);
     let app = text(&app);
     let profile = run(&["contract", "profile", app], 0);
-    assert_eq!(profile["schema"], "zeno-fcis/contract-profile/1");
+    assert_eq!(profile["schema"], "zeno-fcis/contract-profile/2");
     assert_eq!(profile["authority"], "none");
     assert_eq!(profile["status"], "measured");
     assert_eq!(profile["states"]["reachable"], 3);
@@ -226,7 +300,7 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
     );
     assert_eq!(vacuous["status"], "vacuous");
     let replayed = run(&["contract", "scenario", app], 0);
-    assert_eq!(replayed["schema"], "zeno-fcis/contract-scenario/1");
+    assert_eq!(replayed["schema"], "zeno-fcis/contract-scenario/2");
     assert_eq!(replayed["reject_everything"]["killed"], true);
     assert!(replayed.get("max_tuples").is_none());
     let failing = PathBuf::from(app).join("failing.txt");
@@ -251,7 +325,7 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
         &["contract", "probe", "explain", app, "--input", "2 150 1"],
         0,
     );
-    assert_eq!(explained["schema"], "zeno-fcis/contract-probe/1");
+    assert_eq!(explained["schema"], "zeno-fcis/contract-probe/2");
     assert_eq!(explained["result"]["case"], 1);
     assert_eq!(
         zeno(&["contract", "probe", "explain", app, "--input", "2 x 1"])

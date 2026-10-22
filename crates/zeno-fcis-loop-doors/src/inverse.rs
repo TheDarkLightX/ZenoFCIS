@@ -21,7 +21,7 @@
 //! to avoid, or nothing (a don't-care), plus the tuples where no value at
 //! that position can make the output right. If those exist the position
 //! cannot repair the output. [`solve_constant`] is exact and complete over
-//! signed 64-bit constants; [`solve_expression`] uses top-down synthesis and is
+//! signed 128-bit constants; [`solve_expression`] uses top-down synthesis and is
 //! incomplete: `None` means *not found*, never *impossible*.
 
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -31,20 +31,22 @@ use zeno_fcis_program_search::target::{
     Plan, PlanNode, TargetBudget, TargetKind, synthesize_target_counted,
 };
 
-use crate::expr::{Env, Expr, HoleValue, Kind, Op, Vocabulary, compare_side, evaluate, has_holes};
+use crate::expr::{
+    Env, Expr, Function, HoleValue, Kind, Op, Vocabulary, compare_side, evaluate, has_holes,
+};
 use crate::subject::{Subject, domain_size};
 use crate::{Refusal, Result};
 
-/// The least value a position can hold: values are signed 64-bit integers.
-pub const MIN: i128 = i64::MIN as i128;
+/// The least value a position can hold: values are signed 128-bit integers.
+pub const MIN: i128 = i128::MIN;
 /// The greatest value a position can hold.
-pub const MAX: i128 = i64::MAX as i128;
+pub const MAX: i128 = i128::MAX;
 
 /// The requirement on one position, per tuple.
 ///
 /// Requirements are kept as exact wider integers: inverse arithmetic may
-/// leave the 64-bit range even though no evaluated value can. Bounds are
-/// clamped to the 64-bit range, so `[MIN, MAX]` means "no bound" and also
+/// leave the 128-bit range even though no evaluated value can. Bounds are
+/// clamped to the 128-bit range, so `[MIN, MAX]` means "no bound" and also
 /// states that the position's own value must not overflow; a required value
 /// outside that range is unsatisfiable.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,39 +68,14 @@ pub struct Need {
     pub impossible: Vec<bool>,
 }
 
-fn wide(values: &[i64]) -> Vec<i128> {
-    values.iter().map(|v| i128::from(*v)).collect()
-}
-
-fn lower_bound(value: i128) -> i128 {
-    value.max(MIN)
-}
-
-fn upper_bound(value: i128) -> i128 {
-    value.min(MAX)
-}
-
-/// `bound + by`, for a bound kept within the 64-bit range.
-fn shift(bound: &[i128], by: &[i128], clamp: fn(i128) -> i128) -> Vec<i128> {
-    bound
-        .iter()
-        .zip(by)
-        .map(|(b, s)| clamp(b.saturating_add(*s)))
-        .collect()
-}
-
-/// `s - bound`, for a bound kept within the 64-bit range.
-fn flip(s: &[i128], bound: &[i128], clamp: fn(i128) -> i128) -> Vec<i128> {
-    s.iter()
-        .zip(bound)
-        .map(|(s, b)| clamp(s.saturating_sub(*b)))
-        .collect()
+fn wide(values: &[i128]) -> Vec<i128> {
+    values.to_vec()
 }
 
 impl Need {
     /// The output must equal `target` where `care` holds.
     #[must_use]
-    pub fn exact(kind: Kind, target: &[i64], care: &[bool]) -> Self {
+    pub fn exact(kind: Kind, target: &[i128], care: &[bool]) -> Self {
         let n = target.len();
         Self {
             kind,
@@ -125,10 +102,10 @@ impl Need {
 
     /// Per tuple: would `values` at the position meet the need?
     #[must_use]
-    pub fn accepts(&self, values: &[i64]) -> Vec<bool> {
+    pub fn accepts(&self, values: &[i128]) -> Vec<bool> {
         (0..self.len())
             .map(|t| {
-                let v = i128::from(values[t]);
+                let v = values[t];
                 (!self.has_eq[t] || v == self.eq[t])
                     && v >= self.lo[t]
                     && v <= self.hi[t]
@@ -142,12 +119,12 @@ impl Need {
 
     /// Whether `values` meet the need on every tuple.
     #[must_use]
-    pub fn accepts_all(&self, values: &[i64]) -> bool {
+    pub fn accepts_all(&self, values: &[i128]) -> bool {
         self.accepts(values).into_iter().all(|ok| ok)
     }
 
     /// Drops every requirement outside `keep` (those tuples become
-    /// don't-cares, apart from holding a 64-bit value). `impossible` is kept.
+    /// don't-cares, apart from holding a 128-bit value). `impossible` is kept.
     #[must_use]
     pub fn restrict(&self, keep: &[bool]) -> Self {
         let n = self.len();
@@ -276,8 +253,34 @@ pub fn replace_at(node: &Expr, path: &[u8], new: &Expr) -> Result<Expr> {
         (Expr::If(c, a, b), 2) => {
             Expr::select((**c).clone(), (**a).clone(), replace_at(b, rest, new)?)
         }
+        (Expr::Call(function, args), index) if usize::from(index) < args.len() => {
+            let mut args = args.clone();
+            args[usize::from(index)] = replace_at(&args[usize::from(index)], rest, new)?;
+            Expr::Call(*function, args)
+        }
         _ => return Err(Refusal::new("position-outside-tree")),
     })
+}
+
+/// Whether the existing exact inverse covers every ancestor of this path.
+/// Nonlinear arguments are searched over their stated finite candidates;
+/// lack of an inverse never establishes impossibility.
+#[must_use]
+pub fn can_derive(root: &Expr, path: &[u8]) -> bool {
+    let mut node = root;
+    for index in path {
+        if matches!(node, Expr::Call(..) | Expr::Bin(Op::Mul, ..)) {
+            return false;
+        }
+        let Some(child) = crate::expr::children(node)
+            .get(usize::from(*index))
+            .copied()
+        else {
+            return false;
+        };
+        node = child;
+    }
+    true
 }
 
 // --- derivation --------------------------------------------------------------
@@ -388,67 +391,55 @@ fn derive_with(
                 match op {
                     Op::Mul => return Err(Refusal::new("proposal-operator-unsupported:*")),
                     Op::Add | Op::Sub => {
-                        if *op == Op::Add || *i == 0 {
-                            // x + s = t: x = t - s;  x - s = t: x = t + s
-                            let by: Vec<i128> = if *op == Op::Add {
-                                s.iter().map(|v| -v).collect()
+                        // Invert x+s, x-s or s-x directly. A wider signed
+                        // temporary no longer exists at the i128 endpoints.
+                        let reverse = *op == Op::Sub && *i == 1;
+                        let inverse = |value: i128, sibling: i128| {
+                            if *op == Op::Add {
+                                (value.checked_sub(sibling), value.saturating_sub(sibling))
+                            } else if reverse {
+                                (sibling.checked_sub(value), sibling.saturating_sub(value))
                             } else {
-                                s.clone()
+                                (value.checked_add(sibling), value.saturating_add(sibling))
+                            }
+                        };
+                        let mut next = Need {
+                            kind: Kind::Int,
+                            eq: vec![0; n],
+                            has_eq: need.has_eq.clone(),
+                            lo: vec![MIN; n],
+                            hi: vec![MAX; n],
+                            neq: Vec::new(),
+                            impossible: imp,
+                        };
+                        for (t, &side) in s.iter().enumerate().take(n) {
+                            let (exact, _) = inverse(need.eq[t], side);
+                            next.eq[t] = exact.unwrap_or(0);
+                            next.impossible[t] |= need.has_eq[t] && exact.is_none();
+                            next.impossible[t] |= need.lo[t] > need.hi[t];
+                            let (lower, upper) = if reverse {
+                                (need.hi[t], need.lo[t])
+                            } else {
+                                (need.lo[t], need.hi[t])
                             };
-                            need = Need {
-                                kind: Kind::Int,
-                                eq: need
-                                    .eq
-                                    .iter()
-                                    .zip(&by)
-                                    .map(|(e, b)| e.saturating_add(*b))
-                                    .collect(),
-                                has_eq: need.has_eq.clone(),
-                                lo: shift(&need.lo, &by, lower_bound),
-                                hi: shift(&need.hi, &by, upper_bound),
-                                neq: need
-                                    .neq
-                                    .iter()
-                                    .map(|(v, m)| {
-                                        (
-                                            v.iter()
-                                                .zip(&by)
-                                                .map(|(v, b)| v.saturating_add(*b))
-                                                .collect(),
-                                            m.clone(),
-                                        )
-                                    })
-                                    .collect(),
-                                impossible: imp,
-                            };
-                        } else {
-                            // s - x = t: x = s - t, bounds flip
-                            need = Need {
-                                kind: Kind::Int,
-                                eq: s
-                                    .iter()
-                                    .zip(&need.eq)
-                                    .map(|(s, e)| s.saturating_sub(*e))
-                                    .collect(),
-                                has_eq: need.has_eq.clone(),
-                                lo: flip(&s, &need.hi, lower_bound),
-                                hi: flip(&s, &need.lo, upper_bound),
-                                neq: need
-                                    .neq
-                                    .iter()
-                                    .map(|(v, m)| {
-                                        (
-                                            s.iter()
-                                                .zip(v)
-                                                .map(|(s, v)| s.saturating_sub(*v))
-                                                .collect(),
-                                            m.clone(),
-                                        )
-                                    })
-                                    .collect(),
-                                impossible: imp,
-                            };
+                            let (lower_exact, lower_clipped) = inverse(lower, side);
+                            let (upper_exact, upper_clipped) = inverse(upper, side);
+                            next.lo[t] = lower_clipped;
+                            next.hi[t] = upper_clipped;
+                            next.impossible[t] |= lower_exact.is_none() && lower_clipped == MAX;
+                            next.impossible[t] |= upper_exact.is_none() && upper_clipped == MIN;
                         }
+                        for (values, mask) in &need.neq {
+                            let mut translated = vec![0; n];
+                            let mut active = mask.clone();
+                            for t in 0..n {
+                                let (value, _) = inverse(values[t], s[t]);
+                                translated[t] = value.unwrap_or(0);
+                                active[t] &= value.is_some();
+                            }
+                            next.neq.push((translated, active));
+                        }
+                        need = next;
                         node = mine;
                         want = Kind::Int;
                     }
@@ -549,7 +540,10 @@ fn derive_with(
                             match rel {
                                 Op::Lt => {
                                     if yes {
-                                        hi[t] = v - 1;
+                                        match v.checked_sub(1) {
+                                            Some(bound) => hi[t] = bound,
+                                            None => imp[t] = true,
+                                        }
                                     }
                                     if no {
                                         lo[t] = v;
@@ -560,12 +554,18 @@ fn derive_with(
                                         hi[t] = v;
                                     }
                                     if no {
-                                        lo[t] = v + 1;
+                                        match v.checked_add(1) {
+                                            Some(bound) => lo[t] = bound,
+                                            None => imp[t] = true,
+                                        }
                                     }
                                 }
                                 Op::Gt => {
                                     if yes {
-                                        lo[t] = v + 1;
+                                        match v.checked_add(1) {
+                                            Some(bound) => lo[t] = bound,
+                                            None => imp[t] = true,
+                                        }
                                     }
                                     if no {
                                         hi[t] = v;
@@ -576,7 +576,10 @@ fn derive_with(
                                         lo[t] = v;
                                     }
                                     if no {
-                                        hi[t] = v - 1;
+                                        match v.checked_sub(1) {
+                                            Some(bound) => hi[t] = bound,
+                                            None => imp[t] = true,
+                                        }
                                     }
                                 }
                             }
@@ -626,18 +629,18 @@ pub fn first_unsatisfiable(need: &Need) -> Option<usize> {
     unsatisfiable(need).iter().position(|bad| *bad)
 }
 
-/// The 64-bit constant meeting the need on every tuple, or `None`. Exact and
-/// complete over signed 64-bit constants: the feasible set is one value (if
+/// The 128-bit constant meeting the need on every tuple, or `None`. Exact and
+/// complete over signed 128-bit constants: the feasible set is one value (if
 /// any tuple fixes it) or an interval minus finitely many values. Among
 /// feasible constants, `prefer` comes first (constants already in the
 /// program cost nothing extra), then the one nearest zero.
 #[must_use]
-pub fn solve_constant(need: &Need, prefer: &[i64]) -> Option<i64> {
+pub fn solve_constant(need: &Need, prefer: &[i128]) -> Option<i128> {
     if first_unsatisfiable(need).is_some() {
         return None;
     }
-    let mut lo = need.lo.iter().copied().max().unwrap_or(MIN).max(MIN);
-    let mut hi = need.hi.iter().copied().min().unwrap_or(MAX).min(MAX);
+    let mut lo = need.lo.iter().copied().max().unwrap_or(MIN);
+    let mut hi = need.hi.iter().copied().min().unwrap_or(MAX);
     if need.kind == Kind::Bool {
         lo = lo.max(0);
         hi = hi.min(1);
@@ -662,16 +665,16 @@ pub fn solve_constant(need: &Need, prefer: &[i64]) -> Option<i64> {
     }
     let feasible = |c: i128| lo <= c && c <= hi && !forbidden.contains(&c);
     if let Some(c) = fixed.first() {
-        return feasible(*c).then(|| i64::try_from(*c).ok()).flatten();
+        return feasible(*c).then_some(*c);
     }
-    if let Some(c) = prefer.iter().find(|c| feasible(i128::from(**c))) {
+    if let Some(c) = prefer.iter().find(|c| feasible(**c)) {
         return Some(*c);
     }
     let start = lo.max(0).min(hi);
     for step in 0..=i128::try_from(forbidden.len()).unwrap_or(MAX) {
         for c in [start.saturating_add(step), start.saturating_sub(step)] {
             if feasible(c) {
-                return i64::try_from(c).ok();
+                return Some(c);
             }
         }
     }
@@ -729,7 +732,7 @@ pub fn from_plan(plan: &Plan, vocab: &Vocabulary, readable: bool) -> Result<Expr
                     .ok_or_else(|| Refusal::new("plan-reference"))?,
             ),
             PlanNode::Int(value) => Expr::Int(value),
-            PlanNode::Bool(value) => Expr::Int(i64::from(value)),
+            PlanNode::Bool(value) => Expr::Int(i128::from(value)),
             PlanNode::Not(a) => match at(a)? {
                 Expr::Not(inner) if readable => *inner,
                 other => Expr::negation(other),
@@ -760,6 +763,19 @@ pub fn from_plan(plan: &Plan, vocab: &Vocabulary, readable: bool) -> Result<Expr
             }
             PlanNode::Add(a, b) => Expr::bin(Op::Add, at(a)?, at(b)?),
             PlanNode::Sub(a, b) => Expr::bin(Op::Sub, at(a)?, at(b)?),
+            PlanNode::Mul(a, b) => Expr::bin(Op::Mul, at(a)?, at(b)?),
+            PlanNode::DivFloor(a, b) => Expr::Call(Function::DivFloor, vec![at(a)?, at(b)?]),
+            PlanNode::DivCeil(a, b) => Expr::Call(Function::DivCeil, vec![at(a)?, at(b)?]),
+            PlanNode::MulDivFloor(a, b, d) => {
+                Expr::Call(Function::MulDivFloor, vec![at(a)?, at(b)?, at(d)?])
+            }
+            PlanNode::MulDivCeil(a, b, d) => {
+                Expr::Call(Function::MulDivCeil, vec![at(a)?, at(b)?, at(d)?])
+            }
+            PlanNode::ProductsGe(a, b) => Expr::Call(
+                Function::ProductsGe,
+                a.into_iter().chain(b).map(at).collect::<Result<Vec<_>>>()?,
+            ),
             PlanNode::Eq(a, b) => Expr::bin(Op::Eq, at(a)?, at(b)?),
             PlanNode::Lt(a, b) => Expr::bin(Op::Lt, at(a)?, at(b)?),
             PlanNode::And(a, b) => Expr::bin(Op::And, at(a)?, at(b)?),
@@ -824,7 +840,7 @@ impl<'a> Synthesizer<'a> {
     /// expression; `None` when not found (or a budget stopped the search).
     pub fn solve(
         &self,
-        target: &[i64],
+        target: &[i128],
         care: &[bool],
         kind: Kind,
         depth: u32,
@@ -928,16 +944,10 @@ pub fn solve_expression(
     let env = synthesizer.subject.env(None);
     let none = BTreeMap::new();
     if need.has_eq.iter().any(|h| *h) {
-        // Every required value is within the 64-bit range: the need is
+        // Every required value is within the 128-bit range: the need is
         // satisfiable.
-        let target: Vec<i64> = (0..need.len())
-            .map(|t| {
-                if need.has_eq[t] {
-                    i64::try_from(need.eq[t]).unwrap_or(0)
-                } else {
-                    0
-                }
-            })
+        let target: Vec<i128> = (0..need.len())
+            .map(|t| if need.has_eq[t] { need.eq[t] } else { 0 })
             .collect();
         if let Some(expr) = synthesizer.solve(&target, &need.has_eq, need.kind, depth, false)? {
             let values = evaluate(&expr, &env, &none)?;
@@ -952,12 +962,12 @@ pub fn solve_expression(
             return Ok(Some(atom));
         }
         if need.kind == Kind::Int {
-            for k in [1i64, -1, 2, -2] {
+            for k in [1i128, -1, 2, -2] {
                 // A shift that overflows on some tuple would trap there.
                 let Some(shifted) = values
                     .iter()
                     .map(|v| v.checked_add(k))
-                    .collect::<Option<Vec<i64>>>()
+                    .collect::<Option<Vec<i128>>>()
                 else {
                     continue;
                 };
@@ -984,7 +994,7 @@ pub fn describe_region(
     if mask.iter().all(|m| *m) {
         return Ok(Some(Expr::Int(1)));
     }
-    let target: Vec<i64> = mask.iter().map(|m| i64::from(*m)).collect();
+    let target: Vec<i128> = mask.iter().map(|m| i128::from(*m)).collect();
     let all = vec![true; mask.len()];
     synthesizer.solve(&target, &all, Kind::Bool, depth, true)
 }
@@ -992,10 +1002,10 @@ pub fn describe_region(
 /// Input fields that take one value on every tuple of `mask` (a coarse
 /// description when no formula is found).
 #[must_use]
-pub fn common_cube(mask: &[bool], subject: &Subject) -> Vec<(usize, i64)> {
+pub fn common_cube(mask: &[bool], subject: &Subject) -> Vec<(usize, i128)> {
     let mut out = Vec::new();
     for (k, column) in subject.columns.iter().enumerate() {
-        let values: BTreeSet<i64> = column
+        let values: BTreeSet<i128> = column
             .iter()
             .zip(mask)
             .filter(|(_, m)| **m)

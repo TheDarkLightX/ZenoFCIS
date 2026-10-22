@@ -276,7 +276,7 @@ fn case<'r>(report: &'r Value, rule: &str) -> &'r Value {
         .unwrap_or_else(|| panic!("no case {rule}"))
 }
 
-fn input(witness: &Value, name: &str) -> i64 {
+fn input(witness: &Value, name: &str) -> i128 {
     witness["input"]
         .as_array()
         .and_then(|input| input.iter().find(|value| value["name"] == name))
@@ -526,8 +526,8 @@ fn symbolic_retention_failure_leaves_no_attested_receipt() {
         .as_bytes(),
     );
     let wide = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let program = Program::try_new(vec![wide], vec![wide], vec![Op::Input(0)], vec![0])
         .unwrap_or_else(|error| panic!("identity program: {error:?}"));

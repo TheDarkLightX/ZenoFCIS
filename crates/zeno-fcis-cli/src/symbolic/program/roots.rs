@@ -38,7 +38,7 @@ pub(super) enum Failure {
             && (forall|environment: Map<Seq<char>, denotation::Value>|
                 node::typed_sources(Seq::empty(), terms@, kinds@, environment) ==>
                     spec::typed(encoded.outputs@, encoded.admitted@, environment))
-            && (forall|environment: Map<Seq<char>, denotation::Value>, values: Seq<i64>|
+            && (forall|environment: Map<Seq<char>, denotation::Value>, values: Seq<i128>|
                 node::prefix_values(kinds@, terms@, values, environment) ==>
                     spec::meaning(domains@, roots@, encoded.outputs@, encoded.admitted@,
                         values, environment)),
@@ -105,7 +105,7 @@ pub(super) fn encode_roots(
                 outputs.push(output);
             }
             (Domain::Int { min, max }, Kind::Int) => {
-                let guard = Term::within(term, i128::from(*min), i128::from(*max));
+                let guard = Term::within(term, *min, *max);
                 #[cfg(verus_keep_ghost)]
                 proof! { assert(spec::guard_fact(*domain, *term, guard)); }
                 admitted.push(guard);
@@ -163,7 +163,7 @@ pub(super) fn encode_roots(
             spec::typed_refines(domains@, roots@, terms@, kinds@,
                 outputs@, admitted@, environment);
         }
-        assert forall|environment: Map<Seq<char>, denotation::Value>, values: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, denotation::Value>, values: Seq<i128>|
             node::prefix_values(kinds@, terms@, values, environment) implies
                 spec::meaning(domains@, roots@, outputs@, admitted@, values, environment) by {
             spec::canonical_prefix(domains@, roots@, terms@, kinds@,
@@ -218,12 +218,12 @@ mod tests {
 
         // Opposite Bool/Int wires distinguish kind conversion from root position.
         for (raw_input, expected) in [
-            ([0i64, 1i64], [1i64, 1, 0, 1, 7, 1]),
-            ([1i64, 0i64], [0i64, 0, 1, 0, 7, 0]),
+            ([0i128, 1i128], [1i128, 1, 0, 1, 7, 1]),
+            ([1i128, 0i128], [0i128, 0, 1, 0, 7, 0]),
         ] {
             let assignment = BTreeMap::from([
-                ("x0".to_owned(), i128::from(raw_input[0])),
-                ("x1".to_owned(), i128::from(raw_input[1])),
+                ("x0".to_owned(), raw_input[0]),
+                ("x1".to_owned(), raw_input[1]),
             ]);
             let evaluation = script
                 .evaluate(&assignment)
@@ -231,10 +231,7 @@ mod tests {
             let observed: Vec<Option<i128>> = (0..roots.len())
                 .map(|position| evaluation.int(&format!("root_out{position}")))
                 .collect();
-            assert_eq!(
-                observed,
-                expected.map(|wire| Some(i128::from(wire))).to_vec()
-            );
+            assert_eq!(observed, expected.map(Some).to_vec());
             assert_eq!(evaluation.boolean("root_admitted"), Some(true));
             let (actual, _) = finite::execute_v2(
                 &input_domains,
@@ -356,7 +353,7 @@ mod tests {
         assert_eq!(actual, Ok(Vec::new()));
 
         // Empty output projection must still retain an unused eager overflow.
-        let overflow = [Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1)];
+        let overflow = [Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1)];
         let mut overflowing = Script::default();
         let encoded = encode(
             &mut overflowing,

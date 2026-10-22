@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -26,6 +27,7 @@ import subprocess
 import sys
 
 from behavior import Refusal
+import report_numbers as N
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPRESSIONS_SCHEMA = "zeno-fcis/loop-expressions/1"
@@ -106,7 +108,7 @@ def document(vocabulary: dict | None, outputs: list, parameters: dict | None = N
 
 def open_session(cli: Path, original: Path, session: Path) -> dict:
     code, report = run(cli, ["loop", "open", "--original", original, "--session", session,
-                             "--profile", "checked-i64-v1"])
+                             "--profile", "checked-i128-v1"])
     if code != 0 or report.get("status") != "opened":
         raise Refusal(f"loop open refused the program: {report.get('status')}")
     return report
@@ -146,6 +148,16 @@ def decompose(cli: Path, contract: Path, architecture: Path, compose: bool = Tru
 def gaps(cli: Path, contract: Path, laws: Path) -> tuple[int, dict]:
     """The specification-gap judge with proposed laws (``contract review --gaps --gaps-laws``)."""
     return run(cli, ["contract", "review", contract, "--gaps", "--gaps-laws", laws, "--format", "json"])
+
+
+def evaluate_expression(cli: Path, original: Path, expressions: Path, values: list[int]) -> int:
+    """Read one scalar through Rust's existing library evaluator, with no verdict or receipt."""
+    code, report = run(cli, ["loop", "evaluate", "--original", original, "--expressions", expressions,
+                             "--input=" + ",".join(str(v) for v in values)])
+    result = (report.get("detail") or {}).get("values")
+    if code != 0 or report.get("status") != "evaluated" or not isinstance(result, list) or len(result) != 1:
+        raise Refusal("scenario-expression-refused-by-library")
+    return N.integer(result[0])
 
 
 def lemma(cli: Path, contract: Path, formula: str) -> tuple[int, dict]:
@@ -219,7 +231,7 @@ def generate_family(cli: Path, family_name: str, directory: Path, vocabulary,
         entry = {"name": name, "parameters": params, "program": f"{name}/original.zcve"}
         if optimize:
             code, report = run(cli, ["optimize", "--program", folder / "original.zcve", "--profile",
-                                     "checked-i64-v1", "--candidate-out", folder / "optimized.zcve"])
+                                     "checked-i128-v1", "--candidate-out", folder / "optimized.zcve"])
             if code == 0 and (folder / "optimized.zcve").is_file():
                 entry["optimize"] = f"{name}/optimized.zcve"
         if fit is not None:

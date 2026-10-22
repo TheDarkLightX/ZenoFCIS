@@ -11,6 +11,8 @@ an authorization or a release.
 
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 import json
 import os
@@ -21,6 +23,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import time
 import zipfile
 
 import check_verus as verifier
@@ -97,7 +100,7 @@ def source_paths() -> tuple[Path, ...]:
         Path("verification/verus/authority_v2_test_sources.json"),
         Path("tools/check_checked_assembly.py"), Path("tools/test_check_checked_assembly.py"),
         Path("tools/check_verus.py"), Path("tools/verus_coverage.py"),
-        Path("tools/v2_proof_sources.py"), Path("Cargo.toml"), Path("rust-toolchain.toml"),
+        Path("tools/v2_proof_sources.py"), *verifier.QUALIFICATION_SOURCES, Path("Cargo.toml"), Path("rust-toolchain.toml"),
     ]
     # Every module file of the finite closure the harness compiles, including
     # any the registered source manifest does not list.
@@ -224,8 +227,10 @@ def candidate_profile(process, report, pin, profile, functions):
         raise ValueError('cannot inventory a failed or differently pinned whole proof')
     return {**profile, 'reviewed': False,
         'expected_verified': report['verification-results']['verified'],
+        # Report-only enum getter aliases have different VIR function names.
+        # Pin their complete records in functions; target actual report names.
         'target_functions': sorted(name for name in report['func-details']
-            if name.startswith(NAMESPACES)),
+            if name in functions),
         'functions': functions, 'inventory': counts(functions)}
 
 
@@ -256,6 +261,7 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
         folder.mkdir()
         (folder / "command.json").write_text(json.dumps(
             {"command": args, "cwd": str(cwd)}, indent=2) + "\n")
+        started = time.monotonic_ns()
         process = subprocess.Popen(args, cwd=cwd, env=environment, text=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    start_new_session=True)
@@ -271,6 +277,11 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
                 os.killpg(process.pid, signal.SIGKILL)
                 stdout, stderr = process.communicate(timeout=10)
         proc = subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+        ended = time.monotonic_ns()
+        (folder / "timing.json").write_text(json.dumps({
+            "command": args, "cwd": str(cwd), "started_ns": started,
+            "ended_ns": ended, "elapsed_ns": ended - started,
+        }) + "\n")
         (folder / "stdout").write_text(proc.stdout)
         (folder / "stderr").write_text(proc.stderr)
         (folder / "process.json").write_text(json.dumps({
@@ -296,7 +307,7 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
         with emit_profile.open('x') as stream:
             stream.write(json.dumps(proposal, indent=2, sort_keys=True) + "\n")
         return {'schema': 'zeno-fcis/checked-assembly-evidence/1',
-            'status': 'profile-review-required', 'source_sha256': before,
+            'status': 'profile-review-required', 'source_sha256': before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
             'verus_report': report, 'candidate_profile': str(emit_profile),
             'review_accepted': False, 'all_controls': False}
     require_reviewed_profile(profile)
@@ -309,7 +320,8 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
         raise RuntimeError(f"translated proof functions differ from the reviewed profile: {changed}")
     print(f"Checked assembly: {profile['expected_verified']} obligations verified", flush=True)
     results = []
-    for name, (path, changed, function) in controls.items():
+    def run_control(control_item):
+        (name, (path, changed, function)) = control_item
         specimen = logs / (name + "-source")
         for relative in before:
             destination = specimen / relative
@@ -321,13 +333,18 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
         parsed = json.loads(process.stdout)
         region = function_region(changed, function)
         killed = targeted_refusal(process, parsed, pin, profile, path, specimen, region)
-        results.append({"name": name, "file": str(path), "intended_function": function,
+        control_result = {"name": name, "file": str(path), "intended_function": function,
                         "killed": killed, "exit_code": process.returncode,
                         "verification_results": parsed.get("verification-results", {}),
-                        "source_sha256": verifier.digest(specimen / path)})
+                        "source_sha256": verifier.digest(specimen / path)}
         if not killed:
-            raise RuntimeError(f"control {name} survived or failed for another reason")
+            raise ControlRefused(control_result, f"control {name} survived or failed for another reason")
         print(f"Checked assembly: control {name} fails {function}", flush=True)
+        return control_result
+    for control_result in run_controls(
+            run_control, controls.items(),
+            timings=logs / "control-timings.json"):
+        results.append(control_result)
     versions = {}
     for name, version_command in {
         "verifier_rust": ["rustc", f"+{pin['rust_toolchain']}", "--version"],
@@ -345,7 +362,7 @@ def check(cache: Path, install: bool, logs: Path, emit_profile: Path | None = No
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
     return {
         "schema": "zeno-fcis/checked-assembly-evidence/1", "status": "passed",
-        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before,
+        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
         "toolchain": pin, "versions": versions, "command": positive.args,
         "exit_code": positive.returncode, "verus_report": report,
         "translated_function_coverage": functions, "inventory": counts(functions),

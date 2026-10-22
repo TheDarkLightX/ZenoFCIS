@@ -12,11 +12,12 @@ import verus_contract_controls as contract_controls
 from test_verus_contract_controls import PIN, assert_strict_classification, report
 from verus_coverage import require_coverage
 
-# Primary error/location excerpt of the retained local schema omission run at rlimit 80.
+# Primary error/location excerpt of the local schema omission run at rlimit 80, at the
+# current source lines.
 # Diagnostic order and duplicate catalog postcondition are retained; paths are relative.
 # This fixture tests classification and is not a proof result.
 RETAINED_OMIT = """error: precondition not satisfied
-   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs:133:13
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs:180:13
 
 error: postcondition not satisfied
   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:83:63
@@ -28,7 +29,7 @@ error: postcondition not satisfied
    --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs:136:5
 
 error: postcondition not satisfied
-   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs:345:56
+   --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs:343:56
 
 error: postcondition not satisfied
    --> verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs:63:56
@@ -83,6 +84,7 @@ class SchemaCoverage(unittest.TestCase):
                 stack.enter_context(patch.object(gate.verifier, "run", side_effect=run))
                 stack.enter_context(patch.object(gate.verifier, "verify_tool_files"))
                 stack.enter_context(patch.object(gate, "native_check", return_value={"build_exit": 0, "exit_code": 0}))
+                stack.enter_context(patch.object(gate, "prepare_native_dependencies"))
                 stack.enter_context(patch.object(gate, "require_coverage", return_value={}))
                 stack.enter_context(patch.object(gate, "coverage_control",
                     return_value=(mode != "unrelated-coverage", "synthetic intended refusal")))

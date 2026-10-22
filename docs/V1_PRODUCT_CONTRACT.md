@@ -37,7 +37,7 @@ V1 contains these product features:
    human and LLM documentation, executable acceptance scenarios, and
    release packaging with explicit reproducibility checks.
 8. A bounded `.zeno` compiler, canonical typed project AST, accumulated
-   diagnostics, equivalent authoring builders, derived composition views, and
+   diagnostics, equivalent specification builders, derived composition views, and
    bounded relational/temporal evaluation.
 9. Public deterministic CVC5, Z3, and Lean adapters, a complete `zeno-fcis`
    CLI, and the executable shared-nothing Mini Determinator semantic model.

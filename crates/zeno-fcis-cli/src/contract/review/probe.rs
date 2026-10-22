@@ -43,7 +43,7 @@ use zeno_fcis_synthesis::finite::v2_laws::{Failure, Verdict};
 #[derive(Clone, Debug)]
 pub(crate) enum Question {
     Explain {
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
     Reachable {
         state: String,
@@ -86,7 +86,7 @@ pub(crate) enum Answer {
 
 /// A condition's value on one tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Truth {
+pub(super) enum Truth {
     /// The contract refuses the tuple; there is no decision to read.
     Refused,
     Holds,
@@ -131,10 +131,10 @@ pub(crate) fn probe(
                 }),
                 Some(found) => json!({
                     "answer": "yes",
-                    "state": space.state(found),
+                    "state": crate::report_numbers::integers(&space.state(found)),
                     "trace_from_genesis": Machine::trace(&parent, found)
                         .into_iter()
-                        .map(|input| json!(space.input(input)))
+                        .map(|input| crate::report_numbers::integers(&space.input(input)))
                         .collect::<Vec<_>>(),
                 }),
             }
@@ -179,7 +179,7 @@ pub(crate) fn probe(
                 Some(ordinal) => json!({
                     "answer": "no",
                     "count": broken.len(),
-                    "input": space.at(*ordinal),
+                    "input": crate::report_numbers::integers(&space.at(*ordinal)),
                     "contract": machine.observed[*ordinal].json(space),
                     "conclusion": truth_name(conclusions[*ordinal]),
                 }),
@@ -252,7 +252,7 @@ fn outcome_name(outcome: Observed) -> String {
 }
 
 /// A condition on every tuple, read on the contract's own decision.
-fn conditions(
+pub(super) fn conditions(
     project: &str,
     loaded: &Loaded,
     machine: &Machine,
@@ -270,7 +270,7 @@ fn conditions(
     let space = &machine.space;
     extended.bind(&extended.rules, |authority, framer| {
         let laws = LawSet::new(authority.descriptor(), &[id]);
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         Ok(parallel(space.tuples(), |ordinal| {
             let Observed::Decided {
                 class,
@@ -354,7 +354,7 @@ fn depends(
                 .iter()
                 .map(|ordinal| {
                     json!({
-                        "input": space.at(*ordinal),
+                        "input": crate::report_numbers::integers(&space.at(*ordinal)),
                         "contract": machine.observed[*ordinal].json(space),
                     })
                 })
@@ -375,7 +375,7 @@ fn depends(
 }
 
 /// The case that decides `input` and what the Authority does with it.
-fn explain(loaded: &Loaded, input: &[i64]) -> Result<Value, ContractError> {
+fn explain(loaded: &Loaded, input: &[i128]) -> Result<Value, ContractError> {
     if input.len() != loaded.positions.len() {
         return Err(ContractError::new(
             "--input",
@@ -395,9 +395,9 @@ fn explain(loaded: &Loaded, input: &[i64]) -> Result<Value, ContractError> {
         let inside = match &position.domain {
             LeafDomain::Bool => matches!(value, 0 | 1),
             LeafDomain::Int { min, max } => (min..=max).contains(&value),
-            LeafDomain::Sum { variants, .. } => {
-                variants.iter().any(|variant| i64::from(*variant) == *value)
-            }
+            LeafDomain::Sum { variants, .. } => variants
+                .iter()
+                .any(|variant| i128::from(*variant) == *value),
         };
         if !inside {
             return Err(ContractError::new(
@@ -449,7 +449,7 @@ fn explain(loaded: &Loaded, input: &[i64]) -> Result<Value, ContractError> {
             .positions
             .iter()
             .zip(input)
-            .map(|(position, value)| (position.name.clone(), json!(value)))
+            .map(|(position, value)| (position.name.clone(), crate::report_numbers::integer(*value)))
             .collect::<serde_json::Map<_, _>>(),
         "case": selected,
         "cases_tried": cases,

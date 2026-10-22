@@ -56,6 +56,14 @@ pub(crate) open spec fn arithmetic<'a>(
     }
 }
 
+pub(crate) proof fn scalar_embedding(op: ArithmeticOp, left: i128, right: i128)
+    ensures match arithmetic(IntegerWidth::Signed128, op, Atom::I128(left), Atom::I128(right)) {
+        Ok(Atom::I128(value)) => value as int == operation(op, left as int, right as int),
+        _ => !(i128::MIN <= operation(op, left as int, right as int) <= i128::MAX),
+    },
+{
+}
+
 pub(crate) open spec fn legacy(op: ArithmeticOp, left: i64, right: i64) -> Option<i64> {
     let result = operation(op, left as int, right as int);
     if i64::MIN <= result <= i64::MAX { Some(result as i64) } else { None }

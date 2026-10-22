@@ -16,7 +16,7 @@ verus! {
 /// when an earlier eager instruction overflowed.
 pub(crate) open spec fn outcome(
     input_domains: Seq<Domain>, output_domains: Seq<Domain>,
-    instructions: Seq<Op>, roots: Seq<u16>, raw: Seq<i64>,
+    instructions: Seq<Op>, roots: Seq<u16>, raw: Seq<i128>,
     outputs: Seq<Term>, trap: Term, admitted: Term,
     environment: Map<Seq<char>, denotation::Value>,
 ) -> bool {
@@ -42,7 +42,7 @@ pub(crate) open spec fn outcome(
 
 /// The root owner's exact wire values preserve ordered result equality.
 pub(crate) proof fn output_values_equal(
-    left: Seq<Term>, right: Seq<Term>, left_values: Seq<i64>, right_values: Seq<i64>,
+    left: Seq<Term>, right: Seq<Term>, left_values: Seq<i128>, right_values: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>,
 )
     requires left.len() == right.len(),
@@ -153,7 +153,7 @@ pub(crate) proof fn input_name_push(input: Seq<Term>, wire: Term)
 }
 
 pub(crate) open spec fn raw_inputs(
-    raw: Seq<i64>, environment: Map<Seq<char>, denotation::Value>,
+    raw: Seq<i128>, environment: Map<Seq<char>, denotation::Value>,
 ) -> bool {
     forall|i: int| 0 <= i < raw.len() ==>
         #[trigger] environment.contains_key(names::generated(seq!['x'], i as nat))
@@ -163,7 +163,7 @@ pub(crate) open spec fn raw_inputs(
 
 /// Generated input names denote the supplied admitted runtime tuple.
 pub(crate) proof fn named_input_values(
-    domains: Seq<Domain>, input: Seq<Term>, raw: Seq<i64>,
+    domains: Seq<Domain>, input: Seq<Term>, raw: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>,
 )
     requires input_names(input), input.len() == raw.len(),
@@ -188,7 +188,7 @@ pub(crate) proof fn model_for_pair(
     left_definitions: Seq<(String, Sort, Term)>, definitions: Seq<(String, Sort, Term)>,
     left_domains: Seq<Domain>, left_instructions: Seq<Op>,
     right_domains: Seq<Domain>, right_instructions: Seq<Op>,
-    input: Seq<Term>, raw: Seq<i64>,
+    input: Seq<Term>, raw: Seq<i128>,
 ) -> (environment: Map<Seq<char>, denotation::Value>)
     requires input_names(input), raw.len() == input.len(),
         block(left_definitions, 0, seq!['p'], left_domains, left_instructions, input),

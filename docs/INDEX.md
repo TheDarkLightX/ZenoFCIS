@@ -7,7 +7,7 @@ with [Get started](#get-started), then follow a tutorial.
 
 - [Installation](INSTALLATION.md)
 - [Quickstart](QUICKSTART.md)
-- [ZenoFCIS 2.4.0 release notes](RELEASE_NOTES.md)
+- [ZenoFCIS 2.5.0 release notes](RELEASE_NOTES.md)
 - [Earlier public release candidates](RELEASE_CANDIDATES.md)
 - [V2 normal program API migration](V2_PROGRAM_API_MIGRATION.md)
 
@@ -52,7 +52,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Contract rules reference: `v2/policy.json`](CONTRACT_RULES.md)
 - [Contract judges: specification gaps, state profile, lemmas, scenarios and probes](CONTRACT_JUDGES.md)
 - [Composed-domain composition](COMPOSED_DOMAIN_COMPOSITION.md)
-- [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
+- [RC3 specification contract](RC3_AUTHORING_CONTRACT.md)
 - [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
 - [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
 - [Formal tools](FORMAL_TOOLS_RC3.md)
@@ -203,11 +203,11 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.4.0`, the current release, following the first
-stable V2 line, 2.3.0.
-Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.4.0` source tag; see
+The workspace is version `2.5.0`, the current release source, following the
+first stable V2 line, 2.3.0. Final qualification and publication remain pending.
+Its V2 API differs from the historical crates.io `1.1.0` API and is used from the matching `v2.5.0` source tag; see
 [installation](INSTALLATION.md) and the
-[2.4.0 release notes](RELEASE_NOTES.md). The earlier public candidates
+[2.5.0 release notes](RELEASE_NOTES.md). The earlier public candidates
 `v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
 [candidate record](RELEASE_CANDIDATES.md) keeps their sources and limits.
 

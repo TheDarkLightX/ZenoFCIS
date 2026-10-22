@@ -101,7 +101,7 @@ pub(crate) open spec fn legacy_failure(e:Failure)->super::super::Failure {
         Failure::Budget(e)=>super::super::Failure::Budget(e),
     }
 }
-pub(crate) open spec fn project_prefix(values:Seq<Atom>,count:nat)->Option<Seq<i64>>
+pub(crate) open spec fn project_prefix(values:Seq<Atom>,count:nat)->Option<Seq<i128>>
  recommends count<=values.len(), decreases count,
 {
     if count==0 {Some(Seq::empty())}else{
@@ -110,36 +110,36 @@ pub(crate) open spec fn project_prefix(values:Seq<Atom>,count:nat)->Option<Seq<i
         }
     }
 }
-pub(crate) open spec fn project_all(values:Seq<Atom>)->Option<Seq<i64>> {
+pub(crate) open spec fn project_all(values:Seq<Atom>)->Option<Seq<i128>> {
     project_prefix(values,values.len())
 }
 pub(crate) proof fn project_failure_persists(values:Seq<Atom>,failed:nat,count:nat)
  requires failed<=count<=values.len(),project_prefix(values,failed).is_none(),
  ensures project_prefix(values,count).is_none(),decreases count-failed,
 {if count>failed{project_failure_persists(values,failed,(count-1) as nat);}}
-pub(crate) proof fn lift_prefix_projects(values:Seq<i64>,count:nat)
+pub(crate) proof fn lift_prefix_projects(values:Seq<i128>,count:nat)
  requires count<=values.len(),
  ensures project_prefix(node::lift(values),count)==Some(values.take(count as int)),
  decreases count,
 {if count>0{lift_prefix_projects(values,(count-1) as nat);}}
 pub(crate) open spec fn projected(result:(Result<Seq<Atom>,Failure>,Seq<u64>))
- ->(Result<Seq<i64>,super::super::Failure>,Seq<u64>) {
+ ->(Result<Seq<i128>,super::super::Failure>,Seq<u64>) {
     (match result.0 {Err(e)=>Err(legacy_failure(e)),Ok(values)=>match project_all(values){Some(v)=>Ok(v),None=>Err(super::super::Failure::Arithmetic)}},result.1)
 }
-pub(crate) proof fn lift_projects(values:Seq<i64>)
+pub(crate) proof fn lift_projects(values:Seq<i128>)
  ensures project_all(node::lift(values))==Some(values),
 {lift_prefix_projects(values,values.len());}
 /// Successful narrowing is a lossless inverse, never a Boolean/unsigned coercion.
-pub(crate) proof fn project_prefix_inverse(values:Seq<Atom>,count:nat,codes:Seq<i64>)
+pub(crate) proof fn project_prefix_inverse(values:Seq<Atom>,count:nat,codes:Seq<i128>)
  requires count<=values.len(),project_prefix(values,count)==Some(codes),
  ensures values.take(count as int)==node::lift(codes),decreases count,
 {
     reveal_with_fuel(project_prefix,2);
     if count>0 {
-        let prior=choose|prior:Seq<i64>|project_prefix(values,(count-1) as nat)==Some(prior);
+        let prior=choose|prior:Seq<i128>|project_prefix(values,(count-1) as nat)==Some(prior);
         project_prefix_inverse(values,(count-1) as nat,prior);
         vstd::seq_lib::lemma_seq_take_len(values,(count-1) as int);
-        let code=choose|code:i64|node::project(values[count as int-1])==Some(code);
+        let code=choose|code:i128|node::project(values[count as int-1])==Some(code);
         assert(codes==prior.push(code));
         assert(values[count as int-1]==Atom::I128(code as i128));
         assert(prior.len()==count-1);
@@ -152,11 +152,11 @@ pub(crate) proof fn project_prefix_inverse(values:Seq<Atom>,count:nat,codes:Seq<
         assert(values.take(count as int) =~= node::lift(codes));
     }else{assert(values.take(0) =~= node::lift(codes));}
 }
-pub(crate) proof fn project_inverse(values:Seq<Atom>,codes:Seq<i64>)
+pub(crate) proof fn project_inverse(values:Seq<Atom>,codes:Seq<i128>)
  requires project_all(values)==Some(codes),
  ensures values==node::lift(codes),
 {project_prefix_inverse(values,values.len(),codes);}
-pub(in super::super) proof fn legacy_prefix_embedding(ops:Seq<Op>,input:Seq<i64>,count:nat,limits:Seq<u64>,used:Seq<u64>)
+pub(in super::super) proof fn legacy_prefix_embedding(ops:Seq<Op>,input:Seq<i128>,count:nat,limits:Seq<u64>,used:Seq<u64>)
  requires count<=ops.len(),limits.len()==8,used.len()==8,
  ensures prefix(Seq::new(ops.len(),|i:int|node::legacy_instruction(ops[i])),node::lift(input),count,limits,used)
     ==match old::prefix(ops,input,count,limits,used) {
@@ -170,7 +170,7 @@ pub(in super::super) proof fn legacy_prefix_embedding(ops:Seq<Op>,input:Seq<i64>
 {
     reveal_with_fuel(prefix,2);
     reveal_with_fuel(old::prefix,2);
-    assert(node::lift(Seq::<i64>::empty()) =~= Seq::<Atom>::empty());
+    assert(node::lift(Seq::<i128>::empty()) =~= Seq::<Atom>::empty());
     if count>0 {
         legacy_prefix_embedding(ops,input,(count-1) as nat,limits,used);
         if let (Ok(previous),_) = old::prefix(ops,input,(count-1) as nat,limits,used) {
@@ -181,9 +181,9 @@ pub(in super::super) proof fn legacy_prefix_embedding(ops:Seq<Op>,input:Seq<i64>
                 Ok(value)=>{
                     match value {
                         Atom::I128(n)=>{
-                            assert(i64::MIN<=n<=i64::MAX);
-                            assert(expected==Ok(n as i64));
-                            assert(Atom::I128((n as i64) as i128)==value);
+                            assert(i128::MIN<=n<=i128::MAX);
+                            assert(expected==Ok(n as i128));
+                            assert(Atom::I128((n as i128) as i128)==value);
                         },
                         _=>{assert(false);},
                     }
@@ -202,7 +202,7 @@ pub(in super::super) proof fn legacy_prefix_embedding(ops:Seq<Op>,input:Seq<i64>
         }
     }
 }
-pub(crate) proof fn legacy_projection_embedding(values:Seq<i64>,roots:Seq<u16>,count:nat)
+pub(crate) proof fn legacy_projection_embedding(values:Seq<i128>,roots:Seq<u16>,count:nat)
  requires count<=roots.len(),
  ensures projection(node::lift(values),roots,count)==match scalar::projection(values,roots,count) {
     Ok(out)=>Ok(node::lift(out)),Err(_)=>Err(Failure::Reference),
@@ -210,7 +210,7 @@ pub(crate) proof fn legacy_projection_embedding(values:Seq<i64>,roots:Seq<u16>,c
 {
     reveal_with_fuel(projection,2);
     reveal_with_fuel(scalar::projection,2);
-    assert(node::lift(Seq::<i64>::empty()) =~= Seq::<Atom>::empty());
+    assert(node::lift(Seq::<i128>::empty()) =~= Seq::<Atom>::empty());
     if count>0{
         legacy_projection_embedding(values,roots,(count-1) as nat);
         if let Ok(previous)=scalar::projection(values,roots,(count-1) as nat) {
@@ -222,7 +222,7 @@ pub(crate) proof fn legacy_projection_embedding(values:Seq<i64>,roots:Seq<u16>,c
     }
 }
 // Exact membership lift, including malformed old domains and tuple lengths.
-pub(in super::super) proof fn legacy_admission_embedding(domains:&[LegacyDomain],values:Seq<i64>)
+pub(in super::super) proof fn legacy_admission_embedding(domains:&[LegacyDomain],values:Seq<i128>)
  ensures admitted(Domains::Legacy(domains),node::lift(values))==scalar::admitted(domains@,values),
 {
     if domains@.len()==values.len() {
@@ -246,7 +246,7 @@ pub(in super::super) proof fn legacy_admission_embedding(domains:&[LegacyDomain]
     }
 }
 
-pub(in super::super) proof fn legacy_projection_error(values:Seq<i64>,roots:Seq<u16>,count:nat)
+pub(in super::super) proof fn legacy_projection_error(values:Seq<i128>,roots:Seq<u16>,count:nat)
  requires count<=roots.len(),
  ensures match scalar::projection(values,roots,count) {
      Err(e)=>e==super::super::super::evaluation::Failure::Reference,Ok(_)=>true,
@@ -255,7 +255,7 @@ pub(in super::super) proof fn legacy_projection_error(values:Seq<i64>,roots:Seq<
     if count>0 {legacy_projection_error(values,roots,(count-1) as nat);}
 }
 
-pub(in super::super) proof fn legacy_execution_embedding(p:ProgramView,input:Seq<i64>,limits:Seq<u64>,used:Seq<u64>)
+pub(in super::super) proof fn legacy_execution_embedding(p:ProgramView,input:Seq<i128>,limits:Seq<u64>,used:Seq<u64>)
  requires matches!(p,ProgramView::Legacy{..}),limits.len()==8,used.len()==8,
  ensures projected(execution(p,node::lift(input),limits,used))==match p {
     ProgramView::Legacy{inputs,outputs,nodes,roots}=>old::execution(inputs@,outputs@,nodes@,roots@,input,limits,used),

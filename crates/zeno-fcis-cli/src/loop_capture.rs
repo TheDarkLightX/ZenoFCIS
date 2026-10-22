@@ -22,12 +22,21 @@ use zeno_fcis_synthesis::finite::{MAX_NODES, Program};
 #[path = "capture_runtime.rs"]
 mod runtime;
 
-const SCHEMA: &str = "zeno-fcis/black-box-capture/1";
+#[path = "loop_capture_whole.rs"]
+mod whole;
+
+const SCHEMA: &str = "zeno-fcis/black-box-capture/2";
 const SESSION_SCHEMA: &str = "zeno-fcis/capture-session/1";
 const FILE_LIMIT: usize = 65536;
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
+    /// Owner-side whole-domain arithmetic capture by a complete bounded cover.
+    /// Every piece needs the existing exact checker and receipt replay.
+    Whole {
+        #[command(flatten)]
+        options: whole::Options,
+    },
     /// Owner-side: freeze a complete contained executable reference into a new private session.
     Open {
         #[arg(long)]
@@ -110,7 +119,7 @@ struct Session {
     table_sha256: String,
     program_sha256: String,
     checker: Value,
-    rows: Vec<Vec<i64>>,
+    rows: Vec<Vec<i128>>,
     reference_observations: u64,
     budget: Budget,
     attempts: u64,
@@ -147,7 +156,7 @@ fn report(status: &str, mut detail: Value) -> (u8, Value) {
     };
     (
         code,
-        json!({"schema":SCHEMA,"door":"capture","authority":"none","status":status,"detail":detail}),
+        json!({"schema":SCHEMA,"integer_encoding":crate::report_numbers::ENCODING,"door":"capture","authority":"none","status":status,"detail":detail}),
     )
 }
 fn refused(reason: &str) -> (u8, Value) {
@@ -345,15 +354,35 @@ fn load(dir: &Path) -> Result<(Session, proposal::ReferenceTable, Vec<u8>), Stri
     Ok((state, table, bytes))
 }
 
+// The persisted Session keeps its existing raw-integer format and hash.
+// Its public report is a fresh owned tree using the versioned scalar encoding.
+fn session_report(state: &Session) -> Value {
+    json!({
+        "schema": state.schema, "spec": state.spec,
+        "source_sha256": state.source_sha256, "table_sha256": state.table_sha256,
+        "program_sha256": state.program_sha256, "checker": state.checker,
+        "rows": state.rows.iter().map(|row| crate::report_numbers::integers(row)).collect::<Vec<_>>(),
+        "reference_observations": state.reference_observations, "budget": state.budget,
+        "attempts": state.attempts, "invocations": state.invocations,
+        "reserved_visits": state.reserved_visits, "examples": state.examples,
+        "status": state.status, "events": state.events,
+        "candidate": state.candidate, "receipt": state.receipt,
+    })
+}
+
 fn packet(state: &Session, table: &proposal::ReferenceTable) -> Value {
     let mut examples = state.examples.clone();
     examples.sort_unstable();
     json!({"profile":"zal/fcis-loop/1","abi":{"inputs":domains_json(table.inputs()),
         "outputs":domains_json(table.outputs()),"tuples":table.points().len(),"order":transform::ENUMERATION},
-        "round":state.attempts,"examples":examples.iter().map(|i|json!({"input":table.points()[*i],"output":table.rows()[*i]})).collect::<Vec<_>>()})
+        "round":state.attempts,"examples":examples.iter().map(|i|json!({"input":crate::report_numbers::integers(&table.points()[*i]),"output":crate::report_numbers::integers(&table.rows()[*i])})).collect::<Vec<_>>()})
 }
 
-fn reference_rows(reply: Value, skeleton: &Program, count: usize) -> Result<Vec<Vec<i64>>, String> {
+fn reference_rows(
+    reply: Value,
+    skeleton: &Program,
+    count: usize,
+) -> Result<Vec<Vec<i128>>, String> {
     let object = reply.as_object().ok_or("capture-reference-output-shape")?;
     if object.len() != 1 || !object.contains_key("rows") {
         return Err("capture-reference-output-shape".into());
@@ -374,6 +403,8 @@ fn reference_rows(reply: Value, skeleton: &Program, count: usize) -> Result<Vec<
                 .zip(skeleton.outputs())
                 .map(|(v, d)| {
                     v.as_i64()
+                        .map(i128::from)
+                        .or_else(|| v.as_u64().map(i128::from))
                         .filter(|v| d.contains(*v))
                         .ok_or_else(|| "capture-reference-output-domain".to_owned())
                 })
@@ -392,10 +423,24 @@ struct ReferenceWork {
 fn observed_table(
     source: &str,
     skeleton: &Program,
-    points: &[Vec<i64>],
+    points: &[Vec<i128>],
     stages: &mut super::Stages,
     work: &mut ReferenceWork,
-) -> Result<Vec<Vec<i64>>, String> {
+) -> Result<Vec<Vec<i128>>, String> {
+    observed_table_with(skeleton, points, work, |schedule| {
+        stages.run(true, || runtime::invoke(source, schedule))?
+    })
+}
+
+// The ordinary session uses one contained stage per schedule. Whole capture
+// groups bounded schedules inside a stage while retaining these same repeat,
+// reverse-order, strict-label and work-accounting checks.
+fn observed_table_with(
+    skeleton: &Program,
+    points: &[Vec<i128>],
+    work: &mut ReferenceWork,
+    mut invoke: impl FnMut(&[Vec<i128>]) -> Result<Value, String>,
+) -> Result<Vec<Vec<i128>>, String> {
     let mut baseline = None;
     for reversed in [false, true, false] {
         let mut order = (0..points.len()).collect::<Vec<_>>();
@@ -411,7 +456,7 @@ fn observed_table(
         // only complete, valid replies count as received observations.
         work.schedules_reserved += 1;
         work.observations_scheduled += schedule.len() as u64;
-        let reply = stages.run(true, || runtime::invoke(source, &schedule))??;
+        let reply = invoke(&schedule)?;
         let rows = reference_rows(reply, skeleton, schedule.len())?;
         work.valid_observations_received += rows.len() as u64;
         let table = reconcile_reference(baseline.as_deref(), &order, &rows, |a, b| a == b)?;
@@ -421,11 +466,11 @@ fn observed_table(
 }
 
 fn reconcile_reference(
-    baseline: Option<&[Vec<i64>]>,
+    baseline: Option<&[Vec<i128>]>,
     order: &[usize],
-    rows: &[Vec<i64>],
-    mut same: impl FnMut(&[Vec<i64>], &[Vec<i64>]) -> bool,
-) -> Result<Vec<Vec<i64>>, String> {
+    rows: &[Vec<i128>],
+    mut same: impl FnMut(&[Vec<i128>], &[Vec<i128>]) -> bool,
+) -> Result<Vec<Vec<i128>>, String> {
     let n = order.len();
     if rows.len() != 2 * n || order.iter().any(|i| *i >= n) {
         return Err("capture-reference-row-count".into());
@@ -539,7 +584,11 @@ fn open(
 fn budget_stop(reason: &str) -> bool {
     matches!(
         reason,
-        "reference-domain-budget" | "reference-encoding-budget" | "stage-budget"
+        "reference-domain-budget"
+            | "reference-encoding-budget"
+            | "stage-budget"
+            | "capture-whole-domain-budget"
+            | "capture-whole-work-budget"
     ) || reason == "invocation-deadline"
         || reason == "stage-deadline"
         || reason == "stage-deadline-or-control-failure"
@@ -551,14 +600,16 @@ fn confirm(
     original: &[u8],
     candidate: &[u8],
 ) -> Result<(Value, Option<Value>), String> {
+    stages.run(false, || compare_exact(original, candidate))
+}
+
+fn compare_exact(original: &[u8], candidate: &[u8]) -> (Value, Option<Value>) {
     let limits = transform::Limits {
         steps: transform::DEFAULT_STEP_LIMIT,
         input_tuples: proposal::MAX_TUPLES,
     };
-    stages.run(false, || {
-        checker_reply(transform::check(original, candidate, limits), |receipt| {
-            transform::replay(receipt, original, candidate, proposal::MAX_TUPLES)
-        })
+    checker_reply(transform::check(original, candidate, limits), |receipt| {
+        transform::replay(receipt, original, candidate, proposal::MAX_TUPLES)
     })
 }
 
@@ -592,6 +643,17 @@ fn proposed_program(
     expressions: bool,
     table: &proposal::ReferenceTable,
 ) -> Result<Program, String> {
+    let skeleton = spec_program(
+        &json!({"inputs":domains_json(table.inputs()),"outputs":domains_json(table.outputs())}),
+    )?;
+    proposed_program_for_abi(bytes, expressions, &skeleton)
+}
+
+fn proposed_program_for_abi(
+    bytes: &[u8],
+    expressions: bool,
+    skeleton: &Program,
+) -> Result<Program, String> {
     let value = strict_json(bytes)?;
     if !expressions {
         return program_from_json(&value).map_err(|_| "capture-candidate-format".into());
@@ -622,20 +684,17 @@ fn proposed_program(
     }) {
         return Err("capture-expression-output-reference".into());
     }
-    let skeleton = spec_program(
-        &json!({"inputs":domains_json(table.inputs()),"outputs":domains_json(table.outputs())}),
-    )?;
-    let names = (0..table.inputs().len())
+    let names = (0..skeleton.inputs().len())
         .map(|i| format!("x{i}"))
         .collect::<Vec<_>>();
     let vocab = Vocabulary::new(
         names,
-        table.inputs().to_vec(),
-        table.outputs().to_vec(),
+        skeleton.inputs().to_vec(),
+        skeleton.outputs().to_vec(),
         &Default::default(),
     )
     .map_err(|_| "capture-vocabulary")?;
-    lower::lower_outputs(&nodes, &vocab, &skeleton).map_err(|_| "capture-lowering".into())
+    lower::lower_outputs(&nodes, &vocab, skeleton).map_err(|_| "capture-lowering".into())
 }
 
 #[derive(Clone, Copy)]
@@ -823,7 +882,7 @@ fn candidate(
             &mut state,
             "precheck-refuted",
             json!({"precheck":"precheck-refuted","decided_by":"proposal-example-filter",
-        "example":{"input":table.points()[i],"output":table.rows()[i]},"precheck_reserved_visits":pre,"exact":"not-run"}),
+        "example":{"input":crate::report_numbers::integers(&table.points()[i]),"output":crate::report_numbers::integers(&table.rows()[i])},"precheck_reserved_visits":pre,"exact":"not-run"}),
             Attempt::Spend,
         );
     }
@@ -944,7 +1003,7 @@ fn candidate(
         }
         state.examples.push(ordinal);
     }
-    detail["example"] = json!({"input":table.points()[ordinal],"output":table.rows()[ordinal]});
+    detail["example"] = json!({"input":crate::report_numbers::integers(&table.points()[ordinal]),"output":crate::report_numbers::integers(&table.rows()[ordinal])});
     // The full checker witness is kept private; its ordinal must not expose an
     // additional hidden input through the public counterexample-selection path.
     detail["check"] = json!({"verdict":"counterexample"});
@@ -1007,7 +1066,7 @@ fn status_loaded(
         }
     }
     let detail = if full {
-        json!({"session":state,
+        json!({"session":session_report(state),
             "table_program":program_to_json(&match table.program(){Ok(p)=>p,Err(_)=>return refused("capture-reference-encoding")})})
     } else {
         json!({"source_sha256":state.source_sha256,"table_sha256":state.table_sha256,
@@ -1036,6 +1095,7 @@ fn status_loaded(
 pub(super) fn run(command: Command) -> (u8, Value) {
     let mut stages = super::Stages::new(Instant::now(), super::STATELESS_DEADLINE, 0);
     match command {
+        Command::Whole { options } => whole::run(options, &mut stages),
         Command::Open {
             spec,
             reference,

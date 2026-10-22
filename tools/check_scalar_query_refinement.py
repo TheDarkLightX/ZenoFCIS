@@ -32,6 +32,17 @@ OWNERS = (NAMESPACE + "library::impl&%0::of",) + tuple(
     for name in ("inputs", "outputs", "nodes", "roots")
 )
 
+# Native Rust corpora with their exact expected test counts; a changed count fails.
+NATIVE_CORPUS = (
+    ("symbolic", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "symbolic::",
+                  "--", "--skip", "contract::symbolic::", "--test-threads=1"], 37),
+    ("contract-runtime", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis",
+        "contract::symbolic::tests::the_contract_encoding_agrees_with_the_library_on_sampled_tuples",
+        "--", "--exact", "--test-threads=1"], 1),
+    ("owned-program", ["-p", "zeno-fcis-synthesis", "--lib",
+                      "finite::ir::evaluation_tests::", "--", "--test-threads=1"], 7),
+)
+
 
 def source_paths() -> tuple[Path, ...]:
     symbolic = Path("crates/zeno-fcis-cli/src/symbolic")
@@ -236,15 +247,7 @@ def check(cache: Path, install: bool, logs: Path) -> dict:
     native = []
     cargo = ["cargo", f"+{pin['runtime_rust']}", "test", "--locked", "--offline"]
     native_env = {**environment, "RUSTUP_TOOLCHAIN": pin["runtime_rust"]}
-    for name, arguments, expected in (
-        ("symbolic", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "symbolic::",
-                      "--", "--skip", "contract::symbolic::", "--test-threads=1"], 36),
-        ("contract-runtime", ["-p", "zeno-fcis-cli", "--bin", "zeno-fcis",
-            "contract::symbolic::tests::the_contract_encoding_agrees_with_the_library_on_sampled_tuples",
-            "--", "--exact", "--test-threads=1"], 1),
-        ("owned-program", ["-p", "zeno-fcis-synthesis", "--lib",
-                          "finite::ir::evaluation_tests::", "--", "--test-threads=1"], 7),
-    ):
+    for name, arguments, expected in NATIVE_CORPUS:
         proc, folder = run(name, cargo + arguments, env=native_env)
         verifier.require_success(proc)
         counts = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", proc.stdout)

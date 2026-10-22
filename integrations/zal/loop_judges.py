@@ -69,6 +69,8 @@ class _Writer:
             return node[1] in self.paths and _kind_of(node[1], self.subject) == "Bool"
         if tag == "not":
             return True
+        if tag == "call":
+            return node[1] == "products_ge"
         if tag == "bin":
             return node[1] in ("&&", "||", "->", "==", "!=", "<", "<=", ">", ">=")
         if tag == "if":
@@ -86,6 +88,8 @@ class _Writer:
             return _kind_of(node[1], self.subject) not in (None, "Bool")
         if tag == "bin":
             return node[1] in ("+", "-", "*")
+        if tag == "call":
+            return node[1] != "products_ge"
         if tag == "if":
             return self.is_number(node[2]) or self.is_number(node[3])
         return False
@@ -96,7 +100,7 @@ class _Writer:
             a, b = node[2], node[3]
             if (self.is_number(a) and self.is_bool(b)) or (self.is_bool(a) and self.is_number(b)):
                 raise Unrouted("law-conditional-mixes-a-truth-value-and-a-number")
-        for child in node[1:]:
+        for child in node[2] if node[0] == "call" else node[1:]:
             if isinstance(child, tuple):
                 self.check_conditionals(child)
 
@@ -116,11 +120,13 @@ class _Writer:
             return f"{self.path(node[1])} == 1"
         if tag == "not":
             if self.is_number(node[1]):
-                return f"{self.value(node[1])} == 0"
+                return f"{self.left_value(node[1])} == 0"
             return f"!({self.truth(node[1])})"
         if tag == "if":
             c, a, b = self.truth(node[1]), self.truth(node[2]), self.truth(node[3])
             return f"(({c}) && ({a})) || (!({c}) && ({b}))"
+        if tag == "call" and node[1] == "products_ge":
+            return self.call(node)
         if tag == "bin":
             op, a, b = node[1], node[2], node[3]
             if op in ("||", "->") and (self.is_number(a) or self.is_number(b)):
@@ -134,8 +140,13 @@ class _Writer:
                 both = f"(({x}) && ({y})) || (!({x}) && !({y}))"
                 return both if op == "==" else f"!({both})"
             if op in ("==", "!=", "<", "<=", ">", ">="):
-                return f"{self.value(a)} {op} {self.value(b)}"
+                return f"{self.left_value(a)} {op} {self.value(b)}"
         raise Unrouted("law-not-boolean")
+
+    def left_value(self, node) -> str:
+        value = self.value(node)
+        # The spec grammar reserves an initial '(' for relation groups.
+        return "0 + " + value if value.startswith("(") else value
 
     def value(self, node) -> str:
         tag = node[0]
@@ -145,12 +156,22 @@ class _Writer:
             if node[1] in self.variants and node[1] not in self.paths:
                 return str(self.variants[node[1]])
             return self.path(node[1])
+        if tag == "call" and node[1] != "products_ge":
+            return self.call(node)
+        if tag == "bin" and node[1] == "*":
+            return f"({self.value(node[2])}) * ({self.value(node[3])})"
         if tag == "bin" and node[1] in ("+", "-"):
             right = self.value(node[3])
             if node[3][0] == "bin":
                 right = f"({right})"
             return f"{self.value(node[2])} {node[1]} {right}"
         raise Unrouted("law-value-must-be-a-sum")
+
+    def call(self, node) -> str:
+        from loop_language import FUNCTIONS
+        if node[1] not in FUNCTIONS or len(node[2]) not in FUNCTIONS[node[1]]:
+            raise Unrouted("law-call-arity")
+        return node[1] + "(" + ", ".join(self.value(a) for a in node[2]) + ")"
 
     def path(self, name: str) -> str:
         if name not in self.paths:
@@ -199,6 +220,8 @@ def number(subject: dict, name: str, value) -> int:
 def evaluate(node, env: dict, variants: dict) -> int:
     """A loop expression's value on one input (scenario successors are simple: constants and sums)."""
     tag = node[0]
+    if tag == "call" or (tag == "bin" and node[1] == "*"):
+        raise Unrouted("arithmetic-expression-needs-library-evaluation")
     if tag == "int":
         return node[1]
     if tag == "var":
@@ -230,7 +253,14 @@ def genesis_state(subject: dict) -> dict:
     return out
 
 
-def scenario_text(name: str, start, steps: list, subject: dict) -> str:
+def requires_library(node) -> bool:
+    """New arithmetic is always delegated, including inside conditionals."""
+    from loop_language import _children
+    return node[0] == "call" or (node[0] == "bin" and node[1] == "*") or any(
+        requires_library(child) for child in _children(node))
+
+
+def scenario_text(name: str, start, steps: list, subject: dict, evaluate_expression=None) -> str:
     """``# scenario NAME`` and one decision-example line per step, in the contract's input order."""
     variants = {}
     for table in subject["variants"].values():
@@ -254,7 +284,12 @@ def scenario_text(name: str, start, steps: list, subject: dict) -> str:
             word = "accept" if outcome.cls == "Accept" else "failure"
             post = dict(state)
             for field, expr in outcome.sets:
-                post[field] = evaluate(expr, env, variants)
+                if requires_library(expr):
+                    if evaluate_expression is None:
+                        raise Unrouted("arithmetic-expression-needs-library-evaluation")
+                    post[field] = evaluate_expression(expr, env)
+                else:
+                    post[field] = evaluate(expr, env, variants)
         else:
             raise Unrouted("a scenario step expects an accept, a reject or a committed failure")
         reason = "-" if outcome.cls == "Accept" else str(reason_ids[outcome.reason])

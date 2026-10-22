@@ -41,7 +41,7 @@ fn genesis_publishes_only_the_contract_genesis() {
             InputLeaf::Bool => vec![1 - numbers[index]],
             InputLeaf::I128 { min, max } => [numbers[index] - 1, numbers[index] + 1]
                 .into_iter()
-                .filter(|value| (i128::from(*min)..=i128::from(*max)).contains(value))
+                .filter(|value| (*min..=*max).contains(value))
                 .collect(),
             InputLeaf::Sum { variants, .. } => variants
                 .iter()
@@ -579,7 +579,7 @@ mod commands {
             })
         {
             let mut outside = numbers.to_vec();
-            outside[index] = i128::from(max) + 1;
+            outside[index] = max + 1;
             let (command, context) = outside.split_at(widths().1);
             let written =
                 cli::assignments(command, context).unwrap_or_else(|error| panic!("{error}"));

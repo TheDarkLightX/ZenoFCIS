@@ -220,13 +220,8 @@ fn digest_value(hash: Hash32) -> Result<Value, Error> {
 
 /// Canonical scalar tuple shared by the optional finite operation profiles.
 /// Boolean positions retain the finite ABI's exact integer values 0 and 1.
-fn finite_tuple(values: &[i64]) -> Result<Value, zeno_fcis_codec::EncodeError> {
-    tuple(
-        values
-            .iter()
-            .map(|value| Value::signed(i128::from(*value)))
-            .collect(),
-    )
+fn finite_tuple(values: &[i128]) -> Result<Value, zeno_fcis_codec::EncodeError> {
+    tuple(values.iter().map(|value| Value::signed(*value)).collect())
 }
 
 /// Hard input-space ceiling, checked before any enumeration.
@@ -253,14 +248,14 @@ pub enum Error {
         /// Declared maximum.
         declared: u64,
     },
-    /// Checked i64 arithmetic trapped.
+    /// Checked i128 arithmetic trapped.
     Arithmetic,
     /// The reviewed relation is not total on an admitted pair.
     ContractTrap {
         /// Exact input witness.
-        input: Vec<i64>,
+        input: Vec<i128>,
         /// Exact output witness.
-        output: Vec<i64>,
+        output: Vec<i128>,
     },
     /// Failure in the existing canonical synthesis kernel.
     Search(SynthesisError),
@@ -512,7 +507,7 @@ impl Contract {
         &self.relation
     }
     /// Rechecks a target's actual complete output tuple against the relation.
-    pub fn holds(&self, input: &[i64], output: &[i64]) -> Result<bool, Error> {
+    pub fn holds(&self, input: &[i128], output: &[i128]) -> Result<bool, Error> {
         let mut environment = Vec::new();
         let mut values = Vec::new();
         let mut result = Vec::new();
@@ -526,11 +521,11 @@ impl Contract {
     /// an admitted pair.
     fn holds_into(
         &self,
-        input: &[i64],
-        output: &[i64],
-        environment: &mut Vec<i64>,
-        values: &mut Vec<i64>,
-        result: &mut Vec<i64>,
+        input: &[i128],
+        output: &[i128],
+        environment: &mut Vec<i128>,
+        values: &mut Vec<i128>,
+        result: &mut Vec<i128>,
     ) -> Result<bool, Error> {
         if !ir::admitted(&self.inputs, input) || !ir::admitted(&self.outputs, output) {
             return Err(Error::Invalid("contract-domain"));
@@ -562,7 +557,7 @@ impl Contract {
 #[derive(Clone, Debug)]
 pub struct Space {
     domains: Vec<Domain>,
-    current: Option<Vec<i64>>,
+    current: Option<Vec<i128>>,
     count: u64,
 }
 impl Space {
@@ -570,8 +565,11 @@ impl Space {
         let mut count = 1u64;
         for d in domains {
             let (min, max) = d.bounds();
-            let width = u64::try_from(i128::from(max) - i128::from(min) + 1)
-                .map_err(|_| Error::Limit("space"))?;
+            let width = max
+                .checked_sub(min)
+                .and_then(|span| span.checked_add(1))
+                .and_then(|width| u64::try_from(width).ok())
+                .ok_or(Error::Limit("space"))?;
             count = count
                 .checked_mul(width)
                 .filter(|n| *n <= limit)
@@ -595,7 +593,7 @@ impl Space {
     ///
     /// Returns false once the space is exhausted. Zero fields yield exactly one
     /// empty tuple, matching the public iterator.
-    fn next_into(&mut self, tuple: &mut Vec<i64>) -> bool {
+    fn next_into(&mut self, tuple: &mut Vec<i128>) -> bool {
         let Some(current) = self.current.as_mut() else {
             return false;
         };
@@ -622,8 +620,8 @@ impl Space {
 /// Returns false when the last field wrapped, which is also the answer for a
 /// zero-field tuple: the singleton space is exhausted by its one visit. A field
 /// is incremented only while it is strictly below its maximum, so the odometer
-/// never overflows at an `i64` endpoint.
-fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
+/// never overflows at an `i128` endpoint.
+fn advance(domains: &[Domain], tuple: &mut [i128]) -> bool {
     for index in (0..tuple.len()).rev() {
         let (min, max) = domains[index].bounds();
         if tuple[index] < max {
@@ -635,7 +633,7 @@ fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
     false
 }
 impl Iterator for Space {
-    type Item = Vec<i64>;
+    type Item = Vec<i128>;
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current.as_mut()?;
         let result = current.clone();
@@ -650,17 +648,17 @@ impl Iterator for Space {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Case {
     /// Explicit current inputs.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Exact full output tuple.
-    pub output: Vec<i64>,
+    pub output: Vec<i128>,
 }
 /// First concrete refutation retained for agent repair; hashes retain all refutations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Witness {
     /// Input at which a candidate failed.
-    pub input: Vec<i64>,
+    pub input: Vec<i128>,
     /// Candidate output, or absent if evaluation trapped.
-    pub output: Option<Vec<i64>>,
+    pub output: Option<Vec<i128>>,
 }
 /// Results with distinct contract, grammar, and selected-program meanings.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -688,7 +686,7 @@ pub enum Outcome {
     /// The relation has no admitted output for this admitted input.
     Unrealizable {
         /// Exact input witness, independent of the candidate grammar.
-        input: Vec<i64>,
+        input: Vec<i128>,
     },
 }
 
@@ -775,7 +773,7 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
         )?,
         algorithm_hash: hash_bytes(
             zeno_fcis_codec::domains::FINITE_ALGORITHM,
-            b"canonical-search/1; eager-finite-i64/1; exhaustive-total-relation/1",
+            b"canonical-search/1; eager-finite-i128/1; exhaustive-total-relation/1",
         )?,
     };
     let problem = SynthesisProblem::try_new(
@@ -877,12 +875,12 @@ struct Checker<'a> {
     first: Option<Witness>,
     accepted: Option<Program>,
     inputs: Space,
-    input: Vec<i64>,
-    program_nodes: Vec<i64>,
-    program_output: Vec<i64>,
-    environment: Vec<i64>,
-    relation_nodes: Vec<i64>,
-    relation_output: Vec<i64>,
+    input: Vec<i128>,
+    program_nodes: Vec<i128>,
+    program_output: Vec<i128>,
+    environment: Vec<i128>,
+    relation_nodes: Vec<i128>,
+    relation_output: Vec<i128>,
 }
 impl CandidateChecker for Checker<'_> {
     fn checker_hash(&self) -> Hash32 {
@@ -922,14 +920,9 @@ impl CandidateChecker for Checker<'_> {
                 let output = evaluated.then(|| self.program_output.clone());
                 let counterexample = (|| {
                     tuple(vec![
-                        tuple(
-                            self.input
-                                .iter()
-                                .map(|v| Value::signed((*v).into()))
-                                .collect(),
-                        )?,
+                        tuple(self.input.iter().map(|v| Value::signed(*v)).collect())?,
                         output.as_ref().map_or(Ok(Value::unit()), |out| {
-                            tuple(out.iter().map(|v| Value::signed((*v).into())).collect())
+                            tuple(out.iter().map(|v| Value::signed(*v)).collect())
                         })?,
                     ])
                 })();

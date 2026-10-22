@@ -1,5 +1,5 @@
 format = "zeno-fcis/package-set/1"
-version = "2.4.0"
+version = "2.5.0"
 rust_toolchain = "1.97.1"
 
 # Dependency-first order for crates.io publication. The checker rejects a
@@ -51,4 +51,4 @@ private_packages = ["zeno-fcis-generated-code-tests"]
 [[binaries]]
 package = "zeno-fcis-cli"
 target = "zeno-fcis"
-purpose = "bounded deterministic project authoring and formal-tool interface"
+purpose = "bounded deterministic project specification and formal-tool interface"

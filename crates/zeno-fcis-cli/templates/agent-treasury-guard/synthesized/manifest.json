@@ -20,29 +20,29 @@
   },
   "assignments_evaluated": 8,
   "authority": "none",
-  "certificate": "43217748448f022fc140ddf5a1e6583b65aab54e7953bf01f900dd8283cdb2de",
-  "contract": "c7b52644d36664b6000644cb3640faba48cad80a6bd2ecc9e76af5e936aab910",
-  "emitter_sha256": "6c51dc6f8f64e603097a59cd70b7fefd6c2633f9973df9437fa799addeae6265",
+  "certificate": "34df780a66bbed6930b8c5653516ff9fc38684eba05d755b60e3857aea98152e",
+  "contract": "75960aa838a2fd30ee5f1664e722bbbc68dbd8bef9847a18caf3a5d65dd70885",
+  "emitter_sha256": "645f9437c199fb17de6c306059f44e21773e946d64ff868ffc7af67a24d8272e",
   "files": [
     {
-      "bytes": 8756,
+      "bytes": 8757,
       "path": "problem.json",
-      "sha256": "9eafb5c42f33c1b5d37edcc42898c9712d17d258feab849503c1e28de41cc180"
+      "sha256": "fb27488ded0111d82315e0ae07a7e9fad330c70a202cd75f8c2bbe67f5221b34"
     },
     {
-      "bytes": 4310,
+      "bytes": 4311,
       "path": "program.zcve",
-      "sha256": "e2d8a9d8058500a5a2c168921c0b8d2ade3bc8487954a6d1deafa8b37c9e2c6f"
+      "sha256": "4629969c0fe14e401822ec7eabbf79e0b22e221c32456e1b54f04a893fa22622"
     },
     {
-      "bytes": 5021,
+      "bytes": 5150,
       "path": "transition.rs",
-      "sha256": "ad0135bc03f1d7b8c01599769e0980f7f8706a91f786cc775d6739a6c54e1773"
+      "sha256": "2d5a1fb2b02dbaf7b7e111a6aba43a921ee4d234d8de2ef6782ea1efc83783ca"
     },
     {
-      "bytes": 1265885,
+      "bytes": 1265942,
       "path": "vectors.json",
-      "sha256": "1f08d4b9f50501691150e3924adc1a6bbe07a8930c7371c3893f1d89492f4d4e"
+      "sha256": "d37b4e607a856972cc1593f8fdff7ab34cf7c9cb39728bdf76161b2c7f86bc69"
     }
   ],
   "first_counterexample": {
@@ -65,13 +65,14 @@
     ]
   },
   "input_coverage": 6144,
-  "profile": "zeno-fcis/finite-i64/1",
+  "integer_encoding": "safe-number-or-decimal-string/1",
+  "profile": "zeno-fcis/finite-i128/1",
   "runtime_conformance": "not-run",
-  "schema": "zeno-fcis/synthesis-artifact/1",
+  "schema": "zeno-fcis/synthesis-artifact/2",
   "status": "selected",
   "target": {
     "language": "rust",
-    "revision": 2
+    "revision": 3
   },
-  "trace": "9ea82f03a8114b034e34f303f18974bca07f8a22062bfa4626bcd161cd862166"
+  "trace": "94bd37d9f0551557fd934ac2e3ce5985f9378a79dd6bd1658b0ad28a77aac8f2"
 }

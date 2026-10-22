@@ -71,7 +71,7 @@ impl fmt::Debug for PreparedFold {
     fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result { self.legacy.fmt(f) }
 }
 impl PreparedFold {
-    fn start(p:finite::Program,a:Vec<i64>,items:Vec<Vec<i64>>,c:old::PreparationContext,
+    fn start(p:finite::Program,a:Vec<i128>,items:Vec<Vec<i128>>,c:old::PreparationContext,
         l:old::PreparationLimits,b:old_core::BudgetLimits)->Result<Self,old::PreparationError> {
         let g=checked::admit_graph(p.inputs().to_vec(),p.outputs().to_vec(),p.nodes().to_vec(),p.roots().to_vec()).unwrap();
         let new=checked::start(g,a.clone(),items.clone(),context(c),limits(l),budget(b));
@@ -91,7 +91,7 @@ impl PreparedFold {
         let a=self.legacy.advance(offset,count);let b=self.checked.advance(offset,count).map_err(failure);
         assert_eq!(a,b);self.compare();a
     }
-    fn finish(&self,c:old::PreparationContext)->Result<Vec<i64>,old::PreparationError> {
+    fn finish(&self,c:old::PreparationContext)->Result<Vec<i128>,old::PreparationError> {
         let a=self.legacy.finish(c);let b=self.checked.finish(context(c)).map_err(failure);assert_eq!(a,b);a
     }
     fn processed_items(&self)->u32 { self.compare();self.checked.processed_items() }
@@ -137,8 +137,8 @@ fn budget() -> BudgetLimits {
 }
 fn sum_program() -> Program {
     let scalar = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     Program::try_new(
         vec![scalar, scalar],
@@ -148,7 +148,7 @@ fn sum_program() -> Program {
     )
     .unwrap()
 }
-fn start(initial: i64, items: &[i64]) -> PreparedFold {
+fn start(initial: i128, items: &[i128]) -> PreparedFold {
     PreparedFold::start(
         sum_program(),
         vec![initial],
@@ -159,7 +159,7 @@ fn start(initial: i64, items: &[i64]) -> PreparedFold {
     )
     .unwrap()
 }
-fn wire(values: &[i64]) -> Vec<u8> {
+fn wire(values: &[i128]) -> Vec<u8> {
     Value::tuple(
         values
             .iter()
@@ -191,11 +191,11 @@ fn all_small_partitions_match_the_whole_operation_and_preserve_identity() {
             let mut cursor = encoded;
             let mut items = Vec::new();
             for _ in 0..length {
-                items.push(i64::from(cursor % 3) - 1);
+                items.push(i128::from(cursor % 3) - 1);
                 cursor /= 3;
             }
             for initial in -1..=1 {
-                let expected = initial + items.iter().sum::<i64>();
+                let expected = initial + items.iter().sum::<i128>();
                 let reference = start(initial, &items);
                 for partition in partitions(length) {
                     let mut prepared = start(initial, &items);
@@ -224,7 +224,7 @@ fn all_small_partitions_match_the_whole_operation_and_preserve_identity() {
 
 #[test]
 fn a_failure_after_partial_calculation_does_not_advance_the_chunk() {
-    let mut prepared = start(i64::MAX - 1, &[1, 1]);
+    let mut prepared = start(i128::MAX - 1, &[1, 1]);
     let identity = prepared.operation_hash();
     assert_eq!(
         prepared.advance(0, 2),
@@ -591,8 +591,8 @@ fn wrong_domains_missing_context_and_invalid_limits_fail_before_preparation() {
 #[test]
 fn eager_evaluation_and_absolute_first_error_do_not_change_at_chunk_boundaries() {
     let scalar = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let program = Program::try_new(
         vec![scalar, scalar],
@@ -600,7 +600,7 @@ fn eager_evaluation_and_absolute_first_error_do_not_change_at_chunk_boundaries()
         vec![
             Op::Input(0),
             Op::Input(1),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(2, 1),
             Op::Bool(false),
             Op::Select(4, 3, 0),

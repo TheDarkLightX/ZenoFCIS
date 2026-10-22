@@ -10,7 +10,7 @@ use zeno_fcis_synthesis::finite::{
 
 /// Straightforward reference product in the same input-major lexicographic
 /// order the space iterator promises.
-fn product(domains: &[Domain]) -> Vec<Vec<i64>> {
+fn product(domains: &[Domain]) -> Vec<Vec<i128>> {
     let mut rows = vec![Vec::new()];
     for domain in domains {
         let (min, max) = domain.bounds();
@@ -34,8 +34,8 @@ fn product(domains: &[Domain]) -> Vec<Vec<i64>> {
 
 /// The straightforward evaluator this profile shipped with, kept as an
 /// independent reference for the buffer-reusing interpreter.
-fn reference_evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, Error> {
-    fn admitted(domains: &[Domain], values: &[i64]) -> bool {
+fn reference_evaluate(program: &Program, input: &[i128]) -> Result<Vec<i128>, Error> {
+    fn admitted(domains: &[Domain], values: &[i128]) -> bool {
         domains.len() == values.len()
             && domains
                 .iter()
@@ -45,19 +45,19 @@ fn reference_evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, Erro
     if !admitted(program.inputs(), input) {
         return Err(Error::Invalid("input-domain"));
     }
-    let mut values: Vec<i64> = Vec::new();
+    let mut values: Vec<i128> = Vec::new();
     for op in program.nodes() {
         let at = |id: u16| values[usize::from(id)];
         let value = match *op {
             Op::Input(id) => input[usize::from(id)],
             Op::Int(v) => v,
-            Op::Bool(v) => i64::from(v),
+            Op::Bool(v) => i128::from(v),
             Op::Add(a, b) => at(a).checked_add(at(b)).ok_or(Error::Arithmetic)?,
             Op::Sub(a, b) => at(a).checked_sub(at(b)).ok_or(Error::Arithmetic)?,
-            Op::Eq(a, b) => i64::from(at(a) == at(b)),
-            Op::Lt(a, b) => i64::from(at(a) < at(b)),
-            Op::And(a, b) => i64::from(at(a) == 1 && at(b) == 1),
-            Op::Not(a) => i64::from(at(a) == 0),
+            Op::Eq(a, b) => i128::from(at(a) == at(b)),
+            Op::Lt(a, b) => i128::from(at(a) < at(b)),
+            Op::And(a, b) => i128::from(at(a) == 1 && at(b) == 1),
+            Op::Not(a) => i128::from(at(a) == 0),
             Op::Select(c, a, b) => {
                 if at(c) == 1 {
                     at(a)
@@ -69,7 +69,7 @@ fn reference_evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, Erro
         };
         values.push(value);
     }
-    let output: Vec<i64> = program
+    let output: Vec<i128> = program
         .roots()
         .iter()
         .map(|id| values[usize::from(*id)])
@@ -99,8 +99,8 @@ fn trivial_contract(inputs: Vec<Domain>) -> Contract {
 /// nodes the root reads.
 fn indicator_relation(
     environment: Vec<Domain>,
-    trap: (i64, i64),
-    satisfied: (i64, i64),
+    trap: (i128, i128),
+    satisfied: (i128, i128),
 ) -> Program {
     Program::try_new(
         environment,
@@ -116,7 +116,7 @@ fn indicator_relation(
             Op::Int(1),
             Op::Int(0),
             Op::Select(6, 7, 8),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(10, 9),
             Op::Int(satisfied.0),
             Op::Int(satisfied.1),
@@ -181,8 +181,8 @@ fn tiny() -> (Contract, Sketch) {
 #[test]
 fn the_evaluator_agrees_with_the_straightforward_reference_on_every_input() {
     let full = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let programs = [
         // Every operation, including a Boolean result and an eager Select.
@@ -217,7 +217,7 @@ fn the_evaluator_agrees_with_the_straightforward_reference_on_every_input() {
         Program::try_new(
             vec![Domain::Int { min: 0, max: 1 }],
             vec![full],
-            vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(0, 1)],
+            vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(0, 1)],
             vec![2],
         )
         .unwrap(),
@@ -226,7 +226,7 @@ fn the_evaluator_agrees_with_the_straightforward_reference_on_every_input() {
             vec![],
             vec![Domain::Bool],
             vec![
-                Op::Int(i64::MAX),
+                Op::Int(i128::MAX),
                 Op::Int(1),
                 Op::Add(0, 1),
                 Op::Bool(false),
@@ -239,7 +239,7 @@ fn the_evaluator_agrees_with_the_straightforward_reference_on_every_input() {
         let mut inputs = product(program.inputs());
         inputs.push(Vec::new());
         inputs.push(vec![0, 0, 0]);
-        inputs.push(vec![i64::MAX]);
+        inputs.push(vec![i128::MAX]);
         for input in inputs {
             assert_eq!(
                 program.evaluate(&input),
@@ -257,17 +257,17 @@ fn the_input_space_matches_a_straightforward_product_and_clones_independently() 
         vec![Domain::Bool],
         vec![Domain::Int { min: -1, max: 1 }, Domain::Bool],
         vec![Domain::Int {
-            min: i64::MAX - 1,
-            max: i64::MAX,
+            min: i128::MAX - 1,
+            max: i128::MAX,
         }],
         vec![
             Domain::Int {
-                min: i64::MIN,
-                max: i64::MIN + 1,
+                min: i128::MIN,
+                max: i128::MIN + 1,
             },
             Domain::Int {
-                min: i64::MAX - 1,
-                max: i64::MAX,
+                min: i128::MAX - 1,
+                max: i128::MAX,
             },
         ],
     ] {
@@ -358,7 +358,7 @@ fn a_trapped_candidate_does_not_disturb_the_next_candidate() {
         contract.outputs().to_vec(),
         vec![
             Slot::Fixed(Op::Input(0)),
-            Slot::Fixed(Op::Int(i64::MAX)),
+            Slot::Fixed(Op::Int(i128::MAX)),
             Slot::Fixed(Op::Int(1)),
             Slot::Choice {
                 id: 1,
@@ -524,10 +524,10 @@ fn arithmetic_and_contract_traps_never_become_evidence() {
     let program = Program::try_new(
         vec![],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
-        vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1)],
+        vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1)],
         vec![2],
     )
     .unwrap();
@@ -536,7 +536,7 @@ fn arithmetic_and_contract_traps_never_become_evidence() {
     let relation = Program::try_new(
         [contract.inputs(), contract.outputs()].concat(),
         vec![Domain::Bool],
-        vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1), Op::Eq(2, 2)],
+        vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1), Op::Eq(2, 2)],
         vec![3],
     )
     .unwrap();
@@ -601,13 +601,17 @@ fn language_adapters_keep_distinct_identities_extensions_and_stated_abis() {
     let javascript = JavaScriptEmitter.target();
     assert_eq!(javascript.language, "javascript");
     assert_eq!(javascript.extension, "mjs");
-    assert_eq!(javascript.revision, 2);
+    assert_eq!(javascript.revision, 3);
     assert!(JavaScriptEmitter.abi().contains("primitive string"));
     // A copied adapter that kept another emitter's identity, extension, or ABI
     // would let one target's conformance evidence stand in for another's.
     let adapters: [&dyn TargetEmitter; 3] = [&RustEmitter, &PythonEmitter, &JavaScriptEmitter];
     for (position, left) in adapters.iter().enumerate() {
-        assert_eq!(left.target().revision, 2, "arithmetic adapter revision");
+        assert_eq!(
+            left.target().revision,
+            3,
+            "i128 arithmetic adapter revision"
+        );
         let identity = left.identity();
         assert_eq!(identity, left.identity(), "identity must be stable");
         assert!(!left.abi().is_empty());
@@ -626,7 +630,7 @@ fn unselected_arithmetic_still_traps_and_hole_order_is_canonical() {
         vec![],
         vec![Domain::Int { min: 0, max: 1 }],
         vec![
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(0, 1),
             Op::Bool(false),

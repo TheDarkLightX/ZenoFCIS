@@ -85,6 +85,13 @@ pub(crate) fn load(paths: &[PathBuf]) -> Result<Loaded, Value> {
     load_with_limits(paths, K::Limits::default())
 }
 pub(crate) fn load_with_limits(paths: &[PathBuf], limits: K::Limits) -> Result<Loaded, Value> {
+    load_with_checker(paths, limits, None)
+}
+fn load_with_checker(
+    paths: &[PathBuf],
+    limits: K::Limits,
+    checker: Option<&str>,
+) -> Result<Loaded, Value> {
     if paths.len() > 7 {
         return Err(fail("kb-layer-budget"));
     }
@@ -104,7 +111,7 @@ pub(crate) fn load_with_limits(paths: &[PathBuf], limits: K::Limits) -> Result<L
     (|| {
         let mut bytes = K::EXAMPLE.len();
         let mut validation_files = 0usize;
-        let mut checker_sha = None;
+        let mut checker_sha = checker.map(str::to_owned);
         for p in paths {
             if p.to_str().is_none() {
                 return Err(fail("kb-path-utf8"));
@@ -246,11 +253,12 @@ fn implementation() -> String {
         include_str!("loop_pipeline.rs"),
         include_str!("main.rs"),
         include_str!("checker_process.rs"),
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE_REASONING,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA,
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt"),
+        include_str!(
+            "../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt"
+        ),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"),
         K::EXAMPLE,
-        zeno_fcis_loop_doors::source_fingerprint::LIB,
     ];
     let mut bytes = Vec::new();
     for s in sources {
@@ -337,11 +345,28 @@ pub(crate) fn execute(paths: &[PathBuf], op: Operation) -> u8 {
     result.0
 }
 pub(crate) fn invoke(given: &[PathBuf], op: Operation) -> (u8, Value) {
+    invoke_with_identity(given, op, crate::knowledge_evidence::checker_sha256)
+}
+// The checker binary can be large and hashing time depends on the host. Its
+// identity is acquired once before this unchanged checking-work window; it is
+// still compared with every receipt, and expiration still fails inconclusive.
+const CHECK_WINDOW: std::time::Duration = std::time::Duration::from_secs(5);
+fn invoke_with_identity(
+    given: &[PathBuf],
+    op: Operation,
+    identity: impl FnOnce() -> Result<String, Value>,
+) -> (u8, Value) {
     if let Operation::Replay { recipe, out } = op {
         return crate::knowledge_evidence::replay(&recipe, &out);
     }
+    let checker = match identity() {
+        Ok(checker) => checker,
+        Err(e) => return (1, e),
+    };
     let started = std::time::Instant::now();
-    let loaded = match paths(given).and_then(|p| load(&p)) {
+    let loaded = match paths(given)
+        .and_then(|p| load_with_checker(&p, K::Limits::default(), Some(&checker)))
+    {
         Ok(l) => l,
         Err(e) => {
             return (
@@ -392,7 +417,7 @@ pub(crate) fn invoke(given: &[PathBuf], op: Operation) -> (u8, Value) {
         Operation::Replay { .. } => return (1, fail("kb-replay-routing")),
     };
     let result = run(&loaded, &request, K::Limits::default());
-    if started.elapsed().as_secs() >= 5 {
+    if started.elapsed() >= CHECK_WINDOW {
         return (
             2,
             json!({"schema":K::USAGE_SCHEMA,"authority":"none","status":"inconclusive","reason":"kb-deadline","layers":loaded.bindings}),
@@ -407,8 +432,9 @@ pub(crate) fn invoke(given: &[PathBuf], op: Operation) -> (u8, Value) {
 /// availability, empirical usefulness, or a universal generalization.
 fn public_validation(limits: K::Limits) -> Result<(Vec<K::Validation>, u64), Value> {
     let max_work = limits.work;
-    let dependency =
-        sha256_hex(zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA.as_bytes());
+    let dependency = sha256_hex(include_bytes!(
+        "../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"
+    ));
     let context = "task(tool,zeno-fcis).task(version,v241).";
     let fixtures = [
         (
@@ -518,4 +544,31 @@ fn public_validation(limits: K::Limits) -> Result<(Vec<K::Validation>, u64), Val
         admitted.push(input);
     }
     Ok((admitted, used))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kb_slow_checker_identity_does_not_consume_check_window() {
+        let started = std::time::Instant::now();
+        let (exit, report) = invoke_with_identity(&[], Operation::Check, || {
+            std::thread::sleep(CHECK_WINDOW + std::time::Duration::from_millis(100));
+            Ok("a".repeat(64))
+        });
+        assert!(started.elapsed() >= CHECK_WINDOW);
+        assert_eq!(exit, 0, "{report}");
+        assert_eq!(report["status"], "consistent");
+        assert_eq!(report["authority"], "none");
+    }
+
+    #[test]
+    fn kb_checker_identity_failure_refuses() {
+        let (exit, report) =
+            invoke_with_identity(&[], Operation::Check, || Err(fail("kb-evidence-checker")));
+        assert_eq!(exit, 1);
+        assert_eq!(report["reason"], "kb-evidence-checker");
+        assert_eq!(report["status"], "refused");
+    }
 }

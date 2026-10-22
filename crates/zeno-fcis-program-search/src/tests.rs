@@ -9,12 +9,179 @@ use std::vec;
 use std::vec::Vec;
 use zeno_fcis_synthesis::finite::{Domain, Op};
 
-const I64: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+const I128: Domain = Domain::Int {
+    min: i128::MIN,
+    max: i128::MAX,
 };
 
-fn int(min: i64, max: i64) -> Domain {
+#[test]
+fn wide_arithmetic_search_keeps_each_proposer_and_exact_checker() {
+    let wide = 1i128 << 100;
+    for operation in [
+        Op::MulDivFloor(0, 1, 1),
+        Op::ProductsGe([0, 1, 1], [0, 1, 1]),
+    ] {
+        let boolean = matches!(operation, Op::ProductsGe(..));
+        let output = if boolean { Domain::Bool } else { I128 };
+        let original = bytes(
+            vec![int(wide, wide + 1)],
+            vec![output],
+            vec![Op::Input(0), Op::Int(3), operation],
+            vec![2],
+        );
+        let wrong = bytes(
+            vec![int(wide, wide + 1)],
+            vec![output],
+            vec![if boolean { Op::Bool(false) } else { Op::Int(0) }],
+            vec![0],
+        );
+        for settings in [
+            only(true, false, false),
+            only(false, true, false),
+            only(false, false, true),
+        ] {
+            let outcome = search(&original, &[&wrong], &settings);
+            assert!(!matches!(outcome, Outcome::Stopped(_)), "{outcome:?}");
+            assert_exact(&original, &outcome);
+        }
+    }
+}
+
+#[test]
+fn arithmetic_graphs_and_proposers_keep_all_operands_and_checker_controls() {
+    for operation in [
+        Op::MulDivFloor(0, 1, 2),
+        Op::MulDivCeil(0, 1, 2),
+        Op::ProductsGe([0, 1, 2], [2, 1, 1]),
+    ] {
+        let boolean = matches!(operation, Op::ProductsGe(..));
+        let output = if boolean { Domain::Bool } else { I128 };
+        let original = bytes(
+            vec![int(0, 40)],
+            vec![output],
+            vec![Op::Input(0), Op::Int(2), Op::Int(3), operation],
+            vec![3],
+        );
+        let admitted = import(&original);
+        let graph = Graph::from_program(&admitted).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(graph.to_program(), Some(admitted));
+        let wrong = bytes(
+            vec![int(0, 40)],
+            vec![output],
+            if boolean {
+                vec![Op::Bool(false)]
+            } else {
+                vec![Op::Int(0)]
+            },
+            vec![0],
+        );
+        let right_table = table(&original);
+        let wrong_table = table(&wrong);
+        let control = |compare: &dyn Fn(&Vec<Seen>, &Vec<Seen>) -> bool| {
+            compare(&right_table, &right_table) && !compare(&right_table, &wrong_table)
+        };
+        assert!(control(&|a, b| a == b));
+        assert!(!control(&|_, _| true), "stubbed comparison must fail");
+        for settings in [
+            only(true, false, false),
+            only(false, true, false),
+            only(false, false, true),
+        ] {
+            let outcome = search(&original, &[&wrong], &settings);
+            assert!(!matches!(outcome, Outcome::Stopped(_)), "{outcome:?}");
+            assert_exact(&original, &outcome);
+        }
+    }
+}
+
+#[test]
+fn arithmetic_probe_uses_d1_refusals_and_full_product_precision() {
+    use crate::arithmetic::evaluate;
+    let max = [i128::MAX];
+    assert_eq!(
+        evaluate(Op::MulDivFloor(0, 1, 2), &[&max, &max, &max]),
+        Some(vec![i128::MAX])
+    );
+    assert_eq!(
+        evaluate(Op::MulDivCeil(0, 1, 2), &[&max, &max, &max]),
+        Some(vec![i128::MAX])
+    );
+    assert_eq!(
+        evaluate(
+            Op::ProductsGe([0, 1, 2], [0, 1, 3]),
+            &[&max, &max, &max, &[i128::MAX - 1]]
+        ),
+        Some(vec![1])
+    );
+    assert_eq!(
+        evaluate(Op::MulDivFloor(0, 1, 2), &[&max, &max, &[0]]),
+        None
+    );
+    assert_eq!(evaluate(Op::MulDivCeil(0, 1, 2), &[&max, &max, &[1]]), None);
+    assert_eq!(
+        evaluate(Op::ProductsGe([0, 0, 0], [1, 1, 1]), &[&[1], &[-1]]),
+        None
+    );
+}
+
+#[test]
+fn scaled_cpmm_search_reports_an_exact_improvement_or_none() {
+    for bps in [0, 30, 100] {
+        let inputs = vec![int(0, 40); 3];
+        let outputs = vec![int(0, 40), int(0, 40), int(0, 80), int(0, 40), Domain::Bool];
+        let nodes = vec![
+            Op::Input(0),
+            Op::Input(1),
+            Op::Input(2),
+            Op::Int(bps),
+            Op::Int(10000),
+            Op::MulDivCeil(2, 3, 4),
+            Op::Sub(2, 5),
+            Op::Add(0, 6),
+            Op::Int(0),
+            Op::Eq(7, 8),
+            Op::Int(1),
+            Op::Select(9, 10, 7),
+            Op::MulDivFloor(6, 1, 11),
+            Op::Add(0, 2),
+            Op::Sub(1, 12),
+            Op::ProductsGe([13, 14, 10], [0, 1, 10]),
+            Op::Add(12, 8),
+        ];
+        let roots = vec![5, 16, 13, 14, 15];
+        let original = bytes(
+            inputs.clone(),
+            outputs.clone(),
+            nodes.clone(),
+            roots.clone(),
+        );
+        let mut wrong_nodes = nodes;
+        wrong_nodes[16] = Op::Int(0);
+        let wrong = bytes(inputs, outputs, wrong_nodes, roots);
+        assert_ne!(table(&original), table(&wrong));
+        let mut settings = only(false, true, false);
+        settings.budget.rounds = 1;
+        settings.budget.resub_rounds = 1;
+        settings.shape.resub_choices = 8;
+        let outcome = search(&original, &[&wrong], &settings);
+        assert!(
+            !matches!(outcome, Outcome::Stopped(_)),
+            "fee {bps}: {outcome:?}"
+        );
+        assert_exact(&original, &outcome);
+        match outcome {
+            Outcome::Improved(candidate) => {
+                eprintln!("scaled CPMM fee {bps}: {} nodes", candidate.nodes)
+            }
+            Outcome::Unimproved(_) => {
+                eprintln!("scaled CPMM fee {bps}: none found in declared search budget")
+            }
+            Outcome::Stopped(_) => {}
+        }
+    }
+}
+
+fn int(min: i128, max: i128) -> Domain {
     Domain::Int { min, max }
 }
 
@@ -37,7 +204,7 @@ fn import(bytes: &[u8]) -> Program {
 }
 
 /// Every tuple, last input fastest, written independently of `Space`.
-fn tuples(inputs: &[Domain]) -> Vec<Vec<i64>> {
+fn tuples(inputs: &[Domain]) -> Vec<Vec<i128>> {
     let mut all = vec![Vec::new()];
     for domain in inputs {
         let (min, max) = domain.bounds();
@@ -61,7 +228,7 @@ fn tuples(inputs: &[Domain]) -> Vec<Vec<i64>> {
 
 #[derive(Debug, Eq, PartialEq)]
 enum Seen {
-    Ok(Vec<i64>),
+    Ok(Vec<i128>),
     Arithmetic,
     Refused(&'static str),
 }
@@ -232,8 +399,8 @@ fn an_unselected_trapping_arm_is_kept_and_a_simplification_that_drops_it_is_refu
     // true ? x : x + 1 over x in [MAX - 1, MAX]: the unselected addition traps
     // at MAX, so the program refuses there; plain `x` would not.
     let original = bytes(
-        vec![int(i64::MAX - 1, i64::MAX)],
-        vec![I64],
+        vec![int(i128::MAX - 1, i128::MAX)],
+        vec![I128],
         vec![
             Op::Input(0),
             Op::Bool(true),
@@ -280,8 +447,8 @@ fn an_unselected_trapping_arm_is_kept_and_a_simplification_that_drops_it_is_refu
 fn a_trapping_subtraction_keeps_its_trap() {
     // (x - 1) + 0 over x in [MIN, MIN + 2]: traps at MIN.
     let original = bytes(
-        vec![int(i64::MIN, i64::MIN + 2)],
-        vec![I64],
+        vec![int(i128::MIN, i128::MIN + 2)],
+        vec![I128],
         vec![
             Op::Input(0),
             Op::Int(1),
@@ -303,7 +470,7 @@ fn a_dead_trapping_node_makes_every_tuple_refuse_and_cannot_be_dropped() {
     let original = bytes(
         vec![int(0, 3)],
         vec![int(0, 3)],
-        vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(1, 1)],
+        vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(1, 1)],
         vec![0],
     );
     assert!(
@@ -376,7 +543,7 @@ fn counterexample_guided_synthesis_is_exact() {
     // (forced with a small threshold).
     let original = bytes(
         vec![int(0, 30), int(0, 30)],
-        vec![I64],
+        vec![I128],
         vec![
             Op::Input(0),
             Op::Input(1),
@@ -520,7 +687,7 @@ fn enumeration_order_is_last_input_fastest() {
 fn canonical_form_merges_commuted_operands_and_drops_dead_nodes() {
     let graph = |nodes: Vec<Node>, roots: Vec<usize>| Graph {
         inputs: vec![int(0, 3), int(0, 3)],
-        outputs: vec![I64, I64],
+        outputs: vec![I128, I128],
         nodes,
         roots,
     };
@@ -572,7 +739,7 @@ impl Gen {
     }
 }
 
-/// A random well-typed program over small domains, sometimes at the i64
+/// A random well-typed program over small domains, sometimes at the i128
 /// edges (so additions trap) and sometimes with narrow output domains.
 fn random_program(rng: &mut Gen) -> Vec<u8> {
     loop {
@@ -581,8 +748,8 @@ fn random_program(rng: &mut Gen) -> Vec<u8> {
         for _ in 0..input_count {
             inputs.push(match rng.below(8) {
                 0 | 1 => Domain::Bool,
-                2 => int(i64::MAX - 2, i64::MAX),
-                3 => int(i64::MIN, i64::MIN + 2),
+                2 => int(i128::MAX - 2, i128::MAX),
+                3 => int(i128::MIN, i128::MIN + 2),
                 4 => int(0, 7),
                 5 => int(-2, 2),
                 _ => int(0, 3),
@@ -606,7 +773,7 @@ fn random_program(rng: &mut Gen) -> Vec<u8> {
                 nodes.push(Op::Bool(rng.below(2) == 0));
                 bools.push(id);
             } else {
-                nodes.push(Op::Int(rng.pick(&[0, 1, 2, 3, -1, 5, i64::MAX])));
+                nodes.push(Op::Int(rng.pick(&[0, 1, 2, 3, -1, 5, i128::MAX])));
                 ints.push(id);
             }
         }
@@ -662,7 +829,7 @@ fn random_program(rng: &mut Gen) -> Vec<u8> {
             } else if rng.below(4) == 0 {
                 int(-4, 4)
             } else {
-                I64
+                I128
             });
         }
         if let Ok(program) = Program::try_new(inputs, outputs, nodes, roots)
@@ -820,8 +987,8 @@ fn diagram_resynthesis_copies_a_many_valued_output() {
 fn diagram_resynthesis_is_skipped_or_bounded_by_its_limits() {
     // A trapping original: a diagram never traps, so the proposer is skipped.
     let trapping = bytes(
-        vec![int(i64::MAX - 1, i64::MAX)],
-        vec![I64],
+        vec![int(i128::MAX - 1, i128::MAX)],
+        vec![I128],
         vec![Op::Input(0), Op::Int(1), Op::Add(0, 1)],
         vec![2],
     );

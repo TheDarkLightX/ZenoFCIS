@@ -1,4 +1,4 @@
-# RC3 authoring and composition contract
+# RC3 specification and composition contract
 
 ZenoFCIS `1.0.0-rc.3` is the usability candidate before stable V1. It adds a
 bounded source language and tool-facing shell without changing any existing
@@ -41,7 +41,7 @@ Exhaustion is a diagnostic or `Indeterminate`; it never becomes acceptance.
 
 ## Authority boundary
 
-Authoring may construct typed descriptions, derive conservative footprints,
+Specification may construct typed descriptions, derive conservative footprints,
 generate source, render graphs, and propose formal evidence. It cannot create
 `BackendCertificate`, production evidence, authority, receipts, commits, or
 shell publication capability. Generated source still passes through existing

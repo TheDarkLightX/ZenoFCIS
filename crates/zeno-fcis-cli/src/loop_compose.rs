@@ -66,7 +66,7 @@ struct Fields {
     variants: Vec<Vec<(u16, String)>>,
     reasons: Vec<(u32, String, u32)>,
     /// The genesis value of each state position.
-    genesis: Vec<i64>,
+    genesis: Vec<i128>,
 }
 
 fn fields(core: &Core) -> Result<Fields> {
@@ -114,10 +114,8 @@ fn fields(core: &Core) -> Result<Fields> {
         .iter()
         .filter(|p| p.source == Source::State)
         .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
-            Some(Constant::Bool(b)) => Ok(i64::from(*b)),
-            Some(Constant::Int(v)) => {
-                i64::try_from(*v).map_err(|_| Stop::Invalid("compose-genesis-range".into()))
-            }
+            Some(Constant::Bool(b)) => Ok(i128::from(*b)),
+            Some(Constant::Int(v)) => Ok(*v),
             None => refuse("compose-genesis-missing"),
         })
         .collect::<Result<Vec<_>>>()?;
@@ -184,7 +182,16 @@ fn rule_text(core: &Core, node: &Expr, truth: bool) -> Result<String> {
             rule_text(core, a, truth)?,
             rule_text(core, b, truth)?
         ),
-        Expr::Bin(Op::Mul, ..) => return refuse("compose-rule-multiplication"),
+        Expr::Call(function, args) => {
+            if !function.accepts(args.len()) {
+                return refuse("compose-rule-call-arity");
+            }
+            let args = args
+                .iter()
+                .map(|a| rule_text(core, a, false))
+                .collect::<Result<Vec<_>>>()?;
+            format!("{}({})", function.name(), args.join(", "))
+        }
         Expr::Bin(op, a, b) => {
             let sides = match op {
                 Op::And | Op::Or | Op::Implies => true,
@@ -312,7 +319,7 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
     let mut bindings = Map::new();
     let mut leaf_bindings = Map::new();
     let mut variables = Map::new();
-    let mut genesis = Map::new();
+    let mut genesis = BTreeMap::new();
     let mut bounds = Vec::new();
     let mut variant_lines = String::new();
     // One data type per core sum type, so its variants are declared once.
@@ -346,7 +353,7 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
                         variant_lines.push_str(&format!("variant {id} {type_id} {name} none;\n"));
                     }
                 }
-                let ids = variants.iter().map(|v| i64::from(*v));
+                let ids = variants.iter().map(|v| i128::from(*v));
                 (ids.clone().min().unwrap_or(0), ids.max().unwrap_or(0))
             }
         };
@@ -380,9 +387,9 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
             genesis.insert(
                 field_id.to_string(),
                 if domain == Some(&LeafDomain::Bool) {
-                    json!(value == 1)
+                    GenesisValue::Bool(value == 1)
                 } else {
-                    json!(value)
+                    GenesisValue::Int(value)
                 },
             );
             bounds.push(format!(
@@ -478,11 +485,13 @@ fn leaf(core: &Core, f: &Fields, parts: &[Part], k: usize) -> Result<Leaf> {
         "leaf_bindings": leaf_bindings,
         "variables": variables,
         "cases": cases,
-        "genesis": genesis,
         "law_kinds": law_kinds,
     });
-    let policy_text = serde_json::to_string_pretty(&policy_value)
-        .map_err(|_| Stop::Invalid("compose-policy".into()))?
+    let policy_text = serde_json::to_string_pretty(&PolicyDocument {
+        fields: policy_value,
+        genesis,
+    })
+    .map_err(|_| Stop::Invalid("compose-policy".into()))?
         + "\n";
     let (program, nodes) = program_identity(&project, &policy_text)?;
     let owns_list: Vec<Value> = if owns {
@@ -533,6 +542,46 @@ fn program_identity(project: &str, policy_text: &str) -> Result<(String, usize)>
 
 /// The architecture as a composed-domain composition: the manifest's text
 /// and each component's files, in merge order.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum GenesisValue {
+    Bool(bool),
+    Int(i128),
+}
+
+#[derive(serde::Serialize)]
+struct PolicyDocument {
+    #[serde(flatten)]
+    fields: Value,
+    genesis: BTreeMap<String, GenesisValue>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum RequestDomain {
+    Bool {
+        kind: &'static str,
+    },
+    Int {
+        kind: &'static str,
+        min: i128,
+        max: i128,
+    },
+}
+
+#[derive(serde::Serialize)]
+struct RequestField<'a> {
+    name: &'a str,
+    domain: RequestDomain,
+}
+
+#[derive(serde::Serialize)]
+struct CompositionDocument<'a> {
+    #[serde(flatten)]
+    fields: Value,
+    request: Vec<RequestField<'a>>,
+}
+
 fn composition(core: &Core, parts: &[Part]) -> Result<(String, Vec<Leaf>)> {
     if parts.iter().any(|p| !is_identifier(&p.name)) {
         return refuse("compose-component-names-must-be-lowercase-identifiers");
@@ -541,28 +590,39 @@ fn composition(core: &Core, parts: &[Part]) -> Result<(String, Vec<Leaf>)> {
     let leaves = (0..parts.len())
         .map(|k| leaf(core, &f, parts, k))
         .collect::<Result<Vec<_>>>()?;
-    let request: Vec<Value> = (core.state_width..core.names.len())
+    let request = (core.state_width..core.names.len())
         .map(|k| {
             let domain = match &f.positions[k].domain {
-                LeafDomain::Bool => json!({"kind": "bool"}),
-                LeafDomain::Int { min, max } => json!({"kind": "int", "min": min, "max": max}),
-                LeafDomain::Sum { variants, .. } => json!({"kind": "int",
-                    "min": variants.iter().min().copied().unwrap_or(0),
-                    "max": variants.iter().max().copied().unwrap_or(0)}),
+                LeafDomain::Bool => RequestDomain::Bool { kind: "bool" },
+                LeafDomain::Int { min, max } => RequestDomain::Int {
+                    kind: "int",
+                    min: *min,
+                    max: *max,
+                },
+                LeafDomain::Sum { variants, .. } => RequestDomain::Int {
+                    kind: "int",
+                    min: i128::from(variants.iter().min().copied().unwrap_or(0)),
+                    max: i128::from(variants.iter().max().copied().unwrap_or(0)),
+                },
             };
-            json!({"name": core.names[k], "domain": domain})
+            RequestField {
+                name: &core.names[k],
+                domain,
+            }
         })
         .collect();
     let manifest = json!({
         "schema": DOMAIN_SCHEMA,
         "checker": DOMAIN_CHECKER,
         "name": "loop-decomposition",
-        "request": request,
         "components": leaves.iter().map(|l| l.entry.clone()).collect::<Vec<_>>(),
         "couplings": [],
     });
-    let text = serde_json::to_string_pretty(&manifest)
-        .map_err(|_| Stop::Invalid("compose-manifest".into()))?
+    let text = serde_json::to_string_pretty(&CompositionDocument {
+        fields: manifest,
+        request,
+    })
+    .map_err(|_| Stop::Invalid("compose-manifest".into()))?
         + "\n";
     Ok((text, leaves))
 }
@@ -650,8 +710,8 @@ pub(super) fn compose(core: &Core, parts: &[Part], export: Option<&Path>) -> Res
     let mut first: Option<Value> = None;
     for ordinal in 0..core.tuples() {
         let tuple = core.tuple(ordinal);
-        let global: Vec<i64> = slot_of.iter().map(|p| tuple[*p]).collect();
-        let request: Vec<i64> = request_of.iter().map(|p| tuple[*p]).collect();
+        let global: Vec<i128> = slot_of.iter().map(|p| tuple[*p]).collect();
+        let request: Vec<i128> = request_of.iter().map(|p| tuple[*p]).collect();
         let outcome = joint
             .joint_step(&global, &request)
             .map_err(|error| Stop::Invalid(format!("compose-joint-input: {error:?}")))?;

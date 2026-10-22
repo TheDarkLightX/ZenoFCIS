@@ -8,9 +8,9 @@
 //! every state law, the judge reports:
 //!
 //! - admissible decisions: for each tuple, every decision a contract of this
-//!   schema could make (a reject with each declared reason; an accept with
-//!   each declared state; when a case commits a failure, a committed failure
-//!   with each reason and state), checked against the declared laws by the
+//!   schema could make (a reject with each reject-class reason; an accept with
+//!   each declared state; a committed failure with each failure-class reason
+//!   and state), checked against the declared laws by the
 //!   library's law evaluator. A tuple is determined when exactly one decision
 //!   is admitted. Tuples where the contract's own decision is refused are
 //!   counted apart.
@@ -43,6 +43,7 @@ use super::evaluate::{self, Framer, LawSet, Proposed};
 use super::machine::{self, Inconclusive, Loaded, Machine, Observed, Space};
 use super::mutants::{self, Mutant};
 use super::parallel;
+use zeno_fcis_contract::internals::decision_space;
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
 /// The default limit on law checks: tuples times candidate decisions times
@@ -59,6 +60,10 @@ pub(crate) struct Options<'a> {
     pub(crate) max_work: u64,
     /// Proposed laws: `.zeno` law declarations, one per line.
     pub(crate) proposals: Option<&'a str>,
+    /// Whether to bind the extended catalog's mutants and the
+    /// reject-everything core. Without them those sections are `null`; every
+    /// other measure is unchanged.
+    pub(crate) mutants: bool,
 }
 
 /// The judge's result.
@@ -154,7 +159,7 @@ pub(crate) fn judge(
     if let Some(over) = over_limit(work, options.max_work, "work-over-limit") {
         return Ok(over);
     }
-    let before = match measure(&loaded, space, options.max_tuples) {
+    let before = match measure(&loaded, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
@@ -194,17 +199,27 @@ pub(crate) fn judge(
     ) {
         return Ok(over);
     }
-    let after = match measure(&extended, space, options.max_tuples) {
+    let after = match measure(&extended, space, options.max_tuples, options.mutants) {
         Ok(measured) => measured,
         Err(Stop::Contract(error)) => return Err(error),
         Err(Stop::Withheld(reason)) => return Ok(Gaps::Withheld(reason)),
     };
-    let killed: Vec<&str> = before
-        .mutation
-        .admitted_ids()
-        .difference(&after.mutation.admitted_ids())
-        .copied()
-        .collect();
+    let (admitted, killed) = match (&before.mutation, &after.mutation) {
+        (Some(earlier), Some(later)) => (
+            json!({
+                "full": [earlier.counts[0].admitted, later.counts[0].admitted],
+                "valid": [earlier.counts[1].admitted, later.counts[1].admitted],
+            }),
+            json!(
+                earlier
+                    .admitted_ids()
+                    .difference(&later.admitted_ids())
+                    .copied()
+                    .collect::<Vec<&str>>()
+            ),
+        ),
+        _ => (Value::Null, Value::Null),
+    };
     let proposals = json!({
         "laws": checked.laws_json(),
         "inactive": checked.inactive(),
@@ -212,10 +227,7 @@ pub(crate) fn judge(
             "full": [before.admissible[0].determined, after.admissible[0].determined],
             "valid": [before.admissible[1].determined, after.admissible[1].determined],
         },
-        "mutants_admitted": {
-            "full": [before.mutation.counts[0].admitted, after.mutation.counts[0].admitted],
-            "valid": [before.mutation.counts[1].admitted, after.mutation.counts[1].admitted],
-        },
+        "mutants_admitted": admitted,
         "now_caught": killed,
         "after": after.json(work_after, options.max_work, None),
     });
@@ -265,25 +277,17 @@ fn out_of_scope(rules: &Rules) -> Option<String> {
 /// # Errors
 /// The generator's refusal of the contract.
 fn work_of(loaded: &Loaded, space: &Space) -> Result<u128, ContractError> {
-    let laws = super::super::model::Contract::build(
+    let contract = super::super::model::Contract::build(
         &loaded.declarations,
         &loaded.rules,
         loaded.commitment,
-    )?
-    .laws
-    .len() as u128;
-    let reasons = loaded.reasons().len() as u128;
-    let states = space.states as u128;
-    let failure = u128::from(has_failure(&loaded.rules));
-    let candidates = reasons + states * (1 + failure * reasons);
+    )?;
+    let laws = contract.laws.len() as u128;
+    let rejects = decision_space::reasons_for(&contract.reasons, Class::Reject).len() as u128;
+    let failures =
+        decision_space::reasons_for(&contract.reasons, Class::CommittedFailure).len() as u128;
+    let candidates = rejects + (space.states as u128) * (1 + failures);
     Ok((space.tuples() as u128) * candidates * laws.max(1))
-}
-
-fn has_failure(rules: &Rules) -> bool {
-    rules
-        .cases
-        .iter()
-        .any(|case| case.class == Class::CommittedFailure)
 }
 
 /// Every measure of one contract.
@@ -302,8 +306,9 @@ struct Measured {
     /// The admissible count of each tuple, `-` where the contract's own
     /// decision is refused, as a table digest.
     admissible_sha256: String,
-    reject_everything: Value,
-    mutation: Mutation,
+    /// The reject-everything core and the mutants, when they were bound.
+    reject_everything: Option<Value>,
+    mutation: Option<Mutation>,
 }
 
 impl Measured {
@@ -363,7 +368,7 @@ impl Measured {
                 "rule": "SHA-256 of one line per tuple in ordinal order, each ending in a newline: the number of admissible decisions, or `-` where the contract's own decision is refused",
                 "admissible_sha256": self.admissible_sha256,
             },
-            "mutation": self.mutation.json(),
+            "mutation": self.mutation.as_ref().map(Mutation::json),
             "proposals": proposals,
         })
     }
@@ -396,13 +401,13 @@ struct Example {
 impl Example {
     fn json(&self, space: &Space) -> Value {
         json!({
-            "input": space.at(self.ordinal),
+            "input": crate::report_numbers::integers(&space.at(self.ordinal)),
             "contract": self.reference.json(space),
             "admissible": self.admissible,
             "also_admitted": self.also.iter().map(|(class, reason, next)| json!({
                 "class": class.name(),
                 "reason": reason,
-                "post": next.map(|next| space.state(next)),
+                "post": next.map(|next| crate::report_numbers::integers(&space.state(next))),
             })).collect::<Vec<_>>(),
         })
     }
@@ -421,10 +426,19 @@ struct TupleGap {
     mismatch: bool,
 }
 
-fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, Stop> {
+fn measure(
+    loaded: &Loaded,
+    space: Space,
+    max_tuples: u64,
+    mutants: bool,
+) -> Result<Measured, Stop> {
     let declared = loaded.declared_laws();
-    let reasons = loaded.reasons();
-    let failure = has_failure(&loaded.rules);
+    let reasons = super::super::model::Contract::build(
+        &loaded.declarations,
+        &loaded.rules,
+        loaded.commitment,
+    )?
+    .reasons;
     let (machine, valid, state_laws, gaps) = loaded.bind(&loaded.rules, |authority, framer| {
         let descriptor = authority.descriptor();
         let machine = Machine::observe(authority, framer, space, &loaded.positions, &loaded.rules)?;
@@ -440,9 +454,9 @@ fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, S
             })
             .collect();
         let laws = LawSet::new(descriptor, &declared);
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let gaps = parallel(space.tuples(), |ordinal| {
-            tuple_gap(&laws, framer, &machine, &states, &reasons, failure, ordinal)
+            tuple_gap(&laws, framer, &machine, &states, &reasons, ordinal)
         });
         Ok((machine, valid, state_laws, gaps))
     })?;
@@ -498,8 +512,14 @@ fn measure(loaded: &Loaded, space: Space, max_tuples: u64) -> Result<Measured, S
             gap.admissible.to_string()
         }
     }));
-    let reject_everything = reject_everything(loaded, &machine, max_tuples)?;
-    let mutation = mutation(loaded, &machine, &valid)?;
+    let (reject_everything, mutation) = if mutants {
+        (
+            Some(reject_everything(loaded, &machine, max_tuples)?),
+            Some(mutation(loaded, &machine, &valid)?),
+        )
+    } else {
+        (None, None)
+    };
     Ok(Measured {
         machine,
         declared,
@@ -519,9 +539,8 @@ fn tuple_gap(
     laws: &LawSet<'_>,
     framer: &Framer,
     machine: &Machine,
-    states: &[Vec<i64>],
-    reasons: &[u32],
-    failure: bool,
+    states: &[Vec<i128>],
+    reasons: &[(u32, Class)],
     ordinal: usize,
 ) -> TupleGap {
     let space = &machine.space;
@@ -545,7 +564,7 @@ fn tuple_gap(
             mismatch: false,
         };
     };
-    let check = |class: Class, reason: Option<u32>, post: &[i64]| {
+    let check = |class: Class, reason: Option<u32>, post: &[i128]| {
         laws.on_transition(
             framer,
             &tuple,
@@ -568,20 +587,7 @@ fn tuple_gap(
             })
         })
         .collect();
-    let mut candidates: Vec<(Class, Option<u32>, Option<usize>)> = reasons
-        .iter()
-        .map(|reason| (Class::Reject, Some(*reason), None))
-        .collect();
-    for successor in 0..space.states {
-        candidates.push((Class::Accept, None, Some(successor)));
-    }
-    if failure {
-        for reason in reasons {
-            for successor in 0..space.states {
-                candidates.push((Class::CommittedFailure, Some(*reason), Some(successor)));
-            }
-        }
-    }
+    let candidates = decision_space::alternatives(reasons, space.states);
     let own = (class, reason, (class != Class::Reject).then_some(next));
     let mut admissible = 0;
     let mut classes = BTreeSet::new();
@@ -665,7 +671,7 @@ fn reject_everything(
         "refused_where_the_contract_decides": where_decided,
         "admitted_where_the_contract_decides": where_decided == 0,
         "first_refusal": first.map(|ordinal| json!({
-            "input": machine.space.at(ordinal),
+            "input": crate::report_numbers::integers(&machine.space.at(ordinal)),
             "refusal": observed[ordinal].json(&machine.space),
         })),
     }))
@@ -805,7 +811,7 @@ fn mutation(loaded: &Loaded, machine: &Machine, valid: &[bool]) -> Result<Mutati
         value["valid_domain"] = json!(classify(1));
         let witness = |ordinal: usize| {
             json!({
-                "input": space.at(ordinal),
+                "input": crate::report_numbers::integers(&space.at(ordinal)),
                 "contract": machine.observed[ordinal].json(space),
                 "mutant": observed[ordinal].json(space),
             })
@@ -978,7 +984,7 @@ fn check_proposals(
             .map(|id| LawSet::new(authority.descriptor(), &[*id]))
             .collect();
         let space = &machine.space;
-        let states: Vec<Vec<i64>> = (0..space.states).map(|state| space.state(state)).collect();
+        let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let verdicts = parallel(space.tuples(), |ordinal| {
             let Observed::Decided {
                 class,
@@ -1009,10 +1015,14 @@ fn check_proposals(
                     Some(Verdict::Satisfied) => applies[index] += 1,
                     Some(Verdict::Skipped) => {}
                     _ => {
+                        if verdict.is_some() {
+                            // A false or refused applicable law still applies.
+                            applies[index] += 1;
+                        }
                         false_alarm.get_or_insert_with(|| {
                             json!({
                                 "law": ids[index],
-                                "input": space.at(ordinal),
+                                "input": crate::report_numbers::integers(&space.at(ordinal)),
                                 "contract": machine.observed[ordinal].json(space),
                             })
                         });

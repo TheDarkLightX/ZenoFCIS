@@ -321,3 +321,21 @@ fn a_declared_range_is_the_binding_of_its_int() {
         );
     }
 }
+
+#[test]
+fn quantity_metadata_cannot_be_erased_by_legacy_schema_lowering() {
+    let source = SOURCE.replace(
+        "type 103 int Amount;",
+        "type 103 int Amount unit USD scale e8;",
+    );
+    assert!(matches!(
+        lower_schema(
+            &project(&source),
+            id(100),
+            1,
+            leaves(),
+            SchemaLimits::default()
+        ),
+        Err(SchemaLoweringError::QuantityRequiresContract(_))
+    ));
+}

@@ -18,7 +18,7 @@ fn counter_satisfies_independent_full_decision_table_and_mutations() {
     let (problem, cases) = selected();
     assert_eq!(cases.len(), 64);
     for case in cases {
-        let [count, failures, command, allowed]: [i64; 4] = case.input.clone().try_into().unwrap();
+        let [count, failures, command, allowed]: [i128; 4] = case.input.clone().try_into().unwrap();
         let selected = if command == 0 { count } else { failures };
         let expected = if allowed == 0 {
             vec![0, count, failures, 0, 0, 0]
@@ -64,7 +64,7 @@ fn runner_verdicts_require_exact_outputs_and_complete_coverage() {
                 "{}\n",
                 c.output
                     .iter()
-                    .map(i64::to_string)
+                    .map(i128::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             )
@@ -93,7 +93,7 @@ fn runner_verdicts_require_exact_outputs_and_complete_coverage() {
                 "{}\n",
                 c.output
                     .iter()
-                    .map(i64::to_string)
+                    .map(i128::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             )
@@ -220,7 +220,7 @@ fn runner_retries_a_briefly_busy_executable_then_fails_closed() {
 }
 
 const COUNTER_PROGRAM: &[u8] =
-    include_bytes!("../../templates/durable-counter/synthesized/program.zcve");
+    include_bytes!("../../tests/fixtures/i128-programs/durable-counter-synthesized.zcve");
 
 /// A property over the counter's four inputs followed by its six outputs.
 fn counter_property(problem: &problem::Problem, nodes: Vec<Op>) -> Contract {
@@ -421,5 +421,48 @@ fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
             check_system_property(&program, &property, SystemLimits::default()).unwrap();
         let verdict = system_verdict(&program, &property, solve).unwrap();
         assert_eq!(verdict.code(), exhaustive.code());
+    }
+}
+
+#[test]
+fn wide_synthesis_failure_and_witness_reports_keep_values_and_absence() {
+    for value in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1i128 << 100,
+        1i128 << 64,
+        5,
+    ] {
+        let failure = semantic(Error::ContractTrap {
+            input: vec![value],
+            output: vec![value],
+        });
+        assert_eq!(failure.report["schema"], "zeno-fcis/synthesis-result/2");
+        assert_eq!(
+            crate::report_numbers::read(&failure.report["detail"]["input"][0]),
+            Some(value)
+        );
+        assert_eq!(
+            crate::report_numbers::read(&failure.report["detail"]["output"][0]),
+            Some(value)
+        );
+        for output in [None, Some(vec![value])] {
+            let encoded = witness_json(Some(Witness {
+                input: vec![value],
+                output: output.clone(),
+            }));
+            assert_eq!(
+                crate::report_numbers::read(&encoded["input"][0]),
+                Some(value)
+            );
+            assert_eq!(encoded["output"].is_null(), output.is_none());
+            if output.is_some() {
+                assert_eq!(
+                    crate::report_numbers::read(&encoded["output"][0]),
+                    Some(value)
+                );
+            }
+        }
     }
 }

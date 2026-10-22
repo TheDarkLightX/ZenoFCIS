@@ -42,7 +42,7 @@ pub(super) struct Arguments {
     /// Artifact profile every candidate must stay within; instructions
     /// outside it are never proposed or extracted. A strategy naming another
     /// profile is refused.
-    #[arg(long, value_parser = ["functional-bool-v1", "checked-i64-v1"])]
+    #[arg(long, value_parser = ["functional-bool-v1", "checked-i128-v1"])]
     profile: Option<String>,
     /// A canonical program claimed equivalent to the original, to fuse into
     /// the search (repeatable, at most 8). Each is checked against the
@@ -62,6 +62,21 @@ pub(super) fn run(arguments: Arguments) -> u8 {
         &arguments.with_candidate,
     );
     crate::print_json(&report);
+    if report["status"] == "unsupported-original" {
+        // Diagnostics must not turn a broken stderr pipe into a panic.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "optimize refused: original node {} ({}) is outside the e-graph instruction set; next: {}",
+            report["detail"]["unsupported_node"]["index"],
+            report["detail"]["unsupported_node"]["opcode"]
+                .as_str()
+                .unwrap_or("unknown"),
+            report["detail"]["next_step"]
+                .as_str()
+                .unwrap_or("Use transform with a checked candidate.")
+        );
+    }
     exit
 }
 
@@ -191,27 +206,24 @@ fn optimize_files(
             ),
             Outcome::Searched(search) => {
                 let mut detail = search.json();
-                match &search.best {
-                    Some(best) => {
-                        let receipt_bytes = best.equivalence.receipt();
-                        if let Some(path) = candidate_out
-                            && let Err(error) = crate::atomic_create(path, &best.bytes)
-                        {
-                            return io_failure(&error);
-                        }
-                        if let Some(path) = receipt
-                            && let Err(error) = crate::atomic_create(path, &receipt_bytes)
-                        {
-                            return io_failure(&error);
-                        }
-                        detail["candidate_path"] =
-                            json!(candidate_out.map(|path| path.display().to_string()));
-                        detail["receipt_path"] =
-                            json!(receipt.map(|path| path.display().to_string()));
-                        result(crate::OK, "improved", detail)
+                let (status, exit) = search.status_and_exit();
+                if let Some(best) = &search.best {
+                    let receipt_bytes = best.equivalence.receipt();
+                    if let Some(path) = candidate_out
+                        && let Err(error) = crate::atomic_create(path, &best.bytes)
+                    {
+                        return io_failure(&error);
                     }
-                    None => result(crate::BLOCKED, "no-checked-improvement", detail),
+                    if let Some(path) = receipt
+                        && let Err(error) = crate::atomic_create(path, &receipt_bytes)
+                    {
+                        return io_failure(&error);
+                    }
+                    detail["candidate_path"] =
+                        json!(candidate_out.map(|path| path.display().to_string()));
+                    detail["receipt_path"] = json!(receipt.map(|path| path.display().to_string()));
                 }
+                result(exit, status, detail)
             }
         };
     report["original_sha256"] = json!(transform::sha256_hex(&original));

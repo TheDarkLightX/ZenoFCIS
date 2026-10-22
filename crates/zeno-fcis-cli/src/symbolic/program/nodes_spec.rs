@@ -74,7 +74,7 @@ pub(in super::super) open spec fn body_fact(
             node::typed_sources(input, previous_terms, previous_kinds, environment) ==>
                 node::has_kind(denotation::term(body, environment), kind))
         && (forall|environment: Map<Seq<char>, denotation::Value>,
-            raw_input: Seq<i64>, previous: Seq<i64>|
+            raw_input: Seq<i128>, previous: Seq<i128>|
             node::input_values(domains, input, raw_input, environment)
                 && node::prefix_values(previous_kinds, previous_terms, previous, environment) ==>
                 node::refines(op, kind, body, raw_input, previous, environment))
@@ -94,7 +94,7 @@ pub(in super::super) open spec fn bodies(
 }
 
 pub(in super::super) open spec fn outside(value: int) -> bool {
-    value < i64::MIN || value > i64::MAX
+    value < i128::MIN || value > i128::MAX
 }
 
 pub(in super::super) open spec fn guarded(
@@ -120,7 +120,7 @@ pub(in super::super) open spec fn booleans(
 }
 
 pub(in super::super) open spec fn meaning(
-    nodes: Seq<Op>, raw_input: Seq<i64>, count: nat,
+    nodes: Seq<Op>, raw_input: Seq<i128>, count: nat,
     input: Seq<Term>, kinds: Seq<Kind>, terms: Seq<Term>, checked: Seq<Term>,
     environment: Map<Seq<char>, denotation::Value>,
 ) -> bool {
@@ -144,7 +144,7 @@ pub(in super::super) proof fn prefix_refines(
     definitions: Seq<(String, Sort, Term)>, base: nat, prefix: Seq<char>,
     domains: Seq<Domain>, nodes: Seq<Op>, input: Seq<Term>,
     kinds: Seq<Kind>, terms: Seq<Term>, checked: Seq<Term>,
-    raw_input: Seq<i64>, environment: Map<Seq<char>, denotation::Value>, count: nat,
+    raw_input: Seq<i128>, environment: Map<Seq<char>, denotation::Value>, count: nat,
 )
     requires shape(definitions, base, prefix, kinds, terms),
         bodies(definitions, base, domains, nodes, input, kinds, terms),
@@ -225,7 +225,7 @@ pub(in super::super) proof fn prefix_refines(
         }
         assert(booleans(next_checked, environment));
 
-        // This case split is on the actual checked-i64 prefix, never a new evaluator.
+        // This case split is on the actual checked-i128 prefix, never a new evaluator.
         reveal_with_fuel(runtime::prefix, 1);
         match runtime::prefix(nodes, raw_input, j) {
             Ok(previous) => {
@@ -282,9 +282,9 @@ pub(in super::super) proof fn prefix_refines(
 }
 
 /// Gives the earliest actual failing attempt without retaining a failure counter.
-pub(in super::super) proof fn earliest_arithmetic(nodes: Seq<Op>, input: Seq<i64>, count: nat)
+pub(in super::super) proof fn earliest_arithmetic(nodes: Seq<Op>, input: Seq<i128>, count: nat)
     requires count <= nodes.len(), runtime::prefix(nodes, input, count) == Err(RuntimeFailure::Arithmetic),
-    ensures exists|failed: nat, previous: Seq<i64>| failed < count
+    ensures exists|failed: nat, previous: Seq<i128>| failed < count
         && runtime::prefix(nodes, input, failed) == Ok(previous)
         && runtime::node(nodes[failed as int], input, previous) == Err(RuntimeFailure::Arithmetic),
     decreases count,
@@ -295,7 +295,7 @@ pub(in super::super) proof fn earliest_arithmetic(nodes: Seq<Op>, input: Seq<i64
     match runtime::prefix(nodes, input, j) {
         Ok(previous) => {
             assert(runtime::node(nodes[j as int], input, previous) == Err(RuntimeFailure::Arithmetic));
-            assert(exists|failed: nat, values: Seq<i64>| failed < count
+            assert(exists|failed: nat, values: Seq<i128>| failed < count
                 && runtime::prefix(nodes, input, failed) == Ok(values)
                 && runtime::node(nodes[failed as int], input, values) == Err(RuntimeFailure::Arithmetic));
         },

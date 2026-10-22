@@ -41,7 +41,7 @@ impl Drop for Directory {
 
 fn artifact(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/benchmarks/withdrawal-queue/artifacts")
+        .join("tests/fixtures/i128-programs")
         .join(format!("{name}.zcve"))
 }
 
@@ -336,7 +336,7 @@ fn a_profile_bounds_the_search_and_conflicts_are_refused() {
     // A strategy naming another profile than --profile is refused.
     let named = directory.write(
         "named.json",
-        br#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "boolean", "rounds": 1}], "profile": "checked-i64-v1"}"#,
+        br#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "boolean", "rounds": 1}], "profile": "checked-i128-v1"}"#,
     );
     let (exit, report) = optimize(
         &original,
@@ -466,6 +466,11 @@ fn describe_declares_optimize_effects() {
     assert_eq!(exit, Some(0));
     let command = &report["command"];
     assert_eq!(command["name"], "optimize");
+    assert!(
+        command["guidance"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+    );
     assert_eq!(
         command["effects"],
         json!({
@@ -485,6 +490,7 @@ fn describe_declares_optimize_effects() {
         ids,
         [
             "candidate_out",
+            "containment_backend",
             "help",
             "kb",
             "kb_task",
@@ -503,4 +509,84 @@ fn describe_declares_optimize_effects() {
         .unwrap_or_else(|| panic!("tuple cap"));
     assert_eq!(cap["defaults"], json!(["100000000"]));
     assert_eq!(command["subcommands"], json!([]));
+}
+
+#[test]
+fn an_unsupported_original_names_its_node_instead_of_claiming_search() {
+    let directory = Directory::new();
+    let original = directory.0.join("fee.zcve");
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/arithmetic-fee");
+    let exported = run_raw(&[
+        "contract".as_ref(),
+        "export-program".as_ref(),
+        project.as_os_str(),
+        "--out".as_ref(),
+        original.as_os_str(),
+    ]);
+    assert_eq!(exported.status.code(), Some(0), "{exported:?}");
+    let candidate = directory.0.join("unwritten.zcve");
+    let receipt = directory.0.join("unwritten.json");
+    let output = run_raw(&[
+        "optimize".as_ref(),
+        "--program".as_ref(),
+        original.as_os_str(),
+        "--candidate-out".as_ref(),
+        candidate.as_os_str(),
+        "--receipt".as_ref(),
+        receipt.as_os_str(),
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    let report: Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(report["status"], "unsupported-original");
+    assert_eq!(report["authority"], "none");
+    assert_eq!(report["detail"]["reason"], "unsupported-original-node");
+    let program = import_program(&read(&original)).unwrap_or_else(|error| panic!("{error:?}"));
+    let index = program
+        .nodes()
+        .iter()
+        .position(|op| matches!(op, zeno_fcis_synthesis::finite::Op::MulDivCeil(..)))
+        .unwrap_or_else(|| panic!("exported MulDivCeil instruction"));
+    assert_eq!(report["detail"]["unsupported_node"]["index"], index);
+    assert_eq!(report["detail"]["unsupported_node"]["opcode"], "MulDivCeil");
+    assert_eq!(report["detail"]["search"]["phases_run"], 0);
+    assert_eq!(report["detail"]["search"]["any_limit_hit"], false);
+    assert!(report["detail"]["best"].is_null());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(stderr.lines().count(), 1);
+    assert!(
+        stderr.contains(&format!("original node {index} (MulDivCeil)")),
+        "{stderr}"
+    );
+    assert!(stderr.contains("next: Use transform"), "{stderr}");
+    assert!(!candidate.exists() && !receipt.exists());
+}
+
+#[test]
+fn a_checked_supplied_candidate_survives_an_unsupported_original_opcode() {
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::{Domain, Op, Program};
+    let directory = Directory::new();
+    let domain = Domain::Int { min: 0, max: 0 };
+    let make = |nodes, root| {
+        Program::try_new(vec![domain], vec![domain], nodes, vec![root])
+            .unwrap_or_else(|error| panic!("{error:?}"))
+            .value()
+            .unwrap_or_else(|error| panic!("{error:?}"))
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("{error:?}"))
+    };
+    let original = directory.write(
+        "original.zcve",
+        &make(vec![Op::Input(0), Op::Int(0), Op::Mul(0, 1)], 2),
+    );
+    let candidate = directory.write("candidate.zcve", &make(vec![Op::Int(0)], 0));
+    let (exit, report) = optimize(
+        &original,
+        &["--with-candidate", &candidate.to_string_lossy()],
+    );
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["status"], "improved");
+    assert_eq!(report["detail"]["best"]["supplied"], 0);
+    assert_eq!(report["detail"]["best"]["nodes"], 1);
 }

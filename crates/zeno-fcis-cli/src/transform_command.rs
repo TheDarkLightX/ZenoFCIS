@@ -738,8 +738,7 @@ mod terminal_io_tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn receipt_staging_failure_retains_actual_completed_work_without_verdict() {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/i128-programs");
         let original = fixtures.join("boolean-kernel-original.zcve");
         let candidate = fixtures.join("boolean-kernel-candidate.zcve");
         let missing = std::env::temp_dir().join(format!(
@@ -787,8 +786,7 @@ mod terminal_io_tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn a_receipt_staged_after_the_deadline_is_dropped_without_handover() {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/i128-programs");
         let directory = std::env::temp_dir().join(format!(
             "zeno-late-receipt-{}-{}",
             std::process::id(),
@@ -827,8 +825,7 @@ mod terminal_io_tests {
     #[cfg(not(target_os = "linux"))]
     #[test]
     fn offline_parallel_refuses_without_containment_while_serial_check_remains_available() {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/i128-programs");
         let directory = std::env::temp_dir().join(format!(
             "zeno-unsupported-containment-{}-{}",
             std::process::id(),
@@ -871,8 +868,7 @@ mod terminal_io_tests {
 
     #[test]
     fn publication_collision_after_completed_check_retains_work_and_existing_bytes() {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/i128-programs");
         let directory = std::env::temp_dir().join(format!(
             "zeno-post-check-collision-{}-{}",
             std::process::id(),

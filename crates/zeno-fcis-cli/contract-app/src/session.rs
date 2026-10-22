@@ -1104,7 +1104,13 @@ pub fn scalar_profile() -> AppResult<()> {
                             min: lower,
                             max: upper,
                         }),
-                    ) => min <= max && i128::from(*min) == *lower && i128::from(*max) == *upper,
+                    ) => {
+                        min <= max
+                            && *min >= i128::from(i64::MIN)
+                            && *max <= i128::from(i64::MAX)
+                            && *min == *lower
+                            && *max == *upper
+                    }
                     (
                         InputLeaf::Sum {
                             type_id, variants, ..
@@ -1115,7 +1121,7 @@ pub fn scalar_profile() -> AppResult<()> {
                             && variants.len() == declared.len()
                             && declared.iter().all(|variant| name_fits(variant.name, 128))
                             && variants.iter().all(|variant| {
-                                variant.code == i64::from(variant.id)
+                                variant.code == i128::from(variant.id)
                                     && declared.iter().any(|item| item.id == variant.id)
                             })
                     }

@@ -2,11 +2,12 @@
 use super::*;
 use std::collections::BTreeSet;
 
-fn variants_valid(variants: &[Variant], min: i64, max: i64) -> bool {
+fn variants_valid(variants: &[Variant], min: i128, max: i128) -> bool {
     let ids: BTreeSet<_> = variants.iter().map(|v| v.id).collect();
     let codes: BTreeSet<_> = variants.iter().map(|v| v.code).collect();
     min <= max
-        && max as i128 - min as i128 + 1 == variants.len() as i128
+        && max.checked_sub(min).and_then(|width| width.checked_add(1))
+            == Some(variants.len() as i128)
         && ids.len() == variants.len()
         && codes.len() == variants.len()
         && codes.iter().all(|code| min <= *code && *code <= max)
@@ -15,7 +16,7 @@ pub(in super::super) fn schema_valid(fields: &[Field]) -> bool {
     fields.windows(2).all(|pair| pair[0].id < pair[1].id)
         && fields.iter().all(|field| match &field.leaf {
             Leaf::I128 { min, max } => min <= max,
-            Leaf::U128 { min, max } => min <= max && *max <= i64::MAX as u128,
+            Leaf::U128 { min, max } => min <= max && *max <= i128::MAX as u128,
             Leaf::Bool => true,
             Leaf::Enum {
                 min, max, variants, ..
@@ -31,7 +32,7 @@ fn take<const N: usize>(bytes: &[u8], position: &mut usize) -> Option<[u8; N]> {
     *position = end;
     Some(result)
 }
-fn field(bytes: &[u8], position: &mut usize, descriptor: &Field) -> Option<i64> {
+fn field(bytes: &[u8], position: &mut usize, descriptor: &Field) -> Option<i128> {
     if u16::from_be_bytes(take(bytes, position)?) != descriptor.id {
         return None;
     }
@@ -42,14 +43,14 @@ fn field(bytes: &[u8], position: &mut usize, descriptor: &Field) -> Option<i64> 
                 return None;
             }
             let value = u128::from_be_bytes(take(bytes, position)?);
-            (*min <= value && value <= *max && value <= i64::MAX as u128).then_some(value as i64)
+            (*min <= value && value <= *max && value <= i128::MAX as u128).then_some(value as i128)
         }
         Leaf::I128 { min, max } => {
             if tag != 4 {
                 return None;
             }
             let value = i128::from_be_bytes(take(bytes, position)?);
-            (*min as i128 <= value && value <= *max as i128).then_some(value as i64)
+            (*min <= value && value <= *max).then_some(value)
         }
         Leaf::Bool => match tag {
             1 => Some(0),
@@ -102,7 +103,7 @@ pub(in super::super) fn oracle(
     limits: [u64; 8],
     initial: [u64; 8],
     initial_attempts: Vec<AccessAttempt>,
-) -> (Result<Vec<i64>, Failure>, [u64; 8], Vec<AccessAttempt>) {
+) -> (Result<Vec<i128>, Failure>, [u64; 8], Vec<AccessAttempt>) {
     let mut used = initial;
     let mut attempts = initial_attempts;
     let result = (|| {
@@ -148,8 +149,8 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
         Field {
             id: 0,
             leaf: Leaf::I128 {
-                min: i64::MIN,
-                max: i64::MIN
+                min: i128::MIN,
+                max: i128::MIN
             }
         },
         Field {
@@ -160,16 +161,16 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
             id: 7,
             leaf: Leaf::Enum {
                 type_id: 0,
-                min: i64::MIN,
-                max: i64::MIN + 1,
+                min: i128::MIN,
+                max: i128::MIN + 1,
                 variants: std::vec![
                     Variant {
                         id: u16::MAX,
-                        code: i64::MIN
+                        code: i128::MIN
                     },
                     Variant {
                         id: 0,
-                        code: i64::MIN + 1
+                        code: i128::MIN + 1
                     }
                 ]
             }
@@ -178,16 +179,16 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
             id: 256,
             leaf: Leaf::Sum {
                 type_id: u32::MAX,
-                min: i64::MAX - 1,
-                max: i64::MAX,
+                min: i128::MAX - 1,
+                max: i128::MAX,
                 variants: std::vec![
                     Variant {
                         id: u16::MAX,
-                        code: i64::MAX
+                        code: i128::MAX
                     },
                     Variant {
                         id: 7,
-                        code: i64::MAX - 1
+                        code: i128::MAX - 1
                     }
                 ]
             }
@@ -195,8 +196,8 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
         Field {
             id: 300,
             leaf: Leaf::I128 {
-                min: i64::MAX,
-                max: i64::MAX
+                min: i128::MAX,
+                max: i128::MAX
             }
         },
         Field {
@@ -206,11 +207,11 @@ fn mixed() -> (Vec<Field>, Vec<u8>) {
     ];
     let mut bytes = std::vec![9, 0, 0, 0, 6];
     for (id, payload) in [
-        (0u16, [&[4][..], &(i64::MIN as i128).to_be_bytes()].concat()),
+        (0u16, [&[4][..], &i128::MIN.to_be_bytes()].concat()),
         (1, std::vec![2]),
         (7, std::vec![7, 0, 0, 0, 0, 0, 0]),
         (256, std::vec![10, 255, 255, 255, 255, 255, 255, 0]),
-        (300, [&[4][..], &(i64::MAX as i128).to_be_bytes()].concat()),
+        (300, [&[4][..], &i128::MAX.to_be_bytes()].concat()),
         (u16::MAX, std::vec![1]),
     ] {
         bytes.extend_from_slice(&id.to_be_bytes());
@@ -265,13 +266,41 @@ fn raw_projection_matches_independent_wire_and_wider_counter_oracle() {
     .into_parts();
     assert_eq!(
         actual,
-        Ok(std::vec![i64::MIN, 1, i64::MIN + 1, i64::MAX, i64::MAX, 0])
+        Ok(std::vec![
+            i128::MIN,
+            1,
+            i128::MIN + 1,
+            i128::MAX,
+            i128::MAX,
+            0
+        ])
     );
 }
 
 #[test]
+fn variant_oracle_rejects_unrepresentable_cardinalities_without_overflow() {
+    let variants = [Variant {
+        id: 0,
+        code: i128::MIN,
+    }];
+    for (min, max) in [(i128::MIN, i128::MAX), (i128::MIN, 0), (-1, i128::MAX)] {
+        assert!(!variants_valid(&variants, min, max));
+        let fields = [Field {
+            id: 0,
+            leaf: Leaf::Enum {
+                type_id: 1,
+                min,
+                max,
+                variants: variants.to_vec(),
+            },
+        }];
+        assert_public(&[], &fields, [u64::MAX; 8]);
+    }
+}
+
+#[test]
 fn arbitrary_closed_intervals_maps_and_invalid_metadata_have_exact_admission() {
-    for base in [i64::MIN, -3, 10, i64::MAX - 2] {
+    for base in [i128::MIN, -3, 10, i128::MAX - 2] {
         let vars = std::vec![
             Variant {
                 id: 0,
@@ -320,32 +349,32 @@ fn arbitrary_closed_intervals_maps_and_invalid_metadata_have_exact_admission() {
             ],
         ),
         (
-            i64::MIN,
-            i64::MIN,
+            i128::MIN,
+            i128::MIN,
             std::vec![Variant {
                 id: 0,
-                code: i64::MIN
+                code: i128::MIN
             }],
         ),
         (
-            i64::MAX,
-            i64::MAX,
+            i128::MAX,
+            i128::MAX,
             std::vec![Variant {
                 id: u16::MAX,
-                code: i64::MAX
+                code: i128::MAX
             }],
         ),
         (
-            i64::MIN,
-            i64::MAX,
+            i128::MIN,
+            i128::MAX,
             std::vec![
                 Variant {
                     id: 0,
-                    code: i64::MIN
+                    code: i128::MIN
                 },
                 Variant {
                     id: 7,
-                    code: i64::MAX
+                    code: i128::MAX
                 }
             ],
         ),
@@ -496,7 +525,7 @@ fn unsigned_scalar_projection_checks_original_wire_and_is_injective() {
     for value in [0u128, 1, 9, 1_000_000] {
         let mut bytes = alloc::vec![3];
         bytes.extend_from_slice(&value.to_be_bytes());
-        assert_eq!(decode_scalar(&bytes, 0, &leaf), Some((value as i64, 17)));
+        assert_eq!(decode_scalar(&bytes, 0, &leaf), Some((value as i128, 17)));
         let actual = super::super::decision::Atom::U128(
             decode_scalar(&bytes, 0, &leaf)
                 .unwrap_or_else(|| panic!("strict83 expected checked unsigned scalar projection"))
@@ -517,8 +546,8 @@ fn unsigned_scalar_projection_checks_original_wire_and_is_injective() {
     }
     for value in [
         1_000_001u128,
-        i64::MAX as u128,
-        i64::MAX as u128 + 1,
+        i128::MAX as u128,
+        i128::MAX as u128 + 1,
         u128::MAX,
     ] {
         let mut bytes = alloc::vec![3];
@@ -526,22 +555,22 @@ fn unsigned_scalar_projection_checks_original_wire_and_is_injective() {
         assert!(decode_scalar(&bytes, 0, &leaf).is_none());
     }
     let largest = Leaf::U128 {
-        min: i64::MAX as u128,
-        max: i64::MAX as u128,
+        min: i128::MAX as u128,
+        max: i128::MAX as u128,
     };
     assert!(validate_leaf(&largest));
     let mut bytes = alloc::vec![3];
-    bytes.extend_from_slice(&(i64::MAX as u128).to_be_bytes());
-    assert_eq!(decode_scalar(&bytes, 0, &largest), Some((i64::MAX, 17)));
+    bytes.extend_from_slice(&(i128::MAX as u128).to_be_bytes());
+    assert_eq!(decode_scalar(&bytes, 0, &largest), Some((i128::MAX, 17)));
     assert!(!validate_leaf(&Leaf::U128 {
         min: 0,
-        max: i64::MAX as u128 + 1
+        max: i128::MAX as u128 + 1
     }));
     assert!(!validate_leaf(&Leaf::U128 { min: 1, max: 0 }));
 }
 
 // Migrates the removed account reader's exact signed-wire/truncation grid to
-// the surviving decoder. Its admitted scalar range is explicitly i64; full
+// the surviving decoder. Its admitted scalar range is explicitly i128; full
 // i128 byte values outside that profile refuse instead of being narrowed.
 #[test]
 fn migrated_account_signed_wire_reader_extremes() {
@@ -568,17 +597,14 @@ fn migrated_account_signed_wire_reader_extremes() {
             let field = Field {
                 id,
                 leaf: Leaf::I128 {
-                    min: i64::MIN,
-                    max: i64::MAX,
+                    min: i128::MIN,
+                    max: i128::MAX,
                 },
             };
             let mut b = id.to_be_bytes().to_vec();
             b.push(4);
             b.extend(x.to_be_bytes());
-            assert_eq!(
-                decode_field(&b, 0, &field),
-                i64::try_from(x).ok().map(|n| (n, 19))
-            );
+            assert_eq!(decode_field(&b, 0, &field), Some((x, 19)));
             for end in 0..19 {
                 assert_eq!(decode_field(&b[..end], 0, &field), None);
             }

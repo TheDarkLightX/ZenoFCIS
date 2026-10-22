@@ -3,7 +3,8 @@
 Untrusted search for smaller finite decision programs that behave like a given
 one. **The search proposes; the transform checker decides.**
 
-Given a canonical `zeno-fcis/finite-i64/1` program (`program.zcve`), the
+Given a canonical `zeno-fcis/finite-i64/1` or main-route arithmetic
+`zeno-fcis/finite-i64/3` program (`program.zcve`), the
 library looks for a program with fewer instructions (then fewer canonical
 bytes) that gives identical outputs, or the identical failure kind, on every
 declared input tuple. Five proposers run in a deterministic portfolio:
@@ -22,6 +23,20 @@ Values, traps, output-domain refusals and canonical bytes come from the
 reads no clock, file, environment or randomness, and the same input and
 settings give the same bytes. Explicit budgets bound the domain size, memory,
 work and rounds; over a budget it returns a typed stop and no program.
+
+The graph grammar retains main-route multiplication, rounded division,
+full-product `mul_div_floor`/`mul_div_ceil` and exact two- or three-factor
+product comparisons. Source arithmetic subgraphs can serve as top-down atoms;
+their values come from the library evaluator. This does not enumerate every
+possible arithmetic expression. Refusals, including zero denominators and
+negative full-product operands, remain part of the complete comparison.
+
+Multiply-heavy work should be split into small declared finite instances.
+Three inputs in `0..=40` produce 68,921 tuples; node signatures require one
+i64 cell per node per live tuple. The default 67,108,864-cell cap applies
+separately to each large table. Work budgets and final comparison apply even
+when a proposal is refused. A size cap does not guarantee completion within
+an external stage deadline.
 
 ## Using a result
 

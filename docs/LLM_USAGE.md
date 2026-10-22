@@ -9,7 +9,7 @@ declare its own output verified.
 Read in this order:
 
 1. [Quickstart](QUICKSTART.md)
-2. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md) when working with `.zeno`
+2. [RC3 specification contract](RC3_AUTHORING_CONTRACT.md) when working with `.zeno`
 3. [Canonical bytes and admission](CANONICAL_BYTES.md)
 4. [Crate map](CRATE_MAP.md)
 5. [Feature matrix](FEATURE_MATRIX.md)
@@ -57,6 +57,49 @@ permission to run another command. The effect description is advisory: it
 cannot authorize filesystem changes, tool execution, publication, or a
 protocol decision.
 
+## Choose the tool for the problem
+
+Use the built-in checker workflow before writing a separate search script.
+A loop is a bounded sequence: propose, check, read feedback, revise. Choose
+its checker according to what you need to establish:
+
+| Problem | Tool and result |
+| --- | --- |
+| Make an existing finite program smaller | `optimize`: search for fewer instructions or encoded bytes, with full-domain equivalence checking |
+| Check your own replacement | `transform check`, then `transform replay`: check and independently replay the equivalence receipt |
+| Try several replacements and keep the evidence | `loop open`, then `loop candidate` or `loop run`, then `loop resume` |
+| Infer a program from examples | `loop learn`: fit the supplied examples within the declared vocabulary; without a full-domain reference check, this does not establish behavior on other inputs |
+| Fill holes in an expression | `loop sketch`: propose a completion and check it against the session's original |
+| See what the laws leave unspecified | `contract review --gaps` or `loop question --contract DIR`: inspect alternatives and ask the person responsible for the policy |
+
+For example, after authoring a contract in `my-app`, try:
+
+```bash
+zeno-fcis contract export-program my-app --out original.zcve
+zeno-fcis optimize --program original.zcve --candidate-out smaller.zcve --receipt receipt.json
+zeno-fcis transform replay --original original.zcve --candidate smaller.zcve --receipt receipt.json
+```
+
+Run the replay command only if optimization reports `improved` and writes both
+files. `unsupported-original` names an instruction the search cannot handle;
+increasing limits will not help. You can still propose a replacement and use
+`transform check`. `no-checked-improvement` means a completed search found no
+checked improvement; `inconclusive` means it could not finish. Neither means
+the original is optimal.
+
+For an interactive repair, open a session with `loop open --original
+original.zcve --session session`, then use `loop candidate --session session
+--candidate replacement.zcve`. A differing candidate produces checker
+feedback; revise the candidate without changing the reference to make it pass.
+Use `loop resume --session session` to replay the incumbent. Consult each
+command's `--help` for profile, containment and budget options. A successful
+run checks the declared domain and retains evidence; adopting a program into
+an application remains a separate `contract adopt` operation.
+
+See the [optimizer](CLI_REFERENCE.md#checked-optimizer) and
+[loop reference](CLI_REFERENCE.md#bounded-optimization-loop) for supported
+instructions, status codes and complete examples.
+
 ## JSON-first edit and recovery loop
 
 With the CLI built from the chosen source, run:
@@ -82,8 +125,8 @@ zeno-fcis generate project.zeno --out generated --check --format json
 ```
 
 A `generated` result describes derived files, not accepted laws or production
-authority. Review the diff, then run the relevant crate tests and the full
-acceptance gate. The [durable-counter journey](GENERATED_APPLICATION_MILESTONE.md)
+authority. Review the diff, then run checks appropriate to the changed behavior,
+following [AGENTS.md](../AGENTS.md). The [durable-counter journey](GENERATED_APPLICATION_MILESTONE.md)
 exercises a complete development application against this checkout. The
 release packager separately produces a
 [packaged-application receipt](PACKAGED_APPLICATION_QUALIFICATION.md) for the
@@ -119,23 +162,22 @@ release action still needs its own concrete review. Finish by recording the
 exact source, commands, evidence, and remaining obligations in the response
 format below.
 
-## Safe project workflow
+## Safe V2 application workflow
 
 ```text
-human-reviewed ProjectProfile and ProjectCatalog
-    -> optional inert .zeno source or ProjectSpecBuilder proposal
-    -> canonical typed ProjectSpec and complete diagnostics
-    -> generated typed APIs or reviewed typed domain machines
-    -> ComposedDomainProgram
-    -> complete LawManifest and project-owned law engine
-    -> independently checked retained evidence
-    -> CatalogCommitAuthority
-    -> CatalogAuthorizedTransition
-    -> authorized shell
+reviewed project.zeno + v2/policy.json + independent decision examples
+    -> check and generate contract
+    -> schema and policy admitted by the library
+    -> library-owned Authority computes the complete decision and laws
+    -> genuine Publication capability
+    -> V2SqliteShell commits the publication and records its outbox
 ```
 
-An LLM may help write the implementation at each step. It may not skip a step
-by constructing a lower-level artifact directly.
+Use `zeno-fcis new DIR --contract CONTRACT` to generate this path. Propose
+changes to the declarations and rules, regenerate, and check the results.
+Do not replace the generated core with a model-written decision or law
+callback. Checked optimization changes the program through `contract adopt`;
+store upgrades have their own admission requirements.
 
 When Probity is installed, follow the deterministic repository configuration.
 Use checks appropriate to ordinary changes, following [AGENTS.md](../AGENTS.md).
@@ -179,14 +221,15 @@ authority, or release gate.
 
 ## API rules
 
-Prefer:
+For generated V2 applications, prefer:
 
-- generated private-inner transition APIs;
-- `DomainMachine` with narrow `MachineInterface`;
-- authority-owned `ComposedDomainProgram`;
-- complete `LawManifest` and `verify_project_laws`;
-- `CatalogCommitAuthority::execute`;
-- `CatalogAuthorizedTransition` at a production commit port.
+- reviewed declarations and complete rules in `v2/policy.json`;
+- generated `v2_contract.rs` and the library's schema admission;
+- `v2_authority::Authority` for decisions, laws and publication capabilities;
+- `v2::V2SqliteShell` for durable commits and typed delivery.
+
+The legacy `CatalogCommitAuthority`, project-owned law engines and manually
+constructed transition programs are not the generated V2 application path.
 
 Avoid in production integration:
 
@@ -340,7 +383,7 @@ through the existing catalog laws and nominal authority before it can commit.
 The JavaScript target emits an ES module with `transition(input)`. Pass a
 primitive string of canonical decimal integers separated by single spaces; the
 result is another primitive string, or `null` for rejection. This preserves
-every signed 64-bit value without JavaScript `Number` rounding or object
+every signed 128-bit value without JavaScript `Number` rounding or object
 conversion hooks. `synth verify --target javascript` uses an existing Node.js
 installation. Consult discovery for the supported runtime and the exact ABI.
 Problem and vector JSON also need lossless integer handling in your client.

@@ -29,6 +29,14 @@ class PublicDocsTests(unittest.TestCase):
         subprocess.run(["git", "add", "docs/internal-status.md"], cwd=self.root, check=True)
         self.assertTrue(any("unreviewed" in item for item in check(self.root)))
 
+    def test_removed_unreviewed_tracked_note_is_not_in_working_tree(self):
+        note = self.root / "docs/internal-status.md"
+        note.write_text("Unpublished results")
+        subprocess.run(["git", "add", "docs/internal-status.md"], cwd=self.root, check=True)
+        self.assertTrue(any("unreviewed" in item for item in check(self.root)))
+        note.unlink()
+        self.assertEqual(check(self.root), [])
+
     def test_workspace_link_in_an_approved_document_is_refused(self):
         (self.root / "docs/API.md").write_text("Reference: https://chatgpt.com/space/private-record")
         self.assertTrue(any("workspace link" in item for item in check(self.root)))

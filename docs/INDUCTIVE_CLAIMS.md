@@ -6,7 +6,7 @@ law verdicts have been retired. Their original executable implementations and
 template tests live only in the nonpublished verification oracle. Normal V2
 authority must bind complete declarations and have the library check genesis,
 schemas, and every applicable law; a model diagnostic cannot authorize a
-transition. `invariant_at` remains a pure authoring transformation.
+transition. `invariant_at` remains a pure specification transformation.
 
 ## Purpose
 
@@ -14,12 +14,12 @@ Every other claim is proved over observations that nothing constrains. Such a
 proof holds for every system alike and says nothing about a particular
 application (see [law and claim substance](CLAIM_SUBSTANCE.md)). A property
 over the full integer range of an application's state therefore had no proof
-route, and neither did any property of a hand-written program.
+route, and neither did any property of an LLM-generated program.
 
 An inductive claim uses the application's laws as its model of how the state
 can change. The authority refuses every decision that breaks a law enforced on
 it, so the laws enforced on accepts and on committed failures bound every
-transition the application can commit, whether its program is hand-written or
+transition the application can commit, whether its program is LLM-generated or
 synthesized. An invariant whose induction step holds relative to those laws
 holds on every state the application commits, provided the application checks
 the base case and observes every value the invariant reads.

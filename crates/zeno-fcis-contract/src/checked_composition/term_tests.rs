@@ -27,7 +27,7 @@ fn node(op: Op) -> Node {
 }
 
 /// Every tuple of values within `bounds`.
-fn tuples(bounds: &[(i64, i64)]) -> Vec<Vec<i64>> {
+fn tuples(bounds: &[(i128, i128)]) -> Vec<Vec<i128>> {
     bounds
         .iter()
         .fold(vec![Vec::new()], |prefixes, (min, max)| {
@@ -69,7 +69,7 @@ fn agrees(inputs: &[Domain], outputs: &[Domain], ops: &[Op], roots: &[u16]) -> (
     })
     .unwrap_or_else(|| fail("canonical terms"));
     let outputs: Vec<u32> = roots.iter().map(|root| ids[usize::from(*root)]).collect();
-    let bounds: Vec<(i64, i64)> = inputs.iter().map(|domain| domain.bounds()).collect();
+    let bounds: Vec<(i128, i128)> = inputs.iter().map(|domain| domain.bounds()).collect();
     for input in tuples(&bounds) {
         let expected = program.evaluate(&input).unwrap_or_else(fail);
         let value = |at: Key| match at {

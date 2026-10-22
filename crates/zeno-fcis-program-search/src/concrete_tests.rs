@@ -2,12 +2,12 @@ use super::*;
 use alloc::vec;
 use zeno_fcis_synthesis::finite::Op;
 
-fn program(high: i64) -> Program {
+fn program(high: i128) -> Program {
     Program::try_new(
         vec![Domain::Int { min: 0, max: high }],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
         vec![Op::Input(0), Op::Add(0, 0), Op::Sub(1, 0)],
         vec![2],
@@ -59,7 +59,7 @@ fn concrete_excludes_trapping_cones_and_keeps_whole_program_check_obligation() {
             Op::Input(0),
             Op::Add(0, 0),
             Op::Sub(1, 0),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(3, 4),
         ],

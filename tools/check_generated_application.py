@@ -427,7 +427,9 @@ def exercise_prepared_application(app: Path, directory: Path, package_roots: dic
                       ["replay", "completion.json", "--case", str(case)]):
         reports.append(json.loads(run([*cli, "synth", "completion", *arguments], app,
                                       capture=True, environment=environment)))
-    if any(report.get("schema") != "zeno-fcis/completion-result/1" or
+    if any((report.get("schema") != "zeno-fcis/completion-result/1" and
+            not (report.get("schema") == "zeno-fcis/completion-result/2" and
+                 report.get("integer_encoding") == "safe-number-or-decimal-string/1")) or
            report.get("status") != "verified" or report.get("authority") != "none" or
            report.get("assurance") != "complete-finite" or report.get("states_checked") != 4 or
            report.get("commands_per_state") != 27 or report.get("maximum_exit_steps") != 1

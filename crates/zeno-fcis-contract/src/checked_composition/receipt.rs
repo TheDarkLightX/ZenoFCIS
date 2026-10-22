@@ -1,6 +1,6 @@
 //! The canonical receipt of a checked composition, and its replay.
 //!
-//! A receipt, `zeno-fcis/checked-composition-receipt/1`, is the result
+//! A receipt, `zeno-fcis/checked-composition-receipt/2`, is the result
 //! itself under its schema: the manifest's SHA-256 and commitment, each
 //! leaf's pins and bound program identity, the checker's source-bound
 //! identity with the evaluator digest, every count, and the SHA-256 of each
@@ -13,7 +13,7 @@
 //! digest, identity or pin, or sources that changed since, is refused.
 //!
 //! A composed-domain result has its own receipt,
-//! `zeno-fcis/composed-domain-receipt/1`, written and replayed the same
+//! `zeno-fcis/composed-domain-receipt/2`, written and replayed the same
 //! way by [`DomainResult::receipt`] and [`replay_domain`]; it records the
 //! verdict, whichever it is.
 
@@ -25,9 +25,9 @@ use super::{
 };
 
 /// The schema of a checked composition's receipt.
-pub const RECEIPT_SCHEMA: &str = "zeno-fcis/checked-composition-receipt/1";
+pub const RECEIPT_SCHEMA: &str = "zeno-fcis/checked-composition-receipt/2";
 /// The schema of a composed-domain result's receipt.
-pub const DOMAIN_RECEIPT_SCHEMA: &str = "zeno-fcis/composed-domain-receipt/1";
+pub const DOMAIN_RECEIPT_SCHEMA: &str = "zeno-fcis/composed-domain-receipt/2";
 
 /// What is wrong with a receipt's form.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

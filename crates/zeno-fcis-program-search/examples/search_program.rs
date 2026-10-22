@@ -137,7 +137,7 @@ fn text(value: &str) -> String {
     out
 }
 
-fn decimals(values: &[i64]) -> String {
+fn decimals(values: &[i128]) -> String {
     let items: Vec<String> = values
         .iter()
         .map(|value| text(&value.to_string()))
@@ -323,7 +323,7 @@ fn run_search(arguments: &[String]) -> Result<(u8, String), String> {
 }
 
 /// Every tuple of `inputs`, last input fastest.
-fn tuples(inputs: &[Domain]) -> Vec<Vec<i64>> {
+fn tuples(inputs: &[Domain]) -> Vec<Vec<i128>> {
     let mut all = vec![Vec::new()];
     for domain in inputs {
         let (min, max) = domain.bounds();
@@ -356,7 +356,7 @@ fn run_plant(arguments: &[String]) -> Result<(u8, String), String> {
         .iter()
         .map(|domain| {
             let (min, max) = domain.bounds();
-            u128::try_from(i128::from(max) - i128::from(min) + 1).unwrap_or(u128::MAX)
+            u128::try_from(max - min + 1).unwrap_or(u128::MAX)
         })
         .product();
     if size > 1 << 22 {

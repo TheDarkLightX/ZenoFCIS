@@ -591,8 +591,6 @@ RUN_INSIDE = {
                                     "`atdd.py run` and `atdd.py self-test` run it first"),
     "tools/test_scaffold_versions.py": ("tools/atdd.py", "runs", ("run",),
                                         "`atdd.py run` runs it before any scenario"),
-    "tools/test_binary_labels.py": ("tools/rc_package.py", "runs", ("self-test",),
-                                   "`rc_package.py self-test` runs the binary-label controls"),
     "tools/test_release_privacy.py": ("tools/rc_package.py", "runs", ("self-test",),
                                       "`rc_package.py self-test` runs it"),
     "tools/test_check_installed_cli.py": ("tools/rc_package.py", "runs", ("self-test",),

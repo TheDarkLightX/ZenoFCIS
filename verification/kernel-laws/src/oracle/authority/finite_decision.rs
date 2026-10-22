@@ -24,7 +24,8 @@ use zeno_fcis_synthesis::finite::{Domain as FiniteDomain, Error as FiniteError, 
 use zeno_fcis_synthesis::finite_runtime::{evaluator_hash, import_program};
 use zeno_fcis_value::{Field, Value, ValueError, ValueLimits, ValueRef};
 
-use crate::oracle::authority::finite_bounds::{bounded_product, interval_width};
+use crate::oracle::authority::finite_bounds::bounded_product;
+use crate::oracle::authority::finite_bounds_128::interval_width;
 use crate::oracle::authority::{CatalogTransitionProgram, ReviewedTransitionInput};
 
 const MAX_ROWS: u64 = 1_000_000;
@@ -422,7 +423,7 @@ fn validate_plan(
                     })
                     || variants
                         .iter()
-                        .any(|(variant, code)| *variant == 0 || !domain.contains(*code))
+                        .any(|(variant, code)| *variant == 0 || !domain.contains(i128::from(*code)))
                 {
                     return Err(FiniteDecisionError::Invalid("sum-projection"));
                 }
@@ -496,7 +497,7 @@ fn verify_total(program: &Program, branches: &[DecisionBranch]) -> Result<(), Fi
         rows = bounded_product(rows, width, MAX_ROWS)
             .ok_or(FiniteDecisionError::Invalid("input-product"))?;
     }
-    let mut row: Vec<i64> = program
+    let mut row: Vec<i128> = program
         .inputs()
         .iter()
         .map(|domain| domain.bounds().0)
@@ -505,7 +506,7 @@ fn verify_total(program: &Program, branches: &[DecisionBranch]) -> Result<(), Fi
         let output = program
             .evaluate(&row)
             .map_err(FiniteDecisionError::Finite)?;
-        if !branches.iter().any(|branch| branch.code == output[0]) {
+        if !branches.iter().any(|branch| i128::from(branch.code) == output[0]) {
             return Err(FiniteDecisionError::Invalid("missing-branch"));
         }
         for (value, domain) in row.iter_mut().zip(program.inputs()) {
@@ -780,7 +781,7 @@ impl<H: ApprovedCommitmentProvider> CatalogTransitionProgram<H> for FiniteDecisi
                 .charge(Resource::Read, 1)
                 .map_err(FiniteDecisionError::Budget)?;
             let scalar = project_input(raw, &binding.scalar)?;
-            finite_input.push(scalar);
+            finite_input.push(i128::from(scalar));
             raw_inputs.push(raw);
         }
         let output = self
@@ -792,7 +793,7 @@ impl<H: ApprovedCommitmentProvider> CatalogTransitionProgram<H> for FiniteDecisi
             .contract
             .branches
             .iter()
-            .find(|branch| branch.code == output[0])
+            .find(|branch| i128::from(branch.code) == output[0])
             .ok_or(FiniteDecisionError::Invalid("missing-branch"))?;
         if branch.rejection.is_none() {
             for _assignment in &self.contract.assignments {
@@ -977,8 +978,8 @@ mod tests {
     fn eager_trap_refuses_contract_before_authority() {
         let program = Program::try_new(
             vec![FiniteDomain::Int {
-                min: i64::MAX,
-                max: i64::MAX,
+                min: i128::MAX,
+                max: i128::MAX,
             }],
             vec![FiniteDomain::Int { min: 0, max: 1 }],
             vec![Op::Input(0), Op::Int(1), Op::Add(0, 1)],

@@ -17,7 +17,9 @@ compiler, runtime and library files against
 the CLI built from the same checkout. That driver generates and reviews the C3
 and endpoint applications, builds them, compiles and tests the OCaml client,
 runs the native tests and `tools/check_ocaml_consumer.py`, checks that two
-planted overflow contracts are refused, and runs Clippy on both applications.
+planted i128-overflow contracts are refused, checks that a wider-than-i64
+application cannot advertise or use the scalar profile, and runs Clippy on
+both supported applications.
 Its report sets `release_qualified` and `independent_review` to false.
 
 The profile is `zeno-fcis/native-scalar-consumer/1`. Roots are closed flat

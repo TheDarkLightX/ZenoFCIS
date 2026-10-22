@@ -6,6 +6,7 @@ subjects. It does not establish a universal correspondence theorem. Generic core
 proof, opacity and resource controls remain in their existing mandatory gates.
 """
 from __future__ import annotations
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import hashlib
 import json
@@ -124,7 +125,8 @@ def check(out):
     if positive.returncode or not re.search(r'test result: ok\. [1-9][0-9]* passed', positive.stdout):
         raise RuntimeError('positive account oracle suite failed or ran no tests')
     outcomes = []
-    for name, changed in mutations().items():
+    def run_control(control_item):
+        name, changed = control_item
         specimen = out/'specimens'/name
         for path in paths:
             target = specimen/path
@@ -138,10 +140,14 @@ def check(out):
         killed = proc.returncode == 101 and 'test result: FAILED.' in proc.stdout and bool(intended)
         row = {'name': name, 'killed': killed, 'expected': 'independent native rule-oracle assertion',
                'mutated_sha256': hashlib.sha256(changed.encode()).hexdigest(), 'exit': proc.returncode}
+        control_result = row
+        if not killed:
+            raise ControlRefused(control_result, f'{name} survived or failed outside the intended runtime oracle')
+        return control_result
+    def publish_control(row):
         outcomes.append(row)
         (out/'controls.json').write_text(json.dumps(outcomes, indent=2)+'\n')
-        if not killed:
-            raise RuntimeError(f'{name} survived or failed outside the intended runtime oracle')
+    run_controls(run_control, mutations().items(), timings=out / "control-timings.json", publish=publish_control)
     after = snapshot(ROOT, paths)
     if after != before or source_files(ROOT) != paths:
         raise RuntimeError('account gate source changed during replay')

@@ -158,7 +158,7 @@ fn a_trap_only_one_program_has_is_a_counterexample_in_its_piece() {
     let original = bytes(
         vec![SMALL],
         vec![SMALL],
-        vec![Op::Input(0), Op::Int(i64::MAX), Op::Add(0, 1)],
+        vec![Op::Input(0), Op::Int(i128::MAX), Op::Add(0, 1)],
         vec![0],
     );
     let candidate = bytes(vec![SMALL], vec![SMALL], vec![Op::Input(0)], vec![0]);

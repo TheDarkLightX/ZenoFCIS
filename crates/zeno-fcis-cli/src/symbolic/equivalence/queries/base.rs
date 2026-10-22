@@ -89,7 +89,7 @@ pub(super) fn base(
             original.inputs@, original.nodes@, input@);
         program::bridge::block_length(script.definitions@, left_definitions@.len(), seq!['q'],
             candidate.inputs@, candidate.nodes@, input@);
-        assert forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i128>|
             original.inputs@ == candidate.inputs@
                 && crate::evaluation::spec::admitted(original.inputs@, raw)
                 && program::bridge::raw_inputs(raw, environment)
@@ -111,7 +111,7 @@ pub(super) fn base(
             assert(script_spec::definitions_hold(script.definitions@, left_definitions@.len(),
                 candidate.nodes@.len(), environment));
         }
-        assert forall|raw: Seq<i64>|
+        assert forall|raw: Seq<i128>|
             original.inputs@ == candidate.inputs@
                 && crate::evaluation::spec::admitted(original.inputs@, raw) implies
                 spec::represented_result(original, raw) && spec::represented_result(candidate, raw) by {

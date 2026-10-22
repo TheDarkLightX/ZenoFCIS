@@ -1,12 +1,12 @@
-//! A `finite-i64/1` program as SMT definitions, following the library
+//! A `finite-i128/1` program as SMT definitions, following the library
 //! evaluator (`finite::execute_v2`) exactly: every node is evaluated,
 //! including unused nodes and unselected arms; addition and subtraction are
-//! checked in `i64`; Booleans are the integers 0 and 1 on the wire; and every
+//! checked in `i128`; Booleans are the integers 0 and 1 on the wire; and every
 //! output must lie in its declared domain.
 //!
 //! The evaluator stops at the first trapping node and reports `Arithmetic`,
 //! whichever node it is, so the program traps exactly when some checked
-//! node leaves the `i64` range. It reports `OutputDomain` only for a program
+//! node leaves the `i128` range. It reports `OutputDomain` only for a program
 //! that does not trap.
 
 #[cfg(test)]
@@ -97,13 +97,13 @@ mod tests {
 
     /// The encoding agrees with the library evaluator at every listed input:
     /// the same outputs, the same trap, the same output-domain failure.
-    fn agrees(program: &LibraryProgram, inputs: &[Vec<i64>]) {
+    fn agrees(program: &LibraryProgram, inputs: &[Vec<i128>]) {
         let (script, outputs) = script(program);
         for input in inputs {
             let assignment: BTreeMap<String, i128> = input
                 .iter()
                 .enumerate()
-                .map(|(index, value)| (format!("x{index}"), i128::from(*value)))
+                .map(|(index, value)| (format!("x{index}"), *value))
                 .collect();
             let evaluation = script
                 .evaluate(&assignment)
@@ -124,10 +124,8 @@ mod tests {
                     let encoded: Vec<Option<i128>> = (0..outputs)
                         .map(|index| evaluation.int(&format!("out{index}")))
                         .collect();
-                    let expected: Vec<Option<i128>> = values
-                        .iter()
-                        .map(|value| Some(i128::from(*value)))
-                        .collect();
+                    let expected: Vec<Option<i128>> =
+                        values.iter().map(|value| Some(*value)).collect();
                     assert_eq!(encoded, expected, "{input:?}");
                 }
                 Err(V2ExecutionFailure::Arithmetic) => assert_eq!(trap, Some(true), "{input:?}"),
@@ -142,8 +140,8 @@ mod tests {
     #[test]
     fn checked_arithmetic_traps_where_the_evaluator_traps() {
         let wide = Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         };
         // An unused, unselected sum still traps: evaluation is eager.
         let program = program(
@@ -167,17 +165,17 @@ mod tests {
         );
         let mut inputs = Vec::new();
         for a in [
-            i64::MIN,
-            i64::MIN + 1,
+            i128::MIN,
+            i128::MIN + 1,
             -7,
             -1,
             0,
             1,
             7,
-            i64::MAX - 7,
-            i64::MAX,
+            i128::MAX - 7,
+            i128::MAX,
         ] {
-            for b in [i64::MIN, -1, 0, 1, i64::MAX] {
+            for b in [i128::MIN, -1, 0, 1, i128::MAX] {
                 for flag in [0, 1] {
                     inputs.push(vec![a, b, flag]);
                 }
@@ -195,7 +193,7 @@ mod tests {
             vec![Op::Input(0), Op::Input(1), Op::Add(0, 1), Op::Eq(0, 1)],
             vec![2, 3],
         );
-        let inputs: Vec<Vec<i64>> = (0..=3)
+        let inputs: Vec<Vec<i128>> = (0..=3)
             .flat_map(|a| (0..=3).map(move |b| vec![a, b]))
             .collect();
         agrees(&program, &inputs);
@@ -207,7 +205,7 @@ mod tests {
         let program = program(
             vec![small],
             vec![small],
-            vec![Op::Int(2), Op::Int(i64::MAX), Op::Input(0), Op::Add(1, 2)],
+            vec![Op::Int(2), Op::Int(i128::MAX), Op::Input(0), Op::Add(1, 2)],
             vec![0],
         );
         agrees(&program, &[vec![0], vec![1]]);

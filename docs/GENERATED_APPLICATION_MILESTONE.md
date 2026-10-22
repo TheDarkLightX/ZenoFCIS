@@ -6,7 +6,7 @@ deployment approval. Lean stays pinned at 4.30.0.
 
 ## Scope and contracts
 
-1. Add checked schema lowering from the existing typed authoring AST. Record
+1. Add checked schema lowering from the existing typed specification AST. Record
    fields and sum variants come from authored declarations. Leaf shapes and
    bounds, root selection, and schema version remain explicit reviewed inputs.
    Reject missing, extra, ambiguous, and incompatible bindings before codegen.

@@ -33,11 +33,23 @@ fn program<'a>(
 #[test]
 fn late_empty_domain_wins_over_product_overflow_and_cap() {
     let full = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     let empty = Domain::Int { min: 1, max: 0 };
-    assert_eq!(domain_size(&[full]), Ok(Some(1u128 << 64)));
+    assert_eq!(domain_size(&[full]), Ok(None));
+    let old_full = Domain::Int {
+        min: i128::from(i64::MIN),
+        max: i128::from(i64::MAX),
+    };
+    assert_eq!(domain_size(&[old_full]), Ok(Some(1u128 << 64)));
+    assert_eq!(
+        domain_size(&[Domain::Int {
+            min: i128::MIN,
+            max: i128::MAX - 1
+        }]),
+        Ok(Some(u128::MAX))
+    );
     assert_eq!(domain_size(&[full, full]), Ok(None));
     assert_eq!(domain_size(&[full, full, empty]), Err(2));
     let inputs = [full, full, empty];
@@ -111,11 +123,11 @@ fn late_mismatch_beats_earlier_step_overruns_and_uses_last_input_fastest_order()
 fn trapped_attempts_and_strict_step_boundaries_are_counted() {
     let inputs = [Domain::Bool];
     let outputs = [Domain::Bool];
-    let left_nodes = [Op::Input(0), Op::Int(i64::MAX), Op::Add(1, 1)];
+    let left_nodes = [Op::Input(0), Op::Int(i128::MAX), Op::Add(1, 1)];
     let right_nodes = [
         Op::Input(0),
         Op::Bool(true),
-        Op::Int(i64::MAX),
+        Op::Int(i128::MAX),
         Op::Add(2, 2),
     ];
     let left = program(&inputs, &outputs, &left_nodes, &[0]);
@@ -147,7 +159,7 @@ fn full_outputs_and_exact_failure_classes_decide_equality() {
         compare_equal(&left, &right, 1),
         Err(Failure::Counterexample { ordinal: 0, .. })
     ));
-    let trap = [Op::Int(i64::MAX), Op::Add(0, 0)];
+    let trap = [Op::Int(i128::MAX), Op::Add(0, 0)];
     let invalid = [Op::Input(0)];
     let left = program(&[], &[], &trap, &[]);
     let right = program(&[], &[], &invalid, &[]);

@@ -30,8 +30,8 @@ fn expression_term(
         Some("Bool") => (Domain::Bool, Op::Bool(false)),
         Some("Int") => (
             Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             },
             Op::Int(0),
         ),
@@ -246,7 +246,7 @@ pub(super) fn command(
         let value = json!({"schema": SCHEMA, "authority": "none",
             "scope": {"original_sha256": sha256_hex(&bytes), "implementation_sha256": pipeline::implementation(),
                 "inputs": crate::transform::domains_json(original.inputs()), "domain_tuples": tuples(original.inputs()),
-                "semantics": "eager-i64-full-domain", "decided_by": "proposer"},
+                "semantics": "eager-i128-full-domain", "decided_by": "proposer"},
             "terms": discovered.terms.iter().map(program_to_json).collect::<Vec<_>>(),
             "classes": discovered.classes, "rejected": discovered.rejected,
             "rules": discovered.rules.iter().map(rule_json).collect::<Vec<_>>(), "work_used": discovered.work_used,

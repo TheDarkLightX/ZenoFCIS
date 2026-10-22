@@ -36,6 +36,7 @@ pub enum Form {
 pub struct Type {
     pub name: String,
     pub form: Form,
+    pub quantity: Option<zeno_fcis_spec::Quantity>,
 }
 
 #[derive(Debug)]
@@ -254,8 +255,37 @@ impl Declarations {
                 Type {
                     name: declared.name().as_str().to_owned(),
                     form,
+                    quantity: declared.quantity().cloned(),
                 },
             );
+        }
+        if types.values().any(|t| t.quantity.is_some()) {
+            use zeno_fcis_codec::CommitmentHasher;
+            for declared in types.values_mut() {
+                if matches!(declared.form, Form::Leaf(Leaf::I128 { .. }))
+                    && declared.quantity.is_none()
+                {
+                    return Err(invalid(
+                        "every integer type needs unit U scale eP in a quantity contract"
+                            .to_owned(),
+                    ));
+                }
+                if let Some(q) = &declared.quantity {
+                    let mut bytes = b"zeno-fcis/quantity/i128/1\0".to_vec();
+                    bytes.extend_from_slice(&(declared.name.len() as u32).to_be_bytes());
+                    bytes.extend_from_slice(declared.name.as_bytes());
+                    bytes.push(q.scale());
+                    for (id, power) in q.factors() {
+                        bytes.extend_from_slice(&(id.as_str().len() as u32).to_be_bytes());
+                        bytes.extend_from_slice(id.as_str().as_bytes());
+                        bytes.extend_from_slice(&power.to_be_bytes());
+                    }
+                    let hash = zeno_fcis_crypto::RustCryptoSha256::hash(&bytes);
+                    let digest: String =
+                        hash.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
+                    declared.name = format!("Quantity128_e{}_{}", q.scale(), digest);
+                }
+            }
         }
         for (source, id) in ROOTS {
             let expected = match source {

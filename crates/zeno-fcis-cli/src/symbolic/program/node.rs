@@ -21,13 +21,13 @@ verus! {
             && (wanted.is_none() || wanted == Some(kinds[id as int]))
     }
 
-    pub(super) open spec fn wire_value(kind: Kind, value: i64) -> denotation::Value {
+    pub(super) open spec fn wire_value(kind: Kind, value: i128) -> denotation::Value {
         if boolean(kind) { denotation::Value::Boolean(value == 1) }
         else { denotation::Value::Integer(value as int) }
     }
 
     pub(crate) open spec fn input_values(
-        domains: Seq<Domain>, terms: Seq<Term>, values: Seq<i64>,
+        domains: Seq<Domain>, terms: Seq<Term>, values: Seq<i128>,
         environment: Map<Seq<char>, denotation::Value>,
     ) -> bool {
         crate::evaluation::spec::admitted(domains, values)
@@ -38,7 +38,7 @@ verus! {
     }
 
     pub(super) open spec fn prefix_values(
-        kinds: Seq<Kind>, terms: Seq<Term>, values: Seq<i64>,
+        kinds: Seq<Kind>, terms: Seq<Term>, values: Seq<i128>,
         environment: Map<Seq<char>, denotation::Value>,
     ) -> bool {
         kinds.len() == terms.len() && terms.len() == values.len()
@@ -96,7 +96,7 @@ verus! {
     }
 
     /// The mathematical value of one SMT expression, before the caller's
-    /// checked-i64 guard. This erased relation is connected to the actual
+    /// checked-i128 guard. This erased relation is connected to the actual
     /// runtime below; it does not execute or authorize an application.
     #[verifier::opaque]
     spec fn expression(op: Op, domains: Seq<Domain>, input: Seq<Term>, terms: Seq<Term>,
@@ -136,7 +136,7 @@ verus! {
                 _ => None,
             },
             Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
-            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => None,
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::SignedMulDivFloor(..) | Op::ProductsGe(..) => None,
             Op::Select(c, a, b) => match at(terms, c, environment) {
                 Some(denotation::Value::Boolean(true)) => at(terms, a, environment),
                 Some(denotation::Value::Boolean(false)) => at(terms, b, environment),
@@ -149,7 +149,7 @@ verus! {
     /// Encoding overflow succeeds with an unbounded term; the caller's range
     /// guard, rather than node construction, represents the runtime refusal.
     pub(super) open spec fn refines(
-        op: Op, kind: Kind, term: Term, input: Seq<i64>, values: Seq<i64>,
+        op: Op, kind: Kind, term: Term, input: Seq<i128>, values: Seq<i128>,
         environment: Map<Seq<char>, denotation::Value>,
     ) -> bool {
         match crate::evaluation::spec::node(op, input, values) {
@@ -160,7 +160,7 @@ verus! {
                     let value = if matches!(op, Op::Add(..)) {
                         values[a as int] as int + values[b as int] as int
                     } else { values[a as int] as int - values[b as int] as int };
-                    !boolean(kind) && (value < i64::MIN || value > i64::MAX)
+                    !boolean(kind) && (value < i128::MIN || value > i128::MAX)
                         && denotation::term(term, environment) == Some(denotation::Value::Integer(value))
                 },
                 _ => false,
@@ -171,7 +171,7 @@ verus! {
 
     proof fn expression_refines_runtime(op: Op, domains: Seq<Domain>, input: Seq<Term>,
         terms: Seq<Term>, kinds: Seq<Kind>, kind: Kind, term: Term,
-        raw_input: Seq<i64>, previous: Seq<i64>, environment: Map<Seq<char>, denotation::Value>)
+        raw_input: Seq<i128>, previous: Seq<i128>, environment: Map<Seq<char>, denotation::Value>)
         requires !crate::evaluation::spec::new_arithmetic(op),
             input_values(domains, input, raw_input, environment),
             prefix_values(kinds, terms, previous, environment),
@@ -192,7 +192,7 @@ verus! {
             Op::Not(a) => {},
             Op::Select(c, a, b) => {},
             Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
-            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::SignedMulDivFloor(..) | Op::ProductsGe(..) => { assert(false); },
         }
     }
 
@@ -290,7 +290,7 @@ fn operand(
     },
     match result {
         Ok((kind, term)) => forall|environment: Map<Seq<char>, denotation::Value>,
-            raw_input: Seq<i64>, previous: Seq<i64>|
+            raw_input: Seq<i128>, previous: Seq<i128>|
                 input_values(inputs@, input@, raw_input, environment)
                     && prefix_values(kinds@, terms@, previous, environment) ==>
                 refines(*op, kind, term, raw_input, previous, environment),
@@ -326,7 +326,7 @@ pub(super) fn encode(
                 Kind::Int => (Kind::Int, wire),
             }
         }
-        Op::Int(value) => (Kind::Int, Term::Int(i128::from(value))),
+        Op::Int(value) => (Kind::Int, Term::Int(value)),
         Op::Bool(value) => (Kind::Bool, Term::Bool(value)),
         Op::Add(a, b) | Op::Sub(a, b) => {
             let (a, _) = operand(terms, kinds, a, Some(Kind::Int))?;
@@ -499,7 +499,7 @@ pub(super) fn encode(
                 Op::Not(a) => { assert(a < terms@.len()); },
                 Op::Select(c, a, b) => { assert(c < terms@.len() && a < terms@.len() && b < terms@.len()); },
                 Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
-                | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
+                | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::SignedMulDivFloor(..) | Op::ProductsGe(..) => { assert(false); },
             }
         }
         assert forall|left: Map<Seq<char>, denotation::Value>, right: Map<Seq<char>, denotation::Value>|
@@ -529,11 +529,11 @@ pub(super) fn encode(
                 Op::Not(a) => {},
                 Op::Select(c, a, b) => {},
             Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
-            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) => { assert(false); },
+            | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::SignedMulDivFloor(..) | Op::ProductsGe(..) => { assert(false); },
             }
         }
         assert(depends_on(result.1, input@, terms@, kinds@));
-        assert forall|environment: Map<Seq<char>, denotation::Value>, raw_input: Seq<i64>, previous: Seq<i64>|
+        assert forall|environment: Map<Seq<char>, denotation::Value>, raw_input: Seq<i128>, previous: Seq<i128>|
             input_values(inputs@, input@, raw_input, environment)
                 && prefix_values(kinds@, terms@, previous, environment) implies
             refines(*op, result.0, result.1, raw_input, previous, environment) by {

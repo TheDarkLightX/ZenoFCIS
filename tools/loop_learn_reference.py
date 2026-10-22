@@ -18,10 +18,11 @@ import itertools
 import json
 from pathlib import Path
 
-from program_search_reference import Program, run as run_program, _type_check
+from program_search_reference import I128_MAX, I128_MIN, Program, run as run_program, _type_check
 
-I64_MIN, I64_MAX = -(1 << 63), (1 << 63) - 1
 SCHEMA = "zeno-fcis/loop-learn/1"
+INTEGER_ENCODING = "safe-number-or-decimal-string/1"
+SAFE_INTEGER = (1 << 53) - 1
 ARITHMETIC, OUTPUT_DOMAIN = (1, 0), (2, 0)
 ARGUMENTS = {op: ("Int", "Int") for op in ("+", "-", "<", "<=", "==", "!=", "min", "max")}
 ARGUMENTS.update({"!": ("Bool",), "&&": ("Bool", "Bool"), "||": ("Bool", "Bool"),
@@ -54,7 +55,7 @@ def apply(op, observations):
         v = xs[0] - xs[1]
     elif op == "abs":
         negated = -xs[0]
-        if not I64_MIN <= negated <= I64_MAX:
+        if not I128_MIN <= negated <= I128_MAX:
             return ARITHMETIC
         v = negated if xs[0] < 0 else xs[0]
     elif op == "min":
@@ -79,7 +80,7 @@ def apply(op, observations):
         v = xs[1] if xs[0] == 1 else xs[2]
     else:
         raise ValueError("unsupported reference operation")
-    return value(v) if I64_MIN <= v <= I64_MAX else ARITHMETIC
+    return value(v) if I128_MIN <= v <= I128_MAX else ARITHMETIC
 
 
 def _splits(total, arity):
@@ -206,7 +207,8 @@ def program_fixture(data):
 
 
 def program_digest(program):
-    # ZCVE/1 canonical tuple/profile representation, independent of Rust encoding.
+    # ZCVE/1 canonical (profile text, schema, nodes, roots) tuple, independent of
+    # Rust encoding. The profile is the program's own: finite-i128/1 for fixtures.
     def encode(v):
         if type(v) is bool:
             return bytes([2 if v else 1])
@@ -223,8 +225,24 @@ def program_digest(program):
     domains = tuple(tuple((boolean, integer(lo), integer(hi))) for boolean, lo, hi in program.inputs), \
               tuple(tuple((boolean, integer(lo), integer(hi))) for boolean, lo, hi in program.outputs)
     nodes = tuple(tuple(integer(a) for a in n) for n in program.nodes)
-    body = (b"zeno-fcis/finite-i64/1", domains, nodes, tuple(natural(n) for n in program.roots))
+    body = (program.profile, domains, nodes, tuple(natural(n) for n in program.roots))
     return hashlib.sha256(encode(body)).hexdigest()
+
+
+def reported_integer(n):
+    """safe-number-or-decimal-string/1: a JSON number up to 2^53 - 1 in magnitude, else canonical decimal text."""
+    return n if -SAFE_INTEGER <= n <= SAFE_INTEGER else str(n)
+
+
+def reported_question(question):
+    """The expected question in the report's integer encoding; its worst/squares fields are already text."""
+    if question is None:
+        return None
+    def bucket(b):
+        o = b["observation"]
+        return {**b, "observation": {"value": reported_integer(o["value"])} if "value" in o else o}
+    return {**question, "input": [reported_integer(v) for v in question["input"]],
+            "buckets": [[bucket(b) for b in buckets] for buckets in question["buckets"]]}
 
 
 def agree(left, right):
@@ -256,7 +274,7 @@ def output_program(program, output):
     for k in order:
         opcode, *args = program.nodes[k]
         nodes.append((opcode, *args) if opcode in (0, 1, 2) else (opcode, *[mapping[a] for a in args]))
-    return Program(program.inputs, (program.outputs[output],), tuple(nodes), (mapping[root],))
+    return Program(program.inputs, (program.outputs[output],), tuple(nodes), (mapping[root],), program.profile)
 
 
 def check_report(spec, report):
@@ -265,9 +283,11 @@ def check_report(spec, report):
     detail = report.get("detail", {})
     checks = [agree(report.get("authority"), "none"), agree(detail.get("enumeration"), "proposal"),
               agree(detail.get("complete"), True), agree(detail.get("attempts_spent"), 0),
-              agree(report.get("status"), expected["status"])]
-    for key in ("counts", "before", "by_size", "question", "core"):
+              agree(report.get("status"), expected["status"]),
+              agree(report.get("integer_encoding"), INTEGER_ENCODING)]
+    for key in ("counts", "before", "by_size", "core"):
         checks.append(agree(detail.get(key), expected[key]))
+    checks.append(agree(detail.get("question"), reported_question(expected["question"])))
     candidate = detail.get("candidate")
     if expected["status"] == "outside-vocabulary":
         checks.append(agree(candidate, None))

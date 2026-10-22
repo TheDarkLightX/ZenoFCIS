@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "support/arithmetic_judges.rs"]
+mod arithmetic_fixture;
+
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const CLI: &str = env!("CARGO_BIN_EXE_zeno-fcis");
 
@@ -35,7 +38,7 @@ impl Directory {
     }
 
     /// A core component instantiated from its templates.
-    fn contract(&self, family: &str, parameters: &[(&str, i64)]) -> String {
+    fn contract(&self, family: &str, parameters: &[(&str, i128)]) -> String {
         let base = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../core-components")
             .join(family);
@@ -83,13 +86,198 @@ fn answers(items: &[Value]) -> Value {
     json!({"schema": "zeno-fcis/loop-answers/1", "answers": items})
 }
 
+fn arithmetic_contract(directory: &Directory, successor: &str, condition: &str) -> String {
+    let app = directory.0.join("arithmetic");
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|e| panic!("{e:?}"));
+    fs::write(app.join("project.zeno"), arithmetic_fixture::project())
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    fs::write(
+        app.join("v2/policy.json"),
+        arithmetic_fixture::policy(successor, condition).to_string(),
+    )
+    .unwrap_or_else(|e| panic!("{e:?}"));
+    app.to_string_lossy().into_owned()
+}
+
+fn arithmetic_rule(id: &str, condition: &str, successor: &str) -> Value {
+    json!({"id":id,"where":condition,"class":"Accept","reason":null,"sets":{"value":successor}})
+}
+
+#[test]
+fn arithmetic_teach_back_cli_rejects_wrong_rounding_and_undefined_successors() {
+    for (target, wrong) in [
+        (arithmetic_fixture::FLOOR, arithmetic_fixture::CEIL),
+        (arithmetic_fixture::CEIL, arithmetic_fixture::FLOOR),
+    ] {
+        let directory = Directory::new();
+        let contract = arithmetic_contract(&directory, target, "true");
+        let rules = directory.json(
+            "rules.json",
+            &json!({"schema":"zeno-fcis/loop-rules/1", "rules":[
+                arithmetic_rule("good", "true", target),
+                arithmetic_rule("wrong", "true", wrong),
+                arithmetic_rule("floor-zero", "true", "mul_div_floor(amount, 1, 0)"),
+                arithmetic_rule("ceil-zero", "true", "mul_div_ceil(amount, 1, 0)"),
+            ]}),
+        );
+        let (exit, report) = run(&[
+            "loop",
+            "teach-back",
+            "--contract",
+            &contract,
+            "--rule",
+            &rules,
+        ]);
+        assert_eq!(exit, Some(0), "{report}");
+        assert_eq!(report["authority"], "none");
+        let judged = &report["detail"]["rules"];
+        assert_eq!(judged[0]["verdict"], "exact", "{report}");
+        assert_eq!(judged[1]["verdict"], "wrong", "{report}");
+        assert_eq!(judged[1]["exceptions"], 4);
+        assert_eq!(judged[2]["verdict"], "refused", "{report}");
+        assert_eq!(judged[3]["verdict"], "refused", "{report}");
+    }
+}
+
+#[test]
+fn arithmetic_teach_back_cli_checks_both_product_conditions() {
+    for (good, bad) in [
+        (
+            "products_ge(amount, 2, 3, 1)",
+            "products_ge(amount, 3, 3, 1)",
+        ),
+        (
+            "products_ge(amount, 2, 1, 3, 1, 1)",
+            "products_ge(amount, 3, 1, 3, 1, 1)",
+        ),
+    ] {
+        let directory = Directory::new();
+        let contract = arithmetic_contract(&directory, arithmetic_fixture::FLOOR, good);
+        let rules = directory.json("rules.json", &json!({"schema":"zeno-fcis/loop-rules/1", "rules":[
+            arithmetic_rule("good", good, arithmetic_fixture::FLOOR),
+            arithmetic_rule("wrong", bad, arithmetic_fixture::FLOOR),
+            arithmetic_rule("floor-zero", "products_ge(mul_div_floor(amount, 1, 0), 1, 0, 1)", arithmetic_fixture::FLOOR),
+            arithmetic_rule("ceil-zero", "products_ge(mul_div_ceil(amount, 1, 0), 1, 1, 0, 1, 1)", arithmetic_fixture::FLOOR),
+        ]}));
+        let (exit, report) = run(&[
+            "loop",
+            "teach-back",
+            "--contract",
+            &contract,
+            "--rule",
+            &rules,
+        ]);
+        assert_eq!(exit, Some(0), "{report}");
+        let judged = &report["detail"]["rules"];
+        assert_eq!(judged[0]["verdict"], "exact", "{report}");
+        assert_eq!(judged[1]["verdict"], "wrong", "{report}");
+        assert_eq!(judged[1]["exceptions"], 4);
+        assert_eq!(judged[2]["verdict"], "refused", "{report}");
+        assert_eq!(judged[3]["verdict"], "refused", "{report}");
+    }
+}
+
+#[test]
+fn an_offered_answer_does_not_inherit_another_decisions_successor() {
+    let directory = Directory::new();
+    let app = directory.0.join("toggle");
+    fs::create_dir_all(app.join("v2")).unwrap_or_else(|e| panic!("{e}"));
+    let project = r#"zeno 1;
+project 1 toggle;
+namespace 2 core;
+type 100 state Counter;
+type 101 command Change;
+type 102 context Authorized;
+type 105 int Count;
+field 110 100 count 105;
+variant 120 101 Toggle none;
+reason 200 denied precedence 0;
+component 400 counter {
+ owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 32;
+}
+merge [400];
+law 500 bounded on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 501 toggle on accept = post.100.110 == 1 - pre.100.110;
+"#;
+    let mut policy = json!({
+        "schema": "zeno-fcis/template-declarative-policy/2", "template": "minimal",
+        "roots": {"state":100,"command":101,"context":102},
+        "leaf_bindings": {"102":["Bool"],"105":["I128",0,1]},
+        "variables": {"count":"pre.100.110","allowed":"context.102"},
+        "cases": [
+            {"when":"!allowed","class":"Reject","reason":200,"post":{},"outbox":[]},
+            {"when":"true","class":"Accept","reason":null,"post":{"110":"1 - count"},"outbox":[]}
+        ],
+        "genesis":{"110":0},
+        "law_kinds":{"500":"StateInvariant","501":"AuthoritySubjectRecipient"}
+    });
+    fs::write(app.join("project.zeno"), project).unwrap_or_else(|e| panic!("{e}"));
+    fs::write(app.join("v2/policy.json"), policy.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let path = app.to_string_lossy();
+    let (exit, report) = run(&["loop", "question", "--contract", &path]);
+    assert_eq!(exit, Some(0), "{report}");
+    let question = &report["detail"]["question"];
+    let options = question["options"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{report}"));
+    let mut accept = options
+        .iter()
+        .find(|o| o["class"] == "Accept")
+        .unwrap_or_else(|| panic!("Accept alternative: {report}"))
+        .clone();
+    // Omission leaves the successor open. An empty object would pin identity,
+    // contradicting the toggle law on every input in this region.
+    assert!(accept.get("sets").is_none(), "{accept}");
+    assert_eq!(accept["answer_supported"], true);
+    accept["where"] = question["where"].clone();
+    let answer = directory.json("answer.json", &answers(&[accept]));
+    let (exit, report) = run(&[
+        "loop",
+        "question",
+        "--contract",
+        &path,
+        "--answers",
+        &answer,
+    ]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["answers"][0]["status"], "disagreement");
+    assert_eq!(report["detail"]["stats"]["inconsistent"], 0);
+    assert_eq!(report["detail"]["stats"]["determined"], 2);
+
+    // Keep unanswerable but admissible classes visible with an explicit limit.
+    policy["cases"][0]["class"] = json!("CommittedFailure");
+    policy["law_kinds"]["502"] = json!("CommittedFailureEffects");
+    fs::write(
+        app.join("project.zeno"),
+        format!(
+            "{project}\nlaw 502 failure_keeps_state on failure = post.100.110 == pre.100.110;\n"
+        ),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    fs::write(app.join("v2/policy.json"), policy.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let (exit, report) = run(&["loop", "question", "--contract", &path]);
+    assert_eq!(exit, Some(0), "{report}");
+    let options = report["detail"]["question"]["options"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{report}"));
+    let failure = options
+        .iter()
+        .find(|o| o["class"] == "CommittedFailure")
+        .unwrap_or_else(|| panic!("failure alternative: {report}"));
+    assert_eq!(failure["answer_supported"], false);
+    assert_eq!(
+        failure["answer_refusal"],
+        "question-choice-unsupported:CommittedFailure"
+    );
+}
+
 #[test]
 fn the_largest_open_region_becomes_an_exact_question_and_answers_pin_it() {
     let directory = Directory::new();
     let c8 = directory.contract("bounded-counter", &[("C", 8)]);
     let (exit, report) = run(&["loop", "question", "--contract", &c8]);
     assert_eq!(exit, Some(0), "{report}");
-    assert_eq!(report["schema"], "zeno-fcis/loop-doors/1");
+    assert_eq!(report["schema"], "zeno-fcis/loop-doors/2");
     assert_eq!(report["authority"], "none");
     let detail = &report["detail"];
     // the declared laws determine no decision of the counter: five regions
@@ -188,7 +376,7 @@ fn rules_are_judged_exactly_with_regions_and_a_summary() {
         rule("t2", "authorized && action == Inc && value == 3", "Reject", json!("at_capacity"), Value::Null),
         rule("t1", "action == Inc && value == 3", "Reject", json!("at_capacity"), Value::Null),
         rule("t3", "authorized && action == Inc && value < 2", "Accept", Value::Null, json!({"value": "value + 1"})),
-        rule("o", "!authorized && (9223372036854775807 + 1 < 0)", "Reject", json!("not_authorized"), Value::Null),
+        rule("o", "!authorized && (170141183460469231731687303715884105727 + 1 < 0)", "Reject", json!("not_authorized"), Value::Null),
     ]});
     let path = directory.json("rules.json", &rules);
     let (exit, report) = run(&["loop", "teach-back", "--contract", &c3, "--rule", &path]);

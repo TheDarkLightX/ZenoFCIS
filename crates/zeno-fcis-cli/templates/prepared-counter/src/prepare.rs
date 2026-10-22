@@ -134,11 +134,11 @@ impl PreparedBatch {
         ))?;
         let items = [command.first.0, command.second.0, command.third.0]
             .into_iter()
-            .map(|delta| checked(i64::try_from(delta)).map(|value| vec![value]))
+            .map(|delta| checked(i64::try_from(delta)).map(|value| vec![i128::from(value)]))
             .collect::<AppResult<Vec<_>>>()?;
         let fold = checked(continuation::start(
             graph,
-            vec![checked(i64::try_from(state.count.0))?],
+            vec![i128::from(checked(i64::try_from(state.count.0))?)],
             items,
             context(snapshot, &command_bytes, &context_bytes, replay)?,
             continuation::PreparationLimits {
@@ -292,7 +292,7 @@ impl PreparedBatch {
         };
         let expected = checked(project.admit_root::<RustCryptoSha256>(
             &CounterState {
-                count: CounterValue(i128::from(*count)),
+                count: CounterValue(*count),
             },
             ValidationLimits::default(),
         ))?;
@@ -306,7 +306,7 @@ impl PreparedBatch {
         let destination = checked(NotificationDestination("local-observer".into()).to_value())?;
         let payload = checked(
             Notification {
-                notified_count: CounterValue(i128::from(*count)),
+                notified_count: CounterValue(*count),
             }
             .to_value(),
         )?;

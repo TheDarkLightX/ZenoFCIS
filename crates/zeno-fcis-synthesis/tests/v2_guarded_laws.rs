@@ -85,6 +85,8 @@ fn tuple(items: Vec<Vec<u8>>) -> Vec<u8> {
     b
 }
 fn check_original_graph() {
+    // This file also compiles inside the Verus harness, which has no runtime
+    // importer. v2_composition imports the same artifact with import_program.
     fn domains(values: &[ScalarDomain]) -> Vec<u8> {
         tuple(
             values
@@ -95,7 +97,7 @@ fn check_original_graph() {
                         ScalarDomain::Int { min, max } => (1, min, max),
                         _ => panic!("unsupported future domain in the original graph oracle"),
                     };
-                    tuple(vec![vec![flag], integer(min.into()), integer(max.into())])
+                    tuple(vec![vec![flag], integer(min), integer(max)])
                 })
                 .collect(),
         )
@@ -105,7 +107,7 @@ fn check_original_graph() {
         .map(|op| {
             let fields: Vec<i128> = match *op {
                 ScalarOp::Input(a) => vec![0, a.into()],
-                ScalarOp::Int(a) => vec![1, a.into()],
+                ScalarOp::Int(a) => vec![1, a],
                 ScalarOp::Bool(a) => vec![2, i128::from(a)],
                 ScalarOp::Add(a, b) => vec![3, a.into(), b.into()],
                 ScalarOp::Sub(a, b) => vec![4, a.into(), b.into()],
@@ -120,8 +122,8 @@ fn check_original_graph() {
         })
         .collect();
     let mut tag = vec![6];
-    tag.extend(22u32.to_be_bytes());
-    tag.extend(b"zeno-fcis/finite-i64/1");
+    tag.extend(23u32.to_be_bytes());
+    tag.extend(b"zeno-fcis/finite-i128/1");
     let roots = ROOTS
         .iter()
         .map(|n| {
@@ -158,7 +160,7 @@ fn limits() -> Limits {
     }
     cap
 }
-fn int(id: u16, min: i64, max: i64) -> InputField {
+fn int(id: u16, min: i128, max: i128) -> InputField {
     InputField {
         id,
         leaf: InputLeaf::I128 { min, max },
@@ -231,7 +233,10 @@ fn with_inventory(run: impl FnOnce(&mut c::Descriptor<'_>)) {
                 max: 3,
                 variants: (150..=153)
                     .enumerate()
-                    .map(|(i, id)| Variant { id, code: i as i64 })
+                    .map(|(i, id)| Variant {
+                        id,
+                        code: i as i128,
+                    })
                     .collect(),
             },
         },

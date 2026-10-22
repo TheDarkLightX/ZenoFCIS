@@ -18,12 +18,44 @@ use crate::transform::sha256_hex;
 
 const SCHEMA: &str = "zeno-fcis/loop-learn/1";
 
-#[derive(Deserialize)]
-#[serde(tag = "kind", deny_unknown_fields)]
 enum DomainDocument {
     Bool {},
-    Int { min: i64, max: i64 },
+    Int { min: i128, max: i128 },
 }
+
+// Internally tagged Serde enums buffer numbers through a representation that
+// cannot deserialize i128. Preserve each exact token until its kind is known.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DomainFields {
+    kind: String,
+    #[serde(default, deserialize_with = "present_bound")]
+    min: Option<Box<serde_json::value::RawValue>>,
+    #[serde(default, deserialize_with = "present_bound")]
+    max: Option<Box<serde_json::value::RawValue>>,
+}
+fn present_bound<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Box<serde_json::value::RawValue>>, D::Error> {
+    Deserialize::deserialize(d).map(Some)
+}
+
+impl<'de> Deserialize<'de> for DomainDocument {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let fields = DomainFields::deserialize(d)?;
+        match (fields.kind.as_str(), fields.min, fields.max) {
+            ("Bool", None, None) => Ok(Self::Bool {}),
+            ("Int", Some(min), Some(max)) => Ok(Self::Int {
+                min: serde_json::from_str(min.get()).map_err(serde::de::Error::custom)?,
+                max: serde_json::from_str(max.get()).map_err(serde::de::Error::custom)?,
+            }),
+            _ => Err(serde::de::Error::custom(
+                "invalid integer or boolean domain",
+            )),
+        }
+    }
+}
+
 impl DomainDocument {
     fn domain(&self) -> Domain {
         match self {
@@ -44,11 +76,11 @@ struct InputDocument {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExampleDocument {
-    input: Vec<i64>,
-    output: Vec<i64>,
+    input: Vec<i128>,
+    output: Vec<i128>,
 }
 
-fn constants() -> Vec<i64> {
+fn constants() -> Vec<i128> {
     vec![1, 2, 3]
 }
 fn arithmetic() -> Vec<String> {
@@ -61,7 +93,7 @@ fn size() -> usize {
 #[serde(deny_unknown_fields)]
 struct VocabularyDocument {
     #[serde(default = "constants")]
-    constants: Vec<i64>,
+    constants: Vec<i128>,
     #[serde(default = "arithmetic")]
     arithmetic: Vec<String>,
     #[serde(default)]
@@ -119,6 +151,11 @@ fn specification(bytes: &[u8]) -> Result<Specification, String> {
         operations.push(match s.as_str() {
             "+" => Operation::Add,
             "-" => Operation::Sub,
+            "*" => Operation::Mul,
+            "div_floor" => Operation::DivFloor,
+            "div_ceil" => Operation::DivCeil,
+            "mul_div_floor" => Operation::MulDivFloor,
+            "mul_div_ceil" => Operation::MulDivCeil,
             _ => return Err("learn-arithmetic-operator".into()),
         });
     }
@@ -131,6 +168,10 @@ fn specification(bytes: &[u8]) -> Result<Specification, String> {
         });
     }
     for s in vocab.compare {
+        if s == "products_ge" {
+            operations.extend([Operation::ProductsGe2, Operation::ProductsGe3]);
+            continue;
+        }
         operations.push(match s.as_str() {
             "<" => Operation::Lt,
             "<=" => Operation::Le,
@@ -201,7 +242,7 @@ fn stopped(e: Stop, budget: &Budget, bytes: usize) -> (u8, Value) {
 }
 fn observation(o: Observation) -> Value {
     match o {
-        Observation::Value(v) => json!({"value": v}),
+        Observation::Value(v) => json!({"value": crate::report_numbers::integer(v)}),
         Observation::Arithmetic => json!({"failure": "arithmetic"}),
         Observation::OutputDomain => json!({"failure": "output-domain"}),
     }
@@ -311,14 +352,14 @@ pub(super) fn run(
                     input_bytes,
                 );
                 result["detail"]["examples_check"] = json!({"decided_by": "library-evaluator", "verdict": "mismatch",
-                    "example": example, "checked": checked, "actual": actual,
-                    "expected": spec.examples[example].output});
+                    "example": example, "checked": checked, "actual": actual.as_deref().map(crate::report_numbers::integers),
+                    "expected": crate::report_numbers::integers(&spec.examples[example].output)});
                 return (exit, result);
             }
         }
     }
     let question = analysis.question.as_ref().map(|q| json!({
-        "input": q.input, "ordinal": q.ordinal, "worst": q.worst.to_string(), "squares": q.squares.to_string(),
+        "input": crate::report_numbers::integers(&q.input), "ordinal": q.ordinal, "worst": q.worst.to_string(), "squares": q.squares.to_string(),
         "buckets": q.buckets.iter().map(|bs| bs.iter().map(|b| json!({"observation": observation(b.observation),
             "remaining": b.remaining})).collect::<Vec<_>>()).collect::<Vec<_>>()
     }));
@@ -393,10 +434,34 @@ mod tests {
     }
 
     #[test]
+    fn learn_document_keeps_wide_domains_with_arithmetic_vocabulary() {
+        let wide = 1i128 << 100;
+        let bytes = format!(
+            r#"{{"schema":"zeno-fcis/loop-learn/1",
+            "inputs":[{{"name":"x","domain":{{"kind":"Int","min":{wide},"max":{wide}}}}}],
+            "outputs":[{{"kind":"Int","min":{wide},"max":{wide}}}],
+            "vocabulary":{{"arithmetic":["mul_div_floor"],"compare":["products_ge"]}},
+            "examples":[{{"input":[{wide}],"output":[{wide}]}}]}}"#
+        );
+        let spec = specification(bytes.as_bytes()).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(
+            spec.inputs,
+            vec![Domain::Int {
+                min: wide,
+                max: wide
+            }]
+        );
+        assert_eq!(spec.examples[0].input, vec![wide]);
+        assert_eq!(spec.examples[0].output, vec![wide]);
+        assert!(spec.operations.contains(&Operation::MulDivFloor));
+        assert!(spec.operations.contains(&Operation::ProductsGe3));
+    }
+
+    #[test]
     fn learn_document_refuses_research_primitives_noise_and_aliases() {
         let mut specimens = Vec::new();
         let mut value = declaration();
-        value["vocabulary"]["arithmetic"] = json!(["*"]);
+        value["vocabulary"]["arithmetic"] = json!(["opaque_product"]);
         specimens.push(value);
         let mut value = declaration();
         value["vocabulary"]["opaque"] = json!([]);
@@ -438,7 +503,35 @@ mod tests {
     }
 
     #[test]
-    fn learn_document_rejects_duplicate_names_before_enumeration_and_non_i64_examples() {
+    fn learn_document_admits_only_the_closed_d1_arithmetic_vocabulary() {
+        let mut value = declaration();
+        value["vocabulary"]["arithmetic"] = json!([
+            "*",
+            "div_floor",
+            "div_ceil",
+            "mul_div_floor",
+            "mul_div_ceil"
+        ]);
+        value["vocabulary"]["compare"] = json!(["products_ge"]);
+        let spec = specification(value.to_string().as_bytes()).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(
+            spec.operations,
+            vec![
+                Operation::Mul,
+                Operation::DivFloor,
+                Operation::DivCeil,
+                Operation::MulDivFloor,
+                Operation::MulDivCeil,
+                Operation::ProductsGe2,
+                Operation::ProductsGe3
+            ]
+        );
+        value["vocabulary"]["compare"] = json!(["products_ge", "products_ge"]);
+        assert!(specification(value.to_string().as_bytes()).is_err());
+    }
+
+    #[test]
+    fn learn_document_rejects_duplicate_names_before_enumeration_and_non_i128_examples() {
         let mut duplicate = declaration();
         duplicate["inputs"] = json!([
             duplicate["inputs"][0].clone(),

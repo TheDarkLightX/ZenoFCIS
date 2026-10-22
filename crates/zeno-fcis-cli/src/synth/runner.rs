@@ -111,9 +111,9 @@ fn main() {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
     for line in input.lines() {
-        let values: Vec<i64> = line.split_ascii_whitespace().map(|s| s.parse().unwrap()).collect();
+        let values: Vec<i128> = line.split_ascii_whitespace().map(|s| s.parse().unwrap()).collect();
         match target::transition(&values) {
-            Some(out) => println!("{}", out.iter().map(i64::to_string).collect::<Vec<_>>().join(" ")),
+            Some(out) => println!("{}", out.iter().map(i128::to_string).collect::<Vec<_>>().join(" ")),
             None => println!("trap"),
         }
     }
@@ -318,7 +318,7 @@ fn inputs(cases: &[Case]) -> Vec<u8> {
             &case
                 .input
                 .iter()
-                .map(i64::to_string)
+                .map(i128::to_string)
                 .collect::<Vec<_>>()
                 .join(" "),
         );
@@ -344,12 +344,12 @@ pub(super) fn validate(contract: &Contract, cases: &[Case], stdout: &[u8]) -> Re
         }
         let output = line
             .split(' ')
-            .map(str::parse::<i64>)
+            .map(str::parse::<i128>)
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| error("output-protocol", e))?;
         if output
             .iter()
-            .map(i64::to_string)
+            .map(i128::to_string)
             .collect::<Vec<_>>()
             .join(" ")
             != line
@@ -363,7 +363,7 @@ pub(super) fn validate(contract: &Contract, cases: &[Case], stdout: &[u8]) -> Re
         {
             return Err(error(
                 "counterexample",
-                json!({"ordinal":ordinal,"input":case.input,"expected":case.output,"actual":output}),
+                json!({"ordinal":ordinal,"input":crate::report_numbers::integers(&case.input),"expected":crate::report_numbers::integers(&case.output),"actual":crate::report_numbers::integers(&output)}),
             ));
         }
     }

@@ -7,6 +7,8 @@ The receipt is scoped Verus/Z3 evidence, not an authorization or a V2 release.
 
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 from contextlib import nullcontext
 import json
@@ -20,7 +22,8 @@ import zipfile
 
 from v2_proof_sources import execution_sources
 import scalar_arithmetic_controls as arithmetic_controls
-from v2_native_dependencies import native_dependency_args
+import signed_arithmetic_controls as signed_controls
+from v2_native_dependencies import native_dependency_args, native_test_environment
 import check_verus as verifier
 from verus_coverage import profile_inventory, require_coverage
 
@@ -43,6 +46,10 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("tools/check_finite_execution.py"), Path("tools/verus_coverage.py"),
            Path("tools/scalar_arithmetic_controls.py"), Path("tools/test_scalar_arithmetic_controls.py"),
            Path("tools/scalar_arithmetic_reference.py"), Path("tools/test-data/scalar-arithmetic/vectors.tsv"),
+           Path("tools/test-data/scalar-arithmetic/i128-vectors.tsv"),
+           Path("tools/signed_arithmetic_controls.py"), Path("tools/signed_arithmetic_reference.py"),
+           Path("tools/check_signed_arithmetic.py"), Path("tools/test_signed_arithmetic.py"),
+           Path("tools/test-data/signed-arithmetic/vectors.tsv"),
            Path("tools/check_verus.py"), Path("tools/test_check_finite_execution.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
@@ -52,6 +59,7 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs"),
            Path("tools/v2_proof_sources.py"), Path("verification/verus/authority_v2_sources.json"),
            Path("tools/v2_native_dependencies.py"))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 
 SEMANTIC_TARGETS = {
     'wrong_boolean_encoding': 'legacy_instruction', 'subtract_instead_of_add': 'arithmetic',
@@ -62,6 +70,7 @@ SEMANTIC_TARGETS = {
     'admit_excess_node_count': 'validate_shape', 'accept_wrong_root_kind': 'validate_roots',
 }
 SEMANTIC_TARGETS.update(arithmetic_controls.targets())
+SEMANTIC_TARGETS.update(signed_controls.targets())
 
 
 
@@ -137,6 +146,7 @@ def mutation_sources(execution: str, admission: str, typed: str, value: str) -> 
     mutations["add_uncontracted_function"] = (
         SUBJECT, execution + "\nfn unchecked_identity(value: i64) -> i64 { value }\n", "coverage")
     mutations.update(arithmetic_controls.specimens(ROOT))
+    mutations.update(signed_controls.specimens(ROOT))
     return mutations
 
 
@@ -188,6 +198,7 @@ def proof_rejected(proc, report, pin, profile, name, path, changed, specimen):
 
 def native_tests(directory: Path, pin: dict, environment: dict) -> subprocess.CompletedProcess:
     """Build and run the harness tests natively against fresh codec/value oracles."""
+    environment = native_test_environment(ROOT, environment)
     executable = directory / "finite-tests"
     native_command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
                       "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
@@ -208,6 +219,23 @@ def native_tests(directory: Path, pin: dict, environment: dict) -> subprocess.Co
     }, indent=2) + "\n")
     verifier.require_success(native)
     return native
+
+
+def check_native_only(directory: Path) -> dict:
+    """Fresh test evidence, independently scoped from a retained proof receipt."""
+    before = snapshot()
+    pin = json.loads((ROOT / verifier.PIN).read_text())
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith(("VERUS_", "VARGO_"))
+                   and key not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
+    native = native_tests(directory, pin, environment)
+    verifier.require_success(native)
+    if before != snapshot():
+        raise RuntimeError("source changed during native-only evidence")
+    return {"schema": "zeno-fcis/finite-native-evidence/1", "status": "passed-native-only",
+            "source_sha256": before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
+            "native_exit": native.returncode, "native_test_output": native.stdout.strip(),
+            "proof_performed": False, "qualification_complete": False}
 
 
 def check(cache: Path, install: bool, retained_directory: Path | None = None) -> dict:
@@ -247,9 +275,8 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
         coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
         native = native_tests(directory, pin, environment)
         print(f"Finite execution: {profile['expected_verified']} obligations and native boundaries passed", flush=True)
-        for name, (path, changed, expected) in mutation_sources(
-                (ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text(),
-                (ROOT / TYPED).read_text(), (ROOT / VALUE).read_text()).items():
+        def run_control(control_item):
+            (name, (path, changed, expected)) = control_item
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
@@ -275,13 +302,17 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                           and intended
                           and not verifier.ERROR_HEADER.search(mutant.stderr)
                           and not verifier.NON_SEMANTIC.search(mutant.stderr))
-            mutations.append({"name": name, "expected_failure": expected, "killed": killed,
+            control_result = {"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": coverage_error, "logs": str(specimen)})
-            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+                              "coverage_refusal": coverage_error, "logs": str(specimen)}
             if not killed:
-                raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
+                raise ControlRefused(control_result, f"mutation {name} survived or failed for an unrelated reason")
             print(f"Finite execution: caught {name} ({expected})", flush=True)
+            return control_result
+        def publish_control(control_result):
+            mutations.append(control_result)
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
+        run_controls(run_control, mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text(), (ROOT / TYPED).read_text(), (ROOT / VALUE).read_text()).items(), timings=directory / 'control-timings.json', publish=publish_control)
     versions = {}
     for name, version_command in {
         "runtime_rust": ["rustc", f"+{pin['runtime_rust']}", "--version"],
@@ -298,7 +329,7 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
     return {
         "schema": "zeno-fcis/finite-execution-evidence/1", "status": "passed",
-        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before,
+        "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before, "source_bindings": verifier.evidence_bindings(before, HARNESS),
         "toolchain": pin, "versions": versions, "command": positive_command,
         "exit_code": positive.returncode,
         "verus_report": report, "translated_function_coverage": coverage,
@@ -318,17 +349,22 @@ def main() -> int:
     parser.add_argument("--install", action="store_true")
     parser.add_argument("--cache", type=Path, default=verifier.cache_directory())
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--native-only", action="store_true",
+                        help="emit fresh native evidence only; never a complete proof qualification")
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix="finite-execution-run-", dir=args.out.parent))
     try:
-        receipt = check(args.cache.resolve(), args.install, directory)
+        receipt = (check_native_only(directory) if args.native_only else
+                   check(args.cache.resolve(), args.install, directory))
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         receipt = {"schema": "zeno-fcis/finite-execution-evidence/1", "status": "failed", "error": str(error)}
     receipt["logs"] = str(directory)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"Finite execution: {receipt['status']}; receipt: {args.out}")
+    if receipt["status"] == "passed-native-only":
+        return 0
     if receipt["status"] != "passed":
         print(receipt["error"])
         return 1

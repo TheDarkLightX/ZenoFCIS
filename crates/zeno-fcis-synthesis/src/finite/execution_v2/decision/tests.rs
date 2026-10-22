@@ -895,11 +895,11 @@ fn independent_order_full_schema_product_1728_typed_decisions() {
                             }
                         };
                         let fixture = order_fixture::transition(&[
-                            i64::from(action - 150),
-                            i64::from(status - 160),
-                            attempts as i64,
-                            callback as i64,
-                            i64::from(caller - 170),
+                            i128::from(action - 150),
+                            i128::from(status - 160),
+                            attempts,
+                            callback,
+                            i128::from(caller - 170),
                         ])
                         .unwrap_or_else(|| panic!("missing fixture value in independent_order_full_schema_product_1728_typed_decisions"));
                         let pre = [
@@ -940,7 +940,7 @@ fn independent_order_full_schema_product_1728_typed_decisions() {
                                 type_id: 105,
                                 variant: u16::try_from(fixture[1]).unwrap_or_else(|error| panic!("independent_order_full_schema_product_1728_typed_decisions fixture failed: {error:?}")) + 160,
                             },
-                            Atom::I128(i128::from(fixture[2])),
+                            Atom::I128(fixture[2]),
                         ];
                         let assignments = [
                             Assignment {
@@ -1061,7 +1061,7 @@ fn independent_order_full_schema_product_1728_typed_decisions() {
                                 context: RootView::Record(&context),
                             },
                             &output,
-                            i128::from(fixture[0]),
+                            fixture[0],
                             &branches,
                             &mut meter,
                             &mut observations,

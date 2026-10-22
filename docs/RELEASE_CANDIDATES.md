@@ -1,8 +1,8 @@
 # Public release candidates
 
 This page records the two public V2 prereleases. The current release source
-is 2.4.0, following the consolidated V2.2/V2.3 line in 2.3.0; see the
-[2.4.0 release notes](RELEASE_NOTES.md) and the
+is 2.5.0, following the consolidated V2.2/V2.3 line in 2.3.0; see the
+[2.5.0 release notes](RELEASE_NOTES.md) and the
 [installation guide](INSTALLATION.md). The V2.3 candidate packages declare
 Rust workspace version `2.3.0-rc.1`.
 

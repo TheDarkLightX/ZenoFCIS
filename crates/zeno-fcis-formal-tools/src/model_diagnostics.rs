@@ -125,6 +125,7 @@ pub(super) enum ModelReason {
     Overflow,
     DivisionByZero,
     NonExactDivision,
+    UnsupportedArithmetic,
     InvalidRange,
     OperationLimit,
     QuantifierLimit,
@@ -132,6 +133,7 @@ pub(super) enum ModelReason {
     EmptyTrace,
     HorizonExceeded,
     ResourceLimit,
+    UnsupportedExpression,
 }
 
 /// Three-way relational evaluation result.
@@ -382,6 +384,9 @@ fn eval_value<'formula>(
     fuel.operation()?;
     match value {
         ValueExpr::Int(value) => Ok(*value),
+        // There is no second implementation of full-product arithmetic here.
+        // Only the native library route can check this expression.
+        ValueExpr::MulDiv(..) => Err(ModelReason::UnsupportedExpression),
         ValueExpr::Var(name) => variables
             .iter()
             .rev()
@@ -398,6 +403,9 @@ fn eval_value<'formula>(
         ValueExpr::Mul(left, right) => eval_value(left, step, variables, fuel)?
             .checked_mul(eval_value(right, step, variables, fuel)?)
             .ok_or(ModelReason::Overflow),
+        ValueExpr::SignedMulDivFloor(..)
+        | ValueExpr::ScaledMulDiv(..)
+        | ValueExpr::RepeatMulDiv(..) => Err(ModelReason::UnsupportedArithmetic),
         ValueExpr::Div(mode, left, right) => divide(
             *mode,
             eval_value(left, step, variables, fuel)?,
@@ -540,8 +548,21 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
                 stack.push((left, current_depth.saturating_add(1)));
                 stack.push((right, current_depth.saturating_add(1)));
             }
+            ValueExpr::SignedMulDivFloor(a, b, d)
+            | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
+            | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
+                let next = current_depth.saturating_add(1);
+                stack.push((a, next));
+                stack.push((b, next));
+                stack.push((d, next));
+            }
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
+            }
+            ValueExpr::MulDiv(_, a, b, d) => {
+                for child in [a, b, d] {
+                    stack.push((child, current_depth.saturating_add(1)));
+                }
             }
             ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
         }

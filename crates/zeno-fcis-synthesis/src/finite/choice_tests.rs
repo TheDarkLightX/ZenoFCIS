@@ -8,10 +8,10 @@ fn checked<T, E: core::fmt::Debug>(result: Result<T, E>) -> T {
 fn mixed_choices(order: u8) -> Sketch {
     let mut integer = vec![
         Op::Input(0),
-        Op::Int(i64::MIN),
+        Op::Int(i128::MIN),
         Op::Int(-1),
         Op::Int(0),
-        Op::Int(i64::MAX),
+        Op::Int(i128::MAX),
         Op::Add(0, 2),
         Op::Sub(0, 2),
         Op::Select(1, 0, 2),
@@ -55,8 +55,8 @@ fn mixed_choices(order: u8) -> Sketch {
         vec![4, 6]
     };
     let integer = Domain::Int {
-        min: i64::MIN,
-        max: i64::MAX,
+        min: i128::MIN,
+        max: i128::MAX,
     };
     checked(Sketch::try_new(
         vec![integer, Domain::Bool],

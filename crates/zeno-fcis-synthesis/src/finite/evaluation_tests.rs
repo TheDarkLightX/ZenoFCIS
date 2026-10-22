@@ -107,15 +107,15 @@ fn arithmetic_traps_clear_partial_nodes_before_the_next_input() {
     let program = Program::try_new(
         vec![Domain::Bool],
         vec![Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         }],
         vec![
             Op::Input(0),
             Op::Int(1),
             Op::Int(0),
             Op::Select(0, 1, 2),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(4, 3),
         ],
         vec![5],
@@ -131,7 +131,7 @@ fn arithmetic_traps_clear_partial_nodes_before_the_next_input() {
             assert!(output.is_empty());
         } else {
             assert_eq!(result, Ok(()));
-            assert_eq!(output, [i64::MAX]);
+            assert_eq!(output, [i128::MAX]);
         }
     }
 }
@@ -171,7 +171,7 @@ fn larger_profiles_execute_every_dependent_node_and_are_not_legacy_artifacts() {
         assert_eq!(
             program.evaluate(&[]),
             Ok(vec![
-                i64::try_from(count).unwrap_or_else(|_| panic!("count"))
+                i128::try_from(count).unwrap_or_else(|_| panic!("count"))
             ])
         );
         assert_eq!(
@@ -199,7 +199,7 @@ fn larger_profiles_execute_every_dependent_node_and_are_not_legacy_artifacts() {
 fn larger_profile_still_traps_in_an_unselected_eager_arm() {
     let mut nodes: Vec<_> = (0..257).map(|_| Op::Int(0)).collect();
     nodes.push(Op::Bool(false));
-    nodes.push(Op::Int(i64::MAX));
+    nodes.push(Op::Int(i128::MAX));
     nodes.push(Op::Int(1));
     nodes.push(Op::Add(258, 259));
     nodes.push(Op::Select(257, 260, 0));

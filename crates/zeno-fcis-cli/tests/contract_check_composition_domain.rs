@@ -83,7 +83,7 @@ fn the_ten_core_ladder_is_proved_without_enumerating_its_product() {
     assert_eq!(report["status"], "proved");
     assert_eq!(report["authority"], "none");
     let result = &report["result"];
-    assert_eq!(result["schema"], "zeno-fcis/composed-domain-result/1");
+    assert_eq!(result["schema"], "zeno-fcis/composed-domain-result/2");
     assert_eq!(result["verdict"], "proved");
     let pairs: u128 = result["monolithic"]["pairs"]
         .as_str()
@@ -185,7 +185,7 @@ fn a_receipt_replays_byte_for_byte_and_a_changed_one_or_source_does_not() {
     assert_eq!(written.status.code(), Some(0));
     assert_eq!(
         json(&written)["receipt_schema"],
-        "zeno-fcis/composed-domain-receipt/1"
+        "zeno-fcis/composed-domain-receipt/2"
     );
     let bytes = fs::read(&receipt).unwrap_or_else(|error| panic!("{error}"));
     let replayed = run(

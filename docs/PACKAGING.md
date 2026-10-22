@@ -1,7 +1,8 @@
 # Release packaging
 
-This document describes the release packaging tooling and the `2.4.0`
-artifact set it prepares; the 2.4.0 release publishes that set.
+This document describes the release packaging tooling and the `2.5.0`
+artifact set it prepares. Final release qualification and publication remain
+pending.
 
 ## Package set
 
@@ -9,7 +10,7 @@ artifact set it prepares; the 2.4.0 release publishes that set.
 
 - 39 public crates in dependency-first publication order;
 - one private crate for compiled generated-code tests, for 40 workspace packages;
-- the `zeno-fcis` authoring CLI;
+- the `zeno-fcis` specification CLI;
 - the exact Cargo version and Rust toolchain.
 
 `tools/rc_package.py check` compares that manifest with Cargo metadata. It
@@ -39,10 +40,10 @@ SHA256SUMS
 zeno-fcis-<version>-rc-bundle.zip
 ```
 
-The tooling builds the full list above locally. The 2.4.0 release publishes a
-smaller set: the Linux x86-64 GNU and Apple silicon macOS CLI archives, the
+The tooling builds the full list above locally. The current public candidate
+download pages carry a smaller set: the Linux x86-64 GNU CLI archive, the
 offline Rustdoc archive, `SBOM.cdx.json`, signed checksums, and a commentless
-`RELEASE-SIGNING-KEY.pub`. The release's source is its matching public Git
+`RELEASE-SIGNING-KEY.pub`. A candidate's source is its matching public Git
 tag. The source archive, full bundle, and `.crate` archives are local build
 outputs, not published downloads.
 
@@ -79,15 +80,28 @@ two compilations with all features and `--locked --offline`:
    non-test target that reads a file outside its own package fails here.
 2. **Packaged tests, repository layout.** The same unpacked archives are
    placed at `crates/<crate>/`, and the repository files named in
-   `release/packaged-test-inputs.json` are copied from the exact commit: nine
-   from `verification/`, and the benchmark artifacts under `docs/benchmarks/`
-   that the CLI's checker, optimizer and loop tests include. Every target,
+   `release/packaged-test-inputs.json` are copied from the exact commit:
+   verification inputs, any listed benchmark data, and the nine arithmetic
+   example/vector files explicitly named in the packager. Every target,
    tests included, is compiled with `--no-run`. Rustc's dep-info then lists
    every file that each target read outside its own package. Those reads must
    equal the committed manifest exactly, by test target, path and SHA-256, for
    sibling-archive files and repository files alike. Any non-test target with
-   such a read fails. Only `verification/` and `docs/benchmarks/` may hold a
-   pinned repository file.
+   such a read fails. Repository inputs are restricted to `verification/`,
+   `docs/benchmarks/`, and those nine individually named arithmetic files;
+   other files under `examples/` or `tools/` remain refused.
+
+The CLI embeds dependency source text from its own `source-snapshots/` folder.
+`python3 tools/check_cli_source_snapshots.py --write` refreshes those copies;
+the workspace test and packaging preflight require exact equality with their
+originals. This keeps dependency source identities unchanged while allowing
+the CLI to build from its own archive.
+
+After a reviewed source change, derive a test-input candidate with
+`python3 tools/rc_package.py propose-test-inputs --output <new JSON file>
+--target-dir <isolated target directory>`. Review every changed entry before
+installing it as `release/packaged-test-inputs.json`. The normal archive build
+must independently reproduce the complete set; proposing it does not approve it.
 
 Packaged tests are not standalone. They compile only from the published
 archives laid out as in the repository, plus those pinned repository files. A
@@ -216,23 +230,28 @@ a build or home path.
 and records only this host's executable, with the same remapped compiler
 environment and an empty `ZENO_FCIS_BUILD_TREE`, then runs the privacy scan.
 
-### Two-host release set
+### Host release sets
 
-The read-only release-candidate workflow builds two host executables:
-`x86_64-unknown-linux-gnu`, in the complete Linux set on `ubuntu-24.04`, and
-`aarch64-apple-darwin`, on GitHub's `macos-15` arm64 image with
+The read-only release-candidate workflow builds the complete
+`x86_64-unknown-linux-gnu` set on `ubuntu-24.04`. After native macOS platform
+validation, a manual run with `include_macos` adds
+`aarch64-apple-darwin`, built on GitHub's `macos-15` arm64 image with
 `MACOSX_DEPLOYMENT_TARGET=11.0`. There is no Intel macOS executable and no
 universal binary. The workflow has three jobs:
 
 1. **`assemble`** builds the complete Linux set and reports the hashes of its
    `SHA256SUMS`, archive, host record and compiled-inputs record as job outputs.
-2. **`macos-host-binary`** runs `build-host-binary`, then installs and uses the
+2. **`macos-host-binary`**, when requested, runs `build-host-binary`, then installs and uses the
    executable with `tools/check_installed_cli.py` (below), and reports the
    hashes of its archive, records and journey report.
-3. **`release-set`** downloads both artifacts and checks each file against the
+3. **`release-set`** downloads the requested artifacts and checks each file against the
    hash its producing job reported. It runs the Linux installed-binary journey,
-   merges the macOS host into the set, writes `DOWNLOADS.sha256` and runs the
+   adds the macOS host when requested, writes `DOWNLOADS.sha256` and runs the
    custody check.
+
+A failed requested host blocks the set. The initial Linux publication does not
+wait for the deferred Mac binary. Mac test failures remain unresolved until a
+native run passes; a skipped job is not qualification.
 
 `tools/rc_package.py merge-hosts --release <directory> --host <host folder>...
 --journey <target>=<report>` first checks the set's index, and changes nothing
@@ -287,8 +306,15 @@ set to its source commit by content. Its eleven checks cover:
 10. the producing jobs' hashes;
 11. the download list.
 
-A missing input fails its check, and the bindings must name every host of the
-set with its archive and all four hashes. The tag check confirms that the tag
+Checks 1 to 9 always run, and a missing input fails its check. Checks 10 and
+11 run only when `--bindings` and `--downloads` (or `--signing-key`) are given.
+A check that does not run is listed by name in the report's `not_run` list and
+is never counted as passed. The report's `status` is `passed`, with exit code
+0, only when all eleven checks ran and passed. It is `failed`, exit code 1,
+when any check that ran failed. Otherwise it is `incomplete`, exit code 2: for
+example, a set checked before signing, without the job outputs and download
+list. The bindings must name every host of the set with its archive and all
+four hashes. The tag check confirms that the tag
 names the commit. It does not authenticate the tag: on a tag run, the checkout
 itself creates the tag at the run's commit.
 

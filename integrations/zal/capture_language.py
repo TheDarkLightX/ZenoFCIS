@@ -50,7 +50,7 @@ def render(a, ctx, english):
 def _values(text, width):
     import loop_language as Z
     tokens = [v.strip() for v in text.split(",")] if text.strip() else []
-    if len(tokens) != width or any(not re.fullmatch(r"(?:0|-?[1-9][0-9]{0,18})", t) for t in tokens):
+    if len(tokens) != width or any(not re.fullmatch(r"(?:0|-?[1-9][0-9]{0,38})", t) for t in tokens):
         raise Refusal("zal-capture-values")
     return tuple(Z._integer(t.lstrip("-"), t.startswith("-")) for t in tokens)
 

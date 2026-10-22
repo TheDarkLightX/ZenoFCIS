@@ -17,7 +17,7 @@ import zeno_fcis_transform as tools
 
 
 ROOT = Path(__file__).resolve().parents[2]
-ARTIFACTS = ROOT / "docs/benchmarks/withdrawal-queue/artifacts"
+ARTIFACTS = ROOT / "crates/zeno-fcis-cli/tests/fixtures/i128-programs"
 SWAPPED_KERNEL = {
     "inputs": [{"kind": "Bool"}] * 4,
     "outputs": [{"kind": "Bool"}] * 3,
@@ -82,7 +82,7 @@ class TransformToolsTest(unittest.TestCase):
         self.assertEqual(good["exit_code"], 0)
         self.assertEqual(good["report"]["status"], "checked-improvement")
         detail = good["report"]["detail"]
-        self.assertEqual(detail["outcome"]["cost"], {"nodes": 7, "bytes": 763})
+        self.assertEqual(detail["outcome"]["cost"], {"nodes": 7, "bytes": 764})
         self.assertEqual(detail["incumbent"]["kind"], "checked-replacement")
         self.assertEqual(detail["status"], "best-checked-so-far")
         self.assertEqual(len(detail["incumbent_program"]["nodes"]), 7)
@@ -103,7 +103,7 @@ class TransformToolsTest(unittest.TestCase):
         self.assertEqual(replayed["exit_code"], 0)
         loop_report = replayed["report"]["detail"]["report"]
         self.assertEqual(loop_report["status"], "best-checked-so-far")
-        self.assertEqual(loop_report["incumbent"]["cost"], {"nodes": 7, "bytes": 763})
+        self.assertEqual(loop_report["incumbent"]["cost"], {"nodes": 7, "bytes": 764})
         self.assertEqual(loop_report["accounting"]["attempts"], 4)
         self.assertGreaterEqual(loop_report["accounting"]["replays"], 1)
         self.assertIn("global optimality", loop_report["claims"]["not_claimed"])
@@ -140,17 +140,20 @@ class TransformToolsTest(unittest.TestCase):
             tools.transform_candidate(self.session)
         with self.assertRaises(tools.TransformToolError):
             tools.transform_candidate(self.session, candidate_path=original, candidate_json_path=original)
-        # A session that does not exist is an I/O refusal from the CLI, not a verdict.
+        # A session that does not exist is refused, not given a verdict. Without its policy file the CLI
+        # requires the group-resources profile, which automatic selection never picks, so it stops first.
         missing = tools.transform_replay(str(Path(self.temporary) / "absent"))
-        self.assertEqual((missing["exit_code"], missing["report"]["status"]), (3, "io-error"))
-        # The controller is outside the Boolean profile and inside checked-i64, the default.
+        self.assertEqual((missing["exit_code"], missing["report"]["status"]), (2, "inconclusive"))
+        self.assertEqual(missing["report"]["reason"], "containment-unavailable:auto:explicit-backend-required")
+        self.assertFalse(missing["report"]["containment"]["final"]["application_work_started"])
+        # The controller is outside the Boolean profile and inside checked-i128, the default.
         controller = str(ARTIFACTS / "retained-controller-original.zcve")
         outside = tools.transform_request(controller, self.session, profile="functional-bool-v1")
         self.assertEqual((outside["exit_code"], outside["report"]["status"]), (1, "refused"))
         self.assertEqual(outside["report"]["detail"]["reason"], "profile-inputs")
         inside = tools.transform_request(controller, self.session, attempts=2)
         self.assertEqual(inside["exit_code"], 0)
-        self.assertEqual(inside["report"]["detail"]["request"]["profile"], "checked-i64-v1")
+        self.assertEqual(inside["report"]["detail"]["request"]["profile"], "checked-i128-v1")
         self.assertEqual(inside["report"]["detail"]["request"]["domain"]["size"], 384)
         improved = tools.transform_candidate(
             self.session, candidate_path=str(ARTIFACTS / "retained-controller-candidate.zcve"))

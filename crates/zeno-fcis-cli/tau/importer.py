@@ -718,9 +718,14 @@ def main():
 if __name__ == "__main__":
     try:
         import resource
-        resource.setrlimit(resource.RLIMIT_AS, (256 << 20, 256 << 20))
-        resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        for key, target in ((resource.RLIMIT_AS, 256 << 20), (resource.RLIMIT_CPU, 10),
+                            (resource.RLIMIT_CORE, 0)):
+            inherited = resource.getrlimit(key)
+            expected = tuple(target if value == resource.RLIM_INFINITY else min(value, target)
+                             for value in inherited)
+            resource.setrlimit(key, expected)
+            if resource.getrlimit(key) != expected:
+                raise RuntimeError("rlimit-readback")
         main()
     except (Refused, KeyError, TypeError, ValueError, RecursionError) as error:
         print(f"Tau import refused: {error}", file=sys.stderr)

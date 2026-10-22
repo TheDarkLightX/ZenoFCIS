@@ -122,7 +122,7 @@ for a claim that selects CVC5, use `--backend cvc5` and the CVC5 manifest.
 certificates with the pinned Carcara checker. It compares admitted scalar
 programs whose domain is larger than the enumeration cap. The comparison stays
 within the quantifier-free Boolean and linear integer fragment over eager
-checked-i64 programs, and the Step limit must never bind.
+checked-i128 programs, and the Step limit must never bind.
 
 Follow the [symbolic checks guide](../SYMBOLIC_CHECKS.md#independently-checked-scalar-certificates)
 to build and identify the checker, create `checker.json`, and supply exactly

@@ -6,7 +6,7 @@ existing finite-FSM prototype. It does not expand the fixed 2.2 stage-one journe
 ## Deliverable and acceptance
 
 1. A setup command creates a private project workspace, a Codex project MCP
-   entry, a Claude project MCP entry, and the same authoring skill for both.
+   entry, a Claude project MCP entry, and the same specification skill for both.
    Existing unrelated configuration and reviewed/pending state are preserved.
    Planning performs no writes; each applied file is replaced atomically.
    Interrupted multi-file setup can be resumed; it is not a transactional store.
@@ -147,5 +147,5 @@ Wider profiles depend on their own semantics and actual lowering qualification:
 checked integer widths and eager traps; explicit effects; transition requirements
 and independent owner examples; concurrency/event scheduling; temporal scopes.
 Neither these profiles nor authentication are supplied by this addon.
-Examples-first contract authoring (`contract draft`) is a separate feature with
+Examples-first contract specification (`contract draft`) is a separate feature with
 its own acceptance scenario.

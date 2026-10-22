@@ -258,7 +258,7 @@ fn recompute(
         contract-source meaning, verified compilation, Lean kernel checking or application authority."
     );
     receipt["fragment"] =
-        json!("quantifier-free Boolean and linear Int; eager checked-i64 scalar graphs");
+        json!("quantifier-free Boolean and linear Int; eager checked-i128 scalar graphs");
     receipt["certificates"] = json!(witnesses);
     receipt["certificate_checker"] = json!(checker.identity());
     receipt["trusted_base"] = json!([

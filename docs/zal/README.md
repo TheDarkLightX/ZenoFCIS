@@ -221,7 +221,7 @@ what it sends to its model, using its existing account and permissions.
 ### Project addon for Codex and Claude Code
 
 The [2.3 addon guide](HARNESS_INTEGRATION.md) provides persistent project-local
-MCP entries and a shared authoring skill. Run `integrations/zal/setup.py` from a
+MCP entries and a shared specification skill. Run `integrations/zal/setup.py` from a
 stable source checkout, first without `--apply` to inspect the plan. It preserves
 unrelated configuration and pending work, and refuses a differing existing ZAL
 entry or skill. The older per-invocation instructions below remain available.

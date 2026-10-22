@@ -15,15 +15,15 @@ pub(crate) open spec fn product(ds: Seq<Domain>, n: int) -> int
 {
     if n <= 0 { 1 } else { product(ds, n - 1) * width(ds[n - 1]) }
 }
-pub(crate) open spec fn tuple(ds: Seq<Domain>, xs: Seq<i64>) -> bool {
+pub(crate) open spec fn tuple(ds: Seq<Domain>, xs: Seq<i128>) -> bool {
     xs.len() == ds.len() && forall|i: int| 0 <= i < ds.len() ==> lo(ds[i]) <= #[trigger] xs[i] && xs[i] <= hi(ds[i])
 }
-pub(crate) open spec fn rank(ds: Seq<Domain>, xs: Seq<i64>, n: int) -> int
+pub(crate) open spec fn rank(ds: Seq<Domain>, xs: Seq<i128>, n: int) -> int
     decreases n,
 {
     if n <= 0 { 0 } else { rank(ds, xs, n - 1) * width(ds[n - 1]) + xs[n - 1] - lo(ds[n - 1]) }
 }
-pub(crate) open spec fn minimum(ds: Seq<Domain>, xs: Seq<i64>) -> bool {
+pub(crate) open spec fn minimum(ds: Seq<Domain>, xs: Seq<i128>) -> bool {
     xs.len() == ds.len() && forall|i: int| 0 <= i < ds.len() ==> #[trigger] xs[i] == lo(ds[i])
 }
 pub(crate) open spec fn size_result(ds: Seq<Domain>, result: Result<Option<u128>, usize>) -> bool {
@@ -49,7 +49,7 @@ pub(crate) proof fn product_positive(ds: Seq<Domain>, n: int)
     }
 }
 
-pub(crate) proof fn rank_bounds(ds: Seq<Domain>, xs: Seq<i64>, n: int)
+pub(crate) proof fn rank_bounds(ds: Seq<Domain>, xs: Seq<i128>, n: int)
     requires tuple(ds, xs), 0 <= n <= ds.len(),
     ensures valid(ds, n), 0 <= rank(ds, xs, n) < product(ds, n),
     decreases n,
@@ -66,7 +66,7 @@ pub(crate) proof fn rank_bounds(ds: Seq<Domain>, xs: Seq<i64>, n: int)
     }
 }
 
-pub(crate) proof fn rank_injective(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, n: int)
+pub(crate) proof fn rank_injective(ds: Seq<Domain>, x: Seq<i128>, y: Seq<i128>, n: int)
     requires tuple(ds, x), tuple(ds, y), 0 <= n <= ds.len(),
         rank(ds, x, n) == rank(ds, y, n),
     ensures forall|i: int| 0 <= i < n ==> #[trigger] x[i] == y[i],
@@ -100,7 +100,7 @@ pub(crate) proof fn rank_injective(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, n:
     }
 }
 
-pub(crate) proof fn minimum_rank(ds: Seq<Domain>, xs: Seq<i64>, n: int)
+pub(crate) proof fn minimum_rank(ds: Seq<Domain>, xs: Seq<i128>, n: int)
     requires minimum(ds, xs), 0 <= n <= ds.len(),
     ensures rank(ds, xs, n) == 0,
     decreases n,
@@ -108,7 +108,7 @@ pub(crate) proof fn minimum_rank(ds: Seq<Domain>, xs: Seq<i64>, n: int)
     if n > 0 { minimum_rank(ds, xs, n - 1); }
 }
 
-pub(crate) proof fn maximum_rank(ds: Seq<Domain>, xs: Seq<i64>, n: int)
+pub(crate) proof fn maximum_rank(ds: Seq<Domain>, xs: Seq<i128>, n: int)
     requires tuple(ds, xs), 0 <= n <= ds.len(),
         forall|i: int| 0 <= i < n ==> #[trigger] xs[i] == hi(ds[i]),
     ensures rank(ds, xs, n) == product(ds, n) - 1,
@@ -123,7 +123,7 @@ pub(crate) proof fn maximum_rank(ds: Seq<Domain>, xs: Seq<i64>, n: int)
 }
 
 /// A carry increments one digit and resets its maximal suffix.
-pub(crate) proof fn carry_rank(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, pivot: int, n: int)
+pub(crate) proof fn carry_rank(ds: Seq<Domain>, x: Seq<i128>, y: Seq<i128>, pivot: int, n: int)
     requires tuple(ds, x), tuple(ds, y), 0 <= pivot < n <= ds.len(),
         forall|i: int| 0 <= i < pivot ==> #[trigger] x[i] == y[i],
         y[pivot] == x[pivot] + 1,
@@ -141,7 +141,7 @@ pub(crate) proof fn carry_rank(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, pivot:
     }
 }
 
-pub(crate) proof fn same_prefix_rank(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, n: int)
+pub(crate) proof fn same_prefix_rank(ds: Seq<Domain>, x: Seq<i128>, y: Seq<i128>, n: int)
     requires 0 <= n <= ds.len(), x.len() == ds.len(), y.len() == ds.len(),
         forall|i: int| 0 <= i < n ==> #[trigger] x[i] == y[i],
     ensures rank(ds, x, n) == rank(ds, y, n),
@@ -154,11 +154,11 @@ pub(crate) proof fn same_prefix_rank(ds: Seq<Domain>, x: Seq<i64>, y: Seq<i64>, 
 /// with rank_injective this establishes a bijection, including zero dimensions.
 pub(crate) proof fn rank_surjective(ds: Seq<Domain>, n: int, k: int)
     requires valid(ds, ds.len() as int), 0 <= n <= ds.len(), 0 <= k < product(ds, n),
-    ensures exists|xs: Seq<i64>| tuple(ds, xs) && rank(ds, xs, n) == k,
+    ensures exists|xs: Seq<i128>| tuple(ds, xs) && rank(ds, xs, n) == k,
     decreases n,
 {
     if n == 0 {
-        let xs = Seq::new(ds.len(), |i: int| lo(ds[i]) as i64);
+        let xs = Seq::new(ds.len(), |i: int| lo(ds[i]) as i128);
         assert(tuple(ds, xs));
         assert(rank(ds, xs, n) == k);
     } else {
@@ -174,10 +174,10 @@ pub(crate) proof fn rank_surjective(ds: Seq<Domain>, n: int, k: int)
         assert(0 <= q < p) by(nonlinear_arith)
             requires 0 <= k < p * w, k == q * w + r, 0 <= r < w;
         rank_surjective(ds, n - 1, q);
-        let prior = choose|xs: Seq<i64>| tuple(ds, xs) && rank(ds, xs, n - 1) == q;
+        let prior = choose|xs: Seq<i128>| tuple(ds, xs) && rank(ds, xs, n - 1) == q;
         let digit = lo(ds[n - 1]) + r;
         assert(lo(ds[n - 1]) <= digit <= hi(ds[n - 1]));
-        let xs = prior.update(n - 1, digit as i64);
+        let xs = prior.update(n - 1, digit as i128);
         assert(tuple(ds, xs));
         same_prefix_rank(ds, prior, xs, n - 1);
         assert(rank(ds, xs, n) == k);
@@ -186,15 +186,15 @@ pub(crate) proof fn rank_surjective(ds: Seq<Domain>, n: int, k: int)
 
 /// Unique tuple of rank k. Each scan call establishes a witness before use;
 /// this is ghost choice, never a runtime search or evaluator callback.
-pub(crate) open spec fn at(ds: Seq<Domain>, k: int) -> Seq<i64> {
-    choose|xs: Seq<i64>| tuple(ds, xs) && rank(ds, xs, ds.len() as int) == k
+pub(crate) open spec fn at(ds: Seq<Domain>, k: int) -> Seq<i128> {
+    choose|xs: Seq<i128>| tuple(ds, xs) && rank(ds, xs, ds.len() as int) == k
 }
-pub(crate) proof fn at_rank(ds: Seq<Domain>, xs: Seq<i64>)
+pub(crate) proof fn at_rank(ds: Seq<Domain>, xs: Seq<i128>)
     requires tuple(ds, xs),
     ensures at(ds, rank(ds, xs, ds.len() as int)) == xs,
 {
     let k = rank(ds, xs, ds.len() as int);
-    assert(exists|ys: Seq<i64>| tuple(ds, ys) && rank(ds, ys, ds.len() as int) == k);
+    assert(exists|ys: Seq<i128>| tuple(ds, ys) && rank(ds, ys, ds.len() as int) == k);
     let ys = at(ds, k);
     rank_injective(ds, xs, ys, ds.len() as int);
     assert(xs =~= ys);
@@ -203,28 +203,28 @@ pub(crate) proof fn at_rank(ds: Seq<Domain>, xs: Seq<i64>)
 pub(crate) open spec fn limits() -> Seq<u64> {
     Seq::new(8, |i: int| if i == 7 { FULL_BUDGET } else { 0u64 })
 }
-pub(crate) open spec fn observation(p: &V2ScalarProgram, xs: Seq<i64>) -> (Result<Seq<i64>, V2ExecutionFailure>, u64) {
+pub(crate) open spec fn observation(p: &V2ScalarProgram, xs: Seq<i128>) -> (Result<Seq<i128>, V2ExecutionFailure>, u64) {
     let run = crate::checker_execution(p.inputs@, p.outputs@, p.nodes@, p.roots@,
         xs, limits(), Seq::new(8, |_: int| 0u64));
     (run.0, run.1[7])
 }
-pub(crate) open spec fn result_view(result: Result<Vec<i64>, V2ExecutionFailure>) -> Result<Seq<i64>, V2ExecutionFailure> {
+pub(crate) open spec fn result_view(result: Result<Vec<i128>, V2ExecutionFailure>) -> Result<Seq<i128>, V2ExecutionFailure> {
     match result { Ok(values) => Ok(values@), Err(error) => Err(error) }
 }
-pub(crate) open spec fn observation_view(o: Observation) -> (Result<Seq<i64>, V2ExecutionFailure>, u64) {
+pub(crate) open spec fn observation_view(o: Observation) -> (Result<Seq<i128>, V2ExecutionFailure>, u64) {
     (result_view(o.result), o.steps)
 }
 pub(crate) open spec fn equal_prefix(a: &V2ScalarProgram, b: &V2ScalarProgram, n: int) -> bool {
     forall|k: int| 0 <= k < n ==> observation(a, at(a.inputs@, k)).0 == observation(b, at(a.inputs@, k)).0
 }
 pub(crate) open spec fn all_equal(a: &V2ScalarProgram, b: &V2ScalarProgram) -> bool {
-    forall|xs: Seq<i64>| tuple(a.inputs@, xs) ==> observation(a, xs).0 == observation(b, xs).0
+    forall|xs: Seq<i128>| tuple(a.inputs@, xs) ==> observation(a, xs).0 == observation(b, xs).0
 }
 pub(crate) proof fn prefix_covers(a: &V2ScalarProgram, b: &V2ScalarProgram)
     requires equal_prefix(a, b, product(a.inputs@, a.inputs@.len() as int)),
     ensures all_equal(a, b),
 {
-    assert forall|xs: Seq<i64>| tuple(a.inputs@, xs) implies observation(a, xs).0 == observation(b, xs).0 by {
+    assert forall|xs: Seq<i128>| tuple(a.inputs@, xs) implies observation(a, xs).0 == observation(b, xs).0 by {
         rank_bounds(a.inputs@, xs, a.inputs@.len() as int);
         at_rank(a.inputs@, xs);
     }

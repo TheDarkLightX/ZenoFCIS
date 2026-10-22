@@ -222,7 +222,7 @@ class NegativeRetentionTests(unittest.TestCase):
         for gate in GATES:
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate)
-                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 24 if gate is check_finite_execution else 16)
+                self.assertEqual(len(mutants), 31 if gate is check_protected_input else 25 if gate is check_finite_execution else 16)
                 self.assertEqual(len(observed), 1 + len(mutants))
                 self.assertEqual([entry['name'] for entry in receipt['mutations']], list(mutants))
                 self.assertTrue(all(entry['killed'] for entry in receipt['mutations']))
@@ -240,27 +240,27 @@ class NegativeRetentionTests(unittest.TestCase):
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate, 'survivor')
                 entries = json.loads((Path(receipt['logs']) / 'mutations.json').read_text())
-                self.assertEqual(len(observed), 2)
-                self.assertEqual(len(entries), 1)
+                self.assertEqual(len(observed), 1 + len(mutants))
+                self.assertEqual(len(entries), len(mutants))
                 self.assertFalse(entries[0]['killed'])
 
     def test_malformed_control_retains_raw_stdout_before_json_classification(self):
         for gate in GATES:
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate, 'malformed')
-                self.assertEqual(len(observed), 2)
-                self.assertEqual(observed[-1][2].stdout, 'not JSON: raw mutant stdout\n')
+                self.assertEqual(len(observed), 1 + len(mutants))
+                self.assertEqual(observed[1][2].stdout, 'not JSON: raw mutant stdout\n')
 
     def test_proof_control_without_semantic_error_is_not_killed(self):
         for gate in GATES:
             with self.subTest(gate=gate.__name__):
                 receipt, observed, mutants = self.run_gate(gate, 'missing-semantic')
                 entries = json.loads((Path(receipt['logs']) / 'mutations.json').read_text())
-                self.assertEqual(len(observed), 2)
-                self.assertEqual(len(entries), 1)
+                self.assertEqual(len(observed), 1 + len(mutants))
+                self.assertEqual(len(entries), len(mutants))
                 self.assertFalse(entries[0]['killed'])
-                self.assertEqual(observed[-1][2].returncode, 1)
-                self.assertEqual(observed[-1][2].stderr,
+                self.assertEqual(observed[1][2].returncode, 1)
+                self.assertEqual(observed[1][2].stderr,
                                  f'raw mock diagnostic for {next(iter(mutants))}\n')
 
     def test_default_check_still_cleans_its_temporary_directory(self):
@@ -287,6 +287,9 @@ class StrictGateMutationTests(unittest.TestCase):
             self.assertIn(v2_proof_sources.SOURCE_MANIFEST, sources)
             self.assertIn(v2_proof_sources.TEST_MANIFEST, sources)
             bound = gate.snapshot()
+            for path in v2_proof_sources.NATIVE_TEST_DATA:
+                self.assertIn(path, sources)
+                self.assertEqual(bound[str(path)], gate.verifier.digest(gate.ROOT/path))
             for path in (v2_proof_sources.SOURCE_MANIFEST, v2_proof_sources.TEST_MANIFEST):
                 self.assertEqual(bound[str(path)], gate.verifier.digest(gate.ROOT / path))
         production = json.loads((ROOT / v2_proof_sources.SOURCE_MANIFEST).read_text())['paths']

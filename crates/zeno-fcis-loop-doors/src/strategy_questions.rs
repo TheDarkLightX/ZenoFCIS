@@ -18,11 +18,15 @@ pub struct Limits {
     /// Charged proposer work cap.
     pub work: u64,
 }
-fn points(inputs: &[Domain], l: Limits, w: &mut Work) -> Result<Vec<Vec<i64>>, Stop> {
+fn points(inputs: &[Domain], l: Limits, w: &mut Work) -> Result<Vec<Vec<i128>>, Stop> {
     let mut size = 1u128;
     for d in inputs {
         let (a, b) = d.bounds();
-        size = size.saturating_mul((i128::from(b) - i128::from(a) + 1) as u128);
+        size = size.saturating_mul(
+            b.checked_sub(a)
+                .and_then(|span| span.checked_add(1))
+                .map_or(u128::MAX, |width| width as u128),
+        );
     }
     if size > u128::from(l.worlds)
         || size.saturating_mul(inputs.len() as u128 * 2) > u128::from(l.cells)
@@ -37,7 +41,7 @@ fn points(inputs: &[Domain], l: Limits, w: &mut Work) -> Result<Vec<Vec<i64>>, S
         .collect())
 }
 /// Exact Boolean table used only as proposer data.
-pub(crate) fn bool_table(p: &Program, pts: &[Vec<i64>], w: &mut Work) -> Result<Vec<bool>, Stop> {
+pub(crate) fn bool_table(p: &Program, pts: &[Vec<i128>], w: &mut Work) -> Result<Vec<bool>, Stop> {
     if p.outputs() != [Domain::Bool] {
         return Err(w.stop("strategy-formula-output", false));
     }
@@ -146,7 +150,7 @@ pub struct Diagnosis {
     /// Gate indices, in order.
     pub gates: Vec<usize>,
     /// Every allowed forced-output world.
-    pub worlds: Vec<Vec<i64>>,
+    pub worlds: Vec<Vec<i128>>,
 }
 /// Proposed split, including overlapping prediction buckets.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -173,8 +177,8 @@ pub struct DiagnosisReport {
 /// Enumerate weak-fault explanations then choose the minimax internal probe.
 pub fn diagnose(
     c: &Circuit,
-    vector: &[i64],
-    observed: &BTreeMap<usize, i64>,
+    vector: &[i128],
+    observed: &BTreeMap<usize, i128>,
     max_faults: usize,
     l: Limits,
 ) -> Result<DiagnosisReport, Stop> {
@@ -305,7 +309,7 @@ pub struct ReadingQuestion {
     /// First separating tuple ordinal.
     pub ordinal: usize,
     /// Input world.
-    pub world: Vec<i64>,
+    pub world: Vec<i128>,
     /// Surviving alternative indices for a true answer.
     pub holds: Vec<usize>,
     /// Surviving indices for a false answer.

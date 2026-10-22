@@ -30,7 +30,9 @@ def cases():
 def execute(cli, spec, directory, flags=()):
     file = directory / "specification.json"
     file.write_text(json.dumps(spec, sort_keys=True))
-    result = subprocess.run([str(cli), "loop", "question", "--specification", str(file), *flags], text=True,
+    # Finite-data commands stay on POSIX even when the environment selects systemd.
+    result = subprocess.run([str(cli), "--containment-backend", "auto", "loop", "question", "--specification",
+                             str(file), *flags], text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35)
     return result.returncode, json.loads(result.stdout)
 
@@ -59,7 +61,7 @@ def controls(cli, directory):
                 if report["status"] != "question" or rounds >= len(hidden):
                     failures.append({"case": name, "failure": "owner-not-recovered"})
                     break
-                q = detail["question"]
+                q = O.report_question(detail["question"])
                 s["requirements"].append({"id": f"answer_{rounds}", "input": q["input"], "output": list(hidden[q["ordinal"]])})
                 rounds += 1
     # Minimum conflicts, empty grammar, eager traps and intent outside the
@@ -71,7 +73,7 @@ def controls(cli, directory):
         ("minimum-tie", [{"id": i, "input": [x], "output": [y]} for i, x, y in (("d", 0, 1), ("c", 0, 0), ("b", 1, 1), ("a", 1, 0))]),
         ("law-example-conflict", [{"id": "zero", "law": "out0 == 0"}, {"id": "one", "input": [0], "output": [1]}]),
         ("outside-grammar", [{"id": "outside", "input": [0], "output": [2]}]),
-        ("law-overflow", [{"id": "overflow", "law": "out0 < 9223372036854775807 + x"}]),
+        ("law-overflow", [{"id": "overflow", "law": "out0 < 170141183460469231731687303715884105727 + x"}]),
     ]:
         s = copy.deepcopy(simple)
         # The overflow control needs an integer input to keep strict kinds.
@@ -81,7 +83,7 @@ def controls(cli, directory):
         extra.append((label, s))
     empty = copy.deepcopy(simple); empty["sketch"] = ["?{3 | 4}"]
     extra.append(("empty-grammar", empty))
-    trap = copy.deepcopy(simple); trap["sketch"] = ["?{0 | true ? 0 : 9223372036854775807 + 1}"]
+    trap = copy.deepcopy(simple); trap["sketch"] = ["?{0 | true ? 0 : 170141183460469231731687303715884105727 + 1}"]
     extra.append(("eager-dead-branch-trap", trap))
     for label, s in extra:
         code, report = execute(cli, s, directory)

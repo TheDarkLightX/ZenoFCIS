@@ -96,6 +96,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "scalar-arithmetic": AcceptanceScenario(
         "Execute explicit scalar arithmetic through authored rules and the Authority",
         (("python3", "tools/test_scalar_arithmetic_reference.py"),
+         ("python3", "tools/test_signed_arithmetic.py"),
          ("python3", "tools/test_scalar_arithmetic_controls.py"),
          ("python3", "tools/test_check_scalar_arithmetic.py"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--locked", "--offline", "--test", "scalar_arithmetic"),
@@ -572,6 +573,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "transform_parallel::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
           "equivalence::checker::ranges::"),
+         ("python3", "tools/test_containment_selection.py"),
          ("python3", "tools/check_transform_parallel.py")),
     ),
     "checked-optimizer": AcceptanceScenario(
@@ -858,7 +860,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "verus-integration": AcceptanceScenario(
         "Check Verus evidence admission and shared runtime arithmetic boundaries",
         (("python3", "tools/test_check_verus.py"),
-         ("python3", "tools/test_verus_coverage.py")),
+         ("python3", "tools/test_verus_coverage.py"),
+         ("python3", "tools/test_verus_ids.py"),
+         ("python3", "tools/test_qualification_controls.py"),
+         ("python3", "tools/test_qualification_sources.py"),
+         ("python3", "tools/test_v2_native_dependencies.py")),
     ),
     "finite-execution-proof": AcceptanceScenario(
         "Preserve complete finite execution and reject missing proof contracts",

@@ -968,6 +968,7 @@ fn law_op(op: &LawOp) -> Syntax {
         ),
         LawOp::ToI128(a) => indexes("l::Op::ToI128", &[*a]),
         LawOp::ToU128(a) => indexes("l::Op::ToU128", &[*a]),
+        LawOp::SignedMulDivFloor(a, b, d) => indexes("l::Op::SignedMulDivFloor", &[*a, *b, *d]),
         LawOp::MulDiv(r, a, b, d) => indexes(
             match r {
                 Rounding::Floor => "l::Op::MulDivFloor",
@@ -1118,6 +1119,7 @@ fn scalar_op(op: &ScalarOp) -> Syntax {
             },
             &[*a, *b],
         ),
+        ScalarOp::SignedMulDivFloor(a, b, d) => indexes("Op::SignedMulDivFloor", &[*a, *b, *d]),
         ScalarOp::MulDiv(r, a, b, d) => indexes(
             match r {
                 Rounding::Floor => "Op::MulDivFloor",

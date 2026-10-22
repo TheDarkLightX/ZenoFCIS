@@ -122,7 +122,7 @@ Formulas use the contract rules' expression language
 ([contract rules](CONTRACT_RULES.md)). A number used as a boolean is true
 exactly when it is 1. A formula with no value, such as a division by zero,
 counts as false. A binding is a rule expression, as a decision rule is: no
-multiplication or division, and checked 64-bit arithmetic, so a binding
+multiplication or division, and checked 128-bit arithmetic, so a binding
 that overflows has no value. The library's program evaluator computes each
 binding, reading every field it names as the number it is (a boolean as 0 or
 1), so a component whose fields are all boolean needs no integer declaration;
@@ -197,7 +197,7 @@ nothing evaluated.
 A manifest the checker refuses at validation exits 1 with a refusal and no
 result. A plan within budget is never reported as passed on a sample.
 
-The JSON result (`zeno-fcis/composed-domain-result/1`) lists every obligation
+The JSON result (`zeno-fcis/composed-domain-result/2`) lists every obligation
 with its size, status, `evaluated` count and `admitted` count. A proved
 obligation evaluates every row of its planned space, including rows a
 premise makes vacuous; a violated one stops at its first witness. The
@@ -294,7 +294,7 @@ It does not claim:
 ## Receipts
 
 `--receipt FILE` writes the result's canonical receipt,
-`zeno-fcis/composed-domain-receipt/1`, for any verdict. `--replay FILE`
+`zeno-fcis/composed-domain-receipt/2`, for any verdict. `--replay FILE`
 runs every check again and requires the same receipt byte for byte. A changed
 receipt, or a source that changed since, is refused.
 
@@ -342,3 +342,8 @@ reachable table.
 
 These are tests over the generated cases and the fixtures, not a proof about
 other compositions.
+
+Scalar coordinates in current composition JSON results and joint tables use
+`safe-number-or-decimal-string/1`; see the [integer report encoding](CONTRACT_JUDGES.md#integer-values-in-json-reports).
+Fresh composition receipts use `/2` envelopes for the versioned result. Existing
+receipt files are unchanged; replay requires the current exact schema and result.

@@ -13,6 +13,8 @@ import re
 SOURCE_MANIFEST = Path("verification/verus/authority_v2_sources.json")
 TEST_MANIFEST = Path("verification/verus/authority_v2_test_sources.json")
 GETTER = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs")
+NATIVE_TEST_DATA = (Path("tools/test-data/scalar-arithmetic/i128-vectors.tsv"),
+                    Path("tools/test-data/signed-arithmetic/vectors.tsv"))
 
 
 def execution_sources(root: Path) -> tuple[Path, ...]:
@@ -32,7 +34,8 @@ def execution_sources(root: Path) -> tuple[Path, ...]:
             or any(not isinstance(name, str) for name in tests)
             or tests != sorted(set(tests))):
         raise ValueError("invalid execution test source manifest")
-    names = sorted(set(names + tests + [str(GETTER), str(SOURCE_MANIFEST), str(TEST_MANIFEST)]))
+    names = sorted(set(names + tests + list(map(str, NATIVE_TEST_DATA))
+                       + [str(GETTER), str(SOURCE_MANIFEST), str(TEST_MANIFEST)]))
     paths = []
     for name in names:
         path = Path(name)

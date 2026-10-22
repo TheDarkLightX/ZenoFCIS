@@ -58,7 +58,7 @@ const MEANING_PROFILE: &str = "zeno-fcis/loop-meaning/1";
 /// Bytes of observations hashed per block of a meaning key.
 const MEANING_BLOCK: usize = 1 << 16;
 /// Schema of the stateless doors' results.
-const DOORS_SCHEMA: &str = "zeno-fcis/loop-doors/1";
+const DOORS_SCHEMA: &str = "zeno-fcis/loop-doors/2";
 /// Largest expressions, sketch or manifest file.
 const DOCUMENT_LIMIT: u64 = 65_536;
 /// Largest program file named by a manifest.
@@ -235,6 +235,18 @@ pub(crate) enum DoorCommand {
         #[arg(long)]
         candidate: Option<PathBuf>,
     },
+    /// Evaluate one expression at a declared input through the library; no verdict or receipt.
+    Evaluate {
+        /// Canonical program supplying the declared input domains.
+        #[arg(long)]
+        original: PathBuf,
+        /// One plain output expression and its input vocabulary.
+        #[arg(long)]
+        expressions: PathBuf,
+        /// Input values in the original's ABI order.
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        input: Vec<i128>,
+    },
     /// Ask about the largest region where the contract's laws leave the decision open; no session.
     Question {
         /// Existing application contract (original question mode).
@@ -287,7 +299,7 @@ pub(crate) enum DoorCommand {
 mod version_space;
 
 #[path = "loop_judges.rs"]
-mod judges;
+pub(crate) mod judges;
 
 #[path = "loop_decompose.rs"]
 mod decompose;
@@ -326,6 +338,11 @@ pub(crate) fn run_with_policy(
     match command {
         // BEGIN black-box capture dispatch (additive)
         DoorCommand::Capture { command } => capture::run(command),
+        DoorCommand::Evaluate {
+            original,
+            expressions,
+            input,
+        } => evaluate_command(&original, &expressions, &input),
         // END black-box capture dispatch
         // BEGIN composable program loop dispatch (qualification uses check + replay).
         DoorCommand::Pipeline {
@@ -502,6 +519,7 @@ fn refused(reason: &str) -> (u8, Value) {
 /// The stateless doors report under their own schema, refusals included.
 fn as_door(door: &str, (exit, mut report): (u8, Value)) -> (u8, Value) {
     report["schema"] = json!(DOORS_SCHEMA);
+    report["integer_encoding"] = json!(crate::report_numbers::ENCODING);
     report["door"] = json!(door);
     (exit, report)
 }
@@ -510,22 +528,22 @@ fn doors_result(exit: u8, door: &str, status: &str, mut detail: Value) -> (u8, V
     search_limits::annotate(door, status, &mut detail);
     (
         exit,
-        json!({"schema": DOORS_SCHEMA, "door": door, "status": status, "authority": "none", "detail": detail}),
+        json!({"schema": DOORS_SCHEMA, "integer_encoding": crate::report_numbers::ENCODING, "door": door, "status": status, "authority": "none", "detail": detail}),
     )
 }
 
 /// What a document declares about names.
 struct VocabularySpec {
     inputs: Vec<String>,
-    variants: BTreeMap<String, BTreeMap<String, i64>>,
-    cases: Option<i64>,
+    variants: BTreeMap<String, BTreeMap<String, i128>>,
+    cases: Option<i128>,
 }
 
 /// A parsed expressions document (texts not yet parsed as expressions).
 struct Document {
     vocabulary: Option<VocabularySpec>,
     outputs: Vec<String>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
 }
 
 fn identifier(text: &str) -> bool {
@@ -545,7 +563,7 @@ fn only_keys(object: &Map<String, Value>, allowed: &[&str], what: &str) -> Resul
     }
 }
 
-fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i64>, String> {
+fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i128>, String> {
     let object = value.as_object().ok_or_else(|| format!("{what}-shape"))?;
     let mut out = BTreeMap::new();
     for (name, value) in object {
@@ -556,6 +574,7 @@ fn integer_map(value: &Value, what: &str) -> Result<BTreeMap<String, i64>, Strin
             name.clone(),
             value
                 .as_i64()
+                .map(i128::from)
                 .ok_or_else(|| format!("{what}-value:{name}"))?,
         );
     }
@@ -584,6 +603,7 @@ fn vocabulary_spec(value: &Value) -> Result<VocabularySpec, String> {
         Some(value) => Some(
             value
                 .as_i64()
+                .map(i128::from)
                 .filter(|n| (1..=1 << 16).contains(n))
                 .ok_or("vocabulary-cases")?,
         ),
@@ -684,7 +704,7 @@ fn point_json(subject: &Subject, ordinal: usize) -> Value {
         } else {
             match subject.vocab.variant_name(name, value) {
                 Some(variant) => json!(variant),
-                None => json!(value),
+                None => crate::report_numbers::integer(value),
             }
         };
         out.insert(name.clone(), shown);
@@ -710,7 +730,7 @@ fn fill_json(subject: &Subject, sketch: &[Expr], k: usize, fill: &Fill) -> Value
     match fill {
         Fill::Const(value) => {
             let text = show(&Expr::Int(*value), &subject.vocab, Some(kind));
-            json!({"fill": text, "value": value})
+            json!({"fill": text, "value": crate::report_numbers::integer(*value)})
         }
         Fill::Choice(index) => {
             let alternative = sketch
@@ -783,8 +803,9 @@ impl Stages {
         }
     }
 
-    /// Runs `work` in one contained stage (search: up to five seconds;
-    /// check: up to two), bounded by the invocation's remaining time.
+    /// The contained supervisor charges search/check CPU (5s/2s), including
+    /// its children on systemd. The invocation still has its original wall
+    /// deadline; deterministic tuple/node/work reservations are unchanged.
     fn run<T>(&mut self, search: bool, work: impl FnOnce() -> T) -> Result<T, String> {
         if self.frames + 2 > FRAME_BUDGET {
             return Err("stage-budget".into());
@@ -803,7 +824,13 @@ impl Stages {
         let begun = Instant::now();
         let value = work();
         crate::checker_process::finish()?;
-        if begun.elapsed() >= duration {
+        // FINISH independently checks the supervisor's kernel CPU counter
+        // before permitting a result. Local unit execution has no supervisor,
+        // so retain its cooperative wall fallback rather than inventing usage.
+        if self.started.elapsed() >= self.deadline {
+            return Err("invocation-deadline".into());
+        }
+        if !crate::checker_process::contained() && begun.elapsed() >= duration {
             return Err("stage-deadline".into());
         }
         Ok(value)
@@ -1103,10 +1130,24 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                             let bound = result
                                 .sketch
                                 .get(info.output)
-                                .map_or(0, |node| sketch::constant_bound(subject, node));
+                                .filter(|node| {
+                                    !zeno_fcis_loop_doors::inverse::positions(node).iter().any(
+                                        |(_, sub)| {
+                                            matches!(
+                                                sub,
+                                                Expr::Call(..)
+                                                    | Expr::Bin(
+                                                        zeno_fcis_loop_doors::expr::Op::Mul,
+                                                        ..
+                                                    )
+                                            )
+                                        },
+                                    )
+                                })
+                                .map(|node| sketch::constant_bound(subject, node));
                             json!({"kind": "constant", "derived": "exact over all integers",
-                                   "range": range.map(|(lo, hi)| json!([lo, hi])),
-                                   "enumeration_bound": bound})
+                                   "range": range.map(|(lo, hi)| crate::report_numbers::integers(&[lo, hi])),
+                                   "enumeration_bound": bound.map(crate::report_numbers::integer)})
                         }
                         _ => Value::Null,
                     };
@@ -1122,9 +1163,9 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                         "hole": s.hole,
                         "kind": if s.choice { "choice" } else { "constant" },
                         "values": s.values.len(),
-                        "min": s.values.iter().min(),
-                        "max": s.values.iter().max(),
-                        "listed": if s.values.len() <= 64 { json!(s.values) } else { Value::Null },
+                        "min": s.values.iter().min().copied().map(crate::report_numbers::integer),
+                        "max": s.values.iter().max().copied().map(crate::report_numbers::integer),
+                        "listed": if s.values.len() <= 64 { crate::report_numbers::integers(&s.values) } else { Value::Null },
                         "complete": s.complete,
                     })).collect::<Vec<_>>(),
                     "assignments": info.assignments.to_string(),
@@ -1140,7 +1181,7 @@ fn searched_json(subject: &Subject, result: &SketchResult) -> Value {
                     })),
                     "conflicting_inputs": info.conflicting_inputs.iter().map(|ordinal| json!({
                         "ordinal": ordinal, "input": point_json(subject, *ordinal),
-                        "required_output": subject.targets[info.output][*ordinal],
+                        "required_output": crate::report_numbers::integer(subject.targets[info.output][*ordinal]),
                     })).collect::<Vec<_>>(),
                 })
             })
@@ -1180,7 +1221,7 @@ fn sketch_json(subject: &Subject, result: &SketchResult) -> Value {
                 "output": result.outputs.last().map(|info| format!("out{}", info.output)),
                 "conflicting_inputs": result.outputs.iter().flat_map(|info| info.conflicting_inputs.iter().map(move |ordinal| json!({
                     "output": format!("out{}", info.output), "ordinal": ordinal, "input": point_json(subject, *ordinal),
-                    "required_output": subject.targets[info.output][*ordinal],
+                    "required_output": crate::report_numbers::integer(subject.targets[info.output][*ordinal]),
                 }))).collect::<Vec<_>>()}),
         };
     }
@@ -1473,10 +1514,10 @@ fn failure_region_json(subject: &Subject, region: &repair::Region) -> Value {
                     let shown = if subject.vocab.input_kinds()[*k] == Kind::Bool {
                         json!(*v == 1)
                     } else {
-                        subject
-                            .vocab
-                            .variant_name(name, *v)
-                            .map_or_else(|| json!(v), |variant| json!(variant))
+                        subject.vocab.variant_name(name, *v).map_or_else(
+                            || crate::report_numbers::integer(*v),
+                            |variant| json!(variant),
+                        )
                     };
                     (name.clone(), shown)
                 })
@@ -1581,7 +1622,7 @@ fn explanation(
 
 struct Instance {
     name: String,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     program: Vec<u8>,
     optimize_nodes: Option<usize>,
     fit: bool,
@@ -1591,7 +1632,7 @@ struct Instance {
 /// path, optional optimize-result path, and whether it is fitted on.
 type Listed = (
     String,
-    BTreeMap<String, i64>,
+    BTreeMap<String, i128>,
     PathBuf,
     Option<PathBuf>,
     bool,
@@ -1749,7 +1790,7 @@ struct Row {
     json: Value,
     verdict: String,
     holes: Option<BTreeMap<usize, Fill>>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     nodes: Option<usize>,
     optimize_nodes: Option<usize>,
     fit: bool,
@@ -1772,7 +1813,7 @@ fn judge_instances(
     let holes = outputs.iter().any(has_holes);
     let mut rows = Vec::new();
     for instance in order {
-        let mut row = json!({"instance": instance.name, "parameters": instance.parameters});
+        let mut row = json!({"instance": instance.name, "parameters": instance.parameters.iter().map(|(name, value)| (name.clone(), crate::report_numbers::integer(*value))).collect::<Map<_, _>>()});
         if let Some(fitted) = fitted {
             row["fitted"] = json!(fitted.get(&instance.name).copied().unwrap_or(false));
         }
@@ -1938,7 +1979,7 @@ fn family_command(instances: &Path, program: &Path, fit: bool) -> (u8, Value) {
         .map(|n| zeno_fcis_loop_doors::expr::holes_of(n).len())
         .sum();
     if fit && hole_count > 0 {
-        let samples: Vec<(BTreeMap<String, i64>, BTreeMap<usize, Fill>)> = rows
+        let samples: Vec<(BTreeMap<String, i128>, BTreeMap<usize, Fill>)> = rows
             .iter()
             .filter(|r| r.fit && r.json["sketch"]["status"] == "completed")
             .filter_map(|r| r.holes.clone().map(|h| (r.parameters.clone(), h)))
@@ -2010,14 +2051,93 @@ fn family_command(instances: &Path, program: &Path, fit: bool) -> (u8, Value) {
 fn form_json(form: Option<&Form>) -> Value {
     match form {
         None => Value::Null,
-        Some(Form::Constant(value)) => json!({"constant": value, "text": value.to_string()}),
+        Some(Form::Constant(value)) => {
+            json!({"constant": crate::report_numbers::integer(*value), "text": value.to_string()})
+        }
         Some(form @ Form::Linear { parameter, a, b }) => {
-            json!({"parameter": parameter, "a": a, "b": b, "text": form.text()})
+            json!({"parameter": parameter, "a": crate::report_numbers::integer(*a), "b": crate::report_numbers::integer(*b), "text": form.text()})
         }
     }
 }
 
 // --- the meaning key ---------------------------------------------------------------
+
+fn evaluate_command(original: &Path, expressions: &Path, input: &[i128]) -> (u8, Value) {
+    use zeno_fcis_loop_doors::expr::kind_of;
+    use zeno_fcis_synthesis::finite::{Domain, Op};
+    let bytes = match crate::transform_command::read_bounded(original, PROGRAM_LIMIT) {
+        Ok(bytes) if !crate::transform_command::over(&bytes, PROGRAM_LIMIT) => bytes,
+        Ok(_) => return refused("program-too-large"),
+        Err(error) => return super::io_failure(&error),
+    };
+    let original = match import_program(&bytes) {
+        Ok(program) => program,
+        Err(error) => return refused(&format!("original-not-admitted:{error:?}")),
+    };
+    if tuples(original.inputs()) > u128::from(DOOR_MAX_TUPLES) {
+        return refused("domain-over-budget");
+    }
+    let document = match read_document(expressions) {
+        Ok(d) => d,
+        Err(e) => return e,
+    };
+    if document.outputs.len() != 1 || !document.parameters.is_empty() {
+        return refused("evaluate-needs-one-plain-expression");
+    }
+    let Some(spec) = document.vocabulary else {
+        return refused("document-vocabulary-missing");
+    };
+    let initial_vocab = match vocabulary(&spec, &original) {
+        Ok(v) => v,
+        Err(e) => return refused(&e),
+    };
+    let node = match parse(&document.outputs[0], 0, Allow::PLAIN)
+        .and_then(|n| initial_vocab.resolve_variants(&n))
+    {
+        Ok(node) => node,
+        Err(e) => return refused(&e.0),
+    };
+    let kind = match kind_of(&node, &initial_vocab) {
+        Ok(k) => k.unwrap_or(Kind::Int),
+        Err(e) => return refused(&e.0),
+    };
+    let (output, zero) = if kind == Kind::Bool {
+        (Domain::Bool, Op::Bool(false))
+    } else {
+        (
+            Domain::Int {
+                min: i128::MIN,
+                max: i128::MAX,
+            },
+            Op::Int(0),
+        )
+    };
+    let seed = match Program::try_new(
+        original.inputs().to_vec(),
+        vec![output],
+        vec![zero],
+        vec![0],
+    ) {
+        Ok(p) => p,
+        Err(e) => return refused(&format!("evaluate-not-admitted:{e:?}")),
+    };
+    let vocab = match vocabulary(&spec, &seed) {
+        Ok(v) => v,
+        Err(e) => return refused(&e),
+    };
+    let program = match lower_outputs(&[node], &vocab, &seed) {
+        Ok(p) => p,
+        Err(e) => return refused(&e.0),
+    };
+    match program.evaluate(input) {
+        Ok(values) => super::result(
+            crate::OK,
+            "evaluated",
+            json!({"values": values.iter().map(ToString::to_string).collect::<Vec<_>>()}),
+        ),
+        Err(error) => refused(&format!("evaluation-refused:{error:?}")),
+    }
+}
 
 /// A program's meaning key: a digest of its input and output domains and of
 /// its observation on every declared input, in the checker's order: every
@@ -2224,6 +2344,9 @@ fn question_command(dir: &Path, answers: Option<&Path>) -> (u8, Value) {
                     max_tuples: judges::MAX_TUPLES,
                     max_work: crate::contract::review::gaps::DEFAULT_MAX_WORK,
                     proposals: Some(&lines),
+                    // The question reports only determination and the
+                    // proposals' check, so the mutants are not bound.
+                    mutants: false,
                 },
             )
         });
@@ -2449,7 +2572,7 @@ fn transfer_command(from: &Path, to_instances: &Path) -> (u8, Value) {
     let mut by: BTreeMap<&str, usize> = BTreeMap::new();
     let mut transferred = 0;
     for instance in &manifest.instances {
-        let mut row = json!({"instance": instance.name, "parameters": instance.parameters});
+        let mut row = json!({"instance": instance.name, "parameters": instance.parameters.iter().map(|(name, value)| (name.clone(), crate::report_numbers::integer(*value))).collect::<Map<_, _>>()});
         let moved = stages.run(true, || {
             instance_subject(&manifest, instance).map(|subject| {
                 let result = family::transfer(
@@ -2575,6 +2698,7 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
     match command {
         DoorCommand::Sketch { session, .. } => Some((session, false)),
         DoorCommand::Capture { command } => match command {
+            capture::Command::Whole { .. } => None,
             capture::Command::Open { session, .. } => Some((session, true)),
             capture::Command::Packet { session }
             | capture::Command::Candidate { session, .. }
@@ -2587,6 +2711,99 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fitted_family_reports_keep_full_width_offsets_and_constants() {
+        for value in [
+            i128::MIN,
+            i128::MAX,
+            -(1i128 << 100),
+            1i128 << 100,
+            1i128 << 64,
+            5,
+        ] {
+            let constant = form_json(Some(&Form::Constant(value)));
+            assert_eq!(
+                crate::report_numbers::read(&constant["constant"]),
+                Some(value)
+            );
+            let linear = form_json(Some(&Form::Linear {
+                parameter: "C".into(),
+                a: 1,
+                b: value,
+            }));
+            assert_eq!(crate::report_numbers::read(&linear["a"]), Some(1));
+            assert_eq!(crate::report_numbers::read(&linear["b"]), Some(value));
+            assert!(
+                Form::Linear {
+                    parameter: "C".into(),
+                    a: 1,
+                    b: value
+                }
+                .expr()
+                .is_ok()
+            );
+            assert_eq!(
+                linear["text"],
+                Form::Linear {
+                    parameter: "C".into(),
+                    a: 1,
+                    b: value
+                }
+                .text()
+            );
+        }
+    }
+
+    #[test]
+    fn evaluate_uses_i128_inputs_and_full_width_arithmetic_outputs() {
+        use zeno_fcis_synthesis::finite::{Domain, Op};
+        let wide = 1i128 << 100;
+        let program = Program::try_new(
+            vec![Domain::Int {
+                min: wide,
+                max: wide,
+            }],
+            vec![Domain::Int {
+                min: 0,
+                max: i128::MAX,
+            }],
+            vec![Op::Input(0)],
+            vec![0],
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"));
+        let scratch = std::env::temp_dir().join(format!(
+            "loop-evaluate-wide-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&scratch).unwrap_or_else(|e| panic!("{e:?}"));
+        let original = scratch.join("original.zcve");
+        let expressions = scratch.join("expressions.json");
+        std::fs::write(
+            &original,
+            encode(&program).unwrap_or_else(|e| panic!("{e:?}")),
+        )
+        .unwrap_or_else(|e| panic!("{e:?}"));
+        for (expression, expected) in [
+            ("mul_div_floor(x, 3, 2)", (wide * 3 / 2).to_string()),
+            ("products_ge(x, 3, x, 2)", "1".to_owned()),
+        ] {
+            std::fs::write(
+                &expressions,
+                json!({
+                    "schema":"zeno-fcis/loop-expressions/1", "vocabulary":{"inputs":["x"]},
+                    "outputs":[expression],
+                })
+                .to_string(),
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            let (status, value) = evaluate_command(&original, &expressions, &[wide]);
+            assert_eq!(status, crate::OK, "{value}");
+            assert_eq!(value["detail"]["values"], json!([expected]));
+        }
+        std::fs::remove_dir_all(scratch).unwrap_or_else(|e| panic!("{e:?}"));
+    }
 
     #[test]
     fn documents_are_bounded_and_fail_closed() {

@@ -53,7 +53,7 @@ class Expressions(unittest.TestCase):
 
     def test_refusals_and_bounds(self):
         for text in ["keep + 1", "f(x)", "x + then", "(x", "?{a}", "?{a | ?c}", "?c[5..2]", "x é 1",
-                     "99999999999999999999", " + ".join(["?c"] * 17), " + ".join(["x"] * 520), "x" * 9000]:
+                     "170141183460469231731687303715884105728", " + ".join(["?c"] * 17), " + ".join(["x"] * 520), "x" * 9000]:
             with self.assertRaises(Refusal, msg=text):
                 Z.parse_expression(text, allow_keep=True)
 

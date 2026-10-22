@@ -27,12 +27,7 @@ fn plan_value(plan: &CompletionPlan) -> Value {
                 .map(|row| {
                     tuple(vec![
                         Value::unsigned(row.remaining.into()),
-                        tuple(
-                            row.command
-                                .iter()
-                                .map(|v| Value::signed((*v).into()))
-                                .collect(),
-                        ),
+                        tuple(row.command.iter().map(|v| Value::signed(*v)).collect()),
                     ])
                 })
                 .collect(),
@@ -56,7 +51,7 @@ fn replace_at(value: &Value, path: &[usize], replacement: Value) -> Value {
     tuple(children)
 }
 
-fn terminal(domain: Domain, value: i64) -> Program {
+fn terminal(domain: Domain, value: i128) -> Program {
     Program::try_new(
         vec![domain],
         vec![Domain::Bool],
@@ -132,7 +127,7 @@ fn a_full_state_must_retain_an_exit_even_when_growth_is_rejected() {
     }
 }
 
-fn two_state_model(edges: [Option<i64>; 2], terminals: u8) -> CompletionProblem {
+fn two_state_model(edges: [Option<i128>; 2], terminals: u8) -> CompletionProblem {
     let domain = Domain::Int { min: 0, max: 1 };
     let step = Program::try_new(
         vec![domain],
@@ -201,7 +196,7 @@ fn every_two_state_graph_matches_independent_forward_path_exploration() {
                     Some(first) => assert_eq!(
                         find_completion(&model).unwrap_err(),
                         CompletionError::NoExit {
-                            state: vec![i64::try_from(first).unwrap()]
+                            state: vec![i128::try_from(first).unwrap()]
                         }
                     ),
                     None => {
@@ -282,7 +277,7 @@ fn unselected_and_terminal_state_commands_cannot_hide_an_arithmetic_trap() {
             Op::Int(0),
             Op::Int(1),
             Op::Select(1, 3, 2),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(5, 4),
             Op::Bool(true),
         ],
@@ -805,18 +800,18 @@ fn multiple_signed_and_boolean_fields_keep_lexicographic_state_and_command_order
 #[test]
 fn portable_plans_cover_signed_endpoints_and_zero_command_fields() {
     let low = Domain::Int {
-        min: i64::MIN,
-        max: i64::MIN + 1,
+        min: i128::MIN,
+        max: i128::MIN + 1,
     };
     let high = Domain::Int {
-        min: i64::MAX - 1,
-        max: i64::MAX,
+        min: i128::MAX - 1,
+        max: i128::MAX,
     };
     for command in [
         None,
         Some(Domain::Int {
-            min: i64::MIN,
-            max: i64::MIN,
+            min: i128::MIN,
+            max: i128::MIN,
         }),
     ] {
         let mut inputs = vec![low, high];
@@ -824,7 +819,7 @@ fn portable_plans_cover_signed_endpoints_and_zero_command_fields() {
         let step = Program::try_new(
             inputs,
             vec![Domain::Bool, low, high],
-            vec![Op::Bool(true), Op::Int(i64::MIN), Op::Int(i64::MAX - 1)],
+            vec![Op::Bool(true), Op::Int(i128::MIN), Op::Int(i128::MAX - 1)],
             vec![0, 1, 2],
         )
         .unwrap();
@@ -834,8 +829,8 @@ fn portable_plans_cover_signed_endpoints_and_zero_command_fields() {
             vec![
                 Op::Input(0),
                 Op::Input(1),
-                Op::Int(i64::MIN),
-                Op::Int(i64::MAX - 1),
+                Op::Int(i128::MIN),
+                Op::Int(i128::MAX - 1),
                 Op::Eq(0, 2),
                 Op::Eq(1, 3),
                 Op::And(4, 5),
@@ -851,18 +846,18 @@ fn portable_plans_cover_signed_endpoints_and_zero_command_fields() {
                 .unwrap();
         assert_eq!(checked.plan(), &proposed);
         assert_eq!(
-            checked.next_command(&[i64::MIN, i64::MAX - 1]).unwrap(),
+            checked.next_command(&[i128::MIN, i128::MAX - 1]).unwrap(),
             None
         );
         let expected = if command.is_some() {
-            vec![i64::MIN]
+            vec![i128::MIN]
         } else {
             vec![]
         };
         for state in [
-            [i64::MIN, i64::MAX],
-            [i64::MIN + 1, i64::MAX - 1],
-            [i64::MIN + 1, i64::MAX],
+            [i128::MIN, i128::MAX],
+            [i128::MIN + 1, i128::MAX - 1],
+            [i128::MIN + 1, i128::MAX],
         ] {
             assert_eq!(
                 checked.next_command(&state).unwrap(),
@@ -881,13 +876,13 @@ fn push_op(nodes: &mut Vec<Op>, op: Op) -> u16 {
 fn graph_problem(edges: &[[Option<usize>; 2]], terminals: &[bool]) -> CompletionProblem {
     let state = Domain::Int {
         min: 0,
-        max: i64::try_from(edges.len() - 1).unwrap(),
+        max: i128::try_from(edges.len() - 1).unwrap(),
     };
     let mut nodes = vec![Op::Input(0), Op::Input(1), Op::Bool(false)];
     let mut accepted = 2;
     let mut successor = 0;
     for (source, commands) in edges.iter().enumerate() {
-        let number = push_op(&mut nodes, Op::Int(i64::try_from(source).unwrap()));
+        let number = push_op(&mut nodes, Op::Int(i128::try_from(source).unwrap()));
         let matches_state = push_op(&mut nodes, Op::Eq(0, number));
         for (command, target) in commands.iter().enumerate() {
             let matches_command = if command == 0 {
@@ -899,7 +894,7 @@ fn graph_problem(edges: &[[Option<usize>; 2]], terminals: &[bool]) -> Completion
             let enabled = push_op(&mut nodes, Op::Bool(target.is_some()));
             let next = push_op(
                 &mut nodes,
-                Op::Int(i64::try_from(target.unwrap_or(source)).unwrap()),
+                Op::Int(i128::try_from(target.unwrap_or(source)).unwrap()),
             );
             accepted = push_op(&mut nodes, Op::Select(matches, enabled, accepted));
             successor = push_op(&mut nodes, Op::Select(matches, next, successor));
@@ -915,7 +910,7 @@ fn graph_problem(edges: &[[Option<usize>; 2]], terminals: &[bool]) -> Completion
     let mut nodes = vec![Op::Input(0), Op::Bool(false)];
     let mut result = 1;
     for (index, terminal) in terminals.iter().enumerate() {
-        let number = push_op(&mut nodes, Op::Int(i64::try_from(index).unwrap()));
+        let number = push_op(&mut nodes, Op::Int(i128::try_from(index).unwrap()));
         let matches = push_op(&mut nodes, Op::Eq(0, number));
         let terminal = push_op(&mut nodes, Op::Bool(*terminal));
         result = push_op(&mut nodes, Op::Select(matches, terminal, result));
@@ -1001,7 +996,7 @@ fn check_larger_branching_graph_group(group: u64) {
             assert_eq!(
                 find_completion(&model).unwrap_err(),
                 CompletionError::NoExit {
-                    state: vec![i64::try_from(first).unwrap()]
+                    state: vec![i128::try_from(first).unwrap()]
                 }
             );
             assert_ne!(seed, 1, "the all-terminal case must complete");
@@ -1025,11 +1020,11 @@ fn check_larger_branching_graph_group(group: u64) {
                 edges[source]
                     .iter()
                     .position(|target| target.is_some_and(|target| ranks[target] == Some(rank - 1)))
-                    .map(|command| vec![i64::try_from(command).unwrap()])
+                    .map(|command| vec![i128::try_from(command).unwrap()])
             };
             assert_eq!(
                 checked
-                    .next_command(&[i64::try_from(source).unwrap()])
+                    .next_command(&[i128::try_from(source).unwrap()])
                     .unwrap(),
                 selected.as_deref()
             );

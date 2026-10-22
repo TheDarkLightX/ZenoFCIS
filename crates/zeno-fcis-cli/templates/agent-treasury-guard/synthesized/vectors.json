@@ -116737,5 +116737,6 @@
       ]
     }
   ],
-  "schema": "zeno-fcis/synthesis-vectors/1"
+  "integer_encoding": "safe-number-or-decimal-string/1",
+  "schema": "zeno-fcis/synthesis-vectors/2"
 }

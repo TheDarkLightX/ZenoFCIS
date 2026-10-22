@@ -61,14 +61,28 @@ SCHEMA = custody.JOURNEY_SCHEMA
 URL_PREFIX = re.compile(r"https://github\.com/TheDarkLightX/ZenoFCIS/releases/download/v(\$VERSION|[0-9][^/\s\"']*)/")
 HOSTS = {("Linux", "x86_64"): "x86_64-unknown-linux-gnu", ("Darwin", "arm64"): "aarch64-apple-darwin"}
 MAC = "aarch64-apple-darwin"
-INCONCLUSIVE = {"status": "inconclusive", "authority": "none", "reason": "containment-unavailable:platform",
-                "accounting_complete": False}
-ARTIFACTS = ROOT / "docs/benchmarks/withdrawal-queue/artifacts"
+# Exercise the current release profile, as the shared-checker and parallel gates do.
+ARTIFACTS = ROOT / "crates/zeno-fcis-cli/tests/fixtures/i128-programs"
 FIXTURES = Path("crates/zeno-fcis-cli/tests/fixtures")
 
 
 class JourneyError(RuntimeError):
     """A failed journey step."""
+
+
+def macos_refusal(schema: str, backend: str, profile: str, reason: str) -> dict:
+    """Expected typed refusal when the journey explicitly selects a backend on macOS."""
+    containment = {
+        "schema": "zeno-fcis/containment-result/1", "backend": backend, "required_profile": profile,
+        "selection_source": "flag", "evidence": "inline-unqualified-refusal",
+        "startup": {"admitted": False, "guarantees": []},
+        "final": {"termination": "stopped", "reason": reason, "application_work_started": False,
+                  "cleanup": "unknown", "absence_verified": False},
+    }
+    result = {"schema": schema, "status": "inconclusive", "authority": "none", "reason": reason,
+              "accounting_complete": False, "backend": backend, "required_profile": profile,
+              "containment": containment}
+    return result
 
 
 def host_triple(system: str, machine: str) -> str:
@@ -401,7 +415,7 @@ class Journey:
         root = self.work / "platform"
         root.mkdir()
         parallel = root / "parallel.json"
-        command = [*serial["check"], "--offline-parallel", "--receipt", parallel]
+        command = [*serial["check"], "--offline-parallel", "--receipt", parallel, "--containment-backend", "systemd"]
         counter = self.counter
         if counter is None:
             raise JourneyError("the durable-counter app was not created")
@@ -411,13 +425,16 @@ class Journey:
         verify = [cli, "synth", "verify", "synthesis.json", "--out", "synthesized", "--receipt", conformance]
         if self.host == MAC:
             result = self.report_of("offline-parallel", command, cwd=root, expected=2)
-            if result != {"schema": "zeno-fcis/transform-result/1", **INCONCLUSIVE}:
+            if result != macos_refusal("zeno-fcis/transform-result/1", "systemd", "group-resources/1",
+                                       "containment-unavailable:systemd:platform-unqualified"):
                 raise JourneyError(f"offline-parallel on macOS: {result}")
             session = root / "session"
             loop = self.report_of("loop-open", [cli, "loop", "open", "--original", serial["original"], "--session",
-                                                session], cwd=root, expected=2)
+                                                session, "--containment-backend", "auto"], cwd=root, expected=2)
             acquisition = loop.pop("acquisition", None)
-            if loop != {"schema": "zeno-fcis/transform-loop/1", **INCONCLUSIVE} or not isinstance(acquisition, dict) \
+            if loop != macos_refusal("zeno-fcis/transform-loop/1", "posix", "finite-data/1",
+                                     "containment-unavailable:posix:platform-unqualified") \
+                    or not isinstance(acquisition, dict) \
                     or acquisition.get("observed_intake", "missing") is not None \
                     or acquisition.get("accounting_complete") is not False:
                 raise JourneyError(f"loop open on macOS: {loop}, acquisition {acquisition}")
@@ -431,7 +448,7 @@ class Journey:
                 raise JourneyError("a blocked synth verify wrote a receipt")
             return {"offline_parallel": result, "loop_open": {**loop, "acquisition": acquisition},
                     "synth_verify": "conformance-unknown: unsupported-runtime-platform"}
-        self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent"},
+        self.expect(self.report_of("offline-parallel", command, cwd=root), {"status": "equivalent", "backend": "systemd"},
                     "offline-parallel")
         if parallel.read_bytes() != serial["receipt"].read_bytes():
             raise JourneyError("the contained receipt differs from the serial one")
@@ -441,7 +458,7 @@ class Journey:
         if not conformance.is_file():
             raise JourneyError("synth verify wrote no receipt")
         return {"offline_parallel": "equivalent; the receipt equals the serial receipt and replays",
-                "synth_verify": "passed"}
+                "containment_backend": "systemd", "synth_verify": "passed"}
 
     def main(self) -> None:
         if not self.archive.is_file():

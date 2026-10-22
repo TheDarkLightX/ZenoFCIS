@@ -26,12 +26,12 @@ pub(super) fn program() -> ScalarProgram<'static> {
         outputs: &[
             ScalarDomain::Int { min: 0, max: 6 },
             ScalarDomain::Int {
-                min: -9223372036854775808,
-                max: 9223372036854775807,
+                min: i128::MIN,
+                max: i128::MAX,
             },
             ScalarDomain::Int {
-                min: -9223372036854775808,
-                max: 9223372036854775807,
+                min: i128::MIN,
+                max: i128::MAX,
             },
         ],
         nodes: &[
@@ -79,7 +79,7 @@ pub(super) fn program() -> ScalarProgram<'static> {
 #[derive(Debug)]
 struct Facts {
     raw: (i128, i128, i128, u16, i128, bool),
-    branch: i64,
+    branch: i128,
     increment: i128,
     deadline: i128,
 }
@@ -217,8 +217,8 @@ fn execute_into(
             input[5] != 0,
         ),
         branch: output[0],
-        deadline: output[1] as i128,
-        increment: output[2] as i128,
+        deadline: output[1],
+        increment: output[2],
     })
 }
 struct Report(Result<Facts, Failure>, Usage, Vec<ReadAttempt>);

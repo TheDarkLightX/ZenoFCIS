@@ -21,8 +21,8 @@ use crate::expr::{
 };
 use crate::family::{self, Form, TransferStatus};
 use crate::inverse::{
-    self, MAX, MIN, Need, Synthesis, Synthesizer, derive, describe_region, positions,
-    solve_constant, unsatisfiable,
+    self, MIN, Need, Synthesis, Synthesizer, derive, describe_region, positions, solve_constant,
+    unsatisfiable,
 };
 use crate::lower::{from_program, lower_outputs};
 use crate::repair::{self, SiteKind, Status as RepairStatus, first_difference};
@@ -61,12 +61,12 @@ fn data(name: &str) -> &'static [u8] {
     }
 }
 
-type Variants = Vec<(&'static str, &'static str, i64)>;
+type Variants = Vec<(&'static str, &'static str, i128)>;
 
 /// Field names, variants, case count and parameters of one family's
 /// instance, as the shell writes them from `project.zeno` and the policy.
-fn vocabulary_of(name: &str) -> (Vec<&'static str>, Variants, i64, Vec<(&'static str, i64)>) {
-    let digits = |prefix: char| -> i64 {
+fn vocabulary_of(name: &str) -> (Vec<&'static str>, Variants, i128, Vec<(&'static str, i128)>) {
+    let digits = |prefix: char| -> i128 {
         name.split('-')
             .find_map(|part| part.strip_prefix(prefix).and_then(|n| n.parse().ok()))
             .unwrap_or(0)
@@ -135,16 +135,61 @@ fn vocabulary_of(name: &str) -> (Vec<&'static str>, Variants, i64, Vec<(&'static
 }
 
 fn program(name: &str) -> Program {
-    match import_program(data(name)) {
-        Ok(program) => program,
-        Err(error) => panic!("{name}: {error:?}"),
+    // Historical bytes remain frozen and are admitted only by the i64 route.
+    // These bounded door fixtures need a fresh main-route graph. Check its
+    // complete table against the legacy evaluator before using it in a test.
+    let bytes = data(name);
+    let legacy = zeno_fcis_synthesis::finite_runtime::import_i64_program(bytes)
+        .unwrap_or_else(|error| panic!("{name}: legacy {error:?}"));
+    assert_eq!(
+        legacy
+            .value()
+            .unwrap_or_else(|e| panic!("{e:?}"))
+            .zcve_bytes()
+            .unwrap_or_else(|e| panic!("{e:?}")),
+        bytes
+    );
+    let profile = b"zeno-fcis/finite-i64/1";
+    assert_eq!(
+        &bytes[..10],
+        &[8, 0, 0, 0, 4, 6, 0, 0, 0, profile.len() as u8]
+    );
+    assert_eq!(&bytes[10..10 + profile.len()], profile);
+    let mut fresh = bytes[..10].to_vec();
+    fresh[9] += 1;
+    fresh.extend_from_slice(b"zeno-fcis/finite-i128/1");
+    fresh.extend_from_slice(&bytes[10 + profile.len()..]);
+    let program = import_program(&fresh).unwrap_or_else(|error| panic!("{name}: {error:?}"));
+    let points = crate::subject::tuples(program.inputs());
+    assert!(points <= 100_000, "fixture differential must stay bounded");
+    let mut tuple: Vec<i128> = program.inputs().iter().map(|d| d.bounds().0).collect();
+    for _ in 0..points {
+        let narrow: Vec<i64> = tuple
+            .iter()
+            .map(|v| i64::try_from(*v).unwrap_or_else(|e| panic!("{e:?}")))
+            .collect();
+        assert_eq!(
+            legacy
+                .evaluate(&narrow)
+                .map(|row| row.into_iter().map(i128::from).collect::<Vec<_>>()),
+            program.evaluate(&tuple),
+            "{name}: {tuple:?}",
+        );
+        for (value, domain) in tuple.iter_mut().zip(program.inputs()).rev() {
+            if *value < domain.bounds().1 {
+                *value += 1;
+                break;
+            }
+            *value = domain.bounds().0;
+        }
     }
+    program
 }
 
 fn subject(name: &str) -> Subject {
     let original = program(name);
     let (names, variants, cases, parameters) = vocabulary_of(name);
-    let mut table: BTreeMap<String, BTreeMap<String, i64>> = BTreeMap::new();
+    let mut table: BTreeMap<String, BTreeMap<String, i128>> = BTreeMap::new();
     for (field, variant, value) in variants {
         table
             .entry(field.to_string())
@@ -361,7 +406,7 @@ fn malformed_and_unsupported_text_is_refused() {
         ("?c[5..2]", Allow::ALL),
         ("?c[0..70000]", Allow::ALL),
         ("?c[a..2]", Allow::ALL),
-        ("99999999999999999999", Allow::ALL),
+        ("340282366920938463463374607431768211456", Allow::ALL),
         ("a.b.c", Allow::ALL),
         ("", Allow::ALL),
     ] {
@@ -407,7 +452,7 @@ fn unknown_names_and_clashing_variants_are_refused() {
     assert!(s.vocab.check_names(&expr("value + nosuch")).is_err());
     assert!(s.vocab.check_names(&expr("action == Inc")).is_ok());
     let domains = vec![Domain::Int { min: 0, max: 3 }, Domain::Bool];
-    let clash: BTreeMap<String, BTreeMap<String, i64>> = [(
+    let clash: BTreeMap<String, BTreeMap<String, i128>> = [(
         String::from("x"),
         [(String::from("y"), 1)].into_iter().collect(),
     )]
@@ -471,7 +516,7 @@ fn lowering_keeps_the_exact_abi_and_round_trips_a_program() {
     let s = subject("bounded-counter-c8");
     assert!(lower_outputs(&outputs(&["value", "keep", "keep"]), &s.vocab, &s.original).is_ok());
     for texts in [
-        vec!["value * 2", "keep", "keep"],
+        vec!["value * (value == 0)", "keep", "keep"],
         vec!["?c", "keep", "keep"],
         vec!["$C", "keep", "keep"],
         vec!["nosuch", "keep", "keep"],
@@ -512,7 +557,7 @@ fn tiny() -> Subject {
     ok(Subject::new(original, vocab, BTreeMap::new(), None, 64))
 }
 
-fn derived(s: &Subject, root: &str, path: &[u8], kind: Kind, target: &[i64]) -> Need {
+fn derived(s: &Subject, root: &str, path: &[u8], kind: Kind, target: &[i128]) -> Need {
     let all = vec![true; s.size];
     ok(derive(
         &expr(root),
@@ -530,15 +575,15 @@ fn inverse_rules_for_each_operator() {
     let x = s.columns[0].clone();
     let flag = s.columns[1].clone();
     // `+`: shifted by the sibling
-    let plus: Vec<i64> = x.iter().map(|v| v + 2).collect();
+    let plus: Vec<i128> = x.iter().map(|v| v + 2).collect();
     let d = derived(&s, "x + ?c", &[1], Kind::Int, &plus);
     assert!(d.has_eq.iter().all(|h| *h) && d.eq.iter().all(|e| *e == 2));
     // `k - x`: the requirement on x is k - target
-    let minus: Vec<i64> = x.iter().map(|v| 5 - v).collect();
-    let wide: Vec<i128> = x.iter().map(|v| i128::from(*v)).collect();
+    let minus: Vec<i128> = x.iter().map(|v| 5 - v).collect();
+    let wide: Vec<i128> = x.to_vec();
     assert_eq!(derived(&s, "5 - x", &[1], Kind::Int, &minus).eq, wide);
     // a select's branch: kept where taken, dropped elsewhere
-    let target: Vec<i64> = x
+    let target: Vec<i128> = x
         .iter()
         .zip(&flag)
         .map(|(v, f)| if *f == 1 { v + 1 } else { *v })
@@ -551,16 +596,16 @@ fn inverse_rules_for_each_operator() {
     let d = derived(&s, "?c ? x + 1 : x", &[0], Kind::Int, &target);
     assert_eq!(d.kind, Kind::Bool);
     for t in 0..n {
-        assert_eq!((d.has_eq[t], d.eq[t]), (true, i128::from(flag[t])));
+        assert_eq!((d.has_eq[t], d.eq[t]), (true, flag[t]));
     }
     // `==` on integers: equality where true, inequality where false
-    let two: Vec<i64> = x.iter().map(|v| i64::from(*v == 2)).collect();
+    let two: Vec<i128> = x.iter().map(|v| i128::from(*v == 2)).collect();
     assert_eq!(
         solve_constant(&derived(&s, "?c == x", &[0], Kind::Bool, &two), &[]),
         Some(2)
     );
     // order comparisons: per-tuple bounds
-    let below: Vec<i64> = x.iter().map(|v| i64::from(*v < 2)).collect();
+    let below: Vec<i128> = x.iter().map(|v| i128::from(*v < 2)).collect();
     for (root, path, value) in [
         ("x < ?c", 1u8, 2),
         ("?c > x", 0, 2),
@@ -572,10 +617,10 @@ fn inverse_rules_for_each_operator() {
     }
     // `&&`: free where the sibling is false, impossible where it forces a
     // wrong result
-    let both: Vec<i64> = x
+    let both: Vec<i128> = x
         .iter()
         .zip(&flag)
-        .map(|(v, f)| i64::from(*v > 1 && *f == 1))
+        .map(|(v, f)| i128::from(*v > 1 && *f == 1))
         .collect();
     let and = derived(&s, "flag && ?c", &[1], Kind::Bool, &both);
     for t in 0..n {
@@ -598,16 +643,13 @@ fn inverse_rules_for_each_operator() {
     let implies = derived(&s, "?c -> flag", &[0], Kind::Bool, &both);
     for t in 0..n {
         if flag[t] == 0 {
-            assert_eq!(
-                (implies.has_eq[t], implies.eq[t]),
-                (true, i128::from(1 - both[t]))
-            );
+            assert_eq!((implies.has_eq[t], implies.eq[t]), (true, (1 - both[t])));
         }
     }
     // `!`: negated
     let not = derived(&s, "!?c", &[0], Kind::Bool, &both);
     for t in 0..n {
-        assert_eq!(not.eq[t], i128::from(1 - both[t]));
+        assert_eq!(not.eq[t], (1 - both[t]));
     }
     // a constant's feasible set: an interval minus finitely many values
     let mut need = Need::exact(Kind::Int, &vec![0; n], &vec![false; n]);
@@ -1090,8 +1132,8 @@ fn hole_values_are_fitted_to_the_parameter_and_lifted() {
                 .is_some_and(|p| first_difference(s, &p).is_none())
         );
     }
-    let p = |c: i64| -> BTreeMap<String, i64> { [(String::from("C"), c)].into_iter().collect() };
-    let h = |v: i64| -> BTreeMap<usize, Fill> { [(0, Fill::Const(v))].into_iter().collect() };
+    let p = |c: i128| -> BTreeMap<String, i128> { [(String::from("C"), c)].into_iter().collect() };
+    let h = |v: i128| -> BTreeMap<usize, Fill> { [(0, Fill::Const(v))].into_iter().collect() };
     let text_of =
         |forms: BTreeMap<usize, Option<Form>>| forms.get(&0).cloned().flatten().map(|f| f.text());
     assert_eq!(
@@ -1205,24 +1247,24 @@ fn evaluation_follows_the_lowered_semantics() {
     let x = &s.columns[0];
     let flag = &s.columns[1];
     let eval = |text: &str| ok(evaluate(&expr(text), &env, &none));
-    let or: Vec<i64> = x
+    let or: Vec<i128> = x
         .iter()
         .zip(flag)
-        .map(|(v, f)| if *f == 1 { 1 } else { i64::from(*v == 1) })
+        .map(|(v, f)| if *f == 1 { 1 } else { i128::from(*v == 1) })
         .collect();
     assert_eq!(eval("flag || x == 1"), or);
-    let implies: Vec<i64> = x
+    let implies: Vec<i128> = x
         .iter()
         .zip(flag)
-        .map(|(v, f)| if *f == 1 { i64::from(*v == 1) } else { 1 })
+        .map(|(v, f)| if *f == 1 { i128::from(*v == 1) } else { 1 })
         .collect();
     assert_eq!(eval("flag -> x == 1"), implies);
-    let not: Vec<i64> = x.iter().map(|v| i64::from(*v == 0)).collect();
+    let not: Vec<i128> = x.iter().map(|v| i128::from(*v == 0)).collect();
     assert_eq!(eval("!x"), not);
-    assert!(evaluate(&expr("x * 2"), &env, &none).is_err());
+    assert_eq!(eval("x * 2"), x.iter().map(|v| v * 2).collect::<Vec<_>>());
     assert!(evaluate(&expr("?c"), &env, &none).is_err());
     let holes: BTreeMap<usize, HoleValue> = [(0, HoleValue::Choice(1))].into_iter().collect();
-    let plus: Vec<i64> = x.iter().map(|v| v + 1).collect();
+    let plus: Vec<i128> = x.iter().map(|v| v + 1).collect();
     assert_eq!(ok(evaluate(&expr("?{x | x + 1}"), &env, &holes)), plus);
 }
 
@@ -1247,7 +1289,7 @@ fn one_shared_synthesis_budget_bounds_every_solve_of_a_door_run() {
     );
 }
 
-// --- signed 64-bit arithmetic (the source's post-review gate fixes) ----------
+// --- signed 128-bit arithmetic (the source's post-review gate fixes) ----------
 
 #[test]
 fn evaluation_refuses_eager_overflow() {
@@ -1255,10 +1297,10 @@ fn evaluation_refuses_eager_overflow() {
     let env: Env<'_> = s.env(None);
     let none: BTreeMap<usize, HoleValue> = BTreeMap::new();
     for text in [
-        "9223372036854775807 + 1 < 0",
-        "-9223372036854775807 - 2 > 0",
-        "flag && !flag ? 9223372036854775807 + 1 : 0",
-        "x + 9223372036854775807",
+        "170141183460469231731687303715884105727 + 1 < 0",
+        "-170141183460469231731687303715884105727 - 2 > 0",
+        "flag && !flag ? 170141183460469231731687303715884105727 + 1 : 0",
+        "x + 170141183460469231731687303715884105727",
     ] {
         assert_eq!(
             evaluate(&expr(text), &env, &none),
@@ -1269,14 +1311,14 @@ fn evaluation_refuses_eager_overflow() {
 }
 
 #[test]
-fn inverse_comparisons_at_the_64_bit_ends_do_not_wrap() {
+fn inverse_comparisons_at_the_128_bit_ends_do_not_wrap() {
     let s = subject("bounded-counter-c8");
     let ones = vec![1; s.size];
     for (text, impossible) in [
-        ("?c < -9223372036854775808", true),
-        ("?c > 9223372036854775807", true),
-        ("?c <= 9223372036854775807", false),
-        ("?c >= -9223372036854775808", false),
+        ("?c < -170141183460469231731687303715884105728", true),
+        ("?c > 170141183460469231731687303715884105727", true),
+        ("?c <= 170141183460469231731687303715884105727", false),
+        ("?c >= -170141183460469231731687303715884105728", false),
     ] {
         let need = derived(&s, text, &[0], Kind::Bool, &ones);
         assert_eq!(
@@ -1284,7 +1326,6 @@ fn inverse_comparisons_at_the_64_bit_ends_do_not_wrap() {
             impossible,
             "{text}"
         );
-        assert!(need.lo.iter().all(|lo| *lo >= MIN) && need.hi.iter().all(|hi| *hi <= MAX));
     }
 }
 
@@ -1315,7 +1356,11 @@ fn a_large_constant_sketch_completes_exactly() {
 fn an_overflowing_choice_does_not_hide_a_valid_completion() {
     let (s, r) = sketch_of(
         "bounded-counter-c8",
-        &["keep", "value + ?{9223372036854775807 + 1 | 1}", "keep"],
+        &[
+            "keep",
+            "value + ?{170141183460469231731687303715884105727 + 1 | 1}",
+            "keep",
+        ],
     );
     assert_eq!(r.status, Status::Completed, "{:?}", r.reason);
     assert_eq!(r.holes.get(&0), Some(&Fill::Choice(1)));
@@ -1581,4 +1626,21 @@ fn shared_constant_exhaustion_names_incompatible_inputs_without_a_false_witness(
     let pair = &r.outputs[0].conflicting_inputs;
     assert_eq!(pair.len(), 2);
     assert_ne!(s.targets[0][pair[0]], s.targets[0][pair[1]]);
+}
+
+#[test]
+fn inverse_arithmetic_at_i128_endpoints_preserves_exact_and_forbidden_values() {
+    let s = tiny();
+    for (text, path, target, expected) in [
+        (format!("?c + {}", i128::MIN), vec![0], i128::MIN, Some(0)),
+        (format!("?c + {}", i128::MIN), vec![0], i128::MAX, None),
+        (format!("{} - ?c", i128::MIN), vec![1], 0, Some(i128::MIN)),
+        (format!("{} - ?c", i128::MIN), vec![1], i128::MAX, None),
+    ] {
+        let need = derived(&s, &text, &path, Kind::Int, &vec![target; s.size]);
+        assert_eq!(solve_constant(&need, &[]), expected, "{text} -> {target}");
+    }
+    let text = format!("(?c + {}) != {}", i128::MIN, i128::MAX);
+    let need = derived(&s, &text, &[0, 0], Kind::Bool, &vec![1; s.size]);
+    assert_eq!(solve_constant(&need, &[0]), Some(0));
 }

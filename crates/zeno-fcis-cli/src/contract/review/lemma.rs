@@ -1,7 +1,8 @@
-//! The lemma judge: a candidate state invariant, judged by induction over
-//! the declared domain rather than by exploring runs.
+//! The lemma judge: state induction, or an explicit before/after relation
+//! checked on actual admitted committed decisions of the finite machine.
+//! Transition results are labelled `checked`, not `inductive` or proved.
 //!
-//! A lemma is written as a state law is, a `project.zeno` relation over
+//! In the default state mode a lemma is a `project.zeno` relation over
 //! `post.` state fields, and compiled as a law of the contract declared `on
 //! commit, genesis`; the library's law evaluator runs its program on each
 //! declared state as a genesis frame. Each question an inductive proof asks
@@ -32,6 +33,7 @@ use super::super::ContractError;
 use super::super::rules::LawKind;
 use super::evaluate::LawSet;
 use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
+use super::probe::{self, Truth};
 
 /// The lemma judge's result.
 #[derive(Clone, Debug)]
@@ -83,6 +85,106 @@ pub(crate) fn judge(
     }
     Ok(Lemmas::Judged(judged))
 }
+
+/// Checks before/after relations on every admitted committed decision.
+/// This is a finite relation check, not state induction or a reachability claim.
+/// Rejects preserve state but have no post-law view; refusals have no admitted
+/// decision. Both are counted outside this explicit transition scope. An
+/// undefined relation or an empty admitted scope cannot receive `checked`.
+pub(crate) fn judge_transitions(
+    project: &str,
+    rules: &str,
+    lemmas: &[String],
+    max_tuples: u64,
+) -> Result<Lemmas, ContractError> {
+    if lemmas.is_empty() {
+        return Err(ContractError::new(
+            "transition lemmas",
+            "requires at least one relation",
+        ));
+    }
+    let loaded = Loaded::read(project, rules)?;
+    let observation = match machine::observe_contract(&loaded, max_tuples)? {
+        Ok(observation) => observation,
+        Err(inconclusive) => return Ok(Lemmas::Inconclusive(inconclusive)),
+    };
+    let machine = &observation.machine;
+    let space = &machine.space;
+    let mut judged = Vec::new();
+    for (index, formula) in lemmas.iter().enumerate() {
+        // The probe's shared law path reads actual Authority decisions. The
+        // proposed relation is never installed as an admission law of that
+        // Authority, which would hide the very counterexamples being sought.
+        let truths = probe::conditions(
+            project,
+            &loaded,
+            machine,
+            &format!("transition lemma {}", index + 1),
+            formula,
+        )?;
+        let count = |truth| {
+            truths
+                .iter()
+                .zip(&machine.observed)
+                .filter(|(value, outcome)| outcome.commits() && **value == truth)
+                .count()
+        };
+        let failed = count(Truth::Fails);
+        let undefined = count(Truth::Undefined);
+        let refused = machine
+            .observed
+            .iter()
+            .filter(|outcome| matches!(outcome, machine::Observed::Refused { .. }))
+            .count();
+        let admitted = machine
+            .observed
+            .iter()
+            .filter(|outcome| outcome.commits())
+            .count();
+        let verdict = if failed != 0 {
+            "false"
+        } else if undefined != 0 {
+            "undefined"
+        } else if admitted == 0 {
+            "vacuous"
+        } else {
+            "checked"
+        };
+        let mut result = json!({
+            "mode": "transition-relation", "formula": formula, "verdict": verdict,
+            "scope": "all admitted committed decisions in the declared finite domain",
+            "decided_by": "library-authority-and-law-evaluator",
+            "tuples": space.tuples(), "admitted": admitted, "checked": count(Truth::Holds),
+            "failed": failed, "undefined": undefined, "refused": refused,
+            "rejected_without_state_change": space.tuples() - refused - admitted,
+            "truths_sha256": machine::table_digest(truths.iter().map(|truth| format!("{truth:?}"))),
+        });
+        let witness = if failed != 0 {
+            Truth::Fails
+        } else {
+            Truth::Undefined
+        };
+        if let Some(ordinal) = truths
+            .iter()
+            .zip(&machine.observed)
+            .position(|(truth, outcome)| outcome.commits() && *truth == witness)
+        {
+            result["counterexample"] = json!({
+                "ordinal": ordinal,
+                "state": crate::report_numbers::integers(&space.state(ordinal / space.inputs)),
+                "input": crate::report_numbers::integers(&space.input(ordinal % space.inputs)),
+                "outcome": machine.observed[ordinal].json(space),
+                "relation": if truths[ordinal] == Truth::Fails { "fails" } else { "undefined" },
+            });
+        }
+        judged.push(result);
+    }
+    Ok(Lemmas::Judged(judged))
+}
+
+#[cfg(test)]
+#[path = "transition_lemma_tests.rs"]
+mod transition_tests;
 
 /// Whether each declared state satisfies a state formula: its law program,
 /// compiled as a law of the contract declared `on commit, genesis`, run by
@@ -152,22 +254,22 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
         .min_by_key(|(trace, state)| (trace.len(), *state));
     let verdict = if !holds[machine.genesis] {
         out["reason"] = json!("genesis does not satisfy the lemma");
-        out["genesis"] = json!(space.state(machine.genesis));
+        out["genesis"] = crate::report_numbers::integers(&space.state(machine.genesis));
         Verdict::False
     } else if let Some((trace, state)) = violation {
         let last = *trace.last().unwrap_or(&0);
         let before = parent[state].map_or(machine.genesis, |(before, _)| before);
         out["reason"] = json!("a reachable state lies outside the lemma");
         out["counterexample_to_induction"] = json!({
-            "state": space.state(before),
-            "input": space.input(last),
-            "successor": space.state(state),
+            "state": crate::report_numbers::integers(&space.state(before)),
+            "input": crate::report_numbers::integers(&space.input(last)),
+            "successor": crate::report_numbers::integers(&space.state(state)),
             "count": count,
         });
         out["trace_from_genesis"] = json!(
             trace
                 .into_iter()
-                .map(|input| json!(space.input(input)))
+                .map(|input| crate::report_numbers::integers(&space.input(input)))
                 .collect::<Vec<_>>()
         );
         Verdict::False
@@ -176,9 +278,9 @@ fn verdict(observation: &Observation, holds: &[bool], formula: &str) -> Value {
             "every reachable state satisfies the lemma, but an unreachable state it admits steps outside it: strengthen the lemma to exclude that state"
         );
         out["counterexample_to_induction"] = json!({
-            "state": space.state(state),
-            "input": space.input(input),
-            "successor": space.state(machine.of(state, input).after(state)),
+            "state": crate::report_numbers::integers(&space.state(state)),
+            "input": crate::report_numbers::integers(&space.input(input)),
+            "successor": crate::report_numbers::integers(&space.state(machine.of(state, input).after(state))),
             "count": count,
         });
         Verdict::NotInductive

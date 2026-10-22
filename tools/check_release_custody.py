@@ -6,7 +6,11 @@ Usage:
       [--bindings FILE] [--downloads FILE [--signing-key RELEASE-SIGNING-KEY.pub]]
       [--tag vVERSION [--remote-tag-commit SHA]] [--cargo-home DIR]
 
-The checks, each with counts; a missing input fails, nothing is skipped:
+The checks, each with counts; C1-C9 always run and missing inputs fail.
+C10 and C11 run only when their signing-stage inputs are supplied. A check that
+does not run is listed in `not_run` and is never counted as passed: the status
+is `passed` (exit 0) only when all eleven checks ran and passed, `failed`
+(exit 1) when any check that ran failed, and otherwise `incomplete` (exit 2).
 
 C1  Source state. HEAD is commit C with tree T; the index's stage-0 entries equal T
     (path, mode, object), with no unmerged stage; every working-tree file's
@@ -74,7 +78,7 @@ import tomllib
 import check_release_privacy
 
 ROOT = Path(__file__).resolve().parents[1]
-FORMAT = "zeno-fcis/release-custody/1"
+FORMAT = "zeno-fcis/release-custody/2"
 JOURNEY_SCHEMA = "zeno-fcis/installed-cli-journey/1"
 GLIBC_FLOOR = (2, 39)
 MACOS_MINIMUM = (11, 0)
@@ -901,22 +905,30 @@ def check(release: Path, repo: Path, *, bindings: dict | None = None, downloads:
           cargo_home: Path | None = None) -> dict:
     custody = Custody(release, repo, cargo_home or Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")))
     custody.c1()
-    steps = (("C2-tag-and-version", lambda: custody.c2(tag, remote)), ("C3-source-manifest", custody.c3),
+    steps = [("C2-tag-and-version", lambda: custody.c2(tag, remote)), ("C3-source-manifest", custody.c3),
              ("C4-source-archive", custody.c4), ("C5-crate-archives", custody.c5),
              ("C6-binary-archives", custody.c6), ("C7-compiled-inputs", custody.c7),
-             ("C8-packaged-evidence", custody.c8), ("C9-release-index", custody.c9),
-             ("C10-cross-job", lambda: custody.c10(bindings)),
-             ("C11-download-list", lambda: custody.c11(downloads, signing_key)))
+             ("C8-packaged-evidence", custody.c8), ("C9-release-index", custody.c9)]
+    not_run = []
+    if bindings is not None:
+        steps.append(("C10-cross-job", lambda: custody.c10(bindings)))
+    else:
+        not_run.append("C10-cross-job")
+    if downloads is not None or signing_key is not None:
+        steps.append(("C11-download-list", lambda: custody.c11(downloads, signing_key)))
+    else:
+        not_run.append("C11-download-list")
     for name, step in steps:
         try:
             step()
         except (CustodyError, OSError, KeyError, ValueError, AttributeError, tarfile.TarError,
                 zipfile.BadZipFile, struct.error) as error:
             custody.record(name, [f"unreadable input: {error}"])
-    passed = all(item["passed"] for item in custody.checks.values()) and len(custody.checks) == 11
-    return {"format": FORMAT, "status": "passed" if passed else "failed", "version": custody.version,
+    ran = all(item["passed"] for item in custody.checks.values()) and len(custody.checks) == len(steps) + 1
+    status = "failed" if not ran else "incomplete" if not_run else "passed"
+    return {"format": FORMAT, "status": status, "version": custody.version,
             "source_commit": custody.commit, "tree": custody.tree.tree, "checks": custody.checks,
-            "bindings": bindings, "nonclaims": [
+            "bindings": bindings, "not_run": not_run, "nonclaims": [
                 "nothing is rebuilt: not a reproducible-build proof",
                 "does not authenticate the runner, compiler or linker",
                 "signature trust remains with the signing step"]}
@@ -948,7 +960,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"release-custody: {'PASS' if item['passed'] else 'FAIL'} {name} {item['counts']}")
         for problem in item["problems"][:20]:
             print(f"  - {problem}")
-    return 0 if report["status"] == "passed" else 1
+    for name in report["not_run"]:
+        print(f"release-custody: NOT RUN {name} (its signing-stage input was not supplied)")
+    print(f"release-custody: {report['status'].upper()}")
+    return {"passed": 0, "incomplete": 2}.get(report["status"], 1)
 
 
 if __name__ == "__main__":

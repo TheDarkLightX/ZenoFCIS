@@ -12,36 +12,36 @@ pub open spec fn valid_domain(domain: Domain) -> bool {
     }
 }
 
-pub open spec fn contains(domain: Domain, value: i64) -> bool {
+pub open spec fn contains(domain: Domain, value: i128) -> bool {
     match domain {
         Domain::Bool => 0 <= value <= 1,
         Domain::Int { min, max } => min <= value <= max,
     }
 }
 
-pub open spec fn admitted(domains: Seq<Domain>, values: Seq<i64>) -> bool {
+pub open spec fn admitted(domains: Seq<Domain>, values: Seq<i128>) -> bool {
     domains.len() == values.len()
         && forall|i: int| 0 <= i < domains.len() ==> contains(domains[i], values[i])
 }
 
 pub(crate) open spec fn new_arithmetic(op: Op) -> bool {
     matches!(op, Op::Mul(..) | Op::DivFloor(..) | Op::DivCeil(..)
-        | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..))
+        | Op::MulDivFloor(..) | Op::MulDivCeil(..) | Op::ProductsGe(..) | Op::SignedMulDivFloor(..))
 }
 
-pub(crate) open spec fn scalar_result(value: Option<i64>) -> Result<i64, Failure> {
+pub(crate) open spec fn scalar_result(value: Option<i128>) -> Result<i128, Failure> {
     match value {Some(v)=>Ok(v),None=>Err(Failure::Arithmetic)}
 }
 
-pub(crate) open spec fn node(op: Op, input: Seq<i64>, values: Seq<i64>) -> Result<i64, Failure> {
+pub(crate) open spec fn node(op: Op, input: Seq<i128>, values: Seq<i128>) -> Result<i128, Failure> {
     match op {
         Op::Input(id) => if id < input.len() {
             Ok(input[id as int])
         } else { Err(Failure::Reference) },
         Op::Int(value) => Ok(value),
-        Op::Bool(value) => Ok(if value { 1i64 } else { 0i64 }),
+        Op::Bool(value) => Ok(if value { 1i128 } else { 0i128 }),
         Op::Not(id) => if id < values.len() {
-            Ok(if values[id as int] == 0 { 1i64 } else { 0i64 })
+            Ok(if values[id as int] == 0 { 1i128 } else { 0i128 })
         } else { Err(Failure::Reference) },
         Op::Select(c, a, b) => if c < values.len() && a < values.len() && b < values.len() {
             Ok(if values[c as int] == 1 { values[a as int] } else { values[b as int] })
@@ -61,13 +61,19 @@ pub(crate) open spec fn node(op: Op, input: Seq<i64>, values: Seq<i64>) -> Resul
                     values[a as int],values[b as int],values[d as int]))
             }
         },
+        Op::SignedMulDivFloor(a,b,d) => {
+            if a>=values.len() || b>=values.len() || d>=values.len() {Err(Failure::Reference)} else {
+                scalar_result(super::super::value::scalar::signed_mul_div_floor_value(
+                    values[a as int],values[b as int],values[d as int]))
+            }
+        },
         Op::ProductsGe(a,b) => {
             if a[0]>=values.len() || a[1]>=values.len() || a[2]>=values.len()
                 || b[0]>=values.len() || b[1]>=values.len() || b[2]>=values.len() {Err(Failure::Reference)}
             else { match super::super::value::scalar::products_ge_value(
                 values[a[0] as int],values[a[1] as int],values[a[2] as int],
                 values[b[0] as int],values[b[1] as int],values[b[2] as int]) {
-                    Some(v)=>Ok(if v{1i64}else{0i64}),None=>Err(Failure::Arithmetic),
+                    Some(v)=>Ok(if v{1i128}else{0i128}),None=>Err(Failure::Arithmetic),
                 }
             }
         },
@@ -80,25 +86,25 @@ pub(crate) open spec fn node(op: Op, input: Seq<i64>, values: Seq<i64>) -> Resul
                 match op {
                     Op::Add(_, _) => {
                         let value = left as int + right as int;
-                        if i64::MIN <= value <= i64::MAX { Ok(value as i64) }
+                        if i128::MIN <= value <= i128::MAX { Ok(value as i128) }
                         else { Err(Failure::Arithmetic) }
                     },
                     Op::Sub(_, _) => {
                         let value = left as int - right as int;
-                        if i64::MIN <= value <= i64::MAX { Ok(value as i64) }
+                        if i128::MIN <= value <= i128::MAX { Ok(value as i128) }
                         else { Err(Failure::Arithmetic) }
                     },
-                    Op::Eq(_, _) => Ok(if left == right { 1i64 } else { 0i64 }),
-                    Op::Lt(_, _) => Ok(if left < right { 1i64 } else { 0i64 }),
-                    _ => Ok(if left == 1 && right == 1 { 1i64 } else { 0i64 }),
+                    Op::Eq(_, _) => Ok(if left == right { 1i128 } else { 0i128 }),
+                    Op::Lt(_, _) => Ok(if left < right { 1i128 } else { 0i128 }),
+                    _ => Ok(if left == 1 && right == 1 { 1i128 } else { 0i128 }),
                 }
             }
         },
     }
 }
 
-pub(crate) open spec fn prefix(nodes: Seq<Op>, input: Seq<i64>, count: nat)
-    -> Result<Seq<i64>, Failure>
+pub(crate) open spec fn prefix(nodes: Seq<Op>, input: Seq<i128>, count: nat)
+    -> Result<Seq<i128>, Failure>
     recommends count <= nodes.len(),
     decreases count,
 {
@@ -115,7 +121,7 @@ pub(crate) open spec fn prefix(nodes: Seq<Op>, input: Seq<i64>, count: nat)
 }
 
 pub(crate) proof fn prefix_failure_persists(
-    nodes: Seq<Op>, input: Seq<i64>, failed: nat, count: nat, error: Failure,
+    nodes: Seq<Op>, input: Seq<i128>, failed: nat, count: nat, error: Failure,
 )
     requires
         failed <= count <= nodes.len(),
@@ -128,8 +134,8 @@ pub(crate) proof fn prefix_failure_persists(
     }
 }
 
-pub(crate) open spec fn projection(values: Seq<i64>, roots: Seq<u16>, count: nat)
-    -> Result<Seq<i64>, Failure>
+pub(crate) open spec fn projection(values: Seq<i128>, roots: Seq<u16>, count: nat)
+    -> Result<Seq<i128>, Failure>
     recommends count <= roots.len(),
     decreases count,
 {
@@ -145,7 +151,7 @@ pub(crate) open spec fn projection(values: Seq<i64>, roots: Seq<u16>, count: nat
 }
 
 pub(crate) proof fn projection_failure_persists(
-    values: Seq<i64>, roots: Seq<u16>, failed: nat, count: nat,
+    values: Seq<i128>, roots: Seq<u16>, failed: nat, count: nat,
 )
     requires
         failed <= count <= roots.len(),
@@ -159,8 +165,8 @@ pub(crate) proof fn projection_failure_persists(
 }
 
 pub(crate) open spec fn execution(
-    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>, input: Seq<i64>,
-) -> Result<Seq<i64>, Failure> {
+    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>, input: Seq<i128>,
+) -> Result<Seq<i128>, Failure> {
     if !admitted(inputs, input) { Err(Failure::InputDomain) }
     else {
         match prefix(nodes, input, nodes.len()) {

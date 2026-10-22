@@ -87,7 +87,7 @@ impl App {
         })?
     }
 
-    fn example_inputs(&self) -> Vec<Vec<i64>> {
+    fn example_inputs(&self) -> Vec<Vec<i128>> {
         self.examples
             .as_deref()
             .map(|text| {
@@ -135,7 +135,7 @@ fn a_small_domain_is_enumerated_in_full_in_program_order() {
         .unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(inputs.construction, Construction::FullDomain);
     assert_eq!(inputs.len(), 64);
-    let tuples: Vec<&[i64]> = inputs.tuples().collect();
+    let tuples: Vec<&[i128]> = inputs.tuples().collect();
     assert_eq!(tuples[0], [0, 0, 120, 0]);
     assert_eq!(tuples[1], [0, 0, 120, 1]);
     assert_eq!(tuples[2], [0, 0, 121, 0]);
@@ -171,7 +171,7 @@ fn the_account_lockout_boundary_set_holds_the_lock_constants() {
     let declarations = app.declarations();
     let positions = domain::positions(&declarations).unwrap_or_else(|error| panic!("{error}"));
     let examples = app.example_inputs();
-    let examples: Vec<&[i64]> = examples.iter().map(Vec::as_slice).collect();
+    let examples: Vec<&[i128]> = examples.iter().map(Vec::as_slice).collect();
     let inputs = domain::input_set(
         &positions,
         &app.rules(),
@@ -210,7 +210,7 @@ fn a_large_domain_is_probed_from_genesis_and_the_owner_examples() {
     let declarations = app.declarations();
     let positions = domain::positions(&declarations).unwrap_or_else(|error| panic!("{error}"));
     let examples = app.example_inputs();
-    let examples: Vec<&[i64]> = examples.iter().map(Vec::as_slice).collect();
+    let examples: Vec<&[i128]> = examples.iter().map(Vec::as_slice).collect();
     let inputs = domain::input_set(
         &positions,
         &app.rules(),
@@ -230,7 +230,7 @@ fn a_large_domain_is_probed_from_genesis_and_the_owner_examples() {
     assert!(!boundary.truncated);
     assert!(boundary.singles > 0 && boundary.pairs > boundary.singles);
     assert!(inputs.len() <= usize::try_from(DEFAULT_MAX_TUPLES).unwrap_or(usize::MAX));
-    let distinct: std::collections::BTreeSet<&[i64]> = inputs.tuples().collect();
+    let distinct: std::collections::BTreeSet<&[i128]> = inputs.tuples().collect();
     assert_eq!(distinct.len(), inputs.len(), "no tuple twice");
     // The limit stops the probes and says so.
     let capped = domain::input_set(&positions, &app.rules(), &declarations, &examples, 100)

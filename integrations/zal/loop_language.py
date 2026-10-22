@@ -143,6 +143,8 @@ def _children(node) -> list:
         return [node[2], node[3]]
     if tag == "if":
         return list(node[1:])
+    if tag == "call":
+        return list(node[2])
     if tag == "hole" and node[2] == "choice":
         return list(node[3])
     return []
@@ -170,23 +172,27 @@ def _bounded(node):
 
 TOKEN = re.compile(r"\s*(?:(\d+)|(\$[A-Za-z_][A-Za-z_0-9]*)|(\?c\[|\?c(?![A-Za-z0-9_])|\?e(?![A-Za-z0-9_])|\?\{)|"
                    r"([A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)?)|"
-                   r"(->|&&|\|\||==|!=|<=|>=|\.\.|[()!<>+\-*?:\]|}]))")
+                   r"(->|&&|\|\||==|!=|<=|>=|\.\.|[(),!<>+\-*?:\]|}]))")
 BINARY = {"->": (1, "right"), "||": (2, "left"), "&&": (3, "left"), "==": (4, "left"), "!=": (4, "left"),
           "<": (5, "left"), "<=": (5, "left"), ">": (5, "left"), ">=": (5, "left"),
           "+": (6, "left"), "-": (6, "left"), "*": (7, "left")}
 COMPARE = ("==", "!=", "<", "<=", ">", ">=")
 BOOLEAN = ("&&", "||", "->")
 ARITH = ("+", "-", "*")
+# Closed function vocabulary, with the same arities as main-route rules.
+FUNCTIONS = {"choose": (3,), "div_floor": (2,), "div_ceil": (2,), "mul_div_floor": (3,), "mul_div_ceil": (3,),
+             "products_ge": (4, 6)}
 RESERVED = frozenset({"true", "false", "keep", "not", "and", "or", "is", "if", "then", "otherwise", "implies",
                       "plus", "minus", "times", "less", "greater", "than", "at", "most", "least", "some",
                       "constant", "expression", "one", "of", "from", "to", "parameter", "before", "after",
                       "the", "original", "output", "where"})
-I64 = (-(1 << 63), (1 << 63) - 1)
+I64 = (-(1 << 63), (1 << 63) - 1)  # The separately bounded version-space input grammar.
+I128 = (-(1 << 127), (1 << 127) - 1)
 
 
 def _integer(text: str, negative: bool = False) -> int:
     value = -int(text) if negative else int(text)
-    if not I64[0] <= value <= I64[1]:
+    if not I128[0] <= value <= I128[1]:
         raise Refusal("expression-integer-range")
     return value
 
@@ -269,7 +275,20 @@ def parse_expression(text: str, first_hole: int = 0, *, allow_holes: bool = True
             if value in RESERVED:
                 raise Refusal(f"expression-reserved-word:{value}")
             if peek() == ("op", "("):
-                raise Refusal(f"expression-call-unsupported:{value}")
+                if value not in FUNCTIONS:
+                    raise Refusal(f"expression-call-unsupported:{value}")
+                take()
+                arguments = [conditional()]
+                while accept(","):
+                    if len(arguments) >= 6:
+                        raise Refusal("expression-call-arity")
+                    arguments.append(conditional())
+                expect(")")
+                if len(arguments) not in FUNCTIONS[value]:
+                    raise Refusal("expression-call-arity")
+                if value == "choose":
+                    return ("if", *arguments)
+                return ("call", value, tuple(arguments))
             return ("var", value)
         if value == "(":
             node = conditional()
@@ -361,6 +380,8 @@ def size(node) -> int:
         return 1 + size(node[2]) + size(node[3])
     if tag == "if":
         return 1 + size(node[1]) + size(node[2]) + size(node[3])
+    if tag == "call":
+        return 1 + sum(size(a) for a in node[2])
     if tag == "hole" and node[2] == "choice":
         return 1 + sum(size(a) for a in node[3])
     return 1
@@ -375,6 +396,8 @@ def substitute(node, fn):
         node = ("bin", node[1], substitute(node[2], fn), substitute(node[3], fn))
     elif tag == "if":
         node = ("if", substitute(node[1], fn), substitute(node[2], fn), substitute(node[3], fn))
+    elif tag == "call":
+        node = ("call", node[1], tuple(substitute(a, fn) for a in node[2]))
     elif tag == "hole" and node[2] == "choice":
         node = ("hole", node[1], "choice", tuple(substitute(a, fn) for a in node[3]))
     out = fn(node)
@@ -401,6 +424,9 @@ def holes_of(node) -> list:
             visit(n[3])
         elif tag == "if":
             for child in n[1:]:
+                visit(child)
+        elif tag == "call":
+            for child in n[2]:
                 visit(child)
     visit(node)
     return out
@@ -436,6 +462,8 @@ def renumber(nodes: list) -> list:
             return ("bin", node[1], walk(node[2]), walk(node[3]))
         if tag == "if":
             return ("if",) + tuple(walk(c) for c in node[1:])
+        if tag == "call":
+            return ("call", node[1], tuple(walk(c) for c in node[2]))
         return node
     return [walk(n) for n in nodes]
 
@@ -488,6 +516,8 @@ def kind_of(node, vocab: Vocabulary):
         return "Bool"
     if tag == "if":
         return kind_of(node[2], vocab) or kind_of(node[3], vocab)
+    if tag == "call":
+        return "Bool" if node[1] == "products_ge" else "Int"
     return "Int" if node[1] in ARITH else "Bool"
 
 
@@ -535,6 +565,10 @@ class _Printer:
             return "keep" if self.symbolic else "the original output"
         if tag == "hole":
             return self.hole(node, want)
+        if tag == "call":
+            # Function names and comma-delimited arguments are exact on both
+            # surfaces; arguments retain their surface's operators and names.
+            return node[1] + "(" + ", ".join(self.show(a, 0, "Int") for a in node[2]) + ")"
         if tag == "not":
             inner = node[1]
             text = self.show(inner, 9, "Bool")
@@ -678,7 +712,7 @@ class Context:
             return int(text == "true")
         if text in self.variants:
             return self.variants[text]
-        if re.fullmatch(r"-?\d{1,19}", text):
+        if re.fullmatch(r"-?\d{1,39}", text):
             return _integer(text.lstrip("-"), text.startswith("-"))
         raise Refusal(f"zal-value:{name}={text[:20]}")
 
@@ -704,7 +738,7 @@ def read(text: str, ctx: Context, english: bool, law: bool = False, allow_keep: 
 
 
 _WORD = re.compile(r"\s*(?:(-?\d+)|([A-Za-z_][A-Za-z_0-9]*)|(\?c\[|\?c|\?e|\?\{|\$[A-Za-z_][A-Za-z_0-9]*)|"
-                   r"(->|&&|\|\||==|!=|<=|>=|\.\.|[()\[\]|!<>+\-*?:}]))")
+                   r"(->|&&|\|\||==|!=|<=|>=|\.\.|[(),\[\]|!<>+\-*?:}]))")
 _PHRASES = [("is", "less", "than", "<"), ("is", "at", "most", "<="), ("is", "greater", "than", ">"),
             ("is", "at", "least", ">="), ("is", "not", "!="), ("is", "=="), ("plus", "+"), ("minus", "-"),
             ("times", "*"), ("and", "&&"), ("or", "||"), ("implies", "->")]
@@ -807,6 +841,17 @@ def parse_english(text: str, ctx: Context, law: bool = False):
             raise Refusal(f"zal-expression-primary:{value}")
         if kind != "word":
             raise Refusal("zal-expression-ended")
+        if value in FUNCTIONS and accept_sym("("):
+            arguments = [conditional()]
+            while accept_sym(","):
+                if len(arguments) >= 6:
+                    raise Refusal("expression-call-arity")
+                arguments.append(conditional())
+            if not accept_sym(")") or len(arguments) not in FUNCTIONS[value]:
+                raise Refusal("expression-call-arity")
+            if value == "choose":
+                return ("if", *arguments)
+            return ("call", value, tuple(arguments))
         if value == "not":
             return ("not", primary())
         if value == "parameter":
@@ -1065,7 +1110,9 @@ def _parse_option(text: str, ctx: Context, english: bool) -> Option:
         reason = m.group(2) or m.group(3)
         sets = []
         if m.group(4):
-            for part in m.group(4).split(","):
+            # Function arguments also use commas; only field assignments
+            # separate successors. An equality inside a call is not one.
+            for part in re.split(r",(?=\s*[a-z][a-z0-9_]*\s*=(?!=))", m.group(4)):
                 mm = re.fullmatch(r"\s*([a-z][a-z0-9_]*)\s*=\s*(.+?)\s*", part)
                 if not mm:
                     raise Refusal(f"zal-option-assignment:{part[:40]}")

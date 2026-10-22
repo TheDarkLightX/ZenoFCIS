@@ -188,9 +188,7 @@ fn matches_leaf(domain: Domain<'_>, leaf: &InputLeaf) -> bool {
     match (domain, leaf) {
         (Domain::Bool, InputLeaf::Bool) => true,
         (Domain::U128 { min: a, max: b }, InputLeaf::U128 { min: c, max: d }) => a == *c && b == *d,
-        (Domain::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => {
-            a == *c as i128 && b == *d as i128
-        }
+        (Domain::I128 { min: a, max: b }, InputLeaf::I128 { min: c, max: d }) => a == *c && b == *d,
         (
             Domain::Enum {
                 type_id: a,
@@ -438,21 +436,47 @@ fn reason(d: &Descriptor<'_>, class: Class, reason_id: Option<u32>) -> bool {
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::branches(d,fields@),))]
 fn branches(d: &Descriptor<'_>, fields: &[InputField]) -> bool {
+    // Read the native length even when cardinality arithmetic refuses early.
+    let branch_count = d.branches.len();
     if d.decision_output >= d.output_types.len() {
         return false;
     }
     let InputLeaf::I128 { min, max } = d.output_types[d.decision_output] else {
         return false;
     };
-    if min > max || max as i128 - min as i128 + 1 != d.branches.len() as i128 {
+    if min > max {
+        return false;
+    }
+    let cardinality = match max.checked_sub(min) {
+        Some(span) => match span.checked_add(1) {
+            Some(cardinality) => cardinality,
+            None => {
+                #[cfg(verus_keep_ghost)]
+                proof! {
+                    assert(d.branches@.len() <= usize::MAX);
+                    assert(max as int - min as int + 1 > d.branches@.len());
+                }
+                return false;
+            }
+        },
+        None => {
+            #[cfg(verus_keep_ghost)]
+            proof! {
+                assert(d.branches@.len() <= usize::MAX);
+                assert(max as int - min as int + 1 > d.branches@.len());
+            }
+            return false;
+        }
+    };
+    if cardinality != branch_count as i128 {
         return false;
     }
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.branches.len(),d.decision_output<d.output_types.len(),d.output_types@[d.decision_output as int]==(InputLeaf::I128{min,max}),min<=max,max as int-min as int+1==d.branches@.len(),forall|j:int|0<=j<i==>spec::branch_valid(d,fields@,min,max,j),decreases d.branches.len()-i,))]
     while i < d.branches.len() {
         let b = d.branches[i];
-        if b.code < min as i128
-            || b.code > max as i128
+        if b.code < min
+            || b.code > max
             || (i > 0 && d.branches[i - 1].code >= b.code)
             || !reason(d, b.class, b.reason)
         {

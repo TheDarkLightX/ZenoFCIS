@@ -27,8 +27,7 @@ def u128(value: int) -> bytes:
 
 
 def program(nodes: list[list[int]], roots: list[int], low: int = 0, high: int = 3,
-            out_high: int = 3) -> bytes:
-    profile = b"zeno-fcis/finite-i64/1"
+            out_high: int = 3, profile: bytes = b"zeno-fcis/finite-i64/1") -> bytes:
     domain = tuple_([b"\x01", i128(low), i128(high)])
     output = tuple_([b"\x01", i128(low), i128(out_high)])
     return tuple_([b"\x06" + len(profile).to_bytes(4, "big") + profile,
@@ -113,6 +112,29 @@ class Reference(unittest.TestCase):
         self.assertEqual(reference.compare(plain, shifted)["ordinal"], 0)
         self.assertEqual(reference.compare(plain, plain)["status"], "equal")
         self.assertEqual(reference.compare(plain, narrow)["status"], "abi-differs")
+
+    def test_profiles_are_the_ones_the_rust_source_defines(self):
+        root = Path(__file__).resolve().parents[1] / "crates/zeno-fcis-synthesis/src"
+        current = (root / "finite/ir.rs").read_text()
+        historical = (root / "finite_runtime.rs").read_text()
+        self.assertIn(f'pub const PROFILE: &str = "{reference.PROFILE.decode()}";', current)
+        self.assertIn(f'pub const I64_PROFILE: &str = "{reference.I64_PROFILE.decode()}";', historical)
+
+    def test_the_profile_sets_the_integer_width(self):
+        big, top = (1 << 63) - 1, (1 << 127) - 1
+        add_one = [[0, 0], [1, 1], [3, 0, 1]]
+        current = reference.decode(program(add_one, [0], big - 1, big, big, reference.PROFILE))
+        self.assertEqual(current.profile, reference.PROFILE)
+        self.assertEqual(reference.table(current), [("ok", (big - 1,)), ("ok", (big,))])
+        wide = reference.decode(program(add_one, [0], top - 1, top, top, reference.PROFILE))
+        self.assertEqual(reference.table(wide), [("ok", (top - 1,)), ("error", "arithmetic")])
+        for bad in (program([[0, 0]], [0], 0, 1 << 63, 3),
+                    program([[0, 0], [1, 1 << 63], [3, 0, 1]], [0]),
+                    program([[0, 0]], [0], profile=b"zeno-fcis/finite-i128/2")):
+            with self.assertRaises(reference.ProgramRefused):
+                reference.decode(bad)
+        self.assertEqual(reference.decode(program([[0, 0]], [0], 0, 1 << 63, 3, reference.PROFILE)).inputs,
+                         ((False, 0, 1 << 63),))
 
     def test_refuses_noncanonical_or_ill_typed_bytes(self):
         body = program([[0, 0], [1, 7], [3, 0, 1]], [2])

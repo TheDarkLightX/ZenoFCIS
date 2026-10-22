@@ -32,12 +32,12 @@ use crate::subject::Subject;
 use crate::{Refusal, Result};
 
 /// Coefficients tried for `a * $P + b`.
-pub const FORM_COEFFICIENTS: [i64; 3] = [1, -1, 2];
+pub const FORM_COEFFICIENTS: [i128; 3] = [1, -1, 2];
 /// How far from `a * P` a constant may sit to be opened in a transfer.
-pub const NEAR: i64 = 2;
+pub const NEAR: i128 = 2;
 
 /// Binds an instance's parameters and folds literal arithmetic.
-pub fn bind(outputs: &[Expr], parameters: &BTreeMap<String, i64>) -> Result<Vec<Expr>> {
+pub fn bind(outputs: &[Expr], parameters: &BTreeMap<String, i128>) -> Result<Vec<Expr>> {
     outputs
         .iter()
         .map(|node| fold(&bind_params(node, parameters)?))
@@ -110,15 +110,15 @@ pub fn prepare(outputs: &[Expr], subject: &Subject, settings: &sketch::Settings)
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Form {
     /// The same value on every fitted instance.
-    Constant(i64),
+    Constant(i128),
     /// `a * $parameter + b`.
     Linear {
         /// The parameter.
         parameter: String,
         /// Its coefficient: 1, -1 or 2.
-        a: i64,
+        a: i128,
         /// The offset.
-        b: i64,
+        b: i128,
     },
 }
 
@@ -137,6 +137,7 @@ impl Form {
                 match b.cmp(&0) {
                     core::cmp::Ordering::Equal => term,
                     core::cmp::Ordering::Greater => format!("{term} + {b}"),
+                    core::cmp::Ordering::Less if *b == i128::MIN => format!("{term} + ({b})"),
                     core::cmp::Ordering::Less => format!("{term} - {}", b.unsigned_abs()),
                 }
             }
@@ -153,15 +154,15 @@ impl Form {
 }
 
 /// Fill values that a form can explain: constants and choice indices.
-fn integer(fill: &Fill) -> Option<i64> {
+fn integer(fill: &Fill) -> Option<i128> {
     match fill {
         Fill::Const(value) => Some(*value),
-        Fill::Choice(index) => i64::try_from(*index).ok(),
+        Fill::Choice(index) => i128::try_from(*index).ok(),
         Fill::Ast(_) => None,
     }
 }
 
-fn form(points: &[(&BTreeMap<String, i64>, i64)]) -> Option<Form> {
+fn form(points: &[(&BTreeMap<String, i128>, i128)]) -> Option<Form> {
     let first = points.first()?;
     if points.iter().all(|(_, v)| *v == first.1) {
         return Some(Form::Constant(first.1));
@@ -189,7 +190,7 @@ fn form(points: &[(&BTreeMap<String, i64>, i64)]) -> Option<Form> {
 }
 
 /// One fitted instance: its parameter values and its hole fills.
-pub type Sample = (BTreeMap<String, i64>, BTreeMap<usize, Fill>);
+pub type Sample = (BTreeMap<String, i128>, BTreeMap<usize, Fill>);
 
 /// For each hole, a form reproducing its value on every sample
 /// (parameters, fills). A hole filled with an expression, missing on some
@@ -204,7 +205,7 @@ pub fn fit(samples: &[Sample]) -> BTreeMap<usize, Option<Form>> {
     holes.dedup();
     let mut out = BTreeMap::new();
     for k in holes {
-        let points: Option<Vec<(&BTreeMap<String, i64>, i64)>> = samples
+        let points: Option<Vec<(&BTreeMap<String, i128>, i128)>> = samples
             .iter()
             .map(|(p, h)| h.get(&k).and_then(integer).map(|v| (p, v)))
             .collect();
@@ -230,9 +231,9 @@ pub fn apply_forms(node: &Expr, forms: &BTreeMap<usize, Option<Form>>) -> Result
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Opened {
     /// The source constant.
-    pub value: i64,
+    pub value: i128,
     /// The choices: unchanged first, then shifted values.
-    pub options: Vec<i64>,
+    pub options: Vec<i128>,
 }
 
 /// Opens the source program's constants within [`NEAR`] of `a * P` (for `a`
@@ -240,10 +241,10 @@ pub struct Opened {
 /// holes {unchanged, shifted with `P`}.
 pub fn sketchify(
     outputs: &[Expr],
-    source: &BTreeMap<String, i64>,
-    target: &BTreeMap<String, i64>,
+    source: &BTreeMap<String, i128>,
+    target: &BTreeMap<String, i128>,
 ) -> Result<(Vec<Expr>, BTreeMap<usize, Opened>)> {
-    let deltas: Vec<(&String, i64, i64)> = source
+    let deltas: Vec<(&String, i128, i128)> = source
         .iter()
         .filter_map(|(name, value)| {
             let to = target.get(name)?;
@@ -260,7 +261,7 @@ pub fn sketchify(
             };
             let mut options = vec![*v];
             for (_, value, delta) in &deltas {
-                for a in [1i64, 2, -1] {
+                for a in [1i128, 2, -1] {
                     let centre = a.wrapping_mul(*value);
                     if v.wrapping_sub(centre).unsigned_abs() <= NEAR.unsigned_abs() {
                         let shifted = v.wrapping_add(a.wrapping_mul(*delta));
@@ -340,7 +341,7 @@ pub struct Transfer {
     /// The sketch, when one ran.
     pub sketch: Option<SketchResult>,
     /// The chosen value per opened constant, when the sketch completed.
-    pub choices: Vec<(usize, i64, i64)>,
+    pub choices: Vec<(usize, i128, i128)>,
     /// The repair, when one ran.
     pub repair: Option<repair::Repair>,
     /// The resulting expressions and program, unless failed.
@@ -354,7 +355,7 @@ pub struct Transfer {
 #[must_use]
 pub fn transfer(
     outputs: &[Expr],
-    source: &BTreeMap<String, i64>,
+    source: &BTreeMap<String, i128>,
     target: &Subject,
     sketch_settings: &sketch::Settings,
     repair_settings: &repair::Settings,

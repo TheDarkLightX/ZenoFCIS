@@ -10,16 +10,16 @@ fn table() -> ReferenceTable {
 }
 
 #[test]
-fn table_program_matches_every_row_including_nullary_boolean_and_i64_edges() {
+fn table_program_matches_every_row_including_nullary_boolean_and_i128_edges() {
     for t in [
         table(),
         ReferenceTable::new(
             vec![],
             vec![Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }],
-            vec![vec![i64::MIN]],
+            vec![vec![i128::MIN]],
         )
         .unwrap_or_else(|e| panic!("nullary: {e:?}")),
         ReferenceTable::new(
@@ -27,12 +27,12 @@ fn table_program_matches_every_row_including_nullary_boolean_and_i64_edges() {
             vec![
                 Domain::Bool,
                 Domain::Int {
-                    min: i64::MIN,
-                    max: i64::MAX,
+                    min: i128::MIN,
+                    max: i128::MAX,
                 },
             ],
             (0..8)
-                .map(|i| vec![i % 2, if i < 4 { i64::MIN } else { i64::MAX }])
+                .map(|i| vec![i % 2, if i < 4 { i128::MIN } else { i128::MAX }])
                 .collect(),
         )
         .unwrap_or_else(|e| panic!("mixed: {e:?}")),
@@ -87,7 +87,7 @@ fn coverage_reports_unreachable_outcomes_and_does_not_invent_trapping_prefixes()
         t.inputs().to_vec(),
         t.outputs().to_vec(),
         vec![
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(0, 1),
             Op::Bool(true),
@@ -112,7 +112,7 @@ fn incomplete_tables_wrong_abi_and_large_domains_never_construct_a_target() {
     assert!(points(&[Domain::Int { min: 0, max: 4096 }], MAX_TUPLES).is_err());
     assert_eq!(
         points(&[], MAX_TUPLES).unwrap_or_else(|e| panic!("nullary: {e:?}")),
-        vec![Vec::<i64>::new()]
+        vec![Vec::<i128>::new()]
     );
 }
 

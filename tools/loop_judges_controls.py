@@ -176,11 +176,13 @@ def not_applicable(row: dict, why: str) -> dict:
 
 
 SECONDS: dict = {}
+# Finite-data commands stay on POSIX even when the environment selects systemd.
+FINITE_DATA = ("--containment-backend", "auto")
 
 
 def run(cli: Path, *arguments) -> tuple[int, dict]:
     started = time.monotonic()
-    done = subprocess.run([str(cli), *map(str, arguments)], capture_output=True, timeout=600)
+    done = subprocess.run([str(cli), *FINITE_DATA, *map(str, arguments)], capture_output=True, timeout=600)
     SECONDS["last"] = round(time.monotonic() - started, 2)
     try:
         return done.returncode, json.loads(done.stdout or b"{}")

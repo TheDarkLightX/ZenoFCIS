@@ -641,7 +641,7 @@ fn invalid_payload_maps_and_program_domains_refuse_without_writes() {
             } else {
                 vec![
                     Op::Input(0),
-                    Op::Int(i64::MAX),
+                    Op::Int(i128::MAX),
                     Op::Add(0, 1),
                     Op::Int(0),
                     Op::Lt(2, 3),
@@ -709,7 +709,7 @@ fn split_programs_check_source_tuples_excluded_by_every_state_law() {
                 124,
                 ScalarDomain::Bool,
                 vec![
-                    Op::Int(i64::MAX),
+                    Op::Int(i128::MAX),
                     Op::Select(6, 7, 4),
                     Op::Add(8, 1),
                     Op::Lt(9, 4),

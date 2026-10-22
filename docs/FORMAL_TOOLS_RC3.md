@@ -1,6 +1,6 @@
 # Formal tools in V1
 
-Normal V2 retains SMT authoring, fail-closed process diagnostics, and Lean
+Normal V2 retains SMT specification, fail-closed process diagnostics, and Lean
 runtime inspection. The shallow Lean obligation factories and their renderer
 are private test references. Normal `prove --backend lean` reports
 `UnsupportedMode` before tool execution. An old formula-only kernel result

@@ -37,6 +37,7 @@ pub enum Op {
     ToI128(usize),
     ToU128(usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
 }
 
@@ -88,6 +89,7 @@ pub enum LawOp {
     ToI128(usize),
     ToU128(usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
@@ -99,13 +101,14 @@ pub enum LawOp {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ScalarOp {
     Input(usize),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
     Mul(usize, usize),
     Div(Rounding, usize, usize),
     MulDiv(Rounding, usize, usize, usize),
+    SignedMulDivFloor(usize, usize, usize),
     ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
@@ -144,11 +147,15 @@ pub trait Graph {
     type Node: Clone + Ord;
 
     fn table(&mut self) -> &mut Table<Self::Node>;
+    fn declarations(&self) -> &Declarations;
     fn bool_node(value: bool) -> Self::Node;
     fn int_node(value: i128) -> Result<Self::Node, String>;
     fn op_node(op: Op) -> Result<Self::Node, String>;
     /// A program input or a law observation.
     fn name(&mut self, name: &str) -> Result<Ref, String>;
+    fn decision_reason(&mut self) -> Result<Ref, String> {
+        Err("decision_reason is a law observation, not a program input".to_owned())
+    }
     /// The value as an integer.
     fn numeric(&mut self, node: Ref) -> Result<Ref, String>;
 
@@ -187,33 +194,46 @@ pub trait Graph {
 
     /// Compiles an expression whose variables are already expanded.
     fn compile(&mut self, ast: &Ast) -> Result<Ref, String> {
+        self.compile_with_limits(ast, false)
+    }
+
+    /// Historical expressions follow the original compiler directly. The
+    /// new authoring boundary adds admission/lowering, not runtime authority.
+    fn compile_with_limits(&mut self, ast: &Ast, bounded: bool) -> Result<Ref, String> {
+        if bounded
+            || super::quantity::typed(self.declarations())
+            || super::expr::uses_new_arithmetic(ast)
+        {
+            let lowered = super::quantity::lower(self.declarations(), ast)?;
+            self.compile_raw(&lowered)
+        } else {
+            self.compile_raw(ast)
+        }
+    }
+
+    fn compile_raw(&mut self, ast: &Ast) -> Result<Ref, String> {
         match ast {
             Ast::Bool(value) => Ok(self.bool(*value)),
             Ast::Int(value) => self.int(*value),
             Ast::Name(name) => self.name(name),
+            Ast::DecisionReason => self.decision_reason(),
             Ast::Neg(inner) => {
-                // MIN is a legal i64 literal although its positive magnitude is
-                // not. Keep the old lowering for every previously admitted negation.
-                if matches!(inner.as_ref(), Ast::Int(v) if *v == i64::MAX as i128 + 1)
-                    && Self::int_node(i64::MAX as i128 + 1).is_err()
-                {
-                    return self.int(i64::MIN as i128);
-                }
+                // The parser admits MIN directly; every other negation remains eager.
                 let zero = self.int(0)?;
-                let inner = self.compile(inner)?;
+                let inner = self.compile_raw(inner)?;
                 let inner = self.numeric(inner)?;
                 self.op(Op::Sub(zero.index, inner.index), Kind::Int)
             }
             Ast::Not(inner) => {
-                let inner = self.compile(inner)?;
+                let inner = self.compile_raw(inner)?;
                 let inner = self.boolean(inner)?;
                 self.op(Op::Not(inner.index), Kind::Bool)
             }
             Ast::Choose(condition, then, otherwise) => {
-                let condition = self.compile(condition)?;
+                let condition = self.compile_raw(condition)?;
                 let condition = self.boolean(condition)?;
-                let mut then = self.compile(then)?;
-                let mut otherwise = self.compile(otherwise)?;
+                let mut then = self.compile_raw(then)?;
+                let mut otherwise = self.compile_raw(otherwise)?;
                 if then.kind != otherwise.kind {
                     then = self.numeric(then)?;
                     otherwise = self.numeric(otherwise)?;
@@ -224,16 +244,52 @@ pub trait Graph {
                 )
             }
             Ast::Binary(operator, left, right) => {
-                let left = self.compile(left)?;
-                let right = self.compile(right)?;
+                let left = self.compile_raw(left)?;
+                let right = self.compile_raw(right)?;
                 self.binary(*operator, left, right)
             }
+            Ast::ScaledMulDiv(..) => Err("scaled call was not lowered".to_owned()),
+            Ast::RepeatMulDiv(signed, x, a, d, count) => {
+                let x = self.compile_raw(x)?;
+                let mut value = self.numeric(x)?;
+                let a = self.compile_raw(a)?;
+                let a = self.numeric(a)?;
+                let d = self.compile_raw(d)?;
+                let d = self.numeric(d)?;
+                for _ in 0..*count {
+                    value = if *signed {
+                        self.op(
+                            Op::SignedMulDivFloor(value.index, a.index, d.index),
+                            Kind::Int,
+                        )?
+                    } else {
+                        let x = self.product_operand(value)?;
+                        let a = self.product_operand(a)?;
+                        let d = self.product_operand(d)?;
+                        let result = self.op(
+                            Op::MulDiv(Rounding::Floor, x.index, a.index, d.index),
+                            Kind::Int,
+                        )?;
+                        self.product_result(result)?
+                    };
+                }
+                Ok(value)
+            }
+            Ast::SignedMulDivFloor(a, b, d) => {
+                let a = self.compile_raw(a)?;
+                let a = self.numeric(a)?;
+                let b = self.compile_raw(b)?;
+                let b = self.numeric(b)?;
+                let d = self.compile_raw(d)?;
+                let d = self.numeric(d)?;
+                self.op(Op::SignedMulDivFloor(a.index, b.index, d.index), Kind::Int)
+            }
             Ast::MulDiv(rounding, a, b, d) => {
-                let a = self.compile(a)?;
+                let a = self.compile_raw(a)?;
                 let a = self.product_operand(a)?;
-                let b = self.compile(b)?;
+                let b = self.compile_raw(b)?;
                 let b = self.product_operand(b)?;
-                let d = self.compile(d)?;
+                let d = self.compile_raw(d)?;
                 let d = self.product_operand(d)?;
                 let result =
                     self.op(Op::MulDiv(*rounding, a.index, b.index, d.index), Kind::Int)?;
@@ -245,7 +301,7 @@ pub trait Graph {
                 }
                 let mut refs = Vec::with_capacity(arguments.len());
                 for argument in arguments.iter() {
-                    let node = self.compile(argument)?;
+                    let node = self.compile_raw(argument)?;
                     refs.push(self.product_operand(node)?.index);
                 }
                 let (a, b) = if refs.len() == 4 {
@@ -258,8 +314,8 @@ pub trait Graph {
                 self.op(Op::ProductsGe(a, b), Kind::Bool)
             }
             Ast::Div(rounding, left, right) => {
-                let left = self.compile(left)?;
-                let right = self.compile(right)?;
+                let left = self.compile_raw(left)?;
+                let right = self.compile_raw(right)?;
                 let left = self.numeric(left)?;
                 let right = self.numeric(right)?;
                 self.op(Op::Div(*rounding, left.index, right.index), Kind::Int)
@@ -343,6 +399,10 @@ impl<'d> ScalarGraph<'d> {
 impl Graph for ScalarGraph<'_> {
     type Node = ScalarOp;
 
+    fn declarations(&self) -> &Declarations {
+        self.declarations
+    }
+
     fn table(&mut self) -> &mut Table<ScalarOp> {
         &mut self.table
     }
@@ -352,9 +412,7 @@ impl Graph for ScalarGraph<'_> {
     }
 
     fn int_node(value: i128) -> Result<ScalarOp, String> {
-        i64::try_from(value)
-            .map(ScalarOp::Int)
-            .map_err(|_| format!("decision integer {value} exceeds the 64-bit program range"))
+        Ok(ScalarOp::Int(value))
     }
 
     fn op_node(op: Op) -> Result<ScalarOp, String> {
@@ -368,6 +426,7 @@ impl Graph for ScalarGraph<'_> {
             Op::Select(c, a, b) => ScalarOp::Select(c, a, b),
             Op::Mul(a, b) => ScalarOp::Mul(a, b),
             Op::Div(r, a, b) => ScalarOp::Div(r, a, b),
+            Op::SignedMulDivFloor(a, b, d) => ScalarOp::SignedMulDivFloor(a, b, d),
             Op::MulDiv(r, a, b, d) => ScalarOp::MulDiv(r, a, b, d),
             Op::ProductsGe(a, b) => ScalarOp::ProductsGe(a, b),
             Op::ToU128(_) => {
@@ -523,6 +582,10 @@ impl<'d> LawGraph<'d> {
 impl Graph for LawGraph<'_> {
     type Node = LawOp;
 
+    fn declarations(&self) -> &Declarations {
+        self.declarations
+    }
+
     fn product_operand(&mut self, node: Ref) -> Result<Ref, String> {
         let node = self.numeric(node)?;
         self.op(Op::ToU128(node.index), Kind::Raw)
@@ -556,6 +619,7 @@ impl Graph for LawGraph<'_> {
             Op::Select(c, a, b) => LawOp::Select(c, a, b),
             Op::ToI128(a) => LawOp::ToI128(a),
             Op::ToU128(a) => LawOp::ToU128(a),
+            Op::SignedMulDivFloor(a, b, d) => LawOp::SignedMulDivFloor(a, b, d),
             Op::MulDiv(r, a, b, d) => LawOp::MulDiv(r, a, b, d),
             Op::ProductsGe(a, b) => LawOp::ProductsGe(a, b),
         })
@@ -568,6 +632,10 @@ impl Graph for LawGraph<'_> {
         }
         let observation = self.observation(name)?;
         self.observe(observation, Kind::Int, None, Atom::I128(0))
+    }
+
+    fn decision_reason(&mut self) -> Result<Ref, String> {
+        self.observe(Observation::Reason, Kind::Int, None, Atom::I128(0))
     }
 
     fn numeric(&mut self, node: Ref) -> Result<Ref, String> {

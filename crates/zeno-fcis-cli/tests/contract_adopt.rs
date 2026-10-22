@@ -64,13 +64,11 @@ fn template() -> PathBuf {
 }
 
 fn fixture() -> PathBuf {
-    manifest("tests/fixtures/withdrawal-queue-adopted")
+    manifest("tests/fixtures/withdrawal-queue-adopted-2.5")
 }
 
 fn artifact(name: &str) -> PathBuf {
-    manifest(&format!(
-        "../../docs/benchmarks/withdrawal-queue/artifacts/{name}.zcve"
-    ))
+    manifest(&format!("tests/fixtures/i128-programs/{name}.zcve"))
 }
 
 fn read(path: impl AsRef<Path>) -> Vec<u8> {
@@ -147,6 +145,37 @@ fn snapshot(dir: &Path) -> BTreeMap<String, Vec<u8>> {
     let mut files = BTreeMap::new();
     visit(dir, dir, &mut files);
     files
+}
+
+#[test]
+fn refuses_2_4_adopted_contract_without_changing_its_files() {
+    let historical = manifest("tests/fixtures/withdrawal-queue-adopted");
+    let before = snapshot(&historical);
+    let output = zeno(&[
+        "generate".as_ref(),
+        "contract".as_ref(),
+        historical.as_os_str(),
+        "--check".as_ref(),
+        "--format".as_ref(),
+        "json".as_ref(),
+    ]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let message = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for text in [
+        "superseded_policy_sha256",
+        "version 1 was edited after adoption, or",
+        "adopted by ZenoFCIS 2.4.x, whose integer encoding changed in 2.5",
+        "ZenoFCIS 2.4.0 CLI",
+        "re-adopt it under 2.5",
+        "Compatibility is planned for 2.5.1",
+    ] {
+        assert!(message.contains(text), "missing {text}: {message}");
+    }
+    assert_eq!(snapshot(&historical), before);
 }
 
 #[test]
@@ -320,7 +349,7 @@ fn the_committed_fixture_is_current() {
     );
     assert_eq!(
         report["summary"]["adoptions"][0]["candidate_sha256"],
-        "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89"
+        "467e570f1c82afe073aded99d6a7a89d7f5f9e7d5b236f82997705d7add094e0"
     );
 }
 
@@ -625,7 +654,7 @@ fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
     );
     let report = json(&output);
     assert_eq!(report["status"], "refreshed");
-    assert_eq!(report["checker"], "zeno-fcis/transform-check/3");
+    assert_eq!(report["checker"], "zeno-fcis/transform-check/4");
     assert_eq!(report["refreshed"], json!([1]));
     // The application is the committed fixture again, which is current.
     assert_eq!(snapshot(&dir), snapshot(&fixture()));
@@ -685,7 +714,7 @@ fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
             report["error"]["message"]
                 .as_str()
                 .unwrap_or_default()
-                .contains("changes version 1, which existing stores may run"),
+                .contains("version 1 was edited after adoption, or"),
             "{report}"
         );
         // Version 1 keeps its source and policy, so its identity.

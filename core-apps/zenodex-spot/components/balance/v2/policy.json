@@ -1,0 +1,88 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "spot-balance",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "borrow0": "choose((((pre.100.110 - command.101.120) - 0) < 0), 1, 0)",
+    "column0": "(((pre.100.110 - command.101.120) + command.101.124) + 0)",
+    "carry0": "div_floor(column0, 4294967296)",
+    "next0": "(column0 - (carry0 * 4294967296))",
+    "borrow1": "choose((((pre.100.111 - command.101.121) - borrow0) < 0), 1, 0)",
+    "column1": "(((pre.100.111 - command.101.121) + command.101.125) + carry0)",
+    "carry1": "div_floor(column1, 4294967296)",
+    "next1": "(column1 - (carry1 * 4294967296))",
+    "borrow2": "choose((((pre.100.112 - command.101.122) - borrow1) < 0), 1, 0)",
+    "column2": "(((pre.100.112 - command.101.122) + command.101.126) + carry1)",
+    "carry2": "div_floor(column2, 4294967296)",
+    "next2": "(column2 - (carry2 * 4294967296))",
+    "borrow3": "choose((((pre.100.113 - command.101.123) - borrow2) < 0), 1, 0)",
+    "column3": "(((pre.100.113 - command.101.123) + command.101.127) + carry2)",
+    "carry3": "div_floor(column3, 4294967296)",
+    "next3": "(column3 - (carry3 * 4294967296))"
+  },
+  "cases": [
+    {
+      "rule": "1 ingress debit zero and exact protocol credit",
+      "when": "((context.102.130 == 1) && ((((((((false || (command.101.120 != 0)) || (command.101.121 != 0)) || (command.101.122 != 0)) || (command.101.123 != 0)) || (command.101.124 != context.102.131)) || (command.101.125 != 0)) || (command.101.126 != 0)) || (command.101.127 != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 ingress overflow before ordinary keys",
+      "when": "((context.102.130 == 1) && (carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "3 debit must be funded before credit",
+      "when": "(borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "4 complete u128 result must fit",
+      "when": "(carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "accept exact candidate",
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next2",
+        "113": "next3"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "RejectNoAuthority",
+    "503": "DebitCreditEffectEquality",
+    "504": "AssetConservation"
+  }
+}

@@ -1683,3 +1683,58 @@ fn shared_arithmetic_keeps_all_four_law_arms_and_undefined() {
         Ok(Atom::Bool(false))
     );
 }
+
+#[test]
+fn signed_floor_law_uses_shared_node_with_eager_usage_and_retry() {
+    for (a, b, d, want) in [
+        (-1, 1, 2, Some(-1)),
+        (1001, -25, 10000, Some(-3)),
+        (i128::MIN, 1, 1, Some(i128::MIN)),
+        (i128::MIN, -1, 1, None),
+        (i128::MAX, i128::MAX, i128::MAX, Some(i128::MAX)),
+        (0, 0, 0, None),
+        (0, 0, -1, None),
+    ] {
+        assert_eq!(
+            super::atoms::signed_mul_div_floor(Atom::I128(a), Atom::I128(b), Atom::I128(d)),
+            want.map(Atom::I128).ok_or(Failure::Undefined)
+        );
+        let nodes = [
+            Op::Literal(Atom::I128(a)),
+            Op::Literal(Atom::I128(b)),
+            Op::Literal(Atom::I128(d)),
+            Op::SignedMulDivFloor(0, 1, 2),
+            Op::Literal(Atom::I128(want.unwrap_or(0))),
+            Op::Eq(3, 4),
+        ];
+        let program = Program {
+            nodes: &nodes,
+            root: 5,
+        };
+        let frame = Frame::Genesis {
+            initial: RootView::Record(&[]),
+        };
+        for _ in 0..2 {
+            let mut meter = super::super::meter::new(limits());
+            let mut reads = Vec::new();
+            let r = super::predicate::evaluate(&program, &frame, 60, &mut meter, &mut reads);
+            assert_eq!(
+                r,
+                if want.is_some() {
+                    Ok(())
+                } else {
+                    Err(Failure::Undefined)
+                }
+            );
+            assert_eq!(
+                meter.used.used(Resource::Step),
+                if want.is_some() { 6 } else { 4 }
+            );
+            assert!(reads.is_empty());
+        }
+    }
+    assert_eq!(
+        super::atoms::signed_mul_div_floor(Atom::U128(0), Atom::I128(0), Atom::I128(-1)),
+        Err(Failure::Undefined)
+    );
+}

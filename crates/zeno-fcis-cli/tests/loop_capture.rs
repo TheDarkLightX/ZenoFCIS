@@ -39,7 +39,18 @@ impl Drop for Directory {
     }
 }
 fn run(args: &[&str]) -> (i32, Value) {
-    let done = Command::new(CLI)
+    let backend = if args
+        .windows(2)
+        .any(|pair| pair == ["capture", "open"] || pair == ["capture", "whole"])
+    {
+        "systemd"
+    } else {
+        "auto"
+    };
+    // Explicit test-only executable selection for source-pinned before/after replay.
+    let cli = std::env::var_os("ZENO_CAPTURE_TEST_CLI").unwrap_or_else(|| CLI.into());
+    let done = Command::new(cli)
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", backend)
         .args(args)
         .output()
         .unwrap_or_else(|e| panic!("CLI unavailable: {e}"));
@@ -347,7 +358,7 @@ fn capture_decided_refutation_spends_attempt_when_example_budget_is_zero() {
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn nullary_int(max: i64) -> Value {
+fn nullary_int(max: i128) -> Value {
     json!({"inputs":[],"outputs":[{"kind":"Int","min":"0","max":max.to_string()}]})
 }
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -407,6 +418,7 @@ fn capture_confinement_closes_injected_parent_descriptor_and_environment() {
     // CLOEXEC and would make an inheritance control vacuous.
     let helper = "import os,subprocess,sys\nwith open(sys.argv[2],'rb') as f:\n r=subprocess.run([sys.argv[1],*sys.argv[3:]],pass_fds=(f.fileno(),),env={**os.environ,'CAPTURE_CONTROL_SECRET':'parent-control'},capture_output=True,timeout=35)\n sys.stdout.buffer.write(r.stdout)\n sys.stderr.buffer.write(r.stderr)\n sys.exit(r.returncode)\n";
     let done = Command::new("python3")
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
         .args([
             "-B",
             "-c",
@@ -523,6 +535,7 @@ fn capture_zal_real_cli_expression_grammar_round_trips() {
         .unwrap_or_else(|| panic!("repository root"))
         .to_path_buf();
     let done = Command::new("python3")
+        .env("ZENO_FCIS_CONTAINMENT_BACKEND", "systemd")
         .args([
             "-B",
             "-m",
@@ -547,3 +560,183 @@ fn capture_zal_real_cli_expression_grammar_round_trips() {
     assert!(!String::from_utf8_lossy(&done.stderr).contains("skipped"));
 }
 // END capture review regressions
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn capture_cpmm_formula_slices_reach_captured_exact_and_reject_product_stubs() {
+    for bps in [0, 30, 100] {
+        let d = Directory::new();
+        // One declared 41-tuple slice. This is not a full-cube capture claim.
+        let spec = d.json(
+            "cpmm-spec.json",
+            &json!({
+            "inputs":[{"kind":"Int","min":"0","max":"40"}],
+            "outputs":[{"kind":"Int","min":"0","max":"40"},
+                {"kind":"Int","min":"0","max":"40"},{"kind":"Bool"},{"kind":"Bool"}]}),
+        );
+        let reference = d.text("cpmm-reference.py", &format!(
+            "def reference(p):\n    a=p[0]\n    f=(a*{bps}+9999)//10000\n    n=a-f\n    q=n*40//(40+n)\n    return [f,q,int(q*2>=a),int(q*2*3>=a*1*3)]\n"));
+        let session = d.path("session");
+        let (code, opened) = run(&[
+            "loop",
+            "capture",
+            "open",
+            "--spec",
+            &spec,
+            "--reference",
+            &reference,
+            "--session",
+            &session,
+        ]);
+        assert_eq!(code, 0, "{opened}");
+        let fee = format!("mul_div_ceil(x0, {bps}, 10000)");
+        let net = format!("(x0 - {fee})");
+        let output = format!("mul_div_floor({net}, 40, 40 + {net})");
+        let stubbed = d.json(
+            "stubbed.json",
+            &json!({"schema":"zeno-fcis/capture-expressions/1",
+            "outputs":[fee,output,"true","true"]}),
+        );
+        let (code, rejected) = run(&[
+            "loop",
+            "capture",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &stubbed,
+        ]);
+        assert_ne!(code, 0, "stubbed product comparison accepted: {rejected}");
+        assert_eq!(rejected["status"], "refuted", "{rejected}");
+        let expressions = d.json(
+            "expressions.json",
+            &json!({"schema":"zeno-fcis/capture-expressions/1",
+            "outputs":[fee,output,format!("products_ge({output}, 2, x0, 1)"),
+                format!("products_ge({output}, 2, 3, x0, 1, 3)")]}),
+        );
+        let (code, captured) = run(&[
+            "loop",
+            "capture",
+            "candidate",
+            "--session",
+            &session,
+            "--expressions",
+            &expressions,
+        ]);
+        assert_eq!(code, 0, "{captured}");
+        assert_eq!(captured["status"], "captured-exact");
+        assert_eq!(captured["detail"]["check"]["replay"], "matched");
+        let (code, replayed) = run(&["loop", "capture", "status", "--session", &session]);
+        assert_eq!(code, 0, "{replayed}");
+        assert_eq!(replayed["status"], "captured-exact", "{replayed}");
+    }
+}
+
+// Owner-run only: the normal contained CLI, with unchanged runtime deadlines,
+// acquisition/work caps and comparisons. These are whole 41^3 domains.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn capture_whole_cpmm_formula_reaches_exact_for_every_declared_fee() {
+    for bps in [0, 30, 100] {
+        let d = Directory::new();
+        let spec = d.json(
+            "whole-spec.json",
+            &json!({
+                "inputs":vec![json!({"kind":"Int","min":"0","max":"40"});3],
+                "outputs":vec![json!({"kind":"Int","min":"0","max":"40"});2],
+            }),
+        );
+        let source=d.text("reference.py",&format!(
+            "def reference(p):\n    x,y,a=p\n    fee=(a*{bps}+9999)//10000\n    n=a-fee\n    den=x+n\n    out=0 if den==0 else n*y//den\n    return [fee,out]\n"));
+        let fee = format!("mul_div_ceil(x2, {bps}, 10000)");
+        let net = format!("(x2 - {fee})");
+        let den = format!("(x0 + {net})");
+        let out = format!("mul_div_floor({net}, x1, ({den} == 0 ? 1 : {den}))");
+        let expressions = d.json(
+            "whole.json",
+            &json!({"schema":"zeno-fcis/capture-expressions/1",
+            "outputs":[fee,format!("products_ge(x2, 1, 0, 1, 1, 1) ? ({out} + 1) : {out}")]}),
+        );
+        let (code, result) = run(&[
+            "loop",
+            "capture",
+            "whole",
+            "--spec",
+            &spec,
+            "--reference",
+            &source,
+            "--expressions",
+            &expressions,
+            "--node-visits",
+            "10000000",
+        ]);
+        assert_eq!(code, 0, "{result}");
+        assert_eq!(result["status"], "captured-exact", "{result}");
+        assert_eq!(result["detail"]["coverage"]["declared"], 68_921);
+        assert_eq!(result["detail"]["coverage"]["checked"], 68_921);
+        assert_eq!(result["detail"]["coverage"]["complete"], true);
+        assert_eq!(
+            result["detail"]["reference_work"]["reservation"]["valid_observations_received"],
+            413_526
+        );
+        assert_eq!(result["authority"], "none");
+        if bps == 30 {
+            for comparison in ["products_ge(x2, 0, 1, 1)", "products_ge(x2, 1, 0, 1, 1, 1)"] {
+                // An always-true replacement for either exact product call
+                // changes the first actual output; the judge must refute it.
+                let stubbed =
+                    format!("{comparison} ? ({out} + 1) : {out}").replacen(comparison, "true", 1);
+                let bad = d.json(
+                    "stubbed.json",
+                    &json!({"schema":"zeno-fcis/capture-expressions/1","outputs":[fee,stubbed]}),
+                );
+                let (code, refuted) = run(&[
+                    "loop",
+                    "capture",
+                    "whole",
+                    "--spec",
+                    &spec,
+                    "--reference",
+                    &source,
+                    "--expressions",
+                    &bad,
+                    "--node-visits",
+                    "10000000",
+                ]);
+                assert_eq!(code, 1, "{refuted}");
+                assert_eq!(refuted["status"], "refuted", "{refuted}");
+                assert_eq!(refuted["detail"]["difference"]["input"], json!([0, 0, 0]));
+                assert_eq!(refuted["detail"]["coverage"]["complete"], false);
+            }
+            let late = d.json(
+                "late.json",
+                &json!({"schema":"zeno-fcis/capture-expressions/1",
+                "outputs":[fee,format!("x0 == 40 && x1 == 40 && x2 == 40 ? ({out} + 1) : {out}")]}),
+            );
+            let (code, refuted) = run(&[
+                "loop",
+                "capture",
+                "whole",
+                "--spec",
+                &spec,
+                "--reference",
+                &source,
+                "--expressions",
+                &late,
+                "--node-visits",
+                "10000000",
+            ]);
+            assert_eq!(code, 1, "{refuted}");
+            assert_eq!(refuted["detail"]["difference"]["ordinal"], 68_920);
+            assert_eq!(
+                refuted["detail"]["difference"]["input"],
+                json!([40, 40, 40])
+            );
+            assert_eq!(refuted["detail"]["difference"]["expected"], json!([1, 19]));
+            assert_eq!(
+                refuted["detail"]["difference"]["actual"]["output"],
+                json!([1, 20])
+            );
+        }
+    }
+}

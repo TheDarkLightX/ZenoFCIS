@@ -39,7 +39,7 @@ pub(crate) const SAMPLES: usize = 256;
 enum Values {
     /// Bit `i` of the bitset is the value 1 on local tuple `i`.
     Bool(Vec<u64>),
-    Int(Vec<i64>),
+    Int(Vec<i128>),
 }
 
 impl Values {
@@ -50,14 +50,14 @@ impl Values {
         }
     }
 
-    fn get(&self, index: usize) -> i64 {
+    fn get(&self, index: usize) -> i128 {
         match self {
-            Self::Bool(bits) => i64::from(bit(bits, index)),
+            Self::Bool(bits) => i128::from(bit(bits, index)),
             Self::Int(values) => values[index],
         }
     }
 
-    fn set(&mut self, index: usize, value: i64) {
+    fn set(&mut self, index: usize, value: i128) {
         match self {
             Self::Bool(bits) => {
                 if value == 1 {
@@ -103,7 +103,7 @@ impl Table {
     }
 
     /// Value on local tuple `index`; `None` where poisoned.
-    pub(crate) fn get(&self, index: usize) -> Option<i64> {
+    pub(crate) fn get(&self, index: usize) -> Option<i128> {
         (!bit(&self.poison, index)).then(|| self.values.get(index))
     }
 
@@ -113,7 +113,7 @@ impl Table {
 
     /// The one value of a constant, never-poisoned class. With a minimal
     /// support, a class is constant exactly when its support is empty.
-    pub(crate) fn constant_value(&self) -> Option<i64> {
+    pub(crate) fn constant_value(&self) -> Option<i128> {
         if self.support.is_empty() {
             self.get(0)
         } else {
@@ -122,7 +122,7 @@ impl Table {
     }
 
     /// Smallest and largest defined value, when some tuple is defined.
-    pub(crate) fn range(&self) -> Option<(i64, i64)> {
+    pub(crate) fn range(&self) -> Option<(i128, i128)> {
         (0..self.len)
             .filter_map(|index| self.get(index))
             .fold(None, |range, value| match range {
@@ -141,13 +141,13 @@ impl Table {
     }
 
     /// Value and poison of local tuple `index`, comparable as one entry.
-    fn entry(&self, index: usize) -> (bool, i64) {
+    fn entry(&self, index: usize) -> (bool, i128) {
         (bit(&self.poison, index), self.values.get(index))
     }
 
     /// Local index of a whole-domain tuple.
     #[cfg(test)]
-    pub(crate) fn index_of(&self, tuple: &[i64], minima: &[i64], widths: &[u64]) -> usize {
+    pub(crate) fn index_of(&self, tuple: &[i128], minima: &[i128], widths: &[u64]) -> usize {
         self.support.iter().fold(0, |index, input| {
             let input = usize::from(*input);
             let offset = tuple[input].abs_diff(minima[input]);
@@ -226,7 +226,7 @@ fn product(support: &[u16], widths: &[u64]) -> Option<u64> {
 pub(crate) fn input(
     position: u16,
     kind: Kind,
-    min: i64,
+    min: i128,
     widths: &[u64],
     budget: &mut Budget,
 ) -> Option<Table> {
@@ -237,7 +237,7 @@ pub(crate) fn input(
     let len = len as usize;
     let mut values = Values::new(kind, len);
     for index in 0..len {
-        values.set(index, min.wrapping_add(index as i64));
+        values.set(index, min.wrapping_add(index as i128));
     }
     let table = Table {
         support: vec![position],
@@ -249,7 +249,7 @@ pub(crate) fn input(
 }
 
 /// The table of a constant.
-pub(crate) fn constant(kind: Kind, value: i64) -> Table {
+pub(crate) fn constant(kind: Kind, value: i128) -> Table {
     let mut values = Values::new(kind, 1);
     values.set(0, value);
     Table {
@@ -276,7 +276,7 @@ pub(crate) fn combine(
     operands: &[&Table],
     widths: &[u64],
     budget: &mut Budget,
-    mut op: impl FnMut(&[i64]) -> Option<i64>,
+    mut op: impl FnMut(&[i128]) -> Option<i128>,
 ) -> Option<Combined> {
     let mut support: Vec<u16> = operands
         .iter()
@@ -311,7 +311,7 @@ pub(crate) fn combine(
     let mut poison = vec![0_u64; len.div_ceil(64)];
     let mut digits = vec![0_u64; support.len()];
     let mut indices = vec![0_u64; operands.len()];
-    let mut arguments = [0_i64; 3];
+    let mut arguments = [0_i128; 3];
     let mut trapped = false;
     for local in 0..len {
         let mut poisoned = false;
@@ -433,18 +433,18 @@ pub(crate) enum Samples {
         poison: Vec<u64>,
     },
     Int {
-        values: Vec<i64>,
+        values: Vec<i128>,
         poison: Vec<u64>,
     },
 }
 
 impl Samples {
     /// The same value at every one of `count` samples.
-    pub(crate) fn constant(kind: Kind, value: i64, count: usize) -> Self {
+    pub(crate) fn constant(kind: Kind, value: i128, count: usize) -> Self {
         Self::from_values(kind, vec![value; count])
     }
 
-    pub(crate) fn from_values(kind: Kind, values: Vec<i64>) -> Self {
+    pub(crate) fn from_values(kind: Kind, values: Vec<i128>) -> Self {
         let poison = vec![0; values.len().div_ceil(64)];
         match kind {
             Kind::Bool => Self::Bool {
@@ -470,12 +470,12 @@ impl Samples {
     }
 
     /// Value at sample `k`; `None` where poisoned.
-    pub(crate) fn get(&self, sample: usize) -> Option<i64> {
+    pub(crate) fn get(&self, sample: usize) -> Option<i128> {
         if bit(self.poison_words(), sample) {
             return None;
         }
         Some(match self {
-            Self::Bool { ones, .. } => i64::from(bit(ones, sample)),
+            Self::Bool { ones, .. } => i128::from(bit(ones, sample)),
             Self::Int { values, .. } => values[sample],
         })
     }
@@ -485,13 +485,13 @@ impl Samples {
     pub(crate) fn combine(
         kind: Kind,
         operands: &[&Samples],
-        mut op: impl FnMut(&[i64]) -> Option<i64>,
+        mut op: impl FnMut(&[i128]) -> Option<i128>,
     ) -> (Self, bool) {
         let count = operands.first().map_or(0, |samples| samples.len());
         let mut values = vec![0; count];
         let mut poisoned = vec![false; count];
         let mut trapped = false;
-        let mut arguments = [0_i64; 3];
+        let mut arguments = [0_i128; 3];
         for sample in 0..count {
             let mut defined = true;
             for (slot, samples) in operands.iter().enumerate() {
@@ -540,7 +540,7 @@ impl Samples {
 
     /// The values, 0 where poisoned.
     #[cfg(test)]
-    pub(crate) fn values(&self) -> Vec<i64> {
+    pub(crate) fn values(&self) -> Vec<i128> {
         (0..self.len())
             .map(|sample| self.get(sample).unwrap_or(0))
             .collect()
@@ -590,7 +590,7 @@ pub(crate) fn words(flags: impl Iterator<Item = bool>, count: usize) -> Vec<u64>
 /// The [`SAMPLES`] fixed sample tuples of a domain larger than
 /// [`EXHAUSTIVE_SAMPLES`]: every input at its minimum, every input at its
 /// maximum, then tuples drawn per input from a fixed SplitMix64 sequence.
-pub(crate) fn sample_tuples(bounds: &[(i64, i64)]) -> Vec<Vec<i64>> {
+pub(crate) fn sample_tuples(bounds: &[(i128, i128)]) -> Vec<Vec<i128>> {
     let mut tuples = vec![
         bounds.iter().map(|(min, _)| *min).collect(),
         bounds.iter().map(|(_, max)| *max).collect(),
@@ -601,9 +601,18 @@ pub(crate) fn sample_tuples(bounds: &[(i64, i64)]) -> Vec<Vec<i64>> {
             bounds
                 .iter()
                 .map(|(min, max)| {
-                    let width = (i128::from(*max) - i128::from(*min) + 1) as u128;
-                    let offset = (u128::from(split_mix(&mut state)) * width) >> 64;
-                    (i128::from(*min) + offset as i128) as i64
+                    let random = u128::from(split_mix(&mut state));
+                    let offset = match max.abs_diff(*min).checked_add(1) {
+                        Some(width) => {
+                            // floor(random * width / 2^64), without a 192-bit
+                            // intermediate. This retains the old narrow samples.
+                            random * (width >> 64) + ((random * u128::from(width as u64)) >> 64)
+                        }
+                        // The complete signed range has width 2^128.
+                        None => random << 64,
+                    };
+                    let sign = 1u128 << 127;
+                    (((*min as u128 ^ sign) + offset) ^ sign) as i128
                 })
                 .collect(),
         );

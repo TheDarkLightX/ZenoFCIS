@@ -44,7 +44,7 @@ impl Drop for Directory {
 
 fn artifact(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/benchmarks/withdrawal-queue/artifacts")
+        .join("tests/fixtures/i128-programs")
         .join(format!("{name}.zcve"))
 }
 
@@ -115,8 +115,8 @@ fn an_agent_drives_the_loop_one_candidate_at_a_time_and_resumes() {
         .unwrap_or_default()
         .to_owned();
     assert_eq!(request_id.len(), 64);
-    // checked-i64-v1 is the default profile (G12).
-    assert_eq!(report["detail"]["request"]["profile"], "checked-i64-v1");
+    // checked-i128-v1 is the default profile (G12).
+    assert_eq!(report["detail"]["request"]["profile"], "checked-i128-v1");
     assert_eq!(report["detail"]["request"]["policy"]["hosted"], "disabled");
     assert_eq!(report["detail"]["view"]["original"]["nodes"], 16);
     for name in [
@@ -169,7 +169,7 @@ fn an_agent_drives_the_loop_one_candidate_at_a_time_and_resumes() {
     assert_eq!(report["status"], "checked-improvement");
     assert_eq!(
         report["detail"]["outcome"]["cost"],
-        json!({"nodes": 7, "bytes": 763})
+        json!({"nodes": 7, "bytes": 764})
     );
     assert_eq!(
         report["detail"]["outcome"]["selection"]["selection"],
@@ -311,7 +311,7 @@ fn the_fake_provider_improves_a_benchmark_case_and_its_claims_change_nothing() {
     assert_eq!(loop_report["status"], "best-checked-so-far");
     assert_eq!(
         loop_report["incumbent"]["cost"],
-        json!({"nodes": 7, "bytes": 763})
+        json!({"nodes": 7, "bytes": 764})
     );
     assert_eq!(loop_report["session"]["stop_reason"], "proposer-exhausted");
     assert_eq!(loop_report["accounting"]["model_calls"], 4);
@@ -649,6 +649,11 @@ fn describe_declares_loop_effects() {
     assert_eq!(exit, Some(0));
     let group = &report["command"];
     assert_eq!(group["effects"]["classification"], "command-group");
+    assert!(
+        group["guidance"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+    );
     let names: Vec<_> = group["subcommands"]
         .as_array()
         .unwrap_or_else(|| panic!("subcommands"))
@@ -662,6 +667,7 @@ fn describe_declares_loop_effects() {
             json!("capture"),
             json!("decompose"),
             json!("encode"),
+            json!("evaluate"),
             json!("family"),
             json!("learn"),
             json!("meaning"),

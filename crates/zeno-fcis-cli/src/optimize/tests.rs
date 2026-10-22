@@ -24,12 +24,12 @@ use zeno_fcis_synthesis::finite::{Domain, Op, Program, V2ExecutionFailure};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 const FULL: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+    min: i128::MIN,
+    max: i128::MAX,
 };
 const NEAR_MAX: Domain = Domain::Int {
-    min: i64::MAX - 1,
-    max: i64::MAX,
+    min: i128::MAX - 1,
+    max: i128::MAX,
 };
 const GENEROUS: transform::Limits = transform::Limits {
     steps: transform::DEFAULT_STEP_LIMIT,
@@ -41,7 +41,7 @@ fn artifact(name: &str) -> &'static [u8] {
         ($($name:literal),+) => {
             match name {
                 $($name => include_bytes!(concat!(
-                    "../../../../docs/benchmarks/withdrawal-queue/artifacts/", $name, ".zcve"
+                    "../../tests/fixtures/i128-programs/", $name, ".zcve"
                 )),)+
                 _ => panic!("unknown artifact {name}"),
             }
@@ -140,7 +140,7 @@ fn screened(verdict: &Verdict) -> bool {
 }
 
 /// Reads a `cases.json` decimal string.
-fn decimal(value: &Value) -> i64 {
+fn decimal(value: &Value) -> i128 {
     value
         .as_str()
         .and_then(|text| text.parse().ok())
@@ -221,7 +221,7 @@ struct Seed {
 
 fn seeds(prefix: char) -> Vec<Seed> {
     let fixtures: Value =
-        serde_json::from_str(include_str!("../../../../docs/benchmarks/cases.json"))
+        serde_json::from_str(include_str!("../../tests/fixtures/cases-i128.json"))
             .unwrap_or_else(|error| panic!("cases.json: {error}"));
     fixtures["cases"]
         .as_array()
@@ -444,21 +444,21 @@ fn caps_stop_growth_before_anything_is_created() {
 /// Each node's value on one whole-domain tuple, `None` where eager
 /// evaluation has trapped at or before it: a reference written separately
 /// from the table code.
-fn reference_values(program: &Program, tuple: &[i64]) -> Vec<Option<i64>> {
-    let mut values: Vec<Option<i64>> = Vec::with_capacity(program.nodes().len());
+fn reference_values(program: &Program, tuple: &[i128]) -> Vec<Option<i128>> {
+    let mut values: Vec<Option<i128>> = Vec::with_capacity(program.nodes().len());
     for op in program.nodes() {
         let at = |id: u16| values[usize::from(id)];
         let both = |a: u16, b: u16| at(a).zip(at(b));
         values.push(match *op {
             Op::Input(index) => Some(tuple[usize::from(index)]),
             Op::Int(value) => Some(value),
-            Op::Bool(value) => Some(i64::from(value)),
+            Op::Bool(value) => Some(i128::from(value)),
             Op::Add(a, b) => both(a, b).and_then(|(a, b)| a.checked_add(b)),
             Op::Sub(a, b) => both(a, b).and_then(|(a, b)| a.checked_sub(b)),
-            Op::Eq(a, b) => both(a, b).map(|(a, b)| i64::from(a == b)),
-            Op::Lt(a, b) => both(a, b).map(|(a, b)| i64::from(a < b)),
-            Op::And(a, b) => both(a, b).map(|(a, b)| i64::from(a == 1 && b == 1)),
-            Op::Not(a) => at(a).map(|a| i64::from(a == 0)),
+            Op::Eq(a, b) => both(a, b).map(|(a, b)| i128::from(a == b)),
+            Op::Lt(a, b) => both(a, b).map(|(a, b)| i128::from(a < b)),
+            Op::And(a, b) => both(a, b).map(|(a, b)| i128::from(a == 1 && b == 1)),
+            Op::Not(a) => at(a).map(|a| i128::from(a == 0)),
             Op::Select(c, a, b) => {
                 both(a, b).and_then(|(a, b)| at(c).map(|c| if c == 1 { a } else { b }))
             }
@@ -469,7 +469,7 @@ fn reference_values(program: &Program, tuple: &[i64]) -> Vec<Option<i64>> {
 }
 
 /// Every tuple of a program's declared domain, in enumeration order.
-fn every_tuple(program: &Program) -> Vec<Vec<i64>> {
+fn every_tuple(program: &Program) -> Vec<Vec<i128>> {
     let mut tuples = Vec::new();
     let mut tuple = transform::first_tuple(program.inputs());
     loop {
@@ -487,7 +487,7 @@ fn assert_tables_match_reference(program: &Program) {
     let (egraph, _) = egraph_of(program);
     let domain = egraph.domain();
     let tuples = every_tuple(program);
-    let reference: Vec<Vec<Option<i64>>> = tuples
+    let reference: Vec<Vec<Option<i128>>> = tuples
         .iter()
         .map(|tuple| reference_values(program, tuple))
         .collect();
@@ -533,7 +533,7 @@ fn assert_tables_match_reference(program: &Program) {
     // Samples are the values at the fixed sample tuples, 0 where poisoned.
     if domain.exhaustive() {
         for (node, class) in classes.iter().enumerate() {
-            let expected: Vec<i64> = reference
+            let expected: Vec<i128> = reference
                 .iter()
                 .map(|values| values[node].unwrap_or(0))
                 .collect();
@@ -603,10 +603,10 @@ fn tables_follow_the_checker_enumeration_and_carry_poison() {
     assert_eq!(table(0).support(), &[0]);
     assert_eq!(values(0), [Some(0), Some(1)]);
     assert_eq!(table(1).support(), &[1]);
-    assert_eq!(values(1), [Some(i64::MAX - 1), Some(i64::MAX)]);
+    assert_eq!(values(1), [Some(i128::MAX - 1), Some(i128::MAX)]);
     // The addition traps where x = MAX; its users inherit the poison.
     assert_eq!(table(3).support(), &[1]);
-    assert_eq!(values(3), [Some(i64::MAX), None]);
+    assert_eq!(values(3), [Some(i128::MAX), None]);
     assert!(table(3).poisoned());
     assert_eq!(values(6), [Some(0), None]);
     assert!(egraph.node_may_trap(3));
@@ -623,7 +623,7 @@ fn tables_follow_the_checker_enumeration_and_carry_poison() {
     assert_eq!(egraph.data(4).samples.bits(), [0b0011]);
     assert_eq!(
         egraph.data(3).samples.values(),
-        &[i64::MAX, 0, i64::MAX, 0],
+        &[i128::MAX, 0, i128::MAX, 0],
         "poisoned samples hold 0"
     );
     assert!(egraph.data(3).samples.poisoned());
@@ -669,8 +669,8 @@ fn tables_match_a_reference_evaluation_on_every_tuple() {
     // inputs and single-value domains.
     let small = Domain::Int { min: -2, max: 2 };
     let near_min = Domain::Int {
-        min: i64::MIN,
-        max: i64::MIN + 2,
+        min: i128::MIN,
+        max: i128::MIN + 2,
     };
     let point = Domain::Int { min: 7, max: 7 };
     let base = program(
@@ -835,7 +835,7 @@ fn bounds_stay_conservative_beyond_the_table_cap() {
         egraph.data(9).interval,
         Interval {
             min: 0,
-            max: i64::MAX
+            max: i128::MAX
         }
     );
     assert_eq!(
@@ -894,12 +894,12 @@ fn op_bytes_match_the_canonical_encoding() {
         base(vec![Op::Input(0), Op::Bool(true)], 1) - leaf,
         op_bytes(&Op::Bool(true))
     );
-    assert_eq!(op_bytes(&Op::Int(i64::MIN)), 39);
+    assert_eq!(op_bytes(&Op::Int(i128::MIN)), 39);
     assert_eq!(op_bytes(&Op::Eq(0, 1)), 56);
     assert_eq!(ENode::Select(0, 0, 0).bytes(), 73);
     // Whole programs: the kernel's 16 and 7 instructions.
-    assert_eq!(artifact("boolean-kernel-original").len(), 1063);
-    assert_eq!(artifact("boolean-kernel-candidate").len(), 763);
+    assert_eq!(artifact("boolean-kernel-original").len(), 1064);
+    assert_eq!(artifact("boolean-kernel-candidate").len(), 764);
 }
 
 // ---- strategy grammar ---------------------------------------------------------
@@ -1045,7 +1045,7 @@ fn fold_phase_folds_constants_but_never_a_possible_trap() {
             Op::Bool(false),
             Op::Not(1),
             Op::And(0, 2),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Int(1),
             Op::Add(4, 5),
             Op::Int(0),
@@ -1241,9 +1241,9 @@ fn extraction_keeps_every_pinned_node_and_dropping_one_is_refuted() {
     else {
         panic!("the judge must refute the dropped trap");
     };
-    assert_eq!(witness.input, vec![i64::MAX]);
+    assert_eq!(witness.input, vec![i128::MAX]);
     assert_eq!(witness.original.result, Err(V2ExecutionFailure::Arithmetic));
-    assert_eq!(witness.candidate.result, Ok(vec![i64::MAX]));
+    assert_eq!(witness.candidate.result, Ok(vec![i128::MAX]));
     // The optimizer itself finds nothing to improve: the trap must stay.
     let search = run(&encode(&base), &default_strategy());
     assert_eq!(best_nodes(&search), None);
@@ -1267,7 +1267,7 @@ fn withdrawal_kernel_reaches_seven_nodes_with_a_replayable_receipt() {
         .unwrap_or_else(|| panic!("improvement"));
     assert_eq!(best.nodes, 7);
     assert_eq!(best.max_steps, 7);
-    assert_eq!(best.bytes.len(), 763);
+    assert_eq!(best.bytes.len(), 764);
     assert_eq!(import(&best.bytes).nodes().len(), 7);
     let receipt = best.equivalence.receipt();
     assert_eq!(
@@ -1635,11 +1635,14 @@ fn candidates_the_judge_rejects_are_never_the_result() {
     let detail = super::candidate_json(&candidate);
     assert_eq!(detail["verdict"], "counterexample");
     assert_eq!(detail["detail"]["ordinal"], 1);
-    assert_eq!(detail["detail"]["input"], json!(["9223372036854775807"]));
+    assert_eq!(
+        detail["detail"]["input"],
+        json!(["170141183460469231731687303715884105727"])
+    );
     assert_eq!(detail["detail"]["original"]["error"], "Arithmetic");
     assert_eq!(
         detail["detail"]["candidate"]["ok"],
-        json!(["9223372036854775807"])
+        json!(["170141183460469231731687303715884105727"])
     );
     // The other rejection shapes render in the checker's vocabulary.
     let json = super::rejection_json(&Rejection::Inconclusive(
@@ -1684,7 +1687,7 @@ fn search_report_states_its_bounds() {
     let search = run(artifact("boolean-kernel-original"), &default_strategy());
     let report = search.json();
     assert_eq!(report["original"]["nodes"], 16);
-    assert_eq!(report["original"]["bytes"], 1063);
+    assert_eq!(report["original"]["bytes"], 1064);
     assert_eq!(
         report["domain"],
         json!({"size": 16, "exact_signatures": true, "max_input_tuples": DEFAULT_MAX_INPUT_TUPLES})
@@ -1800,10 +1803,21 @@ fn tight_limits_are_reported_and_the_original_is_never_lost() {
     assert_eq!(search.stopped, Some("original-exceeds-max-enodes"));
     assert!(search.phases.is_empty());
     assert!(search.best.is_none());
+    assert!(search.any_limit_hit());
+    assert_eq!(search.status_and_exit(), ("inconclusive", 2));
     assert_eq!(
         search.json()["search"]["stopped"],
         "original-exceeds-max-enodes"
     );
+    assert_eq!(search.json()["search"]["any_limit_hit"], true);
+
+    let mut strategy = default_strategy();
+    strategy.limits.max_classes = 1;
+    let search = run(artifact("boolean-kernel-original"), &strategy);
+    assert_eq!(search.stopped, Some("original-exceeds-max-classes"));
+    assert!(search.phases.is_empty());
+    assert!(search.any_limit_hit());
+    assert_eq!(search.status_and_exit(), ("inconclusive", 2));
 }
 
 #[test]
@@ -2031,8 +2045,8 @@ fn the_optimizer_profile_matches_the_loop_gate_for_every_opcode() {
         let node =
             ENode::from_op(&op, |id| Some(u32::from(id))).unwrap_or_else(|| panic!("{op:?}"));
         assert_eq!(node.in_profile(Profile::FunctionalBoolV1), gate, "{op:?}");
-        assert!(node.in_profile(Profile::CheckedI64V1));
-        assert!(Profile::CheckedI64V1.admit(&base).is_ok());
+        assert!(node.in_profile(Profile::CheckedI128V1));
+        assert!(Profile::CheckedI128V1.admit(&base).is_ok());
     }
 }
 
@@ -2253,7 +2267,7 @@ fn the_portfolio_grammar_is_closed() {
             .iter()
             .all(|strategy| strategy.profile == Some(Profile::FunctionalBoolV1))
     );
-    assert!(plan.restrict(Profile::CheckedI64V1).is_err());
+    assert!(plan.restrict(Profile::CheckedI128V1).is_err());
 }
 
 #[test]
@@ -2503,4 +2517,30 @@ fn fusion_merges_roots_of_a_trapping_original_only_by_exact_tables() {
             .all(|candidate| screened(&candidate.verdict))
     );
     assert!(search.best.is_none());
+}
+
+#[test]
+fn wide_domain_sampling_and_width_caps_remain_total() {
+    let domain = DomainInfo::new(&[FULL]).unwrap_or_else(|| panic!("expected a value"));
+    assert_eq!(domain.widths(), &[u64::MAX]);
+    assert_eq!(domain.size(), None);
+    let samples = super::signature::sample_tuples(&[
+        (i128::MIN, i128::MAX),
+        (i128::MAX - 3, i128::MAX),
+        (i128::MIN, i128::MIN + 3),
+    ]);
+    assert_eq!(
+        samples,
+        super::signature::sample_tuples(&[
+            (i128::MIN, i128::MAX),
+            (i128::MAX - 3, i128::MAX),
+            (i128::MIN, i128::MIN + 3)
+        ])
+    );
+    assert_eq!(samples[0], vec![i128::MIN, i128::MAX - 3, i128::MIN]);
+    assert_eq!(samples[1], vec![i128::MAX, i128::MAX, i128::MIN + 3]);
+    for row in samples {
+        assert!((i128::MAX - 3..=i128::MAX).contains(&row[1]));
+        assert!((i128::MIN..=i128::MIN + 3).contains(&row[2]));
+    }
 }

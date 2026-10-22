@@ -68,9 +68,9 @@ pub(crate) enum Outcome {
 /// A replayed difference: both programs' results on one input.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Difference {
-    pub(crate) input: Vec<i64>,
-    pub(crate) original: Result<Vec<i64>, V2ExecutionFailure>,
-    pub(crate) candidate: Result<Vec<i64>, V2ExecutionFailure>,
+    pub(crate) input: Vec<i128>,
+    pub(crate) original: Result<Vec<i128>, V2ExecutionFailure>,
+    pub(crate) candidate: Result<Vec<i128>, V2ExecutionFailure>,
 }
 
 /// One piece of the domain and its query's judgment.
@@ -298,7 +298,7 @@ impl Prepared {
 }
 
 /// Runs a program through the library evaluator at the full Step budget.
-fn run(program: &Program, input: &[i64]) -> Result<Vec<i64>, V2ExecutionFailure> {
+fn run(program: &Program, input: &[i128]) -> Result<Vec<i128>, V2ExecutionFailure> {
     let meter = v2_zero_limits().with_limit(V2Resource::Step, transform::FULL_BUDGET);
     execute_v2(
         program.inputs(),
@@ -316,7 +316,7 @@ fn run(program: &Program, input: &[i64]) -> Result<Vec<i64>, V2ExecutionFailure>
 fn model_input(
     program: &Program,
     model: &std::collections::BTreeMap<String, i128>,
-) -> Result<Vec<i64>, String> {
+) -> Result<Vec<i128>, String> {
     program
         .inputs()
         .iter()
@@ -326,8 +326,6 @@ fn model_input(
             let value = *model
                 .get(&name)
                 .ok_or_else(|| format!("the model has no value for {name}"))?;
-            let value = i64::try_from(value)
-                .map_err(|_| format!("{name} = {value} is outside the 64-bit range"))?;
             if domain.contains(value) {
                 Ok(value)
             } else {
@@ -378,13 +376,13 @@ fn planted_difference(
         return Err("the programs have no outputs".to_owned());
     };
     for (name, value) in [("original_first", a), ("candidate_first", b)] {
-        if model.get(name) != Some(&i128::from(*value)) {
+        if model.get(name) != Some(value) {
             return Err(format!(
                 "the model's {name} differs from the evaluator's {value} on {input:?}"
             ));
         }
     }
-    if i128::from(*b) + 1 == i128::from(*a) {
+    if (*b) + 1 == (*a) {
         return Err(format!(
             "the shifted first output equals the original's on {input:?}"
         ));
@@ -396,7 +394,7 @@ fn planted_difference(
     })
 }
 
-fn result_json(result: &Result<Vec<i64>, V2ExecutionFailure>) -> Value {
+fn result_json(result: &Result<Vec<i128>, V2ExecutionFailure>) -> Value {
     match result {
         Ok(values) => json!({"ok": transform::values_json(values)}),
         Err(failure) => json!({"error": transform::failure_tag(*failure)}),

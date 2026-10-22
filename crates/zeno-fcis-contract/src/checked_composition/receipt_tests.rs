@@ -189,7 +189,7 @@ fn a_receipt_that_is_not_canonical_is_refused_before_the_check() {
     let mut extra = value.clone();
     extra["note"] = json!("x");
     let mut schema = value.clone();
-    schema["schema"] = json!("zeno-fcis/checked-composition-receipt/2");
+    schema["schema"] = json!("zeno-fcis/checked-composition-receipt/3");
     for (text, form) in [
         ("not json".to_owned(), ReceiptForm::NotJson),
         (pretty, ReceiptForm::NotCanonical),
@@ -221,7 +221,7 @@ fn the_local_table_digest_is_the_digest_of_typed_outcomes() {
             Contract::build(&compiled.declarations, &compiled.rules, compiled.commitment)
                 .unwrap_or_else(fail);
         let framer = Framer::new(&compiled.positions, &contract);
-        let values: Vec<Vec<i64>> = compiled
+        let values: Vec<Vec<i128>> = compiled
             .positions
             .iter()
             .map(|position| {

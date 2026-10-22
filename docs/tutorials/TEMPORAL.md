@@ -40,7 +40,7 @@ proof, and a finite run is never turned into a claim about every future event.
 
 ## See both modes in `.zeno`
 
-The Mini Determinator authoring example contains:
+The Mini Determinator specification example contains:
 
 ```zeno
 claim 500 finite_state_reflexivity all finite 4 =

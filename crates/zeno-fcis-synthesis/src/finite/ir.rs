@@ -11,24 +11,24 @@ pub use super::evaluation::{
     Op,
 };
 
-/// Versioned eager, acyclic, checked-i64 semantic profile.
-pub const PROFILE: &str = "zeno-fcis/finite-i64/1";
+/// Versioned eager, acyclic, checked-i128 semantic profile.
+pub const PROFILE: &str = "zeno-fcis/finite-i128/1";
 
-/// Larger bounded profile with the same checked-i64, eager semantics.
-pub const EXTENDED_PROFILE: &str = "zeno-fcis/finite-i64/2";
+/// Larger bounded profile with the same checked-i128, eager semantics.
+pub const EXTENDED_PROFILE: &str = "zeno-fcis/finite-i128/2";
 
-/// Checked i64 arithmetic extension under the original 256-node/16-output caps.
-pub const ARITHMETIC_PROFILE: &str = "zeno-fcis/finite-i64/3";
+/// Checked i128 arithmetic extension under the original 256-node/16-output caps.
+pub const ARITHMETIC_PROFILE: &str = "zeno-fcis/finite-i128/3";
 /// The arithmetic extension under the 4,096-node/64-output caps.
-pub const ARITHMETIC_EXTENDED_PROFILE: &str = "zeno-fcis/finite-i64/4";
+pub const ARITHMETIC_EXTENDED_PROFILE: &str = "zeno-fcis/finite-i128/4";
 
 impl Domain {
     pub(super) fn value(self) -> Result<Value, EncodeError> {
         let (min, max) = self.bounds();
         tuple(vec![
             Value::boolean(self.boolean()),
-            Value::signed(min.into()),
-            Value::signed(max.into()),
+            Value::signed(min),
+            Value::signed(max),
         ])
     }
 }
@@ -47,7 +47,7 @@ impl Op {
         };
         match *self {
             Self::Input(a) => ints(0, &[a.into()]),
-            Self::Int(a) => ints(1, &[a.into()]),
+            Self::Int(a) => ints(1, &[a]),
             Self::Bool(a) => ints(2, &[i128::from(a)]),
             Self::Add(a, b) => ints(3, &[a.into(), b.into()]),
             Self::Sub(a, b) => ints(4, &[a.into(), b.into()]),
@@ -59,6 +59,7 @@ impl Op {
             Self::Mul(a, b) => ints(10, &[a.into(), b.into()]),
             Self::DivFloor(a, b) => ints(11, &[a.into(), b.into()]),
             Self::DivCeil(a, b) => ints(12, &[a.into(), b.into()]),
+            Self::SignedMulDivFloor(a, b, d) => ints(16, &[a.into(), b.into(), d.into()]),
             Self::MulDivFloor(a, b, d) => ints(13, &[a.into(), b.into(), d.into()]),
             Self::MulDivCeil(a, b, d) => ints(14, &[a.into(), b.into(), d.into()]),
             Self::ProductsGe(a, b) => ints(
@@ -131,7 +132,7 @@ impl Program {
         }
     }
     /// Evaluates explicit inputs without any ambient state or effects.
-    pub fn evaluate(&self, input: &[i64]) -> Result<Vec<i64>, Error> {
+    pub fn evaluate(&self, input: &[i128]) -> Result<Vec<i128>, Error> {
         let mut values = Vec::new();
         let mut output = Vec::new();
         self.evaluate_into(input, &mut values, &mut output)?;
@@ -143,7 +144,7 @@ impl Program {
     /// to the verified `execute_v2` entry point; the adapter itself is not in
     /// the current Verus proof subject. It grants no transition authority.
     #[must_use]
-    pub fn execute_v2(&self, input: &[i64], limits: super::V2Limits) -> super::V2ExecutionOutcome {
+    pub fn execute_v2(&self, input: &[i128], limits: super::V2Limits) -> super::V2ExecutionOutcome {
         super::execution_v2::execute(
             &self.inputs,
             &self.outputs,
@@ -160,9 +161,9 @@ impl Program {
     /// leave a partial row visible to the next evaluation.
     pub(super) fn evaluate_into(
         &self,
-        input: &[i64],
-        values: &mut Vec<i64>,
-        output: &mut Vec<i64>,
+        input: &[i128],
+        values: &mut Vec<i128>,
+        output: &mut Vec<i128>,
     ) -> Result<(), Error> {
         evaluation::evaluate_into(
             &self.inputs,
@@ -202,7 +203,7 @@ impl Program {
     }
 }
 
-pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
+pub(super) fn admitted(domains: &[Domain], values: &[i128]) -> bool {
     evaluation::admitted(domains, values)
 }
 

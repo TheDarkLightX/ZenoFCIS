@@ -5,6 +5,8 @@ This lower-level checked engine is not transition authorization. Catalog
 lowering and the complete decision/frame producer bridge remain separate.
 """
 from __future__ import annotations
+
+from qualification_controls import ControlRefused, run_controls
 import argparse
 import json
 import os
@@ -13,7 +15,7 @@ import subprocess
 import tempfile
 import zipfile
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, native_test_environment
 import check_verus as verifier
 from check_finite_execution import once
 from check_metered_execution import UNIT_SOURCES as METER_SOURCES
@@ -39,6 +41,7 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *verifier.QUALIFICATION_SOURCES)))
 
 def snapshot():
     for path in SOURCES:
@@ -167,6 +170,7 @@ def coverage_refusal(vir, profile, name):
     return matched and error is not None and target in error, error
 
 def native_checks(directory,pin,environment):
+    environment = native_test_environment(ROOT, environment)
     directory.mkdir(parents=True,exist_ok=True)
     rust=['rustc',f"+{pin['runtime_rust']}",'--edition=2024','--check-cfg','cfg(verus_keep_ghost)','--check-cfg','cfg(test)']
     rust += native_dependency_args(ROOT, directory, environment)
@@ -213,7 +217,8 @@ def check(cache,install,evidence):
     native=native_checks(evidence/'native',pin,env)
     print('laws: complete proof/coverage and native/custody passed',flush=True)
     mutations=[]
-    for name,(path,changed,expected) in mutation_sources().items():
+    def run_control(control_item):
+        (name, (path, changed, expected)) = control_item
         specimen=evidence/name
         for unit in UNIT_SOURCES:
             target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
@@ -229,13 +234,17 @@ def check(cache,install,evidence):
             matched,coverage_error=coverage_refusal((specimen/'logs/crate.vir').read_text(),profile,name)
             killed=result.returncode==0 and verifier.proof_succeeded(parsed,pin) and not result.stderr.strip() and matched
         entry={'name':name,'expected_failure':expected,'killed':killed,'exit_code':result.returncode,'verification_results':actual,'coverage_refusal':coverage_error,'log_directory':str(specimen)}
-        mutations.append(entry)
-        (evidence/'mutations.json').write_text(json.dumps(mutations,indent=2)+'\n')
-        if not killed:raise RuntimeError(f'mutation {name} survived or failed for an unrelated reason; inspect {specimen}')
+        control_result = entry
+        if not killed:raise ControlRefused(control_result, f'mutation {name} survived or failed for an unrelated reason; inspect {specimen}')
         print(f'laws: caught {name} ({expected})',flush=True)
+        return control_result
+    def publish_control(control_result):
+        mutations.append(control_result)
+        (evidence/'mutations.json').write_text(json.dumps(mutations,indent=2)+'\n')
+    run_controls(run_control, mutation_sources().items(), timings=evidence / 'control-timings.json', publish=publish_control)
     verifier.verify_tool_files(tools,pin)
     if before!=snapshot():raise RuntimeError('source changed during law verification')
-    return {'schema':'zeno-fcis/laws-v2-evidence/1','status':'passed','source_sha256':before,'command':positive_command,'exit_code':positive.returncode,
+    return {'schema':'zeno-fcis/laws-v2-evidence/1','status':'passed','source_sha256':before, "source_bindings": verifier.evidence_bindings(before, HARNESS),'command':positive_command,'exit_code':positive.returncode,
             'verus_report':report,'translated_function_coverage':coverage,'native':native,'mutations':mutations,
             'evidence_directory':str(evidence),'revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
             'operational_order_evidence':'complete reviewed executable-body inventory; verifying observe-before-charge control refused by coverage',

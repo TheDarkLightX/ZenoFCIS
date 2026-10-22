@@ -20,7 +20,7 @@ pub(crate) enum ProgramJsonError {
     Shape,
     /// A domain object is malformed.
     Domain { position: usize },
-    /// A decimal string is not a canonical i64.
+    /// A decimal string is not a canonical i128.
     Decimal { text: String },
     /// A node is malformed or names an unknown opcode or arity.
     Node { index: usize },
@@ -33,7 +33,7 @@ pub(crate) enum ProgramJsonError {
 }
 
 /// Reads a canonical signed decimal: no plus sign, leading zeros or `-0`.
-fn decimal(value: &Value) -> Result<i64, ProgramJsonError> {
+fn decimal(value: &Value) -> Result<i128, ProgramJsonError> {
     let text = value.as_str().ok_or_else(|| ProgramJsonError::Decimal {
         text: value.to_string(),
     })?;
@@ -78,6 +78,31 @@ fn node(value: &Value, index: usize) -> Result<Op, ProgramJsonError> {
         (Some("Bool"), 2) => Op::Bool(items[1].as_bool().ok_or_else(error)?),
         (Some("Add"), 3) => Op::Add(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
         (Some("Sub"), 3) => Op::Sub(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
+        (Some("Mul"), 3) => Op::Mul(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
+        (Some("DivFloor"), 3) => Op::DivFloor(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
+        (Some("DivCeil"), 3) => Op::DivCeil(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
+        (Some("MulDivFloor"), 4) => Op::MulDivFloor(
+            id(1).ok_or_else(error)?,
+            id(2).ok_or_else(error)?,
+            id(3).ok_or_else(error)?,
+        ),
+        (Some("MulDivCeil"), 4) => Op::MulDivCeil(
+            id(1).ok_or_else(error)?,
+            id(2).ok_or_else(error)?,
+            id(3).ok_or_else(error)?,
+        ),
+        (Some("ProductsGe"), 7) => Op::ProductsGe(
+            [
+                id(1).ok_or_else(error)?,
+                id(2).ok_or_else(error)?,
+                id(3).ok_or_else(error)?,
+            ],
+            [
+                id(4).ok_or_else(error)?,
+                id(5).ok_or_else(error)?,
+                id(6).ok_or_else(error)?,
+            ],
+        ),
         (Some("Eq"), 3) => Op::Eq(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
         (Some("Lt"), 3) => Op::Lt(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
         (Some("And"), 3) => Op::And(id(1).ok_or_else(error)?, id(2).ok_or_else(error)?),
@@ -164,6 +189,12 @@ fn op_json(op: &Op) -> Value {
         Op::Bool(a) => json!(["Bool", a]),
         Op::Add(a, b) => json!(["Add", a, b]),
         Op::Sub(a, b) => json!(["Sub", a, b]),
+        Op::Mul(a, b) => json!(["Mul", a, b]),
+        Op::DivFloor(a, b) => json!(["DivFloor", a, b]),
+        Op::DivCeil(a, b) => json!(["DivCeil", a, b]),
+        Op::MulDivFloor(a, b, d) => json!(["MulDivFloor", a, b, d]),
+        Op::MulDivCeil(a, b, d) => json!(["MulDivCeil", a, b, d]),
+        Op::ProductsGe(a, b) => json!(["ProductsGe", a[0], a[1], a[2], b[0], b[1], b[2]]),
         Op::Eq(a, b) => json!(["Eq", a, b]),
         Op::Lt(a, b) => json!(["Lt", a, b]),
         Op::And(a, b) => json!(["And", a, b]),
@@ -185,7 +216,7 @@ pub(crate) fn program_to_json(program: &Program) -> Value {
 
 /// Typed values in the fixture vocabulary: Bool positions as JSON Booleans,
 /// integers as decimal strings.
-pub(crate) fn typed_values(domains: &[Domain], values: &[i64]) -> Value {
+pub(crate) fn typed_values(domains: &[Domain], values: &[i128]) -> Value {
     Value::Array(
         domains
             .iter()

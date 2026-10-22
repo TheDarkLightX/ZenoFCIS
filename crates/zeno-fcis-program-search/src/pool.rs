@@ -41,7 +41,7 @@ impl Pool {
         id
     }
 
-    pub(crate) fn constant(&mut self, kind: Kind, value: i64) -> usize {
+    pub(crate) fn constant(&mut self, kind: Kind, value: i128) -> usize {
         match kind {
             Kind::Bool => self.add(Node::Bool(value != 0)),
             Kind::Int => self.add(Node::Int(value)),

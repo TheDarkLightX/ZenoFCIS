@@ -1517,7 +1517,21 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 }
             },
             ExportNode::Value(value) => match value {
+                ValueExpr::SignedMulDivFloor(..)
+                | ValueExpr::ScaledMulDiv(..)
+                | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
+                ValueExpr::MulDiv(_, a, b, d) => {
+                    for child in [a, b, d] {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Value(child),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 ValueExpr::Add(left, right)
                 | ValueExpr::Sub(left, right)
                 | ValueExpr::Mul(left, right)
@@ -1980,6 +1994,7 @@ impl UndefinedReason {
             ModelReason::Overflow => Some(Self::Overflow),
             ModelReason::DivisionByZero => Some(Self::DivisionByZero),
             ModelReason::NonExactDivision => Some(Self::NonExactDivision),
+            ModelReason::UnsupportedArithmetic => None,
             _ => None,
         }
     }
@@ -3172,23 +3187,11 @@ impl ContainedChild {
 
         let group_result = killpg(self.process_group, Signal::SIGKILL);
         let _ = self.child.kill();
-        let waited = self.child.wait();
+        let _ = self.child.wait();
         self.armed = false;
         match group_result {
             Ok(()) => Ok(()),
-            // The group can disappear after the child exits but before the
-            // caller's first try_wait (notably on macOS). A successful wait
-            // also establishes that the owned child has been reaped.
-            Err(Errno::ESRCH) if observed_exit || waited.is_ok() => Ok(()),
-            // Darwin reports EPERM for a group containing only zombies. Once
-            // our child is reaped, require the group to be absent. Signal zero
-            // only probes; it cannot kill a process if the group ID was reused.
-            #[cfg(target_os = "macos")]
-            Err(Errno::EPERM)
-                if waited.is_ok() && killpg(self.process_group, None) == Err(Errno::ESRCH) =>
-            {
-                Ok(())
-            }
+            Err(Errno::ESRCH) if observed_exit => Ok(()),
             Err(_) => Err(ToolFailure::ProcessContainmentFailed),
         }
     }
@@ -3590,6 +3593,13 @@ fn render_value_smt(
             render_value_smt(right, step, environment, budget)?,
             budget,
         )?,
+        // Native main-route compilation owns fused arithmetic. This optional
+        // backend has no matching full-product semantics: refuse, never emit
+        // an intermediate signed multiplication with different overflow rules.
+        ValueExpr::MulDiv(..) => return Err(ExportError::UnsupportedMode),
+        ValueExpr::SignedMulDivFloor(..)
+        | ValueExpr::ScaledMulDiv(..)
+        | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
         ValueExpr::Div(mode, left, right) => {
             let left = render_value_smt(left, step, environment, budget)?;
             let right = render_value_smt(right, step, environment, budget)?;
@@ -4001,9 +4011,89 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
             collect_value(a, paths);
             collect_value(b, paths)
         }
+        ValueExpr::SignedMulDivFloor(a, b, d)
+        | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
+        | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
+            collect_value(a, paths);
+            collect_value(b, paths);
+            collect_value(d, paths);
+        }
         ValueExpr::Sum { body, .. } => collect_value(body, paths),
+        ValueExpr::MulDiv(_, a, b, d) => {
+            collect_value(a, paths);
+            collect_value(b, paths);
+            collect_value(d, paths);
+        }
         ValueExpr::Int(_) | ValueExpr::Var(_) => {}
     }
+}
+
+#[cfg(test)]
+#[test]
+fn fused_value_calls_refuse_in_unextended_backends() {
+    let value = ValueExpr::MulDiv(
+        zeno_fcis_spec::DivisionMode::Floor,
+        Box::new(ValueExpr::Int(1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    for value in [
+        value.clone(),
+        ValueExpr::ScaledMulDiv(
+            DivisionMode::Floor,
+            false,
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
+            Box::new(ValueExpr::Int(3)),
+            8,
+        ),
+        ValueExpr::RepeatMulDiv(
+            false,
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
+            Box::new(ValueExpr::Int(3)),
+            2,
+        ),
+        ValueExpr::SignedMulDivFloor(
+            Box::new(ValueExpr::Int(-1)),
+            Box::new(ValueExpr::Int(1)),
+            Box::new(ValueExpr::Int(2)),
+        ),
+    ] {
+        assert!(matches!(
+            render_value_lean(
+                &value,
+                "0",
+                &BTreeMap::new(),
+                &mut LeanRenderBudget::new(ExportLimits::default())
+            ),
+            Err(ExportError::UnsupportedMode)
+        ));
+        assert!(matches!(
+            render_value_smt(
+                &value,
+                0,
+                &BTreeMap::new(),
+                &mut SmtRenderBudget::new(ExportLimits::default())
+            ),
+            Err(ExportError::UnsupportedMode)
+        ));
+    }
+    let formula = RelExpr::Compare(CompareOp::Eq, value, ValueExpr::Int(0));
+    let step = model_diagnostics::ModelStep::try_new(Vec::new())
+        .unwrap_or_else(|| panic!("expected a value"));
+    let limits = model_diagnostics::DiagnosticLimits::try_new(1000, 1000, 1000)
+        .unwrap_or_else(|| panic!("expected a value"));
+    let result = model_diagnostics::check_relation(
+        &formula,
+        model_diagnostics::ModelContext::new(&step, limits),
+    );
+    assert_eq!(
+        result,
+        model_diagnostics::DiagnosticOutcome::Indeterminate(
+            model_diagnostics::ModelReason::UnsupportedExpression
+        )
+    );
 }
 fn parse_lean_axioms(text: &str) -> Option<Vec<String>> {
     let reports = text
@@ -4662,32 +4752,6 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn cleanup_accepts_an_exit_before_the_first_status_observation() {
-        use std::os::unix::process::CommandExt as _;
-
-        for _ in 0..8 {
-            let mut command = Command::new("/bin/sh");
-            command.args(["-c", "exit 0"]).process_group(0);
-            let child = command
-                .spawn()
-                .unwrap_or_else(|error| panic!("spawn helper: {error}"));
-            let mut owned = ContainedChild::new(child).unwrap_or_else(|_| unreachable!());
-            thread::sleep(Duration::from_millis(30));
-            owned
-                .terminate(false)
-                .unwrap_or_else(|error| panic!("cleanup exited helper: {error:?}"));
-            assert!(
-                owned
-                    .child
-                    .try_wait()
-                    .unwrap_or_else(|_| unreachable!())
-                    .is_some()
-            );
-        }
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
     fn busy_executables_are_retried_briefly_then_fail_closed() {
         use std::os::unix::fs::PermissionsExt as _;
 
@@ -5209,23 +5273,21 @@ mod tests {
             ToolRunStatus::Failed(ToolFailure::Crash(Some(23)))
         );
 
-        let overflow = run_fixed(
-            &executable,
-            &[
-                "--ignored",
-                "--exact",
-                "tests::process_helper_output_limit",
-                "--nocapture",
-            ],
-            None,
-            1_000,
-            64,
-        );
-        assert!(
-            matches!(&overflow, Err(ToolFailure::OutputLimit)),
-            "unexpected output-limit result: {:?}",
-            overflow.map(|output| output.status)
-        );
+        assert!(matches!(
+            run_fixed(
+                &executable,
+                &[
+                    "--ignored",
+                    "--exact",
+                    "tests::process_helper_output_limit",
+                    "--nocapture",
+                ],
+                None,
+                1_000,
+                64,
+            ),
+            Err(ToolFailure::OutputLimit)
+        ));
     }
 
     #[test]

@@ -87,8 +87,8 @@ pub fn node_term(program: &Program, root: usize) -> Result<Program, Stop> {
     let output = match kind {
         Kind::Bool => Domain::Bool,
         Kind::Int => Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     };
     let mut pool = Pool::new(&graph.inputs);
@@ -100,7 +100,7 @@ pub fn node_term(program: &Program, root: usize) -> Result<Program, Stop> {
 pub fn validate_term(term: &Program, inputs: &[Domain]) -> Result<(), Stop> {
     let full = match term.outputs() {
         [Domain::Bool] => true,
-        [Domain::Int { min, max }] => *min == i64::MIN && *max == i64::MAX,
+        [Domain::Int { min, max }] => *min == i128::MIN && *max == i128::MAX,
         _ => false,
     };
     if term.inputs() != inputs || !full {
@@ -256,7 +256,7 @@ fn discover_metered(
             limit: budget.max_work,
         });
     }
-    let mut groups: BTreeMap<(Kind, Vec<i64>), Vec<usize>> = BTreeMap::new();
+    let mut groups: BTreeMap<(Kind, Vec<i128>), Vec<usize>> = BTreeMap::new();
     let mut rejected = Vec::new();
     let mut point = Vec::new();
     for (index, term) in terms.iter().enumerate() {

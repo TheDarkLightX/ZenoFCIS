@@ -303,7 +303,7 @@ pub(super) fn evaluate<'a>(
 #[cfg_attr(verus_keep_ghost,verus_spec(result => ensures
     result ==> spec::project_all(values@)==Some(final(output)@),
     !result ==> spec::project_all(values@).is_none(),))]
-pub(super) fn project_legacy(values: &[Atom<'_>], output: &mut Vec<i64>) -> bool {
+pub(super) fn project_legacy(values: &[Atom<'_>], output: &mut Vec<i128>) -> bool {
     output.clear();
     output.reserve(values.len());
     let mut i = 0usize;

@@ -1,5 +1,8 @@
 //! Approved local evidence adapter. Recipes are data, never shell commands.
 //! LLM-generated.
+mod snapshot;
+use snapshot::Snapshot;
+
 use crate::transform::sha256_hex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -196,21 +199,16 @@ fn bind_checked_subjects(root: &Path, c: &Case) -> Result<(), Value> {
     Ok(())
 }
 fn dependencies(root: &Path, r: &Recipe, checker: Option<&str>) -> Result<String, Value> {
-    bind_checked_subjects(root, &r.positive)?;
-    bind_checked_subjects(root, &r.negative)?;
-    let mut digests = Vec::new();
-    for input in r
-        .dependencies
-        .iter()
-        .chain(r.positive.inputs.iter())
-        .chain(r.negative.inputs.iter())
-    {
-        bound_input(root, input, 1_048_576)?;
-        digests.push((
-            input.path.to_string_lossy().into_owned(),
-            input.sha256.clone(),
-        ));
-    }
+    let positive = Snapshot::new(root, &r.positive, &r.dependencies)?;
+    let negative = Snapshot::new(root, &r.negative, &r.dependencies)?;
+    staged_dependencies(&positive, &negative, r, checker)
+}
+fn staged_dependencies(
+    positive: &Snapshot,
+    negative: &Snapshot,
+    r: &Recipe,
+    checker: Option<&str>,
+) -> Result<String, Value> {
     let actual = match checker {
         Some(s) => s.to_owned(),
         None => checker_sha256()?,
@@ -218,11 +216,17 @@ fn dependencies(root: &Path, r: &Recipe, checker: Option<&str>) -> Result<String
     if actual != r.checker_sha256 {
         return Err(error("kb-evidence-checker-stale"));
     }
-    digests.push(("checker".into(), actual));
-    digests.sort();
-    digests.dedup();
+    // Case tags retain both snapshots even when the same path occurs in each.
+    // All copied files and directories, including undeclared contract files,
+    // participate. The marker intentionally invalidates older live-path receipts.
     Ok(sha256_hex(
-        &serde_json::to_vec(&digests).map_err(|_| error("kb-evidence-encoding"))?,
+        &serde_json::to_vec(&(
+            "zeno-fcis/kb-snapshot/1",
+            positive.manifest(),
+            negative.manifest(),
+            actual,
+        ))
+        .map_err(|_| error("kb-evidence-encoding"))?,
     ))
 }
 fn checked(c: &Case, r: &CaseResult) -> bool {
@@ -274,6 +278,7 @@ pub(crate) fn load(
                 Value::String(s) => Ok(K::Value::Text(s)),
                 Value::Number(n) => n
                     .as_i64()
+                    .map(i128::from)
                     .map(K::Value::Integer)
                     .ok_or_else(|| error("kb-evidence-statement")),
                 _ => Err(error("kb-evidence-statement")),
@@ -296,22 +301,24 @@ pub(crate) fn load(
         status: K::EvidenceStatus::Validated,
     })
 }
-fn run_case(root: &Path, c: &Case) -> Result<CaseResult, Value> {
+fn run_case(
+    snapshot: &Snapshot,
+    c: &Case,
+    executable: &Path,
+    before_spawn: impl FnOnce(),
+) -> Result<CaseResult, Value> {
     use std::io::Read;
     use std::process::{Command, Stdio};
-    for input in &c.inputs {
-        bound_input(root, input, 1_048_576)?;
-    }
-    let mut process =
-        Command::new(std::env::current_exe().map_err(|_| error("kb-evidence-checker"))?)
-            .args(&c.arguments)
-            .current_dir(root)
-            .env_remove("ZENO_FCIS_KB")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|_| error("kb-evidence-runner-start"))?;
+    before_spawn();
+    let mut process = Command::new(executable)
+        .args(&c.arguments)
+        .current_dir(snapshot.root())
+        .env_remove("ZENO_FCIS_KB")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|_| error("kb-evidence-runner-start"))?;
     let stdout = process
         .stdout
         .take()
@@ -397,9 +404,25 @@ pub(crate) fn replay(path: &Path, out: &Path) -> (u8, Value) {
         let r: Recipe = serde_json::from_slice(&bytes).map_err(|_| error("kb-evidence-recipe"))?;
         validate_recipe(&r)?;
         let root = recipe.parent().ok_or_else(|| error("kb-evidence-parent"))?;
-        let dependency_sha256 = dependencies(root, &r, None)?;
-        let positive = run_case(root, &r.positive)?;
-        let negative = run_case(root, &r.negative)?;
+        // A receipt created in either complete contract tree would immediately
+        // change the dependency inventory that it claims to validate. Compare
+        // physical parents so symlink aliases and `..` cannot bypass refusal.
+        for case in [&r.positive, &r.negative] {
+            if case.arguments[0] == "contract" {
+                let subject = std::fs::canonicalize(root.join(&case.arguments[2]))
+                    .map_err(|_| error("kb-evidence-snapshot-source"))?;
+                if parent.starts_with(subject) {
+                    return Err(error("kb-evidence-output-subject"));
+                }
+            }
+        }
+        let positive_snapshot = Snapshot::new(root, &r.positive, &r.dependencies)?;
+        let negative_snapshot = Snapshot::new(root, &r.negative, &r.dependencies)?;
+        let dependency_sha256 =
+            staged_dependencies(&positive_snapshot, &negative_snapshot, &r, None)?;
+        let executable = std::env::current_exe().map_err(|_| error("kb-evidence-checker"))?;
+        let positive = run_case(&positive_snapshot, &r.positive, &executable, || {})?;
+        let negative = run_case(&negative_snapshot, &r.negative, &executable, || {})?;
         // A dependency changing during replay invalidates the entire result.
         if dependencies(root, &r, None)? != dependency_sha256 {
             return Err(error("kb-evidence-stale"));
@@ -449,7 +472,7 @@ pub(crate) fn replay(path: &Path, out: &Path) -> (u8, Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn recipe() -> Recipe {
+    pub(super) fn recipe() -> Recipe {
         let input = Input {
             path: "original.zcve".into(),
             sha256: "a".repeat(64),
@@ -520,3 +543,7 @@ mod tests {
         assert!(!checked(&r.positive, &result));
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "knowledge_evidence/tests.rs"]
+mod snapshot_tests;

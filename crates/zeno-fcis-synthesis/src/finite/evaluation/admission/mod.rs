@@ -88,7 +88,7 @@ pub(crate) fn kind(
             require_node(previous, b, false)?;
             Ok(matches!(op, Op::Lt(..)))
         }
-        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) => {
+        Op::MulDivFloor(a, b, d) | Op::MulDivCeil(a, b, d) | Op::SignedMulDivFloor(a, b, d) => {
             require_node(previous, a, false)?;
             require_node(previous, b, false)?;
             require_node(previous, d, false)?;

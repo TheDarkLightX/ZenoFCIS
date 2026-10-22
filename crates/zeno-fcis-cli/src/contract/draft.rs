@@ -51,7 +51,7 @@ pub(crate) struct Assessment {
     pub(crate) ready: bool,
     pub(crate) generated: GeneratedContract,
     pub(crate) examples: String,
-    pub(crate) questions: BTreeSet<Vec<i64>>,
+    pub(crate) questions: BTreeSet<Vec<i128>>,
 }
 
 pub(crate) fn hash(bytes: &[u8]) -> String {
@@ -335,29 +335,29 @@ impl Draft {
             let values = witness["input"]
                 .as_array()
                 .ok_or("review witness lacks input")?;
-            let input: Vec<i64> = values
+            let input: Vec<i128> = values
                 .iter()
                 .map(|v| {
                     v.as_str()
                         .ok_or("review input is not decimal".to_owned())
-                        .and_then(|s| s.parse::<i64>().map_err(|e| e.to_string()))
+                        .and_then(|s| s.parse::<i128>().map_err(|e| e.to_string()))
                 })
                 .collect::<Result<_, _>>()?;
             if questions.insert(input.clone()) {
                 details.push(
-                    json!({"input": input, "proposed_example": witness["proposed_example"],
+                    json!({"input": crate::report_numbers::integers(&input), "proposed_example": witness["proposed_example"],
                     "alternative_example": witness["mutant_as_example"],
                     "label_supplied": labels.iter().any(|l| l.input == input)}),
                 );
             }
         }
-        let covered: BTreeSet<Vec<i64>> = labels.iter().map(|l| l.input.clone()).collect();
+        let covered: BTreeSet<Vec<i128>> = labels.iter().map(|l| l.input.clone()).collect();
         let missing: Vec<_> = questions.difference(&covered).cloned().collect();
         let ready = !labels.is_empty() && missing.is_empty() && reviewed.summary().findings == 0;
-        let report = json!({"shape": shape, "proposal": proposal.id, "ready": ready,
+        let report = json!({"schema":"zeno-fcis/contract-draft-assessment/2", "integer_encoding":crate::report_numbers::ENCODING, "shape": shape, "proposal": proposal.id, "ready": ready,
             "status": if ready {"labels-agree"} else {"needs-labels-or-revision"},
-            "labels_compared": labels, "label_provenance": {"initial": self.provenance, "additional": self.labels},
-            "questions": details, "unlabeled_inputs": missing,
+            "labels_compared": labels.iter().map(|label| json!({"input": crate::report_numbers::integers(&label.input), "text": label.text, "difference": label.difference})).collect::<Vec<_>>(), "label_provenance": {"initial": self.provenance, "additional": self.labels},
+            "questions": details, "unlabeled_inputs": missing.iter().map(|input| crate::report_numbers::integers(input)).collect::<Vec<_>>(),
             "review": packet, "authority": "none", "hosted_model": "off",
             "assumptions": "Labels and their provenance are supplied intent assumptions, not authenticated owner approval. F2 remains advisory."});
         Ok(Assessment {

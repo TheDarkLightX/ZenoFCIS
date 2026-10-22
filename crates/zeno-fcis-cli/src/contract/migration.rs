@@ -423,7 +423,10 @@ fn expression(
                 names(then, found);
                 names(otherwise, found);
             }
-            Ast::MulDiv(_, a, b, d) => {
+            Ast::MulDiv(_, a, b, d)
+            | Ast::SignedMulDivFloor(a, b, d)
+            | Ast::ScaledMulDiv(_, _, a, b, d, _)
+            | Ast::RepeatMulDiv(_, a, b, d, _) => {
                 names(a, found);
                 names(b, found);
                 names(d, found);
@@ -433,7 +436,7 @@ fn expression(
                     names(a, found);
                 }
             }
-            Ast::Bool(_) | Ast::Int(_) => {}
+            Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => {}
         }
     }
     let mut found = std::collections::BTreeSet::new();
@@ -515,10 +518,7 @@ fn scalar_domain(kind: Kind<'_>) -> Result<ScalarDomain, String> {
             return Err("text has no supported finite migration expression domain".to_owned());
         }
     };
-    Ok(ScalarDomain::Int {
-        min: i64::try_from(min).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
-        max: i64::try_from(max).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
-    })
+    Ok(ScalarDomain::Int { min, max })
 }
 
 fn fields_syntax(fields: &[(u16, Field)]) -> Syntax {

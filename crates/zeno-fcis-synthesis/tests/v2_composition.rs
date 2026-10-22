@@ -56,26 +56,26 @@ fn leaf(type_id: u32, ids: &[u16], sum: bool) -> InputLeaf {
         .enumerate()
         .map(|(code, &id)| Variant {
             id,
-            code: code as i64,
+            code: code as i128,
         })
         .collect();
     if sum {
         InputLeaf::Sum {
             type_id,
             min: 0,
-            max: ids.len() as i64 - 1,
+            max: ids.len() as i128 - 1,
             variants,
         }
     } else {
         InputLeaf::Enum {
             type_id,
             min: 0,
-            max: ids.len() as i64 - 1,
+            max: ids.len() as i128 - 1,
             variants,
         }
     }
 }
-fn int(id: u16, min: i64, max: i64) -> InputField {
+fn int(id: u16, min: i128, max: i128) -> InputField {
     InputField {
         id,
         leaf: InputLeaf::I128 { min, max },
@@ -192,12 +192,11 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
         };
         x
     }
-    fn number(v: &Value) -> i64 {
+    fn number(v: &Value) -> i128 {
         let ValueRef::I128(x) = v.view() else {
             panic!("artifact integer")
         };
-        i64::try_from(x)
-            .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
+        x
     }
     fn domains(v: &Value) -> Vec<ScalarDomain> {
         tuple(v)
@@ -219,6 +218,18 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
         .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"));
     let v = tuple(&value);
     assert_eq!(v[0].view(), ValueRef::Text(finite::PROFILE));
+    let imported = zeno_fcis_synthesis::finite_runtime::import_program(bytes)
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    {
+        assert_eq!(
+            imported
+                .value()
+                .unwrap_or_else(|e| panic!("{e:?}"))
+                .zcve_bytes()
+                .unwrap_or_else(|e| panic!("{e:?}")),
+            bytes
+        );
+    }
     let schema = tuple(&v[1]);
     let nodes = tuple(&v[2])
         .iter()
@@ -254,8 +265,33 @@ fn template_graph(bytes: &[u8]) -> ScalarOwned {
                 .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
         })
         .collect();
-    ScalarOwned::try_new(domains(&schema[0]), domains(&schema[1]), nodes, roots)
-        .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"))
+    let main = ScalarOwned::try_new(domains(&schema[0]), domains(&schema[1]), nodes, roots)
+        .unwrap_or_else(|error| panic!("unexpected composition oracle refusal: {error:?}"));
+    // Reification is only for this bounded original-wire corpus. Check every
+    // input against the runtime importer's checked-i128 execution.
+    let size = main
+        .inputs()
+        .iter()
+        .try_fold(1u128, |size, d| {
+            let (min, max) = d.bounds();
+            size.checked_mul(min.abs_diff(max).checked_add(1)?)
+        })
+        .unwrap_or_else(|| panic!("expected a value"));
+    assert!(size <= 100_000);
+    let mut point: Vec<_> = main.inputs().iter().map(|d| d.bounds().0).collect();
+    for _ in 0..size {
+        assert_eq!(imported.evaluate(&point), main.evaluate(&point));
+        for (v, d) in point.iter_mut().zip(main.inputs()).rev() {
+            let (min, max) = d.bounds();
+            if *v == max {
+                *v = min;
+            } else {
+                *v += 1;
+                break;
+            }
+        }
+    }
+    main
 }
 #[derive(Default)]
 struct Predicate {
@@ -1333,7 +1369,7 @@ fn with_account(run: impl FnOnce(&Descriptor<'_>)) {
         variants: (120..=122)
             .map(|id| Variant {
                 id,
-                code: id as i64,
+                code: id as i128,
             })
             .collect(),
     };
@@ -1358,12 +1394,12 @@ fn with_account(run: impl FnOnce(&Descriptor<'_>)) {
     let outputs = [
         InputLeaf::I128 { min: 0, max: 6 },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     ];
     let assign = |field, value, max| Assignment {

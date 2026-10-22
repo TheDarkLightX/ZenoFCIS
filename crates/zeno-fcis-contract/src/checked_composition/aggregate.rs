@@ -288,8 +288,15 @@ impl Layout {
                 Box::new(self.renamed(leaf, then)?),
                 Box::new(self.renamed(leaf, otherwise)?),
             ),
-            Ast::MulDiv(..) | Ast::ProductsGe(..) => {
+            Ast::MulDiv(..)
+            | Ast::SignedMulDivFloor(..)
+            | Ast::ScaledMulDiv(..)
+            | Ast::RepeatMulDiv(..)
+            | Ast::ProductsGe(..) => {
                 return Err("arithmetic extension is outside the assembly profile".to_owned());
+            }
+            Ast::DecisionReason => {
+                return Err("a local decision reason has no aggregate observation".to_owned());
             }
             Ast::Div(rounding, left, right) => Ast::Div(
                 *rounding,
@@ -624,7 +631,7 @@ pub(crate) fn generate(
             cases.push(Value::Object(entry));
         }
     }
-    let mut genesis = Map::new();
+    let mut genesis = BTreeMap::new();
     for (slot, (position, field)) in layout.slots.iter().enumerate() {
         let value = compiled[*position]
             .rules
@@ -639,8 +646,8 @@ pub(crate) fn generate(
         genesis.insert(
             state_field(slot).to_string(),
             match value {
-                Constant::Bool(value) => json!(value),
-                Constant::Int(value) => json!(value),
+                Constant::Bool(value) => GenesisValue::Bool(*value),
+                Constant::Int(value) => GenesisValue::Int(*value),
             },
         );
     }
@@ -651,16 +658,32 @@ pub(crate) fn generate(
         "leaf_bindings": {},
         "variables": {},
         "cases": cases,
-        "genesis": genesis,
         "law_kinds": law_kinds,
     });
-    let mut rules_text = serde_json::to_string_pretty(&rules)
-        .map_err(|error| profile("v2/policy.json", error.to_string()))?;
+    let mut rules_text = serde_json::to_string_pretty(&PolicyDocument {
+        fields: rules,
+        genesis,
+    })
+    .map_err(|error| profile("v2/policy.json", error.to_string()))?;
     rules_text.push('\n');
     Ok(AggregateSources {
         project,
         rules: rules_text,
     })
+}
+
+// Invocation-local compiler input preparation; preserve raw integer tokens.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum GenesisValue {
+    Bool(bool),
+    Int(i128),
+}
+#[derive(serde::Serialize)]
+struct PolicyDocument {
+    #[serde(flatten)]
+    fields: Value,
+    genesis: BTreeMap<String, GenesisValue>,
 }
 
 /// Unique declaration names: a repeated name gets its ID appended.

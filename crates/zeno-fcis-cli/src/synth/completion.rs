@@ -18,7 +18,7 @@ use zeno_fcis_synthesis::finite::completion::{
 use zeno_fcis_synthesis::finite::{Domain, Error, MAX_INPUTS, MAX_STEPS, PROFILE};
 
 const SCHEMA: &str = "zeno-fcis/completion-problem/1";
-const RESULT_SCHEMA: &str = "zeno-fcis/completion-result/1";
+const RESULT_SCHEMA: &str = "zeno-fcis/completion-result/2";
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
@@ -106,7 +106,7 @@ struct PreparedCase {
 fn fail(exit: u8, status: &str, detail: Value) -> Failure {
     Failure {
         exit,
-        report: json!({"schema": RESULT_SCHEMA, "status": status,
+        report: json!({"schema": RESULT_SCHEMA, "integer_encoding": crate::report_numbers::ENCODING, "status": status,
         "authority": "none", "detail": detail}),
     }
 }
@@ -233,7 +233,7 @@ fn load(path: &Path) -> Result<Loaded> {
 }
 
 fn verified_report(model: &CompletionProblem, checked: &VerifiedCompletion, bytes: &[u8]) -> Value {
-    json!({"schema": RESULT_SCHEMA, "status": "verified", "authority": "none",
+    json!({"schema": RESULT_SCHEMA, "integer_encoding": crate::report_numbers::ENCODING, "status": "verified", "authority": "none",
         "profile": PROFILE, "problem": hex(model.problem_hash()),
         "states_checked": model.state_count(), "commands_per_state": model.command_count(),
         "maximum_exit_steps": checked.plan().steps.iter().map(|row| row.remaining).max().unwrap_or(0),
@@ -375,23 +375,25 @@ fn semantic(error: CompletionError) -> Failure {
             "resource-limit",
             json!({"resource": resource}),
         ),
-        CompletionError::NoExit { state } => {
-            fail(crate::INVALID, "no-exit", json!({"state": state}))
-        }
+        CompletionError::NoExit { state } => fail(
+            crate::INVALID,
+            "no-exit",
+            json!({"state": crate::report_numbers::integers(&state)}),
+        ),
         CompletionError::Evaluation { input, source } => fail(
             crate::INVALID,
             "evaluation-trap",
-            json!({"input": input, "error": source.to_string()}),
+            json!({"input": crate::report_numbers::integers(&input), "error": source.to_string()}),
         ),
         CompletionError::RejectedStateChange { input } => fail(
             crate::INVALID,
             "rejected-state-change",
-            json!({"input": input}),
+            json!({"input": crate::report_numbers::integers(&input)}),
         ),
         CompletionError::InvalidPlan { reason, state } => fail(
             crate::INVALID,
             "invalid-plan",
-            json!({"reason": reason, "state": state}),
+            json!({"reason": reason, "state": state.as_deref().map(crate::report_numbers::integers)}),
         ),
         CompletionError::Decoding(error) => decoded(error),
         CompletionError::Encoding(error) => fail(
@@ -437,5 +439,62 @@ fn decoded(error: DecodeError) -> Failure {
             "invalid-plan-bytes",
             json!({"message": error.to_string()}),
         )
+    }
+}
+
+#[cfg(test)]
+mod report_tests {
+    use super::*;
+    #[test]
+    fn all_completion_error_tuples_use_lossless_reports() {
+        for value in [
+            i128::MIN,
+            i128::MAX,
+            -(1i128 << 100),
+            1 << 100,
+            (1 << 53) + 1,
+            5,
+        ] {
+            let encoded = crate::report_numbers::integers(&[value]);
+            for (error, field) in [
+                (CompletionError::NoExit { state: vec![value] }, "state"),
+                (
+                    CompletionError::Evaluation {
+                        input: vec![value],
+                        source: Error::Invalid("test trap"),
+                    },
+                    "input",
+                ),
+                (
+                    CompletionError::RejectedStateChange { input: vec![value] },
+                    "input",
+                ),
+                (
+                    CompletionError::InvalidPlan {
+                        reason: "test",
+                        state: Some(vec![value]),
+                    },
+                    "state",
+                ),
+            ] {
+                let failure = semantic(error);
+                assert_eq!(failure.exit, crate::INVALID);
+                assert_eq!(failure.report["schema"], "zeno-fcis/completion-result/2");
+                assert_eq!(
+                    failure.report["integer_encoding"],
+                    crate::report_numbers::ENCODING
+                );
+                assert_eq!(failure.report["detail"][field], encoded);
+                assert!(serde_json::to_vec(&failure.report).is_ok());
+            }
+        }
+        assert_eq!(
+            semantic(CompletionError::InvalidPlan {
+                reason: "test",
+                state: None
+            })
+            .report["detail"]["state"],
+            Value::Null
+        );
     }
 }

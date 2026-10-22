@@ -1,0 +1,22 @@
+zeno 1;
+project 1 kb_fixture;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int Flag;
+field 110 100 value 105;
+variant 120 101 Set none;
+reason 200 denied precedence 0;
+component 400 fixture {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 32;
+}
+merge [400];
+law 500 bounded_state on commit, genesis = post.100.110 >= 0 && post.100.110 <= 1;
+law 501 acceptance on accept = post.100.110 == pre.100.110;
+law 502 no_failure on failure = false;
+law 503 rejection on reject = true;

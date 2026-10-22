@@ -25,7 +25,7 @@ pub(crate) type NodeId = u32;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum ENode {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(ClassId, ClassId),
     Sub(ClassId, ClassId),
@@ -90,7 +90,7 @@ impl ENode {
                 self,
                 Self::Input(_) | Self::Bool(_) | Self::And(..) | Self::Not(_) | Self::Select(..)
             ),
-            Profile::CheckedI64V1 => true,
+            Profile::CheckedI128V1 => true,
         }
     }
 

@@ -170,8 +170,71 @@ impl Parser {
         } else {
             declared
         };
+        let declared = if self.take_keyword("unit") {
+            self.parse_quantity(declared)?
+        } else {
+            declared
+        };
         self.expect_symbol(TokenKind::Semicolon, "type");
         Some(declared)
+    }
+    fn parse_scale(&mut self) -> Option<u8> {
+        let text = self.take_identifier("quantity.scale")?;
+        let scale = text
+            .as_str()
+            .strip_prefix('e')
+            .and_then(|s| s.parse::<u8>().ok())
+            .filter(|s| *s <= 38);
+        if scale.is_none() {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "quantity.scale",
+                "e0..e38",
+                text.as_str(),
+                "declare a literal decimal exponent",
+            );
+        }
+        scale
+    }
+    fn parse_quantity(&mut self, declared: TypeDecl) -> Option<TypeDecl> {
+        let mut factors = Vec::new();
+        let mut sign = 1;
+        loop {
+            if self.current().kind == TokenKind::Number(1) {
+                self.advance();
+            } else {
+                factors.push((self.take_identifier("quantity.unit")?, sign));
+            }
+            if self.take_symbol(&TokenKind::Star) {
+                sign = 1;
+            } else if self.take_symbol(&TokenKind::Slash) {
+                sign = -1;
+            } else {
+                break;
+            }
+        }
+        if !self.take_keyword("scale") {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "quantity.scale",
+                "scale eP",
+                self.describe_current(),
+                "both unit and scale are required",
+            );
+            return None;
+        }
+        let quantity = Quantity::try_new(factors, self.parse_scale()?)?;
+        let result = declared.with_quantity(quantity);
+        if result.is_none() {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "quantity",
+                "int",
+                "non-integer",
+                "only integer declarations carry units",
+            );
+        }
+        result
     }
     /// Parses `MIN..=MAX` after `in` in a type declaration. The bounds are
     /// inclusive, as in the schema; `..` alone is refused, because quantifiers
@@ -726,7 +789,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil")
+                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor")
         );
         if named_predicate {
             let name = self
@@ -811,6 +874,10 @@ impl Parser {
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
         if self.take_symbol(&TokenKind::Minus) {
+            if self.current().kind == TokenKind::Number(1u128 << 127) {
+                self.advance();
+                return ValueExpr::Int(i128::MIN);
+            }
             let value = self.nested("value.negation", ValueExpr::Int(0), |parser| {
                 parser.parse_value_atom()
             });
@@ -818,7 +885,19 @@ impl Parser {
         }
         if let TokenKind::Number(value) = self.current().kind.clone() {
             self.advance();
-            return ValueExpr::Int(i128::from(value));
+            return match i128::try_from(value) {
+                Ok(value) => ValueExpr::Int(value),
+                Err(_) => {
+                    self.error(
+                        DiagnosticCode::InvalidNumber,
+                        "value.integer",
+                        "i128",
+                        text(value),
+                        "use a signed 128-bit integer",
+                    );
+                    ValueExpr::Int(0)
+                }
+            };
         }
         if self.take_symbol(&TokenKind::LParen) {
             let value = self.nested("value.group", ValueExpr::Int(0), |parser| {
@@ -830,6 +909,58 @@ impl Parser {
         let name = self
             .take_identifier("value")
             .unwrap_or_else(fallback_identifier);
+        if matches!(
+            name.as_str(),
+            "mul_div_floor"
+                | "mul_div_ceil"
+                | "signed_mul_div_floor"
+                | "repeat_mul_div_floor"
+                | "repeat_signed_mul_div_floor"
+        ) && self.take_symbol(&TokenKind::LParen)
+        {
+            let a = self.nested("value.fused.left", ValueExpr::Int(0), |p| p.parse_value());
+            self.expect_symbol(TokenKind::Comma, "fused division");
+            let b = self.nested("value.fused.right", ValueExpr::Int(0), |p| p.parse_value());
+            self.expect_symbol(TokenKind::Comma, "fused division");
+            let d = self.nested("value.fused.denominator", ValueExpr::Int(0), |p| {
+                p.parse_value()
+            });
+            let signed = name.as_str().contains("signed");
+            let a = Box::new(a);
+            let b = Box::new(b);
+            let d = Box::new(d);
+            if name.as_str().starts_with("repeat_") {
+                self.expect_symbol(TokenKind::Comma, "repeat count");
+                let count = self.take_u16("repeat count").filter(|p| *p <= 16);
+                if count.is_none() {
+                    self.error(
+                        DiagnosticCode::InvalidDeclaration,
+                        "repeat count",
+                        "literal 0..16",
+                        "unsupported",
+                        "use a bounded literal count",
+                    );
+                }
+                self.expect_symbol(TokenKind::RParen, "repeat");
+                return ValueExpr::RepeatMulDiv(signed, a, b, d, count.unwrap_or(0) as u8);
+            }
+            let mode = if name.as_str() == "mul_div_ceil" {
+                DivisionMode::Ceil
+            } else {
+                DivisionMode::Floor
+            };
+            if self.take_symbol(&TokenKind::Comma) {
+                let scale = self.parse_scale().unwrap_or(0);
+                self.expect_symbol(TokenKind::RParen, "scaled division");
+                return ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale);
+            }
+            self.expect_symbol(TokenKind::RParen, "fused division");
+            return if signed {
+                ValueExpr::SignedMulDivFloor(a, b, d)
+            } else {
+                ValueExpr::MulDiv(mode, a, b, d)
+            };
+        }
         if matches!(name.as_str(), "div_exact" | "div_floor" | "div_ceil")
             && self.take_symbol(&TokenKind::LParen)
         {
@@ -1055,7 +1186,19 @@ impl Parser {
     fn take_number(&mut self, path: &str) -> Option<u64> {
         if let TokenKind::Number(value) = self.current().kind.clone() {
             self.advance();
-            Some(value)
+            match u64::try_from(value) {
+                Ok(value) => Some(value),
+                Err(_) => {
+                    self.error(
+                        DiagnosticCode::InvalidNumber,
+                        path,
+                        "u64",
+                        text(value),
+                        "use a value within the u64 range",
+                    );
+                    None
+                }
+            }
         } else {
             self.error(
                 DiagnosticCode::ExpectedToken,
@@ -1101,8 +1244,34 @@ impl Parser {
     }
     fn take_i128(&mut self, path: &str) -> Option<i128> {
         let negative = self.take_symbol(&TokenKind::Minus);
-        let value = i128::from(self.take_number(path)?);
-        Some(if negative { -value } else { value })
+        let TokenKind::Number(magnitude) = self.current().kind.clone() else {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                path,
+                "integer",
+                self.describe_current(),
+                "use an explicit decimal integer",
+            );
+            return None;
+        };
+        self.advance();
+        let value = if negative && magnitude == 1u128 << 127 {
+            Some(i128::MIN)
+        } else {
+            i128::try_from(magnitude)
+                .ok()
+                .map(|value| if negative { -value } else { value })
+        };
+        if value.is_none() {
+            self.error(
+                DiagnosticCode::InvalidNumber,
+                path,
+                "i128",
+                text(magnitude),
+                "use a signed 128-bit integer",
+            );
+        }
+        value
     }
     fn take_id(&mut self, path: &str) -> Option<StableId> {
         let value = self.take_u32(path)?;

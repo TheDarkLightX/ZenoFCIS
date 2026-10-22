@@ -7,6 +7,7 @@ mod binding;
 mod checker_process;
 mod compliance_gateway;
 mod composition_command;
+mod containment_policy;
 mod contract;
 mod contract_adopt;
 mod contract_diff;
@@ -28,6 +29,7 @@ mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
+mod report_numbers;
 mod review_command;
 mod shell_v2;
 mod symbolic;
@@ -135,6 +137,9 @@ claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pr
     disable_help_subcommand = true
 )]
 struct Cli {
+    /// Backend override; otherwise ZENO_FCIS_CONTAINMENT_BACKEND, then auto (finite data only).
+    #[arg(long, global = true, value_enum)]
+    containment_backend: Option<containment_policy::Backend>,
     /// Ordered external KB files; omission consults ZENO_FCIS_KB for loop sessions.
     #[arg(long, global = true)]
     kb: Vec<PathBuf>,
@@ -212,12 +217,18 @@ enum Command {
         #[command(subcommand)]
         command: transform_command::Command,
     },
-    /// Search for a smaller equivalent finite scalar program; every candidate is checked on every input tuple.
+    /// Find a smaller finite program without changing its behavior on the declared input domain.
+    #[command(
+        after_help = "Workflow:\n  contract export-program APP --out original.zcve\n  optimize --program original.zcve --candidate-out smaller.zcve --receipt receipt.json\n  transform replay --original original.zcve --candidate smaller.zcve --receipt receipt.json\n\nEvery accepted candidate passes the full-domain transform check. Optimization does not adopt the result; contract adopt is a separate step. Unsupported instructions are reported explicitly; increasing search limits does not add instruction support."
+    )]
     Optimize {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
     },
-    /// Run the bounded optimization loop: proposers suggest, the transform checker judges.
+    /// Learn, complete or improve finite programs through bounded proposals and checker feedback.
+    #[command(
+        after_help = "Choose by task:\n  Check a known replacement: transform check\n  Find a smaller program in one run: optimize\n  Keep a resumable proposal history: loop open, then candidate or run, then resume\n  Learn from finite examples: loop learn\n  Complete holes in an expression: loop sketch\n  Ask about decisions left open by contract laws: loop question\n\nA loop is propose, check, read feedback, revise. Read each command's checked scope: fitting examples alone does not establish equivalence over the full domain. Results do not adopt a program or authorize application effects."
+    )]
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
@@ -402,17 +413,34 @@ enum SmtBackend {
 }
 
 fn main() -> ExitCode {
+    if let Some(code) = checker_process::bootstrap() {
+        return ExitCode::from(code);
+    }
     match Cli::try_parse() {
         Ok(cli) => {
             if let Command::Kb { operation } = cli.command {
                 return ExitCode::from(knowledge_command::execute(&cli.kb, operation));
             }
-            if let Some(result) =
-                loop_command::knowledge_operation(&cli.command, &cli.kb, &cli.kb_task)
+            let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {
-                print_json(&result.1);
-                return ExitCode::from(result.0);
-            }
+                Ok(admission) => admission,
+                Err(failure) => {
+                    return ExitCode::from(checker_process::refuse(&cli.command, failure));
+                }
+            };
+            let resolved_kb =
+                if cli.kb.is_empty() && loop_command::has_knowledge_operation(&cli.command) {
+                    match knowledge_command::paths(&[]) {
+                        Ok(paths) => Some(paths),
+                        Err(report) => {
+                            print_json(&report);
+                            return ExitCode::from(INVALID);
+                        }
+                    }
+                } else {
+                    None
+                };
+            let kb_paths = resolved_kb.as_deref().unwrap_or(&cli.kb);
             let knowledge = match loop_knowledge::prepare(
                 &cli.command,
                 &cli.kb,
@@ -445,6 +473,7 @@ fn main() -> ExitCode {
                 BLOCKED
             } else if let Some(code) = checker_process::dispatch(
                 &cli.command,
+                admission,
                 knowledge.as_ref().map(|k| k.policy.snapshot.as_str()),
                 knowledge.as_ref().map(|k| k.invocation()),
                 if cli.kb_task.is_empty() {
@@ -452,12 +481,19 @@ fn main() -> ExitCode {
                 } else {
                     None
                 },
-                if cli.kb.is_empty() {
+                if let Some(paths) = &resolved_kb {
+                    Some(paths)
+                } else if cli.kb.is_empty() {
                     knowledge.as_ref().map(|k| k.paths())
                 } else {
                     None
                 },
             ) {
+                code
+            } else if let Some((code, report)) =
+                loop_command::knowledge_operation(&cli.command, kb_paths, &cli.kb_task)
+            {
+                print_json(&report);
                 code
             } else {
                 match cli.command {
@@ -609,13 +645,13 @@ fn describe(path: &[String]) -> u8 {
             "sha256":loop_command::implementation_identity()},
         "authority": "diagnostic-only",
         "normal_program": {
-            "declaration_api": "zeno_fcis::program", "authority": "none",
+            "declaration_api": "generated v2_contract.rs", "authority": "none",
             "runtime_admission": "not-run",
             "templates": ["durable-counter", "account-lockout", "order-fulfillment",
                 "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
                 "prepared-counter", "compliance-gateway"],
-            "binding": ["complete original schema and policy", "complete ProgramDefinition",
-                "original frame and channel links", "bind_catalog", "bind_program"],
+            "binding": ["complete original schema and policy", "complete composition::Descriptor",
+                "original frame and channel links", "catalog::bind_original", "authority::bind"],
             "execution": "Original envelopes, private meter, complete decision, required transition/genesis laws, then private Publication",
             "unsupported": "Named library refusal; no native callback authority fallback",
             "shell": "Context authentication, durable replay/state comparison and physical effects require the trusted host"
@@ -663,6 +699,7 @@ fn describe_tree(command: &clap::Command, path: &[String]) -> Value {
         .collect();
     json!({
         "name": command.get_name(), "path": path, "about": command.get_about().map(ToString::to_string),
+        "guidance": command.get_after_help().map(ToString::to_string),
         "subcommand_required": command.is_subcommand_required_set(),
         "arguments": arguments, "subcommands": commands, "effects": describe_effects(path)
     })
@@ -1721,7 +1758,9 @@ fn diagnostic_json(path: &Path, diagnostics: &[&Diagnostic], truncated: bool) ->
 }
 
 fn print_json(value: &Value) {
-    match serde_json::to_string(value) {
+    let mut value = value.clone();
+    checker_process::label_public_result(&mut value);
+    match serde_json::to_string(&value) {
         Ok(encoded) => println!("{encoded}"),
         Err(error) => eprintln!("JSON encoding failed: {error}"),
     }
@@ -1894,6 +1933,14 @@ mod tests {
         // Every loop command, named by the parser, so a new one needs review.
         let example = |path: &[&str]| -> &[&str] {
             match path {
+                ["loop", "capture", "whole"] => &[
+                    "--spec",
+                    "s.json",
+                    "--reference",
+                    "r.py",
+                    "--candidate-json",
+                    "c.json",
+                ],
                 ["loop", "capture", "open"] => {
                     &["--spec", "s.json", "--reference", "r.py", "--session", "s"]
                 }
@@ -1911,6 +1958,13 @@ mod tests {
                     "family" => &["--instances", "m.json", "--program", "p.json"],
                     "transfer" => &["--from", "p.json", "--to-instances", "m.json"],
                     "meaning" => &["--original", "p.zcve", "--candidate", "c.zcve"],
+                    "evaluate" => &[
+                        "--original",
+                        "p.zcve",
+                        "--expressions",
+                        "e.json",
+                        "--input=0",
+                    ],
                     "question" => &["--contract", "app"],
                     "teach-back" => &["--contract", "app", "--rule", "r.json"],
                     "decompose" => &["--contract", "app", "--architecture", "a.json"],

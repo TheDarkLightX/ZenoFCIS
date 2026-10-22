@@ -69,7 +69,43 @@ class CustodyTest(unittest.TestCase):
         report = self.check(tag=f"v{fixture.VERSION}", remote=self.source.commit)
         self.assertEqual(report["status"], "passed", json.dumps(report["checks"], indent=1)[:4000])
         self.assertEqual(len(report["checks"]), 11)
+        self.assertEqual(report["not_run"], [])
         self.assertEqual(report["checks"]["C7-compiled-inputs"]["counts"]["registry_inputs"], 2)
+
+    def test_an_unrun_check_is_listed_and_never_counted_as_passed(self):
+        report = self.check(bindings=None, downloads=None)
+        self.assertEqual(report["status"], "incomplete")
+        self.assertEqual(len(report["checks"]), 9)
+        self.assertTrue(all(item["passed"] for item in report["checks"].values()))
+        self.assertEqual(report["not_run"], ["C10-cross-job", "C11-download-list"])
+        self.assertNotIn("C10-cross-job", report["checks"])
+        for overrides, missing in (({"bindings": None}, ["C10-cross-job"]), ({"downloads": None}, ["C11-download-list"])):
+            partial = self.check(**overrides)
+            self.assertEqual((partial["status"], partial["not_run"], len(partial["checks"])), ("incomplete", missing, 10))
+        # A failure among the checks that ran outranks the unrun ones.
+        journey = self.release / "hosts" / fixture.LINUX / "INSTALLED-JOURNEY.json"
+        journey.unlink()
+        failed = self.check(bindings=None, downloads=None)
+        self.assertEqual(failed["status"], "failed")
+        self.assertIn("C6-binary-archives", self.failed(failed))
+
+    def test_only_a_complete_run_exits_zero(self):
+        bindings = self.root / "JOB-OUTPUTS.json"
+        bindings.write_text(json.dumps(self.source.bindings(self.release)))
+        common = ["--release", str(self.release), "--repo", str(self.source.repo),
+                  "--cargo-home", str(self.source.cargo_home)]
+        for extra, code, status in (([], 2, "incomplete"), (["--bindings", str(bindings)], 2, "incomplete"),
+                                    (["--bindings", str(bindings), "--downloads", str(self.downloads)], 0, "passed")):
+            report = self.root / f"custody-{code}-{len(extra)}.json"
+            self.assertEqual(custody.main([*common, "--report", str(report), *extra]), code)
+            self.assertEqual(json.loads(report.read_text())["status"], status)
+        (self.release / "hosts" / fixture.LINUX / "INSTALLED-JOURNEY.json").unlink()
+        self.assertEqual(custody.main([*common, "--report", str(self.root / "failed.json")]), 1)
+
+    def test_signing_key_without_download_list_still_refuses(self):
+        key = self.root / "RELEASE-SIGNING-KEY.pub"
+        key.write_text("ssh-ed25519 AAAA\n")
+        self.assertIn("C11-download-list", self.failed(self.check(downloads=None, signing_key=key)))
 
     def test_a_stat_only_index_rewrite_still_passes(self):
         index = self.source.repo / ".git" / "index"
@@ -358,7 +394,7 @@ class CustodyTest(unittest.TestCase):
         self.assertIn("C9-release-index", self.failed(self.check()))
 
     def test_bindings_and_rustc_must_agree(self):
-        self.assertIn("C10-cross-job", self.failed(self.check(bindings=None)))
+        self.assertIn("C10-cross-job", self.failed(self.check(bindings={})))
         bindings = self.source.bindings(self.release)
         bindings[fixture.MAC]["journey_sha256"] = "0" * 64
         self.assertIn("C10-cross-job", self.failed(self.check(bindings=bindings)))
@@ -386,7 +422,7 @@ class CustodyTest(unittest.TestCase):
                 self.assertEqual(self.failed(self.check(bindings=bindings)), {"C10-cross-job"}, label)
 
     def test_download_list_controls(self):
-        self.assertIn("C11-download-list", self.failed(self.check(downloads=None)))
+        self.assertIn("C11-download-list", self.failed(self.check(downloads=self.root / "missing-list")))
         lines = self.downloads.read_text().splitlines()
         names = [line.split("  ")[1] for line in lines]
         self.assertEqual(names, sorted([f"zeno-fcis-{fixture.VERSION}-{fixture.LINUX}.tar.gz",
@@ -416,37 +452,6 @@ class CustodyTest(unittest.TestCase):
             with self.subTest(label):
                 self.downloads.write_text(text)
                 self.assertIn("C11-download-list", self.failed(self.check(signing_key=given)), label)
-
-
-class PackagedRegressionInputsTest(unittest.TestCase):
-    def test_manifest_matches_every_current_input(self):
-        for row in rc_package.load_packaged_test_inputs():
-            with self.subTest(package=row["package"], target=row["target"], path=row["path"]):
-                self.assertEqual(rc_package.sha256(rc_package.ROOT / row["path"]), row["sha256"])
-
-    def test_public_arithmetic_inputs_stage_only_at_the_reviewed_digest(self):
-        entries = [row for row in rc_package.load_packaged_test_inputs()
-                   if row["path"].startswith(("examples/arithmetic-", "tools/test-data/scalar-arithmetic/"))]
-        self.assertEqual(len(entries), 7)
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory)
-            staged = rc_package.stage_repository_inputs(
-                entries, target, read_blob=lambda name: (rc_package.ROOT / name).read_bytes())
-            self.assertEqual(len(staged), 7)
-            for row in staged:
-                self.assertEqual(rc_package.sha256(target / row["path"]), row["sha256"])
-            with self.assertRaises(rc_package.RcError):
-                rc_package.stage_repository_inputs(entries, target, read_blob=lambda name: b"changed")
-
-    def test_other_examples_and_traversal_do_not_enter_the_fixture_scope(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "inputs.json"
-            for name in ("examples/unreviewed/project.zeno", "tools/private/input.txt",
-                         "examples/arithmetic-fee/../private/input.txt"):
-                row = {"package": "example", "target": "test:input", "path": name, "sha256": "0" * 64}
-                path.write_text(json.dumps({"format": rc_package.PACKAGED_TEST_INPUTS_FORMAT, "inputs": [row]}))
-                with self.assertRaises(rc_package.RcError):
-                    rc_package.load_packaged_test_inputs(path)
 
 
 class PackagedLockTest(unittest.TestCase):

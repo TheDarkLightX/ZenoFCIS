@@ -25,13 +25,13 @@ pub(crate) open spec fn assertions_hold(script: crate::symbolic::smt::Script,
             == Some(denotation::Value::Boolean(true))
 }
 
-pub(crate) open spec fn execution(program: Program<'_>, raw: Seq<i64>)
-    -> Result<Seq<i64>, crate::evaluation::Failure> {
+pub(crate) open spec fn execution(program: Program<'_>, raw: Seq<i128>)
+    -> Result<Seq<i128>, crate::evaluation::Failure> {
     crate::evaluation::spec::execution(program.inputs@, program.outputs@,
         program.nodes@, program.roots@, raw)
 }
 
-pub(crate) open spec fn represented_result(program: Program<'_>, raw: Seq<i64>) -> bool {
+pub(crate) open spec fn represented_result(program: Program<'_>, raw: Seq<i128>) -> bool {
     match execution(program, raw) {
         Ok(_) | Err(crate::evaluation::Failure::Arithmetic)
             | Err(crate::evaluation::Failure::OutputDomain) => true,
@@ -41,12 +41,12 @@ pub(crate) open spec fn represented_result(program: Program<'_>, raw: Seq<i64>) 
 
 /// Successful construction represents every admitted tuple, including failures.
 pub(crate) open spec fn runtime_supported(program: Program<'_>) -> bool {
-    forall|raw: Seq<i64>| crate::evaluation::spec::admitted(program.inputs@, raw) ==>
+    forall|raw: Seq<i128>| crate::evaluation::spec::admitted(program.inputs@, raw) ==>
         represented_result(program, raw)
 }
 
 pub(crate) open spec fn expected(piece: Piece, original: Program<'_>,
-    candidate: Program<'_>, raw: Seq<i64>) -> bool {
+    candidate: Program<'_>, raw: Seq<i128>) -> bool {
     let left = execution(original, raw);
     let right = execution(candidate, raw);
     match piece {
@@ -73,7 +73,7 @@ pub(crate) open spec fn expected(piece: Piece, original: Program<'_>,
 /// Conditions supplied by the checked caller and actual common-base witness.
 /// Model existence is established separately by model_for_base.
 pub(crate) open spec fn context(script: crate::symbolic::smt::Script,
-    original: Program<'_>, candidate: Program<'_>, raw: Seq<i64>,
+    original: Program<'_>, candidate: Program<'_>, raw: Seq<i128>,
     environment: Map<Seq<char>, denotation::Value>) -> bool {
     original.inputs@ == candidate.inputs@ && original.outputs@ == candidate.outputs@
         && crate::evaluation::spec::admitted(original.inputs@, raw)
@@ -87,7 +87,7 @@ pub(crate) open spec fn query(script: crate::symbolic::smt::Script,
         && constants_prefix(script.constants@, original.inputs@, original.inputs@.len())
         && (original.inputs@ == candidate.inputs@ ==>
             runtime_supported(original) && runtime_supported(candidate))
-        && forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i64>|
+        && forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i128>|
             context(script, original, candidate, raw, environment) ==>
                 assertions_hold(script, environment) == expected(piece, original, candidate, raw)
 }
@@ -106,7 +106,7 @@ pub(crate) open spec fn declarations_hold(script: crate::symbolic::smt::Script,
 
 /// A concrete model exists for each admitted input; query meaning is nonvacuous.
 pub(crate) proof fn model_for_query(script: crate::symbolic::smt::Script,
-    piece: Piece, original: Program<'_>, candidate: Program<'_>, raw: Seq<i64>)
+    piece: Piece, original: Program<'_>, candidate: Program<'_>, raw: Seq<i128>)
     -> (environment: Map<Seq<char>, denotation::Value>)
     requires query(script, piece, original, candidate),
         original.inputs@ == candidate.inputs@, original.outputs@ == candidate.outputs@,
@@ -158,7 +158,7 @@ pub(crate) open spec fn partition_piece(domains: Seq<Domain>, index: nat) -> Pie
 
 /// A successful runtime output belongs to the declared first-output range.
 /// Arithmetic and output-domain failures need no output value to select a piece.
-pub(crate) proof fn partition_covers(original: Program<'_>, candidate: Program<'_>, raw: Seq<i64>)
+pub(crate) proof fn partition_covers(original: Program<'_>, candidate: Program<'_>, raw: Seq<i128>)
     requires match execution(original, raw) {
         Ok(_) | Err(crate::evaluation::Failure::Arithmetic)
             | Err(crate::evaluation::Failure::OutputDomain) => true,
@@ -251,7 +251,7 @@ pub(crate) open spec fn pair_meaning(
     definitions: Seq<(String, Sort, Term)>,
     original: Program<'_>, candidate: Program<'_>, left: Encoded, right: Encoded,
 ) -> bool {
-    forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i64>|
+    forall|environment: Map<Seq<char>, denotation::Value>, raw: Seq<i128>|
         original.inputs@ == candidate.inputs@
             && crate::evaluation::spec::admitted(original.inputs@, raw)
             && bridge::raw_inputs(raw, environment)
@@ -305,7 +305,7 @@ pub(super) proof fn record_base(
 pub(crate) proof fn model_for_base(
     definitions: Seq<(String, Sort, Term)>,
     left_domains: Seq<Domain>, left_instructions: Seq<Op>,
-    right_domains: Seq<Domain>, right_instructions: Seq<Op>, raw: Seq<i64>,
+    right_domains: Seq<Domain>, right_instructions: Seq<Op>, raw: Seq<i128>,
 ) -> (environment: Map<Seq<char>, denotation::Value>)
     requires base(definitions, left_domains, left_instructions, right_domains, right_instructions),
         raw.len() == left_domains.len(),

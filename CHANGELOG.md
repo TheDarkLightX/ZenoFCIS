@@ -4,6 +4,37 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## 2.5.0 - 2026-10-18
+
+- **Breaking change:** 2.4-adopted contracts, their i64 transform receipts,
+  and stores created by 2.4 applications are incompatible with the 2.5 integer
+  encoding. Use the 2.4.0 CLI and matching 2.4 runtime, or re-adopt the original
+  pre-adoption contract with a newly checked 2.5 candidate and receipt and
+  start a new store. Re-adoption does not migrate existing stores.
+  Compatibility is planned for 2.5.1.
+
+- **Tested and finite checked:** extend loop doors, exact transform checks,
+  replay and point evaluation to the main signed 128-bit arithmetic route.
+- **Tested:** add explicit POSIX/systemd containment selection and CPU-time
+  stage budgets with independent FINISH checks. Sub-resolution POSIX requests
+  stop inconclusive before START, preserving intake and durable accounting.
+- **Tested and finite checked:** add signed fused floor, units, scales and
+  bounded rounded chains, preserving final-fit refusals and prefix rounding.
+- **Proved in reviewed Verus profiles:** repair arithmetic quotient/remainder
+  and projection proofs, extend assembly terms with signed floor, and update
+  the retained verification workspace for 128-bit scalars. The pinned Verus
+  profiles are run on the release source as part of release qualification.
+  This is no whole-application theorem.
+- ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, are planned for 2.5.1.
+- **Tested:** bind each knowledge invocation to an immutable bounded snapshot;
+  knowledge and strategy proposals retain no decision or publication authority.
+- **Tested tooling:** improve bounded qualification scheduling and source-policy
+  handling. No release-wide speedup is established.
+- Code is LLM-generated or synthesized. Under extreme concurrent filesystem
+  I/O a contained capture may stop inconclusive and fails closed. Systemd paths
+  need a host with a user manager. Packaging, signing and publication are
+  separate gates; this entry records the release changes.
+
 ## 2.4.0 - 2026-10-15
 
 - Add checked scalar multiplication, floor/ceiling division, fused mul-div and

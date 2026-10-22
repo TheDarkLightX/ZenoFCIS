@@ -10,7 +10,7 @@ mod ir;
 pub(crate) mod preparation;
 use ir::tuple;
 
-fn finite_tuple(values: &[i64]) -> Result<Value, zeno_fcis_codec::EncodeError> {
+fn finite_tuple(values: &[i128]) -> Result<Value, zeno_fcis_codec::EncodeError> {
     tuple(
         values
             .iter()

@@ -1,21 +1,143 @@
-# ZenoFCIS 2.4.0
+# ZenoFCIS 2.5.0 release notes
 
-2.4.0 is the current release. These notes describe the changes recorded in the
-[changelog](../CHANGELOG.md#240---2026-10-15). Check every published download
-against its signed checksum list, as the [installation guide](INSTALLATION.md)
-describes. The release source also includes two release-preparation fixes: crates
-now carry their own source fingerprints, so each package builds in isolation, and
-external-tool process cleanup on macOS accepts a process group that has already
-exited.
+Code is LLM-generated or synthesized;
+acceptance depends on the stated check, domain and assumptions. The
+[installation guide](INSTALLATION.md) describes how to verify published assets
+once they are available.
 
-## Known issue
+## Breaking change
 
-- Knowledge-evidence replay checks each declared input's fingerprint and then reruns
-  the case, which reopens the input files. If an input is edited during that window
-  and restored before the final dependency check, the validation receipt can name the
-  original bytes while the case ran on the edited ones. Do not edit evidence inputs
-  while validation runs. The fix, which runs each case on a private snapshot of the
-  checked bytes, is planned for 2.5.
+ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
+2.4.x, their i64 transform receipts, and stores created by 2.4 applications
+are incompatible with 2.5. Use the ZenoFCIS 2.4.0 CLI and matching 2.4
+runtime for those applications and stores.
+
+To start a separate 2.5 lineage, return to the original pre-adoption
+declarations and rules, check the candidate with the 2.5 CLI, and use
+`contract adopt` under 2.5 with the new receipt. Start a new store;
+re-adoption does not migrate a 2.4 store. Keep the retained policies,
+digests and receipts unchanged. Compatibility is planned for a later release.
+
+## Optimizer, contract review and templates
+
+The optimizer now distinguishes an unsupported instruction from a completed
+search that found no improvement. It names the instruction and suggests the
+next step. A search stopped by its limits reports `inconclusive` unless a
+checked improvement was already found. CLI help and the agent guide explain
+when to optimize, check a supplied replacement, or use a resumable loop.
+Structured command discovery exposes the same workflow guidance to MCP agents.
+The limit flag includes runs stopped before their first phase. Resumed sessions
+label completed historical settlements separately from incomplete checks;
+retaining a settlement does not mean it was freshly replayed. A dropped
+historical counterexample is marked unreplayed. Requirement questions no longer
+copy a rejecting branch's state updates onto an Accept alternative, and mark
+unsupported answer classes explicitly. False proposed laws count toward their
+applicability totals, so a false law is not mistaken for an inactive one.
+
+`contract review --gaps` now considers each reason only in its declared
+Reject or CommittedFailure class. The durable-counter and prepared-counter
+templates replace an always-true rejection law with their actual rejection
+conditions, so new projects pass `check --require-substantive`.
+
+Two small Verus harness obligations cover the production status classifier
+and class-specific decision enumeration. They do not prove the whole search,
+compiler or review command. Template behavior is checked over the complete
+finite input domains, separately from those proofs.
+
+## Arithmetic loops
+
+**Tested and finite checked.** Arithmetic expressions now reach the normal
+loop doors, exact full-domain transform checks, receipt replay and point
+evaluation through the signed 128-bit route. Proposers still supply no
+acceptance or publication authority. A finite check establishes agreement
+only over its complete declared domain; a stopped check is inconclusive.
+
+## Containment and CPU budgets
+
+**Tested.** The portable POSIX containment route has explicit backend
+selection alongside the systemd route. Supported profiles and prerequisites
+are described in the [CLI reference](CLI_REFERENCE.md). Backend selection does
+not silently substitute a weaker backend when the selected one is unavailable.
+Linux runtime checks establish the observed containment behavior; the backend
+name alone does not qualify another operating system or arbitrary executable.
+
+Stage limits measure CPU time, with conservative FINISH uncertainty and a
+separate wall backstop. POSIX requests below the counter's FINISH uncertainty
+are refused before START: at HZ=100, 18 and 19 ms refuse, while 20 ms is
+admissible subject to the unchanged FINISH checks. An unreplayed session has
+no trusted incumbent; its inconclusive report preserves durable charges and
+has an empty current-invocation attempts list. Systemd's counter policy and
+hard resource caps are unchanged.
+
+**Known limits.** Under extreme concurrent filesystem I/O a contained capture
+may stop inconclusive; it fails closed. Host-dependent systemd paths need a
+host with a user manager. A refusal is no verdict and grants no authority.
+On a shared host, another local user can create the POSIX backend's fixed
+evidence directory, `/tmp/zeno-fcis-containment-<uid>`, first; contained
+commands are then refused until it is removed, which fails closed. If the
+caller is killed during a contained POSIX run, the guardian can exit with
+code 101 instead of its refusal code after cleanup; only the exit code
+differs. Both remain known issues.
+
+## Arithmetic and specifications
+
+**Tested and finite checked.** The main scalar route uses checked signed
+128-bit arithmetic, including the signed minimum. Explicit signed fused floor
+division preserves the exact product until the final fit check. Units and
+scales are checked before erasure; explicit target scales and bounded rounded
+chains retain prefix rounding and refusal semantics. The quantity-enabled
+route caps dependent chains at 16 steps; historical policy/2 compatibility
+remains separately checked. Native regression, independent arithmetic and
+semantic mutation controls cover their declared cases, not every program.
+
+**Proved in the reviewed proof profiles.** The arithmetic repair restores the
+signed-floor quotient/remainder argument and division projection, extends the
+assembly term proof with the signed-floor operation, and brings the retained
+verification workspace into line with 128-bit scalars. These are Verus proofs
+under their reviewed specifications, pinned verifier, solver, translation and
+erasure assumptions. The pinned Verus profiles are run on the release source
+as part of release qualification.
+They are distinct from Lean kernel-checked results and from solver-attested
+queries, and do not prove the whole compiler, runtime or application shell.
+
+## Spot pool
+
+ZenoDEX Spot: for any group of accounts and any number of operations, rounding gains stay below one atom per asset per account. This is kernel-checked in Lean for the pool's contract model. The Rust implementation is checked against that contract exhaustively on bounded domains and by replay. A machine-checked refinement from the Rust code to the model, and a no-profitable-round-trip theorem, remain future work.
+
+## Knowledge snapshots
+
+**Tested.** A knowledge invocation freezes the selected external files into a
+bounded snapshot, binds their bytes to its identity and refuses inconsistent
+or incomplete acquisition. Configuration precedence remains explicit, and
+retries cannot silently change the invocation's knowledge. Retrieved facts
+and proposed plans remain advisory; a snapshot does not authenticate facts,
+establish owner intent or authorize a decision.
+
+## Qualification tools
+
+**Tested tooling.** Qualification tools add
+bounded worker scheduling, deterministic source identities and separate
+source policies for approved test-only changes. Offline replay and planted
+controls check those tools within their stated scope. These changes are
+intended to shorten qualification; no end-to-end speedup has been measured
+for this release. A missing, timed-out or stale check never counts as a pass.
+
+The checked program API and private publication boundary remain in force.
+Canonical formats keep their own versioned identifiers. Tests, finite checks,
+solver-attested results, kernel-checked theorems and proofs under a tool's
+trusted base describe different evidence; none alone establishes release,
+deployment or external-effect authority.
+
+---
+
+## Historical 2.4.0 source and qualification
+
+The 2.4.0 notes below describe the changes recorded
+in the [changelog](../CHANGELOG.md#240---2026-10-15). Final source qualification,
+hosted checks, packaging, signing and publication remain separate gates; these
+notes do not claim those gates have passed. Published downloads must be checked
+against their signed checksum list as the [installation guide](INSTALLATION.md)
+describes.
 
 ## Arithmetic and execution
 
@@ -98,10 +220,10 @@ channels and laws as data. The library admits the inputs, computes the
 decision and resource use, checks every applicable declared law, and issues
 a private publication capability only for a committing outcome. Applications
 cannot replace this route with decision or law callbacks, caller-reported
-usage or caller-built publications. Authoring, search and evidence tools
+usage or caller-built publications. Specification, search and evidence tools
 grant no publication authority.
 
-### Library and contract authoring
+### Library and contract specification
 
 - The crate root and prelude use the checked program API. `bind_catalog` and
   `bind_program` admit declarations; `Program::publish` evaluates original
@@ -123,7 +245,7 @@ grant no publication authority.
   escaped key spellings, including compact and CRLF rule files.
 - Library numeric descriptors support checked signed and unsigned 128-bit
   arithmetic and whole declared compound values. Nested field selection and
-  a numeric CLI authoring or lineage-upgrade route are unsupported. CLI
+  a numeric CLI specification or lineage-upgrade route are unsupported. CLI
   contracts support up to 4,096 nodes, 64 inputs and 64 outputs with checked
   signed 64-bit expressions. See [wide values](WIDE_VALUE_EXECUTION.md).
 
@@ -244,7 +366,7 @@ run reported disagreement, `UNKNOWN` or failure. These query results grant
 no authority and do not authenticate supplied authorization or context.
 
 The OCaml consumer is a client of the generated Rust application; Rust retains
-decisions, laws and storage. ZAL remains an optional finite-model authoring
+decisions, laws and storage. ZAL remains an optional finite-model specification
 prototype, outside the released API; supplied labels and scripted review
 are not human approval or authenticated authorization.
 
@@ -280,6 +402,11 @@ examples capture human intent. Supplied principals, authorization, time and
 context are application inputs; ZenoFCIS does not authenticate them.
 
 ### Platforms and upgrading
+
+The initial 2.5.0 publication is Linux-only. The Mac binary is deferred until
+native platform validation is complete; its full portable test suite has not
+passed. The optional Mac build and installed-binary journey do not replace
+that outstanding validation.
 
 The release process publishes a binary for each of these targets only after
 its platform qualification, installation and release-custody checks pass:

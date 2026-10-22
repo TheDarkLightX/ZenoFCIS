@@ -1,4 +1,4 @@
-# Checked program authoring with agents
+# Checked program generation with agents
 
 The [skill](../skills/zenofcis-synthesis-first/SKILL.md) and local
 [MCP server](../integrations/mcp/zeno_fcis_synthesis.py) use the actual `zeno-fcis`
@@ -27,32 +27,37 @@ or target selection and documented booleans; they never invoke a shell or accept
 arbitrary CLI arguments.
 
 `discover_program_authoring` runs `zeno-fcis describe` to expose the actual
-command contracts and normal program route. `create_program_project` runs `new`
+command contracts, task guidance and normal program route. Use `optimize` to
+search for a smaller equivalent program, `transform check` for a known
+replacement, or a resumable `loop` session to propose and repair candidates.
+The [shipped skill](../skills/zenofcis-synthesis-first/SKILL.md) also routes
+requirements review, example learning and sketch completion.
+`create_program_project` runs `new`
 with one of durable-counter, account-lockout, order-fulfillment,
 inventory-reservation, withdrawal-queue, agent-treasury-guard, prepared-counter
 or compliance-gateway. The destination's
 parent must exist; a nonempty destination is refused without overwriting files.
 `check_project_spec` runs `check --format json`, optionally with
-`--require-substantive`. These are authoring results with runtime admission
+`--require-substantive`. These are proposal results with runtime admission
 explicitly not run.
 
 Follow [the normal API migration](V2_PROGRAM_API_MIGRATION.md): independently
 review complete original schema/policy bytes, closed control and branches,
 footprints, reasons, channels, required transition/genesis laws and all legal
-input domains. `bind_catalog` and `bind_program` call the actual checked library.
-Generated `GeneratedProgramProposal`/`GeneratedDeclarations` are untrusted data;
+input domains. Generated `v2_contract.rs` binds its descriptor through
+`catalog::bind_original` and `authority::bind`. The declarations are proposals;
 metadata cannot invent a complete policy. Original envelopes are retained and
-independently admitted during execution. A committing `Program::publish` or
+independently admitted during execution. The library Authority's `publish` or
 `publish_genesis` can produce a private Publication only after actual execution
 and required law checks. Authentication, persistence/replay/state comparison and
 physical delivery remain trusted shell work.
 
-The library supports closed finite/control declarations and a full-width Account
-producer. Account-lockout uses that library-owned producer over its original
-timestamp domains; it does not fall back to an application-supplied authority callback.
+The generated templates use library-owned evaluation of their declared programs,
+including account-lockout's timestamp arithmetic. They do not supply an
+application decision callback or a special Account producer.
 Unsupported profiles return named refusals and grant no publication capability.
 Independent acceptance models and source-bound proof qualification remain
-separate from these authoring tools.
+separate from these generation tools.
 
 The original three finite tools remain: `assess_finite_problem`,
 `synthesize_finite_core` and `verify_finite_core`. Order-fulfillment's standalone
@@ -64,7 +69,7 @@ code-generation theorem or automatic authority for generated native code.
 
 Three transform-loop tools drive the bounded optimization loop
 (`zeno-fcis loop`, see the [CLI reference](CLI_REFERENCE.md)):
-`transform_request(original_path, session_path, profile="checked-i64-v1",
+`transform_request(original_path, session_path, profile="checked-i128-v1",
 attempts, checks, deadline_ms)` admits an original and opens a session with
 work ceilings scaled to it; `transform_candidate
 (session_path, candidate_path | candidate_json_path)` spends one attempt on a
@@ -118,13 +123,13 @@ cp skills/zenofcis-synthesis-first/SKILL.md \
 ```
 
 Other agents can load the same `SKILL.md` as project guidance. Keep server, CLI,
-library and skill revisions consistent. Report authoring diagnostics, finite
+library and skill revisions consistent. Report specification diagnostics, finite
 exhaustive evidence, qualified source-bound proofs, runtime Publications and
 shell effects separately. A passing sample, timeout or unchecked solver answer
 is not proof acceptance; tool use does not replace independent intent review.
 
 Exercise the real MCP protocol, all original finite cases and the normal
-authoring/refusal tools with:
+generation/refusal tools with:
 
 ```sh
 ZENO_FCIS_CLI=/absolute/path/to/zeno-fcis uv run --no-project --with 'mcp==2.2.0' \

@@ -17,7 +17,7 @@ there, `contract/rules.rs`, `contract/model.rs` and `contract/expr.rs` are in
 | Original declarations | `crates/zeno-fcis-spec/src/{lexer,parser,ast,elaborate,logic}.rs` | `.zeno` already describes types, reasons, channels, scoped laws and claims. It is not an unrestricted programming language. |
 | Factory inputs | `crates/zeno-fcis-cli/src/contract.rs:68`, `contract/rules.rs:19` | `project.zeno`, `v2/policy.json`, optional schema origin, and retained adoption artifacts form a contract. Rules use schema `zeno-fcis/template-declarative-policy/2`; unknown and duplicate keys are refused. |
 | Contract generation | `crates/zeno-fcis-cli/src/contract.rs:255`, `contract_files.rs:188` | Pure generation consumes supplied contents, checks catalog binding, emits schema, Rust declarations and library-encoded policy. The file shell writes them. Generation does not certify human intent. |
-| Factory finite profile | Historical `contract/model.rs:22`, `contract/expr.rs`; [current model source](../crates/zeno-fcis-contract/src/internals/model.rs) | At most 32 inputs, 16 outputs and 256 eager scalar nodes. Boolean and checked i64 computations are supported. Context facts are explicit inputs. Eager overflow/refusal is observable. |
+| Factory finite profile | Historical `contract/model.rs:22`, `contract/expr.rs`; [current model source](../crates/zeno-fcis-contract/src/internals/model.rs) | At most 32 inputs, 16 outputs and 256 eager scalar nodes. Boolean and checked i128 computations are supported. Context facts are explicit inputs. Eager overflow/refusal is observable. |
 | Meaning review | `crates/zeno-fcis-cli/src/review_command.rs:58`, `contract/review.rs`, `contract/review/packet.rs:43` | Decision tables, example disagreements, mutations and replayable distinguishing inputs. Reports distinguish full-domain and boundary-set searches and have `authority: none`. Findings and law refusals affect the command result. |
 | Export and scaffolding | `crates/zeno-fcis-cli/src/contract_files.rs:227`, `:317` | `new --contract --source` builds a generated application around the existing route; `contract export-program` emits the current canonical decision graph. |
 | Executable scalar program | `crates/zeno-fcis-synthesis/src/finite/ir.rs:54`, `:110` | Owned admitted DAG; `execute_v2` uses the actual metered evaluator. A surface renderer cannot substitute its own evaluator for factory evidence. |
@@ -28,7 +28,7 @@ there, `contract/rules.rs`, `contract/model.rs` and `contract/expr.rs` are in
 | Authority | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs:79`, `:186`, `:222` | Exact catalog binding, original-envelope evaluation, required laws/genesis, and private publication custody. No application callback supplies the decision. |
 | Publication | `crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication.rs:49` | Private non-Clone capability carrying the actual committing evaluation, original poststate and ordered deliveries. Reports or serialized subjects cannot construct it. |
 | Persistence and upgrade | `crates/zeno-fcis-shell-sqlite/src/v2.rs:452`, `v2/upgrade.rs:93`, `:364` | Mandatory capability-based SQLite route, exact identity/replay, and same-schema upgrade premises. Data migration and changed-business-rule evolution were added later as `contract evolve` (see [rule changes](CLI_REFERENCE.md#rule-changes-for-live-stores) and [data migrations](CLI_REFERENCE.md#data-migrations-and-renames)). |
-| Existing agent bridge | `integrations/mcp/zeno_fcis_synthesis.py`, `zeno_fcis_transform.py` | Fixed authoring/check/synthesis/loop commands with no publication claim. Existing MCP registration is optional; the ZAL MVP need not modify accounts or MCP configuration. |
+| Existing agent bridge | `integrations/mcp/zeno_fcis_synthesis.py`, `zeno_fcis_transform.py` | Fixed specification/check/synthesis/loop commands with no publication claim. Existing MCP registration is optional; the ZAL MVP need not modify accounts or MCP configuration. |
 
 `docs/CONTRACT_RULES.md` describes ordered cases: the first matching case wins
 and the final case must be literal `true`. ZAL can choose stricter source
@@ -89,7 +89,7 @@ describe this implemented scope.
 map and generated Authority comparison test. Qualification runs actual contract
 generation, drift checking, advisory review, scaffolding and app tests against
 the pinned source. Interpreter checks remain distinct from actual Authority
-correspondence. No authoring result is an agreement, Authority, Publication,
+correspondence. No specification result is an agreement, Authority, Publication,
 replacement receipt or deployment approval. The generated test obtains its
 Authority through the existing library route. See [usage](zal/README.md).
 

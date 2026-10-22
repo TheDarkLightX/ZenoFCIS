@@ -84,7 +84,7 @@ class TranslatedCoverage(unittest.TestCase):
     def test_runtime_inventory_and_mutation_anchors_are_explicit(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = [record for record in profile["functions"].values() if record["mode"] == "Exec"]
-        self.assertEqual(len(runtime), 641)
+        self.assertEqual(len(runtime), 647)
         executable_names = {n for n, r in profile['functions'].items() if r['mode'] == 'Exec'}
         self.assertEqual(executable_names, set(profile['body_covered_functions']))
         self.assertTrue(all('body_sha256' in profile['functions'][n] for n in executable_names))
@@ -93,7 +93,7 @@ class TranslatedCoverage(unittest.TestCase):
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0 for record in runtime))
         mutations = gate.mutation_sources(*((gate.ROOT / path).read_text() for path in
                                             (gate.SUBJECT, gate.ADMISSION, gate.TYPED, gate.VALUE)))
-        self.assertEqual(len(mutations), 24)
+        self.assertEqual(len(mutations), 25)
         for path, changed, expected in mutations.values():
             self.assertNotEqual(changed, (gate.ROOT / path).read_text())
             self.assertIn(expected, ("proof", "coverage"))

@@ -39,14 +39,14 @@ pub(crate) enum Code {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Spec {
     Node(usize),
-    Const(Kind, i64),
+    Const(Kind, i128),
     Op(Code, Vec<Spec>),
 }
 
 /// One proposal: replace `node` by `spec`, expecting `gain` fewer nodes.
 #[derive(Clone, Debug)]
 pub(crate) struct Proposal {
-    pub(crate) gain: i64,
+    pub(crate) gain: i128,
     pub(crate) node: usize,
     pub(crate) spec: Spec,
 }
@@ -55,7 +55,7 @@ pub(crate) struct Proposal {
 /// reach an output.
 pub(crate) fn observability(
     graph: &Graph,
-    sig: &[Vec<i64>],
+    sig: &[Vec<i128>],
     meter: &mut Meter,
 ) -> Result<Vec<Vec<bool>>, Stop> {
     let live = sig.first().map_or(0, Vec::len);
@@ -185,11 +185,11 @@ fn fanout_cone(graph: &Graph, node: usize) -> Bits {
 pub(crate) fn mined_constants(
     graph: &Graph,
     kinds: &[Kind],
-    sig: &[Vec<i64>],
+    sig: &[Vec<i128>],
     limit: usize,
     meter: &mut Meter,
-) -> Result<Vec<i64>, Stop> {
-    let mut found: BTreeSet<i64> = [0, 1, 2, -1].into_iter().collect();
+) -> Result<Vec<i128>, Stop> {
+    let mut found: BTreeSet<i128> = [0, 1, 2, -1].into_iter().collect();
     for node in &graph.nodes {
         if let Node::Int(value) = node {
             found.insert(*value);
@@ -205,12 +205,12 @@ pub(crate) fn mined_constants(
         }
         for node in ints.iter().take(64) {
             meter.charge(live.saturating_mul(2))?;
-            let forward: Option<Vec<i64>> = sig[*node]
+            let forward: Option<Vec<i128>> = sig[*node]
                 .iter()
                 .zip(&sig[*root])
                 .map(|(a, b)| a.checked_sub(*b))
                 .collect();
-            let backward: Option<Vec<i64>> = sig[*root]
+            let backward: Option<Vec<i128>> = sig[*root]
                 .iter()
                 .zip(&sig[*node])
                 .map(|(a, b)| a.checked_sub(*b))
@@ -222,14 +222,14 @@ pub(crate) fn mined_constants(
             }
         }
     }
-    let mut ordered: Vec<i64> = found.into_iter().collect();
+    let mut ordered: Vec<i128> = found.into_iter().collect();
     ordered.sort_by_key(|value| (value.unsigned_abs(), *value));
     ordered.truncate(limit + 8);
     Ok(ordered)
 }
 
-fn compare(code: Code, a: i64, b: i64) -> i64 {
-    i64::from(match code {
+fn compare(code: Code, a: i128, b: i128) -> i128 {
+    i128::from(match code {
         Code::Eq => a == b,
         _ => a < b,
     })
@@ -268,7 +268,7 @@ impl Tally {
 
     /// True when `value(k) == want[k]` for every position, stopping early.
     /// False once the budget is exhausted; `settle` then stops the search.
-    fn all(&mut self, want: &[i64], mut value: impl FnMut(usize) -> i64) -> bool {
+    fn all(&mut self, want: &[i128], mut value: impl FnMut(usize) -> i128) -> bool {
         for (k, expected) in want.iter().enumerate() {
             if !self.add(1) || value(k) != *expected {
                 return false;
@@ -290,7 +290,7 @@ impl Tally {
 /// Every proposal for `graph`, in a fixed generation order.
 pub(crate) fn candidates(
     graph: &Graph,
-    sig: &[Vec<i64>],
+    sig: &[Vec<i128>],
     max_new: u32,
     complement: bool,
     meter: &mut Meter,
@@ -317,15 +317,15 @@ pub(crate) fn candidates(
         }
         let mut tally = Tally::new(meter.remaining());
         let freed = &freed_sets[node];
-        let gain0 = freed.len() as i64;
+        let gain0 = freed.len() as i128;
         let kept = |used: &[usize]| {
             let mut union = Bits::new(size);
             for item in used {
                 union.union_with(&fanins[*item]);
             }
-            union.intersection_len(freed) as i64
+            union.intersection_len(freed) as i128
         };
-        let mut push = |gain: i64, spec: Spec| out.push(Proposal { gain, node, spec });
+        let mut push = |gain: i128, spec: Spec| out.push(Proposal { gain, node, spec });
         let kind = kinds[node];
         let pos: Vec<usize> = obs[node]
             .iter()
@@ -337,7 +337,7 @@ pub(crate) fn candidates(
             continue;
         }
         let target = &sig[node];
-        let want: Vec<i64> = pos.iter().map(|p| target[*p]).collect();
+        let want: Vec<i128> = pos.iter().map(|p| target[*p]).collect();
         if let Some(value) = single_value(&want) {
             push(gain0 - 1, Spec::Const(kind, value));
         }
@@ -370,7 +370,7 @@ pub(crate) fn candidates(
             let key = fingerprint(FNV_BASIS, pos.iter().map(|p| sig[*m][*p]));
             table.entry((kinds[*m], key)).or_default().push(*m);
         }
-        let lookup = |tally: &mut Tally, kind: Kind, values: &[i64]| -> Option<usize> {
+        let lookup = |tally: &mut Tally, kind: Kind, values: &[i128]| -> Option<usize> {
             let key = fingerprint(FNV_BASIS, values.iter().copied());
             table
                 .get(&(kind, key))?
@@ -379,7 +379,7 @@ pub(crate) fn candidates(
                 .find(|m| tally.all(values, |k| sig[*m][pos[k]]))
         };
         if kind == Kind::Bool {
-            let negated: Vec<i64> = want.iter().map(|value| i64::from(*value == 0)).collect();
+            let negated: Vec<i128> = want.iter().map(|value| i128::from(*value == 0)).collect();
             if let Some(m) = lookup(&mut tally, Kind::Bool, &negated) {
                 push(
                     gain0 - 1 - kept(&[m]),
@@ -388,7 +388,7 @@ pub(crate) fn candidates(
             }
             for (i, x) in bools.iter().enumerate() {
                 for y in &bools[i + 1..] {
-                    let both = |k: usize| i64::from(sig[*x][pos[k]] == 1 && sig[*y][pos[k]] == 1);
+                    let both = |k: usize| i128::from(sig[*x][pos[k]] == 1 && sig[*y][pos[k]] == 1);
                     if tally.all(&want, both) {
                         push(
                             gain0 - 1 - kept(&[*x, *y]),
@@ -446,7 +446,7 @@ pub(crate) fn candidates(
                     if !tally.add(pos.len()) {
                         return Err(meter.exhausted());
                     }
-                    let need: Option<Vec<i64>> = pos
+                    let need: Option<Vec<i128>> = pos
                         .iter()
                         .zip(&want)
                         .map(|(p, w)| match code {
@@ -476,7 +476,7 @@ pub(crate) fn candidates(
                     if !tally.add(pos.len()) {
                         return Err(meter.exhausted());
                     }
-                    let sum: Option<Vec<i64>> = pos
+                    let sum: Option<Vec<i128>> = pos
                         .iter()
                         .zip(&want)
                         .map(|(p, w)| w.checked_add(sig[*x][*p]))
@@ -505,7 +505,7 @@ pub(crate) fn candidates(
                 continue;
             }
             let part = |tally: &mut Tally, side: &[usize]| -> Option<Spec> {
-                let wanted: Vec<i64> = side.iter().map(|k| want[*k]).collect();
+                let wanted: Vec<i128> = side.iter().map(|k| want[*k]).collect();
                 if let Some(value) = single_value(&wanted) {
                     return Some(Spec::Const(kind, value));
                 }
@@ -524,7 +524,7 @@ pub(crate) fn candidates(
             let constants_added = [&x, &y]
                 .iter()
                 .filter(|spec| matches!(spec, Spec::Const(..)))
-                .count() as i64;
+                .count() as i128;
             let mut used = vec![*c];
             for spec in [&x, &y] {
                 if let Spec::Node(m) = spec {

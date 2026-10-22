@@ -17,7 +17,7 @@ from zeno_fcis_knowledge import TOOLS as KNOWLEDGE_TOOLS, ANNOTATIONS as KNOWLED
 
 
 mcp = MCPServer("ZenoFCIS synthesis")
-PROFILE = "zeno-fcis/finite-i64/1"
+PROFILE = "zeno-fcis/finite-i128/1"
 TARGETS = {"rust", "python", "javascript"}
 PROGRAM_TEMPLATES = {"durable-counter", "account-lockout", "order-fulfillment",
                      "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
@@ -102,7 +102,7 @@ def _program_command(arguments: list[str], json_report: bool) -> dict[str, Any]:
 
 @mcp.tool()
 def discover_program_authoring() -> dict[str, Any]:
-    """Discover the actual CLI and normal checked Program declaration workflow."""
+    """Discover commands and task guidance for contracts, optimization and checker loops."""
     return _program_command(["describe"], True)
 
 

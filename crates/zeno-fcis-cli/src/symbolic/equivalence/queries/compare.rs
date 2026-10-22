@@ -53,7 +53,7 @@ pub(super) open spec fn items_meaning(items: Seq<Term>, count: nat,
 pub(super) proof fn runtime_equality(
     original: crate::symbolic::program::Program<'_>,
     candidate: crate::symbolic::program::Program<'_>,
-    left: Encoded, right: Encoded, raw: Seq<i64>,
+    left: Encoded, right: Encoded, raw: Seq<i128>,
     environment: Map<Seq<char>, Value>,
 )
     requires

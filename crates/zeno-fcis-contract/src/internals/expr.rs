@@ -67,14 +67,20 @@ pub const OPERATORS: [(&str, Binary); 12] = [
 ];
 
 /// Every function with its number of arguments.
-pub const FUNCTIONS: [(&str, usize); 7] = [
+pub const FUNCTIONS: [(&str, usize); 13] = [
     ("choose", 3),
     ("div_floor", 2),
     ("div_ceil", 2),
     ("mul_div_floor", 3),
+    ("signed_mul_div_floor", 3),
     ("mul_div_ceil", 3),
     ("products_ge", 4),
     ("products_ge", 6),
+    ("mul_div_floor", 4),
+    ("mul_div_ceil", 4),
+    ("signed_mul_div_floor", 4),
+    ("repeat_mul_div_floor", 4),
+    ("repeat_signed_mul_div_floor", 4),
 ];
 
 /// Rounding of `div_floor` and `div_ceil`.
@@ -90,6 +96,8 @@ pub enum Rounding {
 pub enum Ast {
     Bool(bool),
     Int(i128),
+    /// Candidate reason, available only to rejection/failure laws.
+    DecisionReason,
     Name(String),
     Not(Box<Ast>),
     Neg(Box<Ast>),
@@ -98,6 +106,9 @@ pub enum Ast {
     Div(Rounding, Box<Ast>, Box<Ast>),
     /// Explicit fused product/division, distinct from Div(Mul(..), ..).
     MulDiv(Rounding, Box<Ast>, Box<Ast>, Box<Ast>),
+    SignedMulDivFloor(Box<Ast>, Box<Ast>, Box<Ast>),
+    ScaledMulDiv(Rounding, bool, Box<Ast>, Box<Ast>, Box<Ast>, u8),
+    RepeatMulDiv(bool, Box<Ast>, Box<Ast>, Box<Ast>, u8),
     /// Four arguments compare two-factor products; six compare three factors.
     ProductsGe(Box<[Ast]>),
 }
@@ -186,7 +197,20 @@ impl<'t> Parser<'t> {
                 inner
             }
             "!" => Ast::Not(Box::new(self.expression(8, depth + 1)?)),
-            "-" => Ast::Neg(Box::new(self.expression(8, depth + 1)?)),
+            "-" => {
+                // The minimum has no positive i128 magnitude. Preserve the
+                // existing Neg tree for every other expression and literal.
+                if self
+                    .tokens
+                    .get(self.index)
+                    .is_some_and(|digits| digits.parse::<u128>() == Ok(1u128 << 127))
+                {
+                    self.index += 1;
+                    Ast::Int(i128::MIN)
+                } else {
+                    Ast::Neg(Box::new(self.expression(8, depth + 1)?))
+                }
+            }
             "true" => Ast::Bool(true),
             "false" => Ast::Bool(false),
             _ if token.as_bytes()[0].is_ascii_digit() => Ast::Int(
@@ -228,12 +252,60 @@ impl<'t> Parser<'t> {
 
 fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let count = arguments.len();
+    if count == 4
+        && matches!(
+            name,
+            "mul_div_floor"
+                | "mul_div_ceil"
+                | "signed_mul_div_floor"
+                | "repeat_mul_div_floor"
+                | "repeat_signed_mul_div_floor"
+        )
+    {
+        let mut args = arguments.into_iter();
+        let a = Box::new(args.next().ok_or("missing a")?);
+        let b = Box::new(args.next().ok_or("missing b")?);
+        let d = Box::new(args.next().ok_or("missing d")?);
+        let last = args.next().ok_or("missing literal")?;
+        let signed = name.contains("signed");
+        return if name.starts_with("repeat_") {
+            match last {
+                Ast::Int(p) if (0..=16).contains(&p) => {
+                    Ok(Ast::RepeatMulDiv(signed, a, b, d, p as u8))
+                }
+                _ => Err("repeat count must be a literal in 0..16".to_owned()),
+            }
+        } else {
+            let scale = match last {
+                Ast::Name(s) => s
+                    .strip_prefix('e')
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .filter(|p| *p <= 38),
+                _ => None,
+            };
+            Ok(Ast::ScaledMulDiv(
+                if name == "mul_div_ceil" {
+                    Rounding::Ceil
+                } else {
+                    Rounding::Floor
+                },
+                signed,
+                a,
+                b,
+                d,
+                scale.ok_or("target scale must be e0..e38")?,
+            ))
+        };
+    }
     if name == "products_ge" && (count == 4 || count == 6) {
         return Ok(Ast::ProductsGe(arguments.into_boxed_slice()));
     }
     let mut arguments = arguments.into_iter().map(Box::new);
     let mut next = || arguments.next();
     let call = match (name, count, next(), next(), next()) {
+        ("signed_mul_div_floor", 3, Some(a), Some(b), Some(d)) => {
+            Some(Ast::SignedMulDivFloor(a, b, d))
+        }
         ("mul_div_floor", 3, Some(a), Some(b), Some(d)) => {
             Some(Ast::MulDiv(Rounding::Floor, a, b, d))
         }
@@ -266,7 +338,8 @@ fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
 
 /// The expression as rule text, with only the parentheses its operators
 /// need: `parse` reads it back as the same tree, except that a negative
-/// integer constant reads back as a negated one.
+/// integer constant reads back as a negated one. DecisionReason is a law-only
+/// value, read back through the `.zeno` law parser rather than rule syntax.
 pub fn render(ast: &Ast) -> String {
     let mut text = String::new();
     write(ast, 0, &mut text);
@@ -290,6 +363,7 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
     match ast {
         Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
         Ast::Int(value) => out.push_str(&value.to_string()),
+        Ast::DecisionReason => out.push_str("decision_reason"),
         Ast::Name(name) => out.push_str(name),
         Ast::Not(inner) => {
             out.push('!');
@@ -337,6 +411,35 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
             &[a, b, d],
             out,
         ),
+        Ast::SignedMulDivFloor(a, b, d) => call("signed_mul_div_floor", &[a, b, d], out),
+        Ast::ScaledMulDiv(r, signed, a, b, d, scale) => {
+            let name = if *signed {
+                "signed_mul_div_floor"
+            } else if *r == Rounding::Floor {
+                "mul_div_floor"
+            } else {
+                "mul_div_ceil"
+            };
+            out.push_str(name);
+            out.push('(');
+            for operand in [a, b, d] {
+                write(operand, 0, out);
+                out.push_str(", ");
+            }
+            out.push_str(&format!("e{scale})"));
+        }
+        Ast::RepeatMulDiv(signed, a, b, d, count) => {
+            out.push_str(if *signed {
+                "repeat_signed_mul_div_floor("
+            } else {
+                "repeat_mul_div_floor("
+            });
+            for operand in [a, b, d] {
+                write(operand, 0, out);
+                out.push_str(", ");
+            }
+            out.push_str(&format!("{count})"));
+        }
         Ast::ProductsGe(arguments) => {
             call("products_ge", &arguments.iter().collect::<Vec<_>>(), out)
         }
@@ -346,16 +449,63 @@ fn write(ast: &Ast, level: u8, out: &mut String) {
 /// Replaces rule variables by their definitions; a variable may not refer to
 /// itself, directly or through others.
 pub fn expand(ast: &Ast, variables: &BTreeMap<String, Ast>) -> Result<Ast, String> {
-    expand_with(ast, variables, &mut Vec::new())
+    expand_with_limits(
+        ast,
+        variables,
+        uses_new_arithmetic(ast) || variables.values().any(uses_new_arithmetic),
+    )
+}
+
+/// The authoring boundary opts into the new limits. Historical expansion
+/// retains its original admission and cycle check, without a new work cap.
+pub fn expand_with_limits(
+    ast: &Ast,
+    variables: &BTreeMap<String, Ast>,
+    bounded: bool,
+) -> Result<Ast, String> {
+    expand_with(
+        ast,
+        variables,
+        &mut Vec::new(),
+        &mut bounded.then_some(65_536),
+        0,
+    )
+}
+
+/// Recognizes the new syntax before expansion, including in unused bindings.
+pub fn uses_new_arithmetic(ast: &Ast) -> bool {
+    match ast {
+        Ast::ScaledMulDiv(..) | Ast::RepeatMulDiv(..) => true,
+        Ast::Bool(_) | Ast::Int(_) | Ast::Name(_) | Ast::DecisionReason => false,
+        Ast::Neg(a) | Ast::Not(a) => uses_new_arithmetic(a),
+        Ast::Binary(_, a, b) | Ast::Div(_, a, b) => {
+            uses_new_arithmetic(a) || uses_new_arithmetic(b)
+        }
+        Ast::Choose(a, b, c) | Ast::MulDiv(_, a, b, c) | Ast::SignedMulDivFloor(a, b, c) => {
+            uses_new_arithmetic(a) || uses_new_arithmetic(b) || uses_new_arithmetic(c)
+        }
+        Ast::ProductsGe(arguments) => arguments.iter().any(uses_new_arithmetic),
+    }
 }
 
 fn expand_with<'v>(
     ast: &Ast,
     variables: &'v BTreeMap<String, Ast>,
     stack: &mut Vec<&'v str>,
+    fuel: &mut Option<usize>,
+    depth: usize,
 ) -> Result<Ast, String> {
-    let recurse =
-        |ast: &Ast, stack: &mut Vec<&'v str>| expand_with(ast, variables, stack).map(Box::new);
+    if let Some(remaining) = fuel {
+        *remaining = remaining
+            .checked_sub(1)
+            .ok_or("expanded expression exceeds admission work cap")?;
+    }
+    if fuel.is_some() && depth > 256 {
+        return Err("expanded expression nests too deeply".to_owned());
+    }
+    let recurse = |ast: &Ast, stack: &mut Vec<&'v str>, fuel: &mut Option<usize>| {
+        expand_with(ast, variables, stack, fuel, depth + 1).map(Box::new)
+    };
     Ok(match ast {
         Ast::Name(name) => match variables.get_key_value(name) {
             Some((key, definition)) => {
@@ -363,38 +513,62 @@ fn expand_with<'v>(
                     return Err(format!("variable `{name}` refers to itself"));
                 }
                 stack.push(key);
-                let expanded = expand_with(definition, variables, stack)?;
+                let expanded = expand_with(definition, variables, stack, fuel, depth + 1)?;
                 stack.pop();
                 expanded
             }
             None => ast.clone(),
         },
-        Ast::Bool(_) | Ast::Int(_) => ast.clone(),
-        Ast::Not(inner) => Ast::Not(recurse(inner, stack)?),
-        Ast::Neg(inner) => Ast::Neg(recurse(inner, stack)?),
-        Ast::Binary(operator, left, right) => {
-            Ast::Binary(*operator, recurse(left, stack)?, recurse(right, stack)?)
-        }
+        Ast::Bool(_) | Ast::Int(_) | Ast::DecisionReason => ast.clone(),
+        Ast::Not(inner) => Ast::Not(recurse(inner, stack, fuel)?),
+        Ast::Neg(inner) => Ast::Neg(recurse(inner, stack, fuel)?),
+        Ast::Binary(operator, left, right) => Ast::Binary(
+            *operator,
+            recurse(left, stack, fuel)?,
+            recurse(right, stack, fuel)?,
+        ),
         Ast::Choose(condition, then, otherwise) => Ast::Choose(
-            recurse(condition, stack)?,
-            recurse(then, stack)?,
-            recurse(otherwise, stack)?,
+            recurse(condition, stack, fuel)?,
+            recurse(then, stack, fuel)?,
+            recurse(otherwise, stack, fuel)?,
+        ),
+        Ast::SignedMulDivFloor(a, b, d) => Ast::SignedMulDivFloor(
+            recurse(a, stack, fuel)?,
+            recurse(b, stack, fuel)?,
+            recurse(d, stack, fuel)?,
+        ),
+        Ast::ScaledMulDiv(r, signed, a, b, d, scale) => Ast::ScaledMulDiv(
+            *r,
+            *signed,
+            recurse(a, stack, fuel)?,
+            recurse(b, stack, fuel)?,
+            recurse(d, stack, fuel)?,
+            *scale,
+        ),
+        Ast::RepeatMulDiv(signed, a, b, d, count) => Ast::RepeatMulDiv(
+            *signed,
+            recurse(a, stack, fuel)?,
+            recurse(b, stack, fuel)?,
+            recurse(d, stack, fuel)?,
+            *count,
         ),
         Ast::MulDiv(rounding, a, b, d) => Ast::MulDiv(
             *rounding,
-            recurse(a, stack)?,
-            recurse(b, stack)?,
-            recurse(d, stack)?,
+            recurse(a, stack, fuel)?,
+            recurse(b, stack, fuel)?,
+            recurse(d, stack, fuel)?,
         ),
         Ast::ProductsGe(arguments) => Ast::ProductsGe(
             arguments
                 .iter()
-                .map(|a| expand_with(a, variables, stack))
+                .map(|a| expand_with(a, variables, stack, fuel, depth + 1))
                 .collect::<Result<_, _>>()?,
         ),
-        Ast::Div(rounding, left, right) => {
-            Ast::Div(*rounding, recurse(left, stack)?, recurse(right, stack)?)
-        }
+        Ast::Div(rounding, left, right) => Ast::Div(
+            *rounding,
+            recurse(left, stack, fuel)?,
+            recurse(right, stack, fuel)?,
+        ),
     })
 }
 
@@ -470,6 +644,30 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ValueExpr::Add(left, right) => binary(Binary::Add, left, right),
         ValueExpr::Sub(left, right) => binary(Binary::Sub, left, right),
         ValueExpr::Mul(left, right) => binary(Binary::Mul, left, right),
+        ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale) => Ok(Ast::ScaledMulDiv(
+            match mode {
+                DivisionMode::Floor => Rounding::Floor,
+                DivisionMode::Ceil => Rounding::Ceil,
+                DivisionMode::Exact => return Err("exact scaled division".to_owned()),
+            },
+            *signed,
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+            Box::new(value(d)?),
+            *scale,
+        )),
+        ValueExpr::RepeatMulDiv(signed, a, b, d, count) => Ok(Ast::RepeatMulDiv(
+            *signed,
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+            Box::new(value(d)?),
+            *count,
+        )),
+        ValueExpr::SignedMulDivFloor(a, b, d) => Ok(Ast::SignedMulDivFloor(
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+            Box::new(value(d)?),
+        )),
         ValueExpr::Div(mode, left, right) => {
             let rounding = match mode {
                 DivisionMode::Floor => Rounding::Floor,
@@ -482,7 +680,43 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
                 Box::new(value(right)?),
             ))
         }
+        ValueExpr::MulDiv(mode, a, b, d) => {
+            let rounding = match mode {
+                DivisionMode::Floor => Rounding::Floor,
+                DivisionMode::Ceil => Rounding::Ceil,
+                DivisionMode::Exact => return Err("fused exact division".to_owned()),
+            };
+            // Compile with the existing full-product graph operation. Do not
+            // turn this into Ast::Div(Ast::Mul(..), ..).
+            Ok(Ast::MulDiv(
+                rounding,
+                Box::new(value(a)?),
+                Box::new(value(b)?),
+                Box::new(value(d)?),
+            ))
+        }
+        ValueExpr::Var(name) if name.as_str() == "decision_reason" => Ok(Ast::DecisionReason),
         ValueExpr::Var(name) => Err(format!("free variable `{}`", name.as_str())),
         ValueExpr::Sum { .. } => Err("sum".to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod signed_literal_tests {
+    use super::*;
+
+    #[test]
+    fn minimum_literal_parses_directly_and_keeps_other_negation_trees() {
+        assert_eq!(parse(&i128::MIN.to_string()), Ok(Ast::Int(i128::MIN)));
+        assert_eq!(parse(&i128::MAX.to_string()), Ok(Ast::Int(i128::MAX)));
+        assert_eq!(parse("-1"), Ok(Ast::Neg(Box::new(Ast::Int(1)))));
+        for text in [
+            "170141183460469231731687303715884105728",
+            "-170141183460469231731687303715884105729",
+        ] {
+            assert!(parse(text).is_err(), "{text}");
+        }
+        let tree = Ast::Int(i128::MIN);
+        assert_eq!(parse(&render(&tree)), Ok(tree));
     }
 }

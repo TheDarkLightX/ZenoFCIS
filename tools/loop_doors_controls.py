@@ -69,6 +69,16 @@ def run(cli: Path, *arguments) -> tuple[int, dict]:
         return done.returncode, {"unreadable": done.stdout[-400:].decode(errors="replace")}
 
 
+def open_session(cli: Path, original: Path, session: Path) -> tuple[int, dict]:
+    """``loop open`` under the current integer profile. Only a work-infeasible refusal may fall back to a
+    stateless door; any other failure stops the control rather than silently changing its path."""
+    code, report = run(cli, "loop", "open", "--original", original, "--session", session, "--profile",
+                       "checked-i128-v1")
+    if code != 0 and (report.get("detail") or {}).get("reason") != "work-infeasible":
+        raise SystemExit(f"loop open failed for {original}: exit {code}: {report}")
+    return code, report
+
+
 def single_manifest(scratch: Path, label: str, program: Path, vocabulary: dict, parameters: dict) -> Path:
     """A one-instance manifest beside a copy of ``program``."""
     folder = scratch / f"{label}-instance"
@@ -87,7 +97,7 @@ def program_json(cli: Path, path: Path, scratch: Path, vocabulary: dict) -> dict
     program, which is the program itself, and checks it)."""
     session = Path(tempfile.mkdtemp(prefix="open-", dir=scratch))
     session.rmdir()
-    code, report = run(cli, "loop", "open", "--original", path, "--session", session, "--profile", "checked-i64-v1")
+    code, report = open_session(cli, path, session)
     if code == 0:
         return report["detail"]["view"]["original"]["program"]
     manifest = single_manifest(scratch, f"view-{path.stem}", path, vocabulary, {})
@@ -237,8 +247,7 @@ def repair_controls(cli: Path, name: str, original: Path, optimized_program: dic
     vocab = Z.Vocabulary(vocabulary["inputs"], kinds, [d["kind"] for d in optimized_program["outputs"]])
     output_kinds = [d["kind"] for d in optimized_program["outputs"]]
     session = scratch / f"{name}-session"
-    code, opened = run(cli, "loop", "open", "--original", original, "--session", session, "--profile",
-                       "checked-i64-v1")
+    code, opened = open_session(cli, original, session)
     # A session whose check work cannot cover the domain is refused (work-infeasible); the repair then runs
     # through the stateless transfer door (direct, then repair), which reports no sites.
     via_transfer = code != 0
@@ -576,6 +585,7 @@ def main() -> int:
         "repair_repaired": sum(1 for r in planted if r.get("repaired")),
         "repair_top_covers": sum(1 for r in planted if r.get("top_covers")),
         "repair_via_transfer_door": sum(1 for r in planted if r.get("via") == "transfer door"),
+        "repair_via_session": sum(1 for r in planted if r.get("via") != "transfer door"),
         "repair_no_larger": sum(1 for r in planted if r.get("no_larger")),
         "zal_statements": sum(r["statements"] for r in report["zal"]),
         "zal_mismatches": sum(r["mismatches"] for r in report["zal"]),

@@ -1027,15 +1027,11 @@ fn every_original_declared_state_has_a_checked_eligible_exit_that_publishes_with
         assert_eq!(model.evaluate(&input).unwrap(), [1, 0]);
         let temp = Temp::new();
         let mut shell = create(&temp.0.join("state.sqlite"), &authority).unwrap();
-        reach(&mut shell, &authority, i128::from(count));
+        reach(&mut shell, &authority, count);
         complete(
             &mut shell,
             &authority,
-            [
-                i128::from(exit[0]),
-                i128::from(exit[1]),
-                i128::from(exit[2]),
-            ],
+            [exit[0], exit[1], exit[2]],
             "eligible-exit",
         )
         .publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES)

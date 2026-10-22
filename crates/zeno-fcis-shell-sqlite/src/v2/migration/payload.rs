@@ -215,10 +215,7 @@ fn fields(channel: &c::Channel<'_>) -> Option<Vec<InputField>> {
         .map(|field| {
             let leaf = match field.domain {
                 c::Domain::Bool => Leaf::Bool,
-                c::Domain::I128 { min, max } => Leaf::I128 {
-                    min: i64::try_from(min).ok()?,
-                    max: i64::try_from(max).ok()?,
-                },
+                c::Domain::I128 { min, max } => Leaf::I128 { min, max },
                 c::Domain::U128 { min, max } => Leaf::U128 { min, max },
                 c::Domain::Enum { type_id, variants } | c::Domain::Sum { type_id, variants } => {
                     let mut ids = variants.to_vec();
@@ -229,11 +226,11 @@ fn fields(channel: &c::Channel<'_>) -> Option<Vec<InputField>> {
                         .map(|(code, id)| {
                             Some(Variant {
                                 id,
-                                code: i64::try_from(code).ok()?,
+                                code: i128::try_from(code).ok()?,
                             })
                         })
                         .collect::<Option<Vec<_>>>()?;
-                    let max = i64::try_from(variants.len()).ok()?.checked_sub(1)?;
+                    let max = i128::try_from(variants.len()).ok()?.checked_sub(1)?;
                     if matches!(field.domain, c::Domain::Enum { .. }) {
                         Leaf::Enum {
                             type_id,
@@ -324,9 +321,7 @@ pub(super) fn validate(
                         let position = old.ids.iter().position(|id| *id == field)?;
                         let leaf = old.leaves[position];
                         let (min, max) = bounds(leaf)?;
-                        let domain = u128::try_from(i128::from(max) - i128::from(min))
-                            .ok()?
-                            .checked_add(1)?;
+                        let domain = u128::try_from(max.checked_sub(min)?).ok()?.checked_add(1)?;
                         if u128::try_from(cases.len()).ok()? != domain
                             || cases.iter().any(|(value, _)| code(leaf, *value).is_none())
                         {

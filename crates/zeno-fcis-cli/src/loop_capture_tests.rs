@@ -43,7 +43,7 @@ fn capture_reference_replay_control_fails_with_stubbed_comparison() {
     let stable = vec![vec![0], vec![1], vec![0], vec![1]];
     let nondeterministic = vec![vec![0], vec![1], vec![0], vec![0]];
     let controls = |stub: bool| {
-        let same = |a: &[Vec<i64>], b: &[Vec<i64>]| stub || a == b;
+        let same = |a: &[Vec<i128>], b: &[Vec<i128>]| stub || a == b;
         reconcile_reference(Some(&first), &order, &stable, same).is_ok()
             && reconcile_reference(Some(&first), &order, &nondeterministic, same).is_err()
             && reconcile_reference(Some(&[vec![1], vec![1]]), &order, &stable, same).is_err()
@@ -193,4 +193,162 @@ fn capture_whole_domain_single_faults_and_changed_receipts_fail_existing_checker
         transform::replay(&ok(serde_json::to_vec(&receipt)), &a, &a, 4096),
         transform::Replay::Matched
     );
+}
+
+#[test]
+fn capture_arithmetic_candidates_use_exact_checker_and_product_stub_fails() {
+    for comparison in [
+        "products_ge(mul_div_floor(x0, 3, 2), 1, mul_div_ceil(x0, 3, 2), 1)",
+        "products_ge(mul_div_floor(x0, 3, 2), 1, 3, mul_div_ceil(x0, 3, 2), 1, 3)",
+    ] {
+        let table = ok(proposal::ReferenceTable::new(
+            vec![Domain::Int { min: 0, max: 40 }],
+            vec![Domain::Bool],
+            (0..=40).map(|x| vec![i128::from(x % 2 == 0)]).collect(),
+        ));
+        let bytes = ok(serde_json::to_vec(
+            &json!({"schema":"zeno-fcis/capture-expressions/1","outputs":[comparison]}),
+        ));
+        let proposed = ok(proposed_program(&bytes, true, &table));
+        let reference = ok(encode(&ok(table.program())));
+        let control = |stub: bool| {
+            let nodes = proposed
+                .nodes()
+                .iter()
+                .map(|n| {
+                    if stub && matches!(n, Op::ProductsGe(..)) {
+                        Op::Bool(true)
+                    } else {
+                        n.clone()
+                    }
+                })
+                .collect();
+            let candidate = ok(Program::try_new(
+                proposed.inputs().to_vec(),
+                proposed.outputs().to_vec(),
+                nodes,
+                proposed.roots().to_vec(),
+            ));
+            let candidate = ok(encode(&candidate));
+            let (check, receipt) = checker_reply(
+                transform::check(
+                    &reference,
+                    &candidate,
+                    transform::Limits {
+                        steps: transform::DEFAULT_STEP_LIMIT,
+                        input_tuples: 41,
+                    },
+                ),
+                |receipt| transform::replay(receipt, &reference, &candidate, 41),
+            );
+            check["verdict"] == "equivalent" && check["replay"] == "matched" && receipt.is_some()
+        };
+        assert!(control(false));
+        assert!(
+            !control(true),
+            "stubbed product comparison must fail capture control"
+        );
+    }
+}
+
+#[test]
+fn capture_arithmetic_refusals_cannot_be_checked_as_wrapped_values() {
+    let table = ok(proposal::ReferenceTable::new(
+        vec![Domain::Int { min: 0, max: 40 }],
+        vec![Domain::Int { min: 0, max: 40 }],
+        (0..=40).map(|x| vec![x]).collect(),
+    ));
+    let reference = ok(encode(&ok(table.program())));
+    for expression in [
+        "mul_div_floor(x0, 1, 0)",
+        "mul_div_ceil(-1, 1, 1)",
+        "mul_div_floor(9223372036854775807, 2, 1)",
+        "true ? x0 : mul_div_ceil(1, 1, 0)",
+    ] {
+        let bytes = ok(serde_json::to_vec(
+            &json!({"schema":"zeno-fcis/capture-expressions/1","outputs":[expression]}),
+        ));
+        let candidate = ok(proposed_program(&bytes, true, &table));
+        assert!(candidate.evaluate(&[0]).is_err(), "{expression}");
+        let candidate = ok(encode(&candidate));
+        let (check, receipt) = checker_reply(
+            transform::check(
+                &reference,
+                &candidate,
+                transform::Limits {
+                    steps: transform::DEFAULT_STEP_LIMIT,
+                    input_tuples: 41,
+                },
+            ),
+            |receipt| transform::replay(receipt, &reference, &candidate, 41),
+        );
+        assert_eq!(check["verdict"], "counterexample", "{expression}: {check}");
+        assert!(receipt.is_none());
+    }
+}
+
+#[test]
+fn capture_packet_coordinates_and_rows_keep_full_width_values() {
+    for value in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1i128 << 100,
+        1i128 << 64,
+        5,
+    ] {
+        let domain = Domain::Int {
+            min: value,
+            max: value,
+        };
+        let table = ok(proposal::ReferenceTable::new(
+            vec![domain],
+            vec![domain],
+            vec![vec![value]],
+        ));
+        // Formatter-only fixture: these unused placeholders are not checked
+        // session bindings or evidence of a qualified reference worker.
+        let state = Session {
+            schema: SESSION_SCHEMA.into(),
+            spec: Value::Null,
+            source_sha256: String::new(),
+            table_sha256: String::new(),
+            program_sha256: String::new(),
+            checker: Value::Null,
+            rows: vec![vec![value]],
+            reference_observations: 0,
+            budget: Budget {
+                max_tuples: 1,
+                rounds: 1,
+                max_examples: 1,
+                node_visits: 100,
+            },
+            attempts: 0,
+            invocations: 0,
+            reserved_visits: 0,
+            examples: vec![0],
+            status: "fixture".into(),
+            events: vec![],
+            candidate: None,
+            receipt: None,
+        };
+        let session = session_report(&state);
+        assert_eq!(session["rows"][0][0], crate::report_numbers::integer(value));
+        assert_eq!(state.rows[0][0], value);
+        if value == 5 {
+            assert_eq!(
+                session,
+                serde_json::to_value(&state).unwrap_or_else(|e| panic!("{e:?}"))
+            );
+        }
+        let packet = packet(&state, &table);
+        let wire: Value = ok(serde_json::from_slice(&ok(serde_json::to_vec(&packet))));
+        for side in ["input", "output"] {
+            assert_eq!(
+                crate::report_numbers::read(&wire["examples"][0][side][0]),
+                Some(value)
+            );
+        }
+        assert_eq!(table.rows(), &[vec![value]]);
+    }
 }

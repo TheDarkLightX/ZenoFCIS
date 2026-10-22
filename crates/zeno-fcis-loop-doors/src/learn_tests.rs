@@ -18,7 +18,7 @@ fn base() -> Specification {
 fn analyzed(spec: &Specification) -> Analysis {
     analyze(spec, &mut Budget::new(Limits::default())).unwrap_or_else(|e| panic!("analyze: {e:?}"))
 }
-fn all_examples(spec: &mut Specification, f: impl Fn(i64, i64) -> Vec<i64>) {
+fn all_examples(spec: &mut Specification, f: impl Fn(i128, i128) -> Vec<i128>) {
     spec.examples = (0..=2)
         .flat_map(|x| (0..=2).map(move |y| (x, y)))
         .map(|(x, y)| Example {
@@ -115,7 +115,7 @@ fn learn_boolean_and_conditional_vocabulary_is_typed() {
     let mut spec = base();
     spec.operations = vec![Operation::Lt, Operation::Le, Operation::Not];
     spec.outputs = vec![Domain::Bool];
-    all_examples(&mut spec, |x, y| vec![i64::from(x < y)]);
+    all_examples(&mut spec, |x, y| vec![i128::from(x < y)]);
     let a = analyzed(&spec);
     assert_eq!(a.counts, vec![1]);
     let p = a.candidate.unwrap_or_else(|| panic!("candidate"));
@@ -168,7 +168,7 @@ fn learn_minimum_conflict_is_not_capped_at_four_examples() {
         max_size: 1,
         examples: (0..6)
             .map(|k| Example {
-                input: (0..6).map(|j| i64::from(j == k)).collect(),
+                input: (0..6).map(|j| i128::from(j == k)).collect(),
                 output: vec![0],
             })
             .collect(),
@@ -200,11 +200,11 @@ fn learn_domain_projection_keeps_eager_failure_separate_without_sentinels() {
     let mut spec = base();
     spec.names = vec!["x".into()];
     spec.inputs = vec![Domain::Int {
-        min: i64::MIN,
-        max: i64::MIN + 1,
+        min: i128::MIN,
+        max: i128::MIN + 1,
     }];
     spec.outputs = spec.inputs.clone();
-    spec.constants = vec![i64::MIN];
+    spec.constants = vec![i128::MIN];
     spec.operations = vec![Operation::Sub, Operation::Abs];
     spec.max_size = 3;
     let a = analyzed(&spec);
@@ -212,9 +212,9 @@ fn learn_domain_projection_keeps_eager_failure_separate_without_sentinels() {
     let abs = Operation::Abs
         .probe()
         .unwrap_or_else(|e| panic!("abs: {e:?}"));
-    assert_eq!(abs.evaluate(&[i64::MIN]), Err(Error::Arithmetic));
+    assert_eq!(abs.evaluate(&[i128::MIN]), Err(Error::Arithmetic));
     let cols = columns(&spec.inputs, 2).unwrap_or_else(|e| panic!("columns: {e}"));
-    assert_eq!(cols[0], vec![i64::MIN, i64::MIN + 1]);
+    assert_eq!(cols[0], vec![i128::MIN, i128::MIN + 1]);
 }
 
 #[test]
@@ -223,8 +223,8 @@ fn learn_overflow_in_an_unselected_branch_is_eager() {
     spec.names = vec!["x".into(), "c".into()];
     spec.inputs = vec![
         Domain::Int {
-            min: i64::MAX,
-            max: i64::MAX,
+            min: i128::MAX,
+            max: i128::MAX,
         },
         Domain::Bool,
     ];
@@ -250,8 +250,8 @@ fn learn_overflow_in_an_unselected_branch_is_eager() {
         Expr::bin(Op::Add, Expr::Var("x".into()), Expr::Int(1)),
     );
     let p = lower_outputs(&[node], &vocab, &seed).unwrap_or_else(|e| panic!("lower: {e}"));
-    assert_eq!(p.evaluate(&[i64::MAX, 1]), Err(Error::Arithmetic));
-    assert_eq!(p.evaluate(&[i64::MAX, 0]), Err(Error::Arithmetic));
+    assert_eq!(p.evaluate(&[i128::MAX, 1]), Err(Error::Arithmetic));
+    assert_eq!(p.evaluate(&[i128::MAX, 0]), Err(Error::Arithmetic));
 }
 
 #[test]
@@ -377,4 +377,128 @@ fn learn_refuses_duplicate_examples_and_out_of_domain_answers() {
         output: vec![101],
     }];
     assert!(spec.vocabulary().is_err());
+}
+
+#[test]
+fn learn_arithmetic_vocabulary_lowers_and_checks_every_example() {
+    for op in [
+        Operation::Mul,
+        Operation::DivFloor,
+        Operation::DivCeil,
+        Operation::MulDivFloor,
+        Operation::MulDivCeil,
+        Operation::ProductsGe2,
+        Operation::ProductsGe3,
+    ] {
+        let mut spec = base();
+        spec.constants = vec![2];
+        spec.operations = vec![op];
+        spec.max_size = 1 + op.arguments().len();
+        if op.kind() == Kind::Bool {
+            spec.outputs = vec![Domain::Bool];
+        }
+        all_examples(&mut spec, |x, y| {
+            vec![match op {
+                Operation::Mul => x * y,
+                Operation::DivFloor => x / 2,
+                Operation::DivCeil => (x + 1) / 2,
+                Operation::MulDivFloor => x * y / 2,
+                Operation::MulDivCeil => (x * y + 1) / 2,
+                Operation::ProductsGe2 => i128::from(x * y >= 4),
+                Operation::ProductsGe3 => i128::from(x * y * 2 >= 8),
+                _ => unreachable!(),
+            }]
+        });
+        let analysis = analyzed(&spec);
+        assert_eq!(analysis.status, Status::Determined, "{op:?}");
+        let candidate = analysis.candidate.unwrap_or_else(|| panic!("candidate"));
+        assert_eq!(
+            check_examples(&spec, &candidate, &mut Budget::new(Limits::default())),
+            Ok(ExampleCheck::Reproduced { checked: 9 }),
+            "{op:?}"
+        );
+        let expanded = &analysis.representatives[0].expression;
+        let text = expr::print_symbolic(expanded);
+        assert_eq!(
+            expr::parse(&text, 0, expr::Allow::PLAIN),
+            Ok(expanded.clone())
+        );
+    }
+}
+
+#[test]
+fn learn_product_comparison_control_is_load_bearing() {
+    for op in [Operation::ProductsGe2, Operation::ProductsGe3] {
+        let mut spec = base();
+        spec.outputs = vec![Domain::Bool];
+        spec.constants = vec![2];
+        spec.operations = vec![op];
+        spec.max_size = 1 + op.arguments().len();
+        all_examples(&mut spec, |x, y| vec![i128::from(x * y >= 4)]);
+        let candidate = analyzed(&spec)
+            .candidate
+            .unwrap_or_else(|| panic!("candidate"));
+        assert!(
+            candidate
+                .nodes()
+                .iter()
+                .any(|n| matches!(n, Instruction::ProductsGe(..)))
+        );
+        // Mutate only the product-comparison instruction to an always-true stub.
+        // Both runs still use the production lowered-example checker and D1.
+        let control = |stub: bool| {
+            let nodes = candidate
+                .nodes()
+                .iter()
+                .map(|n| {
+                    if stub && matches!(n, Instruction::ProductsGe(..)) {
+                        Instruction::Bool(true)
+                    } else {
+                        n.clone()
+                    }
+                })
+                .collect();
+            let program = Program::try_new(
+                candidate.inputs().to_vec(),
+                candidate.outputs().to_vec(),
+                nodes,
+                candidate.roots().to_vec(),
+            )
+            .unwrap_or_else(|e| panic!("{e:?}"));
+            matches!(
+                check_examples(&spec, &program, &mut Budget::new(Limits::default())),
+                Ok(ExampleCheck::Reproduced { checked: 9 })
+            )
+        };
+        assert!(control(false));
+        assert!(
+            !control(true),
+            "stubbed product comparison must fail learn control"
+        );
+    }
+}
+
+#[test]
+fn learn_fused_probes_preserve_full_products_and_refusals() {
+    for op in [Operation::MulDivFloor, Operation::MulDivCeil] {
+        let p = op.probe().unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(
+            p.evaluate(&[i128::MAX, i128::MAX, i128::MAX]),
+            Ok(vec![i128::MAX])
+        );
+        for input in [
+            [1, 2, 0],
+            [-1, 2, 1],
+            [1, -2, 1],
+            [1, 2, -1],
+            [i128::MAX, i128::MAX, 1],
+        ] {
+            assert_eq!(p.evaluate(&input), Err(Error::Arithmetic));
+        }
+    }
+    let p = Operation::ProductsGe3
+        .probe()
+        .unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(p.evaluate(&[i128::MAX; 6]), Ok(vec![1]));
+    assert_eq!(p.evaluate(&[1, 1, 1, 1, 1, -1]), Err(Error::Arithmetic));
 }

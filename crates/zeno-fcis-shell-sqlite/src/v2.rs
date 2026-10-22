@@ -61,6 +61,8 @@ pub mod behaviour;
 mod compact;
 mod delivery;
 pub mod equivalence;
+/// Read-only access to retained histories, without assigning a new Authority.
+pub mod history;
 mod lineage;
 /// Data migrations admitted by forward simulation, and the rename tier.
 pub mod migration;
@@ -217,6 +219,10 @@ impl Snapshot {
 /// certificate replay successfully. This owned reporting data grants no authority.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditedCommit {
+    /// Original replay key, retained in the checked commit record.
+    pub replay_id: Hash32,
+    /// Complete canonical publication bundle reconstructed under the publishing Authority.
+    pub bundle: PublicationBundle,
     /// Commit position, from one.
     pub sequence: u64,
     /// Position of the publishing contract in the supplied lineage, from one.
@@ -1705,7 +1711,24 @@ fn audit_tail_with_inputs<'p, D: DescriptorData<'p> + 'p>(
         }
         check_commit(connection, lineage, segments, &row, &anchor.state)?;
         if let Some(commits) = commits.as_mut() {
+            let publishing = lineage
+                .get(segments.position(consumed))
+                .ok_or(Error::History)?;
+            let publication = match publishing.publish(Raw {
+                state: &anchor.state,
+                command: &row.command,
+                context: &row.context,
+            }) {
+                PublicationOutcome::Commit(publication) => publication,
+                _ => return Err(Error::History),
+            };
+            let bundle = complete_bundle(&anchor, row.replay_id, &publication)?;
+            if bundle.receipt() != row.certificate {
+                return Err(Error::History);
+            }
             commits.push(AuditedCommit {
+                replay_id: row.replay_id,
+                bundle,
                 sequence: u64::try_from(sequence).map_err(|_| Error::History)?,
                 contract_version: segments.position(consumed) + 1,
                 prestate: anchor.state.clone(),
@@ -2193,7 +2216,7 @@ impl PublicationSizes {
     }
 }
 /// Complete durable bytes and included receipt/outbox components for inspection.
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PublicationBundle {
     bytes: Vec<u8>,
     receipt: Vec<u8>,

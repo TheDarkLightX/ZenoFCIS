@@ -1,6 +1,6 @@
 # `zeno-fcis` CLI reference
 
-This guide documents the `2.4.0` source. Its retained V1
+This guide documents the `2.5.0` source. Its retained V1
 protocol guidance is historical; see [the release notes](RELEASE_NOTES.md)
 for the current checked API and assurance boundaries.
 
@@ -28,7 +28,7 @@ zeno-fcis transform check --original FILE --candidate FILE --symbolic --tools FI
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis transform check-certificates --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--step-limit N] [--max-input-tuples N] [--out RECEIPT] [--queries DIR]
 zeno-fcis transform replay-certificates --receipt FILE --original FILE --candidate FILE --tools FILE --checker FILE --certificates DIR [--max-input-tuples N]
-zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
+zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i128-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract draft start --session DIR --intent FILE --project FILE --provenance TEXT [--examples FILE] [--rounds 4] [--max-tuples 4096]
 zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --provenance TEXT
 zeno-fcis contract draft questions|check --session DIR
@@ -149,8 +149,8 @@ release binary, extract the release's `source/zeno-fcis-<version>-source.tar.gz`
 and pass `--source <extracted source tree>`:
 
 ```sh
-tar -xzf zeno-fcis-2.4.0-source.tar.gz
-zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.4.0
+tar -xzf zeno-fcis-2.5.0-source.tar.gz
+zeno-fcis new my-app --contract my-contract --source zeno-fcis-2.5.0
 ```
  The generated README lists the build commands, which
 `tools/check_app_journey.py` runs exactly as written, in a new directory, on
@@ -392,7 +392,7 @@ zeno-fcis contract adopt . --candidate candidate.zcve --receipt receipt.json --u
 ```
 
 Arithmetic development graphs within 256 nodes, 16 outputs and 32 inputs use
-`zeno-fcis/finite-i64/3`. `contract export-program`, finite `transform check`
+`zeno-fcis/finite-i128/3`. `contract export-program`, finite `transform check`
 and `transform replay` carry that profile and its exact arithmetic. Older
 readers refuse it. Legacy `optimize` and loop/search proposal profiles refuse
 the new opcodes; symbolic and independent-certificate program encoders also
@@ -408,8 +408,8 @@ their packets were byte-identical. Prefer a release build for these
 commands; their results do not depend on the build.
 
 A decision program of at most 256 nodes, 16 outputs and 32 inputs uses the
-profile `zeno-fcis/finite-i64/1`. A larger one, up to 4,096 nodes, 64 outputs
-and 64 inputs, uses the profile `zeno-fcis/finite-i64/2` (or `/4` when
+profile `zeno-fcis/finite-i128/1`. A larger one, up to 4,096 nodes, 64 outputs
+and 64 inputs, uses the profile `zeno-fcis/finite-i128/2` (or `/4` when
 it contains the arithmetic extension); `generate contract`
 and `new --contract` refuse a contract past any of these limits and name the
 counts. `export-program` writes either profile, and an application built
@@ -458,7 +458,7 @@ schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
 final newline. It records both programs' SHA-256 digests, sizes and node
 counts, the domains, both limits, the tuples checked, the Step usage report
 and the checker identity: the checker's semantics version,
-`zeno-fcis/transform-check/3`, and the library's evaluator digest. The
+`zeno-fcis/transform-check/4`, and the library's evaluator digest. The
 semantics version changes only with a deliberate change of what the check
 means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
 pin it, so a refactor of the checker or a new crate version changes no
@@ -649,7 +649,7 @@ ordinary contract route and requires: its state fields to be the slots with
 their leaves' domains and its genesis to be every leaf's genesis; the target
 to range over the leaves and every other command or context field to be a
 leaf's, with the same domain; no channel or delivery; that no program node
-can leave the 64-bit range on any input within the declared domains; a Step
+can leave the 128-bit range on any input within the declared domains; a Step
 budget that covers every program and law node, and the Authority's observed
 usage within it; on each route, the aggregate's program with its target
 fixed to that route, reduced to canonical terms, choosing the selected
@@ -693,7 +693,7 @@ The application-level safety statement is therefore machine-checked over the
 evaluator specification, with the validator implementation tested, not
 proved.
 
-The result, schema `zeno-fcis/checked-composition-result/1`, records the
+The result, schema `zeno-fcis/checked-composition-result/2`, records the
 manifest's schema, SHA-256 and commitment, the checker's source-bound
 identity, the commitment of the composition specification, each leaf's
 bindings and counts, the SHA-256 of each table the checker ran, the edges and
@@ -703,7 +703,7 @@ validation established.
 The identity combines the SHA-256 of the checker's own source files, the
 source digests of `zeno-fcis-spec` and `zeno-fcis-compose`, and the library
 evaluator's digest. `--receipt FILE` writes the result as a receipt, schema
-`zeno-fcis/checked-composition-receipt/1`: compact JSON with object keys in
+`zeno-fcis/checked-composition-receipt/2`: compact JSON with object keys in
 byte order and a final newline. `--replay FILE` runs every check again and
 requires that receipt byte for byte; a difference is reported with the path
 of the first value that differs.
@@ -748,11 +748,11 @@ limit the manifest gives, the verdict is `refused` and nothing is evaluated
 (`evaluated: 0`, no Authority decision, no formula value). Within budget
 every obligation is checked exhaustively. The JSON report has status
 `proved`, `violated` or `refused` and a result of schema
-`zeno-fcis/composed-domain-result/1`: each obligation's size, status and
+`zeno-fcis/composed-domain-result/2`: each obligation's size, status and
 evaluated rows, the first witness of a violation, the planner's refusal, the
 monolithic product the check did not enumerate, each component's pins and
 decision-table SHA-256, the checker's identity, the claim, the trusted base
-and the non-claims. `--receipt` writes `zeno-fcis/composed-domain-receipt/1`
+and the non-claims. `--receipt` writes `zeno-fcis/composed-domain-receipt/2`
 for any verdict and `--replay` requires it byte for byte.
 
 `--joint-table MAX_PAIRS` prints the joint step on every global state
@@ -771,6 +771,14 @@ Exit codes: 0 `proved`, `replayed` or `explored`; 1 `violated`, `refused`
 written; 64 for usage.
 
 ## Checked optimizer
+
+Use `optimize` when you already have a finite program and want a smaller
+implementation with the same behavior. It searches for redundant computations
+and equivalent expressions, then checks the proposed replacement on every
+declared input. It minimizes stored instructions and encoded size; it does not
+promise the fastest program or the smallest possible program. Use
+`transform check` when you already have a replacement to check, or
+[`loop`](#bounded-optimization-loop) when you want a resumable series of proposals.
 
 `optimize` searches for a smaller program equivalent to a canonical finite
 scalar program and hands every candidate to the transform checker. The
@@ -836,7 +844,7 @@ user-supplied code runs. Phase names come from a closed set:
 | `phases` | Required; 1 to 16 objects, each `{"phase": NAME, "rounds": 1..=8}` with `NAME` from the table above. A round collects every match against the current graph, applies the rewrites and rebuilds; a phase stops early when a round changes nothing. |
 | `limits` | Optional object; each entry is optional and defaults to the value shown, with range 1 to 100000: `max_enodes` (e-nodes ever created, retired duplicates included), `max_classes` (live classes), `max_rewrites_per_round` (rewrites proposed or completions attempted in one round), `max_extraction_rounds` (improvement rounds of `dag-greedy`), `max_work` (deterministic work in millions of steps: rule matches, completion pairs, cut evaluations and table tuple evaluations; no round starts once it is reached). A phase that reaches a limit stops and names it. `max_work` stands in for a time budget, which a deterministic search cannot read; its default does not bind in practice. |
 | `extractor` | Optional; `dag-greedy` (default) or `tree`. |
-| `profile` | Optional; `functional-bool-v1` or `checked-i64-v1`, the artifact profiles of the [bounded optimization loop](#bounded-optimization-loop). Instructions outside the profile (`Int`, `Add`, `Sub`, `Eq` and `Lt` for `functional-bool-v1`) are never added by any phase and have no finite extraction cost; cut rewriting uses its table without `Eq`, and may replace a stored instruction outside the profile. Every candidate must also pass the profile's gate before it is judged. |
+| `profile` | Optional; `functional-bool-v1` or `checked-i128-v1`, the artifact profiles of the [bounded optimization loop](#bounded-optimization-loop). Instructions outside the profile (`Int`, `Add`, `Sub`, `Eq` and `Lt` for `functional-bool-v1`) are never added by any phase and have no finite extraction cost; cut rewriting uses its table without `Eq`, and may replace a stored instruction outside the profile. Every candidate must also pass the profile's gate before it is judged. |
 
 Without `--strategy` the fixed default portfolio, version 1
 (`zeno-fcis/optimize-portfolio/1`), runs three strategies in turn, each from
@@ -920,8 +928,9 @@ refused. With a portfolio, the top-level `enodes` and
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
-| `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
-| `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000); no candidate could be judged, so nothing was searched. |
+| `unsupported-original` | 2 | An instruction in the original is outside the optimizer's instruction set, no search phase ran, and no supplied improvement was accepted. The report names the node and instruction. Nothing is written. |
+| `no-checked-improvement` | 2 | At least one search phase ran and the search completed without an accepted smaller candidate; the original stands. Nothing is written. |
+| `inconclusive` | 2 | No improvement was accepted and the search could not finish: for example, a search limit was reached, or the domain exceeds `--max-input-tuples` (default 100,000,000). Inspect the reported reason. |
 | `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |
 | `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, exceeds 64 KiB, or names a profile other than `--profile`. |
 | `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
@@ -930,6 +939,13 @@ refused. With a portfolio, the top-level `enodes` and
 The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
 original and the written candidate; `transform replay` reproduces it byte for
 byte. The same program, strategy and profile give byte-identical output.
+
+For `unsupported-original`, increasing limits cannot add instruction support.
+For example, `MulDivCeil` can be checked by `transform` but is not in this
+optimizer's e-graph instruction set. Supply a replacement to `transform check`,
+or request support for the instruction. A strictly smaller `--with-candidate`
+that passes the independent transform check can still yield `improved` even
+when the optimizer cannot search the original.
 
 On the recorded withdrawal-queue artifacts the default portfolio reaches the
 7-node Boolean kernel (from 16), a 35-node retained controller (from 69; the
@@ -958,6 +974,25 @@ does not perform.
 
 ## Bounded optimization loop
 
+Choose a loop when a task needs repeated proposals and feedback. For example,
+submit a replacement, inspect the counterexample when it differs, revise it,
+and check again. The optimization session retains the checked incumbent and
+charges each attempt against explicit limits. Other `loop` commands help with
+examples, incomplete expressions and unresolved requirements:
+
+| Your task | Start here |
+| --- | --- |
+| Check a replacement you already have | `transform check` |
+| Find a smaller program in one run | `optimize` |
+| Keep a resumable history of checked proposals | `loop open`, then `loop candidate` or `loop run`, then `loop resume` |
+| Find a program matching finite examples | `loop learn`; example fit alone is not full-domain equivalence |
+| Fill holes in a partial expression | `loop sketch` |
+| Find decisions the contract laws leave open | `loop question --contract DIR`; a person reviews the policy choice |
+
+Use `zeno-fcis describe loop <command>` or that command's `--help` for its
+inputs and limits. The session workflow below compares candidates with an
+existing original; it does not infer intended behavior from prose.
+
 `zeno-fcis loop` runs a bounded adaptive loop: a proposer suggests
 complete candidate programs and `transform check` judges every one against the
 admitted original on its whole declared input domain. The loop keeps an
@@ -967,7 +1002,7 @@ or a "passed" flag cannot build one. Proposals are data, never code.
 
 | Command | Effect |
 | --- | --- |
-| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i64-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i64-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
+| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i128-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile (default `checked-i128-v1`), freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the ceilings (8 attempts, 8 checks, 4 model calls, 20,000 ms, and the work ceilings scaled to the original, below) are refused; lower limits win, and an omitted work limit takes its ceiling. Hosted providers, source disclosure and spending are fixed disabled. |
 | `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
 | `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H] [--seed P]...` | Drives attempts until the proposer is exhausted or a limit stops the session. Each `--seed` program (canonical bytes, such as an `optimize --candidate-out` candidate or a `contract review --mutant-programs` mutant) is proposed first, in order, as an ordinary candidate attempt with no model call metered; a seed is never trusted, only checked. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
 | `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
@@ -985,6 +1020,15 @@ receipt status, every attempt's outcome and cost, the accounting (attempts,
 checks, model calls, tokens, work, unresolved reservations) and the claims the
 result does not make: global optimality, convergence, success probability,
 model learning, application authority, wall-time speedup.
+
+For a repair, inspect the witness input and both output vectors after
+`candidate` exits 1, revise the candidate, and submit it again. An equivalent
+but larger repair leaves the incumbent unchanged; it can still be useful
+feedback for the next proposal. On resume, non-improvement historical
+settlements and differences without a replayed witness use `recorded-outcome`
+with `replayed: false`. The retained replacement is checked again. Earlier
+`checked-improvement` entries retain their historical `equivalent` display;
+that display does not mean each earlier candidate was rechecked.
 
 Selection is strictly lexicographic on (stored nodes, canonical bytes): a
 candidate replaces the incumbent only if neither component exceeds the
@@ -1013,10 +1057,64 @@ documented host-integrity assumption. The `--deadline-ms` limit bounds one
 `run` or `candidate` invocation's loop work; an agent's thinking time between
 `candidate` calls is not loop work, while attempts, checks and work caps are
 session-wide and persisted. The invocation runs in a contained process with a
-64 MiB memory cap and no swap. Check stages have a two-second cooperative
-deadline; the supervisor allows one second of grace to record a timeout before
-killing an unresponsive stage. The whole loop has a 25-second cap from spawn,
-including startup and teardown. A zero-remaining stage records a timeout
+64 MiB memory cap and no swap. Contained loop stages request at most two
+seconds of CPU for a check and five seconds for a search, clipped by the
+invocation's remaining wall allowance. The supervisor samples kernel CPU:
+the verified cgroup's `cpu.stat usage_usec` on systemd, or the owned trusted
+finite worker's user and system ticks on POSIX. POSIX refuses unexpected
+waited-child CPU; interpreter and native profiles still require systemd.
+Missing, malformed or regressed counters refuse. FINISH independently resamples
+and charges the counter's rounding uncertainty before permitting a result.
+CPU use at or above the requested budget refuses; a conservative strict upper
+bound above that budget also refuses at FINISH. POSIX rejects a stage before
+starting it with `stage-cpu-resolution` when the requested CPU milliseconds
+cannot cover FINISH uncertainty (20 ms for two counters at HZ=100). A 20 ms
+request is admissible there, but still needs a bounded FINISH; no extra tick is
+added to the minimum because the strict upper bound may equal the budget.
+Systemd's one-microsecond counter policy is unchanged. A replay refused for
+this reason returns `inconclusive`, an empty current-invocation `attempts`
+list and the persisted accounting, including any replay reservation already
+charged. Intake observations remain complete. Its report marks
+`resume: "not-replayed"` and leaves `incumbent` and `trusted_incumbent` null:
+no retained result is trusted without replay, and no attempt is spent.
+
+Each loop stage also has a wall backstop of nine times its requested CPU
+milliseconds plus two seconds, clipped to the whole worker's remaining time.
+Thus a full check has at most 20 seconds; a full search's nominal 47 seconds
+is clipped by the 25-second worker cap. No CPU increase and no valid completion
+frame for the requested milliseconds plus one second refuses (3 seconds for a
+full check; 6 for a full search). The supervisor services queued protocol
+completion before declaring inactivity; partial or invalid frames do not
+extend this bound. Waiting for a control reply has a separate 10-second
+monotonic limit; wrong, closed, missing and late replies refuse. These are
+checked deadlines, not real-time scheduling guarantees.
+
+The whole loop worker has a 25-second cap from spawn, including startup.
+Cleanup and absence verification fence output and receipts after execution;
+they do not grant more execution time. Caller preparation precedes that clock;
+on POSIX, the separate 30-second guardian clock also includes guardian
+preparation. Startup ACK waiting has a 10-second monotonic deadline inside the
+worker cap; no application work starts before ACK. There is no invocation retry.
+The systemd startup manager query has its own 5-second ceiling, also bounded by
+the worker deadline. Offline check stages keep their explicit requested wall
+limit plus one second of grace and their separate 65-second worker cap.
+Independent deterministic work reservations and invocation deadlines still
+apply; CPU accounting does not replace them.
+
+Operator observations are written separately under the owner-private
+`/tmp/zeno-fcis-operator-UID/` directory (0700; records 0600). The versioned
+`zeno-fcis/operator-containment/1` records identify the observer process and
+record preparation, ACK, worker and guardian durations in milliseconds where
+observed, plus the exact supervisor refusal and cleanup observation. Missing
+phases remain unknown. These records supply no decision, resource accounting,
+admission, receipt or publication authority. They do not enter capture JSON;
+its proposer-facing refusal stays sanitized. A record-write failure sends the
+operator diagnostic to stderr instead. Each complete record is flushed to an
+owner-only temporary file in that same directory and renamed atomically into
+its final name. Readers select the invocation before decoding; malformed
+matching records still fail their checks.
+
+A zero-remaining stage records a timeout
 without starting work. Durable session records can retain earlier completed
 checks even if a later stage fails; resume independently rechecks them.
 
@@ -1087,7 +1185,7 @@ any candidate, and only the loop's check can replace the incumbent. The MCP tool
 runs the local and fake arms of the preregistered protocol over a cases file
 and reports every result, including failures.
 
-### Loop doors (2.4.0)
+### Loop doors (2.5.0)
 
 The doors let a proposer submit expressions, sketches with holes and family
 programs instead of whole canonical programs. They are untrusted proposers
@@ -1107,9 +1205,16 @@ guide is
 | `loop teach-back --contract DIR --rule FILE [--answers FILE]` | No session. Judges each rule (`zeno-fcis/loop-rules/1`) on every declared input and on the reachable states: `exact`, `holds` (with the missing region), `wrong` (exceptions grouped by the core's decision, with regions and examples) or `vacuous`; whether the requirements already force it (`required`: on the inputs where it holds, how many the requirements force it on, leave `open`, or `forbidden` it on, with an admitted decision as the witness; left out with `summary.required.not_computed` when the admissibility table is over its budget); a meaning key (equal keys give equal verdicts); and a summary of the exact and holding rules. In practice, on the 5-second stage deadline, it can stop `inconclusive` (exit 2) above roughly 10,000 state × input tuples. |
 | `loop decompose --contract DIR --architecture FILE [--compose [--export DIR]]` | No session. Steps 1 to 3 for components in merge order (`zeno-fcis/loop-architecture/1`): required behaviour per component, interface counterexamples with suggested reads (and reads owned by a later component), unowned reasons, failures that must change a later-owned field, case tables projected from the core or tabulated for components without cases, and blame with regions for components with cases. Verdicts: `refused`, `unrealizable` (also whenever a structure problem or interface counterexample is found), `realizable`, `completed`, `meets-requirements`, `refuted`. Steps 1 to 3 are the door's own evaluation of the tables (`decided_by: door-simulation`), not a checker's, and do not claim that the composed architecture behaves as the core. With `--compose`, a realizable architecture whose components all have case tables becomes a `zeno-fcis/checked-composition/3` composition of generated contracts, every submitted guard kept (a catch-all reject with its own reason is appended where a last guard is not `true`); the composition checker's joint step is compared with the core on every declared input and its obligation check runs (`detail.compose`, `decided_by: composition-checker`). The verdict is the weaker of steps 1 to 3 and the composed check: `accepted` only when step 3 blames nothing, the joint step equals the core and the obligations are proved; `refuted` when either differs. `--export DIR` writes the manifest and contracts to a new directory (an existing one is refused), whatever the verdict. |
 
+For `loop question`, an option without `sets` leaves the successor unspecified;
+`"sets": {}` explicitly requires unchanged state. The original case's updates
+are shown only for its own decision, never copied onto a different option.
+`answer_supported: false` marks an admissible class the answer format cannot
+currently pin; CommittedFailure answers are refused with the displayed reason.
+Keep such alternatives visible when reviewing requirements.
+
 Results carry `authority: none`. Session doors use schema
 `zeno-fcis/transform-loop/1` with a `door` section; `family` and `transfer`
-use `zeno-fcis/loop-doors/1`. Every door runs in the loop's contained
+use `zeno-fcis/loop-doors/2`. Every door runs in the loop's contained
 process: its search runs in five-second search stages and each confirming
 check in a two-second check stage, within the invocation's deadline; a stage
 that cannot run in time is reported as inconclusive. Input documents and
@@ -1153,7 +1258,7 @@ domains, and every example supplies all outputs.
 }
 ```
 
-Domains are `{"kind":"Bool"}` or inclusive signed-i64
+Domains are `{"kind":"Bool"}` or inclusive signed-i128
 `{"kind":"Int","min":N,"max":N}`. There are 1 to 8 inputs and outputs,
 at most 32 distinct constants and 64 examples, and `max_size` is 1 to 12
 (default 7). Input names are distinct lower-case identifiers of at most 32
@@ -1169,9 +1274,19 @@ costs one plus its arguments. `min`, `max` and `abs` expand to checked IR
 before final checking. Evaluation is eager, including unselected branches.
 Raw meaning vectors retain arithmetic failures and integer values; only an
 output root turns values outside its domain into output-domain failures.
-Failures use tags, including at the lowest i64 output bound.
+Failures use tags, including at the lowest i128 output bound.
 
-Results use `zeno-fcis/loop-doors/1`, `door: learn`, `authority: none`:
+Results use `zeno-fcis/loop-doors/2`, `door: learn`, `authority: none`.
+Scalar report fields use `safe-number-or-decimal-string/1`: integers from
+`-9007199254740991` through `9007199254740991` are JSON numbers; larger
+magnitudes are canonical decimal strings. Decode both forms as exact integers.
+This covers question coordinates, learned observations, witness values, search
+bounds, fills and fitted coefficients. Booleans and variant names retain their
+own types. Existing decimal-string program, domain, evaluate and receipt
+fields retain their formats. The [judge reference](CONTRACT_JUDGES.md#integer-values-in-json-reports)
+lists the corresponding judge and display schemas.
+
+Statuses:
 
 | Status | Exit | Scope |
 |---|---|---|
@@ -1533,6 +1648,18 @@ and also writes the message to stderr.
 
 ## Contract adoption and store upgrades
 
+**2.5 breaking change.** ZenoFCIS 2.5 changed the integer encoding. Contracts adopted with ZenoFCIS
+2.4.x, their i64 transform receipts, and stores created by 2.4 applications
+are incompatible with 2.5. Use the ZenoFCIS 2.4.0 CLI and matching 2.4
+runtime for those applications and stores.
+
+To start a separate 2.5 lineage, return to the original pre-adoption
+declarations and rules, check the candidate with the 2.5 CLI, and use
+`contract adopt` under 2.5 with the new receipt. Start a new store;
+re-adoption does not migrate a 2.4 store. Keep the retained policies,
+digests and receipts unchanged. Compatibility is planned for 2.5.1.
+
+
 `contract adopt DIR --candidate C.zcve --receipt R.json --usage
 preserved|new-version` makes a checked candidate the next version of an
 application's contract. `DIR` holds `project.zeno` and `v2/policy.json`.
@@ -1884,7 +2011,7 @@ For state expressions and payload representation changes, use schema
 complete new payload records using the same field forms. Each changed payload
 needs an explicit map. `{"expr":"old.145 >= 2"}` reads only its source
 record's field 145: the library's closed finite program computes Boolean or
-checked i64 results with addition, subtraction, comparisons, Boolean operators
+checked i128 results with addition, subtraction, comparisons, Boolean operators
 and `choose`. Multiplication, division, text and external inputs are refused.
 All source valuations must evaluate successfully into the declared target
 domain, including those excluded by state laws.
@@ -2235,7 +2362,7 @@ needs:
 
 `zeno-fcis describe synth completion` lists the exact options and filesystem
 effects of `discover`, `find`, `verify` and `replay`. These commands use the
-closed `zeno-fcis/completion-problem/1` JSON schema and existing finite-i64
+closed `zeno-fcis/completion-problem/1` JSON schema and existing finite-i128
 instructions; they never execute supplied code. See
 [bounded completion](BOUNDED_COMPLETION.md) for commands and evidence limits.
 The `prepared-counter` template connects preparation to independently checked
@@ -2244,7 +2371,7 @@ nominal authorization and atomic state/outbox publication.
 
 ## Examples-first contract drafting
 
-`contract draft` is a local authoring conversation with explicit operations.
+`contract draft` is a local specification conversation with explicit operations.
 `start` captures a plain-language intent file, fixed `project.zeno`, optional
 initial [decision examples](CONTRACT_RULES.md), and supplied provenance. An
 agent or owner then supplies a **complete rules file** with `propose`. There
@@ -2319,7 +2446,7 @@ proposal. Fixture replay and generated-app tests do not establish a live owner
 interaction or correct automatic translation of prose.
 
 
-### Requirements-only version-space questions (2.4.0)
+### Requirements-only version-space questions (2.5.0)
 
 ```sh
 zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
@@ -2369,7 +2496,7 @@ budgets, both surfaces and explicit nonclaims.
 
 <!-- BEGIN black-box capture reference: additive block -->
 
-### Black-box capture (2.4.0)
+### Black-box capture (2.5.0)
 
 ```text
 zeno-fcis loop capture open --spec FILE --reference FILE --session NEW_DIR
@@ -2501,7 +2628,7 @@ field is admitted. All problems have schema `zeno-fcis/loop-strategy-problem/1`.
 `learn` uses `zeno-fcis/learn-terms/1`: exact `original_sha256`, `status`
 (`complete` or `inconclusive`), and on completion `integers` and `predicates`
 as finite program JSON. Terms share the exact reference input domains and
-have one full i64 or Boolean output. The consumer recomputes meanings. An
+have one full i128 or Boolean output. The consumer recomputes meanings. An
 incomplete producer stops before decoding lists and cannot certify emptiness.
 
 `circuit` contains `inputs`, `gates` (`kind`, prior `wires`) and `outputs`;
@@ -2614,3 +2741,14 @@ Read-only operations exit 0 for complete answers, 1 for integrity/refusal
 failures, 2 for an inconclusive bound or no plan, and 3 for a file read failure.
 No partial candidate plan is returned after a resource stop.
 <!-- END bounded knowledge operations of the existing loop strategy -->
+
+Scalar coordinates in current composition JSON results and joint tables use
+`safe-number-or-decimal-string/1`; see the [integer report encoding](CONTRACT_JUDGES.md#integer-values-in-json-reports).
+Fresh composition receipts use `/2` envelopes for the versioned result. Existing
+receipt files are unchanged; replay requires the current exact schema and result.
+Draft assessment `/2` applies the same scalar encoding to `labels_compared[].input`,
+`questions[].input` and every tuple in `unlabeled_inputs`; label text and provenance
+remain text. Completion result `/2` declares the same encoding for failure `input`
+and `state` tuples, including optional invalid-plan states. Small coordinates keep
+their numeric form. Completion source documents and canonical plan bytes retain
+their existing formats; a replayed failure case still fails and supplies no plan.

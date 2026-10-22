@@ -43,7 +43,7 @@ pub(crate) const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
 /// `tests/fixtures/transform-check/`, which the tests compare with this
 /// checker's output; refactoring the source, or a new crate version, changes
 /// no receipt.
-pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/3";
+pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/4";
 
 /// Limits that fix the meaning of one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,7 +75,7 @@ pub(crate) enum Rejection {
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Counterexample {
     pub(crate) ordinal: u64,
-    pub(crate) input: Vec<i64>,
+    pub(crate) input: Vec<i128>,
     pub(crate) original: Observation,
     pub(crate) candidate: Observation,
 }
@@ -598,7 +598,7 @@ fn differing_fields(recorded: &Value, computed: &Value) -> Vec<String> {
 }
 
 /// Scalar values as exact decimal strings, which JSON readers cannot round.
-pub(crate) fn values_json(values: &[i64]) -> Value {
+pub(crate) fn values_json(values: &[i128]) -> Value {
     Value::from(
         values
             .iter()

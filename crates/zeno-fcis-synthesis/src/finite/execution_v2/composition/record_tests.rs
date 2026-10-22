@@ -45,7 +45,7 @@ struct Attempts {
     context: Vec<AccessAttempt>,
 }
 struct Outcome {
-    result: Result<Vec<i64>, Failure>,
+    result: Result<Vec<i128>, Failure>,
     usage: super::super::Usage,
     attempts: Attempts,
 }
@@ -53,7 +53,7 @@ impl Outcome {
     fn usage(&self) -> super::super::Usage {
         self.usage
     }
-    fn into_parts(self) -> (Result<Vec<i64>, Failure>, super::super::Usage, Attempts) {
+    fn into_parts(self) -> (Result<Vec<i128>, Failure>, super::super::Usage, Attempts) {
         (self.result, self.usage, self.attempts)
     }
 }
@@ -62,7 +62,7 @@ fn execute_into(
     program: &ScalarProgram<'_>,
     bindings: &[Binding],
     meter: &mut super::super::meter::Meter,
-    output: &mut Vec<i64>,
+    output: &mut Vec<i128>,
     attempts: &mut Attempts,
 ) -> Result<(), Failure> {
     output.clear();
@@ -169,7 +169,11 @@ fn execute(
 }
 
 const SOURCES: [Source; 3] = [Source::State, Source::Command, Source::Context];
-type OracleOutcome = (Result<Vec<i64>, Failure>, [u64; 8], [Vec<AccessAttempt>; 3]);
+type OracleOutcome = (
+    Result<Vec<i128>, Failure>,
+    [u64; 8],
+    [Vec<AccessAttempt>; 3],
+);
 fn record<'a>(inv: &'a Invocation<'_>, source: Source) -> &'a RawRecord<'a> {
     match source {
         Source::State => &inv.state,
@@ -180,9 +184,9 @@ fn record<'a>(inv: &'a Invocation<'_>, source: Source) -> &'a RawRecord<'a> {
 fn domain(leaf: &Leaf) -> Domain {
     match *leaf {
         Leaf::U128 { min, max } => Domain::Int {
-            min: i64::try_from(min)
+            min: i128::try_from(min)
                 .unwrap_or_else(|error| panic!("bounded scalar test projection: {error:?}")),
-            max: i64::try_from(max)
+            max: i128::try_from(max)
                 .unwrap_or_else(|error| panic!("bounded scalar test projection: {error:?}")),
         },
         Leaf::Bool => Domain::Bool,
@@ -357,7 +361,7 @@ fn compare(
 fn empty_prefix() -> [Vec<AccessAttempt>; 3] {
     [Vec::new(), Vec::new(), Vec::new()]
 }
-fn encode(fields: &[Field], values: &[i64]) -> Vec<u8> {
+fn encode(fields: &[Field], values: &[i128]) -> Vec<u8> {
     let mut bytes = std::vec![9];
     bytes.extend_from_slice(&(fields.len() as u32).to_be_bytes());
     for (field, value) in fields.iter().zip(values) {
@@ -373,7 +377,7 @@ fn encode(fields: &[Field], values: &[i64]) -> Vec<u8> {
             }
             Leaf::I128 { .. } => {
                 bytes.push(4);
-                bytes.extend_from_slice(&i128::from(*value).to_be_bytes());
+                bytes.extend_from_slice(&(*value).to_be_bytes());
             }
             Leaf::Bool => bytes.push(if *value == 0 { 1 } else { 2 }),
             Leaf::Enum {
@@ -414,7 +418,7 @@ fn invocation<'a>(bytes: &'a [Vec<u8>; 3], fields: &'a [Vec<Field>; 3]) -> Invoc
         },
     }
 }
-fn mixed() -> ([Vec<Field>; 3], [Vec<i64>; 3]) {
+fn mixed() -> ([Vec<Field>; 3], [Vec<i128>; 3]) {
     (
         [
             std::vec![
@@ -767,11 +771,11 @@ fn malformed_records_quotas_and_eager_graphs_match_independent_oracles() {
     }
     for graph in [
         std::vec![Op::Input(u16::MAX)],
-        std::vec![Op::Int(i64::MAX), Op::Int(1), Op::Add(0, 1)],
+        std::vec![Op::Int(i128::MAX), Op::Int(1), Op::Add(0, 1)],
         std::vec![
             Op::Bool(false),
             Op::Int(9),
-            Op::Int(i64::MIN),
+            Op::Int(i128::MIN),
             Op::Sub(2, 1),
             Op::Select(0, 3, 1)
         ],
@@ -1010,7 +1014,7 @@ fn empty_thirty_two_and_one_hundred_field_records_have_no_new_bound() {
             Vec::new(),
             Vec::new(),
         ];
-        let values = (0..count).map(|value| value as i64).collect::<Vec<_>>();
+        let values = (0..count).map(|value| value as i128).collect::<Vec<_>>();
         let bytes = [
             encode(&fields[0], &values),
             encode(&fields[1], &[]),

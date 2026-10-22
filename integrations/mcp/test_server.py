@@ -71,6 +71,10 @@ class SynthesisToolsTest(unittest.IsolatedAsyncioTestCase):
             workflow = described["report"]["normal_program"]
             self.assertEqual(set(workflow["templates"]), PROGRAM_TEMPLATES)
             self.assertEqual(workflow["runtime_admission"], "not-run")
+            commands = {entry["name"]: entry
+                        for entry in described["report"]["command"]["subcommands"]}
+            for name in ("loop", "optimize"):
+                self.assertTrue(commands[name]["guidance"])
             with tempfile.TemporaryDirectory(prefix="zenofcis-mcp-program-") as temporary:
                 for template in sorted(PROGRAM_TEMPLATES):
                     project = Path(temporary) / template

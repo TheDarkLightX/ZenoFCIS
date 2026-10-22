@@ -218,7 +218,7 @@ mod tests {
         let inputs = [BOOL, SMALL];
         let outputs = [SMALL];
         // A program that traps on every tuple is still equal to itself.
-        let nodes = [Op::Input(1), Op::Int(i64::MAX), Op::Add(1, 1)];
+        let nodes = [Op::Input(1), Op::Int(i128::MAX), Op::Add(1, 1)];
         let same = compare(
             &program(&inputs, &outputs, &nodes, &[0]),
             &program(&inputs, &outputs, &nodes, &[0]),
@@ -301,7 +301,7 @@ mod tests {
         // An unused overflowing node still runs and traps on every tuple.
         let trapping = [
             Op::Input(0),
-            Op::Int(i64::MAX),
+            Op::Int(i128::MAX),
             Op::Add(1, 1),
             Op::Bool(true),
             Op::Select(3, 0, 0),
@@ -368,8 +368,8 @@ mod tests {
             })
         );
         let full = Domain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         };
         let huge = [full, full, full];
         assert_eq!(
@@ -383,9 +383,9 @@ mod tests {
                 cap: u64::MAX
             })
         );
-        // Two full i64 domains: 2^128 tuples overflow u128 by one.
+        // Two full i128 domains: 2^128 tuples overflow u128 by one.
         assert_eq!(domain_size(&[full, full]), Ok(None));
-        assert_eq!(domain_size(&[full]), Ok(Some(1 << 64)));
+        assert_eq!(domain_size(&[full]), Ok(None));
     }
 
     #[test]
@@ -465,15 +465,15 @@ mod tests {
     }
 
     #[test]
-    fn the_odometer_visits_each_tuple_once_up_to_the_i64_endpoints() {
+    fn the_odometer_visits_each_tuple_once_up_to_the_i128_endpoints() {
         let domains = [
             Domain::Int {
-                min: i64::MAX - 1,
-                max: i64::MAX,
+                min: i128::MAX - 1,
+                max: i128::MAX,
             },
             BOOL,
         ];
-        let mut tuple = [i64::MAX - 1, 0];
+        let mut tuple = [i128::MAX - 1, 0];
         let mut seen = vec![tuple];
         while advance(&domains, &mut tuple) {
             seen.push(tuple);
@@ -481,12 +481,12 @@ mod tests {
         assert_eq!(
             seen,
             [
-                [i64::MAX - 1, 0],
-                [i64::MAX - 1, 1],
-                [i64::MAX, 0],
-                [i64::MAX, 1]
+                [i128::MAX - 1, 0],
+                [i128::MAX - 1, 1],
+                [i128::MAX, 0],
+                [i128::MAX, 1]
             ]
         );
-        assert_eq!(tuple, [i64::MAX - 1, 0]);
+        assert_eq!(tuple, [i128::MAX - 1, 0]);
     }
 }

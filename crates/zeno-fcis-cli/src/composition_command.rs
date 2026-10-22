@@ -501,22 +501,22 @@ fn joint_table(
             for row in &rows {
                 println!(
                     "state {} request {} -> {}",
-                    json!(row.state),
-                    json!(row.request),
+                    crate::report_numbers::integers(&row.state),
+                    crate::report_numbers::integers(&row.request),
                     row.outcome.json()
                 );
             }
         }
         OutputFormat::Json => print_json(&json!({
-            "schema": JSON_SCHEMA, "status": "explored", "path": path.display().to_string(),
+            "schema": "zeno-fcis/composed-joint-table/2", "integer_encoding":crate::report_numbers::ENCODING, "status": "explored", "path": path.display().to_string(),
             "authority": "none", "evidence": "composed-domain-joint-table",
             "state_layout": joint.state_layout().iter().map(|slot| format!("{}.{}", slot.component, slot.field)).collect::<Vec<_>>(),
             "request_layout": joint.request_layout().iter().map(|slot| slot.name.clone()).collect::<Vec<_>>(),
-            "genesis": joint.genesis(),
+            "genesis": crate::report_numbers::integers(joint.genesis()),
             "rows": rows.iter().map(|row| {
                 let mut out = row.outcome.json();
-                out["state"] = json!(row.state);
-                out["request"] = json!(row.request);
+                out["state"] = crate::report_numbers::integers(&row.state);
+                out["request"] = crate::report_numbers::integers(&row.request);
                 out
             }).collect::<Vec<_>>(),
         })),
@@ -575,6 +575,16 @@ mod tests {
                 rules: read(ring.join(leaf).join(super::RULES)),
             })
             .collect();
+        let historical = include_str!("../tests/fixtures/legacy-composition/register-ring-n2.json");
+        assert!(
+            checked_composition::check(CompositionSources {
+                manifest: historical,
+                leaves: &leaves,
+                aggregate: None,
+            })
+            .is_err(),
+            "historical Authority identities must not authorize the new source"
+        );
         let committed = read(ring.join("composition.json"));
         // A name with quotes, a backslash, non-ASCII text and a control
         // character, so that both writers escape the same strings.

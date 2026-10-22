@@ -320,6 +320,24 @@ def fixture_sets(pins: Pins, root: Path) -> dict[str, str]:
     return out
 
 
+def limit_fixtures(pins: Pins, target: Path) -> dict[str, str]:
+    """Refresh only program bindings of the retained limit scenarios."""
+    manifests = {}
+    for path in sorted((target / "limits").rglob("*.json")):
+        manifest = json.loads(path.read_text())
+        if manifest.get("schema") != SCHEMA:
+            continue
+        for component in manifest["components"]:
+            actual = pins.of(path.parent / component["path"])
+            # A width-profile refresh cannot silently bless changed inputs.
+            for key in ("project_sha256", "policy_sha256"):
+                if component[key] != actual[key]:
+                    raise SystemExit(f"limit fixture inputs changed: {path}: {component['name']}: {key}")
+            component["program_sha256"] = actual["program_sha256"]
+        manifests[str(path.relative_to(target))] = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    return manifests
+
+
 def fixtures(args) -> int:
     scratch = Path(args.scratch)
     scratch.mkdir(parents=True, exist_ok=True)
@@ -328,7 +346,9 @@ def fixtures(args) -> int:
     if args.check:
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(CONTRACTS, target / "contracts")
+        shutil.copytree(FIXTURES / "limits", target / "limits")
     manifests = fixture_sets(pins, target)
+    manifests.update(limit_fixtures(pins, target))
     for path, text in manifests.items():
         (target / path).write_text(text)
     if not args.check:
@@ -505,15 +525,38 @@ def cli_json(cli, *args):
         return result.returncode, {"status": "unreadable", "stdout": result.stdout, "stderr": result.stderr}
 
 
+def report_integer(value):
+    """Exact report syntax only; independent transition semantics stay below."""
+    if type(value) is int:
+        number = value
+    elif type(value) is str and len(value) <= 40:
+        number = int(value)
+        if str(number) != value:
+            raise ValueError("noncanonical report integer")
+    else:
+        raise ValueError("report integer")
+    if not -(1 << 127) <= number < (1 << 127):
+        raise ValueError("report i128 bound")
+    return number
+
+
+def report_witness(witness):
+    """Decode only typed named coordinate maps, retaining descriptive text."""
+    names = ('genesis', 'states', 'after', 'providers', 'request', 'state', 'inputs', 'post')
+    return {key: ({name: report_integer(value) for name, value in values.items()}
+                  if key in names and isinstance(values, dict) else values)
+            for key, values in witness.items()}
+
+
 def canonical_rows_rust(table: dict) -> dict:
     names = table["state_layout"]
     rows = {}
     for row in table["rows"]:
-        state = tuple(sorted(zip(names, row["state"])))
-        after = tuple(sorted(zip(names, row["successor"])))
+        state = tuple(sorted(zip(names, [report_integer(v) for v in row["state"]])))
+        after = tuple(sorted(zip(names, [report_integer(v) for v in row["successor"]])))
         outcome = row["outcome"]
         detail = outcome.get("reason") if outcome["kind"] in ("Reject", "CommittedFailure") else outcome.get("class")
-        rows[(state, tuple(row["request"]))] = (outcome["kind"], outcome.get("component"), detail, after)
+        rows[(state, tuple([report_integer(v) for v in row["request"]]))] = (outcome["kind"], outcome.get("component"), detail, after)
     return rows
 
 
@@ -782,7 +825,7 @@ def faults(args) -> int:
             row["obligation"] = kind
             agree = (ours["first"]["kind"], ours["first"]["subject"]) == (kind["kind"], kind["subject"])
             expected = _named_witness(composition, ours["first"]["witness"])
-            got = theirs["witness"]["witness"]
+            got = report_witness(theirs["witness"]["witness"])
             if kind["kind"] == "local":
                 fields = composition.by_name[kind["subject"]]
                 expected = {"state": dict(zip(fields.state_names, ours["first"]["witness"]["state"])),

@@ -1,0 +1,311 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "spot-pool",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "x": "choose((command.101.121 == 0), pre.100.110, pre.100.111)",
+    "y": "choose((command.101.121 == 0), pre.100.111, pre.100.110)",
+    "inverse_net": "mul_div_ceil(x, command.101.122, choose(((y - command.101.122) > 1), (y - command.101.122), 1))",
+    "inverse_gross": "mul_div_ceil(inverse_net, 10000, 9970)",
+    "gross": "choose((command.101.120 == 2), inverse_gross, command.101.122)",
+    "fee": "mul_div_ceil(gross, 30, 10000)",
+    "protocol": "mul_div_floor(fee, 2000, 10000)",
+    "net": "(gross - fee)",
+    "quote": "mul_div_floor(y, net, choose(((x + net) > 1), (x + net), 1))",
+    "gap_bps": "mul_div_ceil(choose(((quote - command.101.122) > 0), (quote - command.101.122), 0), 10000, choose((command.101.122 > 1), command.101.122, 1))",
+    "used0": "choose(products_ge(command.101.123, pre.100.110, command.101.122, pre.100.111), command.101.122, mul_div_floor(command.101.123, pre.100.110, choose((pre.100.111 > 1), pre.100.111, 1)))",
+    "used1": "choose(products_ge(command.101.123, pre.100.110, command.101.122, pre.100.111), mul_div_floor(command.101.122, pre.100.111, choose((pre.100.110 > 1), pre.100.110, 1)), command.101.123)",
+    "mint": "choose((mul_div_floor(used0, pre.100.112, choose((pre.100.110 > 1), pre.100.110, 1)) <= mul_div_floor(used1, pre.100.112, choose((pre.100.111 > 1), pre.100.111, 1))), mul_div_floor(used0, pre.100.112, choose((pre.100.110 > 1), pre.100.110, 1)), mul_div_floor(used1, pre.100.112, choose((pre.100.111 > 1), pre.100.111, 1)))",
+    "payout0": "mul_div_floor(command.101.122, pre.100.110, choose((pre.100.112 > 1), pre.100.112, 1))",
+    "payout1": "mul_div_floor(command.101.122, pre.100.111, choose((pre.100.112 > 1), pre.100.112, 1))",
+    "paid": "choose((command.101.120 == 2), command.101.122, quote)",
+    "next0": "choose((command.101.120 == 0), command.101.122, choose((command.101.120 == 1), choose((command.101.121 == 0), ((x + gross) - protocol), (y - paid)), choose((command.101.120 == 2), choose((command.101.121 == 0), ((x + gross) - protocol), (y - paid)), choose((command.101.120 == 3), (pre.100.110 + used0), (pre.100.110 - payout0)))))",
+    "next1": "choose((command.101.120 == 0), command.101.123, choose((command.101.120 == 1), choose((command.101.121 == 0), (y - paid), ((x + gross) - protocol)), choose((command.101.120 == 2), choose((command.101.121 == 0), (y - paid), ((x + gross) - protocol)), choose((command.101.120 == 3), (pre.100.111 + used1), (pre.100.111 - payout1)))))",
+    "next_supply": "choose((command.101.120 == 0), command.101.126, choose((command.101.120 == 1), pre.100.112, choose((command.101.120 == 2), pre.100.112, choose((command.101.120 == 3), (pre.100.112 + mint), (pre.100.112 - command.101.122)))))"
+  },
+  "cases": [
+    {
+      "rule": "1 closed shape and input ranges",
+      "when": "(((((((context.102.134 == 0) || (command.101.120 > 4)) || (command.101.121 > 1)) || (command.101.122 == 0)) || !((((((true && (((command.101.120 == 0) || (command.101.120 == 3)) || (command.101.123 == 0))) && ((command.101.120 == 0) || (command.101.126 == 0))) && (((command.101.120 == 1) || (command.101.120 == 2)) || (command.101.121 == 0))) && (!((command.101.120 == 0)) || ((command.101.124 == 0) && (command.101.125 == 0)))) && (!(((command.101.120 == 1) || (command.101.120 == 2))) || (command.101.125 == 0))))) || (((command.101.120 == 0) || (command.101.120 == 3)) && (((command.101.122 > 1000000000) || (command.101.123 == 0)) || (command.101.123 > 1000000000)))) || ((command.101.120 == 3) && ((command.101.124 > 1000000000) || (command.101.125 > 1000000000))))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 pair already exists",
+      "when": "((command.101.120 == 0) && (pre.100.113 == 1))",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 pair absent",
+      "when": "(!((command.101.120 == 0)) && (pre.100.113 == 0))",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "3 ACTIVE only",
+      "when": "((pre.100.113 == 1) && (pre.100.114 != 0))",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "4 existing empty or below permanent lock",
+      "when": "((pre.100.113 == 1) && (((pre.100.110 == 0) || (pre.100.111 == 0)) || (pre.100.112 < 1000)))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "5 pre-state pool/balance and LP equations",
+      "when": "((context.102.130 == 0) || ((pre.100.113 == 0) && (((pre.100.110 != 0) || (pre.100.111 != 0)) || (pre.100.112 != 0))))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 burn lock actor before other roles",
+      "when": "((command.101.120 == 4) && (context.102.131 == 1))",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 no reserved actor or recipient",
+      "when": "((context.102.131 != 0) || ((((command.101.120 == 1) || (command.101.120 == 2)) || (command.101.120 == 4)) && (context.102.132 != 0)))",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 floor square witness",
+      "when": "((command.101.120 == 0) && (!(products_ge(command.101.122, command.101.123, command.101.126, command.101.126)) || products_ge(command.101.122, command.101.123, (command.101.126 + 1), (command.101.126 + 1))))",
+      "class": "Reject",
+      "reason": 207,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 positive creator mint after K",
+      "when": "((command.101.120 == 0) && (command.101.126 <= 1000))",
+      "class": "Reject",
+      "reason": 208,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in conservative gross reserve cap",
+      "when": "((command.101.120 == 1) && ((x + command.101.122) > 3000000000))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in positive net",
+      "when": "((command.101.120 == 1) && (net <= 0))",
+      "class": "Reject",
+      "reason": 210,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in positive output",
+      "when": "((command.101.120 == 1) && (quote <= 0))",
+      "class": "Reject",
+      "reason": 211,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in minimum output",
+      "when": "((command.101.120 == 1) && (quote < command.101.124))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out no drain",
+      "when": "((command.101.120 == 2) && (command.101.122 >= y))",
+      "class": "Reject",
+      "reason": 213,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out raw gross bounds before narrowing",
+      "when": "((command.101.120 == 2) && ((inverse_gross > 3000000000) || ((x + inverse_gross) > 3000000000)))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out sufficient quote",
+      "when": "((command.101.120 == 2) && ((net <= 0) || (quote < command.101.122)))",
+      "class": "Reject",
+      "reason": 214,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out maximum input",
+      "when": "((command.101.120 == 2) && (gross > command.101.124))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out ceil quote-gap cap",
+      "when": "((command.101.120 == 2) && (gap_bps > 200))",
+      "class": "Reject",
+      "reason": 215,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 ratio-selected positive deposits",
+      "when": "((command.101.120 == 3) && ((used0 <= 0) || (used1 <= 0)))",
+      "class": "Reject",
+      "reason": 216,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 add minima before mint",
+      "when": "((command.101.120 == 3) && ((used0 < command.101.124) || (used1 < command.101.125)))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 positive ratio mint",
+      "when": "((command.101.120 == 3) && (mint <= 0))",
+      "class": "Reject",
+      "reason": 217,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 burn balance and lock",
+      "when": "((command.101.120 == 4) && ((context.102.133 < command.101.122) || (command.101.122 > (pre.100.112 - 1000))))",
+      "class": "Reject",
+      "reason": 218,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 both payouts before minima",
+      "when": "((command.101.120 == 4) && ((payout0 <= 0) || (payout1 <= 0)))",
+      "class": "Reject",
+      "reason": 219,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 remove minima",
+      "when": "((command.101.120 == 4) && ((payout0 < command.101.124) || (payout1 < command.101.125)))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "8 remaining successor bounds",
+      "when": "((((((next0 < 0) || (next1 < 0)) || (next_supply < 0)) || (next0 > 3000000000)) || (next1 > 3000000000)) || (next_supply > 3000000000))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "9 swap output and k",
+      "when": "(((command.101.120 == 1) || (command.101.120 == 2)) && (((paid <= 0) || (paid >= y)) || !(products_ge(choose((((x + gross) - protocol) > 0), ((x + gross) - protocol), 0), choose(((y - paid) > 0), (y - paid), 0), x, y))))",
+      "class": "Reject",
+      "reason": 220,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "unreachable on admitted bounds; evaluator refusal is not a semantic reject",
+      "when": "false",
+      "class": "Reject",
+      "reason": 221,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "accept exact candidate",
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "MintBurnAuthorization",
+    "502": "FeeAndRounding",
+    "503": "AssetConservation",
+    "504": "FeeAndRounding",
+    "505": "FeeAndRounding",
+    "506": "FeeAndRounding",
+    "507": "AssetConservation",
+    "508": "FeeAndRounding",
+    "509": "FeeAndRounding",
+    "510": "FeeAndRounding",
+    "511": "FeeAndRounding",
+    "512": "AssetConservation",
+    "513": "FeeAndRounding",
+    "514": "FeeAndRounding",
+    "515": "FeeAndRounding",
+    "516": "AssetConservation",
+    "517": "FeeAndRounding",
+    "518": "FeeAndRounding",
+    "519": "FeeAndRounding",
+    "520": "FeeAndRounding",
+    "521": "FeeAndRounding",
+    "522": "MintBurnAuthorization",
+    "523": "AuthoritySubjectRecipient",
+    "524": "RejectNoAuthority",
+    "525": "AuthoritySubjectRecipient",
+    "526": "FeeAndRounding",
+    "527": "FeeAndRounding",
+    "528": "FeeAndRounding",
+    "529": "FeeAndRounding",
+    "530": "FeeAndRounding"
+  }
+}

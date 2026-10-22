@@ -201,7 +201,48 @@ const LAW_501: &[l::Op<'static>] = &[
     l::Op::And(25, 31),
 ];
 const LAW_502: &[l::Op<'static>] = &[l::Op::Literal(l::Atom::Bool(false))];
-const LAW_503: &[l::Op<'static>] = &[l::Op::Literal(l::Atom::Bool(true))];
+const LAW_503: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::ContextRoot),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Eq(1, 2),
+    l::Op::Not(3),
+    l::Op::Observe(l::Observation::Pre(110)),
+    l::Op::ToI128(5),
+    l::Op::Observe(l::Observation::Command(120)),
+    l::Op::ToI128(7),
+    l::Op::Add(6, 8),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(9, 10),
+    l::Op::Not(11),
+    l::Op::Literal(l::Atom::I128(3)),
+    l::Op::Lt(13, 9),
+    l::Op::Not(14),
+    l::Op::And(12, 15),
+    l::Op::Observe(l::Observation::Command(121)),
+    l::Op::ToI128(17),
+    l::Op::Add(9, 18),
+    l::Op::Lt(19, 10),
+    l::Op::Not(20),
+    l::Op::And(16, 21),
+    l::Op::Lt(13, 19),
+    l::Op::Not(23),
+    l::Op::And(22, 24),
+    l::Op::Observe(l::Observation::Command(122)),
+    l::Op::ToI128(26),
+    l::Op::Add(19, 27),
+    l::Op::Lt(28, 10),
+    l::Op::Not(29),
+    l::Op::And(25, 30),
+    l::Op::Lt(13, 28),
+    l::Op::Not(32),
+    l::Op::And(31, 33),
+    l::Op::Not(34),
+    l::Op::Not(4),
+    l::Op::Not(35),
+    l::Op::And(36, 37),
+    l::Op::Not(38),
+];
 const LAW_909: &[l::Op<'static>] = &[
     l::Op::Observe(l::Observation::PostLength),
     l::Op::ToI128(0),
@@ -403,7 +444,7 @@ pub const LAWS: &[l::Law<'static>] = &[
         genesis: false,
         program: l::Program {
             nodes: LAW_503,
-            root: 0,
+            root: 39,
         },
     },
     l::Law {
@@ -478,8 +519,8 @@ impl Contract {
             output_types: vec![
                 InputLeaf::I128 { min: 0, max: 2 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
             ],
         }
@@ -502,8 +543,8 @@ impl Contract {
                 outputs: &[
                     ScalarDomain::Int { min: 0, max: 2 },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                 ],
                 nodes: &[
@@ -598,14 +639,14 @@ impl Contract {
             laws: LAWS,
             required: REQUIRED,
             limits: v2_zero_limits()
-                .with_limit(Resource::Read, 109)
+                .with_limit(Resource::Read, 114)
                 .with_limit(Resource::Write, 1)
                 .with_limit(Resource::Candidate, 1)
                 .with_limit(Resource::Effect, 1)
                 .with_limit(Resource::Byte, 231)
                 .with_limit(Resource::WitnessByte, 0)
                 .with_limit(Resource::Depth, 0)
-                .with_limit(Resource::Step, 242),
+                .with_limit(Resource::Step, 281),
         }
     }
 }

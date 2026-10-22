@@ -26,7 +26,7 @@ import tomllib
 import check_generated_application as generated_application
 import check_release_custody as custody
 import check_release_privacy
-import check_binary_labels
+import check_cli_source_snapshots as source_snapshots
 # BEGIN public knowledge example packaging guard.
 import check_knowledge_files as knowledge_files
 # END public knowledge example packaging guard.
@@ -45,7 +45,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "7c575de932dde9ab36ed0cd164dd8b42f1ae678c0dbab69e848ff3704ae9dc52"
+    "20e01c600a0df0baf92ccf54a56d807a955616cf13bb7ac9d13c95be65045030"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -77,6 +77,9 @@ def parse_args() -> argparse.Namespace:
     verify = subcommands.add_parser("verify-packaged", help="exercise an existing crate set and its generated application")
     verify.add_argument("--packages", type=Path, required=True)
     verify.add_argument("--output", type=Path, required=True)
+    propose = subcommands.add_parser("propose-test-inputs", help="derive a candidate test-input manifest; never install it")
+    propose.add_argument("--output", type=Path, required=True)
+    propose.add_argument("--target-dir", type=Path, required=True, help="an isolated target for this published-target graph")
     host = subcommands.add_parser("build-host-binary", help="build, archive and record this host's executable only")
     host.add_argument("--output", type=Path, required=True)
     merge = subcommands.add_parser("merge-hosts", help="add other hosts' archives and records to a release set")
@@ -163,8 +166,8 @@ def validate_developer_tooling_documents(
     dependencies = package.get("devDependencies")
     if dependencies != {"@nizos/probity": EXPECTED_PROBITY_VERSION}:
         raise RcError("package.json must pin only Probity 1.10.0 as developer tooling")
-    if package.get("overrides") != {"@modelcontextprotocol/sdk": "1.31.0"}:
-        raise RcError("package.json must pin the patched MCP SDK 1.31.0 override")
+    if package.get("overrides") != {"@modelcontextprotocol/sdk": "1.32.1"}:
+        raise RcError("package.json must pin the patched MCP SDK 1.32.1 override")
     if node_version.strip() != EXPECTED_NODE_VERSION:
         raise RcError(".node-version does not pin exact Node 22.23.1")
 
@@ -198,7 +201,6 @@ def validate_developer_tooling_documents(
         "rustCommandPolicy",
         "cargo\\s+(?:\\+\\S+\\s+)?update",
         "cargo\\s+(?:\\+\\S+\\s+)?publish",
-        "python3\\s+tools\\/atdd\\.py\\s+run\\s+--all",
     )
     for marker in required_config:
         if marker not in config_text:
@@ -390,6 +392,7 @@ def validate_package_documents(
 
 
 def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
+    source_snapshots.check(ROOT)
     # BEGIN refuse unlisted knowledge before invoking Cargo.
     if knowledge_files.check(ROOT):
         raise RcError("knowledge file include policy failed")
@@ -507,7 +510,8 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     else:
         raise RcError("self-test mutation survived: Probity version")
 
-    for changed_override in ({}, {"@modelcontextprotocol/sdk": "1.30.0"}):
+    for changed_override in ({}, {"@modelcontextprotocol/sdk": "1.30.0"},
+                             {"@modelcontextprotocol/sdk": "1.31.0"}):
         wrong_override = copy.deepcopy(package)
         wrong_override["overrides"] = changed_override
         try:
@@ -662,6 +666,21 @@ def run_packaged_layout_self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-packaged-layout-self-test-") as raw:
         base = Path(raw)
 
+        # The arithmetic allowance is a fixed file list, not an examples/ or
+        # tools/ directory allowance. The listed bytes are still hash-checked.
+        named = sorted(REPOSITORY_INPUT_FILES)[0]
+        entry = {"package": "alpha", "target": "test:reads", "path": named,
+                 "sha256": hashlib.sha256(fixture).hexdigest()}
+        manifest = base / "test-inputs.json"
+        write_json(manifest, {"format": PACKAGED_TEST_INPUTS_FORMAT, "inputs": [entry]})
+        reviewed = load_packaged_test_inputs(manifest)
+        stage_repository_inputs(reviewed, base / "named-input", read_blob=lambda path: fixture)
+        if (base / "named-input" / named).read_bytes() != fixture:
+            raise RcError("named repository test input was not staged exactly")
+        entry["path"] = str(PurePosixPath(named).parent / "unlisted-fixture.txt")
+        write_json(manifest, {"format": PACKAGED_TEST_INPUTS_FORMAT, "inputs": [entry]})
+        refused(lambda: load_packaged_test_inputs(manifest), "an unlisted arithmetic fixture")
+
         def environment(name: str) -> dict[str, str]:
             return dict(os.environ, CARGO_TARGET_DIR=str(base / f"target-{name}"),
                         CARGO_INCREMENTAL="0", CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
@@ -704,33 +723,23 @@ def run_packaged_layout_self_test() -> None:
         refused(lambda: require_packaged_test_inputs(changed, expected, changed_non_test),
                 "a changed verification fixture")
 
-        # Control 4: a non-test target with any cross-package read fails, even when it compiles.
-        mixed = base / "mixed"
-        mixed_roots = {"gamma": package(mixed / "crates" / "gamma", "gamma", sibling_read),
-                       "beta": package(mixed / "crates" / "beta", "beta", "")}
-        _, mixed_observed, mixed_non_test = layout_reads(mixed, mixed_roots, environment("mixed"))
-        if not mixed_non_test:
-            raise RcError("packaged layout self-test missed a non-test cross-package read")
-        refused(lambda: require_packaged_test_inputs(mixed_observed, mixed_observed, mixed_non_test),
-                "a non-test cross-package read")
-
-
-
-        # A dependency exports its own source data: consumers do not read
-        # outside their archive, even in the versioned isolated layout.
-        owned = base / "owned"
-        owned_env = environment("owned")
-        owned_roots = {
-            "alpha": package(owned / "sources" / "alpha-0.1.0", "alpha",
-                             "pub const DATA: &str = beta::DATA;\n"
-                             "pub const BYTES: &[u8] = beta::DATA.as_bytes();\n"),
-            "beta": package(owned / "sources" / "beta-0.1.0", "beta",
-                            'pub const DATA: &str = include_str!("../data.txt");\n'),
-        }
-        with (owned_roots["alpha"] / "Cargo.toml").open("a", encoding="utf-8") as manifest:
-            manifest.write('\n[dependencies]\nbeta = "=0.1.0"\n')
-        run(consumer_build_command(workspace(owned, owned_roots, owned_env)),
-            environment=owned_env, cwd=owned)
+        # Each Rust compile-time input form must fail even when a sibling is
+        # present and compilation succeeds. The actual release check derives
+        # these reads from rustc dep-info for every published package target.
+        for form, library in (
+            ("include-str", sibling_read),
+            ("include-bytes", 'pub const DATA: &[u8] = include_bytes!("../../beta/data.txt");\n'),
+            ("include", 'include!("../../beta/src/lib.rs");\n'),
+            ("path", '#[path = "../../beta/src/lib.rs"] pub mod external;\n'),
+        ):
+            mixed = base / form
+            mixed_roots = {"gamma": package(mixed / "crates" / "gamma", "gamma", library),
+                           "beta": package(mixed / "crates" / "beta", "beta", "")}
+            _, observed, non_test = layout_reads(mixed, mixed_roots, environment(form))
+            if not non_test:
+                raise RcError(f"packaged layout self-test missed an external {form} read")
+            refused(lambda: require_packaged_test_inputs(observed, observed, non_test),
+                    f"a non-test cross-package {form} read")
 
 
 def run_rustdoc_normalization_self_test() -> None:
@@ -1204,16 +1213,26 @@ PACKAGED_TEST_INPUTS_PATH = ROOT / "release" / "packaged-test-inputs.json"
 PACKAGED_TEST_INPUTS_FORMAT = "zeno-fcis/packaged-test-inputs/1"
 # Test inputs that are not in any published archive. They are copied from the
 # exact commit and must also appear, with their SHA-256, in the manifest. Only
-# these repository folders may hold them. Arithmetic regression inputs are
-# explicit public examples/vectors; every file still needs an exact reviewed
-# per-target digest, and production cross-package reads remain forbidden.
-REPOSITORY_INPUT_PREFIXES = (
-    "verification/", "docs/benchmarks/", "examples/arithmetic-fee/",
-    "examples/arithmetic-quote/", "examples/arithmetic-fused/",
-    "tools/test-data/scalar-arithmetic/",
-)
+# these repository folders may hold them: the verification workspace, and the
+# benchmark artifacts that the CLI's checker, optimizer and loop tests read.
+REPOSITORY_INPUT_PREFIXES = ("verification/", "docs/benchmarks/")
+REPOSITORY_INPUT_FILES = frozenset((
+    "examples/arithmetic-fee/project.zeno",
+    "examples/arithmetic-fee/v2/policy.json",
+    "examples/arithmetic-fused/project.zeno",
+    "examples/arithmetic-fused/v2/policy.json",
+    "examples/arithmetic-quote/project.zeno",
+    "examples/arithmetic-quote/v2/policy.json",
+    "tools/test-data/scalar-arithmetic/i128-vectors.tsv",
+    "tools/test-data/scalar-arithmetic/vectors.tsv",
+    "tools/test-data/signed-arithmetic/vectors.tsv",
+))
 CONSUMER_TARGET_ARGUMENTS = ("--workspace", "--lib", "--bins", "--examples", "--all-features")
 PACKAGED_TEST_ARGUMENTS = ("--workspace", "--all-targets", "--all-features")
+
+
+def repository_test_input(path: str) -> bool:
+    return path.startswith(REPOSITORY_INPUT_PREFIXES) or path in REPOSITORY_INPUT_FILES
 
 
 def load_packaged_test_inputs(path: Path = PACKAGED_TEST_INPUTS_PATH) -> list[dict[str, str]]:
@@ -1239,7 +1258,7 @@ def load_packaged_test_inputs(path: Path = PACKAGED_TEST_INPUTS_PATH) -> list[di
             or ".." in relative.parts
             or relative.as_posix() != entry["path"]
             or not (relative.parts[0] == "crates"
-                    or entry["path"].startswith(REPOSITORY_INPUT_PREFIXES))
+                    or repository_test_input(entry["path"]))
             or re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) is None
         ):
             raise RcError(f"{path.name}: invalid input entry {entry['path']}")
@@ -1271,7 +1290,7 @@ def stage_repository_inputs(
 
     staged = []
     for path, digest in sorted({(entry["path"], entry["sha256"]) for entry in entries}):
-        if not path.startswith(REPOSITORY_INPUT_PREFIXES):
+        if not repository_test_input(path):
             continue
         data = read_blob(path)
         if hashlib.sha256(data).hexdigest() != digest:
@@ -1387,6 +1406,7 @@ def require_packaged_test_inputs(
 
 def repository_layout_reads(
     layout_manifest: Path, layout_root: Path, environment: dict[str, str],
+    excluded_packages: tuple[str, ...] = (),
 ) -> tuple[str, list[dict[str, str]], list[str]]:
     """Build every non-test and test target in the repository layout and derive cross-package reads.
 
@@ -1394,14 +1414,42 @@ def repository_layout_reads(
     script leaves its own dep-info, even when no test depends on it.
     """
 
-    run(consumer_build_command(layout_manifest), environment=environment, cwd=layout_root)
-    messages = run(packaged_test_command(layout_manifest), capture=True,
+    exclusions = [word for name in excluded_packages for word in ("--exclude", name)]
+    run(consumer_build_command(layout_manifest) + exclusions, environment=environment, cwd=layout_root)
+    messages = run(packaged_test_command(layout_manifest) + exclusions, capture=True,
                    environment=environment, cwd=layout_root)
     if not isinstance(messages, str):
         raise RcError("packaged test build returned binary data")
     observed, non_test = observed_cross_package_inputs(
         messages, layout_root, Path(environment["CARGO_TARGET_DIR"]))
     return messages, observed, non_test
+
+
+def propose_test_inputs(output: Path, target: Path) -> None:
+    """Derive candidate bytes from all published targets, retaining exact acceptance checks."""
+    if output.exists():
+        raise RcError("test-input proposal output already exists")
+    before = require_source_state("test-input proposal start")
+    environment = compiler_environment(dict(os.environ))
+    environment.update(CARGO_TARGET_DIR=str(target), CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
+                       CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
+    _, observed, non_test = repository_layout_reads(
+        ROOT / "Cargo.toml", ROOT, environment,
+        tuple(require_string_list(package_set(), "private_packages")),
+    )
+    if non_test:
+        raise RcError("test-input proposal found non-test cross-package reads: " + "; ".join(non_test))
+    for entry in observed:
+        if hashlib.sha256(git_blob(entry["path"])).hexdigest() != entry["sha256"]:
+            raise RcError(f"test-input proposal differs from its committed blob: {entry['path']}")
+    if require_source_state("test-input proposal end") != before:
+        raise RcError("source changed during test-input proposal")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps({"format": PACKAGED_TEST_INPUTS_FORMAT, "inputs": observed}, indent=2) + "\n")
+    # Exercise the same path/schema checks as the normal release build. The
+    # normal isolated-archive build must independently reproduce this candidate.
+    load_packaged_test_inputs(output)
+    print(f"rc-package: proposed {len(observed)} test inputs at {before['commit']}; review before installation")
 
 
 def write_packaged_workspace_manifest(root: Path, package_roots: dict[str, Path]) -> Path:
@@ -1429,7 +1477,8 @@ def packaged_test_command(workspace_manifest: Path) -> list[str]:
 
 def packaged_checker_inputs() -> list[dict[str, str]]:
     return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
-        "tools/rc_package.py", "tools/check_generated_application.py", "tools/check_synthesis.py",
+        "tools/rc_package.py", "tools/check_cli_source_snapshots.py",
+        "tools/check_generated_application.py", "tools/check_synthesis.py",
         "Cargo.lock", "release/package-set.toml", "release/packaged-test-inputs.json",
         "tools/check_v1_compatibility.py",
         "test-data/v1-compatibility/baseline.json",
@@ -1957,9 +2006,7 @@ def merge_hosts(release: Path, host_dirs: list[Path], journeys: dict[str, Path],
     joining = [*existing.values(),
                *(item[key] for item in added.values() for key in ("record_path", "inputs", "journey"))]
     # Without paths the scan would read the whole checkout instead.
-    findings = privacy_findings(joining, commit=commit, records=[
-        (Path(item["record_path"]), Path(item["archive"])) for item in added.values()
-    ]) if joining else []
+    findings = privacy_findings(joining) if joining else []
     if findings:
         raise RcError("a file joining the set holds private data: " + "; ".join(findings[:5]))
     # Nothing is copied until every host and journey has been checked.
@@ -1988,8 +2035,7 @@ def merge_hosts(release: Path, host_dirs: list[Path], journeys: dict[str, Path],
     return {"hosts": sorted(every), "added": sorted(added), "artifacts": count}
 
 
-def privacy_findings(paths: list[Path], *, commit: str | None = None,
-                     records: list[tuple[Path, Path]] | None = None) -> list[str]:
+def privacy_findings(paths: list[Path]) -> list[str]:
     """What the release privacy scan finds in `paths`, by file and code; it never prints the matched data.
 
     The scan honours ZENO_FCIS_PRIVATE_MARKERS_FILE, as it does at the end of `build`."""
@@ -1999,38 +2045,11 @@ def privacy_findings(paths: list[Path], *, commit: str | None = None,
         report = json.loads(completed.stdout)
     except ValueError:
         return [f"the privacy scan exited {completed.returncode} without a report"]
-    # Keep ordinary source scanning and every other privacy category strict.
-    # Only exact build records can invoke the independently reviewed label policy.
-    if (completed.returncode == 1 and report.get("status") == "failed"
-            and commit and records and not report.get("errors") and report.get("findings")
-            and all(item.get("code") == "model-api-token" and item.get("source") == "content"
-                    for item in report["findings"])):
-        try:
-            disposition = check_binary_labels.check(paths, ROOT, commit, records)
-        except (OSError, ValueError, KeyError, TypeError, tarfile.TarError):
-            return ["the binary public-label disposition refused its source or artifact bindings"]
-        print(json.dumps(disposition, sort_keys=True))
-        if disposition["effective_status"] == "accepted-public-labels":
-            return []
     found = [f"{item.get('location')}: {item.get('code')}" for item in [*report.get("findings", []),
                                                                         *report.get("errors", [])]]
     if completed.returncode != 0 and not found:
         found.append(f"the privacy scan exited {completed.returncode}")
     return found
-
-
-def require_artifact_privacy(output: Path, commit: str) -> None:
-    records = []
-    for path in [output / "HOST-BINARY.json", *sorted(output.glob("hosts/*/HOST-BINARY.json"))]:
-        if path.is_file():
-            record = load_json_object(path)
-            name = record.get("archive", {}).get("name")
-            if not isinstance(name, str) or Path(name).name != name:
-                raise RcError("the host archive name is not a basename")
-            records.append((path, output / "binaries" / name))
-    findings = privacy_findings([output], commit=commit, records=records)
-    if findings:
-        raise RcError("release artifact privacy refused: " + "; ".join(findings[:5]))
 
 
 def downloads_lines(release: Path, signing_key: Path | None = None) -> str:
@@ -2072,7 +2091,7 @@ def build_host_binary(output: Path) -> None:
     shutil.rmtree(build_target)
     if require_source_state("build-host-binary end")["commit"] != commit:
         raise RcError("source commit changed while building the host executable")
-    require_artifact_privacy(output, commit)
+    run([sys.executable, "tools/check_release_privacy.py", "check", str(output)])
     print(f"rc-package: built and recorded the {host} executable at {commit}")
 
 
@@ -2214,7 +2233,7 @@ def build(output: Path) -> None:
     write_json(output / "PROVENANCE-INPUTS.json", provenance_inputs)
 
     artifact_count = write_release_index(output, version, commit)
-    require_artifact_privacy(output, commit)
+    run([sys.executable, "tools/check_release_privacy.py", "check", str(output)])
     print(
         f"rc-package: built {len(require_string_list(configured, 'publish_order'))} "
         f"crate packages and {artifact_count} retained artifacts at {commit}"
@@ -2236,7 +2255,6 @@ def main() -> int:
             )
         elif args.command == "self-test":
             run([sys.executable, "tools/test_release_privacy.py"])
-            run([sys.executable, "tools/test_binary_labels.py"])
             run([sys.executable, "tools/test_check_release_custody.py"])
             run([sys.executable, "tools/test_release_hosts.py"])
             run([sys.executable, "tools/test_check_installed_cli.py"])
@@ -2252,6 +2270,8 @@ def main() -> int:
             )
         elif args.command == "verify-packaged":
             verify_packaged(args.packages.resolve(), args.output.resolve(), require_string(configured, "version"))
+        elif args.command == "propose-test-inputs":
+            propose_test_inputs(args.output.resolve(), args.target_dir.resolve())
         elif args.command == "build-host-binary":
             build_host_binary(args.output.resolve())
         elif args.command == "merge-hosts":

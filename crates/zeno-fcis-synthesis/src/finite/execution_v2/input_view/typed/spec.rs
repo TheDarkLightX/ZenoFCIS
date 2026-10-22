@@ -18,7 +18,7 @@ pub(crate) open spec fn decode(bytes:Seq<u8>,offset:usize,leaf:LeafView)->Option
 }
 pub(crate) proof fn legacy_embedding(bytes:Seq<u8>,offset:usize,leaf:&Leaf)
     ensures match decode(bytes,offset,LeafView::Legacy(leaf)) {
-        Some((Atom::I128(v),end))=>i64::MIN<=v<=i64::MAX && legacy::scalar(bytes,offset,*leaf)==Some((v as i64,end)),
+        Some((Atom::I128(v),end))=>i128::MIN<=v<=i128::MAX && legacy::scalar(bytes,offset,*leaf)==Some((v as i128,end)),
         None=>legacy::scalar(bytes,offset,*leaf).is_none(),_=>false,
     },
 {}
@@ -106,11 +106,11 @@ pub(crate) open(in super::super::super) spec fn projection(bytes:Seq<u8>,view:Fi
         }
     }
 }
-pub(crate) open spec fn lift(values:Seq<i64>)->Seq<Atom<'static>> {
-    values.map(|_:int,v:i64|Atom::I128(v as i128))
+pub(crate) open spec fn lift(values:Seq<i128>)->Seq<Atom<'static>> {
+    values.map(|_:int,v:i128|Atom::I128(v as i128))
 }
 /// Lifting a decoded prefix preserves its final append.
-pub(crate) proof fn lift_push(values:Seq<i64>,value:i64)
+pub(crate) proof fn lift_push(values:Seq<i128>,value:i128)
     ensures lift(values.push(value))==lift(values).push(Atom::I128(value as i128)),
 {
     assert(lift(values.push(value)) =~= lift(values).push(Atom::I128(value as i128)));
@@ -135,7 +135,7 @@ proof fn legacy_prefix(bytes:Seq<u8>,fs:&[Field],count:nat,offset:usize,limits:S
     reveal_with_fuel(prefix,2);
     reveal_with_fuel(legacy::prefix,2);
     if count==0 {
-        assert(lift(Seq::<i64>::empty()) =~= Seq::<Atom<'static>>::empty());
+        assert(lift(Seq::<i128>::empty()) =~= Seq::<Atom<'static>>::empty());
     } else {
         legacy_prefix(bytes,fs,(count-1) as nat,offset,limits,used);
         let previous=legacy::prefix(bytes,fs@,(count-1) as nat,offset,limits,used);

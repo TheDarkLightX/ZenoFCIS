@@ -11,6 +11,7 @@ import secrets
 import tempfile
 
 from behavior import Refusal
+import report_numbers as N
 from shared import SharedWorkspace
 import loop_doors as D
 import loop_language as Z
@@ -73,7 +74,8 @@ class CaptureWorkspace:
         if code != 0 or report.get("status") != "packet" or not isinstance(packet, dict) or \
                 set(packet) != {"profile", "abi", "round", "examples"} or packet["abi"] != saved["abi"]:
             raise Refusal("capture-packet-refused")
-        return packet
+        return {**packet, "examples": [{**e, "input": list(N.integers(e["input"])),
+                                        "output": list(N.integers(e["output"]))} for e in packet["examples"]]}
 
     def init(self, spec, reference, session, reference_format="python-function-v1"):
         # Owner-side entry, never reachable through the MCP tools.
@@ -163,7 +165,7 @@ class CaptureWorkspace:
         ctx = self.ctx(saved)
         headers = {surface: Z.render(Z.Document(ctx.subject_ref, "model", ()), ctx, surface == "english")
                    for surface in ("symbolic", "english")}
-        return {"packet": self.packet_data(saved), "headers": headers, "authority": "none"}
+        return N.encode({"packet": self.packet_data(saved), "headers": headers, "integer_encoding": N.ENCODING, "authority": "none"})
 
 
 def mcp_call(name, arguments):

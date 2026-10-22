@@ -57,7 +57,7 @@ fn run(command: &mut Command) -> (i32, Value) {
 fn source() -> Value {
     json!({
         "schema": "zeno-fcis/completion-problem/1",
-        "profile": "zeno-fcis/finite-i64/1",
+        "profile": "zeno-fcis/finite-i128/1",
         "state": [{"name": "count", "type": {"kind": "int", "min": 0, "max": 3}}],
         "commands": [{"name": "exit", "type": {"kind": "bool"}}],
         "step": {"nodes": [["input", 0], ["input", 1], ["int", 0], ["int", 1],
@@ -79,6 +79,53 @@ fn names(path: &Path) -> Vec<String> {
         .collect();
     names.sort();
     names
+}
+
+#[test]
+fn emitted_prepared_counter_uses_the_supported_profile_and_replays() {
+    let directory = Directory::new();
+    let app = directory.path("app");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let emitted = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .arg("new")
+        .arg(&app)
+        .args(["--template", "prepared-counter", "--source"])
+        .arg(root)
+        .output()
+        .unwrap();
+    assert!(emitted.status.success(), "{emitted:?}");
+    let problem = app.join("completion.json");
+    let mut model: Value = serde_json::from_slice(&fs::read(&problem).unwrap()).unwrap();
+    let (exit, discovery) = run(cli().arg("discover"));
+    assert_eq!(exit, 0);
+    assert_eq!(model["profile"], discovery["profile"]);
+    let case = directory.path("case");
+    let (exit, found) = run(cli().arg("find").arg(&problem).arg("--out").arg(&case));
+    assert_eq!(exit, 0, "{found}");
+    assert_eq!(found["status"], "verified");
+    assert_eq!(found["states_checked"], 4);
+    assert_eq!(found["commands_per_state"], 27);
+    assert_eq!(found["maximum_exit_steps"], 1);
+    let (exit, verified) = run(cli()
+        .arg("verify")
+        .arg(&problem)
+        .arg("--plan")
+        .arg(case.join("plan.zcve")));
+    assert_eq!(exit, 0, "{verified}");
+    assert_eq!(verified["problem"], found["problem"]);
+    assert_eq!(verified["plan_sha256"], found["plan_sha256"]);
+    let (exit, replayed) = run(cli().arg("replay").arg(&problem).arg("--case").arg(&case));
+    assert_eq!(exit, 0, "{replayed}");
+    assert_eq!(replayed["replay"], "matched");
+    model["profile"] = json!("zeno-fcis/finite-i64/1");
+    let legacy = directory.write("legacy.json", &model);
+    let (exit, refused) = run(cli()
+        .arg("find")
+        .arg(legacy)
+        .arg("--out")
+        .arg(directory.path("legacy-case")));
+    assert_eq!(exit, 1);
+    assert_eq!(refused["status"], "invalid-problem");
 }
 
 #[test]
@@ -133,7 +180,7 @@ fn failure_cases_are_inert_portable_and_replay_the_actual_claim_exit_code() {
     no_exit["step"] = json!({"nodes": [["bool", true], ["input", 0]], "roots": [0, 1]});
     let mut trap = source();
     trap["step"]["nodes"].as_array_mut().unwrap().extend([
-        json!(["int", i64::MAX]),
+        json!(["int", i128::MAX.to_string()]),
         json!(["int", 1]),
         json!(["add", 8, 9]),
     ]);
@@ -438,4 +485,52 @@ fn symlink_inputs_outputs_and_case_members_cannot_redirect_the_file_boundary() {
         1
     );
     assert_eq!(fs::read(&outside).unwrap(), original);
+}
+
+#[test]
+fn wide_no_exit_reports_replay_exactly_without_authorizing_a_plan() {
+    let directory = Directory::new();
+    for (i, value) in [
+        i128::MIN,
+        i128::MAX,
+        -(1i128 << 100),
+        1 << 100,
+        (1 << 53) + 1,
+        5,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // Source grammar retains exact raw integer tokens; the report uses its
+        // declared encoding. An inert failure case must replay as a failure.
+        let text = format!(
+            r#"{{"schema":"zeno-fcis/completion-problem/1","profile":"zeno-fcis/finite-i128/1",
+          "state":[{{"name":"value","type":{{"kind":"int","min":{value},"max":{value}}}}}],
+          "commands":[{{"name":"request","type":{{"kind":"bool"}}}}],
+          "step":{{"nodes":[["bool",true],["input",0]],"roots":[0,1]}},
+          "terminal":{{"nodes":[["bool",false]],"roots":[0]}}}}"#
+        );
+        let problem = directory.path(&format!("wide-{i}.json"));
+        fs::write(&problem, text).unwrap();
+        let out = directory.path(&format!("wide-case-{i}"));
+        let (exit, report) = run(cli().arg("find").arg(&problem).arg("--out").arg(&out));
+        assert_eq!(exit, 1);
+        assert_eq!(report["status"], "no-exit");
+        assert_eq!(report["schema"], "zeno-fcis/completion-result/2");
+        assert_eq!(
+            report["integer_encoding"],
+            "safe-number-or-decimal-string/1"
+        );
+        let scalar = if value == 5 {
+            json!(5)
+        } else {
+            json!(value.to_string())
+        };
+        assert_eq!(report["detail"]["state"], json!([scalar]));
+        assert!(!out.join("plan.zcve").exists());
+        let (exit, replay) = run(cli().arg("replay").arg(&problem).arg("--case").arg(&out));
+        let mut expected = report;
+        expected["replay"] = json!("matched");
+        assert_eq!((exit, replay), (1, expected));
+    }
 }

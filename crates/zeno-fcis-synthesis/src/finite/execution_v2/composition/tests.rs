@@ -706,7 +706,7 @@ fn eager_unused_arithmetic_and_law_observations_refuse_exactly() {
             context: &x,
         };
         let mut nodes = d.program.nodes.to_vec();
-        nodes.extend([Op::Int(i64::MAX), Op::Int(1), Op::Add(2, 3)]);
+        nodes.extend([Op::Int(i128::MAX), Op::Int(1), Op::Add(2, 3)]);
         let mut changed = copy_descriptor(d);
         changed.program.nodes = &nodes;
         let core = bind(&changed).unwrap_or_else(|error| panic!("eager_unused_arithmetic_and_law_observations_refuse_exactly fixture failed: {error:?}"));
@@ -939,12 +939,12 @@ fn account_raw_facts_feed_actual_graph_and_preserve_seen_and_deadline() {
     let types = [
         InputLeaf::I128 { min: 0, max: 6 },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
         InputLeaf::I128 {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         },
     ];
     let third = [

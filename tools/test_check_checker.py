@@ -107,6 +107,43 @@ class SharedCheckerGate(unittest.TestCase):
             start, end = gate.target_lines(controls[name][1], target)
             self.assertLess(start, end)
 
+    def test_i128_width_and_product_mutations_change_only_the_intended_function(self):
+        source = (gate.ROOT / gate.SUBJECT).read_text()
+        controls = gate.mutations(source, (gate.ROOT / gate.SPEC).read_text(),
+                                  (gate.ROOT / gate.EQUALITY).read_text(),
+                                  (gate.ROOT / gate.API).read_text())
+        controls.update(gate.g10.mutations(gate.ROOT))
+        for name, path, function, before, after in (
+            ('width_minus_one', gate.SUBJECT, 'domain_size',
+             'let width = interval_width(min, max);',
+             'let width = match interval_width(min, max) { Some(width) => Some(width - 1), None => None };'),
+            ('R8_wrong_unrank_width', gate.RANGES, 'tuple_at',
+             'let maybe_width = interval_width(min, max);',
+             'let maybe_width = match interval_width(min, max) { Some(width) => Some(width - 1), None => None };'),
+            ('wrap_product', gate.SUBJECT, 'domain_size',
+             '(Some(n), Some(width)) => n.checked_mul(width),',
+             '(Some(n), Some(width)) => Some(n.wrapping_mul(width)),'),
+            ('overflow_before_late_empty', gate.SUBJECT, 'domain_size',
+             '(Some(n), Some(width)) => n.checked_mul(width),',
+             '(Some(n), Some(width)) => match n.checked_mul(width) { Some(next) => Some(next), None => return Ok(None) },'),
+        ):
+            with self.subTest(control=name):
+                original = (gate.ROOT / path).read_text()
+                actual_path, mutant, kind = controls[name]
+                self.assertEqual((actual_path, kind), (path, 'proof'))
+                self.assertEqual(original.count(before), 1)
+                self.assertEqual(mutant.count(after), 1)
+                self.assertEqual(mutant.replace(after, before), original)
+                first, last = gate.target_lines(original, function)
+                lines = original.splitlines(keepends=True)
+                body = ''.join(lines[first - 1:last])
+                self.assertEqual(body.count(before), 1)
+                self.assertEqual(mutant, ''.join(lines[:first - 1])
+                                 + body.replace(before, after) + ''.join(lines[last:]))
+                # Missing or ambiguous current anchors must still refuse.
+                for invalid in (original.replace(before, ''), original + '\n' + before):
+                    with self.assertRaisesRegex(RuntimeError, 'mutation anchor changed'):
+                        gate.once(invalid, before, after)
     def test_order_mutant_changes_matching_domain_and_tuple_coordinates(self):
         controls = gate.mutations((gate.ROOT / gate.SUBJECT).read_text(), (gate.ROOT / gate.SPEC).read_text(), (gate.ROOT / gate.EQUALITY).read_text(), (gate.ROOT / gate.API).read_text())
         forward = controls['first_input_fastest'][1]
@@ -299,8 +336,8 @@ class SharedCheckerGate(unittest.TestCase):
                                  + 'error: aborting due to 3 previous errors\n')[0])
 
     def test_pinned_unrank_division_diagnostics_keep_exact_failure_attribution(self):
-        # Retained R8_wrong_unrank_width emitted these two diagnostics for one
-        # failed tuple_at query. Derive their locations from the actual mutant.
+        # Keep the pinned two-diagnostic refusal fixture, locating division in
+        # the current Option-width match arm of the actual tuple_at mutant.
         path, source, expected = gate.g10.mutations(gate.ROOT)['R8_wrong_unrank_width']
         self.assertEqual(path, gate.RANGES)
         self.assertEqual(expected, 'proof')
@@ -317,15 +354,16 @@ class SharedCheckerGate(unittest.TestCase):
         start, end = gate.target_lines(source, 'tuple_at')
         lines = source.splitlines()
         division_line = next(i for i in range(start, end + 1)
-                             if 'let digit = remaining % width;' in lines[i - 1])
+                             if 'Some(width) => (remaining % width, remaining / width),' in lines[i - 1])
+        division_column = lines[division_line - 1].index('remaining % width') + 1
         requires_line = next(i for i in range(start, end + 1)
                              if 'requires remaining < p * width, remaining == next * width + digit,' in lines[i - 1])
         division = (
             'error: possible division by zero\n'
-            f'   --> verification/verus/../../{path}:{division_line}:21\n'
+            f'   --> verification/verus/../../{path}:{division_line}:{division_column}\n'
             '    |\n'
-            f'{division_line} |         let digit = remaining % width;\n'
-            '    |                     ^^^^^^^^^^^^^^^^^\n\n'
+            f'{division_line} | {lines[division_line - 1]}\n'
+            f'    | {" " * (division_column - 1)}^^^^^^^^^^^^^^^^^\n\n'
         )
         requires = (
             'error: requires not satisfied\n'
@@ -348,14 +386,14 @@ class SharedCheckerGate(unittest.TestCase):
         self.assertEqual(evidence['diagnostic_count'], 2)
         self.assertEqual(evidence['terminal_error_count'], 2)
         self.assertEqual(evidence['diagnostics'], [
-            {'kind': 'possible division by zero', 'line': division_line, 'column': 21},
+            {'kind': 'possible division by zero', 'line': division_line, 'column': division_column},
             {'kind': 'requires not satisfied', 'line': requires_line, 'column': 26},
         ])
         unrelated_line = gate.target_lines(source, 'same_program')[0]
         for stderr in (
             division.replace(str(path), 'unrelated/' + path.name) + requires + summary,
             division + requires.replace(str(path), 'unrelated/' + path.name) + summary,
-            division.replace(f':{division_line}:21', f':{unrelated_line}:21') + requires + summary,
+            division.replace(f':{division_line}:{division_column}', f':{unrelated_line}:{division_column}') + requires + summary,
             division + requires.replace(f':{requires_line}:26', f':{unrelated_line}:26') + summary,
             diagnostic.replace('error: possible', 'error[E0308]: possible') + summary,
             diagnostic.replace('division by zero', 'division by zero with extra text') + summary,

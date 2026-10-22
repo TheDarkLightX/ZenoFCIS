@@ -1104,11 +1104,11 @@ fn wide_catalog(cap: u64, swap_roots: bool, run: impl FnOnce(&catalog::BoundCata
         let codes = vec![
             InputVariant {
                 id: 0,
-                code: i64::MIN,
+                code: i128::MIN,
             },
             InputVariant {
                 id: u16::MAX,
-                code: i64::MIN + 1,
+                code: i128::MIN + 1,
             },
         ];
         let state = [
@@ -1116,8 +1116,8 @@ fn wide_catalog(cap: u64, swap_roots: bool, run: impl FnOnce(&catalog::BoundCata
                 id: 0,
                 leaf: InputLeaf::Enum {
                     type_id: 500,
-                    min: i64::MIN,
-                    max: i64::MIN + 1,
+                    min: i128::MIN,
+                    max: i128::MIN + 1,
                     variants: codes.clone(),
                 },
             },
@@ -1125,20 +1125,20 @@ fn wide_catalog(cap: u64, swap_roots: bool, run: impl FnOnce(&catalog::BoundCata
                 id: u16::MAX,
                 leaf: InputLeaf::Sum {
                     type_id: 501,
-                    min: i64::MIN,
-                    max: i64::MIN + 1,
+                    min: i128::MIN,
+                    max: i128::MIN + 1,
                     variants: codes,
                 },
             },
         ];
         let domains = [
             ScalarDomain::Int {
-                min: i64::MIN,
-                max: i64::MIN + 1,
+                min: i128::MIN,
+                max: i128::MIN + 1,
             },
             ScalarDomain::Int {
-                min: i64::MIN,
-                max: i64::MIN + 1,
+                min: i128::MIN,
+                max: i128::MIN + 1,
             },
             ScalarDomain::Int { min: 0, max: 2 },
         ];

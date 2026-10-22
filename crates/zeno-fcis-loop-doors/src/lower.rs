@@ -20,17 +20,23 @@ use alloc::vec;
 use alloc::vec::Vec;
 use zeno_fcis_synthesis::finite::{Domain, Error, Op as LibOp, Program};
 
-use crate::expr::{Expr, Kind, Op, Vocabulary, compare_side};
+use crate::expr::{Expr, Function, Kind, Op, Vocabulary, compare_side};
 use crate::{Refusal, Result};
 
 /// One pool term; operands are pool ids.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Term {
     Input(u16),
-    Int(i64),
+    Int(i128),
     Bool(bool),
     Add(usize, usize),
     Sub(usize, usize),
+    Mul(usize, usize),
+    DivFloor(usize, usize),
+    DivCeil(usize, usize),
+    MulDivFloor(usize, usize, usize),
+    MulDivCeil(usize, usize, usize),
+    ProductsGe([usize; 3], [usize; 3]),
     Eq(usize, usize),
     Lt(usize, usize),
     And(usize, usize),
@@ -45,12 +51,18 @@ impl Term {
             Self::Not(a) => vec![a],
             Self::Add(a, b)
             | Self::Sub(a, b)
+            | Self::Mul(a, b)
+            | Self::DivFloor(a, b)
+            | Self::DivCeil(a, b)
             | Self::Eq(a, b)
             | Self::Lt(a, b)
             | Self::And(a, b) => {
                 vec![a, b]
             }
-            Self::Select(c, a, b) => vec![c, a, b],
+            Self::Select(c, a, b) | Self::MulDivFloor(c, a, b) | Self::MulDivCeil(c, a, b) => {
+                vec![c, a, b]
+            }
+            Self::ProductsGe(a, b) => a.into_iter().chain(b).collect(),
         }
     }
 
@@ -59,6 +71,12 @@ impl Term {
             Self::Input(_) | Self::Int(_) | Self::Bool(_) => self,
             Self::Add(a, b) => Self::Add(f(a), f(b)),
             Self::Sub(a, b) => Self::Sub(f(a), f(b)),
+            Self::Mul(a, b) => Self::Mul(f(a), f(b)),
+            Self::DivFloor(a, b) => Self::DivFloor(f(a), f(b)),
+            Self::DivCeil(a, b) => Self::DivCeil(f(a), f(b)),
+            Self::MulDivFloor(a, b, d) => Self::MulDivFloor(f(a), f(b), f(d)),
+            Self::MulDivCeil(a, b, d) => Self::MulDivCeil(f(a), f(b), f(d)),
+            Self::ProductsGe(a, b) => Self::ProductsGe(a.map(f), b.map(f)),
             Self::Eq(a, b) => Self::Eq(f(a), f(b)),
             Self::Lt(a, b) => Self::Lt(f(a), f(b)),
             Self::And(a, b) => Self::And(f(a), f(b)),
@@ -101,6 +119,12 @@ impl Pool {
                 LibOp::Bool(value) => Term::Bool(value),
                 LibOp::Add(a, b) => Term::Add(at(a), at(b)),
                 LibOp::Sub(a, b) => Term::Sub(at(a), at(b)),
+                LibOp::Mul(a, b) => Term::Mul(at(a), at(b)),
+                LibOp::DivFloor(a, b) => Term::DivFloor(at(a), at(b)),
+                LibOp::DivCeil(a, b) => Term::DivCeil(at(a), at(b)),
+                LibOp::MulDivFloor(a, b, d) => Term::MulDivFloor(at(a), at(b), at(d)),
+                LibOp::MulDivCeil(a, b, d) => Term::MulDivCeil(at(a), at(b), at(d)),
+                LibOp::ProductsGe(a, b) => Term::ProductsGe(a.map(at), b.map(at)),
                 LibOp::Eq(a, b) => Term::Eq(at(a), at(b)),
                 LibOp::Lt(a, b) => Term::Lt(at(a), at(b)),
                 LibOp::And(a, b) => Term::And(at(a), at(b)),
@@ -166,6 +190,15 @@ fn library(nodes: &[Term]) -> Result<Vec<LibOp>> {
                 Term::Bool(value) => LibOp::Bool(value),
                 Term::Add(a, b) => LibOp::Add(id(a)?, id(b)?),
                 Term::Sub(a, b) => LibOp::Sub(id(a)?, id(b)?),
+                Term::Mul(a, b) => LibOp::Mul(id(a)?, id(b)?),
+                Term::DivFloor(a, b) => LibOp::DivFloor(id(a)?, id(b)?),
+                Term::DivCeil(a, b) => LibOp::DivCeil(id(a)?, id(b)?),
+                Term::MulDivFloor(a, b, d) => LibOp::MulDivFloor(id(a)?, id(b)?, id(d)?),
+                Term::MulDivCeil(a, b, d) => LibOp::MulDivCeil(id(a)?, id(b)?, id(d)?),
+                Term::ProductsGe(a, b) => LibOp::ProductsGe(
+                    [id(a[0])?, id(a[1])?, id(a[2])?],
+                    [id(b[0])?, id(b[1])?, id(b[2])?],
+                ),
                 Term::Eq(a, b) => LibOp::Eq(id(a)?, id(b)?),
                 Term::Lt(a, b) => LibOp::Lt(id(a)?, id(b)?),
                 Term::And(a, b) => LibOp::And(id(a)?, id(b)?),
@@ -241,13 +274,38 @@ impl Lowerer<'_> {
                 self.pool.add(Term::Select(c, a, b))
             }
             Expr::Bin(op, a, b) => self.binary(*op, a, b, want)?,
+            Expr::Call(function, args) => {
+                if !function.accepts(args.len()) {
+                    return Err(Refusal::new("expression-call-arity"));
+                }
+                if function.kind() != want {
+                    return Err(Refusal::new("proposal-kind:call"));
+                }
+                let args = args
+                    .iter()
+                    .map(|a| self.lower(a, Kind::Int))
+                    .collect::<Result<Vec<_>>>()?;
+                let term = match function {
+                    Function::DivFloor => Term::DivFloor(args[0], args[1]),
+                    Function::DivCeil => Term::DivCeil(args[0], args[1]),
+                    Function::MulDivFloor => Term::MulDivFloor(args[0], args[1], args[2]),
+                    Function::MulDivCeil => Term::MulDivCeil(args[0], args[1], args[2]),
+                    Function::ProductsGe if args.len() == 4 => {
+                        let one = self.pool.add(Term::Int(1));
+                        Term::ProductsGe([args[0], args[1], one], [args[2], args[3], one])
+                    }
+                    Function::ProductsGe => {
+                        Term::ProductsGe([args[0], args[1], args[2]], [args[3], args[4], args[5]])
+                    }
+                };
+                self.pool.add(term)
+            }
         })
     }
 
     fn binary(&mut self, op: Op, a: &Expr, b: &Expr, want: Kind) -> Result<usize> {
         match op {
-            Op::Mul => Err(Refusal::new("proposal-operator-unsupported:*")),
-            Op::Add | Op::Sub => {
+            Op::Add | Op::Sub | Op::Mul => {
                 if want != Kind::Int {
                     return Err(Refusal::new("proposal-kind:arithmetic"));
                 }
@@ -262,10 +320,10 @@ impl Lowerer<'_> {
                 }
                 let x = self.lower(a, Kind::Int)?;
                 let y = self.lower(b, Kind::Int)?;
-                Ok(self.pool.add(if op == Op::Add {
-                    Term::Add(x, y)
-                } else {
-                    Term::Sub(x, y)
+                Ok(self.pool.add(match op {
+                    Op::Add => Term::Add(x, y),
+                    Op::Mul => Term::Mul(x, y),
+                    _ => Term::Sub(x, y),
                 }))
             }
             _ if want != Kind::Bool => Err(Refusal::new(format!("proposal-kind:{}", op.symbol()))),
@@ -396,8 +454,16 @@ pub fn estimated_bytes(program: &Program) -> usize {
         .nodes()
         .iter()
         .map(|op| match op {
-            LibOp::Add(..) | LibOp::Sub(..) | LibOp::Eq(..) | LibOp::Lt(..) | LibOp::And(..) => 56,
-            LibOp::Select(..) => 73,
+            LibOp::Add(..)
+            | LibOp::Sub(..)
+            | LibOp::Mul(..)
+            | LibOp::DivFloor(..)
+            | LibOp::DivCeil(..)
+            | LibOp::Eq(..)
+            | LibOp::Lt(..)
+            | LibOp::And(..) => 56,
+            LibOp::Select(..) | LibOp::MulDivFloor(..) | LibOp::MulDivCeil(..) => 73,
+            LibOp::ProductsGe(..) => 124,
             _ => 39,
         })
         .sum();
@@ -430,7 +496,7 @@ pub fn from_program(program: &Program, vocab: &Vocabulary, max_size: usize) -> R
                 1,
             ),
             LibOp::Int(value) => (Expr::Int(*value), 1),
-            LibOp::Bool(value) => (Expr::Int(i64::from(*value)), 1),
+            LibOp::Bool(value) => (Expr::Int(i128::from(*value)), 1),
             LibOp::Not(a) => {
                 let (a, s) = at(a).ok_or_else(missing)?;
                 (Expr::negation(a), 1 + s)
@@ -441,14 +507,52 @@ pub fn from_program(program: &Program, vocab: &Vocabulary, max_size: usize) -> R
                 let (b, sb) = at(b).ok_or_else(missing)?;
                 (Expr::select(c, a, b), 1 + sc + sa + sb)
             }
+            LibOp::MulDivFloor(a, b, d) | LibOp::MulDivCeil(a, b, d) => {
+                let function = if matches!(op, LibOp::MulDivFloor(..)) {
+                    Function::MulDivFloor
+                } else {
+                    Function::MulDivCeil
+                };
+                let (a, sa) = at(a).ok_or_else(missing)?;
+                let (b, sb) = at(b).ok_or_else(missing)?;
+                let (d, sd) = at(d).ok_or_else(missing)?;
+                (Expr::Call(function, vec![a, b, d]), 1 + sa + sb + sd)
+            }
+            LibOp::ProductsGe(a, b) => {
+                let args = a
+                    .iter()
+                    .chain(b)
+                    .map(|k| at(k).ok_or_else(missing))
+                    .collect::<Result<Vec<_>>>()?;
+                let size = 1 + args.iter().map(|(_, s)| *s).sum::<usize>();
+                (
+                    Expr::Call(
+                        Function::ProductsGe,
+                        args.into_iter().map(|(e, _)| e).collect(),
+                    ),
+                    size,
+                )
+            }
+            LibOp::DivFloor(a, b) | LibOp::DivCeil(a, b) => {
+                let function = if matches!(op, LibOp::DivFloor(..)) {
+                    Function::DivFloor
+                } else {
+                    Function::DivCeil
+                };
+                let (a, sa) = at(a).ok_or_else(missing)?;
+                let (b, sb) = at(b).ok_or_else(missing)?;
+                (Expr::Call(function, vec![a, b]), 1 + sa + sb)
+            }
             LibOp::Add(a, b)
             | LibOp::Sub(a, b)
+            | LibOp::Mul(a, b)
             | LibOp::Eq(a, b)
             | LibOp::Lt(a, b)
             | LibOp::And(a, b) => {
                 let symbol = match op {
                     LibOp::Add(..) => Op::Add,
                     LibOp::Sub(..) => Op::Sub,
+                    LibOp::Mul(..) => Op::Mul,
                     LibOp::Eq(..) => Op::Eq,
                     LibOp::Lt(..) => Op::Lt,
                     _ => Op::And,
@@ -485,8 +589,8 @@ pub fn widened(program: &Program) -> Result<Program> {
         .map(|domain| match Kind::of(*domain) {
             Some(Kind::Bool) => Ok(Domain::Bool),
             Some(Kind::Int) => Ok(Domain::Int {
-                min: i64::MIN,
-                max: i64::MAX,
+                min: i128::MIN,
+                max: i128::MAX,
             }),
             None => Err(Refusal::new("unsupported-domain")),
         })
@@ -501,6 +605,12 @@ pub fn widened(program: &Program) -> Result<Program> {
                 LibOp::Bool(value) => LibOp::Bool(value),
                 LibOp::Add(a, b) => LibOp::Add(a, b),
                 LibOp::Sub(a, b) => LibOp::Sub(a, b),
+                LibOp::Mul(a, b) => LibOp::Mul(a, b),
+                LibOp::DivFloor(a, b) => LibOp::DivFloor(a, b),
+                LibOp::DivCeil(a, b) => LibOp::DivCeil(a, b),
+                LibOp::MulDivFloor(a, b, d) => LibOp::MulDivFloor(a, b, d),
+                LibOp::MulDivCeil(a, b, d) => LibOp::MulDivCeil(a, b, d),
+                LibOp::ProductsGe(a, b) => LibOp::ProductsGe(a, b),
                 LibOp::Eq(a, b) => LibOp::Eq(a, b),
                 LibOp::Lt(a, b) => LibOp::Lt(a, b),
                 LibOp::And(a, b) => LibOp::And(a, b),

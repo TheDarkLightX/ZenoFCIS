@@ -23,7 +23,7 @@ use super::super::rules::{Constant, Rules};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LeafDomain {
     Bool,
-    Int { min: i64, max: i64 },
+    Int { min: i128, max: i128 },
     Sum { type_id: u32, variants: Vec<u16> },
 }
 
@@ -32,9 +32,12 @@ impl LeafDomain {
     pub fn size(&self) -> Option<u128> {
         match self {
             Self::Bool => Some(2),
-            Self::Int { min, max } => u128::try_from(i128::from(*max) - i128::from(*min))
-                .ok()?
-                .checked_add(1),
+            Self::Int { min, max } => {
+                if min > max {
+                    return None;
+                }
+                min.abs_diff(*max).checked_add(1)
+            }
             Self::Sum { variants, .. } => Some(variants.len() as u128),
         }
     }
@@ -42,11 +45,11 @@ impl LeafDomain {
     /// The first value in enumeration order, in constant time and space for
     /// every domain; `None` for an empty domain. It equals the first element
     /// of [`Self::values_within`] whenever that returns a list.
-    pub fn least(&self) -> Option<i64> {
+    pub fn least(&self) -> Option<i128> {
         match self {
             Self::Bool => Some(0),
             Self::Int { min, max } => (min <= max).then_some(*min),
-            Self::Sum { variants, .. } => variants.first().map(|id| i64::from(*id)),
+            Self::Sum { variants, .. } => variants.first().map(|id| i128::from(*id)),
         }
     }
 
@@ -54,14 +57,14 @@ impl LeafDomain {
     /// more than `limit` values or its size is unknown. The size is checked
     /// before anything is allocated, so the list never holds more than
     /// `limit` values and a wide declared range is never collected.
-    pub fn values_within(&self, limit: u64) -> Option<Vec<i64>> {
+    pub fn values_within(&self, limit: u64) -> Option<Vec<i128>> {
         if self.size()? > u128::from(limit) {
             return None;
         }
         Some(match self {
             Self::Bool => vec![0, 1],
             Self::Int { min, max } => (*min..=*max).collect(),
-            Self::Sum { variants, .. } => variants.iter().map(|id| i64::from(*id)).collect(),
+            Self::Sum { variants, .. } => variants.iter().map(|id| i128::from(*id)).collect(),
         })
     }
 
@@ -80,18 +83,9 @@ impl LeafDomain {
 
 /// The domain of a scalar type; text has none.
 pub fn leaf_domain(declarations: &Declarations, type_id: u32) -> Result<LeafDomain, ContractError> {
-    let wide = || {
-        ContractError::new(
-            "project.zeno",
-            format!("type {type_id} range exceeds the 64-bit program range"),
-        )
-    };
     Ok(match declarations.kind(type_id)? {
         TypeKind::Bool => LeafDomain::Bool,
-        TypeKind::I128 { min, max } => LeafDomain::Int {
-            min: i64::try_from(min).map_err(|_| wide())?,
-            max: i64::try_from(max).map_err(|_| wide())?,
-        },
+        TypeKind::I128 { min, max } => LeafDomain::Int { min, max },
         TypeKind::Sum(variants) => LeafDomain::Sum {
             type_id,
             variants: variants.iter().map(|variant| variant.id).collect(),
@@ -182,11 +176,11 @@ impl Construction {
 #[derive(Debug)]
 pub struct Boundary {
     /// Integer constants by the type they were used with.
-    pub constants: BTreeMap<u32, BTreeSet<i64>>,
+    pub constants: BTreeMap<u32, BTreeSet<i128>>,
     /// Boundary values of each position.
-    pub values: Vec<Vec<i64>>,
+    pub values: Vec<Vec<i128>>,
     /// Probe bases with their origin; empty for a boundary product.
-    pub bases: Vec<(String, Vec<i64>)>,
+    pub bases: Vec<(String, Vec<i128>)>,
     /// Probes that vary one position, then two.
     pub singles: usize,
     pub pairs: usize,
@@ -200,7 +194,7 @@ pub struct InputSet {
     pub construction: Construction,
     pub domain_size: Option<u128>,
     pub width: usize,
-    values: Vec<i64>,
+    values: Vec<i128>,
     pub boundary: Option<Boundary>,
 }
 
@@ -212,11 +206,11 @@ impl InputSet {
         self.values.len().checked_div(self.width).unwrap_or(0)
     }
 
-    pub fn tuple(&self, ordinal: usize) -> &[i64] {
+    pub fn tuple(&self, ordinal: usize) -> &[i128] {
         &self.values[ordinal * self.width..(ordinal + 1) * self.width]
     }
 
-    pub fn tuples(&self) -> impl Iterator<Item = &[i64]> {
+    pub fn tuples(&self) -> impl Iterator<Item = &[i128]> {
         self.values.chunks_exact(self.width.max(1))
     }
 }
@@ -227,7 +221,7 @@ pub fn input_set(
     positions: &[Position],
     rules: &Rules,
     declarations: &Declarations,
-    examples: &[&[i64]],
+    examples: &[&[i128]],
     max_tuples: u64,
 ) -> Result<InputSet, ContractError> {
     let width = positions.len();
@@ -238,7 +232,7 @@ pub fn input_set(
     {
         // An empty domain has no tuples, whatever the other positions hold;
         // otherwise every position has at most `size` values.
-        let lists: Option<Vec<Vec<i64>>> = if size == 0 {
+        let lists: Option<Vec<Vec<i128>>> = if size == 0 {
             Some(vec![Vec::new(); width.max(1)])
         } else {
             positions
@@ -257,7 +251,7 @@ pub fn input_set(
         }
     }
     let constants = constants(rules, declarations, positions)?;
-    let values: Vec<Vec<i64>> = positions
+    let values: Vec<Vec<i128>> = positions
         .iter()
         .map(|position| boundary_values(position, &constants))
         .collect();
@@ -284,14 +278,14 @@ pub fn input_set(
     }
     let mut probes = Probes::new(width, max_tuples);
     let mut bases = Vec::new();
-    let genesis: Vec<i64> = positions
+    let genesis: Vec<i128> = positions
         .iter()
         .enumerate()
         .map(
             |(index, position)| match (position.source, position.field) {
                 (Source::State, Some(field)) => match rules.genesis.get(&field) {
-                    Some(Constant::Bool(value)) => i64::from(*value),
-                    Some(Constant::Int(value)) => i64::try_from(*value).unwrap_or(values[index][0]),
+                    Some(Constant::Bool(value)) => i128::from(*value),
+                    Some(Constant::Int(value)) => *value,
                     None => values[index][0],
                 },
                 _ => values[index][0],
@@ -372,8 +366,8 @@ pub fn input_set(
 struct Probes {
     width: usize,
     limit: usize,
-    seen: BTreeSet<Vec<i64>>,
-    values: Vec<i64>,
+    seen: BTreeSet<Vec<i128>>,
+    values: Vec<i128>,
 }
 
 impl Probes {
@@ -391,7 +385,7 @@ impl Probes {
     }
 
     /// Adds a tuple not seen before; `true` when it was added.
-    fn push(&mut self, tuple: &[i64]) -> bool {
+    fn push(&mut self, tuple: &[i128]) -> bool {
         if self.full() || tuple.len() != self.width || !self.seen.insert(tuple.to_vec()) {
             return false;
         }
@@ -401,7 +395,7 @@ impl Probes {
 }
 
 /// Every tuple over the lists, in order, the last position fastest.
-fn product(lists: &[Vec<i64>]) -> Vec<i64> {
+fn product(lists: &[Vec<i128>]) -> Vec<i128> {
     if lists.iter().any(Vec::is_empty) {
         return Vec::new();
     }
@@ -423,7 +417,7 @@ fn product(lists: &[Vec<i64>]) -> Vec<i64> {
 
 /// The boundary values of one position: both booleans, every variant, or
 /// the endpoints and each constant of the type with its neighbours.
-fn boundary_values(position: &Position, constants: &BTreeMap<u32, BTreeSet<i64>>) -> Vec<i64> {
+fn boundary_values(position: &Position, constants: &BTreeMap<u32, BTreeSet<i128>>) -> Vec<i128> {
     match &position.domain {
         LeafDomain::Int { min, max } => {
             let mut values = BTreeSet::from([*min, *max]);
@@ -444,7 +438,7 @@ fn boundary_values(position: &Position, constants: &BTreeMap<u32, BTreeSet<i64>>
             values.into_iter().collect()
         }
         LeafDomain::Bool => vec![0, 1],
-        LeafDomain::Sum { variants, .. } => variants.iter().map(|id| i64::from(*id)).collect(),
+        LeafDomain::Sum { variants, .. } => variants.iter().map(|id| i128::from(*id)).collect(),
     }
 }
 
@@ -455,7 +449,7 @@ fn constants(
     rules: &Rules,
     declarations: &Declarations,
     positions: &[Position],
-) -> Result<BTreeMap<u32, BTreeSet<i64>>, ContractError> {
+) -> Result<BTreeMap<u32, BTreeSet<i128>>, ContractError> {
     let mut found = BTreeMap::new();
     let expand = |ast: &Ast, place: String| {
         expr::expand(ast, &rules.variables)
@@ -495,12 +489,11 @@ fn constants(
         if let (Constant::Int(value), Some(declared)) = (
             value,
             state_fields.iter().find(|declared| declared.id == *field),
-        ) && let Ok(value) = i64::try_from(*value)
-        {
+        ) {
             found
                 .entry(declared.type_id)
                 .or_insert_with(BTreeSet::new)
-                .insert(value);
+                .insert(*value);
         }
     }
     Ok(found)
@@ -532,7 +525,7 @@ fn collect(
     ast: &Ast,
     expected: &[u32],
     positions: &[Position],
-    found: &mut BTreeMap<u32, BTreeSet<i64>>,
+    found: &mut BTreeMap<u32, BTreeSet<i128>>,
 ) {
     let with = |other: &Ast| {
         let mut hints = expected.to_vec();
@@ -541,13 +534,11 @@ fn collect(
     };
     match ast {
         Ast::Int(value) => {
-            if let Ok(value) = i64::try_from(*value) {
-                for type_id in expected {
-                    found.entry(*type_id).or_default().insert(value);
-                }
+            for type_id in expected {
+                found.entry(*type_id).or_default().insert(*value);
             }
         }
-        Ast::Bool(_) | Ast::Name(_) => {}
+        Ast::Bool(_) | Ast::Name(_) | Ast::DecisionReason => {}
         Ast::Not(inner) => collect(inner, &[], positions, found),
         Ast::Neg(inner) => collect(inner, expected, positions, found),
         Ast::Binary(operator, left, right) => match operator {
@@ -578,7 +569,10 @@ fn collect(
             collect(left, &with(right), positions, found);
             collect(right, &with(left), positions, found);
         }
-        Ast::MulDiv(_, a, b, d) => {
+        Ast::MulDiv(_, a, b, d)
+        | Ast::SignedMulDivFloor(a, b, d)
+        | Ast::ScaledMulDiv(_, _, a, b, d, _)
+        | Ast::RepeatMulDiv(_, a, b, d, _) => {
             collect(a, expected, positions, found);
             collect(b, expected, positions, found);
             collect(d, expected, positions, found);
@@ -609,11 +603,32 @@ mod bounded_values {
         assert_eq!(time.values_within(1 << 20), None);
         assert_eq!(time.least(), Some(0));
         let whole = LeafDomain::Int {
-            min: i64::MIN,
-            max: i64::MAX,
+            min: i128::MIN,
+            max: i128::MAX,
         };
         assert_eq!(whole.values_within(u64::MAX), None);
-        assert_eq!(whole.least(), Some(i64::MIN));
+        assert_eq!(whole.least(), Some(i128::MIN));
+    }
+
+    #[test]
+    fn interval_cardinality_covers_both_i128_boundaries_without_collecting() {
+        for (min, max, size) in [
+            (i128::MIN, i128::MAX, None),
+            (i128::MIN, 0, Some((1u128 << 127) + 1)),
+            (-1, i128::MAX, Some((1u128 << 127) + 1)),
+            (i128::MIN, i128::MIN + 1, Some(2)),
+            (i128::MAX - 1, i128::MAX, Some(2)),
+            (1, 0, None),
+        ] {
+            let domain = LeafDomain::Int { min, max };
+            assert_eq!(domain.size(), size);
+            if size == Some(2) {
+                assert_eq!(domain.values_within(1), None);
+                assert_eq!(domain.values_within(2), Some(vec![min, max]));
+            } else {
+                assert_eq!(domain.values_within(u64::MAX), None);
+            }
+        }
     }
 
     #[test]

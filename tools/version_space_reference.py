@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integrations" / "z
 import loop_language as Z
 from behavior import Refusal
 
-I64 = (-(1 << 63), (1 << 63) - 1)
+I64 = (-(1 << 63), (1 << 63) - 1)  # Declared domains and report coordinates.
+I128 = (-(1 << 127), (1 << 127) - 1)  # Eager checked evaluation.
 
 
 def scalar(node, env, assignment):
@@ -62,8 +63,8 @@ def scalar(node, env, assignment):
             raise Refusal("unsupported reference operator")
     else:
         raise Refusal("unsupported reference expression")
-    if not I64[0] <= value <= I64[1]:
-        raise OverflowError("eager i64 overflow")
+    if not I128[0] <= value <= I128[1]:
+        raise OverflowError("eager i128 overflow")
     return value
 
 
@@ -196,8 +197,8 @@ def program_table(program):
                 a, b = (values[k] for k in args)
                 value = {"Add": lambda: a+b, "Sub": lambda: a-b, "Eq": lambda: int(a == b),
                          "Lt": lambda: int(a < b), "And": lambda: int(a == 1 and b == 1)}[code]()
-            if not I64[0] <= value <= I64[1]:
-                raise OverflowError("program i64 overflow")
+            if not I128[0] <= value <= I128[1]:
+                raise OverflowError("program i128 overflow")
             values.append(value)
         row = tuple(values[k] for k in program["roots"])
         if any(not int(lo) <= v <= int(hi) for v, (lo, hi) in zip(row, map(bounds, program["outputs"]))):
@@ -206,13 +207,34 @@ def program_table(program):
     return tuple(result)
 
 
+def report_question(question):
+    """Decode report coordinates within this reference's original i64 scope."""
+    def scalar(value):
+        if type(value) is int:
+            number = value
+        elif type(value) is str and len(value) <= 40:
+            number = int(value)
+            if str(number) != value:
+                raise ValueError("noncanonical report integer")
+        else:
+            raise ValueError("report integer")
+        if not I64[0] <= number <= I64[1]:
+            raise ValueError("report outside reference i64 scope")
+        return number
+    return {**question, "input": [scalar(v) for v in question["input"]],
+            "answers": [{**a, "output": [scalar(v) for v in a["output"]]} for a in question["answers"]]}
+
+
 def compare(spec, report, stub=False):
     """Exact comparisons, separate from the oracle to support mutation controls."""
     wanted = expected(spec)
     detail = report.get("detail", report)
     comparisons = [detail.get("count") == wanted["count"]]
     if "question" in wanted:
-        q = detail.get("question") or {}
+        try:
+            q = report_question(detail.get("question") or {})
+        except (ValueError, KeyError, TypeError):
+            return False
         comparisons.extend(q.get(k) == v for k, v in wanted["question"].items())
     elif "conflict" in wanted:
         comparisons.append((detail.get("conflict") or {}).get("requirements") == wanted["conflict"])

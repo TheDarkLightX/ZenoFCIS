@@ -514,13 +514,13 @@ impl<'d> Root<'d> {
     fn size(&self) -> Option<u128> {
         self.leaves.iter().try_fold(1u128, |size, leaf| {
             let (min, max) = bounds(leaf)?;
-            let width = u128::try_from(i128::from(max) - i128::from(min)).ok()?;
+            let width = u128::try_from(max.checked_sub(min)?).ok()?;
             size.checked_mul(width.checked_add(1)?)
         })
     }
 
     /// The first value in enumeration order.
-    fn first(&self) -> Vec<i64> {
+    fn first(&self) -> Vec<i128> {
         self.leaves
             .iter()
             .map(|leaf| bounds(leaf).map_or(0, |(min, _)| min))
@@ -529,7 +529,7 @@ impl<'d> Root<'d> {
 
     /// Steps `codes` to the next value, last field fastest; false after the
     /// last value, when `codes` is the first one again.
-    fn next(&self, codes: &mut [i64]) -> bool {
+    fn next(&self, codes: &mut [i128]) -> bool {
         for (code, leaf) in codes.iter_mut().zip(&self.leaves).rev() {
             let Some((min, max)) = bounds(leaf) else {
                 return false;
@@ -544,26 +544,26 @@ impl<'d> Root<'d> {
     }
 
     /// The value at `index` in enumeration order.
-    fn at(&self, mut index: u128) -> Option<Vec<i64>> {
+    fn at(&self, mut index: u128) -> Option<Vec<i128>> {
         let mut codes = vec![0; self.leaves.len()];
         for (code, leaf) in codes.iter_mut().zip(&self.leaves).rev() {
             let (min, max) = bounds(leaf)?;
-            let width = u128::try_from(i128::from(max) - i128::from(min)).ok()? + 1;
-            *code = i64::try_from(i128::from(min) + i128::try_from(index % width).ok()?).ok()?;
+            let width = u128::try_from(max.checked_sub(min)?).ok()? + 1;
+            *code = min.checked_add(i128::try_from(index % width).ok()?)?;
             index /= width;
         }
         (index == 0).then_some(codes)
     }
 
     /// The envelope of the value with these codes.
-    fn frame(&self, codes: &[i64]) -> Option<Vec<u8>> {
+    fn frame(&self, codes: &[i128]) -> Option<Vec<u8>> {
         let max = usize::try_from(self.binding.max_bytes).ok()?;
         let payload = self.payload(codes)?;
         output::encode_envelope(self.binding.root, &self.binding.schema, &payload, max).ok()
     }
 
     /// Exact canonical value bytes, without a state envelope.
-    fn payload(&self, codes: &[i64]) -> Option<Vec<u8>> {
+    fn payload(&self, codes: &[i128]) -> Option<Vec<u8>> {
         let max = usize::try_from(self.binding.max_bytes).ok()?;
         if codes.len() != self.leaves.len() {
             return None;
@@ -589,7 +589,7 @@ impl<'d> Root<'d> {
 
     /// The codes of a record envelope's fields; `None` unless `bytes` is a
     /// complete envelope of this root.
-    fn decode(&self, bytes: &[u8], fields: &[InputField]) -> Option<Vec<i64>> {
+    fn decode(&self, bytes: &[u8], fields: &[InputField]) -> Option<Vec<i128>> {
         if !self.record {
             return None;
         }
@@ -604,7 +604,7 @@ impl<'d> Root<'d> {
     }
 
     /// Decode through the same library record projection as state ingress.
-    fn decode_payload(&self, bytes: &[u8], fields: &[InputField]) -> Option<Vec<i64>> {
+    fn decode_payload(&self, bytes: &[u8], fields: &[InputField]) -> Option<Vec<i128>> {
         if !self.record {
             return None;
         }
@@ -628,22 +628,22 @@ impl<'d> Root<'d> {
     }
 
     /// Field IDs with the numbers of these codes.
-    fn numbers(&self, codes: &[i64]) -> Vec<(u16, i128)> {
+    fn numbers(&self, codes: &[i128]) -> Vec<(u16, i128)> {
         self.ids
             .iter()
             .zip(&self.leaves)
             .zip(codes)
-            .map(|((id, leaf), code)| (*id, number(leaf, *code).unwrap_or(i128::from(*code))))
+            .map(|((id, leaf), code)| (*id, number(leaf, *code).unwrap_or(*code)))
             .collect()
     }
 }
 
 /// The inclusive code interval of a leaf; `None` for a leaf without one.
-fn bounds(leaf: &Leaf) -> Option<(i64, i64)> {
+fn bounds(leaf: &Leaf) -> Option<(i128, i128)> {
     let (min, max) = match leaf {
         Leaf::Bool => (0, 1),
         Leaf::I128 { min, max } => (*min, *max),
-        Leaf::U128 { min, max } => (i64::try_from(*min).ok()?, i64::try_from(*max).ok()?),
+        Leaf::U128 { min, max } => (i128::try_from(*min).ok()?, i128::try_from(*max).ok()?),
         Leaf::Enum { min, max, .. } | Leaf::Sum { min, max, .. } => (*min, *max),
         _ => return None,
     };
@@ -652,9 +652,9 @@ fn bounds(leaf: &Leaf) -> Option<(i64, i64)> {
 
 /// The number a leaf's code stands for: 0 or 1, the integer, or the
 /// variant's ID.
-fn number(leaf: &Leaf, code: i64) -> Option<i128> {
+fn number(leaf: &Leaf, code: i128) -> Option<i128> {
     match leaf {
-        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => Some(i128::from(code)),
+        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => Some(code),
         Leaf::Enum { variants, .. } | Leaf::Sum { variants, .. } => variants
             .iter()
             .find(|variant| variant.code == code)
@@ -664,9 +664,9 @@ fn number(leaf: &Leaf, code: i64) -> Option<i128> {
 }
 
 /// The code of a number in a leaf's domain; `None` outside it.
-fn code(leaf: &Leaf, number: i128) -> Option<i64> {
+fn code(leaf: &Leaf, number: i128) -> Option<i128> {
     let code = match leaf {
-        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => i64::try_from(number).ok()?,
+        Leaf::Bool | Leaf::I128 { .. } | Leaf::U128 { .. } => number,
         Leaf::Enum { variants, .. } | Leaf::Sum { variants, .. } => {
             variants
                 .iter()
@@ -680,14 +680,14 @@ fn code(leaf: &Leaf, number: i128) -> Option<i64> {
 }
 
 /// The library value of a code.
-fn atom(leaf: &Leaf, code: i64) -> Option<c::Atom<'static>> {
+fn atom(leaf: &Leaf, code: i128) -> Option<c::Atom<'static>> {
     Some(match leaf {
         Leaf::Bool => c::Atom::Bool(match code {
             0 => false,
             1 => true,
             _ => return None,
         }),
-        Leaf::I128 { .. } => c::Atom::I128(i128::from(code)),
+        Leaf::I128 { .. } => c::Atom::I128(code),
         Leaf::U128 { .. } => c::Atom::U128(u128::try_from(code).ok()?),
         Leaf::Enum {
             type_id, variants, ..
@@ -853,10 +853,10 @@ fn program_total(fields: &[u16], program: &Program, old: &Root<'_>, target: &Lea
             .leaves
             .iter()
             .zip(&codes)
-            .map(|(leaf, value)| i64::try_from(number(leaf, *value)?).ok())
+            .map(|(leaf, value)| number(leaf, *value))
             .collect::<Option<Vec<_>>>()?;
         let result = program.evaluate(&input).ok()?;
-        code(target, i128::from(*result.first()?))?;
+        code(target, *result.first()?)?;
         root.next(&mut codes);
     }
     Some(())
@@ -868,8 +868,8 @@ fn apply(
     migration: &Migration<'_>,
     old: &Root<'_>,
     new: &Root<'_>,
-    codes: &[i64],
-) -> Result<Vec<i64>, u16> {
+    codes: &[i128],
+) -> Result<Vec<i128>, u16> {
     let value = |field: u16| {
         let position = old.ids.iter().position(|id| *id == field)?;
         number(old.leaves[position], codes[position])
@@ -890,11 +890,10 @@ fn apply(
                 }),
                 Source::Program { fields, program } => fields
                     .iter()
-                    .map(|field| i64::try_from(value(*field)?).ok())
+                    .map(|field| value(*field))
                     .collect::<Option<Vec<_>>>()
                     .and_then(|input| program.evaluate(&input).ok())
-                    .and_then(|output| output.first().copied())
-                    .map(i128::from),
+                    .and_then(|output| output.first().copied()),
             };
             number
                 .and_then(|number| code(leaf, number))

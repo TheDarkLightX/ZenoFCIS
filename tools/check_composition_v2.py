@@ -2,6 +2,8 @@
 """Offline exact-source composition qualification; no catalog or shell authority."""
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+
 import argparse
 import hashlib
 import json
@@ -13,7 +15,7 @@ import subprocess
 import tempfile
 
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
-from v2_native_dependencies import native_dependency_args
+from v2_native_dependencies import native_dependency_args, prepare_native_dependencies, native_test_environment
 import check_verus as verifier
 from verus_coverage import inventory, profile_inventory, require_coverage
 
@@ -28,7 +30,7 @@ CARGO_TARGET = os.environ.get('CARGO_TARGET_DIR', str(ROOT / 'target'))
 TEMPLATES = Path('crates/zeno-fcis-cli/templates')
 FIXED = (HARNESS, PROFILE, verifier.PIN, TEST, Path('verification/verus/record-stage-migration.json'), Path('verification/verus/account-stage-migration.json'),
          Path('tools/check_composition_v2.py'), Path('tools/test_check_composition_v2.py'),
-         Path('tools/check_verus.py'), Path('tools/verus_coverage.py'),
+         Path('tools/check_verus.py'), *verifier.QUALIFICATION_SOURCES, Path('tools/verus_coverage.py'),
          Path('README.md'), Path('Cargo.toml'), Path('Cargo.lock'))
 
 
@@ -193,9 +195,10 @@ def proof_killed(result, report, path, pin):
             and semantic is not None and inconclusive is None and path.name in result.stderr)
 
 
-def native(root, env, directory, filtered=False):
+def native(root, env, directory, filtered=False, *, prepared=None):
+    env = native_test_environment(root, env)
     binary = directory/'native-tests'
-    dependencies = native_dependency_args(ROOT, directory, env)
+    dependencies = native_dependency_args(ROOT, directory, env, prepared=prepared)
     build = recorded(['rustc', '+1.97.1', '--edition=2024', '--test', '--check-cfg',
                       'cfg(verus_keep_ghost)', '--check-cfg', 'cfg(test)', str(HARNESS),
                       '-o', str(binary), *dependencies], root, env, directory, 'native-build')
@@ -259,7 +262,8 @@ def check(out: Path, positive_only=False):
         raise RuntimeError('unaccepted whole-crate proof, pinned tool, or proof inventory')
     observed = coverage((directory/'positive/crate.vir').read_text(), profile)
     (directory/'coverage.json').write_text(json.dumps(observed, sort_keys=True, indent=2)+'\n')
-    verifier.require_success(native(ROOT, env, directory))
+    dependencies = prepare_native_dependencies(ROOT, directory/'common-native', env)
+    verifier.require_success(native(ROOT, env, directory, prepared=dependencies))
     opacity_results = opacity(ROOT, env, directory)
     (directory/'opacity.json').write_text(json.dumps(opacity_results, indent=2)+'\n')
     for name, args in (
@@ -271,7 +275,8 @@ def check(out: Path, positive_only=False):
     results = []
     print('Positive proof, full body coverage, native, opacity and pinned crate checks passed', flush=True)
     if not positive_only:
-        for name, (path, changed, expected, native_control) in mutations().items():
+        def run_control(control_item):
+            (name, (path, changed, expected, native_control)) = control_item
             control = directory/name
             control.mkdir()
             (control/'mutation.rs').write_text(changed)
@@ -305,7 +310,7 @@ def check(out: Path, positive_only=False):
                               and report_control.get('verus', {}).get('commit') == pin['commit'])
                 native_status = None
                 if native_control:
-                    result = native(specimen, env, control, True)
+                    result = native(specimen, env, control, True, prepared=dependencies)
                     native_status = result.returncode
                     caught = caught and result.returncode != 0 and 'test result: FAILED' in result.stdout
                 item = dict(name=name, path=str(path), before_sha256=before[str(path)],
@@ -313,11 +318,16 @@ def check(out: Path, positive_only=False):
                             killed=caught, proof_exit_code=proof.returncode, verification_results=parsed,
                             coverage_refusal=refusal, intended_coverage_control=intended,
                             native_exit_code=native_status)
-                results.append(item)
+                control_result = item
                 (control/'result.json').write_text(json.dumps(item, indent=2)+'\n')
                 if not caught:
-                    raise RuntimeError(f'control survived or failed for an unrelated reason: {item}')
+                    raise ControlRefused(control_result, f'control survived or failed for an unrelated reason: {item}')
                 print(f'Caught {name}: {expected}; native={native_status}', flush=True)
+            return control_result
+        for control_result in run_controls(
+                run_control, mutations().items(),
+                timings=directory / "control-timings.json"):
+            results.append(control_result)
     if snapshot() != before:
         raise RuntimeError('source drift during qualification')
     verifier.verify_tool_files(tool, pin)

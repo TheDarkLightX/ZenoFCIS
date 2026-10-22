@@ -3,7 +3,7 @@ name: zal-authoring
 description: Discuss, inspect, or change precise application behavior through the ZAL MCP tools in a coding harness. Use for a configured ZAL workspace and supported finite control-state models.
 ---
 
-Use the project's `zal` MCP server for behavior authoring. Read
+Use the project's `zal` MCP server for behavior specification. Read
 `.zeno-fcis/zal/install.json` for the shared workspace and human review command.
 If setup is absent, use the library's `integrations/zal/setup.py` with the target
 project; inspect its plan before applying it. Preserve existing configurations,

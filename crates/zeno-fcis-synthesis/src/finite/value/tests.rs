@@ -152,7 +152,7 @@ fn full_width_endpoints_and_kinds_have_exact_failures() {
 }
 
 #[test]
-fn raw_legacy_node_semantics_and_eager_traps_remain_visible() {
+fn raw_main_node_semantics_and_eager_traps_remain_visible() {
     use super::super::evaluation::{Domain, Failure, Op, evaluate_into, evaluate_node};
     use alloc::vec;
     use alloc::vec::Vec;
@@ -160,12 +160,12 @@ fn raw_legacy_node_semantics_and_eager_traps_remain_visible() {
     assert_eq!(evaluate_node(&Op::And(0, 1), &[], &[2, 1]), Ok(0));
     assert_eq!(evaluate_node(&Op::Select(0, 1, 2), &[], &[2, 5, 9]), Ok(9));
     assert_eq!(
-        evaluate_node(&Op::Add(0, 9), &[], &[i64::MAX]),
+        evaluate_node(&Op::Add(0, 9), &[], &[i128::MAX]),
         Err(Failure::Reference)
     );
     let graph = [
         Op::Bool(false),
-        Op::Int(i64::MAX),
+        Op::Int(i128::MAX),
         Op::Int(1),
         Op::Add(1, 2),
         Op::Select(0, 3, 2),
@@ -177,8 +177,8 @@ fn raw_legacy_node_semantics_and_eager_traps_remain_visible() {
             evaluate_into(
                 &[],
                 &[Domain::Int {
-                    min: i64::MIN,
-                    max: i64::MAX
+                    min: i128::MIN,
+                    max: i128::MAX
                 }],
                 &graph,
                 roots,

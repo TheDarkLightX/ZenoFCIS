@@ -366,7 +366,7 @@ impl Strategy {
             None => None,
             Some(name) => Some(Profile::parse(&name).ok_or_else(|| StrategyError {
                 message: format!(
-                    "profile must be \"functional-bool-v1\" or \"checked-i64-v1\", found {name:?}"
+                    "profile must be \"functional-bool-v1\" or \"checked-i128-v1\", found {name:?}"
                 ),
             })?),
         };

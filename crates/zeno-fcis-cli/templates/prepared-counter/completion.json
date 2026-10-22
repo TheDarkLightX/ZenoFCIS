@@ -1,6 +1,6 @@
 {
   "schema": "zeno-fcis/completion-problem/1",
-  "profile": "zeno-fcis/finite-i64/1",
+  "profile": "zeno-fcis/finite-i128/1",
   "state": [
     {
       "name": "count",

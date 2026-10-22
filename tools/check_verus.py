@@ -8,6 +8,10 @@ not an authorization certificate or a Lean-kernel proof.
 
 from __future__ import annotations
 
+from qualification_controls import ControlRefused, run_controls
+from qualification_sources import bindings as evidence_bindings
+
+
 import argparse
 import hashlib
 import json
@@ -18,9 +22,15 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from urllib.request import urlopen
+import uuid
 import zipfile
 
+QUALIFICATION_SOURCES = tuple(map(Path, (
+    "tools/qualification_controls.py", "tools/qualification_sources.py", "tools/verus_ids.py",
+    "tools/test_qualification_controls.py", "tools/test_qualification_sources.py", "tools/test_verus_ids.py",
+    "verification/verus/qualification_sources.json")))
 ROOT = Path(__file__).resolve().parents[1]
 PIN = Path("verification/verus/toolchain.json")
 HARNESS = Path("verification/verus/domain_bounds.rs")
@@ -28,6 +38,7 @@ SUBJECT = Path("verification/kernel-laws/src/oracle/authority/finite_bounds.rs")
 SOURCES = (PIN, HARNESS, SUBJECT, Path("tools/check_verus.py"), Path("Cargo.toml"),
            Path("verification/kernel-laws/src/oracle/authority/mod.rs"),
            Path("verification/kernel-laws/src/oracle/authority/finite_decision.rs"))
+SOURCES = tuple(dict.fromkeys((*SOURCES, *QUALIFICATION_SOURCES)))
 
 SEMANTIC_FAILURES = frozenset((
     'assertion failed', 'postcondition not satisfied', 'precondition not satisfied',
@@ -235,8 +246,28 @@ def accepted(report: dict, pin: dict) -> bool:
 
 
 def run(command: list[str], cwd: Path, environment: dict, timeout: int = 600) -> subprocess.CompletedProcess:
-    return subprocess.run(command, cwd=cwd, env=environment, text=True,
-                          capture_output=True, timeout=timeout, check=False)
+    started = time.monotonic_ns()
+    result, failure = None, None
+    try:
+        result = subprocess.run(command, cwd=cwd, env=environment, text=True,
+                                capture_output=True, timeout=timeout, check=False)
+        return result
+    except Exception as error:
+        failure = type(error).__name__
+        raise
+    finally:
+        ended = time.monotonic_ns()
+        configured = environment.get("ZENO_FCIS_TIMING_DIR")
+        if configured:
+            directory = Path(configured)
+            directory.mkdir(parents=True, exist_ok=True)
+            record = {"command": command, "cwd": str(cwd), "started_ns": started,
+                      "ended_ns": ended, "elapsed_ns": ended - started,
+                      "timeout_seconds": timeout, "failure": failure,
+                      "returncode": None if result is None else result.returncode}
+            # Unique files keep concurrent writers independent. These clocks
+            # are measurements, never part of an acceptance receipt or cache.
+            (directory / (uuid.uuid4().hex + ".json")).write_text(json.dumps(record) + "\n")
 
 
 def require_success(result: subprocess.CompletedProcess) -> None:
@@ -258,6 +289,26 @@ def mutation_sources(source: str) -> dict[str, tuple[str, str]]:
         "bypass_product_limit": (source.replace(limit_line, "if false {"), "proof"),
         "omit_interval_contract": (source[:start] + source[end:], "coverage"),
     }
+
+
+SEMANTIC_TARGETS = {
+    "wrong_interval_width": "interval_width",
+    "refuse_exact_limit": "bounded_product",
+    "bypass_product_limit": "bounded_product",
+}
+
+
+def coverage_refusal(proc, report: dict, pin: dict, name: str, positive: dict) -> bool:
+    """Only the interval postcondition may disappear, leaving two obligations."""
+    removed = "domain_bounds::finite_bounds::interval_width"
+    if (name != "omit_interval_contract" or pin.get("expected_verified") != 3
+            or proc.returncode != 0 or proc.stderr.strip()
+            or not proof_succeeded(positive, pin) or not accepted(positive, pin)
+            or not proof_succeeded(report, pin)):
+        return False
+    functions = positive["func-details"]
+    return (removed in functions and report["verification-results"]["verified"] == 2
+            and report["func-details"] == {k: v for k, v in functions.items() if k != removed})
 
 
 def check(cache: Path, install: bool) -> dict:
@@ -288,7 +339,8 @@ def check(cache: Path, install: bool) -> dict:
         require_success(run(native, ROOT, environment))
         native_tests = run([str(executable)], ROOT, environment)
         require_success(native_tests)
-        for name, (changed, expected) in mutation_sources((ROOT / SUBJECT).read_text()).items():
+        def run_control(control_item):
+            (name, (changed, expected)) = control_item
             specimen = directory / name
             (specimen / HARNESS).parent.mkdir(parents=True)
             (specimen / SUBJECT).parent.mkdir(parents=True)
@@ -298,17 +350,21 @@ def check(cache: Path, install: bool) -> dict:
             mutant_report = json.loads(outcome.stdout)
             result = mutant_report.get("verification-results", {})
             if expected == "proof":
-                killed = (outcome.returncode != 0 and result.get("success") is False
-                          and result.get("errors", 0) > 0
-                          and result.get("encountered-vir-error") is False)
+                killed = semantic_refusal(outcome, mutant_report, pin, SUBJECT, specimen,
+                    region=function_lines(changed, SEMANTIC_TARGETS[name]),
+                    target_functions=pin["target_functions"])
             else:
-                killed = (outcome.returncode == 0 and result.get("success") is True
-                          and not accepted(mutant_report, pin))
-            mutations.append({"name": name, "expected_failure": expected,
+                killed = coverage_refusal(outcome, mutant_report, pin, name, report)
+            control_result = {"name": name, "expected_failure": expected,
                               "killed": killed, "exit_code": outcome.returncode,
-                              "verification_results": result})
+                              "verification_results": result}
             if not killed:
-                raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
+                raise ControlRefused(control_result, f"mutation {name} survived or failed for an unrelated reason")
+            return control_result
+        for control_result in run_controls(
+                run_control, mutation_sources((ROOT / SUBJECT).read_text()).items(),
+                timings=directory / "control-timings.json"):
+            mutations.append(control_result)
     versions = {}
     for name, version_command in {
         "runtime_rust": ["rustc", f"+{pin['runtime_rust']}", "--version"],
@@ -325,7 +381,7 @@ def check(cache: Path, install: bool) -> dict:
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
     return {"schema": "zeno-fcis/verus-evidence/1", "status": "passed",
             "revision": revision, "working_tree_dirty": bool(dirty),
-            "source_sha256": before, "toolchain": pin, "versions": versions,
+            "source_sha256": before, "source_bindings": evidence_bindings(before, HARNESS), "toolchain": pin, "versions": versions,
             "command": command, "exit_code": positive.returncode, "verus_report": report,
             "native_test_output": native_tests.stdout.strip(), "mutations": mutations,
             "scope": "interval_width and bounded_product over all declared machine inputs",

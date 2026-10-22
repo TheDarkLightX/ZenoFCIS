@@ -27,23 +27,28 @@ pub struct Subject {
     /// The admitted original.
     pub original: Program,
     /// Each input's value on every tuple.
-    pub columns: Vec<Vec<i64>>,
+    pub columns: Vec<Vec<i128>>,
     /// Each output's value on every tuple.
-    pub targets: Vec<Vec<i64>>,
+    pub targets: Vec<Vec<i128>>,
     /// Tuples in the declared domain.
     pub size: usize,
     /// Family parameter values of this instance, if any.
-    pub parameters: BTreeMap<String, i64>,
+    pub parameters: BTreeMap<String, i128>,
     /// How many cases the contract's table has, when known (out0 is the
     /// index of the first matching case in exported contract programs).
-    pub cases: Option<i64>,
+    pub cases: Option<i128>,
 }
 
-/// Values in a domain.
+/// Domain cardinality capped at u128::MAX; huge domains refuse enumeration.
 #[must_use]
 pub fn domain_size(domain: Domain) -> u128 {
     let (lo, hi) = domain.bounds();
-    u128::try_from(i128::from(hi) - i128::from(lo) + 1).unwrap_or(0)
+    if lo > hi {
+        return 0;
+    }
+    let lower = (lo as u128) ^ (1u128 << 127);
+    let upper = (hi as u128) ^ (1u128 << 127);
+    (upper - lower).saturating_add(1)
 }
 
 /// Tuples in the product of the domains (saturating).
@@ -55,7 +60,7 @@ pub fn tuples(domains: &[Domain]) -> u128 {
 }
 
 /// Every tuple's values, one column per input, in the checker's order.
-pub fn columns(domains: &[Domain], max_tuples: u64) -> Result<Vec<Vec<i64>>> {
+pub fn columns(domains: &[Domain], max_tuples: u64) -> Result<Vec<Vec<i128>>> {
     let total = tuples(domains);
     if total > u128::from(max_tuples) {
         return Err(Refusal::new(format!(
@@ -63,7 +68,7 @@ pub fn columns(domains: &[Domain], max_tuples: u64) -> Result<Vec<Vec<i64>>> {
         )));
     }
     let total = usize::try_from(total).map_err(|_| Refusal::new("domain-over-budget"))?;
-    let mut columns: Vec<Vec<i64>> = domains.iter().map(|_| Vec::with_capacity(total)).collect();
+    let mut columns: Vec<Vec<i128>> = domains.iter().map(|_| Vec::with_capacity(total)).collect();
     let mut repeat = total;
     let mut cycle = 1usize;
     for (k, domain) in domains.iter().enumerate() {
@@ -89,8 +94,8 @@ impl Subject {
     pub fn new(
         original: Program,
         vocab: Vocabulary,
-        parameters: BTreeMap<String, i64>,
-        cases: Option<i64>,
+        parameters: BTreeMap<String, i128>,
+        cases: Option<i128>,
         max_tuples: u64,
     ) -> Result<Self> {
         if vocab.inputs() != original.inputs() || vocab.outputs() != original.outputs() {
@@ -99,7 +104,7 @@ impl Subject {
         let columns = columns(original.inputs(), max_tuples)?;
         let size = columns.first().map_or(1, Vec::len);
         let width = original.outputs().len();
-        let mut targets: Vec<Vec<i64>> = (0..width).map(|_| Vec::with_capacity(size)).collect();
+        let mut targets: Vec<Vec<i128>> = (0..width).map(|_| Vec::with_capacity(size)).collect();
         let mut row = Vec::with_capacity(columns.len());
         for ordinal in 0..size {
             row.clear();
@@ -124,21 +129,23 @@ impl Subject {
 
     /// Input values of one tuple.
     #[must_use]
-    pub fn point(&self, ordinal: usize) -> Vec<i64> {
+    pub fn point(&self, ordinal: usize) -> Vec<i128> {
         self.columns.iter().map(|column| column[ordinal]).collect()
     }
 
     /// The ordinal of a tuple of input values (`None` outside the domain).
     #[must_use]
-    pub fn ordinal(&self, point: &[i64]) -> Option<usize> {
+    pub fn ordinal(&self, point: &[i128]) -> Option<usize> {
         let mut ordinal: u128 = 0;
         for (value, domain) in point.iter().zip(self.original.inputs()) {
             if !domain.contains(*value) {
                 return None;
             }
             let (lo, _) = domain.bounds();
-            ordinal = ordinal * domain_size(*domain)
-                + u128::try_from(i128::from(*value) - i128::from(lo)).ok()?;
+            let offset = value.checked_sub(lo).and_then(|n| u128::try_from(n).ok())?;
+            ordinal = ordinal
+                .checked_mul(domain_size(*domain))?
+                .checked_add(offset)?;
         }
         usize::try_from(ordinal).ok()
     }
@@ -167,7 +174,7 @@ impl Subject {
 
     /// Integer constants of the original program, in node order.
     #[must_use]
-    pub fn original_constants(&self) -> Vec<i64> {
+    pub fn original_constants(&self) -> Vec<i128> {
         self.original
             .nodes()
             .iter()

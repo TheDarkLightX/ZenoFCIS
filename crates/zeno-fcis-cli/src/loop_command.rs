@@ -74,15 +74,15 @@ const HEAD_LIMIT: u64 = acquisition::HEAD_BYTES;
 pub(super) enum ProfileArg {
     #[value(name = "functional-bool-v1")]
     FunctionalBoolV1,
-    #[value(name = "checked-i64-v1")]
-    CheckedI64V1,
+    #[value(name = "checked-i128-v1")]
+    CheckedI128V1,
 }
 
 impl ProfileArg {
     fn profile(self) -> Profile {
         match self {
             ProfileArg::FunctionalBoolV1 => Profile::FunctionalBoolV1,
-            ProfileArg::CheckedI64V1 => Profile::CheckedI64V1,
+            ProfileArg::CheckedI128V1 => Profile::CheckedI128V1,
         }
     }
 }
@@ -110,7 +110,7 @@ pub(super) enum Command {
         /// New or empty directory holding the request, ledger and artifacts.
         #[arg(long)]
         session: PathBuf,
-        #[arg(long, value_enum, default_value_t = ProfileArg::CheckedI64V1)]
+        #[arg(long, value_enum, default_value_t = ProfileArg::CheckedI128V1)]
         profile: ProfileArg,
         /// Attempts per session, at most 8.
         #[arg(long, default_value_t = Limits::CEILING.attempts)]
@@ -472,7 +472,7 @@ fn acquisition_entries(
     Ok(paths)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 fn open(original: &Path, session: &Path, profile: Profile, limits: Limits) -> (u8, Value) {
     open_work(
         original,
@@ -649,6 +649,17 @@ fn load_session(
     }
     let replay_started = Instant::now();
     if let Err(reason) = crate::checker_process::start(duration, false) {
+        if reason == crate::checker_process::STAGE_CPU_RESOLUTION {
+            let report = reserved.into_unreplayed_report();
+            let complete = report["accounting"]["complete"].clone();
+            let mut outcome = result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({"reason":reason,"trusted_incumbent":Value::Null,"report":report}),
+            );
+            outcome.1["accounting_complete"] = complete;
+            return Err(outcome);
+        }
         return Err(result(
             crate::BLOCKED,
             "resume-inconclusive",
@@ -1701,8 +1712,16 @@ fn storage_io(error: StorageError) -> std::io::Error {
 #[path = "loop_command_tests.rs"]
 mod tests;
 
-// Explicit KB operations are read only and run before containment. They do not
-// open a loop session or write an inbox, including on the legacy command path.
+// Explicit loop KB operations are read only inside the same finite-data
+// boundary. They do not open a loop session or write an inbox.
+pub(crate) fn has_knowledge_operation(command: &crate::Command) -> bool {
+    matches!(
+        command,
+        crate::Command::Loop {
+            command: Command::Doors(doors::DoorCommand::Strategy { kb_op: Some(_), .. })
+        }
+    )
+}
 pub(crate) fn knowledge_operation(
     command: &crate::Command,
     paths: &[PathBuf],
@@ -1752,6 +1771,8 @@ pub(crate) fn knowledge_subjects(command: &crate::Command) -> Option<Vec<String>
         } => vec!["expressions-door"],
         Command::Candidate { .. } => vec!["candidate"],
         Command::Doors(d) => match d {
+            // Scalar observations supply no reusable operation evidence.
+            D::Evaluate { .. } => return None,
             D::Strategy { kb_op: Some(_), .. } => return None,
             D::Strategy {
                 kind: Some(kind), ..

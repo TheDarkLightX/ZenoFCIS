@@ -274,7 +274,7 @@ impl Framer {
     }
 
     /// The framed state, command and context bytes of a tuple.
-    pub fn frame(&self, tuple: &[i64]) -> [Vec<u8>; 3] {
+    pub fn frame(&self, tuple: &[i128]) -> [Vec<u8>; 3] {
         [
             self.envelope(&self.roots[0], tuple),
             self.envelope(&self.roots[1], tuple),
@@ -282,7 +282,7 @@ impl Framer {
         ]
     }
 
-    fn envelope(&self, root: &RootFrame, tuple: &[i64]) -> Vec<u8> {
+    fn envelope(&self, root: &RootFrame, tuple: &[i128]) -> Vec<u8> {
         let payload = if root.record {
             output::encode_record(&self.fields(root, tuple), root.max_bytes)
         } else {
@@ -307,7 +307,7 @@ impl Framer {
     pub fn view<'f>(
         &self,
         root: &RootFrame,
-        tuple: &[i64],
+        tuple: &[i128],
         fields: &'f [c::Field<'static>],
     ) -> laws::RootView<'f, 'static> {
         match root.positions.first() {
@@ -319,7 +319,7 @@ impl Framer {
     }
 
     /// A record root's fields in field-ID order, as the library admits them.
-    pub fn fields(&self, root: &RootFrame, tuple: &[i64]) -> Vec<c::Field<'static>> {
+    pub fn fields(&self, root: &RootFrame, tuple: &[i128]) -> Vec<c::Field<'static>> {
         let mut fields: Vec<c::Field<'static>> = root
             .positions
             .iter()
@@ -333,10 +333,10 @@ impl Framer {
     }
 }
 
-fn atom(kind: AtomKind, value: i64) -> c::Atom<'static> {
+fn atom(kind: AtomKind, value: i128) -> c::Atom<'static> {
     match kind {
         AtomKind::Bool => c::Atom::Bool(value != 0),
-        AtomKind::Int => c::Atom::I128(i128::from(value)),
+        AtomKind::Int => c::Atom::I128(value),
         AtomKind::Sum(type_id) => c::Atom::Sum {
             type_id,
             variant: u16::try_from(value).unwrap_or(u16::MAX),
@@ -345,7 +345,7 @@ fn atom(kind: AtomKind, value: i64) -> c::Atom<'static> {
 }
 
 /// Evaluates one tuple with the bound Authority.
-pub fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i64]) -> Outcome {
+pub fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i128]) -> Outcome {
     let frames = framer.frame(tuple);
     let evaluation = authority.evaluate(c::Raw {
         state: &frames[0],
@@ -400,7 +400,7 @@ pub fn first_unsatisfied_state_law(
     descriptor: &c::Descriptor<'_>,
     state_laws: &[u32],
     framer: &Framer,
-    tuple: &[i64],
+    tuple: &[i128],
 ) -> Option<u32> {
     if state_laws.is_empty() {
         return None;
@@ -451,7 +451,7 @@ pub struct Proposed<'v> {
     pub reason: Option<u32>,
     /// The successor's state values in state position order; a reject's is
     /// ignored, since a reject has no successor.
-    pub post: &'v [i64],
+    pub post: &'v [i128],
 }
 
 /// Some of a contract's own law programs, run by the library's law
@@ -540,7 +540,7 @@ impl<'d> LawSet<'d> {
     pub fn on_transition(
         &self,
         framer: &Framer,
-        tuple: &[i64],
+        tuple: &[i128],
         proposed: &Proposed<'_>,
     ) -> (bool, Vec<laws::Diagnostic>) {
         let views = [0, 1, 2].map(|index| framer.fields(&framer.roots[index], tuple));
@@ -616,7 +616,7 @@ impl<'d> LawSet<'d> {
     /// genesis frame, where a law that reads the successor reads that state.
     /// A selected law that does not apply at genesis, or reads anything a
     /// genesis frame does not hold, counts as not satisfied.
-    pub fn on_state(&self, framer: &Framer, tuple: &[i64]) -> bool {
+    pub fn on_state(&self, framer: &Framer, tuple: &[i128]) -> bool {
         let root = &framer.roots[0];
         let fields = framer.fields(root, tuple);
         let frame = laws::Frame::Genesis {

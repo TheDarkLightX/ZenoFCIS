@@ -1,7 +1,7 @@
 # ZenoFCIS feature matrix
 
 This matrix covers the current `zeno-fcis` umbrella source API. The workspace
-declares `2.4.0`, the current release source, and the breaking V2 API below
+declares `2.5.0`, the current release source, and the breaking V2 API below
 needs a pinned source dependency on the matching tag, as the
 [installation guide](INSTALLATION.md) describes. The historical `1.1.0`
 package and its API stability promise have their own scope. The earlier public
@@ -13,25 +13,28 @@ The normal application API is `zeno_fcis::program`, which needs no optional
 features. It binds complete declarations to the library-owned evaluator and to
 private publication capabilities. Historical reference surfaces live under
 `zeno_fcis::legacy`. Enabling a dependency feature does not restore a retired
-native authoring API.
+native callback API.
 
 ## Host platforms
 
-The 2.4.0 release workflow builds two required host executables:
+The initial 2.5.0 release publishes Linux; the macOS binary follows native
+platform validation. The workflow supports these host builds:
 
 - Linux x86_64 GNU, on Ubuntu 24.04;
 - macOS on Apple silicon (`aarch64-apple-darwin`, minimum-version field
   macOS 11.0), on GitHub's macOS 15 arm64 image.
 
-Its release-set job requires both host jobs and their installed-binary
-records. The table lists the configured workflow checks. Only a completed run
+Its release-set job requires the Linux build and installed-binary record.
+The optional macOS build and full native test suite run on manual request;
+when that host is requested, its build and installed-binary record must pass too.
+The table lists the available checks, not a claim that every check has passed. Only a completed run
 bound to the release source and artifact qualifies a host executable.
 
 | Workflow check | Linux x86_64 | macOS arm64 |
 |---|---|---|
 | Build, archive and custody check | yes | yes |
 | Installed-binary journey | yes | yes |
-| Clippy and tests | yes | portable tests only |
+| Clippy and tests | yes | portable tests; validation pending |
 | Contained checker runtime | yes | unavailable (exit 2) |
 | `synth verify` execution | yes | blocked (exit 2) |
 | ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |
@@ -66,14 +69,14 @@ cryptographic provider features also serve the historical reference APIs.
 
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
-| `authoring` | `no_std + alloc` | Authoring | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
+| `authoring` | `no_std + alloc` | Specification | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
 | `schema` | `no_std + alloc` | Core | Closed schemas and schema-admitted values |
 | `catalog` | `no_std + alloc` | Core | Schema plus project reasons, effects, channels, authority rules, and limits |
-| `transition` | `no_std + alloc` | Historical | Native transition authoring is retired; normal transitions use `program` |
+| `transition` | `no_std + alloc` | Historical | Native transition implementations are retired; normal transitions use `program` |
 | `laws` | `no_std + alloc` | Metadata | Law declarations and evidence subjects; the checked evaluator is reached through `program::law` |
 | `authority` | `no_std + alloc` | Core authority | Library-owned V2 authority and publication re-exports |
-| `domain-machines` | `no_std + alloc` | Historical | Native domain-machine authoring is retired |
-| `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
+| `domain-machines` | `no_std + alloc` | Historical | Native domain-machine implementations are retired |
+| `composed-program` | `no_std + alloc` | Historical | Native composed-program implementations are retired |
 
 Start both single-domain and multi-domain applications with complete
 declarations through `zeno_fcis::program`. V2.2 has three finite component
@@ -155,7 +158,7 @@ graph or production authority.
 ## Common selections
 
 These are alternative dependency declarations against a checkout of
-`v2.4.0` at `../ZenoFCIS`. Select the one declaration whose features your
+`v2.5.0` at `../ZenoFCIS`. Select the one declaration whose features your
 application needs. `version = "=1.1.0"` does not supply the current API.
 
 ```toml
@@ -177,7 +180,7 @@ zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", features = ["authenticated-
 # Tool-neutral checked backend protocol
 zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["backend"] }
 
-# Pure authoring compiler and Mini Determinator
+# Pure specification compiler and Mini Determinator
 zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["authoring"] }
 ```
 
@@ -188,7 +191,7 @@ commutativity and sequential-versus-composed parity. Its external evidence
 verifier is a named trust boundary. Native domain and composed-program execution
 are retired; the normal route evaluates one complete checked program.
 
-ZenoFCIS does not yet ship a production parallel component runtime. The 2.4.0
+ZenoFCIS does not yet ship a production parallel component runtime. The 2.5.0
 source includes an offline parallel exhaustive checker whose qualification is
 bound to its release-source checks. That checker is separate from parallel
 application execution. Component composition needs its own coupled

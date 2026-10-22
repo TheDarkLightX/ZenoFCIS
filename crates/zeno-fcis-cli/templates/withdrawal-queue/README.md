@@ -27,7 +27,7 @@ cannot state. The template shows four patterns:
   pause in range, for every integer. CVC5 attests each induction step, and
   `tests/claims.rs` checks the rest of the argument.
 
-The original privately retained `src/program.rs` decides deposits and requests by hand-written rules and
+The original privately retained `src/program.rs` decides deposits and requests by LLM-generated rules and
 ticks by the synthesized step in `synthesized/transition.rs`. The law checker
 in `src/laws.rs` evaluates the formulas in `project.zeno` against every
 decision and refuses any decision that breaks them, including a tick that
@@ -50,7 +50,7 @@ constructs the complete decision, and checks the original law programs with
 one meter. The SQLite shell consumes genuine `Publication` and
 `Publication` capabilities; exact replay recomputes the same original inputs.
 
-The hand-written adapters, legacy law engines and earlier synthesis/model
+The LLM-generated adapters, legacy law engines and earlier synthesis/model
 checks described below are retained only in the repository’s nonpublished
 `verification/kernel-laws/src/oracle/templates/withdrawal-queue` package for independent oracle
 and historical evidence tests. They do not execute the normal V2 decision.

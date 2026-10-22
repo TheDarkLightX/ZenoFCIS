@@ -60,6 +60,7 @@
 
 extern crate alloc;
 
+pub mod arithmetic;
 mod diagram;
 mod fold;
 mod ir;
@@ -108,7 +109,7 @@ const DIAGRAM: &str = "dd-resynth";
 pub struct Budget {
     /// Largest declared input domain the search enumerates.
     pub max_tuples: u64,
-    /// Most `i64` cells in each of three tables: the original's observations,
+    /// Most `i128` cells in each of three tables: the original's observations,
     /// a program's node signatures, and the top-down plan values. Each table
     /// is limited separately, so together they can hold up to three times
     /// this; smaller buffers are not counted.
@@ -676,32 +677,4 @@ fn run(original: &[u8], seeds: &[&[u8]], settings: &Settings) -> Result<Outcome,
         nodes: best.cost.0,
         provenance,
     }))
-}
-
-/// Source text for internal tool fingerprints; not a stable application API.
-/// Include `LIB` as well as leaf entries so fingerprints bind this mapping.
-#[doc(hidden)]
-pub mod source_fingerprint {
-    /// Exact source bytes owned by this crate.
-    pub const CONCRETE: &str = include_str!("concrete.rs");
-    /// Exact source bytes owned by this crate.
-    pub const DIAGRAM: &str = include_str!("diagram.rs");
-    /// Exact source bytes owned by this crate.
-    pub const FOLD: &str = include_str!("fold.rs");
-    /// Exact source bytes owned by this crate.
-    pub const IR: &str = include_str!("ir.rs");
-    /// Exact source bytes owned by this crate.
-    pub const LIB: &str = include_str!("lib.rs");
-    /// Exact source bytes owned by this crate.
-    pub const POOL: &str = include_str!("pool.rs");
-    /// Exact source bytes owned by this crate.
-    pub const RESUB: &str = include_str!("resub.rs");
-    /// Exact source bytes owned by this crate.
-    pub const SPACE: &str = include_str!("space.rs");
-    /// Exact source bytes owned by this crate.
-    pub const TARGET: &str = include_str!("target.rs");
-    /// Exact source bytes owned by this crate.
-    pub const TOPDOWN: &str = include_str!("topdown.rs");
-    /// Exact source bytes owned by this crate.
-    pub const UTIL: &str = include_str!("util.rs");
 }

@@ -13,6 +13,8 @@ use zeno_fcis_spec::{ProjectSpec, StableId, TypeKind as AuthoredKind};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum SchemaLoweringError {
+    /// Quantity annotations require the quantity-aware contract compiler.
+    QuantityRequiresContract(StableId),
     /// The selected root is absent or is not declared as state.
     WrongRoot(StableId),
     /// An authored leaf has no explicit shape and bounds.
@@ -45,6 +47,11 @@ impl From<SchemaError> for SchemaLoweringError {
 impl fmt::Display for SchemaLoweringError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::QuantityRequiresContract(id) => write!(
+                formatter,
+                "type {} requires the quantity-aware contract compiler",
+                id.get()
+            ),
             Self::WrongRoot(id) => {
                 write!(formatter, "type {} is not a declared state root", id.get())
             }
@@ -105,6 +112,9 @@ pub fn lower_schema(
     leaf_bindings: Vec<(StableId, TypeKind)>,
     limits: SchemaLimits,
 ) -> Result<Schema, SchemaLoweringError> {
+    if let Some(ty) = project.types().iter().find(|ty| ty.quantity().is_some()) {
+        return Err(SchemaLoweringError::QuantityRequiresContract(ty.id()));
+    }
     let max_types = usize::try_from(limits.max_types).unwrap_or(usize::MAX);
     if project.types().len() > max_types || leaf_bindings.len() > max_types {
         return Err(SchemaError::LimitExceeded.into());

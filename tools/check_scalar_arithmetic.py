@@ -58,7 +58,10 @@ def run(command:list[str],directory:Path,label:str,input_text:str|None=None,env:
     return process.stdout
 
 
-RUST_DRIVER='\nfn main() {\n    use std::io::Read;\n    let mut input=String::new();std::io::stdin().read_to_string(&mut input).unwrap();\n    for line in input.lines() {\n        let fields:Vec<i64>=line.split(\' \').map(|v|v.parse().unwrap()).collect();\n        match transition(&fields) {\n            Some(output)=>println!("{}",output[0]),None=>println!("null"),\n        }\n    }\n}\n'
+# The emitted subjects are on the finite-i128/3 main route: signed i128
+# operands and results, so the oracle, the corpus and the Rust driver use 128 bits.
+BITS=128
+RUST_DRIVER='\nfn main() {\n    use std::io::Read;\n    let mut input=String::new();std::io::stdin().read_to_string(&mut input).unwrap();\n    for line in input.lines() {\n        let fields:Vec<i128>=line.split(\' \').map(|v|v.parse().unwrap()).collect();\n        match transition(&fields) {\n            Some(output)=>println!("{}",output[0]),None=>println!("null"),\n        }\n    }\n}\n'
 
 
 def execute(path:Path,cases:tuple[Case,...],rustc:str,node:str,directory:Path,label:str)->list:
@@ -105,11 +108,11 @@ def check(out:Path,node:str,stub:bool)->dict:
         raise RuntimeError("Cargo jobs must be within the assigned cap, at most six")
     environment["RUST_TEST_THREADS"]="1"
     run(["cargo","+1.97.1","test","-p","zeno-fcis-synthesis","--test","scalar_arithmetic","--locked","--offline","-j",str(jobs),"--","emit_qualification_subjects","--exact"],out,"emit",env=environment)
-    vectors=boundary_cases()
+    vectors=boundary_cases(BITS)
     all_actual=[];all_expected=[];subjects=[]
     for operation,arity in [("mul",2),("div_floor",2),("div_ceil",2),("mul_div_floor",3),("mul_div_ceil",3),("products_ge",4),("products_ge",6)]:
         cases=tuple(c for c in vectors if c.operation==operation and len(c.operands)==arity)
-        expected=[result(c) for c in cases]
+        expected=[result(c,BITS) for c in cases]
         for extension in ("rs","py","mjs"):
             key=f"{operation}-{arity}.{extension}";path=sources/key
             actual=execute(path,cases,rustc,node,out,key)
@@ -132,19 +135,19 @@ def check(out:Path,node:str,stub:bool)->dict:
     faults=[
         ("truncation","div_floor-2.py","v0 // v1","int(abs(v0)//abs(v1)) * (-1 if (v0<0)!=(v1<0) else 1)",Case("div_floor",(-1,2))),
         ("rounding_swap","div_ceil-2.py","-((-v0) // v1)","v0 // v1",Case("div_ceil",(1,2))),
-        ("dropped_product_word","mul_div_floor-3.py","(v0 * v1) // v2","((v0 * v1) & ((1<<64)-1)) // v2",Case("mul_div_floor",((1<<63)-1,(1<<63)-1,(1<<63)-1))),
+        ("dropped_product_word","mul_div_floor-3.py","(v0 * v1) // v2","((v0 * v1) & ((1<<128)-1)) // v2",Case("mul_div_floor",((1<<127)-1,(1<<127)-1,(1<<127)-1))),
         ("hardcoded_fee","mul_div_ceil-3.py","(v0 * v1 + v2 - 1) // v2","1",Case("mul_div_ceil",(20,3,10))),
         ("all_zero","mul_div_ceil-3.py","(v0 * v1 + v2 - 1) // v2","0",Case("mul_div_ceil",(11,1,10))),
         ("always_refuse","mul_div_ceil-3.py","return (v3,)","return None",Case("mul_div_ceil",(11,1,10))),
         ("division_zero_to_zero","div_floor-2.rs","if b == 0 { return None; }","if b == 0 { return Some(0); }",Case("div_floor",(1,0))),
-        ("wrapping_multiply","mul-2.rs","a.checked_mul(b)","Some(a.wrapping_mul(b))",Case("mul",((1<<63)-1,2))),
+        ("wrapping_multiply","mul-2.rs","a.checked_mul(b)","Some(a.wrapping_mul(b))",Case("mul",((1<<127)-1,2))),
     ]
     for name,base,anchor,replacement,witness in faults:
         original=sources/base
         changed=sources/(name+original.suffix)
         changed.write_text(replace_once(original.read_text(),anchor,replacement))
         actual=execute(changed,(witness,),rustc,node,out,"mutant-"+name)
-        mutants[name]=(actual,[result(witness)])
+        mutants[name]=(actual,[result(witness,BITS)])
     lazy=sources/"lazy-choose.py"
     source=replace_once((sources/"eager-choose.py").read_text(),
         "if v1 == 0:","if False:")

@@ -71,10 +71,10 @@ zeno-fcis contract import --tau integrations/tau/allowance-study.tau \
 ```
 
 Export supports nonnegative scalar input codes up to 65535, scalar state and
-payload observations, and fixed delivery metadata. Signed i64 constants and
-intermediates use explicit two's-complement `bv[64]` encoding and signed order.
+payload observations, and fixed delivery metadata. Signed i128 constants and
+intermediates use explicit two's-complement `bv[128]` encoding and signed order.
 It independently bounds every eager native node and every expanded authored
-expression, including unused nodes and unselected arms; a possible i64 overflow
+expression, including unused nodes and unselected arms; a possible i128 overflow
 refuses. Unsupported instructions, dynamic text observations and adopted/evolved
 lineages refuse. Numeric conditionals become universally quantified helpers
 with exact conditional equalities. The paired SMT script is the negation of the

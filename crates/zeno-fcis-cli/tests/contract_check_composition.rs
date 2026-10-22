@@ -76,7 +76,7 @@ fn the_committed_ring_is_checked_with_the_same_bytes_on_repeat() {
     assert_eq!(report["status"], "checked");
     assert_eq!(report["authority"], "none");
     let result = &report["result"];
-    assert_eq!(result["schema"], "zeno-fcis/checked-composition-result/1");
+    assert_eq!(result["schema"], "zeno-fcis/checked-composition-result/2");
     assert_eq!(result["evidence"], "checked");
     assert_eq!(result["totals"]["local_rows"], 640);
     assert_eq!(result["totals"]["interface_rows"], 80);
@@ -170,13 +170,13 @@ fn a_written_receipt_replays_and_a_tampered_one_does_not() {
     assert_eq!(report["status"], "checked");
     assert_eq!(
         report["receipt_schema"],
-        "zeno-fcis/checked-composition-receipt/1"
+        "zeno-fcis/checked-composition-receipt/2"
     );
     let bytes = fs::read(&receipt).unwrap_or_else(|error| panic!("{error}"));
     let document = json(&bytes);
     assert_eq!(
         document["schema"],
-        "zeno-fcis/checked-composition-receipt/1"
+        "zeno-fcis/checked-composition-receipt/2"
     );
     assert_eq!(document["result"], report["result"]);
 

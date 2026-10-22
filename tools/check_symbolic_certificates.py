@@ -30,7 +30,7 @@ def main():
     if summary != [("1", "0", "0")]:
         print("certificate qualification did not run its complete real-tool journey", file=sys.stderr)
         return 1
-    print("certificate qualification PASS: full-i64 identity and non-identical check/replay, actual refusal controls")
+    print("certificate qualification PASS: full-i128 identity and non-identical check/replay, actual refusal controls")
     return 0
 
 

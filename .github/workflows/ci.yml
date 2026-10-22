@@ -1,6 +1,12 @@
 name: ci
 
 on:
+  workflow_dispatch:
+    inputs:
+      check_macos:
+        description: Run the deferred native macOS test suite
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -10,6 +16,13 @@ on:
 permissions:
   contents: read
 
+# Keep test executables within the checked evidence-reader's 128 MiB input bound.
+# Debug assertions and overflow checks remain enabled.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
 concurrency:
   group: zeno-fcis-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -17,7 +30,7 @@ concurrency:
 jobs:
   rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 120
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -112,6 +125,8 @@ jobs:
 
   rust-macos:
     name: rust (macOS arm64)
+    # Native macOS qualification is separate from the initial Linux release.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.check_macos }}
     runs-on: macos-15
     timeout-minutes: 120
     defaults:

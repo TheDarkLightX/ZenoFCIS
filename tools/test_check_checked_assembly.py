@@ -101,7 +101,8 @@ class Admission(unittest.TestCase):
             'verification-results': {'success': True, 'errors': 0, 'verified': 1204,
                 'encountered-error': False, 'encountered-vir-error': False,
                 'is-verifying-entire-crate': True},
-            'func-details': {**dict.fromkeys(profile['functions'], {}), 'outside::exec': {}}}
+            'func-details': {**dict.fromkeys(profile['functions'], {}), 'outside::exec': {},
+                'checked_assembly::route::ReportOnlyGetterAlias': {}}}
         process = subprocess.CompletedProcess([], 0, '', '')
         candidate = gate.candidate_profile(process, report, pin, profile, profile['functions'])
         self.assertFalse(candidate['reviewed'])

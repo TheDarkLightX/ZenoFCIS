@@ -29,5 +29,5 @@ law 500 quota on commit, genesis = post.100.111 >= 0 && post.100.111 <= 3;
 law 501 exact_charge on accept = context.102.131 == 1 && context.102.130 >= pre.100.110 && (context.102.130 < pre.100.110 + 1 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1) && (context.102.130 >= pre.100.110 + 1 -> post.100.110 == context.102.130 && post.100.111 == 1);
 // Core seed rate-limiter/1; parameters {"N": 3, "W": 1}.
 // Instance source-set SHA256 a5120ce5e55fb3cdb18f9d89739eb671a7905af2109bc63f9fd257bd1a12a794.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/rate-limiter.json SHA256 06b2e2c4fe56a0a4d4717c85bdd5e5d3b342f0853521578d23addb1d9810f7ca; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/rate-limiter.json SHA256 95a0186891186ab16830c486671a1577c49bf6cdddc90dbfbb52436a53bf5d7d; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.

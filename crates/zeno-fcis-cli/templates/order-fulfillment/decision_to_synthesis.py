@@ -113,7 +113,7 @@ def problem():
     sketch = Graph(5)
     selected = successor(sketch, decision(sketch, True))
     return {"schema": "zeno-fcis/synthesis-problem/1",
-            "profile": "zeno-fcis/finite-i64/1", "inputs": inputs, "outputs": outputs,
+            "profile": "zeno-fcis/finite-i128/1", "inputs": inputs, "outputs": outputs,
             "contract": {"nodes": contract.nodes, "roots": [contract_root]},
             "sketch": {"nodes": sketch.nodes, "roots": list(selected)}}
 

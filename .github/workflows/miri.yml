@@ -14,7 +14,7 @@ jobs:
   interpret:
     name: interpret (${{ matrix.group }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: ${{ matrix.group == 'synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-20-24' && 360 || 240 }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +39,9 @@ jobs:
           {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
           {"group": "synthesis-scalar-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_arithmetic"},
+          {"group": "synthesis-scalar-routes", "packages": "-p zeno-fcis-synthesis", "target": "--test scalar_routes"},
+          {"group": "synthesis-signed-arithmetic", "packages": "-p zeno-fcis-synthesis", "target": "--test signed_arithmetic"},
+          {"group": "synthesis-width-study", "packages": "-p zeno-fcis-synthesis", "target": "--test width_study"},
           {"group": "synthesis-arithmetic-pilot", "packages": "-p zeno-fcis-synthesis", "target": "--test arithmetic_pilot"},
           {"group": "synthesis-search", "packages": "-p zeno-fcis-synthesis", "target": "--test search"},
           {"group": "synthesis-v2-execution", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_execution"},

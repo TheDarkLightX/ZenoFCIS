@@ -240,48 +240,66 @@ pub(crate) fn implementation() -> String {
         include_str!("loop_knowledge.rs"),
         include_str!("knowledge_command.rs"),
         include_str!("knowledge_evidence.rs"),
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_KNOWLEDGE_REASONING,
-        zeno_fcis_loop_doors::source_fingerprint::EXAMPLES_STRATEGY_EXAMPLE,
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge.rs.txt"),
+        include_str!(
+            "../source-snapshots/zeno-fcis-loop-doors/src/strategy_knowledge/reasoning.rs.txt"
+        ),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/examples/strategy-example.kb.txt"),
         include_str!("loop_strategy.rs"),
         include_str!("loop_rules.rs"),
         include_str!("loop_strategy_profiles.rs"),
         // BEGIN L1/L2 compiled source binding.
         include_str!("loop_learn.rs"),
+        include_str!("loop_capture.rs"),
+        include_str!("loop_capture_whole.rs"),
+        include_str!("../source-snapshots/zeno-fcis-spec/src/ast.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-spec/src/parser.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-contract/src/internals/expr.rs.txt"),
+        include_str!("loop_version_space.rs"),
         include_str!("loop_search_limits.rs"),
-        zeno_fcis_loop_doors::source_fingerprint::LEARN,
-        zeno_fcis_loop_doors::source_fingerprint::CAPTURE,
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/learn.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/capture.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/version_space.rs.txt"),
         // END L1/L2 compiled source binding.
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_ALGEBRA,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_QUESTIONS,
-        zeno_fcis_loop_doors::source_fingerprint::STRATEGY_SPLIT,
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_algebra.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_questions.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/strategy_split.rs.txt"),
         include_str!("loop_doors_command.rs"),
         include_str!("transform.rs"),
-        zeno_fcis_shell_sqlite::source_fingerprint::V2_EQUIVALENCE_CHECKER,
-        zeno_fcis_shell_sqlite::source_fingerprint::V2_EQUIVALENCE_CHECKER_API,
-        zeno_fcis_shell_sqlite::source_fingerprint::V2_EQUIVALENCE_CHECKER_EQUALITY,
-        zeno_fcis_shell_sqlite::source_fingerprint::V2_EQUIVALENCE_CHECKER_RANGES,
-        zeno_fcis_shell_sqlite::source_fingerprint::V2_EQUIVALENCE_CHECKER_SPEC,
+        include_str!(
+            "../source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker.rs.txt"
+        ),
+        include_str!(
+            "../source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_api.rs.txt"
+        ),
+        include_str!(
+            "../source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_equality.rs.txt"
+        ),
+        include_str!(
+            "../source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_ranges.rs.txt"
+        ),
+        include_str!(
+            "../source-snapshots/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_spec.rs.txt"
+        ),
         include_str!("neural_loop/program_json.rs"),
-        zeno_fcis_program_search::source_fingerprint::CONCRETE,
-        zeno_fcis_program_search::source_fingerprint::LIB,
-        zeno_fcis_program_search::source_fingerprint::POOL,
-        zeno_fcis_program_search::source_fingerprint::IR,
-        zeno_fcis_program_search::source_fingerprint::SPACE,
-        zeno_fcis_program_search::source_fingerprint::RESUB,
-        zeno_fcis_program_search::source_fingerprint::TOPDOWN,
-        zeno_fcis_program_search::source_fingerprint::TARGET,
-        zeno_fcis_program_search::source_fingerprint::FOLD,
-        zeno_fcis_program_search::source_fingerprint::DIAGRAM,
-        zeno_fcis_program_search::source_fingerprint::UTIL,
-        zeno_fcis_loop_doors::source_fingerprint::EXPR,
-        zeno_fcis_loop_doors::source_fingerprint::LOWER,
-        zeno_fcis_loop_doors::source_fingerprint::SUBJECT,
-        zeno_fcis_loop_doors::source_fingerprint::SKETCH,
-        zeno_fcis_loop_doors::source_fingerprint::REPAIR,
-        zeno_fcis_loop_doors::source_fingerprint::INVERSE,
-        zeno_fcis_loop_doors::source_fingerprint::LIB,
-        zeno_fcis_shell_sqlite::source_fingerprint::LIB,
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/concrete.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/lib.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/arithmetic.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/pool.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/ir.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/space.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/resub.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/topdown.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/target.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/fold.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/diagram.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-program-search/src/util.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/expr.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/lower.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/subject.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/sketch.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/repair.rs.txt"),
+        include_str!("../source-snapshots/zeno-fcis-loop-doors/src/inverse.rs.txt"),
     ];
     let mut bytes = Vec::new();
     for source in sources {
@@ -395,7 +413,7 @@ pub(super) struct Task {
     pub(super) binding: Value,
     expressions: Vec<Expr>,
     vocabulary: Option<VocabularySpec>,
-    parameters: BTreeMap<String, i64>,
+    parameters: BTreeMap<String, i128>,
     candidate: Option<Program>,
 }
 

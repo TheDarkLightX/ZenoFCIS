@@ -141,6 +141,60 @@ impl IntRange {
     }
 }
 
+/// Canonical nominal dimensions and a declared decimal raw-atom scale.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Quantity {
+    factors: alloc::vec::Vec<(Identifier, i32)>,
+    scale: u8,
+}
+
+impl Quantity {
+    /// Normalizes nominal products/quotients; a zero exponent is omitted.
+    pub fn try_new(
+        factors: impl IntoIterator<Item = (Identifier, i32)>,
+        scale: u8,
+    ) -> Option<Self> {
+        if scale > 38 {
+            return None;
+        }
+        let mut terms = alloc::collections::BTreeMap::<Identifier, i32>::new();
+        for (name, power) in factors {
+            let entry = terms.entry(name).or_default();
+            *entry = entry.checked_add(power)?;
+        }
+        Some(Self {
+            factors: terms.into_iter().filter(|(_, p)| *p != 0).collect(),
+            scale,
+        })
+    }
+    /// Canonical nominal factors in identifier order, with signed powers.
+    pub fn factors(&self) -> &[(Identifier, i32)] {
+        &self.factors
+    }
+    /// The raw atom exponent, in 0..=38. All quantity widths are i128.
+    pub const fn scale(&self) -> u8 {
+        self.scale
+    }
+    /// A dimensionless integer quantity.
+    pub fn dimensionless() -> Self {
+        Self {
+            factors: alloc::vec::Vec::new(),
+            scale: 0,
+        }
+    }
+    /// Canonical product or quotient, at an explicitly supplied exponent.
+    pub fn combine(&self, other: &Self, divide: bool, scale: u8) -> Option<Self> {
+        let mut factors = self.factors.clone();
+        for (name, power) in &other.factors {
+            factors.push((
+                name.clone(),
+                if divide { power.checked_neg()? } else { *power },
+            ));
+        }
+        Self::try_new(factors, scale)
+    }
+}
+
 /// One explicit type declaration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeDecl {
@@ -148,6 +202,7 @@ pub struct TypeDecl {
     pub(crate) kind: TypeKind,
     pub(crate) name: Identifier,
     pub(crate) range: Option<IntRange>,
+    pub(crate) quantity: Option<Quantity>,
 }
 impl TypeDecl {
     /// Creates a type declaration.
@@ -158,6 +213,7 @@ impl TypeDecl {
             kind,
             name,
             range: None,
+            quantity: None,
         }
     }
     /// Declares the inclusive range of an `int` type. Returns `None` for any
@@ -169,6 +225,18 @@ impl TypeDecl {
         }
         self.range = Some(range);
         Some(self)
+    }
+    /// Adds a quantity annotation only to an integer declaration.
+    pub fn with_quantity(mut self, quantity: Quantity) -> Option<Self> {
+        if self.kind != TypeKind::Int {
+            return None;
+        }
+        self.quantity = Some(quantity);
+        Some(self)
+    }
+    /// The declared nominal unit and scale, if present.
+    pub fn quantity(&self) -> Option<&Quantity> {
+        self.quantity.as_ref()
     }
     /// Returns the declared range of an `int` type, if it declares one.
     #[must_use]
@@ -789,6 +857,21 @@ pub enum ValueExpr {
     Sub(Box<ValueExpr>, Box<ValueExpr>),
     Mul(Box<ValueExpr>, Box<ValueExpr>),
     Div(DivisionMode, Box<ValueExpr>, Box<ValueExpr>),
+    /// Nonnegative full-product division, distinct from a possibly trapping
+    /// intermediate multiplication. Authored calls use Floor or Ceil.
+    MulDiv(DivisionMode, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
+    SignedMulDivFloor(Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>),
+    /// Explicit target scale, rounding, and signed-factor domain.
+    ScaledMulDiv(
+        DivisionMode,
+        bool,
+        Box<ValueExpr>,
+        Box<ValueExpr>,
+        Box<ValueExpr>,
+        u8,
+    ),
+    /// Eager operands followed by a literal number of ordered floor steps.
+    RepeatMulDiv(bool, Box<ValueExpr>, Box<ValueExpr>, Box<ValueExpr>, u8),
     Sum {
         variable: Identifier,
         start: i128,
@@ -1315,11 +1398,22 @@ impl ProjectSpec {
     /// Appends this protocol type's exact canonical encoding.
     pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
-        output.extend_from_slice(&PROJECT_SPEC_FORMAT_VERSION.to_be_bytes());
+        let format = if self.types.iter().any(|t| t.quantity.is_some()) {
+            2u16
+        } else {
+            PROJECT_SPEC_FORMAT_VERSION
+        };
+        output.extend_from_slice(&format.to_be_bytes());
         self.project_id.encode_to(output)?;
         self.name.encode_to(output)?;
         put_slice(output, &self.namespaces, encode_namespace)?;
-        put_slice(output, &self.types, encode_type)?;
+        put_length(output, self.types.len())?;
+        for declared in &self.types {
+            if format == 2 {
+                output.push(u8::from(declared.quantity.is_some()));
+            }
+            encode_type(declared, output)?;
+        }
         put_slice(output, &self.fields, encode_field)?;
         put_slice(output, &self.variants, encode_variant)?;
         put_slice(output, &self.reasons, encode_reason)?;
@@ -1387,7 +1481,16 @@ fn encode_type(value: &TypeDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
             out.extend_from_slice(&range.max.to_be_bytes());
         }
     }
-    value.name.encode_to(out)
+    value.name.encode_to(out)?;
+    if let Some(quantity) = &value.quantity {
+        out.push(quantity.scale);
+        put_length(out, quantity.factors.len())?;
+        for (name, power) in &quantity.factors {
+            name.encode_to(out)?;
+            out.extend_from_slice(&power.to_be_bytes());
+        }
+    }
+    Ok(())
 }
 fn encode_field(value: &FieldDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.owner.encode_to(out)?;
@@ -1515,6 +1618,45 @@ fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError>
             });
             encode_value(a, out)?;
             encode_value(b, out)
+        }
+        ValueExpr::MulDiv(mode, a, b, d) => {
+            // Append a tag; all pre-existing expression encodings stay intact.
+            out.push(8);
+            out.push(match mode {
+                DivisionMode::Exact => 0,
+                DivisionMode::Floor => 1,
+                DivisionMode::Ceil => 2,
+            });
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
+        }
+        ValueExpr::SignedMulDivFloor(a, b, d) => {
+            out.push(9);
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
+        }
+        ValueExpr::ScaledMulDiv(mode, signed, a, b, d, scale) => {
+            out.extend_from_slice(&[
+                10,
+                *signed as u8,
+                match mode {
+                    DivisionMode::Exact => 0,
+                    DivisionMode::Floor => 1,
+                    DivisionMode::Ceil => 2,
+                },
+                *scale,
+            ]);
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
+        }
+        ValueExpr::RepeatMulDiv(signed, a, b, d, count) => {
+            out.extend_from_slice(&[11, *signed as u8, *count]);
+            encode_value(a, out)?;
+            encode_value(b, out)?;
+            encode_value(d, out)
         }
         ValueExpr::Sum {
             variable,
@@ -1717,10 +1859,40 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
             ValueExpr::Sum { body, .. } => {
                 stack.push((body, current_depth.saturating_add(1)));
             }
+            ValueExpr::MulDiv(_, a, b, d)
+            | ValueExpr::SignedMulDivFloor(a, b, d)
+            | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
+            | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
+                for child in [a, b, d] {
+                    stack.push((child, current_depth.saturating_add(1)));
+                }
+            }
             ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
         }
     }
     (nodes, depth)
+}
+
+#[cfg(test)]
+#[test]
+fn fused_variants_keep_distinct_tags_and_count_every_operand() {
+    let nonnegative = ValueExpr::MulDiv(
+        DivisionMode::Floor,
+        Box::new(ValueExpr::Int(1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    let signed = ValueExpr::SignedMulDivFloor(
+        Box::new(ValueExpr::Int(-1)),
+        Box::new(ValueExpr::Int(2)),
+        Box::new(ValueExpr::Int(3)),
+    );
+    for (value, tag) in [(&nonnegative, 8), (&signed, 9)] {
+        let mut encoded = Vec::new();
+        encode_value(value, &mut encoded).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(encoded[0], tag);
+        assert_eq!(formula_shape_value(value), (4, 2));
+    }
 }
 
 pub(crate) fn formula_shape_rel(value: &RelExpr) -> (usize, usize) {

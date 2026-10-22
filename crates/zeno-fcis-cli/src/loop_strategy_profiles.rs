@@ -285,7 +285,11 @@ pub(super) fn command(
             };
             let vector = list(&input["vector"])?
                 .iter()
-                .map(|v| v.as_i64().ok_or("strategy-input-value".into()))
+                .map(|v| {
+                    v.as_i64()
+                        .map(i128::from)
+                        .ok_or("strategy-input-value".into())
+                })
                 .collect::<Result<Vec<_>, String>>()?;
             let mut observed = BTreeMap::new();
             for pair in list(&input["observations"])? {
@@ -294,7 +298,10 @@ pub(super) fn command(
                     return Err("strategy-observation".into());
                 }
                 let wire = int(&pair[0])?;
-                let value = pair[1].as_i64().ok_or("strategy-observation-value")?;
+                let value = pair[1]
+                    .as_i64()
+                    .map(i128::from)
+                    .ok_or("strategy-observation-value")?;
                 if observed.insert(wire, value).is_some() {
                     return Err("strategy-duplicate-observation".into());
                 }
@@ -374,7 +381,7 @@ pub(super) fn command(
             } else {
                 "proposed-ambiguous"
             };
-            let q=r.question.map(|q|json!({"statement":q.statement,"id":groups[q.statement].id,"text":input["readings"][q.statement]["text"],"ordinal":q.ordinal,"world":q.world,"holds":q.holds,"does_not_hold":q.does_not_hold}));
+            let q=r.question.map(|q|json!({"statement":q.statement,"id":groups[q.statement].id,"text":input["readings"][q.statement]["text"],"ordinal":q.ordinal,"world":crate::report_numbers::integers(&q.world),"holds":q.holds,"does_not_hold":q.does_not_hold}));
             Ok((
                 json!({"status":status,"query":input["query"],"distinct":r.distinct,"answers":r.answers,"answer":if answer.len()==1{answer.first().copied()}else{None},"question":q,"proposer_work":r.work,"claim":"answer stability over listed finite readings only; no owner intent or missing-reading completeness"}),
                 r.trace,

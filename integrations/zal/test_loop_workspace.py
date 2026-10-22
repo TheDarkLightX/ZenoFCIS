@@ -550,11 +550,60 @@ SWEEP_ENVS = [{"x": x, "f": f} for x in range(4) for f in (0, 1)]
 SWEEP_PATHS = {"pre.100.110": "x", "context.102.130": "f"}
 
 
+def arithmetic_reference(name, args):
+    """Independent test oracle only; production arithmetic is evaluated in Rust."""
+    import math
+    if not name.startswith("div_") and any(v < 0 for v in args):
+        raise Refusal("arithmetic")
+    if name == "products_ge":
+        middle = len(args) // 2
+        return int(math.prod(args[:middle]) >= math.prod(args[middle:]))
+    numerator = args[0] if name.startswith("div_") else args[0] * args[1]
+    denominator = args[-1]
+    if denominator == 0:
+        raise Refusal("arithmetic")
+    q, r = divmod(numerator, denominator)
+    value = q + int(name.endswith("ceil") and r != 0)
+    if not -(1 << 63) <= value < (1 << 63):
+        raise Refusal("arithmetic")
+    return value
+
+
+def loop_value(node, env):
+    """Test-only eager source semantics for the bounded translation corpus."""
+    tag = node[0]
+    if tag == "int":
+        return node[1]
+    if tag == "var":
+        return env[node[1]]
+    if tag == "call":
+        return arithmetic_reference(node[1], [loop_value(a, env) for a in node[2]])
+    if tag == "not":
+        return int(loop_value(node[1], env) == 0)
+    if tag == "if":
+        c, a, b = (loop_value(n, env) for n in node[1:])
+        return a if c == 1 else b
+    op, a, b = node[1], loop_value(node[2], env), loop_value(node[3], env)
+    return {"+": lambda: a + b, "-": lambda: a - b, "*": lambda: a * b,
+            "==": lambda: int(a == b), "!=": lambda: int(a != b), "<": lambda: int(a < b),
+            "<=": lambda: int(a <= b), ">": lambda: int(a > b), ">=": lambda: int(a >= b),
+            "&&": lambda: int(a == 1 and b == 1), "||": lambda: a if a == 1 else b,
+            "->": lambda: b if a == 1 else 1}[op]()
+
+
+def truth_observation(reader, code, env, source=False):
+    try:
+        value = reader(code, env)
+        return ("value", value == 1 if source else bool(value))
+    except Refusal:
+        return ("arithmetic-refusal",)
+
+
 def law_value(text: str, env: dict):
     """A law formula's value on one input: a small reader for the law text the writers emit (paths, integer
     literals, `true`/`false`, `!`, `+ -`, comparisons, `&& || ->`, parentheses)."""
     import re
-    tokens = re.findall(r"pre\.\d+\.\d+|context\.\d+\.\d+|\d+|true|false|==|!=|<=|>=|&&|\|\||->|[-+<>!()]", text)
+    tokens = re.findall(r"mul_div_floor|mul_div_ceil|div_floor|div_ceil|products_ge|pre\.\d+\.\d+|context\.\d+\.\d+|\d+|true|false|==|!=|<=|>=|&&|\|\||->|[-+*<>!(),]", text)
     assert "".join(tokens) == re.sub(r"\s+", "", text), text
     at = [0]
 
@@ -577,9 +626,17 @@ def law_value(text: str, env: dict):
             return tok == "true"
         if tok in SWEEP_PATHS:
             return env[SWEEP_PATHS[tok]]
+        if tok in Z.FUNCTIONS:
+            assert take() == "("
+            arguments = [level(0)]
+            while peek() == ",":
+                take()
+                arguments.append(level(0))
+            assert take() == ")"
+            return arithmetic_reference(tok, arguments)
         return int(tok)
 
-    levels = [("->",), ("||",), ("&&",), ("==", "!=", "<", "<=", ">", ">="), ("+", "-")]
+    levels = [("->",), ("||",), ("&&",), ("==", "!=", "<", "<=", ">", ">="), ("+", "-"), ("*",)]
 
     def level(i):
         if i == len(levels):
@@ -588,10 +645,10 @@ def law_value(text: str, env: dict):
         while peek() in levels[i]:
             op = take()
             right = level(i + 1)
-            left = {"->": lambda: (not left) or right, "||": lambda: left or right, "&&": lambda: left and right,
-                    "==": lambda: left == right, "!=": lambda: left != right, "<": lambda: left < right,
-                    "<=": lambda: left <= right, ">": lambda: left > right, ">=": lambda: left >= right,
-                    "+": lambda: left + right, "-": lambda: left - right}[op]()
+            left = {"->": lambda x, y: (not x) or y, "||": lambda x, y: x or y, "&&": lambda x, y: x and y,
+                    "==": lambda x, y: x == y, "!=": lambda x, y: x != y, "<": lambda x, y: x < y,
+                    "<=": lambda x, y: x <= y, ">": lambda x, y: x > y, ">=": lambda x, y: x >= y,
+                    "+": lambda x, y: x + y, "-": lambda x, y: x - y, "*": lambda x, y: x * y}[op](left, right)
         return left
 
     out = level(0)
@@ -605,10 +662,17 @@ class TranslationSweep(unittest.TestCase):
 
     def test_routed_laws_keep_the_loop_meaning_or_are_refused(self):
         atoms = [("var", "x"), ("var", "f"), ("int", 0), ("int", 1), ("int", 2)]
-        ops = ["+", "-", "&&", "||", "->", "==", "!=", "<"]
+        ops = ["+", "-", "*", "&&", "||", "->", "==", "!=", "<"]
         depth1 = list(atoms) + [("not", a) for a in atoms] + \
             [("bin", op, a, b) for op in ops for a in atoms for b in atoms] + \
             [("if", c, a, b) for c in atoms[:2] for a in atoms for b in atoms]
+        x, zero, one, two = atoms[0], atoms[2], atoms[3], atoms[4]
+        depth1 += [("call", name, args) for name in ("mul_div_floor", "mul_div_ceil")
+                   for args in ((x, two, one), (x, two, two), (x, one, two), (x, two, zero))]
+        depth1 += [("call", name, (x, denominator)) for name in ("div_floor", "div_ceil")
+                   for denominator in (zero, one, two)]
+        depth1 += [("call", "products_ge", args) for args in ((x, two, one, two),
+                   (x, two, zero, one), (x, two, one, one, two, two), (x, two, zero, one, two, two))]
         ifs = [n for n in depth1 if n[0] == "if"]
         depth2 = [("not", n) for n in depth1] + \
             [("bin", op, a, b) for op in ops for n in depth1 for m in atoms for a, b in ((n, m), (m, n))] + \
@@ -622,12 +686,13 @@ class TranslationSweep(unittest.TestCase):
                 refused += 1
                 continue
             translated += 1
-            meant = [J.evaluate(node, env, {}) == 1 for env in SWEEP_ENVS]
-            if [bool(law_value(text, env)) for env in SWEEP_ENVS] != meant:
+            meant = [truth_observation(loop_value, node, env, source=True) for env in SWEEP_ENVS]
+            if [truth_observation(law_value, text, env) for env in SWEEP_ENVS] != meant:
                 wrong.append((node, text))
         self.assertEqual(wrong[:3], [])
         self.assertGreater(translated, 5000)
         self.assertGreater(refused, 0)
+        print(f"depth-2 translation: {translated} routed, {refused} refused, {len(wrong)} mismatches")
 
     def test_a_conditional_mixing_a_truth_value_and_a_number_is_refused(self):
         x, f = ("var", "x"), ("var", "f")

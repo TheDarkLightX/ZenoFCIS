@@ -1216,6 +1216,25 @@ pub(crate) struct ReservedReplay {
 }
 
 impl ReservedReplay {
+    /// Consumes an unused durable replay reservation without trusting the
+    /// retained incumbent or witnesses. No new attempt ran. Historical spend
+    /// stays in the ledger totals; no replay charge is refunded. This owned
+    /// report cannot resume the session or supply a checker result.
+    pub(crate) fn into_unreplayed_report(self) -> Value {
+        let plan = self.plan;
+        json!({
+            "schema": REPORT_SCHEMA, "authority": "none",
+            "request_id": plan.request.id(), "profile": plan.request.profile().name(),
+            "status": "no-checked-improvement", "resume": "not-replayed",
+            "incumbent": Value::Null, "trusted_incumbent": Value::Null,
+            "session": match &plan.closed {
+                Some(reason) => json!({"state":"closed", "stop_reason":StopReason::parse(reason).name()}),
+                None => json!({"state":"open"}),
+            },
+            "attempts": [], "accounting": plan.ledger.accounting().json(),
+            "ledger_head": plan.ledger.head().json(),
+        })
+    }
     pub(crate) fn remaining_ms(&self, elapsed_ms: u64) -> u64 {
         self.plan
             .request
@@ -1429,9 +1448,10 @@ fn rebuild_attempts(ledger: &Ledger, verified: &[Witness]) -> Vec<AttemptRecord>
                             attempt: *attempt,
                             witness: witness.clone(),
                         },
-                        None => Feedback::Incomplete {
+                        None => Feedback::Recorded {
                             attempt: *attempt,
-                            stop: json!({"outcome": "different", "witness": "not-retained"}),
+                            outcome: outcome.clone(),
+                            cost: *cost,
                         },
                     }
                 } else if let (Some(cost), "checked-improvement") = (cost, outcome.as_str()) {
@@ -1441,9 +1461,12 @@ fn rebuild_attempts(ledger: &Ledger, verified: &[Witness]) -> Vec<AttemptRecord>
                         selection: Selection::CheckedImprovement,
                     }
                 } else {
-                    Feedback::Incomplete {
+                    // A completed historical check is not an incomplete one.
+                    // Its settlement is retained, but it is not fresh evidence.
+                    Feedback::Recorded {
                         attempt: *attempt,
-                        stop: json!({"outcome": outcome, "cost": cost.map(Cost::json)}),
+                        outcome: outcome.clone(),
+                        cost: *cost,
                     }
                 };
                 Some(AttemptRecord {

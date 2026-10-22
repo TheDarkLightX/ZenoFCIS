@@ -1,12 +1,12 @@
 # ZenoFCIS
 
-**A neurosymbolic software factory for high-assurance FCIS applications.**
+**Toward a neurosymbolic software factory for high-assurance FCIS applications.**
 
 ZenoFCIS is a Rust library family for functional-core / imperative-shell
-(FCIS) systems. It combines LLM-assisted generation with symbolic checking:
-LLMs propose specifications and programs, and deterministic checkers decide
-whether supported artifacts meet their declared contracts. The assurance comes
-from those contracts and qualified checks, whichever model makes a proposal.
+(FCIS) systems. It combines LLM-assisted generation with symbolic checking: LLMs
+propose specifications and programs, and deterministic checkers decide whether
+supported artifacts meet their declared contracts. The assurance comes from
+those contracts and qualified checks, whichever model makes a proposal.
 
 It serves three kinds of user:
 
@@ -18,20 +18,11 @@ It serves three kinds of user:
 [What this gives developers, LLMs, and agents](#what-this-gives-developers-llms-and-agents)
 describes each in detail.
 
-**What the factory does today.** `zeno-fcis new --contract` builds a working
-application from a reviewed contract. The library's authority makes every
-decision from that contract and checks its laws before anything is stored. The
-application's SQLite shell keeps the decisions and delivers their effects
-through an outbox. LLMs and agents can propose contracts, programs and repairs,
-and exact checkers accept or refuse each one. The
-[demo site](https://thedarklightx.github.io/ZenoFCIS/) runs six generated
-applications in the browser. [The assurance goal and its current scope](#the-assurance-goal-and-its-current-scope)
-states what is checked and what is not.
-
-**Where it is heading.** A **state-of-the-art, high-assurance software
-factory**: wider supported domains, more of each application under checked
-rules, and more platforms. Comparative leadership remains a claim to
-demonstrate.
+ZenoFCIS aims to become a **state-of-the-art, high-assurance software
+factory**: one that turns reviewed requirements into applications built around
+a **formally verified functional core**, with durable effects and evidence that
+agents can maintain. This describes where the project is heading; comparative
+leadership remains a claim to demonstrate.
 
 ## The assurance goal and its current scope
 
@@ -66,7 +57,7 @@ must preserve the same assurance whoever produced them. Each guarantee names
 the exact implementation, specification, full supported input domain and
 trusted-base assumptions.
 
-**What is checked today.** The 2.4.0 release uses the supported checked
+**What is checked today.** The 2.5.0 release uses the supported checked
 program and mandatory Authority route. Its assurance is executable conformance to a
 reviewed contract across the supported domain, under named trusted
 assumptions. [Release assurance](docs/RELEASE_ASSURANCE.md) states the
@@ -83,15 +74,14 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**2.4.0** is the current release, published on the
-[v2.4.0 release page](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.4.0).
-It builds on the first stable V2 line, 2.3.0. The
-[2.4.0 release notes](docs/RELEASE_NOTES.md) describe the new arithmetic, search,
-loop and contract-judge features, and list one known issue. The release set has two
-host executables: the **Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on
-Apple silicon** (`aarch64-apple-darwin`). Check every download against the signed
-`DOWNLOADS.sha256` on the release page, as the
-[installation guide](docs/INSTALLATION.md) describes. See the
+**2.5.0** is the current release source. It builds on the first stable V2
+line, 2.3.0; the [2.5.0 release notes](docs/RELEASE_NOTES.md) describe the
+new arithmetic, search, loop and contract-judge features. Final qualification
+and publication remain separate release gates. The initial release provides the
+**Linux x86_64 GNU CLI** (glibc 2.39 or later). A **macOS on Apple silicon**
+(`aarch64-apple-darwin`) binary will follow native platform validation.
+Every published archive must pass its build, custody and installed-binary checks. See
+[installation](docs/INSTALLATION.md) and the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
 [Release assurance](docs/RELEASE_ASSURANCE.md) describes the required checks
@@ -104,15 +94,15 @@ and [2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-r
 prereleases keep their exact sources and limits in the
 [candidate record](docs/RELEASE_CANDIDATES.md). The historical `1.1.0` release
 and its [release notes](docs/V1_1_RELEASE_NOTES.md) have their own scope;
-The 2.3.0 cutover changed the public execution API; 2.4.0 retains that boundary.
+The 2.3.0 cutover changed the public execution API; 2.5.0 retains that boundary.
 
 ## Install and run a first example
 
 The normal V2 library route declares a complete checked program. It is
-available in the 2.4.0 release, both with default features and with
+available in the 2.5.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-Check out the `v2.4.0` tag as the [installation guide](docs/INSTALLATION.md)
+After qualification and publication, check out the `v2.5.0` tag as the [installation guide](docs/INSTALLATION.md)
 describes, then bind the dependency to that source:
 
 ```toml
@@ -138,7 +128,7 @@ original schema + complete ProgramDefinition + reviewed policy + framing/channel
 Run the smallest example with
 `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`.
 
-The root and prelude cutover was introduced in 2.3.0 and remains in 2.4.0.
+The root and prelude cutover was introduced in 2.3.0 and remains in 2.5.0.
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
 and standalone evidence utilities. The
@@ -162,7 +152,7 @@ The [documentation index](docs/INDEX.md) lists every guide by task. Common
 starting points:
 
 - **Build an application:** the [installation guide](docs/INSTALLATION.md),
-  [quickstart](docs/QUICKSTART.md), [2.4.0 release notes](docs/RELEASE_NOTES.md),
+  [quickstart](docs/QUICKSTART.md), [2.5.0 release notes](docs/RELEASE_NOTES.md),
   [API reference](docs/API_REFERENCE.md), [crate map](docs/CRATE_MAP.md) and
   [feature matrix](docs/FEATURE_MATRIX.md). The
   [CLI reference](docs/CLI_REFERENCE.md) describes the supported generation,
@@ -360,8 +350,8 @@ be published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 
 ## Example applications
 
-`zeno-fcis new DIR --template NAME` creates a complete application: a
-`project.zeno` specification, generated typed bindings, declarative decision and
+`zeno-fcis new DIR --template NAME` creates a complete application: an
+authored `project.zeno`, generated typed bindings, declarative decision and
 law programs that the library evaluates before publication, a SQLite store
 with an outbox, tests, and a README that states its rules.
 
@@ -387,9 +377,8 @@ conformance test through the running application, and determinism checks.
 template in this table as an isolated package against this checkout. Each
 application's core builds without its SQLite shell
 (`cargo build --no-default-features`), including for `wasm32-unknown-unknown`,
-which the same gate checks. `site/` runs six of these examples in the browser
-through that build; the Pages workflow publishes it as the
-[demo site](https://thedarklightx.github.io/ZenoFCIS/).
+which the same gate checks. `site/` runs the account-lockout example in the
+browser through that build.
 
 ### An application from its contract
 
@@ -416,6 +405,21 @@ library decides on every input of a small domain, or on a boundary set of a
 large one; whether that agrees with `tests/decision-examples.txt`; which law
 refusals fall on states the contract's state laws allow; and which rule
 mutants those inputs distinguish, each with a proposed example.
+
+To improve an existing finite program, use `zeno-fcis optimize`: it searches
+for fewer instructions and smaller encoded programs, checking each accepted
+replacement against the original on every declared input. Use `transform
+check` for a replacement you already have. Neither command adopts the result
+or promises a globally optimal program.
+
+For repeated proposals, use `zeno-fcis loop`: open a bounded session, submit
+candidates, inspect counterexamples, revise, and resume from checked evidence.
+The other loop commands help learn from examples, complete expression holes,
+and ask about decisions left open by contract laws. Each has its own checked
+scope; fitting examples alone does not prove behavior on unseen inputs. The
+[agent guide](docs/LLM_USAGE.md#choose-the-tool-for-the-problem) maps tasks to
+commands, and the [CLI reference](docs/CLI_REFERENCE.md#bounded-optimization-loop)
+gives the complete workflows.
 
 `zeno-fcis contract export-program DIR --out P` writes the contract's
 decision program in the encoding that `optimize` and `transform` read.
@@ -453,7 +457,7 @@ satisfies the new state laws and claims. See
 V1 includes the inert `.zeno` language, a canonical typed project AST,
 accumulated diagnostics, bounded relational and temporal logic, deterministic
 formal-tool adapters, and the `zeno-fcis` CLI. Start with the
-[RC3 language and composition contract](docs/RC3_AUTHORING_CONTRACT.md),
+[specification contract](docs/RC3_AUTHORING_CONTRACT.md),
 [language specification](docs/ZENO_LANGUAGE_V1.md),
 [temporal semantics](docs/TEMPORAL_LOGIC_V1.md),
 [formal-tools contract](docs/FORMAL_TOOLS_RC3.md),
@@ -470,7 +474,7 @@ cargo +1.97.1 run -p zeno-fcis-spec --example mini_determinator --locked
 python3 tools/qemu_demo.py run
 ```
 
-The tutorials cover [the specification language](docs/tutorials/LANGUAGE.md),
+The tutorials cover [language specification](docs/tutorials/LANGUAGE.md),
 [composition](docs/tutorials/COMPOSITION.md),
 [temporal claims](docs/tutorials/TEMPORAL.md),
 [formal tools](docs/tutorials/FORMAL_TOOLS.md),
@@ -503,7 +507,7 @@ synthesis uses the second.
 | | Correct by construction | Correct by exhaustive verification |
 | --- | --- | --- |
 | How correctness is shown | Every step that builds the program preserves correctness, so the result must be correct | The program is found by any method, then checked on every input the contract admits |
-| What you trust | The construction rules and the tool that applies them | The checker: the `finite-i64/1` interpreter and its enumeration of inputs |
+| What you trust | The construction rules and the tool that applies them | The checker: the `finite-i128/1` interpreter and its enumeration of inputs |
 | If the builder has a bug | A wrong program can come out with no warning, unless the tool is itself verified | A wrong candidate fails the check and is never selected |
 | What it can cover | Unbounded input domains | Finite domains small enough to enumerate |
 
@@ -564,7 +568,7 @@ The guarantee depends on four things:
 - **The checker must be correct.** The V1 end-to-end synthesis path trusts its
   interpreter and enumeration. The V2 route has source-bound executable
   interpreter, admission, decision and authority evidence, with the scope and
-  trusted assumptions recorded in the [2.4.0 release notes](docs/RELEASE_NOTES.md).
+  trusted assumptions recorded in the [2.5.0 release notes](docs/RELEASE_NOTES.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -609,7 +613,7 @@ bytes alone are not publication authority. See the
 Existing package names and optional compatibility data do not enlarge the
 supported V2 execution scope, and historical mounted comparisons do not qualify
 wider compound-value execution. Consult the
-[2.4.0 release notes](docs/RELEASE_NOTES.md) and the API migration guide
+[2.5.0 release notes](docs/RELEASE_NOTES.md) and the API migration guide
 before you choose an execution profile.
 
 ## Verification
@@ -620,7 +624,7 @@ covers admission, original-byte interpretation, scalar execution, complete
 decisions, laws/genesis and mandatory authority/replay. Per-stage proof runs
 are provisional; final source-bound profiles, controls and integration checks
 must pass together. See [release assurance](docs/RELEASE_ASSURANCE.md) and the
-[2.4.0 release notes](docs/RELEASE_NOTES.md) for scope and qualification
+[2.5.0 release notes](docs/RELEASE_NOTES.md) for scope and qualification
 limits.
 
 The main local gate is:
@@ -650,8 +654,8 @@ python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 `rc_package.py build` writes a full local release package: all public `.crate`
 packages, Rustdoc, source and diagnostic binary archives, checksums, a
 CycloneDX SBOM, and provenance inputs. This is local packaging output. The
-release process requires both host CLI archives and their installed-use
-records before publication, and the signed release checksum list identifies
+release process requires each published host archive and its installed-use
+record to pass custody checks, and the signed release checksum list identifies
 the assets actually published. See the [packaging reference](docs/PACKAGING.md).
 
 ## License

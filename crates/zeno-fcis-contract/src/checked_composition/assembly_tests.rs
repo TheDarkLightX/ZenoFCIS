@@ -157,7 +157,7 @@ fn an_unused_eager_trap_in_the_aggregate_is_refused() {
     let aggregate = with_rules(&generated(&ring), |rules| {
         let trap = json!({"rule": "never", "when": "command.101.1002 == 0 && pre.100.1000 > 7",
             "class": "Accept", "reason": null,
-            "post": {"1000": "pre.100.1000 + 9223372036854775807 - 9223372036854775807"},
+            "post": {"1000": "pre.100.1000 + 170141183460469231731687303715884105727 - 170141183460469231731687303715884105727"},
             "outbox": []});
         let cases = rules["cases"]
             .as_array_mut()

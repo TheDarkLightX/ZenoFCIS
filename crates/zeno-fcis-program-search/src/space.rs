@@ -16,7 +16,7 @@ use zeno_fcis_synthesis::finite::{
 use crate::Stop;
 use crate::ir::Graph;
 
-/// Probe results per library evaluation (the finite-i64/2 output bound).
+/// Probe results per library evaluation (the finite-i128/2 output bound).
 const PROBE_WIDTH: usize = 64;
 
 /// Work accounting shared by every stage of one search.
@@ -68,7 +68,7 @@ pub(crate) enum Status {
 
 /// The declared domain in `ordered-product-last-input-fastest-v1` order.
 pub(crate) struct Space {
-    mins: Vec<i64>,
+    mins: Vec<i128>,
     sizes: Vec<u64>,
     strides: Vec<u64>,
     count: usize,
@@ -81,7 +81,17 @@ impl Space {
         let mut total: u128 = 1;
         for domain in inputs {
             let (min, max) = domain.bounds();
-            let size = u128::try_from(i128::from(max) - i128::from(min) + 1).unwrap_or(0);
+            if min > max {
+                return Err(Stop::EmptyInputDomain);
+            }
+            let size = max
+                .checked_sub(min)
+                .and_then(|span| span.checked_add(1))
+                .and_then(|n| u128::try_from(n).ok())
+                .ok_or(Stop::DomainOverBudget {
+                    tuples: u128::MAX,
+                    limit: max_tuples,
+                })?;
             if size == 0 {
                 return Err(Stop::EmptyInputDomain);
             }
@@ -116,19 +126,18 @@ impl Space {
     }
 
     /// Writes the tuple at `ordinal` into `out`.
-    pub(crate) fn tuple(&self, ordinal: usize, out: &mut Vec<i64>) {
+    pub(crate) fn tuple(&self, ordinal: usize, out: &mut Vec<i128>) {
         out.clear();
         let ordinal = u64::try_from(ordinal).unwrap_or(u64::MAX);
         for ((min, size), stride) in self.mins.iter().zip(&self.sizes).zip(&self.strides) {
             let offset = (ordinal / stride) % size;
             // The offset is below the domain size, so the sum stays in range.
-            let value = i128::from(*min) + i128::from(offset);
-            out.push(i64::try_from(value).unwrap_or(*min));
+            out.push(*min + i128::from(offset));
         }
     }
 
     /// One input's value at each listed ordinal.
-    pub(crate) fn column(&self, input: usize, ordinals: &[u32]) -> Vec<i64> {
+    pub(crate) fn column(&self, input: usize, ordinals: &[u32]) -> Vec<i128> {
         let (Some(min), Some(size), Some(stride)) = (
             self.mins.get(input),
             self.sizes.get(input),
@@ -140,13 +149,13 @@ impl Space {
             .iter()
             .map(|ordinal| {
                 let offset = (u64::from(*ordinal) / stride) % size;
-                i64::try_from(i128::from(*min) + i128::from(offset)).unwrap_or(*min)
+                *min + i128::from(offset)
             })
             .collect()
     }
 }
 
-fn observe(program: &Program, input: &[i64], outputs: &mut Vec<i64>) -> Status {
+fn observe(program: &Program, input: &[i128], outputs: &mut Vec<i128>) -> Status {
     let limits =
         v2_zero_limits().with_limit(V2Resource::Step, u64::try_from(MAX_NODES).unwrap_or(0));
     let (result, _) = program.execute_v2(input, limits).into_parts();
@@ -167,7 +176,7 @@ pub(crate) struct Reference {
     inputs: Vec<Domain>,
     outputs: Vec<Domain>,
     status: Vec<Status>,
-    values: Vec<i64>,
+    values: Vec<i128>,
     width: usize,
     /// Ordinals where no instruction traps: node values are defined there.
     live: Vec<u32>,
@@ -307,8 +316,8 @@ impl Reference {
         candidate: &Program,
         space: &Space,
         ordinal: usize,
-        tuple: &mut Vec<i64>,
-        outputs: &mut Vec<i64>,
+        tuple: &mut Vec<i128>,
+        outputs: &mut Vec<i128>,
     ) -> bool {
         space.tuple(ordinal, tuple);
         let observed = observe(candidate, tuple, outputs);
@@ -328,7 +337,7 @@ impl Reference {
         space: &Space,
         max_cells: u64,
         meter: &mut Meter,
-    ) -> Result<Option<Vec<Vec<i64>>>, Stop> {
+    ) -> Result<Option<Vec<Vec<i128>>>, Stop> {
         let n = self.live.len();
         let cells = (graph.nodes.len() as u128).saturating_mul(n as u128);
         if cells > u128::from(max_cells) {

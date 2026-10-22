@@ -22,8 +22,8 @@ spec fn after_steps(count: nat) -> Seq<u64>
     zero_usage().update(resource_index(Resource::Step) as int, count as u64)
 }
 
-spec fn lift_result(result: Result<Seq<i64>, ScalarFailure>)
-    -> Result<Seq<i64>, Failure>
+spec fn lift_result(result: Result<Seq<i128>, ScalarFailure>)
+    -> Result<Seq<i128>, Failure>
 {
     match result {
         Ok(values) => Ok(values),
@@ -32,7 +32,7 @@ spec fn lift_result(result: Result<Seq<i64>, ScalarFailure>)
 }
 
 // A witness over the actual scalar prefix/node results. It is nonrecursive.
-spec fn refused_at(nodes: Seq<Op>, input: Seq<i64>, failed: nat) -> bool {
+spec fn refused_at(nodes: Seq<Op>, input: Seq<i128>, failed: nat) -> bool {
     failed < nodes.len() && match scalar::prefix(nodes, input, failed) {
         Ok(values) => scalar::node(nodes[failed as int], input, values).is_err(),
         Err(_) => false,
@@ -75,7 +75,7 @@ proof fn charge_step(limits: Seq<u64>, completed: nat)
 
 // This induction never unfolds an instruction into another implementation.
 // It compares the two actual prefix recurrences and their actual node result.
-proof fn prefix_refines(nodes: Seq<Op>, input: Seq<i64>, count: nat,
+proof fn prefix_refines(nodes: Seq<Op>, input: Seq<i128>, count: nat,
     limits: Seq<u64>)
     requires count <= nodes.len(), limits.len() == 8,
         count <= limits[resource_index(Resource::Step) as int],
@@ -143,7 +143,7 @@ proof fn prefix_refines(nodes: Seq<Op>, input: Seq<i64>, count: nat,
 /// references remain Reference; a trapping instruction includes its own Step.
 pub(crate) proof fn execution_refines_scalar(
     inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>,
-    input: Seq<i64>, limits: Seq<u64>,
+    input: Seq<i128>, limits: Seq<u64>,
 )
     requires limits.len() == 8,
         nodes.len() <= limits[resource_index(Resource::Step) as int],

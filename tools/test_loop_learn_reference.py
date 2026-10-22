@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -26,8 +27,9 @@ def fixture_report(spec):
         "program": program, "sha256": R.program_digest(R.program_fixture(program)), "status": "examples-reproduced",
         "examples_check": {"decided_by": "library-evaluator", "checked": len(spec["examples"]),
                            "vacuous": not spec["examples"], "verdict": "reproduced"}}
-    return {"status": a["status"], "authority": "none", "detail": {
-        **{k: a[k] for k in ("counts", "before", "by_size", "question", "core")}, "complete": True,
+    return {"status": a["status"], "authority": "none", "integer_encoding": R.INTEGER_ENCODING, "detail": {
+        **{k: a[k] for k in ("counts", "before", "by_size", "core")}, "question": R.reported_question(a["question"]),
+        "complete": True,
         "enumeration": "proposal", "attempts_spent": 0, "candidate": candidate,
         "representatives": [] if candidate is None else [{"size": s} for s in a["minimum_sizes"]]}}
 
@@ -124,14 +126,41 @@ class Semantics(unittest.TestCase):
 
     def test_raw_values_are_retained_until_root_projection_and_failures_use_tags(self):
         spec = declaration()
-        spec["inputs"][0]["domain"] = {"kind": "Int", "min": R.I64_MIN, "max": R.I64_MIN + 1}
+        spec["inputs"][0]["domain"] = {"kind": "Int", "min": R.I128_MIN, "max": R.I128_MIN + 1}
         spec["outputs"] = [spec["inputs"][0]["domain"].copy()]
-        spec["vocabulary"] = {"constants": [R.I64_MIN], "arithmetic": ["-"], "macros": ["abs"]}
+        spec["vocabulary"] = {"constants": [R.I128_MIN], "arithmetic": ["-"], "macros": ["abs"]}
         spec["max_size"] = 3
         a = R.analyze(spec)
         self.assertLess(a["before"][0], sum(row[0] for row in a["by_size"]))
-        self.assertEqual(R.apply("abs", [R.value(R.I64_MIN)]), R.ARITHMETIC)
-        self.assertEqual(R.apply("+", [R.value(R.I64_MAX), R.value(1)]), R.ARITHMETIC)
+        self.assertEqual(R.apply("abs", [R.value(R.I128_MIN)]), R.ARITHMETIC)
+        self.assertEqual(R.apply("+", [R.value(R.I128_MAX), R.value(1)]), R.ARITHMETIC)
+
+    def test_arithmetic_is_checked_at_the_i128_width(self):
+        # The former i64 bounds are ordinary values of the current profile.
+        i64_min, i64_max = -(1 << 63), (1 << 63) - 1
+        self.assertEqual(R.apply("abs", [R.value(i64_min)]), R.value(1 << 63))
+        self.assertEqual(R.apply("+", [R.value(i64_max), R.value(1)]), R.value(1 << 63))
+        self.assertEqual(R.apply("-", [R.value(i64_min), R.value(1)]), R.value(i64_min - 1))
+        self.assertEqual(R.apply("-", [R.value(R.I128_MIN), R.value(1)]), R.ARITHMETIC)
+
+    def test_question_values_are_compared_in_the_report_integer_encoding(self):
+        spec = declaration()
+        spec["inputs"][0]["domain"] = {"kind": "Int", "min": -(1 << 63), "max": -(1 << 63) + 1}
+        spec["outputs"] = [spec["inputs"][0]["domain"].copy()]
+        spec["vocabulary"] = {"constants": [-(1 << 63)], "arithmetic": ["-"], "macros": ["abs"]}
+        spec["max_size"] = 3
+        good = fixture_report(spec)
+        question = good["detail"]["question"]
+        self.assertEqual(question["input"], [str(-(1 << 63) + 1)])
+        self.assertTrue(R.check_report(spec, good))
+        unencoded = copy.deepcopy(good)
+        unencoded["detail"]["question"]["input"] = [-(1 << 63) + 1]
+        undeclared = copy.deepcopy(good)
+        del undeclared["integer_encoding"]
+        for bad in (unencoded, undeclared):
+            self.assertFalse(R.check_report(spec, bad))
+        self.assertEqual([R.reported_integer(n) for n in (R.SAFE_INTEGER, -R.SAFE_INTEGER, 1 << 53)],
+                         [R.SAFE_INTEGER, -R.SAFE_INTEGER, str(1 << 53)])
 
     def test_comparison_self_test_kills_each_planted_fault_and_fails_when_stubbed(self):
         self.assertTrue(comparison_self_test())
@@ -144,8 +173,59 @@ class Semantics(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         path = root / "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve"
         body = path.read_bytes()
-        import hashlib
+        # A historical finite-i64/1 artifact keeps its own profile and bytes.
         self.assertEqual(R.program_digest(decode(body)), hashlib.sha256(body).hexdigest())
+
+    def test_reported_program_digest_uses_the_current_i128_profile(self):
+        # x + 1, encoded by hand from the public ZCVE/1 tags, independent of any encoder.
+        def signed(n):
+            return "04" + n.to_bytes(16, "big", signed=True).hex()
+        profile = b"zeno-fcis/finite-i128/1"
+        expected = bytes.fromhex(
+            "0800000004"                                            # (profile, schema, nodes, roots)
+            + "06" + len(profile).to_bytes(4, "big").hex() + profile.hex()
+            + "0800000002"                                          # (inputs, outputs)
+            + "0800000001" + "0800000003" + "01" + signed(0) + signed(2)
+            + "0800000001" + "0800000003" + "01" + signed(-10) + signed(10)
+            + "0800000003"                                          # nodes
+            + "0800000002" + signed(0) + signed(0)                  # Input 0
+            + "0800000002" + signed(1) + signed(1)                  # Int 1
+            + "0800000003" + signed(3) + signed(0) + signed(1)      # Add 0 1
+            + "0800000001" + "03" + (2).to_bytes(16, "big").hex())  # roots
+        reported = {"inputs": [{"kind": "Int", "min": "0", "max": "2"}],
+                    "outputs": [{"kind": "Int", "min": "-10", "max": "10"}],
+                    "nodes": [["Input", 0], ["Int", "1"], ["Add", 0, 1]], "roots": [2]}
+        program = R.program_fixture(reported)
+        self.assertEqual(R.program_digest(program), hashlib.sha256(expected).hexdigest())
+        self.assertEqual(decode(expected), program)
+
+    def test_reported_programs_rebuild_committed_i128_program_bytes(self):
+        # Candidates are reported as JSON; rebuilding committed current-profile
+        # programs from that form must reproduce their canonical bytes exactly.
+        names = {0: "Input", 1: "Int", 2: "Bool", 3: "Add", 4: "Sub", 5: "Eq", 6: "Lt", 7: "And", 8: "Not",
+                 9: "Select"}
+
+        def domain(d):
+            return {"kind": "Bool"} if d[0] else {"kind": "Int", "min": str(d[1]), "max": str(d[2])}
+
+        def node(n):
+            if n[0] == 1:
+                return ["Int", str(n[1])]
+            if n[0] == 2:
+                return ["Bool", bool(n[1])]
+            return [names[n[0]], *n[1:]]
+        root = Path(__file__).resolve().parents[1]
+        paths = sorted((root / "crates/zeno-fcis-cli/tests/fixtures/i128-door-programs").glob("*.zcve"))
+        self.assertTrue(paths)
+        for path in paths:
+            with self.subTest(path.name):
+                body = path.read_bytes()
+                program = decode(body)
+                self.assertEqual(program.profile, b"zeno-fcis/finite-i128/1")
+                reported = {"inputs": [domain(d) for d in program.inputs],
+                            "outputs": [domain(d) for d in program.outputs],
+                            "nodes": [node(n) for n in program.nodes], "roots": list(program.roots)}
+                self.assertEqual(R.program_digest(R.program_fixture(reported)), hashlib.sha256(body).hexdigest())
 
 
 if __name__ == "__main__":

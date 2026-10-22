@@ -1,0 +1,305 @@
+{
+  "schema": "zeno-fcis/core-application-composition/1",
+  "application": "zenodex-spot",
+  "profile": "fake-ledger-two-users-one-pair/1",
+  "authority": "none",
+  "owner_adoption": false,
+  "contract_owner": "Spot owner-approved fixed policy",
+  "composition_owner": "ZenoFCIS acceptance-example lead",
+  "evidence_status": "bounded native checks; optional generated SQLite/HTTP adapter; application acceptance pending",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114,
+    150,
+    151,
+    152,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026,
+    2027,
+    2028,
+    2029,
+    2030,
+    2031
+  ],
+  "stateless_components": [],
+  "physical_component": 400,
+  "complete_contract": {
+    "project.zeno": "b85eb044ad6bb7a9cfe3565432a0c0a78ac838004eb9a1342409c539de7e887d",
+    "v2/policy.json": "bd8ea637c6cf23312893e24794269f0c8bbda7eeb1c3c2897d961c8b07fb2483"
+  },
+  "components": [
+    {
+      "name": "pool",
+      "family": "spot-pool/4",
+      "owns_fields": [
+        110,
+        111,
+        112,
+        113,
+        114,
+        150,
+        151,
+        152
+      ],
+      "source_files": {
+        "project.zeno": "7e7d6b9261f36de898c7fa79a6cd70439ac5a803d935b3379b206b96387e2530",
+        "v2/policy.json": "50d1752a6fecceadbc043628341b6c1a3bc1a439611efccb29befb9fe525c36d"
+      },
+      "local_evidence": "bounded judges and complete-root native probes",
+      "views": {
+        "state": [
+          "reserves",
+          "supply",
+          "existence",
+          "status"
+        ],
+        "command": [
+          "action",
+          "direction",
+          "amounts",
+          "limits",
+          "sqrt"
+        ],
+        "context": [
+          "snapshot mirror equations",
+          "actor/recipient roles",
+          "actor LP balance",
+          "closed shape"
+        ]
+      }
+    },
+    {
+      "name": "balance",
+      "family": "spot-u128-balance/1",
+      "owns_fields": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026,
+        2027,
+        2028,
+        2029,
+        2030,
+        2031
+      ],
+      "source_files": {
+        "project.zeno": "b37024cae398ea9ef381445e72970c2ce4fb096b5ddb8c1b5e0e7ceee568f747",
+        "v2/policy.json": "960cccef70bead9e4717d186b2e5100f6a4bdb69d0bae975711586e216bb0bf6"
+      },
+      "local_evidence": "bounded ingress judge and native u128 carry/borrow probes",
+      "views": {
+        "state": [
+          "one complete-key balance in four little-endian u32 limbs"
+        ],
+        "command": [
+          "aggregated command-derived debit",
+          "aggregated command-derived credit"
+        ],
+        "context": [
+          "reserved ingress role",
+          "exact expected protocol credit"
+        ]
+      }
+    }
+  ],
+  "occurrences": [
+    {
+      "name": "CreatePool",
+      "ordered_steps": [
+        "Pool computes exact plan",
+        "Balance checks each canonical complete key",
+        "per-asset and LP conservation",
+        "pool/Balance and lock equations",
+        "one complete candidate"
+      ]
+    },
+    {
+      "name": "SwapExactIn",
+      "ordered_steps": [
+        "Pool computes exact plan",
+        "Balance checks each canonical complete key",
+        "per-asset and LP conservation",
+        "pool/Balance and lock equations",
+        "one complete candidate"
+      ]
+    },
+    {
+      "name": "SwapExactOut",
+      "ordered_steps": [
+        "Pool computes exact plan",
+        "Balance checks each canonical complete key",
+        "per-asset and LP conservation",
+        "pool/Balance and lock equations",
+        "one complete candidate"
+      ]
+    },
+    {
+      "name": "AddLiquidity",
+      "ordered_steps": [
+        "Pool computes exact plan",
+        "Balance checks each canonical complete key",
+        "per-asset and LP conservation",
+        "pool/Balance and lock equations",
+        "one complete candidate"
+      ]
+    },
+    {
+      "name": "RemoveLiquidity",
+      "ordered_steps": [
+        "Pool computes exact plan",
+        "Balance checks each canonical complete key",
+        "per-asset and LP conservation",
+        "pool/Balance and lock equations",
+        "one complete candidate"
+      ]
+    }
+  ],
+  "key_order": [
+    "pool-x",
+    "pool-y",
+    "ingress-x",
+    "ingress-y",
+    "alice-x",
+    "alice-y",
+    "bob-x",
+    "bob-y"
+  ],
+  "key_identity": "fixed ledger spot-test, ordered assets X<Y; account path before asset; full key includes ledger",
+  "account_slots": {
+    "0": "user:alice",
+    "1": "user:bob",
+    "2": "pool:X:Y",
+    "3": "lock:X:Y",
+    "4": "protocol:fee-ingress:X",
+    "5": "protocol:fee-ingress:Y"
+  },
+  "balance_roles": "Ingress is authoritative custody outside LP reserves; no ingress debit command exists.",
+  "effects": {
+    "channels": {
+      "300": "X transfer",
+      "301": "Y transfer",
+      "302": "Pool-authorized signed LP delta",
+      "303": "read-only decision output, never a transfer"
+    },
+    "economic_payload": [
+      "source slot",
+      "destination slot",
+      "quantity"
+    ],
+    "zero_transfers": "omitted",
+    "destination": "zenoledger; output observations use decision",
+    "max_economic_per_transition": 4
+  },
+  "output_positions": {
+    "CreatePool": [
+      "mint",
+      "locked",
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "SwapExactIn": [
+      "A",
+      "o",
+      "F",
+      "P",
+      "retained",
+      "net",
+      0,
+      0
+    ],
+    "SwapExactOut": [
+      "A",
+      "w",
+      "F",
+      "P",
+      "retained",
+      "net",
+      "q",
+      "gap_bps"
+    ],
+    "AddLiquidity": [
+      "used0",
+      "used1",
+      "mint",
+      "unspent0",
+      "unspent1",
+      0,
+      0,
+      0
+    ],
+    "RemoveLiquidity": [
+      "paid0",
+      "paid1",
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "assumptions": [
+    "closed two-user one-pair fake-value profile; no multi-pool runtime claim",
+    "the optional mount binds transport identities and closed requests before native admission",
+    "the integrated contract derives component views; callers cannot provide effect plans or role flags",
+    "contract compiler, CLI, library Authority, law evaluator and scalar schema are named trusted boundaries"
+  ],
+  "publication": "one complete native Authority decision; optional native SQLite mount; application acceptance is a separate gate",
+  "activation": null,
+  "rollback": "no deployment or activation occurred; future coordinated activation is a lead gate"
+}

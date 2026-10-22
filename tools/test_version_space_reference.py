@@ -32,7 +32,12 @@ class Reference(unittest.TestCase):
         self.assertEqual(O.expected(s), {"count": 0, "conflict": []})
 
     def test_laws_examples_eager_overflow_and_outside_grammar(self):
-        s = spec(["?{false | true ? false : 9223372036854775807 + 1}"])
+        s = spec(["?{false | true ? false : 170141183460469231731687303715884105727 + 1}"])
+        self.assertEqual(O.expected(s)["count"], 1)
+        # Evaluation is checked at i128: the former i64 bound is an ordinary value.
+        s = spec(["?{false | true ? true : 9223372036854775807 + 1 > 0}"])
+        self.assertEqual(O.expected(s)["count"], 2)
+        s = spec(["?{false | true ? true : 170141183460469231731687303715884105727 + 1 > 0}"])
         self.assertEqual(O.expected(s)["count"], 1)
         s = spec(["?c"], requirements=[{"id": "zero", "law": "out0 == false"}, {"id": "one", "input": [0], "output": [1]}])
         self.assertEqual(O.expected(s)["count"], 0)

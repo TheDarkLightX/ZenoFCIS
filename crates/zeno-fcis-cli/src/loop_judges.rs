@@ -41,8 +41,8 @@ use zeno_fcis_contract::internals::review::evaluate::{
 use zeno_fcis_contract::internals::rules::{Class, Constant, LawKind, Rules};
 use zeno_fcis_contract::internals::{policy, schema, schema_commitment};
 use zeno_fcis_loop_doors::expr::{
-    Allow, Env, Expr, Kind, Op, Vocabulary, children, evaluate, kind_of, parse, show, size,
-    substitute,
+    Allow, Env, Expr, Function, Kind, Op, Vocabulary, children, evaluate, kind_of, parse, show,
+    size, substitute,
 };
 use zeno_fcis_loop_doors::inverse::{Synthesis, Synthesizer, describe_region};
 use zeno_fcis_loop_doors::subject::Subject;
@@ -138,12 +138,12 @@ pub(super) struct Core {
     paths: Vec<String>,
     pub(super) bools: Vec<bool>,
     /// Every value of each position, in enumeration order.
-    pub(super) values: Vec<Vec<i64>>,
+    pub(super) values: Vec<Vec<i128>>,
     pub(super) state_width: usize,
     pub(super) states: usize,
     pub(super) inputs: usize,
     /// One column per position over every tuple, in ordinal order.
-    pub(super) columns: Vec<Vec<i64>>,
+    pub(super) columns: Vec<Vec<i128>>,
     /// The decision on each tuple; `None` where the Authority refuses.
     pub(super) decisions: Vec<Option<Dec>>,
     /// The case that fires on each tuple.
@@ -226,7 +226,7 @@ impl Core {
             .iter()
             .map(|p| p.domain == LeafDomain::Bool)
             .collect();
-        let values: Vec<Vec<i64>> = positions
+        let values: Vec<Vec<i128>> = positions
             .iter()
             .map(|p| p.domain.values_within(MAX_TUPLES))
             .collect::<Option<_>>()
@@ -235,17 +235,17 @@ impl Core {
             .iter()
             .filter(|p| p.source == Source::State)
             .count();
-        let count = |lists: &[Vec<i64>]| lists.iter().map(Vec::len).product::<usize>();
+        let count = |lists: &[Vec<i128>]| lists.iter().map(Vec::len).product::<usize>();
         let states = count(&values[..state_width]);
         let inputs = count(&values[state_width..]);
         let tuples = states * inputs;
-        let mut columns: Vec<Vec<i64>> = vec![Vec::with_capacity(tuples); positions.len()];
+        let mut columns: Vec<Vec<i128>> = vec![Vec::with_capacity(tuples); positions.len()];
         for ordinal in 0..tuples {
             for (k, value) in element(&values, ordinal).into_iter().enumerate() {
                 columns[k].push(value);
             }
         }
-        let mut field_variants: BTreeMap<String, BTreeMap<String, i64>> = BTreeMap::new();
+        let mut field_variants: BTreeMap<String, BTreeMap<String, i128>> = BTreeMap::new();
         for (position, name) in positions.iter().zip(&names) {
             if let LeafDomain::Sum { type_id, .. } = &position.domain
                 && let Ok(TypeKind::Sum(variants)) = declarations.kind(*type_id)
@@ -254,7 +254,7 @@ impl Core {
                     name.clone(),
                     variants
                         .iter()
-                        .map(|v| (v.name.clone(), i64::from(v.id)))
+                        .map(|v| (v.name.clone(), i128::from(v.id)))
                         .collect(),
                 );
             }
@@ -294,11 +294,11 @@ impl Core {
                             .iter()
                             .map(|(field, value)| (*field, value.number()))
                             .collect();
-                        let post: Option<Vec<i64>> = positions[..state_width]
+                        let post: Option<Vec<i128>> = positions[..state_width]
                             .iter()
                             .map(|p| {
                                 let number = (*by_field.get(&p.field.unwrap_or(0))?)?;
-                                i64::try_from(number).ok()
+                                Some(number)
                             })
                             .collect();
                         post.and_then(|post| index_of(state_values, &post))
@@ -326,13 +326,11 @@ impl Core {
                     .unwrap_or(usize::MAX)
             })
             .collect();
-        let genesis_values: Vec<i64> = positions[..state_width]
+        let genesis_values: Vec<i128> = positions[..state_width]
             .iter()
             .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
-                Some(Constant::Bool(b)) => Ok(i64::from(*b)),
-                Some(Constant::Int(v)) => {
-                    i64::try_from(*v).map_err(|_| Stop::Invalid("genesis out of range".into()))
-                }
+                Some(Constant::Bool(b)) => Ok(i128::from(*b)),
+                Some(Constant::Int(v)) => Ok(*v),
                 None => invalid("v2/policy.json genesis misses a state field"),
             })
             .collect::<Result<_>>()?;
@@ -438,7 +436,7 @@ impl Core {
         {
             let when = match &raw["when"] {
                 Value::String(text) => expand(self.read_names(text)?)?,
-                Value::Bool(b) => Expr::Int(i64::from(*b)),
+                Value::Bool(b) => Expr::Int(i128::from(*b)),
                 _ => Expr::Int(1),
             };
             let mut post = BTreeMap::new();
@@ -454,11 +452,13 @@ impl Core {
                 };
                 let value = match text {
                     Value::String(text) => expand(self.read_names(text)?)?,
-                    Value::Bool(b) => Expr::Int(i64::from(*b)),
-                    Value::Number(n) => Expr::Int(
-                        n.as_i64()
-                            .ok_or_else(|| Stop::Invalid(format!("case {index} post")))?,
-                    ),
+                    Value::Bool(b) => Expr::Int(i128::from(*b)),
+                    Value::Number(_) => match case.post.get(&field) {
+                        Some(zeno_fcis_contract::internals::expr::Ast::Int(value)) => {
+                            Expr::Int(*value)
+                        }
+                        _ => return invalid(format!("case {index} post")),
+                    },
                     _ => return invalid(format!("case {index} post")),
                 };
                 post.insert(k, value);
@@ -493,12 +493,12 @@ impl Core {
     }
 
     /// The values of the tuple at `ordinal`.
-    pub(super) fn tuple(&self, ordinal: usize) -> Vec<i64> {
+    pub(super) fn tuple(&self, ordinal: usize) -> Vec<i128> {
         self.columns.iter().map(|c| c[ordinal]).collect()
     }
 
     /// The values of state `index`.
-    pub(super) fn state(&self, index: usize) -> Vec<i64> {
+    pub(super) fn state(&self, index: usize) -> Vec<i128> {
         element(&self.values[..self.state_width], index)
     }
 
@@ -512,7 +512,7 @@ impl Core {
     }
 
     /// `node` on every tuple.
-    pub(super) fn eval(&self, node: &Expr) -> Result<Vec<i64>> {
+    pub(super) fn eval(&self, node: &Expr) -> Result<Vec<i128>> {
         Ok(evaluate(node, &self.env(), &BTreeMap::new())?)
     }
 
@@ -526,13 +526,13 @@ impl Core {
         Value::Object(out)
     }
 
-    pub(super) fn value_json(&self, k: usize, value: i64) -> Value {
+    pub(super) fn value_json(&self, k: usize, value: i128) -> Value {
         if self.bools[k] {
             return json!(value == 1);
         }
         match self.vocab.variant_name(&self.names[k], value) {
             Some(variant) => json!(variant),
-            None => json!(value),
+            None => crate::report_numbers::integer(value),
         }
     }
 
@@ -680,7 +680,7 @@ impl Core {
         let Some(&k) = order.get(depth) else {
             return invalid("question-region-not-exact");
         };
-        let mut groups: Vec<(i64, i64, Expr)> = Vec::new();
+        let mut groups: Vec<(i128, i128, Expr)> = Vec::new();
         for value in &self.values[k] {
             let part: Vec<usize> = indices
                 .iter()
@@ -777,6 +777,7 @@ impl Core {
                 .position(|n| n == name)
                 .is_some_and(|k| self.bools[k]),
             Expr::Not(_) => true,
+            Expr::Call(function, _) => function.kind() == Kind::Bool,
             Expr::Bin(op, _, _) => matches!(
                 op,
                 Op::And
@@ -813,8 +814,11 @@ impl Core {
             Expr::Int(1) => "true".to_owned(),
             Expr::Int(0) => "false".to_owned(),
             Expr::Var(name) => format!("{} == 1", self.path_of(name, post)?),
-            Expr::Not(a) if self.is_number(a) => format!("{} == 0", self.law_value(a, post)?),
+            Expr::Not(a) if self.is_number(a) => format!("{} == 0", self.law_left_value(a, post)?),
             Expr::Not(a) => format!("!({})", self.law_bool(a, post)?),
+            Expr::Call(Function::ProductsGe, args) => {
+                self.law_call(Function::ProductsGe, args, post)?
+            }
             Expr::If(c, a, b) => {
                 let (c, a, b) = (
                     self.law_bool(c, post)?,
@@ -850,11 +854,22 @@ impl Core {
             }
             Expr::Bin(op @ (Op::Eq | Op::Ne | Op::Lt | Op::Le | Op::Gt | Op::Ge), a, b) => format!(
                 "{} {} {}",
-                self.law_value(a, post)?,
+                self.law_left_value(a, post)?,
                 op.symbol(),
                 self.law_value(b, post)?
             ),
             _ => return invalid("law-not-boolean"),
+        })
+    }
+
+    fn law_left_value(&self, node: &Expr, post: bool) -> Result<String> {
+        let value = self.law_value(node, post)?;
+        // The spec grammar reads an initial '(' as a relation group. An
+        // identity sum keeps scalar parentheses and their refusal order.
+        Ok(if value.starts_with('(') {
+            format!("0 + {value}")
+        } else {
+            value
         })
     }
 
@@ -863,6 +878,14 @@ impl Core {
             Expr::Int(v) if *v < 0 => format!("(0 - {})", v.unsigned_abs()),
             Expr::Int(v) => v.to_string(),
             Expr::Var(name) => self.path_of(name, post)?,
+            Expr::Call(function, args) if function.kind() == Kind::Int => {
+                self.law_call(*function, args, post)?
+            }
+            Expr::Bin(Op::Mul, a, b) => format!(
+                "({}) * ({})",
+                self.law_value(a, post)?,
+                self.law_value(b, post)?
+            ),
             Expr::Bin(op @ (Op::Add | Op::Sub), a, b) => {
                 let right = self.law_value(b, post)?;
                 let right = if matches!(**b, Expr::Bin(..)) {
@@ -874,6 +897,17 @@ impl Core {
             }
             _ => return invalid("law-value-must-be-a-sum"),
         })
+    }
+
+    fn law_call(&self, function: Function, args: &[Expr], post: bool) -> Result<String> {
+        if !function.accepts(args.len()) {
+            return invalid("law-call-arity");
+        }
+        let args = args
+            .iter()
+            .map(|a| self.law_value(a, post))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(format!("{}({})", function.name(), args.join(", ")))
     }
 
     /// `post.F == value` for state position `k`, `value` over the pre-state
@@ -911,7 +945,7 @@ impl Core {
         &self,
         added: &[(String, String)],
         previous: Option<&[Option<Vec<Candidate>>]>,
-        mask: Option<&[i64]>,
+        mask: Option<&[i128]>,
     ) -> Result<Vec<Option<Vec<Candidate>>>> {
         let per_tuple = self.reasons.len() as u64
             + self.states as u64 * (1 + u64::from(self.failure) * self.reasons.len() as u64);
@@ -934,7 +968,7 @@ impl Core {
             self.declared_laws.clone()
         };
         all.extend(ids);
-        let states: Vec<Vec<i64>> = (0..self.states).map(|s| self.state(s)).collect();
+        let states: Vec<Vec<i128>> = (0..self.states).map(|s| self.state(s)).collect();
         let result = policy::with_authority(&contract, &schema, |authority| {
             let laws = LawSet::new(authority.descriptor(), &all);
             (0..self.tuples())
@@ -942,7 +976,7 @@ impl Core {
                     self.decisions[ordinal]?;
                     let tuple = self.tuple(ordinal);
                     let pre = &states[ordinal / self.inputs];
-                    let admits = |class: Class, reason: Option<u32>, post: &[i64]| {
+                    let admits = |class: Class, reason: Option<u32>, post: &[i128]| {
                         laws.on_transition(
                             &framer,
                             &tuple,
@@ -1125,15 +1159,15 @@ fn domain_of(domain: &LeafDomain) -> Domain {
             max: *max,
         },
         LeafDomain::Sum { variants, .. } => Domain::Int {
-            min: variants.iter().map(|v| i64::from(*v)).min().unwrap_or(0),
-            max: variants.iter().map(|v| i64::from(*v)).max().unwrap_or(0),
+            min: variants.iter().map(|v| i128::from(*v)).min().unwrap_or(0),
+            max: variants.iter().map(|v| i128::from(*v)).max().unwrap_or(0),
         },
     }
 }
 
 /// The values of the `index`th element of the product of `lists`, the last
 /// list fastest.
-pub(super) fn element(lists: &[Vec<i64>], mut index: usize) -> Vec<i64> {
+pub(super) fn element(lists: &[Vec<i128>], mut index: usize) -> Vec<i128> {
     let mut out = vec![0; lists.len()];
     for (slot, list) in out.iter_mut().zip(lists).rev() {
         *slot = list[index % list.len()];
@@ -1143,7 +1177,7 @@ pub(super) fn element(lists: &[Vec<i64>], mut index: usize) -> Vec<i64> {
 }
 
 /// The index of `values` in the product of `lists`.
-pub(super) fn index_of(lists: &[Vec<i64>], values: &[i64]) -> Option<usize> {
+pub(super) fn index_of(lists: &[Vec<i128>], values: &[i128]) -> Option<usize> {
     if values.len() != lists.len() {
         return None;
     }
@@ -1311,7 +1345,7 @@ impl Core {
     /// regions by the case that fires there.
     pub(super) fn freedom(&self, answers: &[Answer]) -> Result<Freedom> {
         let mut admissible = self.admissible(&[])?;
-        let mut reasons: Vec<(Vec<i64>, u32)> = Vec::new();
+        let mut reasons: Vec<(Vec<i128>, u32)> = Vec::new();
         for answer in answers {
             let mask = self.eval(&answer.where_)?;
             admissible =
@@ -1328,7 +1362,7 @@ impl Core {
     fn freedom_from(
         &self,
         mut admissible: Vec<Option<Vec<Candidate>>>,
-        reasons: &[(Vec<i64>, u32)],
+        reasons: &[(Vec<i128>, u32)],
     ) -> Freedom {
         let determined_by_laws = admissible.iter().flatten().filter(|c| c.len() == 1).count();
         // A recorded reason requirement removes rejects with other reasons
@@ -1451,8 +1485,13 @@ impl Core {
             "class": class.name(),
             "reason": self.reason_name(label.1),
             "current": current == Some(label),
+            "answer_supported": class != Class::CommittedFailure,
         });
+        if class == Class::CommittedFailure {
+            out["answer_refusal"] = json!("question-choice-unsupported:CommittedFailure");
+        }
         if class != Class::Reject
+            && current == Some(label)
             && let Some(case) = case.and_then(|k| self.cases.get(k))
         {
             out["sets"] = Value::Object(
@@ -1515,7 +1554,7 @@ pub(super) fn question(core: &Core, answers: &[Answer]) -> Result<Value> {
         let chosen = label(answer.class, answer.reason);
         let inside: Vec<usize> = (0..core.tuples()).filter(|o| mask[*o] == 1).collect();
         // An accept's successor, when the answer gives one, on every tuple.
-        let successor: Option<Vec<Vec<i64>>> = match (&answer.sets, answer.class) {
+        let successor: Option<Vec<Vec<i128>>> = match (&answer.sets, answer.class) {
             (Some(sets), Class::Accept) => Some(
                 (0..core.state_width)
                     .map(|k| match sets.get(&k) {
@@ -1678,7 +1717,7 @@ impl Core {
 
     /// The rule's claimed successor, one column per state position, when it
     /// gives one.
-    pub(super) fn claimed_successor(&self, rule: &Rule) -> Result<Option<Vec<Vec<i64>>>> {
+    pub(super) fn claimed_successor(&self, rule: &Rule) -> Result<Option<Vec<Vec<i128>>>> {
         rule.sets
             .as_ref()
             .map(|sets| {
@@ -1696,7 +1735,7 @@ impl Core {
     fn satisfies(
         &self,
         rule: &Rule,
-        claimed: Option<&Vec<Vec<i64>>>,
+        claimed: Option<&Vec<Vec<i128>>>,
         ordinal: usize,
         candidate: &Candidate,
     ) -> bool {
@@ -1741,9 +1780,9 @@ impl Core {
         let mut parts = vec![
             cond.iter().map(|c| u8::from(*c)).collect::<Vec<u8>>(),
             [
-                i64::from(code).to_be_bytes(),
-                i64::from(reason.unwrap_or(0)).to_be_bytes(),
-                i64::from(rule.sets.is_some()).to_be_bytes(),
+                i128::from(code).to_be_bytes(),
+                i128::from(reason.unwrap_or(0)).to_be_bytes(),
+                i128::from(rule.sets.is_some()).to_be_bytes(),
             ]
             .concat(),
         ];
@@ -1981,12 +2020,49 @@ fn teach_one(core: &Core, rule: &Rule, reach: &[bool], freedom: Option<&Freedom>
 }
 
 #[cfg(test)]
+#[path = "../tests/support/cpmm.rs"]
+pub(crate) mod cpmm;
+
+#[cfg(test)]
+#[path = "loop_judges_arithmetic_tests.rs"]
+mod arithmetic_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
 
-    fn check_prefixes(family: &str, parameter: &str, value: i64, answers: &str) {
+    #[test]
+    fn arithmetic_law_writers_compile_and_check_with_the_native_laws() {
+        let core = Core::from_sources(cpmm::project(2), cpmm::policy(2, 30, false).to_string())
+            .unwrap_or_else(|error| panic!("core: {error:?}"));
+        let baseline = core.admissible(&[]).unwrap_or_else(|e| panic!("{e:?}"));
+        for text in [
+            "(x + 1) * (y + 2) >= x * y",
+            "mul_div_floor(amount, 30, 10000) <= mul_div_ceil(amount, 30, 10000)",
+            "products_ge(x, 2, x, 2)",
+            "products_ge(x, 2, 3, x, 2, 3)",
+        ] {
+            let expression = parse(text, 0, Allow::PLAIN).unwrap_or_else(|e| panic!("{e:?}"));
+            let law = core
+                .law_text(&expression)
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            let admitted = core
+                .admissible(&[("commit".to_owned(), law.clone())])
+                .unwrap_or_else(|e| panic!("{e:?}"));
+            assert_eq!(admitted, baseline, "{text}: {law}");
+        }
+        let constrained = core
+            .admissible(&[("commit".to_owned(), cpmm::RELATION.to_owned())])
+            .unwrap_or_else(|e| panic!("{e:?}"));
+        assert_ne!(
+            constrained, baseline,
+            "product comparison admitted every successor"
+        );
+    }
+
+    fn check_prefixes(family: &str, parameter: &str, value: i128, answers: &str) {
         let root = std::env::temp_dir().join(format!(
             "loop-question-prefixes-{}-{}",
             std::process::id(),

@@ -9,7 +9,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import tarfile
@@ -24,6 +24,8 @@ MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 256 * 1024 * 1024
 MAX_FILES = 20_000
 MAX_DEPTH = 4
+MATCH_CONTEXT_BYTES = 32
+ALLOWLIST = ROOT / "release/privacy-allowlist.json"
 PRIVATE_FILENAMES = {
     ".env", ".netrc", ".git-credentials", "credentials.toml", "credentials.json",
     "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
@@ -48,8 +50,52 @@ def safe_location(location: str, patterns: dict[str, re.Pattern[bytes]]) -> str:
     return encoded.decode("utf-8", errors="replace")[:512]
 
 
+def match_fingerprint(data: bytes, match: re.Match[bytes]) -> str:
+    """Bind the match's position, length and up to 32 bytes on each side."""
+    context = data[max(0, match.start() - MATCH_CONTEXT_BYTES):match.end() + MATCH_CONTEXT_BYTES]
+    framed = (b"zeno-fcis/release-privacy-match/1\0" + match.start().to_bytes(8, "big")
+              + (match.end() - match.start()).to_bytes(8, "big") + context)
+    return hashlib.sha256(framed).hexdigest()
+
+
+def load_allowlist(path: Path = ALLOWLIST) -> frozenset[tuple[str, str, str]]:
+    """Exact reviewed model-token exceptions; never patterns or directory prefixes."""
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("invalid-allowlist")
+    with path.open("rb") as stream:
+        data = stream.read(65537)
+    document = json.loads(data)
+    if (len(data) > 65536 or not isinstance(document, dict)
+            or set(document) != {"schema", "context_bytes", "entries"}
+            or document["schema"] != "zeno-fcis/release-privacy-allowlist/1"
+            or document["context_bytes"] != MATCH_CONTEXT_BYTES
+            or not isinstance(document["entries"], list)):
+        raise ValueError("invalid-allowlist")
+    entries = set()
+    for entry in document["entries"]:
+        if not isinstance(entry, dict) or set(entry) != {"path", "file_sha256", "fingerprint_sha256", "reason"}:
+            raise ValueError("invalid-allowlist")
+        location, file_hash, fingerprint, reason = (entry[key] for key in
+                                                  ("path", "file_sha256", "fingerprint_sha256", "reason"))
+        if (not all(isinstance(value, str) for value in (location, file_hash, fingerprint, reason))
+                or not location or "\\" in location or any(c in location for c in "*?[]")
+                or any(not part or PurePosixPath(part).is_absolute()
+                       or any(piece in {"", ".", ".."} for piece in part.split("/"))
+                       for part in location.split("!"))
+                or not re.fullmatch(r"[0-9a-f]{64}", file_hash)
+                or not re.fullmatch(r"[0-9a-f]{64}", fingerprint)
+                or not reason.strip() or len(reason) > 256 or any(c in reason for c in "\r\n")):
+            raise ValueError("invalid-allowlist")
+        key = (location, file_hash, fingerprint)
+        if key in entries:
+            raise ValueError("invalid-allowlist")
+        entries.add(key)
+    return frozenset(entries)
+
+
 class Scan:
-    def __init__(self, private_markers: tuple[bytes, ...] = ()) -> None:
+    def __init__(self, private_markers: tuple[bytes, ...] = (), *,
+                 allowlist: frozenset[tuple[str, str, str]] = frozenset()) -> None:
         if len(private_markers) > 128 or sum(map(len, private_markers)) > 65536:
             raise ValueError("private-marker-limit")
         if any(len(marker) < 4 for marker in private_markers):
@@ -59,6 +105,8 @@ class Scan:
             longest_first = sorted(private_markers, key=len, reverse=True)
             self.patterns["private-marker"] = re.compile(b"|".join(map(re.escape, longest_first)))
         self.private_marker_count = len(private_markers)
+        self.allowlist = frozenset(allowlist)
+        self.allowlisted_matches = 0
         self.seen: set[bytes] = set()
         self.files = 0
         self.bytes = 0
@@ -69,7 +117,8 @@ class Scan:
         self.errors.append({"location": safe_location(location, self.patterns), "code": code})
 
     def read(self, stream: BinaryIO) -> bytes:
-        limit = min(MAX_FILE_BYTES, MAX_TOTAL_BYTES - self.bytes)
+        # Only inspect() knows whether these bytes have already been charged.
+        limit = MAX_FILE_BYTES
         data = stream.read(limit + 1)
         if len(data) > limit:
             raise ValueError("byte-limit")
@@ -107,12 +156,13 @@ class Scan:
             with tarfile.open(fileobj=io.BytesIO(data), mode="r:"):
                 pass
         digest = hashlib.sha256(data).digest()
-        if digest in self.seen:
-            return
-        self.seen.add(digest)
-        self.bytes += len(data)
-        if self.bytes > MAX_TOTAL_BYTES:
-            raise ValueError("byte-limit")
+        if digest not in self.seen:
+            self.seen.add(digest)
+            self.bytes += len(data)
+            if self.bytes > MAX_TOTAL_BYTES:
+                raise ValueError("byte-limit")
+        # Check each location, including repeated archive members: an exception
+        # for one exact release path must not authorize a copy at another path.
         self.match(location, data, "content")
         if zipped:
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -153,9 +203,15 @@ class Scan:
                 self.inspect(name, member.linkname.encode(), depth + 1)
 
     def match(self, location: str, data: bytes, source: str) -> None:
+        file_hash = None
         for code, pattern in self.patterns.items():
-            match = pattern.search(data)
-            if match:
+            for match in pattern.finditer(data):
+                if code == "model-api-token" and source == "content" and self.allowlist:
+                    if file_hash is None:
+                        file_hash = hashlib.sha256(data).hexdigest()
+                    if (location, file_hash, match_fingerprint(data, match)) in self.allowlist:
+                        self.allowlisted_matches += 1
+                        continue
                 self.findings.append({
                     "location": safe_location(location, self.patterns), "code": code,
                     "source": source, "line": data.count(b"\n", 0, match.start()) + 1,
@@ -192,6 +248,7 @@ class Scan:
             "files_checked": self.files, "unique_bytes_checked": self.bytes,
             "archive_formats": ["zip", "tar", "gzip"],
             "private_marker_count": self.private_marker_count,
+            "allowlisted_matches": self.allowlisted_matches,
             "findings": self.findings, "errors": self.errors,
             "qualification": "Bounded pattern checks; matched data is never printed. This does not prove absence of every possible secret.",
         }
@@ -208,6 +265,13 @@ def main() -> int:
     )
     args = parser.parse_args()
     scan = Scan()
+    try:
+        allowlist = load_allowlist()
+        scan = Scan(allowlist=allowlist)
+    except (OSError, ValueError, TypeError):
+        scan.error("allowlist", "invalid-allowlist")
+        print(json.dumps(scan.report(), sort_keys=True))
+        return 1
     if args.private_markers_file is not None:
         try:
             path = args.private_markers_file
@@ -218,7 +282,7 @@ def main() -> int:
             markers = tuple(line for line in data.splitlines() if line)
             if len(data) > 65536 or not markers:
                 raise ValueError("invalid-private-markers")
-            scan = Scan(markers)
+            scan = Scan(markers, allowlist=allowlist)
         except (OSError, ValueError):
             scan.error("private-markers", "invalid-private-markers")
             print(json.dumps(scan.report(), sort_keys=True))
@@ -242,7 +306,7 @@ def main() -> int:
                         if scan.files > MAX_FILES:
                             break
                         if not child.is_dir() or child.is_symlink():
-                            scan.file(child, path.name + "/" + str(child.relative_to(path)))
+                            scan.file(child, child.relative_to(path).as_posix())
                 else:
                     # BEGIN preserve the canonical explicit example location.
                     location = path.name

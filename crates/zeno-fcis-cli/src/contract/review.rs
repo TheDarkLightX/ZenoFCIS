@@ -55,7 +55,7 @@ use table::{Row, Table};
 
 pub(crate) const PACKET_SCHEMA: &str = "zeno-fcis/contract-review/2";
 /// The packet with the specification-gap judge and the extended catalog.
-pub(crate) const PACKET_SCHEMA_GAPS: &str = "zeno-fcis/contract-review/3";
+pub(crate) const PACKET_SCHEMA_GAPS: &str = "zeno-fcis/contract-review/4";
 pub(crate) use machine::Inconclusive;
 /// The largest input set a review enumerates or probes by default.
 pub(crate) const DEFAULT_MAX_TUPLES: u64 = 1 << 20;
@@ -224,7 +224,7 @@ struct Classified<'m> {
 #[derive(Clone, Debug)]
 struct Witness {
     source: WitnessSource,
-    input: Vec<i64>,
+    input: Vec<i128>,
     original: Outcome,
     mutant: Outcome,
     /// For an owner example: whether its outcome agrees with the contract,
@@ -263,7 +263,7 @@ struct LawRefusal {
     refusal: String,
     inputs: usize,
     ordinal: usize,
-    input: Vec<i64>,
+    input: Vec<i128>,
     /// The case the decision program selects for the witness, and its
     /// `when`, as the library's program evaluator computes it.
     case: Option<(usize, String)>,
@@ -339,7 +339,7 @@ fn review_with(
             Some(text) => examples::parse(text, descriptor)?,
             None => Vec::new(),
         };
-        let example_inputs: Vec<&[i64]> = examples
+        let example_inputs: Vec<&[i128]> = examples
             .iter()
             .map(|example| example.inputs.as_slice())
             .collect();
@@ -504,6 +504,7 @@ fn review_with(
     let mut packet = packet::build(&report);
     if let Some(result) = &gap_result {
         packet["schema"] = json!(PACKET_SCHEMA_GAPS);
+        packet["integer_encoding"] = json!(crate::report_numbers::ENCODING);
         packet["advisory"] = json!(format!("{ADVISORY} {ADVISORY_GAPS}"));
         packet["tool"]["mutant_catalog"] = json!(mutants::CATALOG_V2);
         packet["mutants"]["catalog"] = json!(mutants::CATALOG_V2);
@@ -565,9 +566,9 @@ pub(crate) fn draft_examples(
     Ok((shape, checked))
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug)]
 pub(crate) struct DraftExample {
-    pub(crate) input: Vec<i64>,
+    pub(crate) input: Vec<i128>,
     pub(crate) text: String,
     pub(crate) difference: Option<String>,
 }
@@ -608,7 +609,7 @@ fn law_refusal(
 fn parallel<T: Send>(count: usize, work: impl Fn(usize) -> T + Sync) -> Vec<T> {
     let threads = std::thread::available_parallelism()
         .map_or(1, std::num::NonZeroUsize::get)
-        .min(MAX_THREADS)
+        .min(crate::checker_process::worker_thread_limit(MAX_THREADS))
         .min(count);
     if threads <= 1 {
         return (0..count).map(work).collect();

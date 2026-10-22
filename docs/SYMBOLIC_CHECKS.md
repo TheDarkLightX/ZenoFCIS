@@ -205,7 +205,7 @@ returns outputs with one first output.
 
 Programs are encoded as the library evaluator runs them: every node is
 evaluated, including unused nodes and unselected arms, addition and
-subtraction are checked in `i64`, and outputs must lie in their domains. A
+subtraction are checked in `i128`, and outputs must lie in their domains. A
 counterexample is replayed through the library's `execute_v2` on both
 programs and stands only if their results differ. A planted control, the
 candidate with its first output plus one, must be refuted and replayed in
@@ -254,7 +254,7 @@ incomplete proof prevents a receipt. Undecided pieces, failed processes and
 unresolved disagreements prevent a passing receipt. A concrete counterexample
 still counts only after the actual evaluator confirms the difference.
 
-The scalar arithmetic extension (`finite-i64/3` and `/4`) does not enlarge
+The scalar arithmetic extension (`finite-i128/3` and `/4`) does not enlarge
 this certificate fragment. Variable multiplication, signed division, fused
 mul-div and product comparison return an explicit unsupported result from
 the program encoder, before a certificate can be produced. They are never
@@ -262,7 +262,7 @@ represented as linear terms or unconstrained fresh symbols. Complete finite
 execution remains a separate supported route within its tuple and node caps.
 
 The supported certificate fragment is quantifier-free Boolean and linear
-integer reasoning over eager checked-i64 programs. Every unused node and
+integer reasoning over eager checked-i128 programs. Every unused node and
 unselected arm is still evaluated. Ordered outputs, inclusive domain bounds,
 `Arithmetic` and `OutputDomain` failures are part of equivalence. The Step
 limit must never bind. Equal resource usage is a separate obligation and is
@@ -368,7 +368,7 @@ ZENO_FCIS_CERTIFICATE_CHECKER=/absolute/path/to/checker.json \
   python3 tools/check_symbolic_certificates.py
 ```
 
-This checks a program-equivalence claim covering all 2^64 possible i64 inputs
+This checks a program-equivalence claim covering all 2^128 possible i128 inputs
 using three complete proof pieces, checks and replays non-identical programs
 that differ by an unused constant node, and exercises changed outputs, bounds, eager
 unused overflow, corrupt/missing proofs, receipt tampering and refusal by the
@@ -390,7 +390,7 @@ SMT-LIB's `Int` is unbounded, and every bound is stated explicitly.
 
 | Supported | Semantics followed |
 | --- | --- |
-| Program instructions `Input`, `Int`, `Bool`, `Add`, `Sub`, `Eq`, `Lt`, `And`, `Not`, `Select` | Eager: every node is defined. `Add` and `Sub` trap outside `i64`. Booleans are 0 and 1 on the wire. |
+| Program instructions `Input`, `Int`, `Bool`, `Add`, `Sub`, `Eq`, `Lt`, `And`, `Not`, `Select` | Eager: every node is defined. `Add` and `Sub` trap outside `i128`. Booleans are 0 and 1 on the wire. |
 | Input leaves Bool, I128, U128 within `i128`, Sum and Enum | The ingress codes, with a variant's code mapped to its ID. |
 | Decision construction and delivery schemas | Branch selection by code, the reason and class rules, successor field domains (pre and post), delivery conditions, channel lookup, payload order and field domains, ASCII text. |
 | Law instructions `Literal`, `Observe` of `post` and `initial` state fields, `Add`, `Sub`, `Mul`, `Div` (floor and ceiling), `ToI128`, `Eq`, `Lt`, `And`, `Not`, `Select` | Eager. Integer results must lie in `i128`; a division needs a nonzero divisor; `div_floor` and `div_ceil` round as defined, with negative operands. A law holds only when every node is defined and its root is true. |

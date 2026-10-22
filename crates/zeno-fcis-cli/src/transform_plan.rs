@@ -2,7 +2,7 @@
 //! This policy does not change evaluator Steps or canonical receipt semantics.
 
 // Version 3 bound branch-specific candidate provenance intake. Version 4 binds
-// the G12 work ceilings scaled to the original (with checked-i64-v1 as the
+// the G12 work ceilings scaled to the original (with checked-i128-v1 as the
 // default profile); tariffs, checker reservation formulas and canonical
 // receipt semantics are version 3's.
 pub(crate) const WORK_POLICY: &str = "zeno-fcis/checker-work/4";

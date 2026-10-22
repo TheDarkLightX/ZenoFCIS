@@ -92,6 +92,21 @@ class KnowledgeFiles(unittest.TestCase):
     def test_packaging_guard_fails_before_cargo_and_archive_extraction(self):
         root = self.fixture()
         (root / "other.kb").write_text("opaque test bytes")
+        # Package validation first checks the CLI source snapshots. Supply the
+        # real manifest, originals, copies and include sites so that this test
+        # reaches the knowledge guard without bypassing the earlier guard.
+        snapshots = rc_package.source_snapshots
+        manifest = json.loads((K.ROOT / snapshots.MANIFEST).read_text())
+        paths = [snapshots.MANIFEST]
+        for name in manifest["sources"]:
+            paths += [Path("crates") / name, snapshots.DIRECTORY / (name + ".txt")]
+        paths += [path.relative_to(K.ROOT)
+                  for path in (K.ROOT / snapshots.CLI / "src").rglob("*.rs")
+                  if "source-snapshots/" in path.read_text()]
+        for relative in paths:
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((K.ROOT / relative).read_bytes())
         with patch.object(rc_package, "ROOT", root), patch.object(rc_package, "cargo_metadata", side_effect=AssertionError("cargo called")):
             with self.assertRaisesRegex(rc_package.RcError, "include policy"):
                 rc_package.validate_package_set()

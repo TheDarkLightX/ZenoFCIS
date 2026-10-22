@@ -337,34 +337,7 @@ pub const EVOLUTION_KEYS: [&str; 5] = [
 /// The keys of one entry of an evolution's `shortcuts`.
 pub const SHORTCUT_KEYS: [&str; 2] = ["from_version", "sha256"];
 
-/// Decision class of a case.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Class {
-    Accept,
-    Reject,
-    CommittedFailure,
-}
-
-impl Class {
-    pub const ALL: [Self; 3] = [Self::Accept, Self::Reject, Self::CommittedFailure];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Accept => "Accept",
-            Self::Reject => "Reject",
-            Self::CommittedFailure => "CommittedFailure",
-        }
-    }
-
-    /// The value the `Class` law observation reads.
-    pub fn code(self) -> i128 {
-        match self {
-            Self::Accept => 0,
-            Self::Reject => 1,
-            Self::CommittedFailure => 2,
-        }
-    }
-}
+pub use super::decision_class::Class;
 
 /// Law kinds the library defines.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -456,6 +429,7 @@ pub struct DeliveryObservation {
 
 #[derive(Clone, Debug)]
 pub struct Rules {
+    pub quantities: bool,
     pub template: String,
     pub leaf_bindings: BTreeMap<u32, Leaf>,
     pub variables: BTreeMap<String, Ast>,
@@ -475,7 +449,7 @@ impl Rules {
         let file = Object::new(&json, FILE)?;
         file.only(&FILE_KEYS)?;
         let schema = file.text("schema")?;
-        if schema != RULES_SCHEMA {
+        if schema != RULES_SCHEMA && schema != "zeno-fcis/template-declarative-policy/3" {
             return Err(file.error(
                 "schema",
                 format!("expected `{RULES_SCHEMA}`, found `{schema}`"),
@@ -605,6 +579,7 @@ impl Rules {
                 .collect::<Result<_, ContractError>>()?,
         };
         Ok(Self {
+            quantities: schema.ends_with("/3"),
             template: template.to_owned(),
             leaf_bindings,
             variables,
@@ -1396,17 +1371,43 @@ impl Json {
 
 impl<'de> Deserialize<'de> for Json {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(JsonVisitor)
+        let raw = Box::<serde_json::value::RawValue>::deserialize(deserializer)?;
+        Self::parse_raw(raw.get(), 0).map_err(de::Error::custom)
     }
 }
 
-struct JsonVisitor;
+impl Json {
+    // Capture numeric text before serde_json can narrow it or convert it to
+    // floating point. Strings and object keys still use its JSON decoder.
+    fn parse_raw(raw: &str, depth: usize) -> Result<Self, serde_json::Error> {
+        if depth >= 128 {
+            return Err(de::Error::custom("JSON nests too deeply"));
+        }
+        if raw.starts_with('-') || raw.as_bytes().first().is_some_and(u8::is_ascii_digit) {
+            if raw == "-0" {
+                return Err(de::Error::custom("negative zero is not an integer token"));
+            }
+            return raw
+                .parse::<i128>()
+                .map(Self::Int)
+                .map_err(|_| de::Error::custom("expected an integer within the i128 range"));
+        }
+        let mut decoder = serde_json::Deserializer::from_str(raw);
+        let value = decoder.deserialize_any(JsonVisitor { depth })?;
+        decoder.end()?;
+        Ok(value)
+    }
+}
+
+struct JsonVisitor {
+    depth: usize,
+}
 
 impl<'de> Visitor<'de> for JsonVisitor {
     type Value = Json;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // A fraction or exponent is refused by the default `visit_f64`.
+        // Fractions and exponents are refused before numeric conversion.
         formatter.write_str("JSON with integer numbers and unique object keys")
     }
 
@@ -1436,20 +1437,77 @@ impl<'de> Visitor<'de> for JsonVisitor {
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut items: A) -> Result<Json, A::Error> {
         let mut values = Vec::new();
-        while let Some(value) = items.next_element()? {
-            values.push(value);
+        while let Some(raw) = items.next_element::<Box<serde_json::value::RawValue>>()? {
+            values.push(Json::parse_raw(raw.get(), self.depth + 1).map_err(de::Error::custom)?);
         }
         Ok(Json::Array(values))
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Json, A::Error> {
         let mut entries: Vec<(String, Json)> = Vec::new();
-        while let Some((key, value)) = map.next_entry::<String, Json>()? {
+        while let Some((key, raw)) = map.next_entry::<String, Box<serde_json::value::RawValue>>()? {
+            // Preserve the previous visitor's value-before-duplicate refusal order.
+            let value = Json::parse_raw(raw.get(), self.depth + 1).map_err(de::Error::custom)?;
             if entries.iter().any(|(existing, _)| *existing == key) {
                 return Err(de::Error::custom(format!("duplicate key `{key}`")));
             }
             entries.push((key, value));
         }
         Ok(Json::Object(entries))
+    }
+}
+
+#[cfg(test)]
+mod integer_json_tests {
+    use super::*;
+
+    #[test]
+    fn strict_policy_numbers_cover_i128_without_float_conversion() {
+        for number in [i128::MIN, i128::MIN + 1, -1, 0, 1, 1i128 << 100, i128::MAX] {
+            let text = format!("{{\"value\":{number}}}");
+            let parsed: Json = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{e}"));
+            assert!(parsed.render().contains(&number.to_string()));
+            let Json::Object(fields) = parsed else {
+                panic!("object expected")
+            };
+            assert!(matches!(fields[0].1, Json::Int(value) if value == number));
+        }
+        for text in [
+            "1.0",
+            "1e0",
+            "-0",
+            "01",
+            "+1",
+            "170141183460469231731687303715884105728",
+            "-170141183460469231731687303715884105729",
+        ] {
+            assert!(serde_json::from_str::<Json>(text).is_err(), "{text}");
+        }
+    }
+
+    #[test]
+    fn exact_numbers_preserve_duplicate_type_and_depth_refusals() {
+        for text in [
+            r#"{"a":0,"a":1}"#,
+            r#"{"a":0,"\u0061":1}"#,
+            r#"{"n":1} trailing"#,
+        ] {
+            assert!(serde_json::from_str::<Json>(text).is_err(), "{text}");
+        }
+        assert!(matches!(
+            serde_json::from_str::<Json>("true"),
+            Ok(Json::Bool(true))
+        ));
+        assert!(matches!(
+            serde_json::from_str::<Json>(r#""123""#),
+            Ok(Json::Text(_))
+        ));
+        // A reserved-looking object key is ordinary data, never a number token.
+        assert!(matches!(
+            serde_json::from_str::<Json>(r#"{"$serde_json::private::Number":"123"}"#),
+            Ok(Json::Object(_))
+        ));
+        let nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
+        assert!(serde_json::from_str::<Json>(&nested).is_err());
     }
 }

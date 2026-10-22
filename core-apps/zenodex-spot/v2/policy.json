@@ -1,0 +1,1498 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "zenodex-spot",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ]
+  },
+  "variables": {
+    "x": "choose((command.101.121 == 0), pre.100.110, pre.100.111)",
+    "y": "choose((command.101.121 == 0), pre.100.111, pre.100.110)",
+    "inverse_net": "mul_div_ceil(x, command.101.122, choose(((y - command.101.122) > 1), (y - command.101.122), 1))",
+    "inverse_gross": "mul_div_ceil(inverse_net, 10000, 9970)",
+    "gross": "choose((command.101.120 == 2), inverse_gross, command.101.122)",
+    "fee": "mul_div_ceil(gross, 30, 10000)",
+    "protocol": "mul_div_floor(fee, 2000, 10000)",
+    "net": "(gross - fee)",
+    "quote": "mul_div_floor(y, net, choose(((x + net) > 1), (x + net), 1))",
+    "gap_bps": "mul_div_ceil(choose(((quote - command.101.122) > 0), (quote - command.101.122), 0), 10000, choose((command.101.122 > 1), command.101.122, 1))",
+    "used0": "choose(products_ge(command.101.123, pre.100.110, command.101.122, pre.100.111), command.101.122, mul_div_floor(command.101.123, pre.100.110, choose((pre.100.111 > 1), pre.100.111, 1)))",
+    "used1": "choose(products_ge(command.101.123, pre.100.110, command.101.122, pre.100.111), mul_div_floor(command.101.122, pre.100.111, choose((pre.100.110 > 1), pre.100.110, 1)), command.101.123)",
+    "mint": "choose((mul_div_floor(used0, pre.100.112, choose((pre.100.110 > 1), pre.100.110, 1)) <= mul_div_floor(used1, pre.100.112, choose((pre.100.111 > 1), pre.100.111, 1))), mul_div_floor(used0, pre.100.112, choose((pre.100.110 > 1), pre.100.110, 1)), mul_div_floor(used1, pre.100.112, choose((pre.100.111 > 1), pre.100.111, 1)))",
+    "payout0": "mul_div_floor(command.101.122, pre.100.110, choose((pre.100.112 > 1), pre.100.112, 1))",
+    "payout1": "mul_div_floor(command.101.122, pre.100.111, choose((pre.100.112 > 1), pre.100.112, 1))",
+    "paid": "choose((command.101.120 == 2), command.101.122, quote)",
+    "next0": "choose((command.101.120 == 0), command.101.122, choose((command.101.120 == 1), choose((command.101.121 == 0), ((x + gross) - protocol), (y - paid)), choose((command.101.120 == 2), choose((command.101.121 == 0), ((x + gross) - protocol), (y - paid)), choose((command.101.120 == 3), (pre.100.110 + used0), (pre.100.110 - payout0)))))",
+    "next1": "choose((command.101.120 == 0), command.101.123, choose((command.101.120 == 1), choose((command.101.121 == 0), (y - paid), ((x + gross) - protocol)), choose((command.101.120 == 2), choose((command.101.121 == 0), (y - paid), ((x + gross) - protocol)), choose((command.101.120 == 3), (pre.100.111 + used1), (pre.100.111 - payout1)))))",
+    "next_supply": "choose((command.101.120 == 0), command.101.126, choose((command.101.120 == 1), pre.100.112, choose((command.101.120 == 2), pre.100.112, choose((command.101.120 == 3), (pre.100.112 + mint), (pre.100.112 - command.101.122)))))",
+    "snapshot_mirrors": "((((((((((true && (pre.100.2000 == pre.100.110)) && (pre.100.2004 == pre.100.111)) && (pre.100.2001 == 0)) && (pre.100.2002 == 0)) && (pre.100.2003 == 0)) && (pre.100.2005 == 0)) && (pre.100.2006 == 0)) && (pre.100.2007 == 0)) && (((pre.100.150 + pre.100.151) + pre.100.152) == pre.100.112)) && (((pre.100.113 == 0) && (pre.100.112 == 0)) || ((pre.100.113 == 1) && (pre.100.152 >= 1000))))",
+    "snapshot_actor_role": "choose((command.101.127 < 2), 0, choose((command.101.127 >= 4), 3, choose((command.101.127 == 3), 1, 2)))",
+    "snapshot_recipient_role": "choose((command.101.128 < 2), 0, choose((command.101.128 >= 4), 3, choose((command.101.128 == 3), 1, 2)))",
+    "snapshot_actor_lp": "choose((command.101.127 == 0), pre.100.150, choose((command.101.127 == 1), pre.100.151, 0))",
+    "debit_key0": "choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 3), 0, payout0))))",
+    "credit_key0": "choose((command.101.120 == 0), command.101.122, choose((command.101.120 == 1), choose((command.101.121 == 0), (gross - protocol), 0), choose((command.101.120 == 2), choose((command.101.121 == 0), (gross - protocol), 0), choose((command.101.120 == 3), used0, 0))))",
+    "debit_key1": "choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 3), 0, payout1))))",
+    "credit_key1": "choose((command.101.120 == 0), command.101.123, choose((command.101.120 == 1), choose((command.101.121 == 1), (gross - protocol), 0), choose((command.101.120 == 2), choose((command.101.121 == 1), (gross - protocol), 0), choose((command.101.120 == 3), used1, 0))))",
+    "debit_key2": "0",
+    "credit_key2": "choose((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 0)), protocol, 0)",
+    "debit_key3": "0",
+    "credit_key3": "choose((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 1)), protocol, 0)",
+    "debit_key4": "choose((command.101.127 == 0), choose((command.101.120 == 0), command.101.122, choose((command.101.120 == 1), choose((command.101.121 == 0), gross, 0), choose((command.101.120 == 2), choose((command.101.121 == 0), gross, 0), choose((command.101.120 == 3), used0, 0)))), 0)",
+    "credit_key4": "choose((command.101.128 == 0), choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 3), 0, payout0)))), 0)",
+    "debit_key5": "choose((command.101.127 == 0), choose((command.101.120 == 0), command.101.123, choose((command.101.120 == 1), choose((command.101.121 == 1), gross, 0), choose((command.101.120 == 2), choose((command.101.121 == 1), gross, 0), choose((command.101.120 == 3), used1, 0)))), 0)",
+    "credit_key5": "choose((command.101.128 == 0), choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 3), 0, payout1)))), 0)",
+    "debit_key6": "choose((command.101.127 == 1), choose((command.101.120 == 0), command.101.122, choose((command.101.120 == 1), choose((command.101.121 == 0), gross, 0), choose((command.101.120 == 2), choose((command.101.121 == 0), gross, 0), choose((command.101.120 == 3), used0, 0)))), 0)",
+    "credit_key6": "choose((command.101.128 == 1), choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 0), 0, paid), choose((command.101.120 == 3), 0, payout0)))), 0)",
+    "debit_key7": "choose((command.101.127 == 1), choose((command.101.120 == 0), command.101.123, choose((command.101.120 == 1), choose((command.101.121 == 1), gross, 0), choose((command.101.120 == 2), choose((command.101.121 == 1), gross, 0), choose((command.101.120 == 3), used1, 0)))), 0)",
+    "credit_key7": "choose((command.101.128 == 1), choose((command.101.120 == 0), 0, choose((command.101.120 == 1), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 2), choose((command.101.121 == 1), 0, paid), choose((command.101.120 == 3), 0, payout1)))), 0)",
+    "key0_borrow0": "choose(((((pre.100.2000) - (debit_key0)) - 0) < 0), 1, 0)",
+    "key0_column0": "((((pre.100.2000) - (debit_key0)) + (credit_key0)) + 0)",
+    "key0_carry0": "div_floor(key0_column0, 4294967296)",
+    "key0_next0": "(key0_column0 - (key0_carry0 * 4294967296))",
+    "key0_borrow1": "choose(((((pre.100.2001) - (0)) - key0_borrow0) < 0), 1, 0)",
+    "key0_column1": "((((pre.100.2001) - (0)) + (0)) + key0_carry0)",
+    "key0_carry1": "div_floor(key0_column1, 4294967296)",
+    "key0_next1": "(key0_column1 - (key0_carry1 * 4294967296))",
+    "key0_borrow2": "choose(((((pre.100.2002) - (0)) - key0_borrow1) < 0), 1, 0)",
+    "key0_column2": "((((pre.100.2002) - (0)) + (0)) + key0_carry1)",
+    "key0_carry2": "div_floor(key0_column2, 4294967296)",
+    "key0_next2": "(key0_column2 - (key0_carry2 * 4294967296))",
+    "key0_borrow3": "choose(((((pre.100.2003) - (0)) - key0_borrow2) < 0), 1, 0)",
+    "key0_column3": "((((pre.100.2003) - (0)) + (0)) + key0_carry2)",
+    "key0_carry3": "div_floor(key0_column3, 4294967296)",
+    "key0_next3": "(key0_column3 - (key0_carry3 * 4294967296))",
+    "key1_borrow0": "choose(((((pre.100.2004) - (debit_key1)) - 0) < 0), 1, 0)",
+    "key1_column0": "((((pre.100.2004) - (debit_key1)) + (credit_key1)) + 0)",
+    "key1_carry0": "div_floor(key1_column0, 4294967296)",
+    "key1_next0": "(key1_column0 - (key1_carry0 * 4294967296))",
+    "key1_borrow1": "choose(((((pre.100.2005) - (0)) - key1_borrow0) < 0), 1, 0)",
+    "key1_column1": "((((pre.100.2005) - (0)) + (0)) + key1_carry0)",
+    "key1_carry1": "div_floor(key1_column1, 4294967296)",
+    "key1_next1": "(key1_column1 - (key1_carry1 * 4294967296))",
+    "key1_borrow2": "choose(((((pre.100.2006) - (0)) - key1_borrow1) < 0), 1, 0)",
+    "key1_column2": "((((pre.100.2006) - (0)) + (0)) + key1_carry1)",
+    "key1_carry2": "div_floor(key1_column2, 4294967296)",
+    "key1_next2": "(key1_column2 - (key1_carry2 * 4294967296))",
+    "key1_borrow3": "choose(((((pre.100.2007) - (0)) - key1_borrow2) < 0), 1, 0)",
+    "key1_column3": "((((pre.100.2007) - (0)) + (0)) + key1_carry2)",
+    "key1_carry3": "div_floor(key1_column3, 4294967296)",
+    "key1_next3": "(key1_column3 - (key1_carry3 * 4294967296))",
+    "key2_borrow0": "choose(((((pre.100.2008) - (debit_key2)) - 0) < 0), 1, 0)",
+    "key2_column0": "((((pre.100.2008) - (debit_key2)) + (credit_key2)) + 0)",
+    "key2_carry0": "div_floor(key2_column0, 4294967296)",
+    "key2_next0": "(key2_column0 - (key2_carry0 * 4294967296))",
+    "key2_borrow1": "choose(((((pre.100.2009) - (0)) - key2_borrow0) < 0), 1, 0)",
+    "key2_column1": "((((pre.100.2009) - (0)) + (0)) + key2_carry0)",
+    "key2_carry1": "div_floor(key2_column1, 4294967296)",
+    "key2_next1": "(key2_column1 - (key2_carry1 * 4294967296))",
+    "key2_borrow2": "choose(((((pre.100.2010) - (0)) - key2_borrow1) < 0), 1, 0)",
+    "key2_column2": "((((pre.100.2010) - (0)) + (0)) + key2_carry1)",
+    "key2_carry2": "div_floor(key2_column2, 4294967296)",
+    "key2_next2": "(key2_column2 - (key2_carry2 * 4294967296))",
+    "key2_borrow3": "choose(((((pre.100.2011) - (0)) - key2_borrow2) < 0), 1, 0)",
+    "key2_column3": "((((pre.100.2011) - (0)) + (0)) + key2_carry2)",
+    "key2_carry3": "div_floor(key2_column3, 4294967296)",
+    "key2_next3": "(key2_column3 - (key2_carry3 * 4294967296))",
+    "key3_borrow0": "choose(((((pre.100.2012) - (debit_key3)) - 0) < 0), 1, 0)",
+    "key3_column0": "((((pre.100.2012) - (debit_key3)) + (credit_key3)) + 0)",
+    "key3_carry0": "div_floor(key3_column0, 4294967296)",
+    "key3_next0": "(key3_column0 - (key3_carry0 * 4294967296))",
+    "key3_borrow1": "choose(((((pre.100.2013) - (0)) - key3_borrow0) < 0), 1, 0)",
+    "key3_column1": "((((pre.100.2013) - (0)) + (0)) + key3_carry0)",
+    "key3_carry1": "div_floor(key3_column1, 4294967296)",
+    "key3_next1": "(key3_column1 - (key3_carry1 * 4294967296))",
+    "key3_borrow2": "choose(((((pre.100.2014) - (0)) - key3_borrow1) < 0), 1, 0)",
+    "key3_column2": "((((pre.100.2014) - (0)) + (0)) + key3_carry1)",
+    "key3_carry2": "div_floor(key3_column2, 4294967296)",
+    "key3_next2": "(key3_column2 - (key3_carry2 * 4294967296))",
+    "key3_borrow3": "choose(((((pre.100.2015) - (0)) - key3_borrow2) < 0), 1, 0)",
+    "key3_column3": "((((pre.100.2015) - (0)) + (0)) + key3_carry2)",
+    "key3_carry3": "div_floor(key3_column3, 4294967296)",
+    "key3_next3": "(key3_column3 - (key3_carry3 * 4294967296))",
+    "key4_borrow0": "choose(((((pre.100.2016) - (debit_key4)) - 0) < 0), 1, 0)",
+    "key4_column0": "((((pre.100.2016) - (debit_key4)) + (credit_key4)) + 0)",
+    "key4_carry0": "div_floor(key4_column0, 4294967296)",
+    "key4_next0": "(key4_column0 - (key4_carry0 * 4294967296))",
+    "key4_borrow1": "choose(((((pre.100.2017) - (0)) - key4_borrow0) < 0), 1, 0)",
+    "key4_column1": "((((pre.100.2017) - (0)) + (0)) + key4_carry0)",
+    "key4_carry1": "div_floor(key4_column1, 4294967296)",
+    "key4_next1": "(key4_column1 - (key4_carry1 * 4294967296))",
+    "key4_borrow2": "choose(((((pre.100.2018) - (0)) - key4_borrow1) < 0), 1, 0)",
+    "key4_column2": "((((pre.100.2018) - (0)) + (0)) + key4_carry1)",
+    "key4_carry2": "div_floor(key4_column2, 4294967296)",
+    "key4_next2": "(key4_column2 - (key4_carry2 * 4294967296))",
+    "key4_borrow3": "choose(((((pre.100.2019) - (0)) - key4_borrow2) < 0), 1, 0)",
+    "key4_column3": "((((pre.100.2019) - (0)) + (0)) + key4_carry2)",
+    "key4_carry3": "div_floor(key4_column3, 4294967296)",
+    "key4_next3": "(key4_column3 - (key4_carry3 * 4294967296))",
+    "key5_borrow0": "choose(((((pre.100.2020) - (debit_key5)) - 0) < 0), 1, 0)",
+    "key5_column0": "((((pre.100.2020) - (debit_key5)) + (credit_key5)) + 0)",
+    "key5_carry0": "div_floor(key5_column0, 4294967296)",
+    "key5_next0": "(key5_column0 - (key5_carry0 * 4294967296))",
+    "key5_borrow1": "choose(((((pre.100.2021) - (0)) - key5_borrow0) < 0), 1, 0)",
+    "key5_column1": "((((pre.100.2021) - (0)) + (0)) + key5_carry0)",
+    "key5_carry1": "div_floor(key5_column1, 4294967296)",
+    "key5_next1": "(key5_column1 - (key5_carry1 * 4294967296))",
+    "key5_borrow2": "choose(((((pre.100.2022) - (0)) - key5_borrow1) < 0), 1, 0)",
+    "key5_column2": "((((pre.100.2022) - (0)) + (0)) + key5_carry1)",
+    "key5_carry2": "div_floor(key5_column2, 4294967296)",
+    "key5_next2": "(key5_column2 - (key5_carry2 * 4294967296))",
+    "key5_borrow3": "choose(((((pre.100.2023) - (0)) - key5_borrow2) < 0), 1, 0)",
+    "key5_column3": "((((pre.100.2023) - (0)) + (0)) + key5_carry2)",
+    "key5_carry3": "div_floor(key5_column3, 4294967296)",
+    "key5_next3": "(key5_column3 - (key5_carry3 * 4294967296))",
+    "key6_borrow0": "choose(((((pre.100.2024) - (debit_key6)) - 0) < 0), 1, 0)",
+    "key6_column0": "((((pre.100.2024) - (debit_key6)) + (credit_key6)) + 0)",
+    "key6_carry0": "div_floor(key6_column0, 4294967296)",
+    "key6_next0": "(key6_column0 - (key6_carry0 * 4294967296))",
+    "key6_borrow1": "choose(((((pre.100.2025) - (0)) - key6_borrow0) < 0), 1, 0)",
+    "key6_column1": "((((pre.100.2025) - (0)) + (0)) + key6_carry0)",
+    "key6_carry1": "div_floor(key6_column1, 4294967296)",
+    "key6_next1": "(key6_column1 - (key6_carry1 * 4294967296))",
+    "key6_borrow2": "choose(((((pre.100.2026) - (0)) - key6_borrow1) < 0), 1, 0)",
+    "key6_column2": "((((pre.100.2026) - (0)) + (0)) + key6_carry1)",
+    "key6_carry2": "div_floor(key6_column2, 4294967296)",
+    "key6_next2": "(key6_column2 - (key6_carry2 * 4294967296))",
+    "key6_borrow3": "choose(((((pre.100.2027) - (0)) - key6_borrow2) < 0), 1, 0)",
+    "key6_column3": "((((pre.100.2027) - (0)) + (0)) + key6_carry2)",
+    "key6_carry3": "div_floor(key6_column3, 4294967296)",
+    "key6_next3": "(key6_column3 - (key6_carry3 * 4294967296))",
+    "key7_borrow0": "choose(((((pre.100.2028) - (debit_key7)) - 0) < 0), 1, 0)",
+    "key7_column0": "((((pre.100.2028) - (debit_key7)) + (credit_key7)) + 0)",
+    "key7_carry0": "div_floor(key7_column0, 4294967296)",
+    "key7_next0": "(key7_column0 - (key7_carry0 * 4294967296))",
+    "key7_borrow1": "choose(((((pre.100.2029) - (0)) - key7_borrow0) < 0), 1, 0)",
+    "key7_column1": "((((pre.100.2029) - (0)) + (0)) + key7_carry0)",
+    "key7_carry1": "div_floor(key7_column1, 4294967296)",
+    "key7_next1": "(key7_column1 - (key7_carry1 * 4294967296))",
+    "key7_borrow2": "choose(((((pre.100.2030) - (0)) - key7_borrow1) < 0), 1, 0)",
+    "key7_column2": "((((pre.100.2030) - (0)) + (0)) + key7_carry1)",
+    "key7_carry2": "div_floor(key7_column2, 4294967296)",
+    "key7_next2": "(key7_column2 - (key7_carry2 * 4294967296))",
+    "key7_borrow3": "choose(((((pre.100.2031) - (0)) - key7_borrow2) < 0), 1, 0)",
+    "key7_column3": "((((pre.100.2031) - (0)) + (0)) + key7_carry2)",
+    "key7_carry3": "div_floor(key7_column3, 4294967296)",
+    "key7_next3": "(key7_column3 - (key7_carry3 * 4294967296))"
+  },
+  "cases": [
+    {
+      "rule": "1 closed shape and input ranges",
+      "when": "(((((((context.102.134 == 0) || (command.101.120 > 4)) || (command.101.121 > 1)) || (command.101.122 == 0)) || !((((((true && (((command.101.120 == 0) || (command.101.120 == 3)) || (command.101.123 == 0))) && ((command.101.120 == 0) || (command.101.126 == 0))) && (((command.101.120 == 1) || (command.101.120 == 2)) || (command.101.121 == 0))) && (!((command.101.120 == 0)) || ((command.101.124 == 0) && (command.101.125 == 0)))) && (!(((command.101.120 == 1) || (command.101.120 == 2))) || (command.101.125 == 0))))) || (((command.101.120 == 0) || (command.101.120 == 3)) && (((command.101.122 > 1000000000) || (command.101.123 == 0)) || (command.101.123 > 1000000000)))) || ((command.101.120 == 3) && ((command.101.124 > 1000000000) || (command.101.125 > 1000000000))))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "normalized create/add recipient is actor",
+      "when": "(((command.101.120 == 0) || (command.101.120 == 3)) && (command.101.127 != command.101.128))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 pair already exists",
+      "when": "((command.101.120 == 0) && (pre.100.113 == 1))",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 pair absent",
+      "when": "(!((command.101.120 == 0)) && (pre.100.113 == 0))",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "3 ACTIVE only",
+      "when": "((pre.100.113 == 1) && (pre.100.114 != 0))",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "4 existing empty or below permanent lock",
+      "when": "((pre.100.113 == 1) && (((pre.100.110 == 0) || (pre.100.111 == 0)) || (pre.100.112 < 1000)))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "5 pre-state pool/balance and LP equations",
+      "when": "(((snapshot_mirrors) == 0) || ((pre.100.113 == 0) && (((pre.100.110 != 0) || (pre.100.111 != 0)) || (pre.100.112 != 0))))",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 burn lock actor before other roles",
+      "when": "((command.101.120 == 4) && ((snapshot_actor_role) == 1))",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 no reserved actor or recipient",
+      "when": "(((snapshot_actor_role) != 0) || ((((command.101.120 == 1) || (command.101.120 == 2)) || (command.101.120 == 4)) && ((snapshot_recipient_role) != 0)))",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 floor square witness",
+      "when": "((command.101.120 == 0) && (!(products_ge(command.101.122, command.101.123, command.101.126, command.101.126)) || products_ge(command.101.122, command.101.123, (command.101.126 + 1), (command.101.126 + 1))))",
+      "class": "Reject",
+      "reason": 207,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 positive creator mint after K",
+      "when": "((command.101.120 == 0) && (command.101.126 <= 1000))",
+      "class": "Reject",
+      "reason": 208,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in conservative gross reserve cap",
+      "when": "((command.101.120 == 1) && ((x + command.101.122) > 3000000000))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in positive net",
+      "when": "((command.101.120 == 1) && (net <= 0))",
+      "class": "Reject",
+      "reason": 210,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in positive output",
+      "when": "((command.101.120 == 1) && (quote <= 0))",
+      "class": "Reject",
+      "reason": 211,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-in minimum output",
+      "when": "((command.101.120 == 1) && (quote < command.101.124))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out no drain",
+      "when": "((command.101.120 == 2) && (command.101.122 >= y))",
+      "class": "Reject",
+      "reason": 213,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out raw gross bounds before narrowing",
+      "when": "((command.101.120 == 2) && ((inverse_gross > 3000000000) || ((x + inverse_gross) > 3000000000)))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out sufficient quote",
+      "when": "((command.101.120 == 2) && ((net <= 0) || (quote < command.101.122)))",
+      "class": "Reject",
+      "reason": 214,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out maximum input",
+      "when": "((command.101.120 == 2) && (gross > command.101.124))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 exact-out ceil quote-gap cap",
+      "when": "((command.101.120 == 2) && (gap_bps > 200))",
+      "class": "Reject",
+      "reason": 215,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 ratio-selected positive deposits",
+      "when": "((command.101.120 == 3) && ((used0 <= 0) || (used1 <= 0)))",
+      "class": "Reject",
+      "reason": 216,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 add minima before mint",
+      "when": "((command.101.120 == 3) && ((used0 < command.101.124) || (used1 < command.101.125)))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 positive ratio mint",
+      "when": "((command.101.120 == 3) && (mint <= 0))",
+      "class": "Reject",
+      "reason": 217,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 burn balance and lock",
+      "when": "((command.101.120 == 4) && (((snapshot_actor_lp) < command.101.122) || (command.101.122 > (pre.100.112 - 1000))))",
+      "class": "Reject",
+      "reason": 218,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 both payouts before minima",
+      "when": "((command.101.120 == 4) && ((payout0 <= 0) || (payout1 <= 0)))",
+      "class": "Reject",
+      "reason": 219,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 remove minima",
+      "when": "((command.101.120 == 4) && ((payout0 < command.101.124) || (payout1 < command.101.125)))",
+      "class": "Reject",
+      "reason": 212,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "8 remaining successor bounds",
+      "when": "((((((next0 < 0) || (next1 < 0)) || (next_supply < 0)) || (next0 > 3000000000)) || (next1 > 3000000000)) || (next_supply > 3000000000))",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "9 swap output and k",
+      "when": "(((command.101.120 == 1) || (command.101.120 == 2)) && (((paid <= 0) || (paid >= y)) || !(products_ge(choose((((x + gross) - protocol) > 0), ((x + gross) - protocol), 0), choose(((y - paid) > 0), (y - paid), 0), x, y))))",
+      "class": "Reject",
+      "reason": 220,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "unreachable on admitted bounds; evaluator refusal is not a semantic reject",
+      "when": "false",
+      "class": "Reject",
+      "reason": 221,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-x: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key0) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-x: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key0_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-x: 3 debit must be funded before credit",
+      "when": "(key0_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-x: 4 complete u128 result must fit",
+      "when": "(key0_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-y: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key1) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key1) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-y: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key1_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-y: 3 debit must be funded before credit",
+      "when": "(key1_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance pool-y: 4 complete u128 result must fit",
+      "when": "(key1_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-x: 1 ingress debit zero and exact protocol credit",
+      "when": "(((1) == 1) && ((((((((false || ((debit_key2) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key2) != (credit_key2))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-x: 2 ingress overflow before ordinary keys",
+      "when": "(((1) == 1) && (key2_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-x: 3 debit must be funded before credit",
+      "when": "(key2_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-x: 4 complete u128 result must fit",
+      "when": "(key2_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-y: 1 ingress debit zero and exact protocol credit",
+      "when": "(((1) == 1) && ((((((((false || ((debit_key3) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key3) != (credit_key3))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-y: 2 ingress overflow before ordinary keys",
+      "when": "(((1) == 1) && (key3_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-y: 3 debit must be funded before credit",
+      "when": "(key3_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance ingress-y: 4 complete u128 result must fit",
+      "when": "(key3_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-x: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key4) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key4) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-x: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key4_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-x: 3 debit must be funded before credit",
+      "when": "(key4_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-x: 4 complete u128 result must fit",
+      "when": "(key4_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-y: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key5) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key5) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-y: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key5_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-y: 3 debit must be funded before credit",
+      "when": "(key5_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance alice-y: 4 complete u128 result must fit",
+      "when": "(key5_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-x: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key6) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key6) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-x: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key6_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-x: 3 debit must be funded before credit",
+      "when": "(key6_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-x: 4 complete u128 result must fit",
+      "when": "(key6_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-y: 1 ingress debit zero and exact protocol credit",
+      "when": "(((0) == 1) && ((((((((false || ((debit_key7) != 0)) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)) || ((credit_key7) != (0))) || ((0) != 0)) || ((0) != 0)) || ((0) != 0)))",
+      "class": "Reject",
+      "reason": 222,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-y: 2 ingress overflow before ordinary keys",
+      "when": "(((0) == 1) && (key7_carry3 > 0))",
+      "class": "Reject",
+      "reason": 223,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-y: 3 debit must be funded before credit",
+      "when": "(key7_borrow3 != 0)",
+      "class": "Reject",
+      "reason": 224,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "Balance bob-y: 4 complete u128 result must fit",
+      "when": "(key7_carry3 != 0)",
+      "class": "Reject",
+      "reason": 225,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "complete per-asset and LP conservation",
+      "when": "!((((((((((((true && ((((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024) - (div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) * 4294967296)) == (((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0) - (div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) * 4294967296)))) && ((((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025) - (div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) * 4294967296)) == (((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1) - (div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) * 4294967296)))) && ((((((div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) + pre.100.2002) + pre.100.2010) + pre.100.2018) + pre.100.2026) - (div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) + pre.100.2002) + pre.100.2010) + pre.100.2018) + pre.100.2026), 4294967296) * 4294967296)) == (((((div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) + key0_next2) + key2_next2) + key4_next2) + key6_next2) - (div_floor(((((div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) + key0_next2) + key2_next2) + key4_next2) + key6_next2), 4294967296) * 4294967296)))) && ((((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) + pre.100.2002) + pre.100.2010) + pre.100.2018) + pre.100.2026), 4294967296) + pre.100.2003) + pre.100.2011) + pre.100.2019) + pre.100.2027) - (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) + pre.100.2002) + pre.100.2010) + pre.100.2018) + pre.100.2026), 4294967296) + pre.100.2003) + pre.100.2011) + pre.100.2019) + pre.100.2027), 4294967296) * 4294967296)) == (((((div_floor(((((div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) + key0_next2) + key2_next2) + key4_next2) + key6_next2), 4294967296) + key0_next3) + key2_next3) + key4_next3) + key6_next3) - (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) + key0_next2) + key2_next2) + key4_next2) + key6_next2), 4294967296) + key0_next3) + key2_next3) + key4_next3) + key6_next3), 4294967296) * 4294967296)))) && (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2000) + pre.100.2008) + pre.100.2016) + pre.100.2024), 4294967296) + pre.100.2001) + pre.100.2009) + pre.100.2017) + pre.100.2025), 4294967296) + pre.100.2002) + pre.100.2010) + pre.100.2018) + pre.100.2026), 4294967296) + pre.100.2003) + pre.100.2011) + pre.100.2019) + pre.100.2027), 4294967296) == div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + key0_next0) + key2_next0) + key4_next0) + key6_next0), 4294967296) + key0_next1) + key2_next1) + key4_next1) + key6_next1), 4294967296) + key0_next2) + key2_next2) + key4_next2) + key6_next2), 4294967296) + key0_next3) + key2_next3) + key4_next3) + key6_next3), 4294967296))) && ((((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028) - (div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) * 4294967296)) == (((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0) - (div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) * 4294967296)))) && ((((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029) - (div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) * 4294967296)) == (((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1) - (div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) * 4294967296)))) && ((((((div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) + pre.100.2006) + pre.100.2014) + pre.100.2022) + pre.100.2030) - (div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) + pre.100.2006) + pre.100.2014) + pre.100.2022) + pre.100.2030), 4294967296) * 4294967296)) == (((((div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) + key1_next2) + key3_next2) + key5_next2) + key7_next2) - (div_floor(((((div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) + key1_next2) + key3_next2) + key5_next2) + key7_next2), 4294967296) * 4294967296)))) && ((((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) + pre.100.2006) + pre.100.2014) + pre.100.2022) + pre.100.2030), 4294967296) + pre.100.2007) + pre.100.2015) + pre.100.2023) + pre.100.2031) - (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) + pre.100.2006) + pre.100.2014) + pre.100.2022) + pre.100.2030), 4294967296) + pre.100.2007) + pre.100.2015) + pre.100.2023) + pre.100.2031), 4294967296) * 4294967296)) == (((((div_floor(((((div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) + key1_next2) + key3_next2) + key5_next2) + key7_next2), 4294967296) + key1_next3) + key3_next3) + key5_next3) + key7_next3) - (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) + key1_next2) + key3_next2) + key5_next2) + key7_next2), 4294967296) + key1_next3) + key3_next3) + key5_next3) + key7_next3), 4294967296) * 4294967296)))) && (div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + pre.100.2004) + pre.100.2012) + pre.100.2020) + pre.100.2028), 4294967296) + pre.100.2005) + pre.100.2013) + pre.100.2021) + pre.100.2029), 4294967296) + pre.100.2006) + pre.100.2014) + pre.100.2022) + pre.100.2030), 4294967296) + pre.100.2007) + pre.100.2015) + pre.100.2023) + pre.100.2031), 4294967296) == div_floor(((((div_floor(((((div_floor(((((div_floor(((((0 + key1_next0) + key3_next0) + key5_next0) + key7_next0), 4294967296) + key1_next1) + key3_next1) + key5_next1) + key7_next1), 4294967296) + key1_next2) + key3_next2) + key5_next2) + key7_next2), 4294967296) + key1_next3) + key3_next3) + key5_next3) + key7_next3), 4294967296))) && (((((((pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0)) + (pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))) + (pre.100.152 + choose((command.101.120 == 0), 1000, 0))) - pre.100.150) - pre.100.151) - pre.100.152) == (next_supply - pre.100.112))))",
+      "class": "Reject",
+      "reason": 226,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "complete pool/Balance and LP/lock equations",
+      "when": "!(((((((((((true && (key0_next0 == next0)) && (key1_next0 == next1)) && ((((pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0)) + (pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))) + (pre.100.152 + choose((command.101.120 == 0), 1000, 0))) == next_supply)) && ((pre.100.152 + choose((command.101.120 == 0), 1000, 0)) >= 1000)) && (key0_next1 == 0)) && (key0_next2 == 0)) && (key0_next3 == 0)) && (key1_next1 == 0)) && (key1_next2 == 0)) && (key1_next3 == 0)))",
+      "class": "Reject",
+      "reason": 227,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "(command.101.120 == 0)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "command.101.127",
+            "3001": "2",
+            "3002": "command.101.122"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "command.101.127",
+            "3004": "2",
+            "3005": "command.101.123"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 302,
+          "destination": "zenoledger",
+          "payload": {
+            "3006": "command.101.127",
+            "3007": "command.101.127",
+            "3008": "(command.101.126 - 1000)"
+          },
+          "idempotency_ordinal": 2
+        },
+        {
+          "ordinal": 3,
+          "channel": 302,
+          "destination": "zenoledger",
+          "payload": {
+            "3006": "3",
+            "3007": "3",
+            "3008": "1000"
+          },
+          "idempotency_ordinal": 3
+        },
+        {
+          "ordinal": 4,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "(command.101.126 - 1000)",
+            "3011": "1000",
+            "3012": "0",
+            "3013": "0",
+            "3014": "0",
+            "3015": "0",
+            "3016": "0",
+            "3017": "0"
+          },
+          "idempotency_ordinal": 4
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 0)) && (protocol > 0))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "command.101.127",
+            "3001": "2",
+            "3002": "(gross - protocol)"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "command.101.127",
+            "3001": "4",
+            "3002": "protocol"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "2",
+            "3004": "command.101.128",
+            "3005": "paid"
+          },
+          "idempotency_ordinal": 2
+        },
+        {
+          "ordinal": 3,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "gross",
+            "3011": "paid",
+            "3012": "fee",
+            "3013": "protocol",
+            "3014": "(fee - protocol)",
+            "3015": "net",
+            "3016": "choose((command.101.120 == 2), quote, 0)",
+            "3017": "choose((command.101.120 == 2), gap_bps, 0)"
+          },
+          "idempotency_ordinal": 3
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 0)) && (protocol == 0))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "command.101.127",
+            "3001": "2",
+            "3002": "(gross - protocol)"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "2",
+            "3004": "command.101.128",
+            "3005": "paid"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "gross",
+            "3011": "paid",
+            "3012": "fee",
+            "3013": "protocol",
+            "3014": "(fee - protocol)",
+            "3015": "net",
+            "3016": "choose((command.101.120 == 2), quote, 0)",
+            "3017": "choose((command.101.120 == 2), gap_bps, 0)"
+          },
+          "idempotency_ordinal": 2
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 1)) && (protocol > 0))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "command.101.127",
+            "3004": "2",
+            "3005": "(gross - protocol)"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "command.101.127",
+            "3004": "5",
+            "3005": "protocol"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "2",
+            "3001": "command.101.128",
+            "3002": "paid"
+          },
+          "idempotency_ordinal": 2
+        },
+        {
+          "ordinal": 3,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "gross",
+            "3011": "paid",
+            "3012": "fee",
+            "3013": "protocol",
+            "3014": "(fee - protocol)",
+            "3015": "net",
+            "3016": "choose((command.101.120 == 2), quote, 0)",
+            "3017": "choose((command.101.120 == 2), gap_bps, 0)"
+          },
+          "idempotency_ordinal": 3
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "((((command.101.120 == 1) || (command.101.120 == 2)) && (command.101.121 == 1)) && (protocol == 0))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "command.101.127",
+            "3004": "2",
+            "3005": "(gross - protocol)"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "2",
+            "3001": "command.101.128",
+            "3002": "paid"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "gross",
+            "3011": "paid",
+            "3012": "fee",
+            "3013": "protocol",
+            "3014": "(fee - protocol)",
+            "3015": "net",
+            "3016": "choose((command.101.120 == 2), quote, 0)",
+            "3017": "choose((command.101.120 == 2), gap_bps, 0)"
+          },
+          "idempotency_ordinal": 2
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "(command.101.120 == 3)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "command.101.127",
+            "3001": "2",
+            "3002": "used0"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "command.101.127",
+            "3004": "2",
+            "3005": "used1"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 302,
+          "destination": "zenoledger",
+          "payload": {
+            "3006": "command.101.127",
+            "3007": "command.101.127",
+            "3008": "mint"
+          },
+          "idempotency_ordinal": 2
+        },
+        {
+          "ordinal": 3,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "used0",
+            "3011": "used1",
+            "3012": "mint",
+            "3013": "(command.101.122 - used0)",
+            "3014": "(command.101.123 - used1)",
+            "3015": "0",
+            "3016": "0",
+            "3017": "0"
+          },
+          "idempotency_ordinal": 3
+        }
+      ]
+    },
+    {
+      "rule": "complete atomic Spot plan",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "next0",
+        "111": "next1",
+        "112": "next_supply",
+        "113": "1",
+        "114": "0",
+        "2000": "key0_next0",
+        "2001": "key0_next1",
+        "2002": "key0_next2",
+        "2003": "key0_next3",
+        "2004": "key1_next0",
+        "2005": "key1_next1",
+        "2006": "key1_next2",
+        "2007": "key1_next3",
+        "2008": "key2_next0",
+        "2009": "key2_next1",
+        "2010": "key2_next2",
+        "2011": "key2_next3",
+        "2012": "key3_next0",
+        "2013": "key3_next1",
+        "2014": "key3_next2",
+        "2015": "key3_next3",
+        "2016": "key4_next0",
+        "2017": "key4_next1",
+        "2018": "key4_next2",
+        "2019": "key4_next3",
+        "2020": "key5_next0",
+        "2021": "key5_next1",
+        "2022": "key5_next2",
+        "2023": "key5_next3",
+        "2024": "key6_next0",
+        "2025": "key6_next1",
+        "2026": "key6_next2",
+        "2027": "key6_next3",
+        "2028": "key7_next0",
+        "2029": "key7_next1",
+        "2030": "key7_next2",
+        "2031": "key7_next3",
+        "150": "(pre.100.150 + choose((command.101.127 == 0), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "151": "(pre.100.151 + choose((command.101.127 == 1), choose((command.101.120 == 0), (command.101.126 - 1000), choose((command.101.120 == 1), 0, choose((command.101.120 == 2), 0, choose((command.101.120 == 3), mint, (0 - command.101.122))))), 0))",
+        "152": "(pre.100.152 + choose((command.101.120 == 0), 1000, 0))"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 302,
+          "destination": "zenoledger",
+          "payload": {
+            "3006": "command.101.127",
+            "3007": "command.101.127",
+            "3008": "(0 - command.101.122)"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 300,
+          "destination": "zenoledger",
+          "payload": {
+            "3000": "2",
+            "3001": "command.101.128",
+            "3002": "payout0"
+          },
+          "idempotency_ordinal": 1
+        },
+        {
+          "ordinal": 2,
+          "channel": 301,
+          "destination": "zenoledger",
+          "payload": {
+            "3003": "2",
+            "3004": "command.101.128",
+            "3005": "payout1"
+          },
+          "idempotency_ordinal": 2
+        },
+        {
+          "ordinal": 3,
+          "channel": 303,
+          "destination": "decision",
+          "payload": {
+            "3010": "payout0",
+            "3011": "payout1",
+            "3012": "0",
+            "3013": "0",
+            "3014": "0",
+            "3015": "0",
+            "3016": "0",
+            "3017": "0"
+          },
+          "idempotency_ordinal": 3
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "150": 0,
+    "151": 0,
+    "152": 0,
+    "2000": 0,
+    "2001": 0,
+    "2002": 0,
+    "2003": 0,
+    "2004": 0,
+    "2005": 0,
+    "2006": 0,
+    "2007": 0,
+    "2008": 0,
+    "2009": 0,
+    "2010": 0,
+    "2011": 0,
+    "2012": 0,
+    "2013": 0,
+    "2014": 0,
+    "2015": 0,
+    "2016": 0,
+    "2017": 0,
+    "2018": 0,
+    "2019": 0,
+    "2020": 0,
+    "2021": 0,
+    "2022": 0,
+    "2023": 0,
+    "2024": 0,
+    "2025": 0,
+    "2026": 0,
+    "2027": 0,
+    "2028": 0,
+    "2029": 0,
+    "2030": 0,
+    "2031": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "MintBurnAuthorization",
+    "502": "FeeAndRounding",
+    "503": "AssetConservation",
+    "504": "FeeAndRounding",
+    "505": "FeeAndRounding",
+    "506": "FeeAndRounding",
+    "507": "AssetConservation",
+    "508": "FeeAndRounding",
+    "509": "FeeAndRounding",
+    "510": "FeeAndRounding",
+    "511": "FeeAndRounding",
+    "512": "AssetConservation",
+    "513": "FeeAndRounding",
+    "514": "FeeAndRounding",
+    "515": "FeeAndRounding",
+    "516": "AssetConservation",
+    "517": "FeeAndRounding",
+    "518": "FeeAndRounding",
+    "519": "FeeAndRounding",
+    "520": "FeeAndRounding",
+    "521": "FeeAndRounding",
+    "522": "MintBurnAuthorization",
+    "523": "AuthoritySubjectRecipient",
+    "524": "AuthoritySubjectRecipient",
+    "525": "FeeAndRounding",
+    "526": "FeeAndRounding",
+    "527": "FeeAndRounding",
+    "528": "FeeAndRounding",
+    "529": "FeeAndRounding",
+    "530": "AuthoritySubjectRecipient",
+    "531": "StateInvariant",
+    "532": "AuthoritySubjectRecipient",
+    "533": "AssetConservation",
+    "534": "AssetConservation",
+    "535": "AssetConservation",
+    "536": "AssetConservation",
+    "537": "FeeAndRounding",
+    "538": "RejectNoAuthority"
+  },
+  "delivery_laws": {
+    "537": {
+      "max_deliveries": 5,
+      "observations": {
+        "outbox.107": {
+          "channel": 303
+        },
+        "outbox.107.3010": {
+          "channel": 303,
+          "field": 3010
+        },
+        "outbox.107.3011": {
+          "channel": 303,
+          "field": 3011
+        },
+        "outbox.107.3012": {
+          "channel": 303,
+          "field": 3012
+        },
+        "outbox.107.3013": {
+          "channel": 303,
+          "field": 3013
+        },
+        "outbox.107.3014": {
+          "channel": 303,
+          "field": 3014
+        },
+        "outbox.107.3015": {
+          "channel": 303,
+          "field": 3015
+        },
+        "outbox.107.3016": {
+          "channel": 303,
+          "field": 3016
+        },
+        "outbox.107.3017": {
+          "channel": 303,
+          "field": 3017
+        }
+      }
+    }
+  }
+}

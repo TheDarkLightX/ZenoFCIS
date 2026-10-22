@@ -37,7 +37,7 @@ evidence ([0003](0003-epistemic-status.md)).
 The authority must compute the *complete* decision from a canonical contract
 and the exact admitted invocation. This gate evaluates the contract and
 constructs the decision through library-owned builders. No optimized or
-hand-written executor runs inside this authority path. A caller cannot provide
+LLM-generated executor runs inside this authority path. A caller cannot provide
 a Boolean "conforms" verdict, expected bytes, or a substitute contract at
 invocation time. A missing field, undefined operation, exhausted library meter,
 or unknown domain value refuses authorization before any commit or outbox

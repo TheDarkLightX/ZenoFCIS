@@ -1,0 +1,60 @@
+name: spot-pool
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_NET_OFFLINE: "true"
+      PYTHONDONTWRITEBYTECODE: "1"
+      # Generated projects must sit outside Cargo's ignored build-output tree.
+      SPOT_ACCEPTANCE_ROOT: ${{ github.workspace }}/../spot-acceptance
+      ZENO_FCIS_CLI: ${{ github.workspace }}/target/debug/zeno-fcis
+      SPOT_MOUNT_BINARY: ${{ github.workspace }}/../spot-acceptance/binaries/spot
+      SPOT_FIXTURE_MOUNT_BINARY: ${{ github.workspace }}/../spot-acceptance/binaries/fixture
+      COUNTER_MOUNT_BINARY: ${{ github.workspace }}/../spot-acceptance/binaries/counter
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Fetch locked crates
+        uses: ./.github/actions/fetch-locked-crates
+        env:
+          CARGO_NET_OFFLINE: "false"
+      - name: Build the matching CLI
+        run: cargo +1.97.1 build --locked --offline -p zeno-fcis-cli
+      - name: Prepare native mounts and the labelled test fixture
+        run: |
+          mkdir -p "$SPOT_ACCEPTANCE_ROOT/binaries"
+          python3 core-apps/zenodex-spot/tools/mount_application.py --cli "$ZENO_FCIS_CLI" --out "$SPOT_ACCEPTANCE_ROOT/production"
+          cargo +1.97.1 build --manifest-path "$SPOT_ACCEPTANCE_ROOT/production/Cargo.toml" --bin mounted --features mount-test --locked --offline
+          cp "$CARGO_TARGET_DIR/debug/mounted" "$SPOT_MOUNT_BINARY"
+          python3 core-apps/zenodex-spot/tools/make_test_fixture.py --cli "$ZENO_FCIS_CLI" --out "$SPOT_ACCEPTANCE_ROOT/fixture-contract"
+          python3 core-apps/zenodex-spot/tools/mount_application.py --cli "$ZENO_FCIS_CLI" --contract "$SPOT_ACCEPTANCE_ROOT/fixture-contract" --out "$SPOT_ACCEPTANCE_ROOT/fixture"
+          cargo +1.97.1 build --manifest-path "$SPOT_ACCEPTANCE_ROOT/fixture/Cargo.toml" --bin mounted --features mount-test --locked --offline
+          cp "$CARGO_TARGET_DIR/debug/mounted" "$SPOT_FIXTURE_MOUNT_BINARY"
+          python3 core-apps/zenodex-spot/tools/mount_application.py --cli "$ZENO_FCIS_CLI" --contract crates/zeno-fcis-cli/templates/durable-counter --out "$SPOT_ACCEPTANCE_ROOT/counter"
+          cargo +1.97.1 build --manifest-path "$SPOT_ACCEPTANCE_ROOT/counter/Cargo.toml" --bin mounted --features mount-test --locked --offline
+          cp "$CARGO_TARGET_DIR/debug/mounted" "$COUNTER_MOUNT_BINARY"
+      - name: Run every Spot test file with its native prerequisites
+        run: python3 -m unittest discover -s core-apps/zenodex-spot/tests -p 'test_*.py' -v

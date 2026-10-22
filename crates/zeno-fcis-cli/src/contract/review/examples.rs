@@ -23,7 +23,7 @@ pub(super) const FILE: &str = "tests/decision-examples.txt";
 pub(super) struct Example {
     pub(super) line: usize,
     pub(super) text: String,
-    pub(super) inputs: Vec<i64>,
+    pub(super) inputs: Vec<i128>,
     pub(super) class: Class,
     pub(super) reason: Option<u32>,
     pub(super) post: Vec<i128>,
@@ -52,14 +52,7 @@ pub(super) fn parse(
             let inputs = line
                 .inputs
                 .iter()
-                .map(|value| {
-                    i64::try_from(*value).map_err(|_| {
-                        ContractError::new(
-                            format!("{FILE} line {}", line.number),
-                            format!("`{value}` is too large"),
-                        )
-                    })
-                })
+                .map(|value| Ok(*value))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Example {
                 line: line.number,
@@ -114,7 +107,7 @@ pub(super) fn agrees(
     if example.class == Class::Reject {
         let pre = example.inputs[..state_width.min(example.inputs.len())]
             .iter()
-            .map(|value| i128::from(*value));
+            .copied();
         if !example.post.iter().copied().eq(pre) {
             return Err("the rejected post-state differs from the pre-state".to_owned());
         }
@@ -172,7 +165,7 @@ fn text(reason: Option<u32>) -> String {
 
 /// The example line a decision makes for `inputs`, in the format above; a
 /// reject repeats the pre-state. `None` when a value has no number form.
-pub(super) fn render(inputs: &[i64], decision: &Decision, state_width: usize) -> Option<String> {
+pub(super) fn render(inputs: &[i128], decision: &Decision, state_width: usize) -> Option<String> {
     let class = match decision.class {
         Class::Accept => "accept",
         Class::Reject => "reject",
@@ -215,7 +208,7 @@ pub(super) fn render(inputs: &[i64], decision: &Decision, state_width: usize) ->
 }
 
 /// Numbers separated by one space.
-pub(super) fn join(values: &[i64]) -> String {
+pub(super) fn join(values: &[i128]) -> String {
     values
         .iter()
         .map(ToString::to_string)

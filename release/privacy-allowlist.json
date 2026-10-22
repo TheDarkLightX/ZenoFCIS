@@ -1,0 +1,90 @@
+{
+  "schema": "zeno-fcis/release-privacy-allowlist/1",
+  "context_bytes": 32,
+  "entries": [
+    {
+      "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "4bdd5724fe2c552c2a34bf8ecb58bddd5c49b3193c963555cbffb172b48ae00d",
+      "reason": "Public CLI task and strategy labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "73c0cfbaf33cf67d7513c4ba04e10800ed6870180e30e0bebd6a8acefa016961",
+      "reason": "Public CLI effect labels, pinned Rust core error labels and public synthesis enum names concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "6d6f080d1bca63eb8666f4075060cca6b567dd6375f5a5676b4da9c01971ec6a",
+      "reason": "Public strategy-knowledge labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "4bdd5724fe2c552c2a34bf8ecb58bddd5c49b3193c963555cbffb172b48ae00d",
+      "reason": "Public CLI task and strategy labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "73c0cfbaf33cf67d7513c4ba04e10800ed6870180e30e0bebd6a8acefa016961",
+      "reason": "Public CLI effect labels, pinned Rust core error labels and public synthesis enum names concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-x86_64-unknown-linux-gnu.tar.gz!zeno-fcis-2.5.0-x86_64-unknown-linux-gnu/zeno-fcis",
+      "file_sha256": "e1d35ca35bd1e0ae11ac3de5d50638f1c13c4020d6c2e2bf3c81bb7be6584004",
+      "fingerprint_sha256": "6d6f080d1bca63eb8666f4075060cca6b567dd6375f5a5676b4da9c01971ec6a",
+      "reason": "Public strategy-knowledge labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "a56da1e4abd57fdee10a3932e6688c853fe341e7f512d51f572e83be43542b5e",
+      "reason": "Public CLI strategy-profile labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "c114d4c1ee14d57de5a30545621c02716594c0fadeee31c286ef0a9a02bcd3b5",
+      "reason": "Public CLI effect labels and pinned Rust core integer-parse error labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "9fc4bcb27b91a449da406d4ea2de288c228dcf76e035d5e36a5d62724c746307",
+      "reason": "Public strategy-knowledge diagnostic labels concatenated by the linker."
+    },
+    {
+      "path": "binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "a5570500d54b921057f2fbab1410d281546087749826a9c0a49f8f06f8f65478",
+      "reason": "Public strategy-knowledge diagnostic labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "a56da1e4abd57fdee10a3932e6688c853fe341e7f512d51f572e83be43542b5e",
+      "reason": "Public CLI strategy-profile labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "c114d4c1ee14d57de5a30545621c02716594c0fadeee31c286ef0a9a02bcd3b5",
+      "reason": "Public CLI effect labels and pinned Rust core integer-parse error labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "9fc4bcb27b91a449da406d4ea2de288c228dcf76e035d5e36a5d62724c746307",
+      "reason": "Public strategy-knowledge diagnostic labels concatenated by the linker."
+    },
+    {
+      "path": "zeno-fcis-2.5.0-rc-bundle.zip!binaries/zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz!zeno-fcis-2.5.0-aarch64-apple-darwin/zeno-fcis",
+      "file_sha256": "e167fb829323fff3a6d2531793ab3aabefc56281023ecc013616e4789b38b856",
+      "fingerprint_sha256": "a5570500d54b921057f2fbab1410d281546087749826a9c0a49f8f06f8f65478",
+      "reason": "Public strategy-knowledge diagnostic labels concatenated by the linker."
+    }
+  ]
+}

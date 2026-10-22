@@ -283,3 +283,23 @@ pub(super) fn to_u128<'a>(value: Atom<'a>) -> Result<Atom<'a>, Failure> {
         _ => Err(Failure::Undefined),
     }
 }
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures spec::value_result(result) == spec::signed_mul_div_floor(spec::atom(a),spec::atom(b),spec::atom(d)),
+))]
+pub(super) fn signed_mul_div_floor<'a>(
+    a: Atom<'a>,
+    b: Atom<'a>,
+    d: Atom<'a>,
+) -> Result<Atom<'a>, Failure> {
+    use super::super::super::evaluation::typed::{self, Instruction, Values};
+    let operands = [a, b, d];
+    match typed::node(
+        Instruction::SignedMulDivFloor(0, 1, 2),
+        Values::Typed(&[]),
+        Values::Typed(&operands),
+    ) {
+        Ok(v) => Ok(v),
+        Err(_) => Err(Failure::Undefined),
+    }
+}

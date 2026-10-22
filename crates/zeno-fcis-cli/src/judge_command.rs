@@ -52,11 +52,16 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Judge candidate state invariants by induction over the declared domain: initiation, consecution with the first counterexample to induction, and a shortest trace when the lemma is false. Exit 0 when every lemma is inductive, 1 when one is false, 2 otherwise, 65 for a formula with no contract form. Advisory.
+    /// Judge state invariants by induction, or --transition relations on actual before/after decisions. Exit 0 when every invariant is inductive or relation is checked, 1 when refuted, 2 when incomplete, undefined or vacuous, 65 for a formula with no contract form. Advisory, finite-domain results only.
     Lemma {
-        /// A state formula, written as a state law: a project.zeno relation over post. state fields. Repeat for more lemmas.
+        /// A project.zeno state formula, or with --transition a before/after relation. Repeat for more lemmas.
         #[arg(long = "lemma", required = true)]
         lemmas: Vec<String>,
+        /// Check a before/after relation on every admitted committed decision, instead of state induction.
+        /// Relations may read pre., command., context. and actual post. values.
+        /// Exit 0 means checked on the finite domain, 1 refuted, 2 undefined or vacuous.
+        #[arg(long)]
+        transition: bool,
         #[command(flatten)]
         common: Common,
     },
@@ -137,7 +142,7 @@ pub(super) fn run(command: Command) -> u8 {
     match command {
         Command::Profile { common } => judge(
             &common,
-            "zeno-fcis/contract-profile/1",
+            "zeno-fcis/contract-profile/2",
             None,
             true,
             |sources| {
@@ -151,15 +156,31 @@ pub(super) fn run(command: Command) -> u8 {
                 )
             },
         ),
-        Command::Lemma { lemmas, common } => judge(
+        Command::Lemma {
+            lemmas,
+            transition,
+            common,
+        } => judge(
             &common,
-            "zeno-fcis/contract-lemma/1",
+            if transition {
+                "zeno-fcis/contract-transition-lemma/2"
+            } else {
+                "zeno-fcis/contract-lemma/2"
+            },
             None,
             true,
             |sources| {
                 Ok(
-                    match lemma::judge(sources.project, sources.rules, &lemmas, common.max_tuples)?
-                    {
+                    match if transition {
+                        lemma::judge_transitions(
+                            sources.project,
+                            sources.rules,
+                            &lemmas,
+                            common.max_tuples,
+                        )?
+                    } else {
+                        lemma::judge(sources.project, sources.rules, &lemmas, common.max_tuples)?
+                    } {
                         lemma::Lemmas::Inconclusive(inconclusive) => {
                             Judged::Inconclusive(inconclusive)
                         }
@@ -169,6 +190,10 @@ pub(super) fn run(command: Command) -> u8 {
                             };
                             let (exit, status) = if any(lemma::Verdict::False.name()) {
                                 (INVALID, "refuted")
+                            } else if transition && (any("undefined") || any("vacuous")) {
+                                (BLOCKED, "inconclusive")
+                            } else if transition {
+                                (OK, "checked")
                             } else if any(lemma::Verdict::NotInductive.name()) {
                                 (BLOCKED, "not-inductive")
                             } else {
@@ -185,7 +210,7 @@ pub(super) fn run(command: Command) -> u8 {
             let label = path.display().to_string();
             judge(
                 &common,
-                "zeno-fcis/contract-scenario/1",
+                "zeno-fcis/contract-scenario/2",
                 Some(&path),
                 false,
                 |sources| {
@@ -210,7 +235,7 @@ pub(super) fn run(command: Command) -> u8 {
             let enumerates = !matches!(question, probe::Question::Explain { .. });
             judge(
                 &common,
-                "zeno-fcis/contract-probe/1",
+                "zeno-fcis/contract-probe/2",
                 None,
                 enumerates,
                 |sources| {
@@ -250,7 +275,7 @@ fn parse_question(question: ProbeCommand) -> Result<(Common, probe::Question), S
             let input = input
                 .split_whitespace()
                 .map(|word| {
-                    word.parse::<i64>()
+                    word.parse::<i128>()
                         .map_err(|_| format!("--input: `{word}` is not an integer"))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -356,6 +381,7 @@ fn judge(
     };
     let mut packet = json!({
         "schema": schema,
+        "integer_encoding": crate::report_numbers::ENCODING,
         "authority": "none",
         "advisory": ADVISORY,
         "application": application,

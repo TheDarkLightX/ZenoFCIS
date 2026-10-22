@@ -8,7 +8,7 @@ use zeno_fcis_loop_doors::subject::{DEFAULT_MAX_TUPLES, Subject};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 fn subject() -> Subject {
-    let p = import_program(include_bytes!("data/bounded-counter-c5.original.zcve")).unwrap();
+    let p = import_program(include_bytes!("data/i128/bounded-counter-c5.original.zcve")).unwrap();
     let variants = BTreeMap::from([(
         "action".to_owned(),
         BTreeMap::from([("Inc".to_owned(), 150), ("Dec".to_owned(), 151)]),

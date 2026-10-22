@@ -112,6 +112,7 @@ fn decode_field(
     (match result{Ok(end)=>Ok((final(output)@,end)),Err(e)=>Err(e)},final(meter).used.counters@,final(attempts)@)=={
         let r=spec::prefix(bytes@,spec::fields(fields),spec::fields(fields).len(),offset,old(meter).limits.counters@,old(meter).used.counters@);
         (r.0,r.1,old(attempts)@+r.2)},))]
+#[cfg_attr(verus_keep_ghost, verifier::rlimit(160))]
 fn project_fields(
     bytes: &[u8],
     fields: FieldsView<'_>,
@@ -216,7 +217,7 @@ pub(crate) fn decode_value(
                 return None;
             }
             let (value, end) = read_big_endian(bytes, payload_offset, 16)?;
-            if value < *min || value > *max || value > i64::MAX as u128 {
+            if value < *min || value > *max || value > i128::MAX as u128 {
                 return None;
             }
             Some((Atom::I128(value as i128), end))
@@ -226,7 +227,7 @@ pub(crate) fn decode_value(
                 return None;
             }
             let (value, end) = read_signed_128(bytes, payload_offset)?;
-            if value < *min as i128 || value > *max as i128 {
+            if value < *min || value > *max {
                 return None;
             }
             Some((Atom::I128(value), end))
@@ -243,7 +244,7 @@ pub(crate) fn decode_value(
                 return None;
             }
             let (code, end) = decode_variant(bytes, payload_offset, *type_id, variants, false)?;
-            Some((Atom::I128(code as i128), end))
+            Some((Atom::I128(code), end))
         }
         LeafView::Legacy(Leaf::Sum {
             type_id, variants, ..
@@ -252,7 +253,7 @@ pub(crate) fn decode_value(
                 return None;
             }
             let (code, end) = decode_variant(bytes, payload_offset, *type_id, variants, true)?;
-            Some((Atom::I128(code as i128), end))
+            Some((Atom::I128(code), end))
         }
         LeafView::Numeric(Domain::Bool) => match tag {
             0x01 => Some((Atom::Bool(false), payload_offset)),

@@ -77,8 +77,8 @@ impl Domain {
         match leaf {
             InputLeaf::Bool => Self::Bool,
             InputLeaf::I128 { min, max } => Self::Int {
-                min: i128::from(*min),
-                max: i128::from(*max),
+                min: *min,
+                max: *max,
             },
             InputLeaf::Sum { variants, .. } => {
                 Self::Variants(variants.iter().map(|variant| variant.id).collect())

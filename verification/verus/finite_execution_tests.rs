@@ -4,8 +4,8 @@ use super::evaluation::admission::{AdmissionFailure, kind, validate_program};
 use super::evaluation::{Domain, Failure, Op, evaluate_into};
 
 const INTEGER: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+    min: i128::MIN,
+    max: i128::MAX,
 };
 
 fn execute(
@@ -13,8 +13,8 @@ fn execute(
     outputs: &[Domain],
     nodes: &[Op],
     roots: &[u16],
-    input: &[i64],
-) -> (Result<(), Failure>, Vec<i64>, Vec<i64>) {
+    input: &[i128],
+) -> (Result<(), Failure>, Vec<i128>, Vec<i128>) {
     let mut scratch = vec![123, 456];
     let mut output = vec![789];
     let result = evaluate_into(
@@ -74,14 +74,14 @@ fn all_instructions_preserve_boolean_encoding_and_abi_order() {
 #[test]
 fn checked_arithmetic_covers_the_machine_boundaries() {
     for (op, input, expected) in [
-        (Op::Add(0, 1), [i64::MAX, 1], Err(Failure::Arithmetic)),
-        (Op::Add(0, 1), [i64::MIN, -1], Err(Failure::Arithmetic)),
-        (Op::Sub(0, 1), [i64::MIN, 1], Err(Failure::Arithmetic)),
-        (Op::Sub(0, 1), [i64::MAX, -1], Err(Failure::Arithmetic)),
-        (Op::Add(0, 1), [i64::MAX, 0], Ok(i64::MAX)),
-        (Op::Sub(0, 1), [i64::MIN, 0], Ok(i64::MIN)),
-        (Op::Add(0, 1), [i64::MAX, i64::MIN], Ok(-1)),
-        (Op::Sub(0, 1), [i64::MIN, i64::MIN], Ok(0)),
+        (Op::Add(0, 1), [i128::MAX, 1], Err(Failure::Arithmetic)),
+        (Op::Add(0, 1), [i128::MIN, -1], Err(Failure::Arithmetic)),
+        (Op::Sub(0, 1), [i128::MIN, 1], Err(Failure::Arithmetic)),
+        (Op::Sub(0, 1), [i128::MAX, -1], Err(Failure::Arithmetic)),
+        (Op::Add(0, 1), [i128::MAX, 0], Ok(i128::MAX)),
+        (Op::Sub(0, 1), [i128::MIN, 0], Ok(i128::MIN)),
+        (Op::Add(0, 1), [i128::MAX, i128::MIN], Ok(-1)),
+        (Op::Sub(0, 1), [i128::MIN, i128::MIN], Ok(0)),
     ] {
         let nodes = [Op::Input(0), Op::Input(1), op];
         let (result, scratch, output) =
@@ -171,7 +171,7 @@ fn every_refusal_clears_both_buffers() {
 fn unselected_and_unused_nodes_still_trap_eagerly() {
     let nodes = [
         Op::Bool(false),
-        Op::Int(i64::MAX),
+        Op::Int(i128::MAX),
         Op::Int(1),
         Op::Add(1, 2),
         Op::Int(7),
@@ -256,9 +256,9 @@ fn structural_admission_rejects_bad_shape_types_and_topology_in_order() {
 #[test]
 fn scalar_arithmetic_matches_independent_fraction_vectors_and_clears_refusals() {
     let mut count = 0;
-    for line in include_str!("../../tools/test-data/scalar-arithmetic/vectors.tsv").lines() {
+    for line in include_str!("../../tools/test-data/scalar-arithmetic/i128-vectors.tsv").lines() {
         let fields: Vec<_> = line.split('\t').collect();
-        let input: Vec<i64> = fields[1..fields.len() - 1]
+        let input: Vec<i128> = fields[1..fields.len() - 1]
             .iter()
             .map(|v| v.parse().expect("integer oracle operand"))
             .collect();
@@ -296,7 +296,7 @@ fn scalar_arithmetic_matches_independent_fraction_vectors_and_clears_refusals() 
             assert!(output.is_empty());
         } else {
             let expected = fields[fields.len() - 1]
-                .parse::<i64>()
+                .parse::<i128>()
                 .expect("integer oracle result");
             assert_eq!(actual, Ok(()), "oracle row {count}: {line}");
             assert_eq!(output, [expected], "oracle row {count}: {line}");
@@ -305,4 +305,30 @@ fn scalar_arithmetic_matches_independent_fraction_vectors_and_clears_refusals() 
         count += 1;
     }
     assert_eq!(count, 1165);
+}
+
+#[test]
+fn signed_full_product_oracle_keeps_cleanup_and_eager_prefix() {
+    for line in include_str!("../../tools/test-data/signed-arithmetic/vectors.tsv").lines() {
+        let f: Vec<_> = line.split('\t').collect();
+        let input: Vec<i128> = f[..3]
+            .iter()
+            .map(|n| n.parse().expect("signed oracle"))
+            .collect();
+        let nodes = [
+            Op::Input(0),
+            Op::Input(1),
+            Op::Input(2),
+            Op::SignedMulDivFloor(0, 1, 2),
+        ];
+        let (r, scratch, output) = execute(&[INTEGER; 3], &[INTEGER], &nodes, &[3], &input);
+        if f[3] == "arithmetic" {
+            assert_eq!(r, Err(Failure::Arithmetic));
+            assert!(scratch.is_empty());
+            assert!(output.is_empty());
+        } else {
+            assert_eq!(r, Ok(()));
+            assert_eq!(output, [f[3].parse::<i128>().expect("signed result")]);
+        }
+    }
 }

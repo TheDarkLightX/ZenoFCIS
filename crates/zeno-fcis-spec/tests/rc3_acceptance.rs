@@ -18,6 +18,36 @@ law 400 same = pre.100 == pre.100;
 claim 500 same cvc5 relational = pre.100 == pre.100;
 "#;
 
+#[test]
+fn fused_value_calls_preserve_their_ast_and_canonical_identity() {
+    use zeno_fcis_spec::{CompareOp, DivisionMode, ValueExpr};
+    for (name, mode) in [
+        ("mul_div_floor", DivisionMode::Floor),
+        ("mul_div_ceil", DivisionMode::Ceil),
+    ] {
+        let source = SOURCE_A.replace(
+            "law 400 same = pre.100 == pre.100;",
+            &format!("law 400 same = {name}(pre.100, pre.100, pre.100 + 1) >= 0;"),
+        );
+        let parsed = spec(&source);
+        let RelExpr::Compare(CompareOp::GreaterEq, ValueExpr::MulDiv(actual, _, _, _), _) =
+            parsed.laws()[0].formula()
+        else {
+            panic!("fused syntax lost its full-product node");
+        };
+        assert_eq!(*actual, mode);
+        let unfused = source.replace(
+            &format!("{name}(pre.100, pre.100, pre.100 + 1)"),
+            "div_floor(pre.100 * pre.100, pre.100 + 1)",
+        );
+        assert_ne!(parsed.canonical_bytes(), spec(&unfused).canonical_bytes());
+        for malformed in [format!("{name}(1, 2)"), format!("{name}(1, 2, 3, 4)")] {
+            let bad = SOURCE_A.replace("pre.100 == pre.100;", &format!("{malformed} >= 0;"));
+            assert!(parse_project(&bad, SourceLimits::default()).is_err());
+        }
+    }
+}
+
 const SOURCE_B: &str = r#"// formatting and declaration order are not identity
 zeno 1; project 1 demo;
 claim 500 same cvc5 relational = pre.100 == pre.100;
@@ -38,6 +68,32 @@ fn spec(source: &str) -> zeno_fcis_spec::ProjectSpec {
     let parsed =
         parse_project(source, SourceLimits::default()).unwrap_or_else(|set| panic!("{set}"));
     elaborate_project(parsed, ProjectLimits::default()).unwrap_or_else(|set| panic!("{set}"))
+}
+
+#[test]
+fn signed_and_nonnegative_fused_calls_parse_wide_operands_without_aliasing() {
+    use zeno_fcis_spec::{CompareOp, ValueExpr};
+    let wide = 1i128 << 100;
+    let source = SOURCE_A.replace(
+        "law 400 same = pre.100 == pre.100;",
+        &format!("law 400 same = signed_mul_div_floor({wide}, -1, 2) >= 0;"),
+    );
+    let signed = spec(&source);
+    let RelExpr::Compare(CompareOp::GreaterEq, ValueExpr::SignedMulDivFloor(a, _, _), _) =
+        signed.laws()[0].formula()
+    else {
+        panic!("signed floor lost its dedicated node");
+    };
+    assert_eq!(**a, ValueExpr::Int(wide));
+    let nonnegative = spec(&source.replace("signed_mul_div_floor", "mul_div_floor"));
+    assert_ne!(signed.canonical_bytes(), nonnegative.canonical_bytes());
+    for call in [
+        "signed_mul_div_floor(1, 2)",
+        "signed_mul_div_floor(1, 2, 3, 4)",
+    ] {
+        let bad = SOURCE_A.replace("pre.100 == pre.100;", &format!("{call} >= 0;"));
+        assert!(parse_project(&bad, SourceLimits::default()).is_err());
+    }
 }
 
 fn id(value: u32) -> StableId {
@@ -333,4 +389,38 @@ fn diagnostic_code_registry_is_complete_and_unique() {
     assert!(codes.windows(2).all(|pair| pair[0] != pair[1]));
     assert_eq!(codes.first(), Some(&"ZENO-E0001"));
     assert_eq!(codes.last(), Some(&"ZENO-E0302"));
+}
+
+#[test]
+fn quantity_declarations_use_version_two_canonical_metadata() {
+    let source = "zeno 1; project 1 q; type 100 int Price in 0..=1000 unit USD*COLL/COLL scale e8;";
+    let a = spec(source);
+    let b = spec(&source.replace("USD*COLL/COLL", "USD"));
+    let old = spec(&source.replace(" unit USD*COLL/COLL scale e8", ""));
+    assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    let bytes = a.canonical_bytes().unwrap_or_else(|e| panic!("{e:?}"));
+    let prefix = b"ZFCIS-PROJECT-SPEC\0".len();
+    assert_eq!(&bytes[prefix..prefix + 2], &2u16.to_be_bytes());
+    assert_eq!(
+        &old.canonical_bytes().unwrap_or_else(|e| panic!("{e:?}"))[prefix..prefix + 2],
+        &1u16.to_be_bytes()
+    );
+    assert_ne!(
+        a.canonical_bytes(),
+        spec(&source.replace("scale e8", "scale e9")).canonical_bytes()
+    );
+    for annotation in [
+        "unit USD",
+        "unit USD scale e39",
+        "unit USD scale 8",
+        "unit 0 scale e8",
+    ] {
+        assert!(
+            parse_project(
+                &source.replace("unit USD*COLL/COLL scale e8", annotation),
+                SourceLimits::default()
+            )
+            .is_err()
+        );
+    }
 }

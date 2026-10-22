@@ -28,27 +28,86 @@ use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 const FULL: Domain = Domain::Int {
-    min: i64::MIN,
-    max: i64::MAX,
+    min: i128::MIN,
+    max: i128::MAX,
 };
+
+#[test]
+fn main_route_arithmetic_json_profiles_and_local_rewriting_preserve_refusals() {
+    for operation in [
+        Op::Mul(0, 1),
+        Op::DivFloor(0, 1),
+        Op::DivCeil(0, 1),
+        Op::MulDivFloor(0, 1, 2),
+        Op::MulDivCeil(0, 1, 2),
+        Op::ProductsGe([0, 1, 2], [2, 1, 0]),
+    ] {
+        let output = if matches!(operation, Op::ProductsGe(..)) {
+            Domain::Bool
+        } else {
+            FULL
+        };
+        let original = program(
+            vec![Domain::Int { min: 0, max: 4 }],
+            vec![output],
+            vec![Op::Input(0), Op::Int(2), Op::Int(3), operation],
+            vec![3],
+        );
+        assert_eq!(Profile::CheckedI128V1.admit(&original), Ok(5));
+        assert_eq!(
+            program_from_json(&program_to_json(&original)),
+            Ok(original.clone())
+        );
+        let candidate = super::local::simplify(&original, false)
+            .unwrap_or_else(|| panic!("arithmetic rewrite refused"));
+        let right: Vec<_> = (0..=4).map(|x| original.evaluate(&[x])).collect();
+        let got: Vec<_> = (0..=4).map(|x| candidate.evaluate(&[x])).collect();
+        assert_eq!(got, right);
+        let mut wrong = right.clone();
+        wrong[0] = Err(zeno_fcis_synthesis::finite::Error::Arithmetic);
+        let control = |compare: &dyn Fn(&Vec<_>, &Vec<_>) -> bool| {
+            compare(&got, &right) && !compare(&got, &wrong)
+        };
+        assert!(control(&|a, b| a == b));
+        assert!(!control(&|_, _| true), "stubbed comparison must fail");
+    }
+    // A dead, undefined instruction still traps eagerly after conservative
+    // rewriting. The local proposer cannot erase its refusal.
+    for operation in [
+        Op::MulDivFloor(0, 0, 1),
+        Op::MulDivCeil(0, 0, 1),
+        Op::ProductsGe([0, 0, 0], [2, 0, 0]),
+    ] {
+        let original = program(
+            vec![],
+            vec![FULL],
+            vec![Op::Int(1), Op::Int(0), Op::Int(-1), operation],
+            vec![0],
+        );
+        let candidate = super::local::simplify(&original, false)
+            .unwrap_or_else(|| panic!("arithmetic rewrite refused"));
+        assert!(original.evaluate(&[]).is_err());
+        assert_eq!(candidate.evaluate(&[]), original.evaluate(&[]));
+    }
+}
 
 fn artifact(name: &str) -> &'static [u8] {
     match name {
-        "boolean-kernel-original" => include_bytes!(
-            "../../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve"
-        ),
-        "boolean-kernel-candidate" => include_bytes!(
-            "../../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve"
-        ),
-        "boolean-kernel-padded" => include_bytes!(
-            "../../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve"
-        ),
-        "retained-controller-original" => include_bytes!(
-            "../../../../docs/benchmarks/withdrawal-queue/artifacts/retained-controller-original.zcve"
-        ),
-        "retained-controller-candidate" => include_bytes!(
-            "../../../../docs/benchmarks/withdrawal-queue/artifacts/retained-controller-candidate.zcve"
-        ),
+        "boolean-kernel-original" => {
+            include_bytes!("../../tests/fixtures/i128-programs/boolean-kernel-original.zcve")
+        }
+        "boolean-kernel-candidate" => {
+            include_bytes!("../../tests/fixtures/i128-programs/boolean-kernel-candidate.zcve")
+        }
+        "boolean-kernel-padded" => {
+            include_bytes!("../../tests/fixtures/i128-programs/boolean-kernel-padded.zcve")
+        }
+        "retained-controller-original" => {
+            include_bytes!("../../tests/fixtures/i128-programs/retained-controller-original.zcve")
+        }
+        "retained-controller-candidate" => {
+            include_bytes!("../../tests/fixtures/i128-programs/retained-controller-candidate.zcve")
+        }
         _ => panic!("unknown artifact {name}"),
     }
 }
@@ -68,7 +127,7 @@ fn import(bytes: &[u8]) -> Program {
 
 fn cases() -> Vec<Value> {
     let fixtures: Value =
-        serde_json::from_str(include_str!("../../../../docs/benchmarks/cases.json"))
+        serde_json::from_str(include_str!("../../tests/fixtures/cases-i128.json"))
             .unwrap_or_else(|error| panic!("cases.json: {error}"));
     fixtures["cases"]
         .as_array()
@@ -101,7 +160,7 @@ fn case(id: &str) -> Value {
 fn profile_of(case: &Value) -> Profile {
     match case["profile"].as_str() {
         Some("FunctionalBoolV1") => Profile::FunctionalBoolV1,
-        _ => Profile::CheckedI64V1,
+        _ => Profile::CheckedI128V1,
     }
 }
 
@@ -348,13 +407,13 @@ fn functional_bool_v1_admits_only_the_total_boolean_subset() {
     let sixteen = program(bools(1), bools(16), vec![Op::Input(0)], vec![0; 16]);
     assert_eq!(profile.admit(&sixteen), Ok(2));
     assert!(Program::try_new(bools(1), bools(17), vec![Op::Input(0)], vec![0; 17]).is_err());
-    // The i64 profile admits arithmetic and bounds the domain by F3's cap.
-    assert_eq!(Profile::CheckedI64V1.admit(&dead_int), Ok(2));
+    // The i128 profile admits arithmetic and bounds the domain by F3's cap.
+    assert_eq!(Profile::CheckedI128V1.admit(&dead_int), Ok(2));
     let wide = program(vec![FULL], vec![FULL], vec![Op::Input(0)], vec![0]);
     assert_eq!(
-        Profile::CheckedI64V1.admit(&wide),
+        Profile::CheckedI128V1.admit(&wide),
         Err(ProfileRefusal::DomainTooLarge {
-            size: Some(1 << 64),
+            size: None,
             max: transform::DEFAULT_MAX_INPUT_TUPLES
         })
     );
@@ -363,8 +422,8 @@ fn functional_bool_v1_admits_only_the_total_boolean_subset() {
         Some(Profile::FunctionalBoolV1)
     );
     assert_eq!(
-        Profile::parse("checked-i64-v1"),
-        Some(Profile::CheckedI64V1)
+        Profile::parse("checked-i128-v1"),
+        Some(Profile::CheckedI128V1)
     );
     assert_eq!(Profile::parse("FunctionalBoolV1"), None);
 }
@@ -424,7 +483,7 @@ fn work_ceilings_scale_with_the_domain_under_hard_caps() {
 
 #[test]
 fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
-    let sum = |high: i64| {
+    let sum = |high: i128| {
         bytes_of(&program(
             vec![
                 Domain::Int { min: 0, max: 999 },
@@ -439,7 +498,7 @@ fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
     let wide = sum(99);
     let scaled = Request::admit_work(
         &wide,
-        Profile::CheckedI64V1,
+        Profile::CheckedI128V1,
         Limits::CEILING,
         None,
         None,
@@ -458,7 +517,7 @@ fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
     assert!(matches!(
         Request::admit(
             &wide,
-            Profile::CheckedI64V1,
+            Profile::CheckedI128V1,
             Limits::CEILING,
             Policy::DISABLED
         ),
@@ -470,7 +529,7 @@ fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
     assert!(matches!(
         Request::admit_work(
             &wide,
-            Profile::CheckedI64V1,
+            Profile::CheckedI128V1,
             Limits::CEILING,
             Some(needed + 1),
             None,
@@ -483,7 +542,7 @@ fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
     ));
     let lower = Request::admit_work(
         &wide,
-        Profile::CheckedI64V1,
+        Profile::CheckedI128V1,
         Limits::CEILING,
         None,
         Some(2 * needed),
@@ -503,7 +562,7 @@ fn a_request_takes_its_scaled_ceilings_unless_given_limits() {
     assert!(matches!(
         Request::admit_work(
             &widest,
-            Profile::CheckedI64V1,
+            Profile::CheckedI128V1,
             Limits::CEILING,
             None,
             None,
@@ -551,7 +610,7 @@ fn request_admission_follows_the_precedence_and_freezes_the_identity() {
     assert_eq!(
         Request::admit(
             &oversized,
-            Profile::CheckedI64V1,
+            Profile::CheckedI128V1,
             Limits::CEILING,
             Policy::DISABLED
         ),
@@ -572,7 +631,7 @@ fn request_admission_follows_the_precedence_and_freezes_the_identity() {
         })
     );
     // The controller has eight inputs, some integer: outside the Boolean
-    // profile (the input count is checked first), inside i64.
+    // profile (the input count is checked first), inside i128.
     let controller = artifact("retained-controller-original");
     assert_eq!(
         Request::admit(
@@ -586,7 +645,7 @@ fn request_admission_follows_the_precedence_and_freezes_the_identity() {
             max: 6
         }))
     );
-    let controller_request = request(controller, Profile::CheckedI64V1);
+    let controller_request = request(controller, Profile::CheckedI128V1);
     assert_eq!(controller_request.domain_size(), 384);
     // Work infeasible when the per-check limit is below the self-check.
     let mut tiny = Limits::CEILING;
@@ -607,7 +666,7 @@ fn request_admission_follows_the_precedence_and_freezes_the_identity() {
         request.cost(),
         Cost {
             nodes: 16,
-            bytes: 1_063
+            bytes: 1_064
         }
     );
     let record = request.json();
@@ -764,7 +823,7 @@ fn a_checked_improvement_replaces_the_incumbent_and_regressions_do_not() {
         Outcome::Equivalent {
             cost: Cost {
                 nodes: 7,
-                bytes: 763
+                bytes: 764
             },
             selection: Selection::CheckedImprovement
         }
@@ -802,7 +861,7 @@ fn a_checked_improvement_replaces_the_incumbent_and_regressions_do_not() {
     assert_eq!(report["status"], "best-checked-so-far");
     assert_eq!(
         report["incumbent"]["cost"],
-        json!({"nodes": 7, "bytes": 763})
+        json!({"nodes": 7, "bytes": 764})
     );
     assert_eq!(report["accounting"]["attempts"], 5);
     assert_eq!(report["accounting"]["checks"], 2);
@@ -1266,8 +1325,8 @@ fn check_work_is_precharged_and_exhaustion_is_inconclusive_not_a_difference() {
     let candidate_cost = Cost::measure(&import(candidate), candidate);
     // Whole-plan policy includes setup, unranking, exact output comparison,
     // bounded scheduling and finalization, beyond evaluator instruction work.
-    assert_eq!(request.check_work(candidate_cost), Some(282_871));
-    let candidate_work = 282_871;
+    assert_eq!(request.check_work(candidate_cost), Some(282_891));
+    let candidate_work = 282_891;
     let self_check = request.check_work(request.cost()).unwrap_or_default();
     let mut limits = Limits::CEILING;
     limits.check_work = self_check;
@@ -1436,7 +1495,7 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
             },
         ),
         (
-            json!({"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "fold", "rounds": 1}], "extractor": "tree", "profile": "checked-i64-v2"}),
+            json!({"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "fold", "rounds": 1}], "extractor": "tree", "profile": "checked-i128-v2"}),
             StrategyRefusal::Profile,
         ),
         (
@@ -1934,7 +1993,7 @@ fn resume_replays_the_replacement_charges_the_replay_and_continues_the_session()
                 .request()
                 .check_work(Cost {
                     nodes: 7,
-                    bytes: 763
+                    bytes: 764
                 })
                 .unwrap_or_default()
     );
@@ -1943,6 +2002,15 @@ fn resume_replays_the_replacement_charges_the_replay_and_continues_the_session()
         session.ledger().entries().len() + 1
     );
     assert_eq!(resumed.attempts().len(), 2);
+    let historical = &resumed.report()["attempts"][0]["feedback"];
+    assert_eq!(historical["kind"], "recorded-outcome");
+    assert_eq!(historical["replayed"], false);
+    assert_eq!(historical["outcome"], session.attempts()[0].outcome);
+    assert!(
+        session.attempts()[0]
+            .outcome
+            .starts_with("equivalent-without-improvement:")
+    );
     assert!(matches!(
         resumed.attempts()[1].feedback,
         Feedback::Equivalent {
@@ -2123,6 +2191,67 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
 }
 
 #[test]
+fn an_unreplayed_report_preserves_spend_and_never_trusts_the_retained_incumbent() {
+    for retained in [false, true] {
+        let original = artifact("boolean-kernel-original");
+        let candidate = artifact("boolean-kernel-candidate");
+        let mut session = Session::open(request(original, Profile::FunctionalBoolV1));
+        if retained {
+            attempt(&mut session, Proposal::Candidate(candidate.to_vec()));
+            assert!(session.incumbent().replacement().is_some());
+        }
+        let persisted = Persisted::of(&session);
+        let before = session.ledger().accounting();
+        let replayed = std::rc::Rc::new(std::cell::Cell::new(false));
+        let probe = std::rc::Rc::clone(&replayed);
+        replay_probe::arm(move || probe.set(true));
+        let ResumePlan::Replay(pending) = prepare_resume(persisted.stored(), 0) else {
+            panic!("expected replay plan");
+        };
+        let mut written = None;
+        let reserved = pending
+            .reserve(|ledger| {
+                written = Some(ledger.clone());
+                Ok::<(), Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {});
+        let report = reserved.into_unreplayed_report();
+        let written = written.unwrap_or_else(|| panic!("expected a value"));
+        assert!(!replayed.get(), "the refusal must not run replay work");
+        assert_eq!(report["authority"], "none");
+        assert_eq!(report["status"], "no-checked-improvement");
+        assert_eq!(report["resume"], "not-replayed");
+        assert_eq!(report["incumbent"], Value::Null);
+        assert_eq!(report["trusted_incumbent"], Value::Null);
+        assert_eq!(report["attempts"], json!([]));
+        assert_eq!(report["session"]["state"], "open");
+        assert_eq!(report["accounting"], written.accounting().json());
+        assert_eq!(report["ledger_head"], written.head().json());
+        assert_eq!(report["accounting"]["complete"], true);
+        assert_eq!(written.accounting().attempts, before.attempts);
+        assert_eq!(written.accounting().checks, before.checks);
+        assert_eq!(
+            written.accounting().replays,
+            before.replays + u8::from(retained)
+        );
+        if retained {
+            assert!(written.accounting().work_reserved > before.work_reserved);
+            // A later resume still has to pay and replay; no trust or refund
+            // can be obtained by serializing the refused reservation.
+            let mut interrupted = Persisted::of(&session);
+            interrupted.ledger = written.entries().iter().flat_map(Entry::line).collect();
+            interrupted.head = Some(written.head());
+            let resumed = resumed_session(&interrupted);
+            assert!(replayed.get());
+            assert!(
+                resumed.ledger().accounting().work_reserved > written.accounting().work_reserved
+            );
+            assert_eq!(resumed.incumbent(), session.incumbent());
+        }
+    }
+}
+
+#[test]
 fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() {
     let original = artifact("boolean-kernel-original");
     let candidate = artifact("boolean-kernel-candidate");
@@ -2285,9 +2414,13 @@ fn stored_witnesses_are_replayed_before_reuse_and_dropped_when_they_do_not_repro
     let resumed = resumed_session(&persisted);
     assert!(matches!(
         &resumed.attempts()[0].feedback,
-        Feedback::Incomplete { .. }
+        Feedback::Recorded { outcome, .. } if outcome == "different"
     ));
     assert_eq!(resumed.report()["witnesses_dropped_on_resume"], json!([0]));
+    assert_eq!(
+        resumed.report()["attempts"][0]["feedback"]["replayed"],
+        false
+    );
     // A witness stored against other candidate bytes is dropped too.
     let mut persisted = Persisted::of(&session);
     persisted.witnesses.push((
@@ -2479,7 +2612,7 @@ fn a_check_job_binds_its_candidate_and_work() {
         job.cost(),
         Cost {
             nodes: 7,
-            bytes: 763
+            bytes: 764
         }
     );
     assert_eq!(Some(job.work()), session.request().check_work(job.cost()));

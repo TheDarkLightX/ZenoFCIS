@@ -37,12 +37,46 @@ pub(super) struct Field {
     #[serde(rename = "type")]
     kind: Type,
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Type {
     Bool {},
-    Int { min: i64, max: i64 },
+    Int { min: i128, max: i128 },
 }
+
+// Internally tagged Serde enums buffer numbers through a representation that
+// cannot deserialize i128. Preserve each exact token until its kind is known.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DomainFields {
+    kind: String,
+    #[serde(default, deserialize_with = "present_bound")]
+    min: Option<Box<serde_json::value::RawValue>>,
+    #[serde(default, deserialize_with = "present_bound")]
+    max: Option<Box<serde_json::value::RawValue>>,
+}
+fn present_bound<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Box<serde_json::value::RawValue>>, D::Error> {
+    Deserialize::deserialize(d).map(Some)
+}
+
+impl<'de> Deserialize<'de> for Type {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let fields = DomainFields::deserialize(d)?;
+        match (fields.kind.as_str(), fields.min, fields.max) {
+            ("bool", None, None) => Ok(Self::Bool {}),
+            ("int", Some(min), Some(max)) => Ok(Self::Int {
+                min: serde_json::from_str(min.get()).map_err(serde::de::Error::custom)?,
+                max: serde_json::from_str(max.get()).map_err(serde::de::Error::custom)?,
+            }),
+            _ => Err(serde::de::Error::custom(
+                "invalid integer or boolean domain",
+            )),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Graph {
@@ -200,7 +234,7 @@ fn parse_op(op: &[Value]) -> Result<Op, String> {
     }
     Ok(match tag {
         "input" => Op::Input(node(1)?),
-        "int" => Op::Int(op[1].as_i64().ok_or_else(malformed)?),
+        "int" => Op::Int(scalar_integer(&op[1]).ok_or_else(malformed)?),
         "bool" => Op::Bool(op[1].as_bool().ok_or_else(malformed)?),
         "add" => Op::Add(node(1)?, node(2)?),
         "sub" => Op::Sub(node(1)?, node(2)?),
@@ -211,4 +245,48 @@ fn parse_op(op: &[Value]) -> Result<Op, String> {
         "select" => Op::Select(node(1)?, node(2)?, node(3)?),
         _ => return Err(malformed()),
     })
+}
+
+// Keep existing exact JSON integers, and use canonical decimal strings for
+// values beyond serde_json::Value's native integer range. Never cast a float.
+fn scalar_integer(value: &Value) -> Option<i128> {
+    if let Some(value) = value.as_i64() {
+        return Some(i128::from(value));
+    }
+    if let Some(value) = value.as_u64() {
+        return Some(i128::from(value));
+    }
+    let text = value.as_str()?;
+    let value = text.parse::<i128>().ok()?;
+    (text == value.to_string()).then_some(value)
+}
+
+#[cfg(test)]
+mod integer_tests {
+    use super::*;
+
+    #[test]
+    fn literals_use_exact_numbers_or_canonical_wide_decimal_strings() {
+        for value in [i128::MIN, -(1i128 << 100), 1i128 << 100, i128::MAX] {
+            assert!(
+                matches!(parse_op(&[Value::from("int"), Value::from(value.to_string())]),
+                Ok(Op::Int(found)) if found == value)
+            );
+        }
+        assert!(
+            matches!(parse_op(&[Value::from("int"), Value::from(u64::MAX)]),
+            Ok(Op::Int(value)) if value == i128::from(u64::MAX))
+        );
+        for text in [
+            "+1",
+            "01",
+            "-0",
+            "1.0",
+            "1e0",
+            "170141183460469231731687303715884105728",
+        ] {
+            assert!(parse_op(&[Value::from("int"), Value::from(text)]).is_err());
+        }
+        assert!(parse_op(&[Value::from("int"), serde_json::json!(1.0)]).is_err());
+    }
 }
