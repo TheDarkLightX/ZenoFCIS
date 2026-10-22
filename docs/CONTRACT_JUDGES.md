@@ -67,6 +67,22 @@ Its laws say that the value stays within 0 and 2 (law 500), that an accept is
 authorized and in range (law 501), and that an accepted `Inc` adds one and an
 accepted `Dec` subtracts one (law 502).
 
+## Is the starting state admitted?
+
+A profile, state lemma, reachable-state probe or run-property judgment starts
+only after the bound runtime Authority admits the declared genesis. Refusal
+reports `no-admissible-starting-state`, the first refusing law when available,
+and zero admissible starting and reachable states. It cannot become an
+inductive result over an empty run. `new --contract` applies the same gate
+before writing application files; ordinary compilation remains available for
+diagnosing a refused start. Symbolic induction checks admission before asking
+a solver. Table and collection checks use their respective runtime Authority.
+
+A scenario starting at declared genesis uses that admission too. A stated
+pre-state uses the state-invariant checks instead: initial-condition law 990
+constrains startup, rather than every later state. Existing decision laws,
+resource limits and rejection order remain independent checks.
+
 ## Do the laws pin the contract down?
 
 ```text
@@ -367,3 +383,25 @@ requires the controls, and the whole check, to fail. The acceptance scenarios
 `specification-gaps` and `core-profile` run these checks. Their pass is
 evidence about these subjects and that build, not a proof about every
 contract.
+## Background
+
+Edmund M. Clarke, E. Allen Emerson and A. Prasad Sistla, “Automatic
+Verification of Finite-State Concurrent Systems Using Temporal Logic
+Specifications,” *ACM Transactions on Programming Languages and Systems*
+8(2), 1986, is background for exhaustive finite-state verification. The
+starting-state and transition checks here are implementation-specific
+acceptance conditions within that broader tradition.
+
+## What is new here
+
+This release shares runtime genesis admission across the finite judges and
+application generation, and pairs contract decisions with bounded run
+observers. The comparative assessment of this combination is **prior-art
+search pending**.
+
+## Scope
+
+The judgments cover the declared finite domains and explicit resource limits.
+They remain advisory, and provide no shell execution, publication or external
+settlement authority. The tests and independent references qualify the named
+subjects and implementation, with the limits described above.
