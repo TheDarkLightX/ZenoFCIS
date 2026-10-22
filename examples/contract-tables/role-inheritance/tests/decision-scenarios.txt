@@ -1,0 +1,5 @@
+# LLM-generated scenario expectations, checked through the library Authority.
+# scenario a-permission-inherited-through-two-parents
+0 1 2 1 0 0 | 2 | 130 | accept - 0 1 2 1 0 0 | -
+0 1 2 1 0 0 | 1 | 130 | accept - 0 1 2 1 0 0 | -
+0 1 2 1 0 0 | 0 | 130 | accept - 0 1 2 1 0 0 | -

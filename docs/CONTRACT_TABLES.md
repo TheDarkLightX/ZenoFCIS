@@ -126,6 +126,91 @@ For a linear constant-bound form, write
 for K = 2. A nonconstant-bound count uses this linear form automatically.
 `check --expand` distinguishes Select terms from combinatorial clauses.
 
+## Recursive tables
+
+The ask: "a member may delegate a vote, but delegation must never form a
+cycle." A derived table computes a Boolean relation from the declared inputs;
+it adds no stored state. For three members, where stored target 0 means no
+delegate and target j+1 names member j:
+
+```text
+derived table 700 reach[i][j] in table 110 rounds 9 {
+  when true then post.100.110[i] == j + 1 ||
+    exists k in table 110 { reach[i][k] && reach[k][j] };
+  default false;
+};
+law 500 no_cycles on commit, genesis =
+  forall i in table 110 { !reach[i][i] };
+```
+
+The [delegation example](../examples/contract-tables/delegation/README.md)
+also computes the prospective relation from the state and command, so the
+decision refuses a cycle before committing. The
+[role inheritance example](../examples/contract-tables/role-inheritance/README.md)
+propagates a permission through parents, including cycles with no grant.
+
+### Declaration and safe fragment
+
+`derived table ID name[i] in table T rounds M { ROWS default V; };` declares
+one Boolean entry per index of T. Use `name[i][j]` for a relation over pairs
+of that same table's indices. ID must be unused. Indices are literals or
+bound table indices. M is explicit and must equal the number of Boolean
+entries: N for one index, N*N for a pair.
+
+Each row is `when G then V;`. The first true guard selects its value; when
+none holds, the explicit default supplies the value.
+
+- Guards read scalar state, command, context, stored tables and earlier
+  derived declarations. They may negate this lower data. They cannot read
+  the table being defined, including inside a quantifier's `where` guard.
+- Values and the default combine positive self entries with `&&`, `||`,
+  bounded `exists` and `forall` over fixed tables, constants and lower data.
+  Lower data may be negated. Self negation, comparisons and counts are
+  refused, even when a particular expression would happen to be monotone.
+- A derived declaration is one stratum. A reference to a later declaration,
+  mutual recursion, an unbounded quantifier or an invalid index is refused
+  with a reason at the source. Laws are a higher stratum and may negate or
+  count the completed results.
+
+### Meaning, work and expansion
+
+Every entry starts false. A round applies the selected rule to every entry
+using only the preceding round. For defined lower data, positivity makes
+this map monotone. With M
+Boolean entries, every strict increase adds a true entry, so its Mth iterate
+is the least fixed point. The compiler unrolls this finite bound and shares
+round results in an acyclic Boolean circuit. It never substitutes recursive
+formulas into an exponentially growing tree. For an expanded per-entry rule
+of size B, at most O(M*M*B) circuit operations are needed; existing bounded
+quantifier and count expansion costs remain subject to their own limits.
+
+`check --expand` prints the circuit and checks canonical roundtrip equality.
+It uses backward node references, ordinary formula leaves and Boolean
+operations. The contract compiler lowers them into the existing scalar and
+law graphs; the existing Step and Read meters charge their work. Parser
+limits and runtime budgets remain independent checks. The parser folds
+constant results when it can evaluate their lower formulas exactly. Undefined
+lower expressions keep the existing refusal semantics. Evaluation retains no
+mutable table or cache between requests.
+
+Derived names keep the observation roots written in their rules. A state
+lemma or a genesis law uses a definition over `post.`; a transition lemma
+may also read `pre.`, command and context. The role example includes both
+views explicitly. Probes can read a definition over `pre.` on every decision;
+a `post.` query is undefined on rejection, as for ordinary post-state fields.
+Decision expressions can consume the Boolean circuit printed by expansion.
+
+These checks are exact over the declared finite domains and within the
+existing formula, source, tuple and work limits. Larger domains remain
+inconclusive at their check limits. Derived tables are Boolean and have one
+or two indices over one fixed-size table; they are not keyed collections.
+
+The semantics follow van Emden and Kowalski (1976), *The Semantics of Predicate
+Logic as a Programming Language*, Journal of the ACM 23(4), 733–742. The
+stratification follows Apt, Blair and Walker (1988), *Towards a Theory of
+Declarative Knowledge*, in *Foundations of Deductive Databases and Logic
+Programming*, 89–148.
+
 ## Difference
 
 Before tables, a contract with six copies spelled out six fields and repeated
@@ -151,6 +236,10 @@ indicator sums; they do not qualify an implementation of this feature.
 This release adds table syntax, standalone table-form formulas and
 project-aware policy preparation to the existing checked scalar language.
 The comparative assessment of that combination is **prior-art search pending**.
+Ordinary table forms keep the existing scalar formula encoding. Recursive
+tables add a shared circuit formula, which lowers to existing metered graph
+operations. Results retain their scope: exact checks over the declared
+finite domains, with the existing resource limits.
 
 ## Scope
 

@@ -1,0 +1,8 @@
+# LLM-generated scenario expectations, checked through the library Authority.
+# scenario delegate-without-closing-a-cycle
+0 0 0 | 0 2 | 130 | accept - 2 0 0 | -
+2 0 0 | 1 3 | 130 | accept - 2 3 0 | -
+2 3 0 | 2 1 | 130 | reject 200 2 3 0 | -
+2 3 0 | 0 1 | 130 | reject 200 2 3 0 | -
+2 3 0 | 1 0 | 130 | accept - 2 0 0 | -
+2 0 0 | 0 0 | 130 | accept - 0 0 0 | -

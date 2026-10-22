@@ -1,9 +1,3 @@
-
-# Conditional zUSD interfaces, arithmetic evidence and economic-law scope.
-# Follow docs/PUBLICATION_POLICY.md before adding an entry.
-# Reviewed public user documentation, assurance references and executable fixtures.
-# The next 16 entries are frozen kernel-law oracle fixture copies: byte-identical
-# originals kept for regression tests, not user documentation.
 AGENTS.md
 CHANGELOG.md
 CONTRIBUTING.md
@@ -365,8 +359,10 @@ examples/collections/escrow/README.md
 examples/collections/library/README.md
 examples/collections/token-balances/README.md
 examples/contract-tables/README.md
+examples/contract-tables/delegation/README.md
 examples/contract-tables/library-limits/README.md
 examples/contract-tables/library-loans/README.md
+examples/contract-tables/role-inheritance/README.md
 examples/distribution-laws/README.md
 examples/distribution-laws/biased-reward/README.md
 examples/distribution-laws/lottery-reward/README.md

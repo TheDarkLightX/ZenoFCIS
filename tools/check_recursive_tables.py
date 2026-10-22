@@ -150,14 +150,14 @@ def reference(source, fields):
     return list(current.values())
 
 
-def project(kind, n):
+def project(kind, n, optional=False):
     relation = kind in ("relation", "delegation")
     header = f"""zeno 1;
 project 1 recursive_reference;
 type 100 state State;
 type 101 command Query;
 type 102 context Context;
-type 105 int Parent in 0..={0 if kind == 'relation' else n-1};
+type 105 int Parent in 0..={0 if kind == 'relation' else n if optional else n-1};
 type 106 int Flag in 0..=1;
 table 110 100 parent 105 size {n};
 variant 150 101 Query none;
@@ -167,7 +167,7 @@ reason 200 refused precedence 0;
     if kind in ("relation", "roles"):
         header += f"table 210 100 lower 106 size {n*n if kind == 'relation' else n};\n"
     if relation:
-        base = f"exists e in table 210 where e == i * {n} + j {{ pre.100.210[e] == 1 }}" if kind == "relation" else "pre.100.110[i] == j"
+        base = f"exists e in table 210 where e == i * {n} + j {{ pre.100.210[e] == 1 }}" if kind == "relation" else f"pre.100.110[i] == j{' + 1' if optional else ''}"
         rule = f"""derived table 700 reach[i][j] in table 110 rounds {n*n} {{
 when true then ({base}) || exists k in table 110 {{ reach[i][k] && reach[k][j] }};
 default false;
@@ -176,7 +176,7 @@ default false;
         queries = [f"reach[{i}][{j}]" for i in range(n) for j in range(n)]
     else:
         rule = f"""derived table 700 permission[i] in table 110 rounds {n} {{
-when true then pre.100.210[i] == 1 || exists j in table 110 {{ pre.100.110[i] == j && permission[j] }};
+when true then pre.100.210[i] == 1 || exists j in table 110 {{ pre.100.110[i] == j{' + 1' if optional else ''} && permission[j] }};
 default false;
 }};
 """
@@ -204,17 +204,17 @@ def main():
     results = {"comparisons": [], "sizes": []}
     with tempfile.TemporaryDirectory(prefix="recursive-reference-") as directory:
         folder = Path(directory)
-        for kind, n in [("relation", 3), ("delegation", 4), ("roles", 4)]:
-            source, rules, ids = project(kind, n)
+        for kind, n, optional in [("relation", 3, False), ("delegation", 4, False), ("delegation", 4, True), ("roles", 4, False), ("roles", 4, True)]:
+            source, rules, ids = project(kind, n, optional)
             (folder / "project.zeno").write_text(source)
             (folder / "rules.json").write_text(json.dumps(rules))
             states = []
             if kind == "relation":
                 states = [(0,) * n + edges for edges in itertools.product(range(2), repeat=n*n)]
             elif kind == "delegation":
-                states = list(itertools.product(range(n), repeat=n))
+                states = list(itertools.product(range(n + int(optional)), repeat=n))
             else:
-                states = [parents + grants for parents in itertools.product(range(n), repeat=n)
+                states = [parents + grants for parents in itertools.product(range(n + int(optional)), repeat=n)
                           for grants in itertools.product(range(2), repeat=n)]
             tuples = "".join(json.dumps([*state, 150, 130]) + "\n" for state in states)
             run = subprocess.run([str(args.driver), str(folder / "project.zeno"), str(folder / "rules.json")],
@@ -225,7 +225,7 @@ def main():
             for state, values in zip(states, actual):
                 expected = reference(source, dict(zip(ids, state)))
                 assert values == expected, (kind, state, expected, values)
-            results["comparisons"].append({"kind": kind, "states": len(states), "entries": len(actual[0]),
+            results["comparisons"].append({"kind": kind, "optional_none": optional, "states": len(states), "entries": len(actual[0]),
                                            "entry_checks": len(states) * len(actual[0]), "exit": run.returncode})
         for n in range(2, 7):
             source, _, _ = project("relation", n)

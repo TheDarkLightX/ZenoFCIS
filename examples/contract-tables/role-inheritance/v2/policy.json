@@ -1,0 +1,52 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "role-inheritance",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "permitted": "circuit { formula { 0 == command.101.120 }; false; true; formula { pre.100.210 == 1 }; formula { pre.100.110 == 0 + 1 }; and 4 1; formula { pre.100.110 == 1 + 1 }; and 6 1; or 5 7; formula { pre.100.110 == 2 + 1 }; and 9 1; or 8 10; or 3 11; select 2 12 1; formula { pre.100.211 == 1 }; formula { pre.100.111 == 0 + 1 }; and 15 1; formula { pre.100.111 == 1 + 1 }; and 17 1; or 16 18; formula { pre.100.111 == 2 + 1 }; and 20 1; or 19 21; or 14 22; select 2 23 1; formula { pre.100.212 == 1 }; formula { pre.100.112 == 0 + 1 }; and 26 1; formula { pre.100.112 == 1 + 1 }; and 28 1; or 27 29; formula { pre.100.112 == 2 + 1 }; and 31 1; or 30 32; or 25 33; select 2 34 1; and 4 13; and 6 24; or 36 37; and 9 35; or 38 39; or 3 40; select 2 41 1; and 15 13; and 17 24; or 43 44; and 20 35; or 45 46; or 14 47; select 2 48 1; and 26 13; and 28 24; or 50 51; and 31 35; or 52 53; or 25 54; select 2 55 1; and 4 42; and 6 49; or 57 58; and 9 56; or 59 60; or 3 61; select 2 62 1; and 15 42; and 17 49; or 64 65; and 20 56; or 66 67; or 14 68; select 2 69 1; and 26 42; and 28 49; or 71 72; and 31 56; or 73 74; or 25 75; select 2 76 1; and 0 63; formula { 1 == command.101.120 }; and 79 70; or 78 80; formula { 2 == command.101.120 }; and 82 77; or 81 83; } output 84"
+  },
+  "cases": [
+    {
+      "rule": "the selected role needs the permission",
+      "when": "!permitted",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "permit the request without changing roles",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "pre.100.110",
+        "111": "pre.100.111",
+        "112": "pre.100.112",
+        "210": "pre.100.210",
+        "211": "pre.100.211",
+        "212": "pre.100.212"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 1,
+    "112": 2,
+    "210": 1,
+    "211": 0,
+    "212": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "AuthoritySubjectRecipient",
+    "503": "RejectNoAuthority"
+  }
+}

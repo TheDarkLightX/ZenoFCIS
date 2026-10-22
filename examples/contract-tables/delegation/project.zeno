@@ -1,0 +1,43 @@
+zeno 1;
+project 1 delegation;
+namespace 2 voting;
+type 100 state Delegations;
+type 101 command Delegate;
+type 102 context Session;
+type 105 int Target in 0..=3;
+type 106 index Member of 110;
+table 110 100 delegates 105 size 3;
+field 120 101 member 106;
+field 121 101 target 105;
+variant 130 102 Session none;
+reason 200 cycle precedence 0;
+component 400 delegation {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+// Zero means no delegate; j+1 names member j.
+derived table 700 reach[i][j] in table 110 rounds 9 {
+  when true then post.100.110[i] == j + 1 ||
+    exists k in table 110 { reach[i][k] && reach[k][j] };
+  default false;
+};
+// The prospective relation is computed from immutable state and command.
+derived table 701 candidate[i][j] in table 110 rounds 9 {
+  when true then
+    (i == command.101.120 && command.101.121 == j + 1) ||
+    (i != command.101.120 && pre.100.110[i] == j + 1) ||
+    exists k in table 110 { candidate[i][k] && candidate[k][j] };
+  default false;
+};
+law 500 no_cycles on commit, genesis = forall i in table 110 { !reach[i][i] };
+law 501 frame on commit = forall i in table 110 where i != command.101.120 {
+  post.100.110[i] == pre.100.110[i]
+};
+law 502 selected_member on commit = forall i in table 110 where i == command.101.120 {
+  post.100.110[i] == command.101.121
+};
+law 550 cycle_required on reject = exists i in table 110 { candidate[i][i] };
