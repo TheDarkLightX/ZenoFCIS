@@ -214,7 +214,7 @@ fn derived_ids_are_disjoint_from_all_declarations() {
 }
 
 #[test]
-fn self_counts_are_refused_before_constant_folding() {
+fn self_counts_are_refused_before_constant_folding() -> Result<(), String> {
     for condition in [
         "circuit { formula { x[j] }; } output 0",
         "circuit { formula { !x[j] }; } output 0",
@@ -227,20 +227,24 @@ fn self_counts_are_refused_before_constant_folding() {
         }}; law 500 query = x[0];"
         );
         let errors = parse_project(&source, SourceLimits::default())
-            .expect_err("a constant count must not hide a forbidden self reference");
+            .err()
+            .ok_or("a constant count must not hide a forbidden self reference")?;
         assert!(errors.to_string().contains("count"), "{errors}");
     }
+    Ok(())
 }
 
 #[test]
-fn guard_checks_precede_folding_and_leave_positive_values_eligible() {
+fn guard_checks_precede_folding_and_leave_positive_values_eligible() -> Result<(), String> {
     let source = format!(
         "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{
         when count j in table 110 {{ circuit {{ formula {{ x[j] }}; }} output 0 }} >= 0 then true;
         default false;
     }};"
     );
-    let errors = parse_project(&source, SourceLimits::default()).expect_err("self-reading guard");
+    let errors = parse_project(&source, SourceLimits::default())
+        .err()
+        .ok_or("self-reading guard")?;
     assert!(errors.to_string().contains("guard"), "{errors}");
     let source = format!(
         "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{
@@ -252,6 +256,7 @@ fn guard_checks_precede_folding_and_leave_positive_values_eligible() {
         parse_project(&source, SourceLimits::default()).is_ok(),
         "a positive body remains allowed"
     );
+    Ok(())
 }
 
 #[test]
