@@ -19,15 +19,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if",
-                    "lower", "explain", "guide"]:
+                    "lower", "refine-check", "explain", "guide"]:
         p = sub.add_parser(command, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
         p.add_argument("--syntax", choices=["symbolic", "english"], default="symbolic")
         if command == "render":
             p.add_argument("--to", choices=["symbolic", "english"], required=True)
-        if command == "export":
-            p.add_argument("--out", type=Path, required=True)
+        if command in {"export", "lower"}:
+            p.add_argument("--out", type=Path, required=command == "export")
+        if command == "refine-check":
+            p.add_argument("contract", type=Path)
+            p.add_argument("--cli", type=Path, required=True)
+            p.add_argument("--max-checks", type=int, default=262144)
         if command == "qualify":
             p.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
             p.add_argument("--cli", type=Path)
@@ -59,7 +63,7 @@ def main():
         first = next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
         if first in {"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."}:
             return typed_or_effects(options, source, first)
-        if options.command in {"lower", "explain", "guide"}:
+        if options.command in {"explain", "guide"}:
             raise behavior.Refusal(f"The {options.command} command supports zal/effects/1 and zal/typed-fsm/1 sources")
         model = behavior2.parse_any(source, options.syntax)
         profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
@@ -94,9 +98,17 @@ def main():
                 result = module.why_not(model, *head, json.loads(options.want), options.scope, checker_identity())
             else:
                 result = module.what_if(model, *head, json.loads(options.change), checker_identity())
-        elif options.command == "export":
+        elif options.command in {"export", "lower"}:
+            if options.out is None:
+                raise behavior.Refusal("Finite-FSM lowering needs --out with an absent or empty directory")
             write_new(lower(model), options.out)
-            result = {"status": "exported", "revision": model.revision, "authority": "none"}
+            result = {"status": "lowered" if options.command == "lower" else "exported",
+                      "revision": model.revision, "authority": "none"}
+        elif options.command == "refine-check":
+            from factory import refine_check
+            result, code = refine_check(model, options.contract, options.cli, options.max_checks)
+            print(json.dumps(result, indent=2))
+            return code
         elif options.command == "qualify":
             root = options.root.resolve()
             target = Path(os.environ.get("CARGO_TARGET_DIR", str(root / "target")))

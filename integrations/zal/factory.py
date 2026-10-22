@@ -62,11 +62,13 @@ def lower(model: Model) -> dict[str, str]:
 
     project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
                "type 100 state ControlState;", "type 101 command Event;",
-               "type 102 context Observations;" if facts else "type 102 int UnitContext in 0..=0;",
+               "type 102 context Observations;",
                "type 105 data ControlLabel;", "field 110 100 control 105;"]
     if facts:
         project.append("type 106 bool ContextFact;")
         project.extend(f"field {fid} 102 observed_{name} 106;" for name, fid in facts.items())
+    else:
+        project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
     project.extend(f"variant {sid} 105 state_{name} none;" for name, sid in states.items())
     project.extend(f"variant {eid} 101 event_{name} none;" for name, eid in events.items())
     project.extend(f"reason {rid} refused_{name} precedence {i};" for i, (name, rid) in enumerate(reasons.items()))
@@ -224,10 +226,12 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     observed = bool(facts or inputs)
     project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
                "type 100 state ControlState;", "type 101 command Event;",
-               "type 102 context Observations;" if observed else "type 102 int UnitContext in 0..=0;",
+               "type 102 context Observations;",
                "type 105 data ControlLabel;"]
     if facts:
         project.append("type 106 bool ContextFact;")
+    if not observed:
+        project.extend(["type 106 int UnitContext in 0..=0;", "field 160 102 unit 106;"])
     project.extend(f"type {107 + i} int Variable{i} in {v.low}..={v.high};" for i, v in enumerate(model.variables))
     project.extend(f"type {111 + i} int Input{i} in {v.low}..={v.high};" for i, v in enumerate(model.inputs))
     project.append("field 110 100 control 105;")
@@ -342,6 +346,39 @@ def write_new(files: dict[str, str], destination: Path):
         path = destination / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents, encoding="ascii")
+
+
+def refine_check(model, contract: Path, cli: Path, max_checks=262144):
+    """Compare a contract to the existing ZAL lowering through the native checker.
+
+    The identity abstraction keeps the lowered state and input layouts. This
+    shell grants no authority and implements no decisions or refinement verdict.
+    """
+    files = lower(model)
+    states = len(model.states)
+    if isinstance(model, behavior2.Machine):
+        for variable in model.variables:
+            states *= variable.high - variable.low + 1
+    pins = {"schema": "zeno-fcis/contract-refinement/1", "abstraction": list(range(states)),
+            "invalid_state_law": 500}
+    for side, project, policy in [("abstract", files["project.zeno"].encode("ascii"), files["v2/policy.json"].encode("ascii")),
+                                  ("concrete", (contract / "project.zeno").read_bytes(), (contract / "v2/policy.json").read_bytes())]:
+        pins[f"{side}_project_sha256"] = hashlib.sha256(project).hexdigest()
+        pins[f"{side}_policy_sha256"] = hashlib.sha256(policy).hexdigest()
+    with tempfile.TemporaryDirectory(prefix="zal-refinement-") as temporary:
+        work = Path(temporary)
+        write_new(files, work / "abstract")
+        mapping = work / "abstraction.json"
+        mapping.write_text(json.dumps(pins), encoding="ascii")
+        command = [str(cli.resolve()), "contract", "refine-check", str(work / "abstract"), str(contract.resolve()),
+                   "--abstraction", str(mapping), "--max-checks", str(max_checks), "--format", "json"]
+        checked = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+    result = json.loads(checked.stdout)
+    return {"schema": "zal/contract-refinement/1", "revision": model.revision, "checker": checker_identity(),
+            "status": result.get("verdict", result.get("status")), "contract_check": result,
+            "scope": "native finite refinement of the existing lowering, with identical state and input layouts; "
+                     "ZAL correspondence is tested separately by the generated Authority examples",
+            "authority": "none"}, checked.returncode
 
 
 def qualify(model: Model, root: Path, cli: Path, output: Path | None = None):
