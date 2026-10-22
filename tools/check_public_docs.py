@@ -13,6 +13,7 @@ DOCUMENT_SUFFIXES = {".md", ".pdf", ".tex"}
 # Published documents without a document suffix: the agent index, the README
 # copied into every `zeno-fcis new --contract` application, and the Pages site.
 EXTRA_DOCUMENTS = frozenset({
+    "CITATION.cff",
     "NOTICE",
     "llms.txt",
     "crates/zeno-fcis-cli/contract-app/README.md.in",
