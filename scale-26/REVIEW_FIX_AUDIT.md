@@ -42,3 +42,24 @@ single-use closure; it introduces no mutable interface, retained state or alias.
 Native Authority references remain immutable; solver preparation has no runtime
 decision, metering or publication authority. Final source identity is recorded by
 `run_review_fix.py`; its results are scoped regression evidence pending review.
+
+## Background
+
+C. A. R. Hoare, *An Axiomatic Basis for Computer Programming*, Communications
+of the ACM, 1969, supplies standard assertion-based program reasoning.
+Leonardo de Moura and Nikolaj Bjørner, *Z3: An Efficient SMT Solver*, TACAS,
+2008, and Haniel Barbosa et al., *cvc5: A Versatile and Industrial-Strength
+SMT Solver*, TACAS, 2022, describe the two solver systems used here.
+
+## What is new here
+
+prior-art search pending (Commons gap-fb324b6fe17f). This is a maintenance
+repair of transition scope and its regression evidence. No comparative
+prior-art search was performed offline; the lead will record the search.
+
+## Scope
+
+The inventory concerns the stated declared-domain obligations and the
+six-input cross-mode regression. Encoding guards remain sampled comparisons.
+The Background references supply assertion and solver context, rather than
+validation of this encoding. Independent soundness review remains pending.
