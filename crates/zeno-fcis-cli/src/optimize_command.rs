@@ -57,6 +57,18 @@ pub(super) struct Arguments {
 pub(super) fn run(arguments: Arguments) -> u8 {
     let (exit, report) = optimize_files(&arguments);
     crate::print_json(&report);
+    if report["status"] == "unsupported-original" {
+        eprintln!(
+            "optimize refused: original node {} ({}) is outside the e-graph instruction set; next: {}",
+            report["detail"]["unsupported_node"]["index"],
+            report["detail"]["unsupported_node"]["opcode"]
+                .as_str()
+                .unwrap_or("unknown"),
+            report["detail"]["next_step"]
+                .as_str()
+                .unwrap_or("Inspect guide show program-search.")
+        );
+    }
     exit
 }
 
@@ -158,62 +170,78 @@ fn optimize_files(arguments: &Arguments) -> (u8, Value) {
             json!({"message": error.message}),
         );
     }
-    let (exit, mut report) =
-        match optimize::optimize_plan(&original, &plan, &supplied, max_input_tuples) {
-            Outcome::Refused(Refused::NotAdmitted { code }) => result(
-                crate::INVALID,
-                "refused",
-                json!({"reason": "original-not-admitted", "code": code}),
-            ),
-            Outcome::Refused(Refused::EmptyInputDomain) => result(
-                crate::INVALID,
-                "refused",
-                json!({"reason": "empty-input-domain"}),
-            ),
-            Outcome::Refused(Refused::OutsideProfile(refusal)) => result(
-                crate::INVALID,
-                "refused",
-                json!({"reason": "original-outside-profile", "profile": refusal.json()}),
-            ),
-            Outcome::Inconclusive(stop) => result(
-                crate::BLOCKED,
-                "inconclusive",
-                json!({
-                    "cause": "domain-too-large",
-                    "domain_size": stop.size.map(|size| size.to_string()),
-                    "max_input_tuples": stop.limit
-                }),
-            ),
-            Outcome::Searched(mut search) => {
-                let indexed =
-                    indexed_branches.then(|| optimize::indexed_branches(&mut search, &original));
-                let mut detail = search.json();
-                if let Some(indexed) = indexed {
-                    detail["indexed_branches"] = indexed;
-                }
-                match &search.best {
-                    Some(best) => {
-                        let receipt_bytes = best.equivalence.receipt();
-                        if let Some(path) = candidate_out
-                            && let Err(error) = crate::atomic_create(path, &best.bytes)
-                        {
-                            return io_failure(&error);
-                        }
-                        if let Some(path) = receipt
-                            && let Err(error) = crate::atomic_create(path, &receipt_bytes)
-                        {
-                            return io_failure(&error);
-                        }
-                        detail["candidate_path"] =
-                            json!(candidate_out.map(|path| path.display().to_string()));
-                        detail["receipt_path"] =
-                            json!(receipt.map(|path| path.display().to_string()));
-                        result(crate::OK, "improved", detail)
+    let (exit, mut report) = match optimize::optimize_plan(
+        &original,
+        &plan,
+        &supplied,
+        max_input_tuples,
+    ) {
+        Outcome::Refused(Refused::NotAdmitted { code }) => result(
+            crate::INVALID,
+            "refused",
+            json!({"reason": "original-not-admitted", "code": code}),
+        ),
+        Outcome::Refused(Refused::EmptyInputDomain) => result(
+            crate::INVALID,
+            "refused",
+            json!({"reason": "empty-input-domain"}),
+        ),
+        Outcome::Refused(Refused::OutsideProfile(refusal)) => result(
+            crate::INVALID,
+            "refused",
+            json!({"reason": "original-outside-profile", "profile": refusal.json()}),
+        ),
+        Outcome::Inconclusive(stop) => result(
+            crate::BLOCKED,
+            "inconclusive",
+            json!({
+                "cause": "domain-too-large",
+                "domain_size": stop.size.map(|size| size.to_string()),
+                "max_input_tuples": stop.limit
+            }),
+        ),
+        Outcome::Searched(mut search) => {
+            let indexed =
+                indexed_branches.then(|| optimize::indexed_branches(&mut search, &original));
+            let mut detail = search.json();
+            if let Some(indexed) = indexed {
+                detail["indexed_branches"] = indexed;
+            }
+            match &search.best {
+                Some(best) => {
+                    let receipt_bytes = best.equivalence.receipt();
+                    if let Some(path) = candidate_out
+                        && let Err(error) = crate::atomic_create(path, &best.bytes)
+                    {
+                        return io_failure(&error);
                     }
-                    None => result(crate::BLOCKED, "no-checked-improvement", detail),
+                    if let Some(path) = receipt
+                        && let Err(error) = crate::atomic_create(path, &receipt_bytes)
+                    {
+                        return io_failure(&error);
+                    }
+                    detail["candidate_path"] =
+                        json!(candidate_out.map(|path| path.display().to_string()));
+                    detail["receipt_path"] = json!(receipt.map(|path| path.display().to_string()));
+                    result(crate::OK, "improved", detail)
+                }
+                None => {
+                    if let Some(node) = search.runs.iter().find_map(|run| run.unsupported_original)
+                    {
+                        detail["reason"] = json!("unsupported-original-node");
+                        detail["unsupported_node"] =
+                            json!({"index": node.index, "opcode": node.opcode});
+                        detail["next_step"] = json!(
+                            "Use transform with a supplied candidate checked against this original, or request support for this opcode; changing limits cannot add instruction support."
+                        );
+                        result(crate::BLOCKED, "unsupported-original", detail)
+                    } else {
+                        result(crate::BLOCKED, "no-checked-improvement", detail)
+                    }
                 }
             }
-        };
+        }
+    };
     report["original_sha256"] = json!(transform::sha256_hex(&original));
     report["strategy_sha256"] = json!(transform::sha256_hex(&strategy_bytes));
     report["limits"] = json!({

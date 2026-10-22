@@ -164,12 +164,20 @@ impl Accepted {
     }
 }
 
+/// An admitted instruction the proposer cannot represent, without its operands.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct UnsupportedOriginalNode {
+    pub(crate) index: usize,
+    pub(crate) opcode: &'static str,
+}
+
 /// One strategy's run within a search, from its own e-graph.
 #[derive(Debug)]
 pub(crate) struct Run {
     pub(crate) phases_requested: usize,
     /// Why the run ended before its last phase, when it did.
     pub(crate) stopped: Option<&'static str>,
+    pub(crate) unsupported_original: Option<UnsupportedOriginalNode>,
     pub(crate) enodes: u32,
     pub(crate) classes: u32,
     /// Merges the e-graph accepted and refused.
@@ -186,7 +194,7 @@ pub(crate) struct Run {
 
 impl Run {
     fn json(&self, index: usize) -> Value {
-        json!({
+        let mut report = json!({
             "run": index,
             "phases_requested": self.phases_requested,
             "stopped": self.stopped,
@@ -202,7 +210,12 @@ impl Run {
                 "budget_exhausted": self.tables.3,
             },
             "work": self.work,
-        })
+        });
+        if let Some(node) = self.unsupported_original {
+            report["unsupported_original_node"] =
+                json!({"index": node.index, "opcode": node.opcode});
+        }
+        report
     }
 }
 
@@ -584,6 +597,7 @@ fn run_strategy(
     let mut run = Run {
         phases_requested: strategy.phases.len(),
         stopped: None,
+        unsupported_original: None,
         enodes: 0,
         classes: 0,
         merges: 0,
@@ -605,6 +619,19 @@ fn run_strategy(
         }
         Err(AddError::Type(_)) => {
             run.stopped = Some("original-not-typable");
+            // Admission already validated references. Supplying an image for
+            // every reference isolates unsupported opcodes using the same
+            // conversion as the proposer, without repeating a type checker.
+            run.unsupported_original = judging
+                .program
+                .nodes()
+                .iter()
+                .enumerate()
+                .find(|(_, op)| egraph::ENode::from_op(op, |id| Some(u32::from(id))).is_none())
+                .map(|(index, op)| UnsupportedOriginalNode {
+                    index,
+                    opcode: crate::neural_loop::profiles::opcode_name(op),
+                });
             return run;
         }
     };

@@ -34,7 +34,8 @@
     "invalid-strategy": "Repair the closed strategy document or profile.",
     "output-exists": "Choose fresh candidate/receipt paths; nothing was searched.",
     "io-error": "Repair regular input files or output access and retry.",
-    "refused": "Unsupported input/profile; inspect reason and use supported canonical bytes."
+    "refused": "Unsupported input/profile; inspect reason and use supported canonical bytes.",
+    "unsupported-original": "Exit 2; the proposer cannot represent the named original opcode. No checked candidate was accepted. Read unsupported_node and next_step; increasing search limits does not add opcode support."
   },
   "limits": {
     "minimal_support_table_tuples_cap": 65536,
@@ -57,7 +58,8 @@
   },
   "refusals": {
     "program-encoding": "Export canonical program bytes; policy.zcve is not a standalone program.",
-    "strategy-unavailable": "Use the supported profile and closed strategy vocabulary."
+    "strategy-unavailable": "Use the supported profile and closed strategy vocabulary.",
+    "unsupported-original-node": "Use transform with a supplied candidate checked against the original, or request opcode support; preserve the original domain and semantics."
   },
   "cost": {
     "measured_units": "unknown",
@@ -73,6 +75,26 @@
         "schema": "zeno-fcis/optimize-result/1"
       },
       "contains": []
+    },
+    {
+      "command": "zeno-fcis contract export-program examples/arithmetic-fee --out \"$WORK/fee.zcve\"",
+      "exit": 0,
+      "expected": {},
+      "contains": [
+        "wrote the decision program"
+      ]
+    },
+    {
+      "command": "zeno-fcis optimize --program \"$WORK/fee.zcve\"",
+      "exit": 2,
+      "expected": {
+        "status": "unsupported-original",
+        "detail.unsupported_node.index": 4,
+        "detail.unsupported_node.opcode": "MulDivCeil"
+      },
+      "contains": [
+        "next: Use transform"
+      ]
     }
   ],
   "example": {
@@ -128,7 +150,21 @@ zeno-fcis optimize --program crates/zeno-fcis-cli/tests/fixtures/i128-door-progr
 
 Expected: exit 0; {"schema": "zeno-fcis/optimize-result/1", "status": "improved"}.
 
+```sh
+zeno-fcis contract export-program examples/arithmetic-fee --out "$WORK/fee.zcve"
+```
+
+Expected: exit 0; ["wrote the decision program"].
+
+```sh
+zeno-fcis optimize --program "$WORK/fee.zcve"
+```
+
+Expected: exit 2; {"detail.unsupported_node.index": 4, "detail.unsupported_node.opcode": "MulDivCeil", "status": "unsupported-original"}.
+
 ## Verdicts
+
+`unsupported-original`: Exit 2; the proposer cannot represent the named original opcode. No checked candidate was accepted. Read unsupported_node and next_step; increasing search limits does not add opcode support.
 
 `improved`: A smaller candidate passed full-domain transform checking; replay its receipt.
 
@@ -162,7 +198,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 Read the result scope before revising the input. No report grants runtime or publication authority.
 
-Refusals and remedies: {"program-encoding": "Export canonical program bytes; policy.zcve is not a standalone program.", "strategy-unavailable": "Use the supported profile and closed strategy vocabulary."}
+Refusals and remedies: {"program-encoding": "Export canonical program bytes; policy.zcve is not a standalone program.", "strategy-unavailable": "Use the supported profile and closed strategy vocabulary.", "unsupported-original-node": "Use transform with a supplied candidate checked against the original, or request opcode support; preserve the original domain and semantics."}
 
 ## Worked example
 

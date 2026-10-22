@@ -935,6 +935,7 @@ refused. With a portfolio, the top-level `enodes` and
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
+| `unsupported-original` | 2 | The e-graph cannot represent an original instruction and no supplied or indexed candidate was accepted. `detail.unsupported_node` names its index and opcode; `next_step` gives a checked-candidate route. A one-line diagnostic is also printed on stderr. No candidate or receipt is written. |
 | `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
 | `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000); no candidate could be judged, so nothing was searched. |
 | `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |

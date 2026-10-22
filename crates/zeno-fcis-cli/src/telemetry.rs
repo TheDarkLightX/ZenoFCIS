@@ -220,9 +220,15 @@ pub(crate) fn observe(value: &Value) {
         Some("inconclusive" | "not-inductive" | "unknown" | "UNKNOWN" | "blocked") => {
             Some("unknown")
         }
-        Some("refused" | "invalid" | "error" | "contract-invalid" | "malformed" | "vacuous") => {
-            Some("refused")
-        }
+        Some(
+            "refused"
+            | "invalid"
+            | "error"
+            | "contract-invalid"
+            | "malformed"
+            | "vacuous"
+            | "unsupported-original",
+        ) => Some("refused"),
         _ => None,
     };
     if let Some(class) = class {
