@@ -41,7 +41,7 @@ selection, durable replay/state comparison and physical effects belong to the
 host. A tool report or passing source test is not that runtime capability.
 
 Standalone finite synthesis remains useful. Assess the Cartesian spaces with
-`assess_finite_problem` or the CLI. `finite-i64/1` has 16 fields per side, 256 nodes
+`assess_finite_problem` or the CLI. `zeno-fcis/finite-i128/1` has 16 fields per side, 256 nodes
 per graph, 65,536 inputs, 4,096 outputs and 100 million graph-node work units.
 When the complete reviewed relation fits, use `synthesize_finite_core`/`synth run`,
 `synth run --check` and `verify_finite_core`/`synth verify` on the exact target.

@@ -477,7 +477,7 @@ schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
 final newline. It records both programs' SHA-256 digests, sizes and node
 counts, the domains, both limits, the tuples checked, the Step usage report
 and the checker identity: the checker's semantics version,
-`zeno-fcis/transform-check/3`, and the library's evaluator digest. The
+`zeno-fcis/transform-check/5`, and the library's evaluator digest. The
 semantics version changes only with a deliberate change of what the check
 means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
 pin it, so a refactor of the checker or a new crate version changes no
@@ -514,8 +514,9 @@ that already contains a witness.
 | `--work-units` | 1000000000000 | Complete reservation must fit |
 | `--deadline-ms` | 60000 | 1–60000 |
 
-These flags require `--offline-parallel`. This mode uses the Linux contained
-runtime described in [Installation](INSTALLATION.md#contained-checker-runtime).
+These flags require `--offline-parallel`. On Linux this mode requires
+`--containment-backend systemd`; the default backend yields an inconclusive
+containment result. This mode uses the Linux contained runtime described in [Installation](INSTALLATION.md#contained-checker-runtime).
 On macOS it prints one JSON result with `"status":"inconclusive"`,
 `"authority":"none"`, `"reason":"containment-unavailable:platform"` and
 `"accounting_complete":false`, exits 2, and checks and writes nothing; the
@@ -915,6 +916,9 @@ full domain at the full Step budget with the default declared Step limit of
 bytes, largest Step usage, canonical bytes). Step usage is reported from the
 receipt and never compared for equivalence.
 
+`--indexed-branches` tries indexed branch proposals after ordinary search;
+the exact transform checker still decides acceptance.
+
 Results use schema `zeno-fcis/optimize-result/1`. Every result has a `detail`
 object; once the program and strategy are read, the report also carries
 `original_sha256`, `strategy_sha256` (of the strategy file, or of the built-in
@@ -930,7 +934,7 @@ reason), every candidate with its run and verdict (`accepted`,
 `accepted-not-better`, `counterexample`, `inconclusive`, `refused`,
 `not-smaller`, `duplicate`, `not-better-than-incumbent`, `unextractable`), each
 supplied program with its digest, size, verdict and whether it was fused, and
-`best` with its run and phase (or the index of the supplied program it is),
+`best` with its run and `phase_index` (or the index of the supplied program it is),
 the candidate's digest, sizes, largest Step usage and its complete transform
 receipt. Each run also reports how many supplied roots were merged and
 refused. With a portfolio, the top-level `enodes` and

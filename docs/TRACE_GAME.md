@@ -14,6 +14,52 @@ declared class can meet a requirement. These are different evidence kinds.
 
 ## A journey
 
+For a caller-supplied contract game, use:
+
+```sh
+python3 -B tools/trace_game/game.py certify --game test-data/trace-games/escrow-safe.json --out ../escrow-game-evidence
+python3 -B tools/trace_game/certificate_check.py ../escrow-game-evidence certificate.json
+```
+
+`game.py` takes `check`, `certify` or `select-guard`. The input is at most
+64 KiB of integral JSON with unique keys and schema `zeno-fcis/game/1`:
+
+- `contract`: contract directory relative to the game file;
+- `actors`: 1–16 objects with unique `id`, Boolean `compromised`, and
+  `command`/`context` objects mapping every input position to a nonempty list
+  of distinct integer values;
+- `coalition_bound`: 1 through the actor count;
+  `compromised_actor_bound`: 0 through that count;
+- `objective`: `kind` (`safety` or `reachability`), a single law `formula`
+  of at most 8,192 characters, and optional `on` decision classes from
+  `Accept`, `Reject`, `CommittedFailure`, `Refused`, `Blocked` (default all);
+- optional `guards`: 1–32 distinct pre-state/command/context law expressions,
+  default `["true"]`; optional `K`: 0–1000, used only by `check` (default 6);
+  optional `observation`: only `"perfect"` is supported.
+
+Safety forbids the objective formula; reachability requires every permitted
+event history to reach it. All actor events are environment choices.
+`certify` and `check` fix guard 0; `select-guard` chooses one fixed guard
+before play. A false guard blocks into a stutter. This interface does not
+select a reactive controller. Pre/post include reject/refusal stutters;
+`decision_reason` is 0 when absent. Capabilities must name every non-state
+input, and the expanded event list is limited to 100,000 entries.
+
+Fresh output must be outside the repository. `--native` can supply a prebuilt
+`trace_game_input`; otherwise the command builds it offline. Retained lineages
+and unsigned scalar contracts yield `UNKNOWN`. The existing 10,000-state,
+100,000-edge, 30-second construction and 1,000,000-unit/30-second solver limits
+are shared across guard attempts. Result files include `game-binding.json`,
+`native-table.json`, `certificate.json` and `verdict.json`.
+
+Read `evidence`, not only exit status. Completed `game.py` results exit 0,
+including `counterexample` and `no guard in class`; `checked up to K`,
+`certified safety` and `certified reachability` have distinct scopes. Invalid
+input or a resource stop exits 2 with `UNKNOWN`. The independent certificate
+checker exits 0 when it accepts the evidence, including a bound `UNKNOWN`
+diagnostic, and 2 on refusal. A repeated generic safety `scope` string on a
+negative/unknown result does not override its `evidence` and `claim`.
+
 **The ask, in one line:** "Can anyone in this withdrawal policy move money without permission, or block my exit
 past its deadline?"
 
@@ -309,3 +355,12 @@ Scope: finite declared arenas, sure safety under partial observation, and
 perfect-information reachability and omega objectives under the stated
 conventions. This is separate from native contract execution and release
 qualification.
+
+## Method background and scope
+
+Edmund M. Clarke and E. Allen Emerson, “Design and Synthesis of Synchronization
+Skeletons Using Branching Time Temporal Logic”, Logics of Programs, 1981,
+provides background for finite graph model checking. Checked closure sets and
+decreasing ranks establish only their declared finite-game claims. The JSON
+interface and evidence binding are implementation choices; no new game-solving
+method is claimed here.

@@ -258,6 +258,7 @@ open with input witnesses. `determined_by_laws` covers the exported laws;
 cannot express the complete outbox requirement. A committing answer for a
 channel-bearing contract must give `deliveries: []`, a complete list, or
 `deliveries: "case"`; omission is refused instead of repeating the question.
+The law-only term `decision_reason` also applies to failure laws without genesis.
 Conflicts include an input and the requirements responsible; proposed-law
 false alarms include the owning answer, scope and formula beside the law ID.
 
@@ -1100,3 +1101,12 @@ of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
 background for the exhaustive finite checks described here. Shared determination
 reporting covers the declared finite domains and retains the runtime Authority;
 its comparative prior-art search is pending.
+
+## Method background and scope
+
+Armando Solar-Lezama et al., “Combinatorial Sketching for Finite Programs”,
+ASPLOS, 2006, supplies background for counterexample-guided synthesis; Dana
+Angluin, “Learning Regular Sets from Queries and Counterexamples”, Information
+and Computation, 1987, supplies background for query and counterexample loops.
+These commands use their stated finite grammars, domains and independent checks;
+no new synthesis method or runtime publication guarantee is claimed.

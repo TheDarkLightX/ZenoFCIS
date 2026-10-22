@@ -54,7 +54,8 @@ component ID name { COMPONENT_ITEMS }
 wire COMPONENT.PORT -> COMPONENT.PORT;
 merge [COMPONENT, ...];
 law ID name = RELATIONAL_FORMULA;
-law ID name on any|accept|reject|reject:REASON_ID|failure|commit[, genesis] = RELATIONAL_FORMULA;
+law ID name on any|accept|reject|failure|commit[, genesis] = RELATIONAL_FORMULA;
+law ID name on reject:REASON_ID = INPUT_FORMULA;
 claim ID name BACKEND MODE = FORMULA;
 claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure [LAW, ...]] = STATE_FORMULA;
 ```
@@ -79,7 +80,13 @@ not see.
 A law may declare the decisions its runtime law manifest enforces it on:
 - `on accept`, `on reject`, or `on failure` (committed failures);
 - `on commit`, for accepts and committed failures;
-- `on any`, for every decision.
+- `on any`, for every decision;
+- `on reject:REASON_ID`, for rejects with that declared reason. Contract
+  compilation restricts this formula to pre-state, command and context.
+
+The contract law term `decision_reason` is numeric and is available with
+`on reject` or `on failure`, without genesis; see
+[contract laws](CONTRACT_RULES.md#laws).
 
 `, genesis` marks a law that also constrains the genesis state. The scopes
 mirror the manifest's `DecisionScope` and `GenesisApplicability`. A declared
@@ -177,3 +184,10 @@ of Finite-State Concurrent Systems Using Temporal Logic Specifications,”
 background for the exhaustive finite checks described here. Shared determination
 reporting covers the declared finite domains and retains the runtime Authority;
 its comparative prior-art search is pending.
+
+## Method background and scope
+
+C. A. R. Hoare, “An Axiomatic Basis for Computer Programming”, Communications
+of the ACM, 1969, is background for explicit program assertions. This language
+reference describes the implemented finite declarations and admission rules;
+no new proof method or unbounded program guarantee is claimed.

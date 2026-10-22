@@ -14,22 +14,29 @@
     "runtime deployment from emitted code alone"
   ],
   "inputs": [
-    "PROBLEM: language-neutral finite contract JSON; schema/caps unknown here. Use synth discover before authoring; origins are supplied data."
+    "PROBLEM: zeno-fcis/synthesis-problem/1 JSON, at most 262,144 bytes; profile zeno-fcis/finite-i128/1. Run synth discover for operations, adapters and limits."
   ],
   "outputs": [
-    "Discovery stdout zeno-fcis/synthesis-discovery/1; synthesis result schemas use /2 (exact ids unknown here). Read status, bounds, candidate and conformance; writes target artifacts."
+    "discover: zeno-fcis/synthesis-discovery/1; run: zeno-fcis/synthesis-result/2 and zeno-fcis/synthesis-artifact/2 manifest; verify: zeno-fcis/synthesis-conformance/1. Read status, semantic scope and runtime_conformance."
   ],
   "exit_codes": {
-    "0": "requested result completed",
-    "1": "invalid specification or refutation",
-    "2": "blocked or inconclusive; no acceptance",
-    "3": "filesystem or execution failure",
+    "0": "discover completed, run selected/current, or verify passed",
+    "1": "invalid-problem, unrealizable, no-solution, contract-trap, artifact-drift or conformance-failed",
+    "2": "incomplete, limit-exceeded, indeterminate or conformance-unknown",
+    "3": "I/O failure",
     "64": "invalid command-line usage"
   },
   "verdicts": {
-    "complete": "Only the complete declared finite problem is covered; run synth verify.",
-    "inconclusive": "Budget stopped; retain no completeness claim.",
-    "refused": "Repair grammar or reduce to supported finite fragment."
+    "selected": "Finite solution emitted; runtime_conformance remains not-run until verify.",
+    "current": "run --check recomputed the exact existing artifact set.",
+    "passed": "verify ran the target on every admitted input and matched interpreter/relation.",
+    "unrealizable": "A declared input has no allowed output.",
+    "no-solution": "No candidate in the complete admitted search space satisfied the finite relation.",
+    "contract-trap": "A finite contract observation failed; inspect input/output.",
+    "artifact-drift": "Recomputed files differ from the supplied artifacts.",
+    "incomplete / limit-exceeded / indeterminate": "Budget or checker stop; no complete result.",
+    "conformance-unknown / conformance-failed": "Target execution incomplete or observations disagreed.",
+    "invalid-problem / refused": "Inspect the admission diagnostic; no synthesis acceptance."
   },
   "limits": {
     "all_defaults_and_caps": "unknown"
@@ -88,7 +95,7 @@ unbounded program synthesis; runtime deployment from emitted code alone.
 
 ## Inputs
 
-PROBLEM: language-neutral finite contract JSON; schema/caps unknown here. Use synth discover before authoring; origins are supplied data.
+PROBLEM: zeno-fcis/synthesis-problem/1 JSON, at most 262,144 bytes; profile zeno-fcis/finite-i128/1. Run synth discover for operations, adapters and limits.
 
 Engine: Complete bounded semantic checking and target emission; verify separately executes a complete finite conformance corpus.
 
@@ -106,15 +113,29 @@ Expected: exit 0; [].
 
 ## Verdicts
 
-`complete`: Only the complete declared finite problem is covered; run synth verify.
+`selected`: Finite solution emitted; runtime_conformance remains not-run until verify.
 
-`inconclusive`: Budget stopped; retain no completeness claim.
+`current`: run --check recomputed the exact existing artifact set.
 
-`refused`: Repair grammar or reduce to supported finite fragment.
+`passed`: verify ran the target on every admitted input and matched interpreter/relation.
 
-Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
+`unrealizable`: A declared input has no allowed output.
 
-Outputs: ["Discovery stdout zeno-fcis/synthesis-discovery/1; synthesis result schemas use /2 (exact ids unknown here). Read status, bounds, candidate and conformance; writes target artifacts."]
+`no-solution`: No candidate in the complete admitted search space satisfied the finite relation.
+
+`contract-trap`: A finite contract observation failed; inspect input/output.
+
+`artifact-drift`: Recomputed files differ from the supplied artifacts.
+
+`incomplete / limit-exceeded / indeterminate`: Budget or checker stop; no complete result.
+
+`conformance-unknown / conformance-failed`: Target execution incomplete or observations disagreed.
+
+`invalid-problem / refused`: Inspect the admission diagnostic; no synthesis acceptance.
+
+Exit codes: {"0": "discover completed, run selected/current, or verify passed", "1": "invalid-problem, unrealizable, no-solution, contract-trap, artifact-drift or conformance-failed", "2": "incomplete, limit-exceeded, indeterminate or conformance-unknown", "3": "I/O failure", "64": "invalid command-line usage"}
+
+Outputs: ["discover: zeno-fcis/synthesis-discovery/1; run: zeno-fcis/synthesis-result/2 and zeno-fcis/synthesis-artifact/2 manifest; verify: zeno-fcis/synthesis-conformance/1. Read status, semantic scope and runtime_conformance."]
 
 ## Cost
 
@@ -141,6 +162,8 @@ zeno-fcis synth discover
 Expected: exit 0; [].
 
 ## See also
+
+Background: Armando Solar-Lezama et al., “Combinatorial Sketching for Finite Programs”, ASPLOS, 2006. This card describes bounded finite enumeration and separate target conformance; it makes no new method claim.
 
 Sources: {"engine": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "exit_codes": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "inputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "limits": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "outputs": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "refusals": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "synopsis": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help", "verdicts": "docs/CLI_REFERENCE.md:353-365; zeno-fcis synth --help"}
 

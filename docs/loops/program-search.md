@@ -106,14 +106,14 @@
     "contains": []
   },
   "sources": {
-    "synopsis": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "engine": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "inputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "outputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "exit_codes": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "verdicts": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "limits": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425",
-    "refusals": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425"
+    "synopsis": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "engine": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "inputs": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "outputs": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "exit_codes": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "verdicts": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "limits": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs",
+    "refusals": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs"
   },
   "commands": [
     "optimize"
@@ -176,9 +176,9 @@ Expected: exit 2; {"detail.unsupported_node.index": 4, "detail.unsupported_node.
 
 `output-exists`: Choose fresh candidate/receipt paths; nothing was searched.
 
-`io-error`: Repair regular input files or output access and retry.
+`io-error`: Repair regular input files or output access.
 
-`refused`: Unsupported input/profile; inspect reason and use supported canonical bytes.
+`refused`: Unsupported input/profile; inspect reason and canonical bytes.
 
 Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
@@ -224,6 +224,6 @@ a candidate over its declared finite domain. Proposal search and file creation
 provide no decision or publication authority.
 
 
-Sources: {"engine": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "exit_codes": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "inputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "limits": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "outputs": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "refusals": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "synopsis": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425", "verdicts": "docs/CLI_REFERENCE.md:775-959; docs/CLI_REFERENCE.md:368-425"}
+Sources: {"engine": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "exit_codes": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "inputs": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "limits": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "outputs": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "refusals": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "synopsis": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs", "verdicts": "docs/CLI_REFERENCE.md#checked-optimizer; docs/CLI_REFERENCE.md#contract-program-export; crates/zeno-fcis-cli/src/optimize_command.rs"}
 
 Run `zeno-fcis guide find "search for a smaller program"` for related cards.

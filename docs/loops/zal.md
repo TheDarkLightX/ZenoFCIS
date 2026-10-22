@@ -1,7 +1,7 @@
 ```json
 {
   "name": "zal",
-  "title": "Check and explain a finite authored behaviour",
+  "title": "Check and explain a finite specified behaviour",
   "synopsis": "python3 integrations/zal/run.py check FILE",
   "engine": "Deterministic finite machine enumeration; profile 2 temporal checks cover executions under its explicit fairness premises.",
   "use_when": [
@@ -21,13 +21,17 @@
     "check stdout JSON: status, profile, scope, checks, counterexamples, authority and factory; no runtime publication"
   ],
   "exit_codes": {
-    "0": "pass-with-scope",
-    "other": "unknown; inspect refusal and --help"
+    "0": "completed result; check can report pass-with-scope and diff can still contain differences",
+    "1": "counterexample or unfinished (finite-fsm); counterexample or fail (typed/effects)",
+    "2": "refused input, I/O or malformed command-line arguments",
+    "3": "unsupported"
   },
   "verdicts": {
-    "pass-with-scope": "Only reported finite checks hold under declared domains; inspect missing invariants and factory:not-run.",
-    "counterexample": "Read story or why-not, revise authored requirements, then check.",
-    "refused": "Use supported grammar/profile and inspect guide."
+    "pass-with-scope": "Only reported finite checks hold; inspect missing invariants and factory:not-run.",
+    "counterexample": "Inspect the retained witness, revise requirements, then check.",
+    "unfinished / fail": "Finite/typed checks did not pass; inspect profile and failed checks.",
+    "unsupported": "The selected profile/operation has no supported implementation.",
+    "refused": "Repair grammar, profile or input access."
   },
   "limits": {
     "order_example_raw_inputs": 24,
@@ -80,7 +84,7 @@
 }
 ```
 
-# Check and explain a finite authored behaviour
+# Check and explain a finite specified behaviour
 
 ## Use when
 
@@ -110,13 +114,17 @@ Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 ## Verdicts
 
-`pass-with-scope`: Only reported finite checks hold under declared domains; inspect missing invariants and factory:not-run.
+`pass-with-scope`: Only reported finite checks hold; inspect missing invariants and factory:not-run.
 
-`counterexample`: Read story or why-not, revise authored requirements, then check.
+`counterexample`: Inspect the retained witness, revise requirements, then check.
 
-`refused`: Use supported grammar/profile and inspect guide.
+`unfinished / fail`: Finite/typed checks did not pass; inspect profile and failed checks.
 
-Exit codes: {"0": "pass-with-scope", "other": "unknown; inspect refusal and --help"}
+`unsupported`: The selected profile/operation has no supported implementation.
+
+`refused`: Repair grammar, profile or input access.
+
+Exit codes: {"0": "completed result; check can report pass-with-scope and diff can still contain differences", "1": "counterexample or unfinished (finite-fsm); counterexample or fail (typed/effects)", "2": "refused input, I/O or malformed command-line arguments", "3": "unsupported"}
 
 Outputs: ["check stdout JSON: status, profile, scope, checks, counterexamples, authority and factory; no runtime publication"]
 
@@ -145,6 +153,8 @@ python3 integrations/zal/run.py check integrations/zal/examples/order.zal
 Expected: exit 0; {"authority": "none", "status": "pass-with-scope"}.
 
 ## See also
+
+Background: Edmund M. Clarke, Orna Grumberg and Doron A. Peled, “Model Checking”, MIT Press, 1999. These are finite model checks under the reported assumptions, without runtime publication authority.
 
 Sources: {"engine": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "exit_codes": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "inputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "limits": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "outputs": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "refusals": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "synopsis": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help", "verdicts": "docs/zal/README.md:1-30; docs/zal/README.md:398-470; python3 integrations/zal/run.py --help"}
 

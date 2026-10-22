@@ -20,24 +20,27 @@
     "equilibrium checks"
   ],
   "inputs": [
-    "Repository finite withdrawal/composition fixtures; --certificates-only omits repository-wide documentation/style checks and is not release qualification; fresh output outside committed source; cached pinned Rust dependencies. Certificate binding pins revision, all sources, binary and artifacts."
+    "Repository withdrawal/composition fixtures, or user game JSON zeno-fcis/game/1 through tools/trace_game/game.py. Use fresh evidence outside source; --certificates-only skips repository-wide checks."
   ],
   "outputs": [
-    "retained tables, certificates, binding.json and results.json; checker stdout JSON: read evidence and claim; schema: unknown"
+    "Retained tables, certificates and bindings; game.py writes game-binding.json, native-table.json, certificate.json and verdict.json. Read evidence and claim; fixed-game result schemas differ."
   ],
   "exit_codes": {
-    "0": "requested runner/check completed",
-    "2": "certificate binding/refusal or argument error",
-    "other": "unknown"
+    "0": "game.py completed, including counterexample or no guard in class; certificate_check accepted the evidence, including UNKNOWN diagnostics",
+    "2": "game.py malformed input/resource stop (UNKNOWN), or certificate_check refusal/argument error",
+    "other": "legacy run.py/run_v11.py failures; inspect their retained logs"
   },
   "verdicts": {
-    "checked-through-K": "No exploit found up to K, only under declared moves; increase a declared bound or seek complete enumeration.",
-    "counterexample": "Replay history, add it to regression pool, revise controller.",
-    "certified safety": "Safe against every attacker history allowed by the declared model; retain independent check.",
-    "certified guard": "Selected fixed guard in grammar G is safe in the declared model.",
-    "certified winning strategy": "Declared-observation reactive strategy is safe in the declared model.",
-    "certified unrealizability": "No controller in declared class satisfies the requirement; revise class/assumptions.",
-    "UNKNOWN": "Budget/domain/extraction stop; no safety or impossibility claim."
+    "checked-through-K": "Legacy prefix-search run.status: complete declared histories only through K.",
+    "checked up to K": "User-game checker evidence: complete declared histories through K only.",
+    "counterexample": "Replayed violation or infinite target-avoiding cycle; game.py still exits 0.",
+    "certified safety": "Closed safe set covers all histories of the declared finite game.",
+    "certified reachability": "Checked ranks force the target against every permitted event.",
+    "no guard in class": "Every declared user-game fixed guard was refuted; game.py exits 0.",
+    "exhausted fixed grammar": "Legacy fixed-guard checker exhausted its declared grammar.",
+    "certified guard / certified winning strategy": "Legacy fixed or reactive controller passed the certificate checker.",
+    "certified unrealizability": "Legacy declared controller class cannot satisfy the requirement.",
+    "UNKNOWN": "No safety/impossibility claim; certificate_check may accept only the diagnostic binding."
   },
   "limits": {
     "product_states_default": 10000,
@@ -109,7 +112,7 @@ additional attacker moves outside the declared alphabet; real schedulers or depl
 
 ## Inputs
 
-Repository finite withdrawal/composition fixtures; --certificates-only omits repository-wide documentation/style checks and is not release qualification; fresh output outside committed source; cached pinned Rust dependencies. Certificate binding pins revision, all sources, binary and artifacts.
+Repository withdrawal/composition fixtures, or user game JSON zeno-fcis/game/1 through tools/trace_game/game.py. Use fresh evidence outside source; --certificates-only skips repository-wide checks.
 
 Engine: Bounded complete prefix search; complete finite product graph and greatest fixed point; separate certificate checker reconstructs moves and closure.
 
@@ -127,23 +130,29 @@ Expected: exit 0; ["withdrawal-safety"].
 
 ## Verdicts
 
-`checked-through-K`: No exploit found up to K, only under declared moves; increase a declared bound or seek complete enumeration.
+`checked-through-K`: Legacy prefix-search run.status: complete declared histories only through K.
 
-`counterexample`: Replay history, add it to regression pool, revise controller.
+`checked up to K`: User-game checker evidence: complete declared histories through K only.
 
-`certified safety`: Safe against every attacker history allowed by the declared model; retain independent check.
+`counterexample`: Replayed violation or infinite target-avoiding cycle; game.py still exits 0.
 
-`certified guard`: Selected fixed guard in grammar G is safe in the declared model.
+`certified safety`: Closed safe set covers all histories of the declared finite game.
 
-`certified winning strategy`: Declared-observation reactive strategy is safe in the declared model.
+`certified reachability`: Checked ranks force the target against every permitted event.
 
-`certified unrealizability`: No controller in declared class satisfies the requirement; revise class/assumptions.
+`no guard in class`: Every declared user-game fixed guard was refuted; game.py exits 0.
 
-`UNKNOWN`: Budget/domain/extraction stop; no safety or impossibility claim.
+`exhausted fixed grammar`: Legacy fixed-guard checker exhausted its declared grammar.
 
-Exit codes: {"0": "requested runner/check completed", "2": "certificate binding/refusal or argument error", "other": "unknown"}
+`certified guard / certified winning strategy`: Legacy fixed or reactive controller passed the certificate checker.
 
-Outputs: ["retained tables, certificates, binding.json and results.json; checker stdout JSON: read evidence and claim; schema: unknown"]
+`certified unrealizability`: Legacy declared controller class cannot satisfy the requirement.
+
+`UNKNOWN`: No safety/impossibility claim; certificate_check may accept only the diagnostic binding.
+
+Exit codes: {"0": "game.py completed, including counterexample or no guard in class; certificate_check accepted the evidence, including UNKNOWN diagnostics", "2": "game.py malformed input/resource stop (UNKNOWN), or certificate_check refusal/argument error", "other": "legacy run.py/run_v11.py failures; inspect their retained logs"}
+
+Outputs: ["Retained tables, certificates and bindings; game.py writes game-binding.json, native-table.json, certificate.json and verdict.json. Read evidence and claim; fixed-game result schemas differ."]
 
 ## Cost
 
@@ -170,6 +179,8 @@ python3 -B tools/trace_game/certificate_check.py "$WORK/trace" withdrawal-safety
 Expected: exit 0; {"evidence": "certified safety"}.
 
 ## See also
+
+Background: Edmund M. Clarke and E. Allen Emerson, “Design and Synthesis of Synchronization Skeletons Using Branching Time Temporal Logic”, Logics of Programs, 1981. Finite graph closure and ranked reachability stay within the declared game and bounds.
 
 Sources: {"engine": "docs/TRACE_GAME.md:1-168", "exit_codes": "docs/TRACE_GAME.md:1-168", "inputs": "docs/TRACE_GAME.md:1-168", "limits": "docs/TRACE_GAME.md:1-168", "outputs": "docs/TRACE_GAME.md:1-168", "refusals": "docs/TRACE_GAME.md:1-168", "synopsis": "docs/TRACE_GAME.md:1-168", "verdicts": "docs/TRACE_GAME.md:1-168"}
 

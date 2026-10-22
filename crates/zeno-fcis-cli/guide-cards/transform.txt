@@ -21,7 +21,7 @@
     "Canonical programs <= 65536 bytes; transform receipt from check. Independent certificate routes additionally require pinned tools, checker manifest and certificate directory."
   ],
   "outputs": [
-    "stdout zeno-fcis/transform-result/1; read status, counterexample, usage and receipt. --receipt writes a new receipt."
+    "stdout zeno-fcis/transform-result/1; read status and detail input/original/candidate observations, receipt and usage as present. --receipt writes a new receipt."
   ],
   "exit_codes": {
     "0": "requested result completed",
@@ -31,11 +31,11 @@
     "64": "invalid command-line usage"
   },
   "verdicts": {
-    "equivalent": "Outputs/failures agree on all declared inputs; replay receipt and separately decide usage/adoption.",
-    "different": "Replayed distinguishing input; revise candidate.",
-    "replayed": "The checker recomputed the receipt byte for byte; retain exact subject bindings.",
-    "inconclusive": "No equivalence established; inspect bound.",
-    "refused": "Repair admission or bindings; do not treat as difference."
+    "equivalent": "Outputs/failures agree on all declared inputs; replay the receipt and separately decide usage/adoption.",
+    "counterexample": "A distinguishing input was replayed; inspect detail.input, detail.original and detail.candidate (symbolic mode uses detail.replayed).",
+    "replayed": "The checker recomputed the receipt byte for byte.",
+    "inconclusive": "No equivalence established; inspect the bound.",
+    "refused": "Repair admission or bindings; this is not a distinguishing input."
   },
   "limits": {
     "program_bytes": 65536,
@@ -120,19 +120,19 @@ Expected: exit 0; {"status": "equivalent"}.
 
 ## Verdicts
 
-`equivalent`: Outputs/failures agree on all declared inputs; replay receipt and separately decide usage/adoption.
+`equivalent`: Outputs/failures agree on all declared inputs; replay the receipt and separately decide usage/adoption.
 
-`different`: Replayed distinguishing input; revise candidate.
+`counterexample`: A distinguishing input was replayed; inspect detail.input, detail.original and detail.candidate (symbolic mode uses detail.replayed).
 
-`replayed`: The checker recomputed the receipt byte for byte; retain exact subject bindings.
+`replayed`: The checker recomputed the receipt byte for byte.
 
-`inconclusive`: No equivalence established; inspect bound.
+`inconclusive`: No equivalence established; inspect the bound.
 
-`refused`: Repair admission or bindings; do not treat as difference.
+`refused`: Repair admission or bindings; this is not a distinguishing input.
 
 Exit codes: {"0": "requested result completed", "1": "invalid specification or refutation", "2": "blocked or inconclusive; no acceptance", "3": "filesystem or execution failure", "64": "invalid command-line usage"}
 
-Outputs: ["stdout zeno-fcis/transform-result/1; read status, counterexample, usage and receipt. --receipt writes a new receipt."]
+Outputs: ["stdout zeno-fcis/transform-result/1; read status and detail input/original/candidate observations, receipt and usage as present. --receipt writes a new receipt."]
 
 ## Cost
 
@@ -159,6 +159,8 @@ zeno-fcis transform replay --receipt "$WORK/equivalence.json" --original crates/
 Expected: exit 0; {"status": "replayed"}.
 
 ## See also
+
+Background: Amir Pnueli, Michael Siegel and Eli Singerman, “Translation Validation”, TACAS, 1998. This route checks supplied finite programs over their declared domains; it does not prove an arbitrary optimizer.
 
 Sources: {"engine": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "exit_codes": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "inputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "limits": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "outputs": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "refusals": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "synopsis": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351", "verdicts": "docs/CLI_REFERENCE.md:427-481; docs/CLI_REFERENCE.md:311-351"}
 
