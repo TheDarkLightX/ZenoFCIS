@@ -1,0 +1,197 @@
+//! Growth and provenance fixtures; not native performance or layer-admission evidence.
+use crate::knowledge_assessment::*;
+use crate::knowledge_growth::{self as G, Episode};
+use crate::knowledge_store::{self as S, Layer};
+use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
+
+fn hash(value: &str) -> String {
+    S::hash(&value).unwrap()
+}
+fn scope(family: &str, environment: Option<&str>) -> Scope {
+    let mut scope = BTreeMap::from([("family".into(), BTreeSet::from([family.into()]))]);
+    if let Some(environment) = environment {
+        scope.insert("environment".into(), BTreeSet::from([environment.into()]));
+    }
+    scope
+}
+fn case(label: &str, scope: Scope, on_work: u64) -> Case {
+    let off = Run {
+        task: hash(label),
+        seed: 7,
+        budget: 1000,
+        inputs: hash(&format!("subject-{label}")),
+        verdict: Verdict::Accepted,
+        work: BTreeMap::from([("check_requests".into(), 10)]),
+        result_cost: Some([20, 500]),
+        budget_stop: false,
+        stopping_bound: None,
+        receipt_sha256: hash("receipt"),
+        output_sha256: hash(&format!("off-{label}")),
+    };
+    let mut on = off.clone();
+    on.work.insert("check_requests".into(), on_work);
+    on.output_sha256 = hash(&format!("on-{label}"));
+    Case {
+        task: off.task.clone(),
+        scope,
+        applicable: true,
+        off,
+        on,
+    }
+}
+fn assessed(layer: &mut Layer, id: &str, scope: Scope, cases: Vec<Case>) {
+    let mut candidate: Candidate = serde_json::from_value(
+        json!({"id":id,"subject":"pipeline","scope":scope,"effect":"helps",
+        "action":{"skip":["canonical"],"order":[]},"proposing_tasks":[],"families":[]}),
+    )
+    .unwrap();
+    candidate.statement_sha256 = S::statement(&candidate).unwrap();
+    let (decision, reason) = decide(&cases, &BTreeSet::new(), &Policy::default(), &[]).unwrap();
+    let assessment = Assessment {
+        schema: "zeno-fcis/kb-assessment/1".into(),
+        suite_sha256: hash("suite"),
+        revision_sha256: hash("revision"),
+        candidates: BTreeSet::from([candidate.statement_sha256.clone()]),
+        proposing_tasks: BTreeSet::new(),
+        proposing_subjects: BTreeSet::new(),
+        total_budget: 100000,
+        justifications: BTreeMap::new(),
+        engine_sha256: hash("engine"),
+        checker_sha256: hash("checker"),
+        tool_version: "v1".into(),
+        policy: Policy::default(),
+        assessment_work: recorded_work(&cases, &[]).unwrap(),
+        cases,
+        partial_runs: vec![],
+        annotations: vec![],
+        decision,
+        reason: reason.into(),
+        resource_stop: None,
+        reserved_work: 100000,
+        prior_assessment_work: 0,
+        curation_work: 0,
+    };
+    let key = S::hash(&assessment).unwrap();
+    layer.assessments.insert(key.clone(), assessment);
+    candidate.assessment = Some(key);
+    candidate.state = if decision == Decision::Promote {
+        State::Promoted
+    } else {
+        State::Rejected
+    };
+    layer.candidates.push(candidate);
+}
+#[test]
+fn generalization_carries_parents_and_reserves_all_parent_cases_for_proposing() {
+    let mut layer = Layer::default();
+    layer.isa = BTreeSet::from([
+        ("left".into(), "class".into()),
+        ("right".into(), "class".into()),
+    ]);
+    for family in ["left", "right"] {
+        assessed(
+            &mut layer,
+            family,
+            scope(family, None),
+            vec![case(family, scope(family, None), 5)],
+        );
+    }
+    let grown = G::grow(&layer).unwrap();
+    assert_eq!(grown.len(), 1);
+    let proposal = &grown[0];
+    assert_eq!(proposal.scope, scope("class", None));
+    assert_eq!(proposal.state, State::Proposed);
+    assert!(proposal.assessment.is_none());
+    assert_eq!(
+        proposal.parents,
+        layer
+            .candidates
+            .iter()
+            .map(|c| c.statement_sha256.clone())
+            .collect()
+    );
+    for family in ["left", "right"] {
+        assert!(proposal.proposing_tasks.contains(&hash(family)));
+        assert!(
+            proposal
+                .families
+                .iter()
+                .any(|f| f.subject == hash(&format!("subject-{family}")))
+        );
+    }
+}
+#[test]
+fn generalization_requires_promoted_compatible_siblings() {
+    let mut layer = Layer::default();
+    layer.isa = BTreeSet::from([
+        ("left".into(), "class".into()),
+        ("right".into(), "class".into()),
+    ]);
+    for family in ["left", "right"] {
+        assessed(
+            &mut layer,
+            family,
+            scope(family, None),
+            vec![case(family, scope(family, None), 5)],
+        );
+    }
+    layer.candidates[1].state = State::Proposed;
+    assert!(G::grow(&layer).unwrap().is_empty());
+    layer.candidates[1].state = State::Promoted;
+    layer.candidates[1]
+        .scope
+        .insert("environment".into(), BTreeSet::from(["different".into()]));
+    assert!(G::grow(&layer).unwrap().is_empty());
+}
+#[test]
+fn specialization_uses_a_declared_dimension_and_retains_both_signs_as_proposing() {
+    let mut layer = Layer::default();
+    assessed(
+        &mut layer,
+        "mixed",
+        scope("counter", None),
+        vec![
+            case("positive", scope("counter", Some("fast")), 5),
+            case("negative", scope("counter", Some("slow")), 15),
+        ],
+    );
+    let grown = G::grow(&layer).unwrap();
+    assert_eq!(grown.len(), 1);
+    let proposal = &grown[0];
+    assert_eq!(proposal.scope, scope("counter", Some("fast")));
+    assert_eq!(proposal.state, State::Proposed);
+    assert!(proposal.assessment.is_none());
+    assert_eq!(
+        proposal.parents,
+        BTreeSet::from([layer.candidates[0].statement_sha256.clone()])
+    );
+    assert_eq!(
+        proposal.proposing_tasks,
+        BTreeSet::from([hash("positive"), hash("negative")])
+    );
+}
+#[test]
+fn repeated_failure_requires_distinct_subjects_and_never_becomes_advice() {
+    let episode = |subject: &str| -> Episode {
+        serde_json::from_value(json!({"schema":"zeno-fcis/kb-episode/1","task":hash(subject),"subject":hash(subject),
+        "scope":{"family":["counter"]},"door":"pipeline","steps":[],"advice":[],"counterexamples":[],"stopping_bound":"stage-budget","verdict":"inconclusive",
+        "receipt_sha256":hash("receipt"),"work":{"control_frames":62},"checker_sha256":hash("checker"),"engine_sha256":hash("engine"),
+        "family":{"subject":hash(subject),"session":"session","actor":"contributor","tool":"v1","environment":"sandbox"}})).unwrap()
+    };
+    let first = episode("first");
+    let mut episodes = BTreeMap::from([(S::hash(&first).unwrap(), first.clone())]);
+    episodes.insert(S::hash(&first).unwrap(), first);
+    assert!(G::mine(&episodes).unwrap().is_empty());
+    let second = episode("second");
+    episodes.insert(S::hash(&second).unwrap(), second);
+    let mined = G::mine(&episodes).unwrap();
+    assert_eq!(mined.len(), 1);
+    assert_eq!(mined[0].state, State::Proposed);
+    assert_eq!(mined[0].families.len(), 2);
+    assert!(mined[0].assessment.is_none());
+    assert_eq!(
+        mined[0].proposing_tasks,
+        BTreeSet::from([hash("first"), hash("second")])
+    );
+}

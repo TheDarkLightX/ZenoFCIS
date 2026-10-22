@@ -27,6 +27,8 @@ mod knowledge_assessment;
 mod knowledge_command;
 mod knowledge_evidence;
 mod knowledge_growth;
+#[cfg(test)]
+mod knowledge_growth_tests;
 mod knowledge_metrics;
 mod knowledge_replay;
 mod knowledge_store;
