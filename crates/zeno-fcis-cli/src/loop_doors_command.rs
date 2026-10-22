@@ -2839,3 +2839,46 @@ mod tests {
         assert!(relative(Path::new("/m"), "a/b.zcve").is_ok());
     }
 }
+
+/// Assessment-only routing: the original exact checker and receipt replay stay in the pipeline.
+pub(crate) fn assessment_run(
+    original: &[u8],
+    specification: &Value,
+    actions: &[crate::knowledge_assessment::Action],
+    budget: &crate::knowledge_replay::TaskBudget,
+) -> Result<Value, &'static str> {
+    let mut proposal = specification.clone();
+    proposal["schema"] = json!(pipeline::PIPELINE_SCHEMA);
+    proposal["original_sha256"] = json!(sha256_hex(original));
+    proposal["implementation_sha256"] = json!(pipeline::implementation());
+    if proposal["program"] == "identity" {
+        proposal["program"] =
+            program_to_json(&import_program(original).map_err(|_| "kb-task-program")?);
+    }
+    let stages = pipeline::stages(
+        proposal
+            .get("stages")
+            .unwrap_or(&json!(["canonical", "resubstitute"])),
+    )
+    .map_err(|_| "kb-task-stages")?;
+    let task = pipeline::task(original.to_vec(), proposal).map_err(|_| "kb-task-proposal")?;
+    let limits = pipeline::SearchLimits {
+        max_tuples: budget.tuples,
+        max_gate_pairs: budget.gate_pairs,
+        max_search_work: budget.search_work,
+        max_cells: 1_048_576,
+        max_assignments: 128,
+        max_terms: 32,
+        max_checks: budget.checks,
+        deadline_ms: budget.timeout_ms,
+    };
+    if !limits.valid() {
+        return Err("kb-task-limits");
+    }
+    let mut counter = pipeline::Budget::new(limits);
+    if !actions.is_empty() {
+        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::assessed(actions));
+    }
+    let run = pipeline::run(&task, &stages, &mut counter);
+    Ok(json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":run.report}))
+}

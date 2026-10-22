@@ -7,6 +7,47 @@ use zeno_fcis_loop_doors::strategy_knowledge as K;
 
 #[derive(Subcommand)]
 pub(crate) enum Operation {
+    /// Create an empty private assessment layer.
+    Init {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Preserve legacy curator knowledge as pending, without blessing strategy advice.
+    Migrate {
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Normalise and deduplicate explicit candidate records; never promotes.
+    Curate {
+        #[arg(long)]
+        source: PathBuf,
+    },
+    /// Replay candidate ON/OFF, or all promoted lessons against none.
+    Assess {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        candidate: Option<String>,
+        #[arg(long, default_value_t = 100_000_000)]
+        total_budget: u64,
+        #[arg(long, default_value_t = 0)]
+        minimum_effect_bps: u16,
+        #[arg(long)]
+        annotations: Option<PathBuf>,
+    },
+    /// Pending candidates ordered by observational value; no promotion authority.
+    AssessmentQueue,
+    /// Read-only assessment and retraction history.
+    AssessmentView,
+    #[command(hide = true)]
+    AssessmentTask {
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// All current lessons matching the structured task facts.
     Advise {
         #[arg(long)]
@@ -58,6 +99,7 @@ pub(crate) struct Loaded {
     pub(crate) validations: Vec<K::Validation>,
     pub(crate) validation_problems: Vec<Value>,
     pub(crate) preparation_work: u64,
+    pub(crate) assessed: Vec<crate::knowledge_store::Layer>,
 }
 fn fail(code: &'static str) -> Value {
     json!({"schema":K::USAGE_SCHEMA,"status":if code.ends_with("budget"){"inconclusive"}else{"refused"},"authority":"none","reason":code})
@@ -75,7 +117,7 @@ pub(crate) fn paths(given: &[PathBuf]) -> Result<Vec<PathBuf>, Value> {
     }
     Ok(out)
 }
-fn checkout(path: &Path) -> bool {
+pub(crate) fn checkout(path: &Path) -> bool {
     path.ancestors().any(|p| {
         p.join("crates/zeno-fcis-cli/Cargo.toml").is_file()
             && p.join("crates/zeno-fcis-loop-doors/Cargo.toml").is_file()
@@ -104,6 +146,7 @@ fn load_with_checker(
         validations: Vec::new(),
         validation_problems: Vec::new(),
         preparation_work: 0,
+        assessed: Vec::new(),
     };
     let (public_validations, preparation_work) = public_validation(limits)?;
     loaded.validations = public_validations;
@@ -137,6 +180,18 @@ fn load_with_checker(
                 .bindings
                 .push(json!({"path":resolved,"sha256":sha256_hex(&data)}));
             let text = if data.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
+                if serde_json::from_slice::<Value>(&data)
+                    .ok()
+                    .is_some_and(|v| v["schema"] == "zeno-fcis/kb-layer/2")
+                {
+                    let (layer, _) = crate::knowledge_store::live(&resolved).map_err(fail)?;
+                    loaded.preparation_work =
+                        loaded.preparation_work.saturating_add(data.len() as u64);
+                    loaded.assessed.push(layer);
+                    loaded.paths.push(resolved);
+                    loaded.sources.push(String::new());
+                    continue;
+                }
                 #[derive(serde::Deserialize)]
                 #[serde(deny_unknown_fields)]
                 struct Layer {
@@ -171,7 +226,9 @@ fn load_with_checker(
                     }
                     match crate::knowledge_evidence::load(root, &validation, checker_sha.as_deref())
                     {
-                        Ok(v) => loaded.validations.push(v),
+                        Ok(_) => loaded
+                            .validation_problems
+                            .push(json!({"reason":"kb-strategy-assessment-required"})),
                         Err(e) => loaded.validation_problems.push(e),
                     }
                 }
@@ -305,7 +362,15 @@ pub(crate) fn report(
         }
         K::Outcome::Advised(a) => {
             v["status"] = json!("advised");
-            v["lessons"] = json!(a.lessons.iter().map(constant).collect::<Vec<_>>());
+            let assessed = crate::knowledge_workflow::advice(&loaded.assessed, &a.task_facts);
+            v["assessed_advice"] = json!(assessed);
+            v["lessons"] = json!(
+                a.lessons
+                    .iter()
+                    .map(constant)
+                    .chain(assessed.iter().map(|c| json!(c.id)))
+                    .collect::<Vec<_>>()
+            );
             v["facts"] = json!(a.facts.iter().map(fact).collect::<Vec<_>>());
             v["task_facts"] = json!(a.task_facts.iter().map(fact).collect::<Vec<_>>());
             v["explanations"] = json!(a.explanations.iter().map(explanation).collect::<Vec<_>>());
@@ -356,6 +421,9 @@ fn invoke_with_identity(
     op: Operation,
     identity: impl FnOnce() -> Result<String, Value>,
 ) -> (u8, Value) {
+    if crate::knowledge_workflow::handles(&op) {
+        return crate::knowledge_workflow::invoke(given, op);
+    }
     if let Operation::Replay { recipe, out } = op {
         return crate::knowledge_evidence::replay(&recipe, &out);
     }
@@ -415,6 +483,7 @@ fn invoke_with_identity(
         Operation::Check => K::Request::Check,
         Operation::Query { query } => K::Request::Query(query),
         Operation::Replay { .. } => return (1, fail("kb-replay-routing")),
+        _ => return (1, fail("kb-assessment-routing")),
     };
     let result = run(&loaded, &request, K::Limits::default());
     if started.elapsed() >= CHECK_WINDOW {

@@ -20,7 +20,7 @@ pub(crate) struct Action {
     pub order: Vec<String>,
 }
 impl Action {
-    pub fn check(&self) -> Result<(), &'static str> {
+    pub(crate) fn check(&self) -> Result<(), &'static str> {
         if self.skip.len() > 4
             || self.order.len() > 4
             || self.order.iter().collect::<BTreeSet<_>>().len() != self.order.len()
@@ -97,10 +97,10 @@ pub(crate) enum Verdict {
     Refused,
 }
 impl Verdict {
-    pub fn solved(self) -> bool {
+    pub(crate) fn solved(self) -> bool {
         self == Self::Accepted
     }
-    pub fn decisive(self) -> bool {
+    pub(crate) fn decisive(self) -> bool {
         matches!(
             self,
             Self::Accepted | Self::Counterexample | Self::Unrealizable
@@ -168,6 +168,7 @@ pub(crate) struct Assessment {
     pub annotations: Vec<Annotation>,
     pub decision: Decision,
     pub reason: String,
+    pub resource_stop: Option<String>,
     pub assessment_work: u64,
     pub curation_work: u64,
 }

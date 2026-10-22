@@ -18,6 +18,21 @@ pub(crate) struct LoopPolicy {
     invocation: String,
 }
 impl LoopPolicy {
+    pub(crate) fn assessed(actions: &[crate::knowledge_assessment::Action]) -> Self {
+        let mut policy = Self::default();
+        for action in actions {
+            policy.excluded.extend(action.skip.iter().cloned());
+            for (i, step) in action.order.iter().enumerate() {
+                policy.ranks.insert(step.clone(), (i as u64, 0));
+            }
+        }
+        policy
+    }
+    pub(crate) fn add_assessed(&mut self, actions: &[crate::knowledge_assessment::Action]) {
+        let trial = Self::assessed(actions);
+        self.excluded.extend(trial.excluded);
+        self.ranks.extend(trial.ranks);
+    }
     pub(crate) fn allows(&self, step: &str) -> bool {
         !self.excluded.iter().any(|s| s == step)
     }
@@ -319,6 +334,13 @@ pub(crate) fn prepare(
         }
         policy.ranks.insert(s.name().into(), (penalty, work));
     }
+    let assessed = crate::knowledge_workflow::advice(&loaded.assessed, &advice.task_facts);
+    policy.add_assessed(
+        &assessed
+            .iter()
+            .map(|c| c.action.clone())
+            .collect::<Vec<_>>(),
+    );
     // Pipeline/strategy primitives can be filtered independently. A blocker on
     // the requested whole operation still prevents starting that operation.
     let filterable = subjects

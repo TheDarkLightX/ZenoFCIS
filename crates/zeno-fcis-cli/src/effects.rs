@@ -922,6 +922,13 @@ effects! { crate::judge_command::ProbeCommand {
 
 effects! { crate::knowledge_command::Operation {
     leaves {
+        "init" => Self::Init { .. } => declared((&[], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "migrate" => Self::Migrate { .. } => declared((&["explicit-legacy-layer"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "curate" => Self::Curate { .. } => declared((&["explicit-candidates", "explicit-knowledge-layers"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
+        "assess" => Self::Assess { .. } => declared((&["frozen-suite", "explicit-knowledge-layers", "bound-inputs"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock", "temporary-checker-files"], true, None));
+        "assessment-queue" => Self::AssessmentQueue => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "assessment-view" => Self::AssessmentView => declared((&["explicit-knowledge-layers"], &[], false, None));
+        "assessment-task" => Self::AssessmentTask { .. } => declared((&["bound-task-request"], &["new-private-task-output"], false, None));
         "advise" => Self::Advise { .. } => declared((
                 &["explicit-knowledge-layers", "explicit-validation-records"],
                 &[],
