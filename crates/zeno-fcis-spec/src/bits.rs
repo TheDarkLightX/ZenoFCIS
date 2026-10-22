@@ -394,14 +394,16 @@ impl Parser {
                 .collect();
         }
         let d = &self.derived[name.as_str()];
+        if let Some(constants) = &d.constants {
+            return (0..width)
+                .map(|k| RelExpr::Bool(constants[entry as usize * width as usize + k as usize]))
+                .collect();
+        }
         (0..width)
             .map(|k| {
                 d.circuit
                     .at_output(d.outputs[entry as usize * width as usize + k as usize])
-                    .map(|c| match c.evaluate(tables::static_truth) {
-                        Some(v) => RelExpr::Bool(v),
-                        None => RelExpr::Circuit(Box::new(c)),
-                    })
+                    .map(|c| RelExpr::Circuit(Box::new(c)))
                     .unwrap_or(RelExpr::Bool(false))
             })
             .collect()

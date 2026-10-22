@@ -31,3 +31,5 @@ The recursive examples enumerate 768 and 1,536 input tuples. Every result is
 scoped to its declared finite domain and the existing resource limits.
 
 [Permission sets](permission-words/README.md) inherit three distinct permissions as a finite Boolean algebra.
+
+[Constant hierarchy](constant-role-hierarchy/README.md) keeps a fixed role hierarchy in policy data.

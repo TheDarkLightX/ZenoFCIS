@@ -119,7 +119,17 @@ impl<F> BoolCircuit<F> {
 
     /// Pure eager evaluation. The caller supplies each lower formula's truth value.
     /// Runtime authorities compile these operations into their metered graph instead.
-    pub fn evaluate(&self, mut formula: impl FnMut(&F) -> Option<bool>) -> Option<bool> {
+    pub fn evaluate(&self, formula: impl FnMut(&F) -> Option<bool>) -> Option<bool> {
+        self.evaluate_all(formula)?
+            .get(self.output as usize)
+            .copied()
+    }
+
+    /// Owned invocation scratch; one eager pass, with no retained aliases.
+    pub(crate) fn evaluate_all(
+        &self,
+        mut formula: impl FnMut(&F) -> Option<bool>,
+    ) -> Option<Vec<bool>> {
         let mut values: Vec<bool> = Vec::with_capacity(self.nodes.len());
         for node in self.nodes.iter() {
             let read = |n: u32| values.get(n as usize).copied();
@@ -139,6 +149,6 @@ impl<F> BoolCircuit<F> {
             };
             values.push(value);
         }
-        values.get(self.output as usize).copied()
+        Some(values)
     }
 }

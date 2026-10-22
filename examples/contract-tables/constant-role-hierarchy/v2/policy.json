@@ -1,0 +1,46 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "constant-role-hierarchy",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {
+    "permitted": "circuit { formula { 0 == command.101.120 }; false; true; formula { pre.100.210 == 1 }; and 2 3; formula { pre.100.211 == 1 }; and 1 5; or 4 6; formula { pre.100.212 == 1 }; and 1 8; or 7 9; select 2 10 1; and 2 5; or 4 12; or 13 9; select 2 14 1; and 2 8; or 13 16; select 2 17 1; and 0 11; formula { 1 == command.101.120 }; and 20 15; or 19 21; formula { 2 == command.101.120 }; and 23 18; or 22 24; } output 25"
+  },
+  "cases": [
+    {
+      "rule": "the selected role needs the permission",
+      "when": "!permitted",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "permit the request without changing roles",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "210": "pre.100.210",
+        "211": "pre.100.211",
+        "212": "pre.100.212"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "210": 1,
+    "211": 0,
+    "212": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "AuthoritySubjectRecipient",
+    "503": "RejectNoAuthority"
+  }
+}

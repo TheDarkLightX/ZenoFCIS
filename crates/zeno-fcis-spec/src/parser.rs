@@ -9,6 +9,8 @@ use alloc::vec::Vec;
 
 #[path = "bits.rs"]
 mod bits;
+#[path = "constant_tables.rs"]
+mod constant_tables;
 #[path = "recursive_tables.rs"]
 mod recursive_tables;
 
@@ -204,8 +206,10 @@ fn parse_with_tables(
     limits: SourceLimits,
 ) -> Result<(ParsedProject, Parser), DiagnosticSet> {
     let (tokens, diagnostics) = lex(source, limits);
+    let mut table_sizes = tables::prescan(&tokens);
+    table_sizes.extend(constant_tables::prescan(&tokens));
     let mut parser = Parser {
-        tables: tables::prescan(&tokens),
+        tables: table_sizes,
         scan: Scan::read(&tokens),
         entry_bound: Vec::new(),
         drafts: Drafts::default(),
@@ -226,6 +230,7 @@ fn parse_with_tables(
         table_spans: Vec::new(),
         counts: BTreeMap::new(),
         derived: BTreeMap::new(),
+        constants: BTreeMap::new(),
         defining: None,
         self_refusal: None,
         defining_bits: None,
@@ -285,6 +290,7 @@ struct Parser {
     /// Collection restrictions retained only for standalone formula parsing.
     key_paths: KeyPaths,
     derived: BTreeMap<String, recursive_tables::DerivedTable>,
+    constants: BTreeMap<String, constant_tables::ConstantTable>,
     defining: Option<(String, u32, usize)>,
     self_refusal: Option<&'static str>,
     defining_bits: Option<u8>,
@@ -334,7 +340,10 @@ impl Parser {
         while !matches!(self.current().kind, TokenKind::Eof) {
             let start = self.current().span;
             self.declaration_start = start;
-            let result = if self.take_keyword("namespace") {
+            let result = if self.take_keyword("const") {
+                self.parse_constant_table();
+                None
+            } else if self.take_keyword("namespace") {
                 self.parse_namespace().map(Declaration::Namespace)
             } else if self.take_keyword("type") {
                 self.parse_type().map(Declaration::Type)
@@ -392,6 +401,7 @@ impl Parser {
             }
         }
         self.refuse_table_collisions(project_id);
+        self.refuse_constant_collisions(project_id);
         self.refuse_derived_collisions(project_id);
         let collections = self.finish_collections();
         ParsedProject {
@@ -2079,6 +2089,9 @@ impl Parser {
         false
     }
     fn parse_rel_atom(&mut self) -> RelExpr {
+        if let Some(value) = self.constant_bool() {
+            return value;
+        }
         if self.peek_keyword("subset") {
             return self.parse_subset();
         }
@@ -2258,6 +2271,9 @@ impl Parser {
         value
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
+        if let Some(value) = self.constant_value() {
+            return value;
+        }
         self.table_depth += 1;
         let bits = self.bits_value();
         self.table_depth -= 1;

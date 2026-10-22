@@ -17,8 +17,9 @@ use zeno_fcis_contract::internals::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 3 {
-        return Err("usage: recursive_table_vectors PROJECT RULES".into());
+    let decisions = args.len() == 4 && args[3] == "--decisions";
+    if args.len() != 3 && !decisions {
+        return Err("usage: recursive_table_vectors PROJECT RULES [--decisions]".into());
     }
     let rules = Rules::read(&std::fs::read_to_string(&args[2])?)?;
     let declarations =
@@ -26,6 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let schema = schema::encode(&declarations)?;
     let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
     if contract.unsigned {
+        if decisions {
+            return Err("the decision projection harness supports scalar fixtures".into());
+        }
         return numeric(&contract, &schema);
     }
     let positions = domain::positions(&declarations)?;
@@ -54,6 +58,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                 {
                     return Err("input outside declared finite domain".into());
+                }
+                if decisions {
+                    use zeno_fcis_contract::internals::review::evaluate::{self, Outcome};
+                    match evaluate::evaluate(authority, &framer, &tuple) {
+                        Outcome::Decision(d) => {
+                            if !d.outbox.is_empty() {
+                                return Err("decision fixtures must have no outbox".into());
+                            }
+                            println!(
+                                "{}",
+                                serde_json::json!({"class":d.class.name(),"reason":d.reason,"post":d.post.iter().map(|(id,v)|serde_json::json!([id,v.json()])).collect::<Vec<_>>(),"outbox":[]})
+                            );
+                        }
+                        Outcome::Refused(r) => {
+                            return Err(format!("original Authority refused: {r}").into());
+                        }
+                    }
+                    continue;
                 }
                 let proposed = Proposed {
                     class: Class::Accept,

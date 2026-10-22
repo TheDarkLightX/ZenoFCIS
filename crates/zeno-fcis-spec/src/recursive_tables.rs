@@ -13,6 +13,7 @@ pub(super) struct DerivedTable {
     pub(super) circuit: BoolCircuit<RelExpr>,
     pub(super) outputs: Vec<u32>,
     pub(super) bits: Option<u8>,
+    pub(super) constants: Option<Box<[bool]>>,
 }
 
 /// Temporary references exist only during parsing and cannot escape in a project.
@@ -97,6 +98,7 @@ impl Parser {
             })
             .collect();
         used.insert(project.get());
+        used.extend(self.constants.values().map(|t| t.id.get()));
         let collisions: Vec<SourceSpan> = self
             .derived
             .values()
@@ -173,7 +175,8 @@ impl Parser {
         }
         if variables.len() == 2 && variables[0] == variables[1]
             || self.derived.contains_key(name.as_str())
-            || name.as_str() == "circuit"
+            || self.constants.contains_key(name.as_str())
+            || matches!(name.as_str(), "circuit" | "subset")
         {
             self.recursive_error(at, "derived names and bound indices must be distinct");
             self.recover_top();
@@ -250,6 +253,20 @@ impl Parser {
         }
         match compile(&rules, rounds) {
             Some((circuit, outputs)) if self.charge(at, circuit.nodes().len()) => {
+                let literal: fn(&RelExpr) -> Option<bool> = if self.constants.is_empty() {
+                    tables::static_truth
+                } else {
+                    constant_tables::truth
+                };
+                let constants = circuit
+                    .evaluate_all(literal)
+                    .and_then(|all| {
+                        outputs
+                            .iter()
+                            .map(|n| all.get(*n as usize).copied())
+                            .collect::<Option<Vec<_>>>()
+                    })
+                    .map(Vec::into_boxed_slice);
                 self.derived.insert(
                     name.as_str().into(),
                     DerivedTable {
@@ -260,6 +277,7 @@ impl Parser {
                         circuit,
                         outputs,
                         bits,
+                        constants,
                     },
                 );
                 self.rewrite_declaration(String::new());
@@ -277,7 +295,7 @@ impl Parser {
 
     /// A direct Boolean entry reference, including temporary positive self reads.
     pub(super) fn derived_atom(&mut self) -> Option<RelExpr> {
-        if self.is_bits_entry() {
+        if self.is_bits_entry() || self.constant_name() {
             return None;
         }
         let TokenKind::Ident(name) = self.current().kind.clone() else {
@@ -342,12 +360,13 @@ impl Parser {
             }
         } else {
             let t = &self.derived[name.as_ref()];
-            match t.circuit.at_output(t.outputs[entry as usize]) {
-                Some(c) => match c.evaluate(tables::static_truth) {
-                    Some(value) => RelExpr::Bool(value),
-                    None => RelExpr::Circuit(Box::new(c)),
-                },
-                None => RelExpr::Bool(false),
+            if let Some(constants) = &t.constants {
+                RelExpr::Bool(constants[entry as usize])
+            } else {
+                t.circuit
+                    .at_output(t.outputs[entry as usize])
+                    .map(|c| RelExpr::Circuit(Box::new(c)))
+                    .unwrap_or(RelExpr::Bool(false))
             }
         };
         if self.table_depth == 0 {

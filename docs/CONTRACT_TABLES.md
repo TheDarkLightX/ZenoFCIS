@@ -205,6 +205,35 @@ existing formula, source, tuple and work limits. Larger domains remain
 inconclusive at their check limits. Derived tables have one or two indices over one fixed-size table; they
 are not keyed collections.
 
+### Constant policy tables
+
+A hierarchy fixed by the policy can be declared without stored state:
+
+```text
+const table 110 parents 105 size 3 [0,1,2];
+```
+
+The scalar type 105 must be declared earlier. Entries are Bool, int or u128
+literals within that type's bounds; the size is 1 through 64. The table
+adds an index set, not fields or input-domain dimensions. Read `parents[i]`
+with a bound table index or in-range literal. IDs and names must be distinct.
+Constant and derived declarations are macros: the expanded project contains
+their effective scalar formulas; packets also bind the original source hash.
+
+A closed recursive stratum whose lower formulas are statically known is
+computed once while parsing the policy. Its owned final lookup becomes
+literals in later strata, so the existing compiled graph identity binds the
+effective values. A stratum that reads state, command or context retains its
+metered shared graph. No result from an invocation is retained in a cache.
+The constant pass preserves eager definedness and leaves unrecognized lower
+arithmetic in the existing evaluator.
+
+The [constant-hierarchy journey](../examples/contract-tables/constant-role-hierarchy/README.md)
+keeps only three grant flags as state: eight states and 24 input tuples.
+Comparison with the stored-hierarchy version projects away the fixed parent
+fields and checks class, reason, grant successor and empty outbox. Stored
+schemas and policy identities intentionally change under that projection.
+
 ### Permission sets as finite Boolean algebras
 
 `type 106 bits Permissions width 3;` declares the subsets of three named-by-bit

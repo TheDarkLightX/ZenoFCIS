@@ -162,3 +162,34 @@ fn atom_lift_work_is_metered_by_the_numeric_authority() {
     );
     assert!(used <= baseline);
 }
+
+#[test]
+fn constant_lookup_is_bound_into_policy_identity_without_extra_inputs() {
+    fn identity(parent: u32) -> (Vec<u8>, Vec<u8>, usize) {
+        let source=format!("zeno 1; project 1 constant_identity; type 100 state S; type 101 command C; type 102 context X;
+          type 105 int Parent in 0..=2; type 106 int Flag in 0..=1;
+          const table 110 parents 105 size 2 [0,{parent}]; field 210 100 flag 106; field 120 101 query 106;
+          component 400 core {{owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 4096;}} merge [400];
+          derived table 700 reach[i][j] in table 110 rounds 4 {{when true then i==j || exists k in table 110 {{parents[i]==k+1 && reach[k][j]}}; default false;}};
+          law 500 domain on commit, genesis = post.100.210 >= 0; law 501 query on commit = reach[1][0] || pre.100.210==0;");
+        let raw = json!({"schema":"zeno-fcis/template-declarative-policy/2","template":"constant-identity","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},"cases":[{"when":true,"class":"Accept","reason":null,"post":{"210":"pre.100.210"},"outbox":[]}],"genesis":{"210":0},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
+        let rules = Rules::read(&raw.to_string()).unwrap();
+        let d = Declarations::read(&source, &rules.leaf_bindings).unwrap();
+        let schema = schema::encode(&d).unwrap();
+        let contract = Contract::build(&d, &rules, schema_commitment(&schema).unwrap()).unwrap();
+        let identity =
+            policy::with_authority(&contract, &schema, |a| a.identity().to_vec()).unwrap();
+        (schema, identity, contract.bindings.len())
+    }
+    let (schema_a, a, inputs_a) = identity(0);
+    let (schema_b, b, inputs_b) = identity(1);
+    assert_eq!(
+        schema_a, schema_b,
+        "changing policy data must not change stored/input schema"
+    );
+    assert_eq!((inputs_a, inputs_b), (3, 3));
+    assert_ne!(
+        a, b,
+        "effective lookup changes must be bound into native policy identity"
+    );
+}
