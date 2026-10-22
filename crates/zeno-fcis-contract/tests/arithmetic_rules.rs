@@ -477,3 +477,37 @@ fn named_signed_adjustment_lowers_once_and_runs_through_authority_and_law() {
     let expression = expr::parse(&format!("signed_mul_div_floor({},1,1)", i128::MIN)).unwrap();
     assert!(matches!(expression, expr::Ast::SignedMulDivFloor(..)));
 }
+
+#[test]
+fn select_law_eagerly_traps_in_the_unselected_arm() {
+    let project = include_str!("../../../examples/arithmetic-fused/project.zeno");
+    let rules = include_str!("../../../examples/arithmetic-fused/v2/policy.json").replace(
+        "\"501\": \"FeeAndRounding\"",
+        "\"501\": \"FeeAndRounding\", \"502\": \"FeeAndRounding\"",
+    );
+    for condition in ["true", "false"] {
+        let overflow = format!("{} + 1", i128::MAX);
+        let (a, b) = if condition == "true" {
+            ("7".to_owned(), overflow)
+        } else {
+            (overflow, "7".to_owned())
+        };
+        let source =
+            format!("{project}\nlaw 502 eager on accept = choose({condition}, {a}, {b}) == 7;\n");
+        with_contract(&source, &rules, |contract, schema| {
+            let framer = Framer::new(&domain::positions(contract.declarations).unwrap(), contract);
+            policy::with_authority(contract, schema, |authority| {
+                let actual = evaluate::evaluate(authority, &framer, &[0, 1, 1, 1, 0]);
+                assert!(
+                    matches!(actual, Outcome::Refused(ref r) if r.law == Some(502)),
+                    "unselected overflowing arm must trap: {condition}: {actual:?}"
+                );
+                assert_eq!(
+                    actual,
+                    evaluate::evaluate(authority, &framer, &[0, 1, 1, 1, 0])
+                );
+            })
+            .unwrap();
+        });
+    }
+}

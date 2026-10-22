@@ -560,3 +560,36 @@ fn ladder_temporal_operator_and_window_translation_fixtures() {
         TemporalDiagnosis::Counterexample { step: 0 },
     );
 }
+
+#[test]
+fn select_smt_requires_condition_and_both_arms_to_be_defined() {
+    let value = ValueExpr::Select(
+        Box::new(RelExpr::Bool(true)),
+        Box::new(ValueExpr::Int(7)),
+        Box::new(ValueExpr::Add(
+            Box::new(ValueExpr::Int(i128::MAX)),
+            Box::new(ValueExpr::Int(1)),
+        )),
+    );
+    let rendered = render_value_smt(
+        &value,
+        0,
+        &BTreeMap::new(),
+        &mut SmtRenderBudget::new(ExportLimits::default()),
+    )
+    .unwrap_or_else(|error| panic!("render: {error:?}"));
+    assert!(rendered.term.starts_with("(ite true 7 "));
+    assert!(rendered.defined.contains(&i128::MAX.to_string()));
+    let formula = equal(value, 7);
+    let step = model_diagnostics::ModelStep::try_new(Vec::new()).unwrap_or_else(|| panic!("step"));
+    let result = model_diagnostics::check_relation(
+        &formula,
+        model_diagnostics::ModelContext::new(&step, model_diagnostics::DiagnosticLimits::default()),
+    );
+    assert_eq!(
+        result,
+        model_diagnostics::DiagnosticOutcome::Indeterminate(
+            model_diagnostics::ModelReason::Overflow
+        )
+    );
+}

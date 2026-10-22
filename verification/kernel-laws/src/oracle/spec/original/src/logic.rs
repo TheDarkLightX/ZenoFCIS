@@ -437,8 +437,9 @@ fn eval_value<'formula>(
 ) -> Result<i128, IndeterminateReason> {
     fuel.operation()?;
     match value {
-        // This legacy test oracle has no fused arithmetic semantics.
-        ValueExpr::MulDiv(..)
+        // New scalar nodes have no semantics in this historical test oracle.
+        ValueExpr::Select(..)
+        | ValueExpr::MulDiv(..)
         | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => Err(IndeterminateReason::MissingPredicate),

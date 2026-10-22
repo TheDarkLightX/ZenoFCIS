@@ -130,7 +130,8 @@ fn preflight_export(
                 ValueExpr::ToI128(_) | ValueExpr::ToU128(_) => {
                     return Err(ExportError::U128SubjectUnsupported);
                 }
-                ValueExpr::MulDiv(..)
+                ValueExpr::Select(..)
+                | ValueExpr::MulDiv(..)
                 | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => {
@@ -447,7 +448,8 @@ fn render_value_lean(
 ) -> Result<LeanValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
-        ValueExpr::MulDiv(..)
+        ValueExpr::Select(..)
+        | ValueExpr::MulDiv(..)
         | ValueExpr::SignedMulDivFloor(..)
         | ValueExpr::ScaledMulDiv(..)
         | ValueExpr::RepeatMulDiv(..) => {

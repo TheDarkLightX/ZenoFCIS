@@ -269,6 +269,9 @@ fn relation_reads(expr: &RelExpr, scope: ReadScope) -> bool {
 
 fn value_reads(expr: &ValueExpr, scope: ReadScope) -> bool {
     match expr {
+        ValueExpr::Select(c, a, b) => {
+            relation_reads(c, scope) || value_reads(a, scope) || value_reads(b, scope)
+        }
         ValueExpr::U128(_) => false,
         ValueExpr::ToI128(v) | ValueExpr::ToU128(v) => value_reads(v, scope),
         ValueExpr::Int(_) | ValueExpr::Var(_) => false,

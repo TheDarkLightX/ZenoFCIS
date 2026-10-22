@@ -1536,6 +1536,24 @@ fn preflight_smt(claim: &ClaimDecl, limits: ExportLimits) -> Result<(), ExportEr
                 | ValueExpr::SignedMulDivFloor(..)
                 | ValueExpr::ScaledMulDiv(..)
                 | ValueExpr::RepeatMulDiv(..) => return Err(ExportError::UnsupportedMode),
+                ValueExpr::Select(c, a, b) => {
+                    push_export_node(
+                        &mut stack,
+                        ExportNode::Rel(c),
+                        next_depth,
+                        render_multiplier,
+                        limits,
+                    )?;
+                    for child in [a, b] {
+                        push_export_node(
+                            &mut stack,
+                            ExportNode::Value(child),
+                            next_depth,
+                            render_multiplier,
+                            limits,
+                        )?;
+                    }
+                }
                 ValueExpr::Int(_) | ValueExpr::Var(_) | ValueExpr::Projection(_) => {}
                 ValueExpr::MulDiv(_, a, b, d) => {
                     for child in [a, b, d] {
@@ -3614,6 +3632,15 @@ fn render_value_smt(
 ) -> Result<SmtValue, ExportError> {
     budget.operation()?;
     let rendered = match value {
+        ValueExpr::Select(c, a, b) => {
+            let c = render_rel_smt(c, step, environment, budget)?;
+            let a = render_value_smt(a, step, environment, budget)?;
+            let b = render_value_smt(b, step, environment, budget)?;
+            SmtValue {
+                term: format!("(ite {} {} {})", c.term, a.term, b.term),
+                defined: smt_and(vec![c.defined, a.defined, b.defined]),
+            }
+        }
         ValueExpr::Int(value) => SmtValue {
             term: smt_int(*value),
             defined: "true".to_owned(),
@@ -4026,13 +4053,13 @@ fn collect_rel(
             collect_rel(b, paths, predicates)
         }
         RelExpr::Compare(_, a, b) => {
-            collect_value(a, paths);
-            collect_value(b, paths)
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates)
         }
         RelExpr::Predicate { name, arguments } => {
             predicates.insert(name.clone(), arguments.len());
             for argument in arguments.iter() {
-                collect_value(argument, paths)
+                collect_value(argument, paths, predicates)
             }
         }
         RelExpr::ForAll { body, .. } | RelExpr::Exists { body, .. } => {
@@ -4058,8 +4085,17 @@ fn collect_temporal(
         }
     }
 }
-fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
+fn collect_value(
+    value: &ValueExpr,
+    paths: &mut BTreeSet<ProjectionPath>,
+    predicates: &mut BTreeMap<Identifier, usize>,
+) {
     match value {
+        ValueExpr::Select(c, a, b) => {
+            collect_rel(c, paths, predicates);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+        }
         ValueExpr::Projection(path) => {
             paths.insert(path.clone());
         }
@@ -4067,23 +4103,23 @@ fn collect_value(value: &ValueExpr, paths: &mut BTreeSet<ProjectionPath>) {
         | ValueExpr::Sub(a, b)
         | ValueExpr::Mul(a, b)
         | ValueExpr::Div(_, a, b) => {
-            collect_value(a, paths);
-            collect_value(b, paths)
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates)
         }
         ValueExpr::SignedMulDivFloor(a, b, d)
         | ValueExpr::ScaledMulDiv(_, _, a, b, d, _)
         | ValueExpr::RepeatMulDiv(_, a, b, d, _) => {
-            collect_value(a, paths);
-            collect_value(b, paths);
-            collect_value(d, paths);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+            collect_value(d, paths, predicates);
         }
         ValueExpr::ToI128(body) | ValueExpr::ToU128(body) | ValueExpr::Sum { body, .. } => {
-            collect_value(body, paths)
+            collect_value(body, paths, predicates)
         }
         ValueExpr::MulDiv(_, a, b, d) => {
-            collect_value(a, paths);
-            collect_value(b, paths);
-            collect_value(d, paths);
+            collect_value(a, paths, predicates);
+            collect_value(b, paths, predicates);
+            collect_value(d, paths, predicates);
         }
         ValueExpr::U128(_) | ValueExpr::Int(_) | ValueExpr::Var(_) => {}
     }

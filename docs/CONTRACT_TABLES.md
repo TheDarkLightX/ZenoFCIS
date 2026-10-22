@@ -62,10 +62,22 @@ the same identity and the same checks. The rules are:
   entry is `(C_k -> F_k)`.
 - `exists i in table T { F }` is `F_0 || ... || F_N-1`; with `where C`, each
   entry is `(C_k && F_k)`.
-- `sum i in table T { V }` is `V_0 + ... + V_N-1`, joined left to right. A
-  `where C` keeps the entries whose condition holds; C may read only index
-  variables and integer constants.
-- `count i in table T { C } OP K`, with OP one of `<=`, `<`, `>=`, `>`, `==`,
+- `choose(C, A, B)` is a scalar Select value: evaluate C, A and B eagerly,
+  then select A when C is true and B otherwise. Both arms must have the
+  same scalar kind. An overflow, bad cast or division trap in the unselected
+  arm still refuses evaluation. It lowers to the existing library Select:
+  the condition, both arms and Select incur their ordinary node/work charges,
+  including work measured before a refusal; there is no branch work discount.
+- `sum i in table T { V }` is `V_0 + ... + V_N-1`, joined left to right.
+  `where C` keeps static index/constant filtering compatible with earlier
+  sources. When C reads an input, each entry becomes `choose(C_k, V_k, 0)`;
+  V_k is eager even when C_k is false.
+- A count in a value position, including one compared with a state or command
+  value, is `sum i in table T { choose(C, 1, 0) }`. It has N Select terms
+  and N-1 additions, with the condition evaluated once per entry. For example:
+  `count j in table 110 { post.100.110[j] == command.101.122 } <= pre.100.120`.
+  Counts can also appear on the right of a comparison or inside arithmetic.
+- For compatibility, an isolated `count i in table T { C } OP K`, with OP one of `<=`, `<`, `>=`, `>`, `==`,
   `!=` and K an integer constant, compares the number of entries for which C
   holds with K. `count <= K` is the conjunction, over every set of K+1 entries
   in ascending order, of `!(C_a && C_b && ...)`. `count >= K` is the
@@ -103,15 +115,22 @@ many times it is expanded, so the cost is visible before it reaches the limit:
 | 64 | 3 | 635,376 |
 
 `>= K` costs C(N, K) clauses of K copies, and `==` and `!=` cost both.
+These constant-bound forms retain their existing expansion and identities.
+For a linear constant-bound form, write
+`sum i in table T { choose(C, 1, 0) } <= K` explicitly. At N = 6, 16 and
+64 it has 6, 16 and 64 Select terms instead of 20, 560 and 41,664 clauses
+for K = 2. A nonconstant-bound count uses this linear form automatically.
+`check --expand` distinguishes Select terms from combinatorial clauses.
 
 ## Difference
 
 Before tables, a contract with six copies spelled out six fields and repeated
 each law per copy; "at most two per member" had to be written as a condition
 on every triple of copies. Tables change only how the project is written.
-There is no new encoded project format, no new formula node and no change to
-the checker, the evaluator or the proof tools, so every result keeps its
-existing meaning: exhaustively checked over the declared finite domain.
+Existing sources retain their expansion and canonical bytes. Select adds a
+new scalar encoding tag, leaving earlier tags intact; projects that use it
+have the identity of that expanded formula. It uses the existing library
+Select evaluator. Finite results remain scoped to the declared domain.
 
 ## Scope
 
@@ -123,16 +142,10 @@ existing meaning: exhaustively checked over the declared finite domain.
   the judges are inconclusive, as for any contract.
 - `count` grows with the number of entry sets: C(N, K+1) clauses for
   `<= K`. It suits small tables and small bounds.
-- In 2.6 a `count` is compared with an integer constant, a `sum` condition
-  reads only indices and constants, and an entry index is a literal or an
-  index variable, not an input. A dynamic entry is written as a `forall` with
+- In law formulas an entry index is a literal or a bound index variable,
+  not an input. A dynamic entry is written as a `forall` with
   `where i == command...`, as in the example.
 - `v2/policy.json` and `ui.json` have no table forms; they use entry IDs,
   and the generated interface shows each entry as its own field.
-- `.zeno` law formulas have no if-then-else value, so a sum whose condition
-  reads an input, and a count compared with anything but a constant, have no
-  exact expansion into today's formulas.
-- Future work for 2.7: checking large tables without enumerating every
-  combination; a `choose` value form in laws, which would make counts and
-  conditional sums linear in N; conditional sums and non-constant counts; and
-  table forms in the rules.
+- Linear formulas reduce expansion size, not the finite input domain.
+  Checking large domains without enumeration remains separate work.

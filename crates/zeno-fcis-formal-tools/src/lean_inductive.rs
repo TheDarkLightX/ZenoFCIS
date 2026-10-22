@@ -283,6 +283,15 @@ fn checked_binary(
 fn render_value(value: &ValueExpr, budget: &mut SmtRenderBudget) -> Result<SmtValue, ExportError> {
     budget.operation()?;
     let result = match value {
+        ValueExpr::Select(c, a, b) => {
+            let c = render_relation(c, budget)?;
+            let a = render_value(a, budget)?;
+            let b = render_value(b, budget)?;
+            SmtValue {
+                term: format!("(if {} then {} else {})", c.term, a.term, b.term),
+                defined: conjunction(vec![c.defined, a.defined, b.defined]),
+            }
+        }
         ValueExpr::Int(value) => SmtValue {
             term: integer(*value),
             defined: "True".to_owned(),
@@ -336,7 +345,8 @@ fn is_constant(value: &ValueExpr) -> bool {
         ValueExpr::Add(left, right) | ValueExpr::Sub(left, right) | ValueExpr::Mul(left, right) => {
             is_constant(left) && is_constant(right)
         }
-        ValueExpr::U128(_)
+        ValueExpr::Select(..)
+        | ValueExpr::U128(_)
         | ValueExpr::ToI128(_)
         | ValueExpr::ToU128(_)
         | ValueExpr::MulDiv(_, _, _, _)

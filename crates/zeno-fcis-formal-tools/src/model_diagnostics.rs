@@ -390,6 +390,12 @@ fn eval_value<'formula>(
 ) -> Result<i128, ModelReason> {
     fuel.operation()?;
     match value {
+        ValueExpr::Select(c, a, b) => {
+            let condition = eval_rel(c, step, variables, fuel)?;
+            let then = eval_value(a, step, variables, fuel)?;
+            let otherwise = eval_value(b, step, variables, fuel)?;
+            Ok(if condition { then } else { otherwise })
+        }
         ValueExpr::Int(value) => Ok(*value),
         // There is no second implementation of full-product arithmetic here.
         // Only the native library route can check this expression.
@@ -551,6 +557,13 @@ fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            ValueExpr::Select(c, a, b) => {
+                let (condition_nodes, condition_depth) = formula_shape_rel(c);
+                nodes = nodes.saturating_add(condition_nodes);
+                depth = depth.max(current_depth.saturating_add(condition_depth));
+                stack.push((a, current_depth.saturating_add(1)));
+                stack.push((b, current_depth.saturating_add(1)));
+            }
             ValueExpr::Add(left, right)
             | ValueExpr::Sub(left, right)
             | ValueExpr::Mul(left, right)

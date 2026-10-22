@@ -113,6 +113,12 @@ law 501 any on commit = (0 == command.101.120 && post.100.110 != 0) || (1 == com
 fn holds(formula: &RelExpr, values: &BTreeMap<String, i128>) -> bool {
     fn value(v: &ValueExpr, values: &BTreeMap<String, i128>) -> i128 {
         match v {
+            ValueExpr::Select(c, a, b) => {
+                let condition = holds(c, values);
+                let then = value(a, values);
+                let otherwise = value(b, values);
+                if condition { then } else { otherwise }
+            }
             ValueExpr::Int(n) => *n,
             ValueExpr::Projection(path) => {
                 let segments: Vec<String> = path
@@ -477,5 +483,67 @@ fn tables_include_the_maximum_stable_id_in_collision_checks() {
                 "size={size} before={before}: {refused:?}"
             );
         }
+    }
+}
+
+#[test]
+fn table_value_counts_are_linear_and_match_conditional_sums() {
+    for n in [6, 16, 64] {
+        let prefix = format!("{HEADER}table 1000 100 slot 105 size {n};\n");
+        let counted = format!(
+            "{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= command.101.121;\n"
+        );
+        let summed = format!(
+            "{prefix}law 500 limit on commit = sum j in table 1000 {{ choose(post.100.1000[j] == command.101.120, 1, 0) }} <= command.101.121;\n"
+        );
+        let filtered = format!(
+            "{prefix}law 500 limit on commit = sum j in table 1000 where post.100.1000[j] == command.101.120 {{ 1 }} <= command.101.121;\n"
+        );
+        assert_eq!(bytes(&counted), bytes(&summed));
+        assert_eq!(bytes(&counted), bytes(&filtered));
+        let expansion = expand_tables(&counted, SourceLimits::default()).unwrap();
+        assert_eq!(expansion.text.matches("choose(").count(), n);
+        assert_eq!(bytes(&counted), bytes(&expansion.text));
+        assert!(expansion.counts[0].linear);
+        assert_eq!(expansion.counts[0].clauses, n as u128);
+        eprintln!(
+            "N={n}: linear terms={n}, expanded bytes={}",
+            expansion.text.len()
+        );
+    }
+}
+
+#[test]
+fn table_value_count_limit_includes_the_boundary_and_refuses_three_under_two() {
+    let source = format!(
+        "{HEADER}table 110 100 slot 105 size 6;\nlaw 500 limit on commit = count j in table 110 {{ post.100.110[j] == command.101.120 }} <= command.101.121;\n"
+    );
+    let formula = law(&source, 500);
+    for held in 0..=6 {
+        let mut values = BTreeMap::from([
+            ("Command.101.120".to_owned(), 1),
+            ("Command.101.121".to_owned(), 2),
+        ]);
+        for k in 0..6 {
+            values.insert(format!("Post.100.{}", 110 + k), i128::from(k < held));
+        }
+        assert_eq!(holds(&formula, &values), held <= 2, "held={held} limit=2");
+    }
+    // A count can occur on either side and within arithmetic.
+    for formula in [
+        "command.101.121 >= count j in table 110 { post.100.110[j] == command.101.120 }",
+        "count j in table 110 { post.100.110[j] == command.101.120 } + 1 <= command.101.121 + 1",
+    ] {
+        let source = format!(
+            "{HEADER}table 110 100 slot 105 size 6;\nlaw 500 limit on commit = {formula};\n"
+        );
+        assert_eq!(
+            bytes(&source),
+            bytes(
+                &expand_tables(&source, SourceLimits::default())
+                    .unwrap()
+                    .text
+            )
+        );
     }
 }

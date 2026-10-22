@@ -1903,7 +1903,7 @@ impl Parser {
         }
         if (self.peek_keyword("forall")
             || self.peek_keyword("exists")
-            || self.peek_keyword("count"))
+            || (self.peek_keyword("count") && self.legacy_count_ahead()))
             && self.table_form_ahead(1)
         {
             return self.parse_table_formula();
@@ -1957,7 +1957,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor" | "u128" | "to_i128" | "to_u128")
+                    && !matches!(name.as_ref(), "choose" | "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor" | "u128" | "to_i128" | "to_u128")
         );
         if named_predicate {
             let name = self
@@ -2054,6 +2054,20 @@ impl Parser {
         value
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
+        if self.take_keyword("choose") {
+            self.expect_symbol(TokenKind::LParen, "value.choose");
+            let condition = self.nested("value.choose.condition", RelExpr::Bool(false), |p| {
+                p.parse_rel()
+            });
+            self.expect_symbol(TokenKind::Comma, "value.choose");
+            let then = self.nested("value.choose.then", ValueExpr::Int(0), |p| p.parse_value());
+            self.expect_symbol(TokenKind::Comma, "value.choose");
+            let otherwise = self.nested("value.choose.otherwise", ValueExpr::Int(0), |p| {
+                p.parse_value()
+            });
+            self.expect_symbol(TokenKind::RParen, "value.choose");
+            return ValueExpr::Select(Box::new(condition), Box::new(then), Box::new(otherwise));
+        }
         if self.take_symbol(&TokenKind::Minus) {
             if self.current().kind == TokenKind::Number(1u128 << 127) {
                 self.advance();
@@ -2187,16 +2201,15 @@ impl Parser {
             return ValueExpr::Int(0);
         }
         if name.as_str() == "count" && self.table_form_ahead(0) {
-            self.error(
-                DiagnosticCode::InvalidDeclaration,
-                "table.count",
-                "`count i in table T { C } OP K` as a whole comparison",
-                "a table count inside a value",
-                "compare the count directly with an integer constant",
-            );
-            self.index -= 1;
-            self.parse_table_formula();
-            return ValueExpr::Int(0);
+            let start = self.tokens[self.index.saturating_sub(1)].span;
+            let Some((variable, size)) = self.table_header(start) else {
+                return ValueExpr::Int(0);
+            };
+            self.table_depth += 1;
+            let conditions = self.count_conditions(&variable, size);
+            self.table_depth -= 1;
+            self.table_values += 1;
+            return self.linear_count(start, conditions);
         }
         if name.as_str() == "sum" {
             let variable = self
@@ -2250,6 +2263,69 @@ impl Parser {
         ValueExpr::Var(name)
     }
 
+    fn legacy_count_ahead(&self) -> bool {
+        let mut at = self.index + 5;
+        if self
+            .tokens
+            .get(at)
+            .is_some_and(|t| t.kind == TokenKind::LBrace)
+        {
+            let mut braces = 1usize;
+            at += 1;
+            while let Some(token) = self.tokens.get(at) {
+                match token.kind {
+                    TokenKind::LBrace => braces += 1,
+                    TokenKind::RBrace => braces -= 1,
+                    _ => {}
+                }
+                at += 1;
+                if braces == 0 {
+                    break;
+                }
+            }
+        }
+        if !self.tokens.get(at).is_some_and(|t| {
+            matches!(
+                t.kind,
+                TokenKind::EqEq
+                    | TokenKind::NotEq
+                    | TokenKind::Less
+                    | TokenKind::LessEq
+                    | TokenKind::Greater
+                    | TokenKind::GreaterEq
+            )
+        }) {
+            return false;
+        }
+        at += 1;
+        if self
+            .tokens
+            .get(at)
+            .is_some_and(|t| t.kind == TokenKind::Minus)
+        {
+            at += 1;
+        }
+        if !self
+            .tokens
+            .get(at)
+            .is_some_and(|t| matches!(t.kind, TokenKind::Number(_)))
+        {
+            return false;
+        }
+        self.tokens.get(at + 1).is_some_and(|t| {
+            matches!(
+                t.kind,
+                TokenKind::Semicolon
+                    | TokenKind::RBrace
+                    | TokenKind::RParen
+                    | TokenKind::Comma
+                    | TokenKind::AndAnd
+                    | TokenKind::OrOr
+                    | TokenKind::Arrow
+                    | TokenKind::Eof
+            )
+        })
+    }
     /// True when `IDENT in table` starts `offset` tokens ahead.
     fn table_form_ahead(&self, offset: usize) -> bool {
         let word = |at: usize, expected: Option<&str>| {
@@ -2433,13 +2509,8 @@ impl Parser {
         }
         formula
     }
-    fn parse_table_count(
-        &mut self,
-        start: SourceSpan,
-        variable: &Identifier,
-        size: u32,
-    ) -> RelExpr {
-        let conditions = if matches!(self.current().kind, TokenKind::LBrace) {
+    fn count_conditions(&mut self, variable: &Identifier, size: u32) -> Vec<RelExpr> {
+        if matches!(self.current().kind, TokenKind::LBrace) {
             self.per_entry(variable, size, |parser| {
                 parser.expect_symbol(TokenKind::LBrace, "table.count");
                 let condition =
@@ -2449,7 +2520,43 @@ impl Parser {
             })
         } else {
             vec![RelExpr::Bool(true); size as usize]
-        };
+        }
+    }
+    fn linear_count(&mut self, start: SourceSpan, conditions: Vec<RelExpr>) -> ValueExpr {
+        let terms = conditions.len() as u128;
+        let value = tables::total(
+            conditions
+                .into_iter()
+                .map(|c| {
+                    ValueExpr::Select(
+                        Box::new(c),
+                        Box::new(ValueExpr::Int(1)),
+                        Box::new(ValueExpr::Int(0)),
+                    )
+                })
+                .collect(),
+        );
+        let info = self.counts.entry(start.start()).or_insert(CountInfo {
+            line: start.line(),
+            column: start.column(),
+            clauses: terms,
+            linear: true,
+            expansions: 0,
+        });
+        info.expansions += 1;
+        if self.charge(start, formula_shape_value(&value).0) {
+            value
+        } else {
+            ValueExpr::Int(0)
+        }
+    }
+    fn parse_table_count(
+        &mut self,
+        start: SourceSpan,
+        variable: &Identifier,
+        size: u32,
+    ) -> RelExpr {
+        let conditions = self.count_conditions(variable, size);
         let op = [
             (TokenKind::EqEq, CompareOp::Eq),
             (TokenKind::NotEq, CompareOp::NotEq),
@@ -2495,6 +2602,7 @@ impl Parser {
             line: start.line(),
             column: start.column(),
             clauses,
+            linear: false,
             expansions: 0,
         });
         info.expansions += 1;
@@ -2517,8 +2625,8 @@ impl Parser {
         }
         tables::count(&conditions, op, bound)
     }
-    /// `sum VAR in table T [where C] { V }`, after `sum`; C may read only
-    /// table indices and constants.
+    /// `sum VAR in table T [where C] { V }`, after `sum`; dynamic C
+    /// lowers to an eager Select and static filtering stays compatible.
     fn parse_table_sum(&mut self) -> ValueExpr {
         let start = self.tokens[self.index.saturating_sub(1)].span;
         let Some((variable, size)) = self.table_header(start) else {
@@ -2541,17 +2649,11 @@ impl Parser {
             match condition.as_ref().map(tables::static_truth) {
                 None | Some(Some(true)) => kept.push(body),
                 Some(Some(false)) => {}
-                Some(None) => {
-                    self.error_at(
-                        start,
-                        DiagnosticCode::InvalidDeclaration,
-                        "table.sum.where",
-                        "a condition on table indices and constants only",
-                        "a condition that reads an input",
-                        "move the condition into a forall or count; conditional sums over inputs are not supported",
-                    );
-                    return ValueExpr::Int(0);
-                }
+                Some(None) => kept.push(ValueExpr::Select(
+                    Box::new(condition.unwrap_or(RelExpr::Bool(false))),
+                    Box::new(body),
+                    Box::new(ValueExpr::Int(0)),
+                )),
             }
         }
         let nodes = kept.iter().map(|v| formula_shape_value(v).0).sum();

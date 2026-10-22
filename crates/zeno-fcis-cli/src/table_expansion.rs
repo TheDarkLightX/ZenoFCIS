@@ -72,8 +72,16 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
             );
             for count in &expansion.counts {
                 eprintln!(
-                    "count at line {} column {}: {} clauses per expansion, expanded {} times",
-                    count.line, count.column, count.clauses, count.expansions
+                    "count at line {} column {}: {} {} per expansion, expanded {} times",
+                    count.line,
+                    count.column,
+                    count.clauses,
+                    if count.linear {
+                        "Select terms"
+                    } else {
+                        "clauses"
+                    },
+                    count.expansions
                 );
             }
             if domain.is_some_and(|n| n > FINITE_CHECK_CAP) {
@@ -96,6 +104,7 @@ pub(crate) fn expand(path: &Path, format: OutputFormat) -> u8 {
             "counts": expansion.counts.iter().map(|count| json!({
                 "line": count.line, "column": count.column,
                 "clauses": count.clauses.to_string(), "expansions": count.expansions,
+                "form": if count.linear { "linear-select" } else { "combinations" },
             })).collect::<Vec<_>>(),
             "domain_size": domain.map(|n| n.to_string()),
             "finite_check_cap": FINITE_CHECK_CAP.to_string(),

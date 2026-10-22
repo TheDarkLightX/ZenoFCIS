@@ -872,6 +872,8 @@ pub enum ValueExpr {
     ToU128(Box<ValueExpr>),
     Var(Identifier),
     Projection(ProjectionPath),
+    /// Eager condition and both arms, lowered to the library Select operation.
+    Select(Box<RelExpr>, Box<ValueExpr>, Box<ValueExpr>),
     Add(Box<ValueExpr>, Box<ValueExpr>),
     Sub(Box<ValueExpr>, Box<ValueExpr>),
     Mul(Box<ValueExpr>, Box<ValueExpr>),
@@ -1726,6 +1728,12 @@ fn encode_wiring(value: &WiringDecl, out: &mut Vec<u8>) -> Result<(), EncodeErro
 }
 fn encode_value(value: &ValueExpr, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     match value {
+        ValueExpr::Select(c, a, b) => {
+            out.push(15);
+            encode_rel(c, out)?;
+            encode_value(a, out)?;
+            encode_value(b, out)
+        }
         ValueExpr::U128(v) => {
             out.push(12);
             out.extend_from_slice(&v.to_be_bytes());
@@ -2013,6 +2021,7 @@ impl ValueExpr {
             | Self::SignedMulDivFloor(a, b, d)
             | Self::ScaledMulDiv(_, _, a, b, d, _)
             | Self::RepeatMulDiv(_, a, b, d, _) => a.uses_u128() || b.uses_u128() || d.uses_u128(),
+            Self::Select(c, a, b) => c.uses_u128() || a.uses_u128() || b.uses_u128(),
             Self::Sum { body, .. } => body.uses_u128(),
             _ => false,
         }
@@ -2054,6 +2063,13 @@ pub(crate) fn formula_shape_value(value: &ValueExpr) -> (usize, usize) {
         nodes = nodes.saturating_add(1);
         depth = depth.max(current_depth);
         match current {
+            ValueExpr::Select(c, a, b) => {
+                let (condition_nodes, condition_depth) = formula_shape_rel(c);
+                nodes = nodes.saturating_add(condition_nodes);
+                depth = depth.max(current_depth.saturating_add(condition_depth));
+                stack.push((a, current_depth.saturating_add(1)));
+                stack.push((b, current_depth.saturating_add(1)));
+            }
             ValueExpr::Add(left, right)
             | ValueExpr::Sub(left, right)
             | ValueExpr::Mul(left, right)

@@ -671,6 +671,11 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
         ))
     };
     match expression {
+        ValueExpr::Select(c, a, b) => Ok(Ast::Choose(
+            Box::new(law(c)?),
+            Box::new(value(a)?),
+            Box::new(value(b)?),
+        )),
         ValueExpr::U128(v) => Ok(Ast::U128(*v)),
         ValueExpr::ToI128(v) => Ok(Ast::ToI128(Box::new(value(v)?))),
         ValueExpr::ToU128(v) => Ok(Ast::ToU128(Box::new(value(v)?))),

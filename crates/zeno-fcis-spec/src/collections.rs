@@ -368,6 +368,10 @@ impl KeyPaths {
             | ValueExpr::U128(_)
             | ValueExpr::Var(_)
             | ValueExpr::Projection(_) => None,
+            ValueExpr::Select(c, a, b) => self
+                .misuse(c)
+                .or_else(|| self.value_misuse(a))
+                .or_else(|| self.value_misuse(b)),
             ValueExpr::ToI128(a) | ValueExpr::ToU128(a) => self.value_misuse(a),
             ValueExpr::Add(a, b)
             | ValueExpr::Sub(a, b)
@@ -458,6 +462,11 @@ pub(crate) fn state_reads(formula: &RelExpr, owner: u32, out: &mut BTreeSet<u32>
                 {
                     out.insert(path.segments()[1].get());
                 }
+            }
+            ValueExpr::Select(c, a, b) => {
+                state_reads(c, owner, out);
+                value(a, owner, out);
+                value(b, owner, out);
             }
             ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => {}
             ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {

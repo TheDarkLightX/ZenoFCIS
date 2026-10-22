@@ -13,7 +13,7 @@
 //!   or `F_0 && ... && F_n` without a condition, chained left to right;
 //! - `exists i in table T [where C] { F }` is `(C_0 && F_0) || ... || (C_n && F_n)`;
 //! - `sum i in table T [where C] { V }` is `V_k + ...` over the entries whose
-//!   condition holds; the condition may read only table indices and constants;
+//!   condition holds; input-reading conditions become eager Select values;
 //! - `count i in table T { C } OP K` compares the number of entries satisfying
 //!   C with the integer K. `count <= K` is the conjunction, over every set of
 //!   K+1 entries in order, of `!(C_a && C_b && ...)`; `count >= K` is the
@@ -21,6 +21,7 @@
 //!   `==` and `!=` are composed from those. Clause lists are combined in a
 //!   balanced tree, left half first.
 //!
+//! Counts in value positions expand to sums of eager Select(C_k, 1, 0).
 //! Here X_k is X with the index variable replaced by the integer k.
 
 use alloc::boxed::Box;
@@ -57,8 +58,11 @@ pub struct CountInfo {
     pub line: u32,
     /// One-based source column of the `count` keyword.
     pub column: u32,
-    /// Clauses in one expansion, C(N, K+1) for `count <= K`.
+    /// Clauses in one expansion, C(N, K+1) for constant-bound `count <= K`,
+    /// or N Select terms for a linear value count.
     pub clauses: u128,
+    /// True when clauses counts Select terms in a linear value count.
+    pub linear: bool,
     /// Times the form is expanded: once, or once per entry of each
     /// enclosing table form.
     pub expansions: u64,
@@ -460,6 +464,15 @@ fn write_value(value: &ValueExpr, least: u8, out: &mut String) {
         }
         ValueExpr::U128(value) => {
             let _ = write!(out, "u128({value})");
+        }
+        ValueExpr::Select(c, a, b) => {
+            out.push_str("choose(");
+            write_rel(c, 0, out);
+            out.push_str(", ");
+            write_value(a, 0, out);
+            out.push_str(", ");
+            write_value(b, 0, out);
+            out.push(')');
         }
         ValueExpr::ToI128(inner) => call("to_i128", &[inner.as_ref()], out),
         ValueExpr::ToU128(inner) => call("to_u128", &[inner.as_ref()], out),
