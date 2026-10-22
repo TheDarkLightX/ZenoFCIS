@@ -38,8 +38,10 @@ Everything else is unchanged. `check`, `generate contract`, `contract review`,
 `contract lemma`, the other judges and `new --contract` read the table source
 and see its expansion. The rules in `v2/policy.json` and `ui.json` name the
 entry fields by their IDs, 110 to 115 in the example, as they name any field.
-A `--lemma` text may not contain braces, so a lemma over a table is the
-formula `--expand` prints for it.
+`--lemma` accepts one table-aware formula against the project declarations,
+including braces, newlines and comments. It consumes the entire text and
+refuses trailing declarations. A table-form lemma and its printed expansion
+have the same verdict.
 
 ## Formal model
 
@@ -63,8 +65,8 @@ the same identity and the same checks. The rules are:
 - `exists i in table T { F }` is `F_0 || ... || F_N-1`; with `where C`, each
   entry is `(C_k && F_k)`.
 - `choose(C, A, B)` is a scalar Select value: evaluate C, A and B eagerly,
-  then select A when C is true and B otherwise. Both arms must have the
-  same scalar kind. An overflow, bad cast or division trap in the unselected
+  then select A when C is true and B otherwise. Both arms use the existing
+  scalar-kind checks. An overflow, bad cast or division trap in the unselected
   arm still refuses evaluation. It lowers to the existing library Select:
   the condition, both arms and Select incur their ordinary node/work charges,
   including work measured before a refusal; there is no branch work discount.

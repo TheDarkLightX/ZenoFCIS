@@ -13,8 +13,11 @@ zeno-fcis contract review examples/contract-tables/library-loans
 zeno-fcis new library-app --contract examples/contract-tables/library-loans --app
 ```
 
-`contract lemma` takes the expanded formula of law 500, which `--expand`
-prints, because lemma text may not contain braces.
+`contract lemma --lemma` accepts law 500's table-form formula directly:
+
+```text
+zeno-fcis contract lemma examples/contract-tables/library-loans --lemma 'forall i in table 110 where post.100.110[i] != 0 { count j in table 110 { post.100.110[j] == post.100.110[i] } <= 2 }'
+```
 
 ## Formal model
 

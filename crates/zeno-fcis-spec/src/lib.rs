@@ -41,7 +41,7 @@ pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
-pub use parser::{expand_tables, parse_project};
+pub use parser::{expand_tables, parse_formula, parse_project};
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
 };

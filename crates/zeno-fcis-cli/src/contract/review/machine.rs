@@ -583,16 +583,12 @@ pub(super) fn valid_states(space: &Space, test: impl Fn(&[i128]) -> bool + Sync)
     })
 }
 
-/// Text a formula may not contain: it is placed inside one law declaration
-/// and must not end it, start another or hide text in a comment.
-const FORBIDDEN: [&str; 7] = [";", "\n", "\r", "//", "/*", "{", "}"];
-
 /// The contract with one more law, `law ID NAME on SCOPE = FORMULA;`,
 /// appended to `project.zeno` and given `kind`, and the law's ID: an ID
 /// above every number `project.zeno` holds and every framework law's.
 ///
 /// # Errors
-/// A formula with forbidden text, or one with no contract form, named as
+/// A formula with trailing text, undeclared paths or no contract form, named as
 /// `what`.
 pub(super) fn with_law(
     project: &str,
@@ -606,12 +602,6 @@ pub(super) fn with_law(
     if formula.trim().is_empty() {
         return Err(invalid("is empty".to_owned()));
     }
-    if let Some(text) = FORBIDDEN.iter().find(|text| formula.contains(**text)) {
-        return Err(invalid(format!(
-            "may not contain `{}`",
-            text.escape_debug()
-        )));
-    }
     let highest = project
         .split(|character: char| !character.is_ascii_digit())
         .filter_map(|digits| digits.parse::<u32>().ok())
@@ -621,23 +611,30 @@ pub(super) fn with_law(
     let id = highest
         .checked_add(1)
         .ok_or_else(|| invalid("has no free law ID".to_owned()))?;
-    let mut source = project.to_owned();
-    if !source.ends_with('\n') {
-        source.push('\n');
-    }
-    source.push_str(&format!(
-        "law {id} judged_formula_{id} on {scope} = {formula};\n"
-    ));
+    let parsed =
+        zeno_fcis_spec::parse_formula(project, formula, zeno_fcis_spec::SourceLimits::default())
+            .map_err(|diagnostics| invalid(diagnostics.to_string()))?;
+    let formula = super::super::expr::law(&parsed).map_err(invalid)?;
+    let (scope, genesis) = match scope {
+        "commit, genesis" => (zeno_fcis_spec::LawScope::Committing, true),
+        "commit" => (zeno_fcis_spec::LawScope::Committing, false),
+        "any" => (zeno_fcis_spec::LawScope::Always, false),
+        _ => return Err(invalid("unsupported formula scope".to_owned())),
+    };
     let mut extended = rules.clone();
     extended.law_kinds.insert(id, kind);
-    let before = Declarations::read(project, &rules.leaf_bindings)?
-        .laws
-        .len();
-    let loaded = Loaded::with(&source, extended)
+    let mut loaded = Loaded::with(project, extended)
         .map_err(|error| invalid(format!("{}: {}", error.place(), error.reason())))?;
-    if loaded.declarations.laws.len() != before + 1 {
-        return Err(invalid("must be one formula".to_owned()));
-    }
+    loaded
+        .declarations
+        .laws
+        .push(super::super::declarations::Law {
+            id,
+            name: format!("judged_formula_{id}"),
+            scope,
+            genesis,
+            formula,
+        });
     Ok((loaded, id))
 }
 

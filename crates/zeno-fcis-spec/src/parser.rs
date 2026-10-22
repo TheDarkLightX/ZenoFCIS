@@ -23,6 +23,76 @@ pub fn parse_project(source: &str, limits: SourceLimits) -> Result<ParsedProject
     parse_with_tables(source, limits).map(|(parsed, _)| parsed)
 }
 
+/// Parses exactly one relational formula using the project's table and
+/// collection declarations. Trailing tokens and undeclared projection paths
+/// are refused. The returned tree owns its data and cannot add declarations.
+pub fn parse_formula(
+    project_source: &str,
+    formula_source: &str,
+    limits: SourceLimits,
+) -> Result<RelExpr, DiagnosticSet> {
+    let (parsed, mut parser) = parse_with_tables(project_source, limits)?;
+    let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
+    let (tokens, diagnostics) = lex(formula_source, limits);
+    parser.tokens = tokens;
+    parser.diagnostics = diagnostics;
+    parser.index = 0;
+    parser.nesting = 0;
+    parser.expanded = 0;
+    parser.table_values = 0;
+    parser.rewrites.clear();
+    parser.counts.clear();
+    let formula = parser.parse_rel();
+    if !matches!(parser.current().kind, TokenKind::Eof) {
+        parser.error(
+            DiagnosticCode::ExpectedToken,
+            "formula",
+            "end of one formula",
+            parser.describe_current(),
+            "supply one formula without a declaration or terminator",
+        );
+    }
+    let (nodes, depth) = formula_shape_rel(&formula);
+    if nodes > MAX_FORMULA_NODES || depth > MAX_FORMULA_DEPTH {
+        parser.error(
+            DiagnosticCode::ResourceLimit,
+            "formula",
+            "a bounded formula",
+            format!("{nodes} nodes and depth {depth}"),
+            "use a smaller formula",
+        );
+    }
+    let law = LawDecl::new(project.project_id(), fallback_identifier(), formula);
+    for path in crate::law_paths(&law) {
+        if crate::resolve_path(&project, path).is_unresolved() {
+            parser.error(
+                DiagnosticCode::UnknownReference,
+                "formula.path",
+                "a declared projection",
+                format!("{path:?}"),
+                "use the project's declared fields",
+            );
+        }
+    }
+    if let Some(reason) = parser.key_paths.misuse(law.formula()) {
+        parser.error(
+            DiagnosticCode::InvalidDeclaration,
+            "formula",
+            "valid collection use",
+            reason,
+            "compare keys only for equality and read maps through entries",
+        );
+    }
+    if parser.diagnostics.is_empty() {
+        Ok(law.formula)
+    } else {
+        Err(DiagnosticSet::from_vec(
+            parser.diagnostics,
+            limits.max_diagnostics(),
+        ))
+    }
+}
+
 /// Parses one source file and returns the exact expansion of its table forms:
 /// the source with each table declaration, index type and table formula
 /// replaced by what it expands to, as [`TableExpansion`] describes.
@@ -62,6 +132,7 @@ fn parse_with_tables(
         scan: Scan::read(&tokens),
         entry_bound: Vec::new(),
         drafts: Drafts::default(),
+        key_paths: KeyPaths::default(),
         tokens,
         index: 0,
         diagnostics,
@@ -130,6 +201,8 @@ struct Parser {
     /// Bound entry variables, innermost last, with the entry each names.
     entry_bound: Vec<(Box<str>, u32)>,
     drafts: Drafts,
+    /// Collection restrictions retained only for standalone formula parsing.
+    key_paths: KeyPaths,
 }
 
 impl Parser {
@@ -919,6 +992,7 @@ impl Parser {
             self.declarations
                 .push(SpannedDeclaration { declaration, span });
         }
+        self.key_paths = key_paths;
         keys.sort_by_key(|key| key.id);
         maps.sort_by_key(|map| map.id);
         entries.sort_by_key(|entry| entry.id);

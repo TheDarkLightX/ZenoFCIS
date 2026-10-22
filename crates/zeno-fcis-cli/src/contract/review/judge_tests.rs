@@ -485,7 +485,7 @@ fn a_lemma_must_be_one_state_formula() {
     let counter = Core::new("bounded-counter", &[("C", 2)]);
     for formula in [
         "true; law 9 x on any = false",
-        "post.100.110 == 0 // comment",
+        "post.100.110 == 0 // comment\nlaw 999 x on any = true",
         "pre.100.110 == 0",
         "command.101.120 == 150",
         "",

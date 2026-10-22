@@ -1039,14 +1039,13 @@ pub(super) fn lemmas(
                 .max(1000)
                 .checked_add(1 + index as u32)
                 .ok_or_else(|| error("lemma ID overflow"))?;
-            let source = format!(
-                "{project}\nlaw {id} unsigned_lemma on {} = {formula};\n",
-                if transitions {
-                    "any"
-                } else {
-                    "commit, genesis"
-                }
-            );
+            let parsed = zeno_fcis_spec::parse_formula(
+                project,
+                formula,
+                zeno_fcis_spec::SourceLimits::default(),
+            )
+            .map_err(|diagnostics| error(diagnostics.to_string()))?;
+            let parsed = super::super::expr::law(&parsed).map_err(error)?;
             let mut r = rules.clone();
             r.law_kinds.insert(
                 id,
@@ -1056,7 +1055,18 @@ pub(super) fn lemmas(
                     LawKind::StateInvariant
                 },
             );
-            let d = Declarations::read(&source, &r.leaf_bindings)?;
+            let mut d = Declarations::read(project, &r.leaf_bindings)?;
+            d.laws.push(super::super::declarations::Law {
+                id,
+                name: "unsigned_lemma".to_owned(),
+                scope: if transitions {
+                    zeno_fcis_spec::LawScope::Always
+                } else {
+                    zeno_fcis_spec::LawScope::Committing
+                },
+                genesis: !transitions,
+                formula: parsed,
+            });
             let bytes = schema::encode(&d)?;
             let probe = Contract::build(&d, &r, schema_commitment(&bytes)?)?;
             let judged = policy::with_numeric_authority(&probe, &bytes, |a| {

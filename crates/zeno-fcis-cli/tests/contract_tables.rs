@@ -109,7 +109,7 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
         String::from_utf8_lossy(&generated.stderr)
     );
     assert!(dir.join("v2/policy.zcve").is_file());
-    // `--lemma` text may not contain braces, so pass law 500's expansion.
+    // The table source and printed expansion have the same lemma verdict.
     let expansion = cli(&["check", "--expand"], &[&example().join("project.zeno")]);
     let text = String::from_utf8(expansion.stdout).unwrap_or_else(|error| panic!("{error:?}"));
     let start = text
@@ -138,6 +138,23 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
     assert_eq!(value["lemmas"][0]["verdict"], "inductive");
     assert_eq!(value["lemmas"][0]["states"]["declared"], 4096);
     assert_eq!(value["lemmas"][0]["states"]["reachable"], 2074);
+    let table_formula = "forall i in table 110 where post.100.110[i] != 0 { count j in table 110 { post.100.110[j] == post.100.110[i] } <= 2 }";
+    let tabled = cli(
+        &["contract", "lemma"],
+        &[&example(), Path::new("--lemma"), Path::new(table_formula)],
+    );
+    assert!(
+        tabled.status.success(),
+        "table-form lemma was refused: {}",
+        String::from_utf8_lossy(&tabled.stderr)
+    );
+    let tabled: Value = serde_json::from_slice(&tabled.stdout).unwrap();
+    let mut scalar = value["lemmas"][0].clone();
+    let mut table = tabled["lemmas"][0].clone();
+    scalar.as_object_mut().unwrap().remove("formula");
+    table.as_object_mut().unwrap().remove("formula");
+    assert_eq!(scalar, table);
+
     std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));
 }
 
@@ -179,4 +196,23 @@ fn contract_tables_json_expansion_handles_the_maximum_stable_id()
     }
     std::fs::remove_dir_all(dir)?;
     Ok(())
+}
+
+#[test]
+fn contract_table_lemma_rejects_declaration_injection() {
+    for text in [
+        "post.100.110 == 1 }; law 999 injected on commit = true;",
+        "forall i in table 110 { post.100.110[i] == 0 }; law 999 injected on commit = true;",
+        "post.100.110 == 0 true",
+    ] {
+        let refused = cli(
+            &["contract", "lemma"],
+            &[&example(), Path::new("--lemma"), Path::new(text)],
+        );
+        assert!(
+            !refused.status.success(),
+            "injection must be refused: {text}"
+        );
+        assert_eq!(refused.status.code(), Some(65));
+    }
 }

@@ -547,3 +547,28 @@ fn table_value_count_limit_includes_the_boundary_and_refuses_three_under_two() {
         );
     }
 }
+
+#[test]
+fn standalone_table_formula_consumes_all_text_and_resolves_paths() {
+    let formula = "forall i in table 110 { post.100.110[i] >= 0 }";
+    let parsed = zeno_fcis_spec::parse_formula(LIBRARY, formula, SourceLimits::default()).unwrap();
+    assert_eq!(
+        parsed,
+        law(
+            &format!("{LIBRARY}\nlaw 900 added on commit = {formula};\n"),
+            900
+        )
+    );
+    for bad in [
+        "x == 1 }; law 999 injected on any = true",
+        "post.100.999 == 0",
+        "true;",
+        "true false",
+        "",
+    ] {
+        assert!(
+            zeno_fcis_spec::parse_formula(LIBRARY, bad, SourceLimits::default()).is_err(),
+            "{bad}"
+        );
+    }
+}
