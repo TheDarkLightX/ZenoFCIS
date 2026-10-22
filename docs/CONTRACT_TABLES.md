@@ -202,8 +202,49 @@ Decision expressions can consume the Boolean circuit printed by expansion.
 
 These checks are exact over the declared finite domains and within the
 existing formula, source, tuple and work limits. Larger domains remain
-inconclusive at their check limits. Derived tables are Boolean and have one
-or two indices over one fixed-size table; they are not keyed collections.
+inconclusive at their check limits. Derived tables have one or two indices over one fixed-size table; they
+are not keyed collections.
+
+### Permission sets as finite Boolean algebras
+
+`type 106 bits Permissions width 3;` declares the subsets of three named-by-bit
+atoms, represented by unsigned values 0 through 7. Widths 1 through 128 are
+supported. For a word-valued definition, add `bits K` before `rounds`:
+
+```text
+derived table 700 permissions[i] in table 110 bits 3 rounds 6 {
+  when true then join(pre.100.210[i], join j in table 110
+    where pre.100.110[i] == j { permissions[j] });
+  default u128(0);
+};
+```
+
+Here table 110 has two entries. `join(A,B)` is union, `meet(A,B)` is
+intersection, and bounded `join j in table T { B }` / `meet j in table T { B }`
+join or meet the entries, with optional lower-data `where` guards. Values
+are in-range unsigned literals, bounded unsigned projections, earlier
+word-valued entries, or these algebra operations. `complement(A)` is permitted
+on lower data; self complement is refused before simplification. Widths and
+indices must match. Guards still cannot read the entry being defined.
+
+Laws use explicit-width helpers `join(K,A,B)`, `meet(K,A,B)`,
+`complement(K,A)` and `subset(K,A,B)`. Inner operations inherit the helper's
+width. Equality uses `==` on the resulting unsigned values. Numeric `<=`
+keeps its numeric meaning and does not test set inclusion.
+
+The compiler projects a word to K Boolean atoms and uses the same shared
+round compiler. All words start at zero; M entries require exactly M*K
+declared rounds. Every strict increase adds an atom, so that bound reaches
+the least fixed point. Packing uses checked unsigned arithmetic and eager
+Select operations; width 128 includes the top atom and the full unsigned mask.
+No second runtime evaluator is introduced. Existing expansion and metering
+limits still apply; this does not promise that every table/width combination
+fits those limits. Larger or multiword sets are outside this implementation.
+
+The [permission-word example](../examples/contract-tables/permission-words/README.md)
+keeps read, edit and publish distinct through inheritance. Its JSON decision
+rule contains the printed circuit expansion, retaining the existing table-rule
+parser's separate index, depth and work checks.
 
 The semantics follow van Emden and Kowalski (1976), *The Semantics of Predicate
 Logic as a Programming Language*, Journal of the ACM 23(4), 733–742. The

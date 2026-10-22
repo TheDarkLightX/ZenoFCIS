@@ -19,6 +19,16 @@ use zeno_fcis_synthesis::finite::{
 };
 #[path = "../../../contract-app/src/numeric_examples.rs"]
 mod examples;
+#[path = "unsigned_probe.rs"]
+mod numeric_probe;
+pub(super) fn count_probe(
+    project: &str,
+    rules: &str,
+    condition: &str,
+    max: u64,
+) -> Result<super::probe::Answer, ContractError> {
+    numeric_probe::count_query(project, rules, condition, max)
+}
 fn error(reason: impl Into<String>) -> ContractError {
     ContractError::new("numeric review", reason)
 }

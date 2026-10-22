@@ -29,3 +29,5 @@ Recursive examples replace repeated bounded path checks with a closure rule.
 Exhaustively checked over the declared finite domain of 294,912 input tuples.
 The recursive examples enumerate 768 and 1,536 input tuples. Every result is
 scoped to its declared finite domain and the existing resource limits.
+
+[Permission sets](permission-words/README.md) inherit three distinct permissions as a finite Boolean algebra.

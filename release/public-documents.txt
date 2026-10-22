@@ -362,6 +362,7 @@ examples/contract-tables/README.md
 examples/contract-tables/delegation/README.md
 examples/contract-tables/library-limits/README.md
 examples/contract-tables/library-loans/README.md
+examples/contract-tables/permission-words/README.md
 examples/contract-tables/role-inheritance/README.md
 examples/distribution-laws/README.md
 examples/distribution-laws/biased-reward/README.md

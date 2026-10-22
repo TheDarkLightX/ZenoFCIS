@@ -360,3 +360,77 @@ fn u128_policy4_signed_only_build_checks_unused_bindings() {
     assert!(generated.source().contains("NumericDescriptor"));
     assert!(review::review(review_sources(&p, &text, None), 100).is_ok());
 }
+
+#[test]
+fn numeric_count_probe_observes_original_decisions_exactly() {
+    use review::probe::{Answer, Question};
+    let p = project(H, H + 1);
+    let r = rules(H);
+    for (condition, expected) in [
+        (format!("command.101.120 == u128({H})"), 4usize),
+        ("u128(0) == u128(1)".into(), 0),
+        ("post.100.110 == command.101.120".into(), 8),
+    ] {
+        let Answer::Answered(v) = review::probe::probe(&p, &r, &Question::Count { condition }, 100)
+            .unwrap_or_else(|e| panic!("{e:?}"))
+        else {
+            panic!("exact finite query");
+        };
+        assert_eq!(v["answer"], expected);
+        assert_eq!(v["fails"], 8 - expected);
+        assert_eq!(v["undefined"], 0);
+        assert_eq!(v["refused"], 0);
+        assert_eq!(v["of"], 8);
+    }
+    assert!(matches!(
+        review::probe::probe(
+            &p,
+            &r,
+            &Question::Count {
+                condition: "true".into()
+            },
+            4
+        )
+        .unwrap_or_else(|e| panic!("{e:?}")),
+        Answer::Inconclusive(_)
+    ));
+    assert!(
+        review::probe::probe(
+            &p,
+            &r,
+            &Question::Count {
+                condition: "command.101.999 == u128(0)".into()
+            },
+            100
+        )
+        .is_err()
+    );
+}
+#[test]
+fn numeric_count_probe_keeps_undefined_and_refused_separate() {
+    use review::probe::{Answer, Question};
+    let p = project(H, H + 1);
+    let r = rules(H).replacen("\"when\":false", "\"when\":true", 1);
+    let condition = Question::Count {
+        condition: format!("post.100.110 == u128({H})"),
+    };
+    let Answer::Answered(refused) =
+        review::probe::probe(&p, &r, &condition, 100).unwrap_or_else(|e| panic!("{e:?}"))
+    else {
+        panic!("finite query");
+    };
+    assert_eq!(refused["refused"], 8);
+    assert_eq!(refused["undefined"], 0);
+    let p = p.replace(
+        "law 501 reject_false on reject = false;",
+        "law 501 reject_false on reject = true;",
+    );
+    let Answer::Answered(undefined) =
+        review::probe::probe(&p, &r, &condition, 100).unwrap_or_else(|e| panic!("{e:?}"))
+    else {
+        panic!("finite query");
+    };
+    assert_eq!(undefined["undefined"], 8);
+    assert_eq!(undefined["refused"], 0);
+    assert_eq!(undefined["answer"], 0);
+}

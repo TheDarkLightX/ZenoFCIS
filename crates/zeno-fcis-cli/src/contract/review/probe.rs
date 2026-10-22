@@ -106,6 +106,11 @@ pub(crate) fn probe(
     question: &Question,
     max_tuples: u64,
 ) -> Result<Answer, ContractError> {
+    if let Question::Count { condition } = question
+        && super::super::rules::Rules::read_for_project(project, rules)?.unsigned
+    {
+        return super::unsigned::count_probe(project, rules, condition, max_tuples);
+    }
     let loaded = Loaded::read(project, rules)?;
     if let Question::Explain { input } = question {
         return explain(&loaded, input).map(Answer::Answered);

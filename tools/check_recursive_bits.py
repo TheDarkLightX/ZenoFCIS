@@ -104,10 +104,10 @@ def reference(source, parents, grants, boolean=False):
         raise AssertionError(expr)
 
     def iterate(atom=None):
-        current = [False if atom is not None else 0] * 3
+        current = [False if atom is not None else 0] * len(parents)
         for step in itertools.count(1):
             following = []
-            for i in range(3):
+            for i in range(len(parents)):
                 env = {index: i}
                 body = next((body for guard, body in rows if evaluate(guard, env, current, atom)), default)
                 following.append(evaluate(body, env, current, atom))
@@ -118,7 +118,7 @@ def reference(source, parents, grants, boolean=False):
             assert step <= rounds
             current = following
     if boolean:
-        return [iterate(atom)[i] for i in range(3) for atom in range(width)]
+        return [iterate(atom)[i] for i in range(len(parents)) for atom in range(width)]
     words = iterate()
     return [bool(word & (1 << atom)) for word in words for atom in range(width)]
 

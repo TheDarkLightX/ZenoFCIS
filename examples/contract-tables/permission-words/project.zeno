@@ -1,0 +1,49 @@
+zeno 1;
+project 1 permission_words;
+namespace 2 permissions;
+type 100 state Roles;
+type 101 command Request;
+type 102 context Session;
+type 105 int Role in 0..=1;
+type 106 bits Permissions width 3;
+type 107 u128 Requested in 1..=7;
+table 110 100 parents 105 size 2;
+table 210 100 grants 106 size 2;
+field 120 101 role 105;
+field 121 101 requested 107;
+variant 130 102 Session none;
+reason 200 permission_required precedence 0;
+component 400 inheritance {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 16384;
+}
+merge [400];
+// Bits 1, 2 and 4 mean read, edit and publish. A self parent is a root.
+derived table 700 permissions[i] in table 110 bits 3 rounds 6 {
+  when true then join(pre.100.210[i], join j in table 110 where pre.100.110[i] == j {
+    permissions[j]
+  });
+  default u128(0);
+};
+derived table 701 post_permissions[i] in table 110 bits 3 rounds 6 {
+  when true then join(post.100.210[i], join j in table 110 where post.100.110[i] == j {
+    post_permissions[j]
+  });
+  default u128(0);
+};
+law 500 domains on commit, genesis = forall i in table 110 {
+  post.100.110[i] >= 0 && post.100.110[i] <= 1 &&
+  post.100.210[i] >= u128(0) && post.100.210[i] <= u128(7)
+};
+law 501 frame on commit = forall i in table 110 {
+  post.100.110[i] == pre.100.110[i] && post.100.210[i] == pre.100.210[i]
+};
+law 502 permitted on commit =
+  (command.101.120 == 0 && subset(3, command.101.121, permissions[0])) ||
+  (command.101.120 == 1 && subset(3, command.101.121, permissions[1]));
+law 503 denied on reject = !(
+  (command.101.120 == 0 && subset(3, command.101.121, permissions[0])) ||
+  (command.101.120 == 1 && subset(3, command.101.121, permissions[1])));
