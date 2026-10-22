@@ -54,7 +54,7 @@ rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/TheDarkLightX/ZenoFCIS"
 homepage = "https://github.com/TheDarkLightX/ZenoFCIS"
-authors = ["TheDarkLightX and ZenoFCIS contributors"]
+authors = ["Dana Edwards (TheDarkLightX) and ZenoFCIS contributors"]
 readme = "README.md"
 
 [workspace.lints.rust]
