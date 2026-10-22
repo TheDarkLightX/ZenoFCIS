@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 /// Durable consumer of the mandatory library-owned V2 publication capability.
+pub mod collections;
 pub mod v2;
 
 /// Binds shell-effects publication data to the V2 Authority.
