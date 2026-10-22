@@ -169,7 +169,8 @@ fn self_complement_is_refused() {
     let s="zeno 1; project 1 self_complement; type 100 state S; type 105 int V in 0..=0; table 110 100 slots 105 size 1;
       derived table 700 x[i] in table 110 bits 2 rounds 2 { when true then complement(x[i]); default u128(0); };";
     let error = parse_project(s, SourceLimits::default())
-        .expect_err("same-stratum complement must be refused");
+        .err()
+        .unwrap_or_else(|| panic!("same-stratum complement must be refused"));
     assert!(error.to_string().contains("complement"), "{error}");
 }
 #[test]
