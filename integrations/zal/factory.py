@@ -171,9 +171,14 @@ def _partial(node, accepted):
 
 def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
-    for label, collection in [("temporal property", model.properties), ("fairness assumption", model.fairness)]:
-        for name, _ in collection:
-            raise Refusal(f"unsupported lowering: {label} {name}")
+    safety = []
+    for name, formula in model.properties:
+        shape = behavior2.property_shape(formula)
+        if shape["kind"] != "safety":
+            raise Refusal(f"unsupported lowering: temporal property {name}")
+        safety.append((name, shape["goal"]))
+    for name, _ in model.fairness:
+        raise Refusal(f"unsupported lowering: fairness assumption {name}")
     for kind, _ in model.obligations:
         raise Refusal(f"unsupported lowering: unresolved {kind}")
     report = behavior2.check(model, checker_identity())
@@ -249,18 +254,22 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     for i, (name, formula) in enumerate(model.invariants, 501):
         project.append(f"law {i} invariant_{name} on commit, genesis = {expression(formula, ('post', 'post'), True)};")
         kinds[str(i)] = "StateInvariant"
-    law = 520
-    for name, formula in model.requirements:
-        # A rejection keeps every field, so its post-state reads are the pre-state.
-        for scope, accepted, root, kind in [("accept", True, ("pre", "post"), "AuthoritySubjectRecipient"),
-                                            ("reject", False, ("pre", "pre"), "RejectNoAuthority")]:
-            folded = _partial(formula, accepted)
-            if folded is True:
-                continue
-            body = "false" if folded is False else expression(folded, root, True)
-            project.append(f"law {law} require_{name}_{scope} on {scope} = {body};")
-            kinds[str(law)] = kind
-            law += 1
+    property_laws = {name: [] for name, _ in safety}
+    for prefix, claims, first_law in [("require", model.requirements, 520), ("property", safety, 540)]:
+        law = first_law
+        for name, formula in claims:
+            # A rejection keeps every field, so its post-state reads are the pre-state.
+            for scope, accepted, root, kind in [("accept", True, ("pre", "post"), "AuthoritySubjectRecipient"),
+                                                ("reject", False, ("pre", "pre"), "RejectNoAuthority")]:
+                folded = _partial(formula, accepted)
+                if folded is True:
+                    continue
+                body = "false" if folded is False else expression(folded, root, True)
+                project.append(f"law {law} {prefix}_{name}_{scope} on {scope} = {body};")
+                kinds[str(law)] = kind
+                if prefix == "property":
+                    property_laws[name].append(law)
+                law += 1
 
     def update(item):
         value = term(item.term, ("pre", "post"))
@@ -302,6 +311,14 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
         return f"{' '.join(map(str, inputs_row))} | {result['class'].lower()} {reason} {' '.join(map(str, post))} | -"
 
     domain = [row for row in model.inputs_domain() if admissible(row[0], row[1])]
+    # ZAL safety ranges over reachable executions; contract laws cover every
+    # admissible pre-state. Refuse a strengthening that would change decisions
+    # on unreachable inputs instead of silently changing the reference model.
+    for row in domain:
+        step = model.outcome(*row)[1]
+        for name, goal in safety:
+            if not behavior2.holds(goal, step):
+                raise Refusal(f"unsupported lowering: temporal property {name} does not hold on every admissible step")
     table = [example(*row) for row in domain]
     # One deterministic persistent journey from genesis, stopping on a repeated configuration.
     journey, seen = [], set()
@@ -326,6 +343,7 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
                "variable_fields": variables, "reasons": reasons,
                "case_ids": [r.id for r in model.rules] + ["default"],
                "laws": {k: v for k, v in kinds.items()},
+               "property_laws": property_laws,
                "reference_domain": {"admissible_tuples": len(table), "declared_tuples": report["input_tuples"],
                                     "excluded": "pre-states that break a declared invariant; the contract's genesis "
                                                 "and commit laws keep every held state admissible"},
