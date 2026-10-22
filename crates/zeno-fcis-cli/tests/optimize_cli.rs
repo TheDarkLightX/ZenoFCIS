@@ -96,6 +96,76 @@ fn replay(receipt: &Path, original: &Path, candidate: &Path) -> (Option<i32>, Va
 }
 
 #[test]
+fn output_failure_reports_published_and_remaining_artifacts() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let candidate = directory.0.join("candidate.zcve");
+    let receipt = directory.0.join("missing/receipt.json");
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--candidate-out",
+            &candidate.to_string_lossy(),
+            "--receipt",
+            &receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(report["status"], "io-error");
+    assert_eq!(report["authority"], "none");
+    assert_eq!(
+        report["detail"]["publication"],
+        json!({
+            "candidate": {"path": candidate, "status": "published"},
+            "receipt": {"path": receipt, "status": "write-failed"},
+        })
+    );
+    assert_eq!(
+        read(&candidate),
+        read(&artifact("boolean-kernel-candidate"))
+    );
+    assert!(!receipt.exists());
+    assert!(
+        report["detail"]["next_step"]
+            .as_str()
+            .is_some_and(|s| s.contains("unused output paths"))
+    );
+
+    let missing_candidate = directory.0.join("missing/candidate.zcve");
+    let untouched_receipt = directory.0.join("untouched.json");
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--candidate-out",
+            &missing_candidate.to_string_lossy(),
+            "--receipt",
+            &untouched_receipt.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(
+        report["detail"]["publication"],
+        json!({
+            "candidate": {"path": missing_candidate, "status": "write-failed"},
+            "receipt": {"path": untouched_receipt, "status": "not-attempted"},
+        })
+    );
+    assert!(!missing_candidate.exists() && !untouched_receipt.exists());
+    assert_eq!(
+        read(&candidate),
+        read(&artifact("boolean-kernel-candidate"))
+    );
+
+    let (exit, report) = optimize(&original, &["--receipt", &receipt.to_string_lossy()]);
+    assert_eq!(exit, Some(3), "{report}");
+    assert_eq!(report["detail"]["publication"]["candidate"], Value::Null);
+    assert_eq!(
+        report["detail"]["publication"]["receipt"]["status"],
+        "write-failed"
+    );
+}
+
+#[test]
 fn kernel_improves_to_seven_nodes_and_the_written_receipt_replays() {
     let directory = Directory::new();
     let original = artifact("boolean-kernel-original");

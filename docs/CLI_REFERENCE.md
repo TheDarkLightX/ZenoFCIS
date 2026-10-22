@@ -947,6 +947,15 @@ The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
 original and the written candidate; `transform replay` reproduces it byte for
 byte. The same program, strategy and profile give byte-identical output.
 
+Output creation is sequential: candidate first, then receipt, each with exclusive
+creation. The pair is not transactional. An output `io-error` reports both
+requested paths under `detail.publication`, with status `published`,
+`write-failed`, or `not-attempted`; an unrequested artifact is `null`.
+A published candidate remains when receipt creation fails. A failed write tries
+to remove its incomplete file; inspect that path if cleanup also failed.
+Keep published artifacts, correct the write error, and retry with unused output
+paths. Existing destinations are never overwritten.
+
 On the recorded withdrawal-queue artifacts the default portfolio reaches the
 7-node Boolean kernel (from 16), a 35-node retained controller (from 69; the
 recorded hand candidate has 60) and an 88-node current decision graph (from

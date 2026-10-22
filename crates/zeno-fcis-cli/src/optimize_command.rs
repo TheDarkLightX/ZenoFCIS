@@ -211,12 +211,20 @@ fn optimize_files(arguments: &Arguments) -> (u8, Value) {
                     if let Some(path) = candidate_out
                         && let Err(error) = crate::atomic_create(path, &best.bytes)
                     {
-                        return io_failure(&error);
+                        return publication_failure(
+                            &error,
+                            Some((path, "write-failed")),
+                            receipt.map(|path| (path, "not-attempted")),
+                        );
                     }
                     if let Some(path) = receipt
                         && let Err(error) = crate::atomic_create(path, &receipt_bytes)
                     {
-                        return io_failure(&error);
+                        return publication_failure(
+                            &error,
+                            candidate_out.map(|path| (path, "published")),
+                            Some((path, "write-failed")),
+                        );
                     }
                     detail["candidate_path"] =
                         json!(candidate_out.map(|path| path.display().to_string()));
@@ -277,5 +285,24 @@ fn io_failure(error: &std::io::Error) -> (u8, Value) {
         crate::FAILURE,
         "io-error",
         json!({"message": error.to_string()}),
+    )
+}
+
+fn publication_failure(
+    error: &std::io::Error,
+    candidate: Option<(&Path, &str)>,
+    receipt: Option<(&Path, &str)>,
+) -> (u8, Value) {
+    let artifact = |output: Option<(&Path, &str)>| {
+        output.map(|(path, status)| json!({"path": path.display().to_string(), "status": status}))
+    };
+    result(
+        crate::FAILURE,
+        "io-error",
+        json!({
+            "message": error.to_string(),
+            "publication": {"candidate": artifact(candidate), "receipt": artifact(receipt)},
+            "next_step": "Keep published artifacts. Inspect the write-failed path for an incomplete file, correct the write error, and retry with unused output paths."
+        }),
     )
 }
