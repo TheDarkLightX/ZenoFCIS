@@ -270,11 +270,9 @@ law 501 tail on commit, genesis = sum i in table 110 where i > 0 {{ post.100.110
             "2 * (post.100.110 + post.100.111 + post.100.112) <= 9 && post.100.112 >= -1;"
         )
     );
-    assert!(
-        expansion
-            .text
-            .contains("post.100.111 + post.100.112 - post.100.110 <= 3;")
-    );
+    assert!(expansion.text.contains(
+        "choose(0 > 0, post.100.110, 0) + post.100.111 + post.100.112 - post.100.110 <= 3;"
+    ));
     assert_eq!(bytes(&expansion.text), bytes(&source));
 }
 

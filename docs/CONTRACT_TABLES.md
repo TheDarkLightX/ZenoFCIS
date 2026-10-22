@@ -73,9 +73,10 @@ the same identity and the same checks. The rules are:
   the condition, both arms and Select incur their ordinary node/work charges,
   including work measured before a refusal; there is no branch work discount.
 - `sum i in table T { V }` is `V_0 + ... + V_N-1`, joined left to right.
-  `where C` keeps static index/constant filtering compatible with earlier
-  sources. When C reads an input, each entry becomes `choose(C_k, V_k, 0)`;
-  V_k is eager even when C_k is false.
+  With `where C`, each entry is `choose(C_k, V_k, 0)`; V_k is eager even
+  when C_k is false. A checked-total constant true guard may be removed;
+  a checked-total constant false guard may omit only a checked-total
+  constant body. Otherwise the Select retains both evaluations.
 - A count in a value position, including one compared with a state or command
   value, is `sum i in table T { choose(C, 1, 0) }`. It has N Select terms
   and N-1 additions, with one occurrence of the condition per entry. For example:
@@ -88,8 +89,18 @@ the same identity and the same checks. The rules are:
   disjunction, over every set of K entries, of `(C_a && C_b && ...)`.
   `< K` is `<= K-1`, `> K` is `>= K+1`, `== K` is `>= K && <= K`, and `!= K`
   is its negation. Each clause list is joined in a balanced tree, left half
-  first. A count beyond 0..N is `true` or `false` as the comparison requires,
-  and a count whose conditions read only constants is evaluated.
+  first. When no subset clauses would remain, the count uses the linear
+  Select sum instead, so degenerate bounds still evaluate every predicate.
+  Constant predicates are folded only after checked eager evaluation succeeds.
+
+Definedness is part of a table form's meaning. Boolean `&&`, `||` and `->`
+evaluate both operands; an absorbing truth value cannot hide overflow, a bad
+cast or division failure in the other operand. Counts, filtered sums and
+derived-table specialization may replace an expression with a constant only
+when its removed evaluations have been checked total. Unknown or failed
+constant evaluation keeps the expression for the ordinary eager evaluator;
+it never becomes a Boolean answer. Thus a partial predicate still refuses
+at `count <= N`, `count <= N+1` and `count >= 0`.
 
 So the example's law 500 is six implications, one per copy k: when field
 110+k is not 0, none of the 20 sets of three copies all have copy k's holder.
@@ -119,7 +130,9 @@ many times it is expanded, so the cost is visible before it reaches the limit:
 | 64 | 3 | 635,376 |
 
 `>= K` costs C(N, K) clauses of K copies, and `==` and `!=` cost both.
-These constant-bound forms retain their existing expansion and identities.
+Nondegenerate constant-bound forms retain their existing subset expansion.
+Degenerate bounds with predicates not proved constant and total use N Select
+terms; their expansion and identity change to retain definedness.
 For a linear constant-bound form, write
 `sum i in table T { choose(C, 1, 0) } <= K` explicitly. At N = 6, 16 and
 64 it has 6, 16 and 64 Select terms instead of 20, 560 and 41,664 clauses

@@ -312,15 +312,16 @@ fn choose(n: usize, k: usize) -> Vec<Vec<usize>> {
     }
 }
 
-/// The value of a formula over integer literals only.
+/// A checked constant truth. Both Boolean operands must be defined before a
+/// formula can be folded, just as in the eager runtime graph.
 pub(crate) fn static_truth(value: &RelExpr) -> Option<bool> {
     Some(match value {
         RelExpr::Circuit(c) => c.evaluate(static_truth)?,
         RelExpr::Bool(value) => *value,
         RelExpr::Not(inner) => !static_truth(inner)?,
-        RelExpr::And(a, b) => static_truth(a)? && static_truth(b)?,
-        RelExpr::Or(a, b) => static_truth(a)? || static_truth(b)?,
-        RelExpr::Implies(a, b) => !static_truth(a)? || static_truth(b)?,
+        RelExpr::And(a, b) => static_truth(a)? & static_truth(b)?,
+        RelExpr::Or(a, b) => static_truth(a)? | static_truth(b)?,
+        RelExpr::Implies(a, b) => !static_truth(a)? | static_truth(b)?,
         RelExpr::Compare(op, a, b) => {
             let (a, b) = (static_value(a)?, static_value(b)?);
             match op {
@@ -336,7 +337,8 @@ pub(crate) fn static_truth(value: &RelExpr) -> Option<bool> {
     })
 }
 
-fn static_value(value: &ValueExpr) -> Option<i128> {
+/// A checked literal calculation; `Some` also establishes totality.
+pub(crate) fn static_value(value: &ValueExpr) -> Option<i128> {
     match value {
         ValueExpr::Int(value) => Some(*value),
         ValueExpr::Add(a, b) => static_value(a)?.checked_add(static_value(b)?),

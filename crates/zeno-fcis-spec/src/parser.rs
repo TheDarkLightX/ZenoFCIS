@@ -2858,12 +2858,21 @@ impl Parser {
                 CompareOp::GreaterEq => held >= bound,
             });
         }
+        let (clauses, copies) = tables::count_size(conditions.len(), op, bound);
+        if copies == 0 {
+            // A constant comparison result does not prove the predicates total.
+            // Keep their eager evaluation even when no subset clause is needed.
+            return RelExpr::Compare(
+                op,
+                self.linear_count(start, conditions),
+                ValueExpr::Int(bound),
+            );
+        }
         let largest = conditions
             .iter()
             .map(|c| formula_shape_rel(c).0)
             .max()
             .unwrap_or(1);
-        let (clauses, copies) = tables::count_size(conditions.len(), op, bound);
         let info = self.counts.entry(start.start()).or_insert(CountInfo {
             line: start.line(),
             column: start.column(),
@@ -2892,7 +2901,8 @@ impl Parser {
         tables::count(&conditions, op, bound)
     }
     /// `sum VAR in table T [where C] { V }`, after `sum`; dynamic C
-    /// lowers to an eager Select and static filtering stays compatible.
+    /// lowers to an eager Select. A false static filter may omit only a
+    /// checked-total constant body.
     fn parse_table_sum(&mut self) -> ValueExpr {
         let start = self.tokens[self.index.saturating_sub(1)].span;
         let Some((variable, size)) = self.table_header(start) else {
@@ -2919,8 +2929,8 @@ impl Parser {
         for (condition, body) in entries {
             match condition.as_ref().map(tables::static_truth) {
                 None | Some(Some(true)) => kept.push(body),
-                Some(Some(false)) => {}
-                Some(None) => kept.push(ValueExpr::Select(
+                Some(Some(false)) if tables::static_value(&body).is_some() => {}
+                Some(Some(false)) | Some(None) => kept.push(ValueExpr::Select(
                     Box::new(condition.unwrap_or(RelExpr::Bool(false))),
                     Box::new(body),
                     Box::new(ValueExpr::Int(0)),
