@@ -23,6 +23,11 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--git-dir", type=Path)
     args = parser.parse_args()
+    fixture = ROOT / "tests/fixtures/repair-pre-lemma"
+    wide_fixture = ROOT / "crates/zeno-fcis-cli/tests/fixtures/numeric-scale"
+    for contract in (fixture, wide_fixture):
+        for name in ("project.zeno", "v2/policy.json"):
+            assert (contract / name).is_file(), f"missing evidence fixture: {contract / name}"
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
     env = os.environ.copy()
@@ -96,13 +101,12 @@ def main():
         run(label, command, expected, extra)
         return json.loads(target.read_text())
 
-    fixture = ROOT / "tests/fixtures/repair-pre-lemma"
     native = packet("repair-native", fixture, 6, "pre.100.110 >= 1", True, 1)
     symbolic = packet("repair-symbolic", fixture, 1, "pre.100.110 >= 1", True, 1)
     assert native["status"] == symbolic["status"] == "refuted"
     assert symbolic["lemmas"][0]["obligations"][0]["counterexample"]["authority"]["class"] == "Accept"
     assert packet("repair-review", fixture, 1)["status"] == "solver-checked"
-    assert packet("wide-review", ROOT / "tests/fixtures/numeric-scale", 1)["status"] == "solver-checked"
+    assert packet("wide-review", wide_fixture, 1)["status"] == "solver-checked"
     assert packet("symbolic-gaps-refusal", fixture, 1, expected=2, gaps=True)["status"] == "UNKNOWN"
     assert packet("state-induction", fixture, 1, "post.100.110 >= 1")["status"] == "solver-checked"
 
