@@ -204,3 +204,44 @@ fn derived_ids_are_disjoint_from_all_declarations() {
         assert!(parse_project(&source, SourceLimits::default()).is_err());
     }
 }
+
+#[test]
+fn self_counts_are_refused_before_constant_folding() {
+    for condition in [
+        "circuit { formula { x[j] }; } output 0",
+        "circuit { formula { !x[j] }; } output 0",
+        "circuit { true; formula { x[j] }; } output 0",
+    ] {
+        let source = format!(
+            "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{
+            when true then count j in table 110 {{ {condition} }} >= 0;
+            default false;
+        }}; law 500 query = x[0];"
+        );
+        let errors = parse_project(&source, SourceLimits::default())
+            .expect_err("a constant count must not hide a forbidden self reference");
+        assert!(errors.to_string().contains("count"), "{errors}");
+    }
+}
+
+#[test]
+fn guard_checks_precede_folding_and_leave_positive_values_eligible() {
+    let source = format!(
+        "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{
+        when count j in table 110 {{ circuit {{ formula {{ x[j] }}; }} output 0 }} >= 0 then true;
+        default false;
+    }};"
+    );
+    let errors = parse_project(&source, SourceLimits::default()).expect_err("self-reading guard");
+    assert!(errors.to_string().contains("guard"), "{errors}");
+    let source = format!(
+        "{HEADER} derived table 700 x[i] in table 110 rounds 4 {{
+        when true then exists j in table 110 where false {{ x[j] }};
+        default x[i];
+    }};"
+    );
+    assert!(
+        parse_project(&source, SourceLimits::default()).is_ok(),
+        "a positive body remains allowed"
+    );
+}

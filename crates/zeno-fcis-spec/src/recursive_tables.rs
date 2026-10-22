@@ -17,6 +17,7 @@ pub(super) struct DerivedTable {
 /// Temporary references exist only during parsing and cannot escape in a project.
 pub(super) fn reads_self(f: &RelExpr) -> bool {
     match f {
+        RelExpr::Circuit(c) => c.formulas().any(reads_self),
         RelExpr::Predicate { name, .. } => name.as_str() == SELF,
         RelExpr::Not(a) => reads_self(a),
         RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
@@ -69,6 +70,20 @@ fn lower_value(v: &ValueExpr) -> bool {
 }
 
 impl Parser {
+    /// Refuse active self reads before a surrounding expansion can erase them.
+    /// This context belongs to one parse and never enters the checked project.
+    pub(super) fn with_self_refusal<T>(
+        &mut self,
+        reason: &'static str,
+        parse: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous = self.self_refusal;
+        self.self_refusal = previous.or(Some(reason));
+        let value = parse(self);
+        self.self_refusal = previous;
+        value
+    }
+
     pub(super) fn refuse_derived_collisions(&mut self, project: StableId) {
         let mut used: BTreeSet<u32> = self
             .declarations
@@ -178,7 +193,10 @@ impl Parser {
             }
             let mut rows = Vec::new();
             while self.take_keyword("when") {
-                let guard = self.parse_rel();
+                let guard = self
+                    .with_self_refusal("a guard cannot read the table being defined", |p| {
+                        p.parse_rel()
+                    });
                 self.expect_keyword("then", "derived.row");
                 let value = self.parse_rel();
                 self.expect_symbol(TokenKind::Semicolon, "derived.row");
@@ -275,8 +293,11 @@ impl Parser {
         let own = self
             .defining
             .as_ref()
-            .filter(|(n, _, _)| n == name.as_ref());
-        let dimensions = own
+            .is_some_and(|(n, _, _)| n == name.as_ref());
+        let dimensions = self
+            .defining
+            .as_ref()
+            .filter(|(n, _, _)| n == name.as_ref())
             .map(|(_, s, r)| (*s, *r))
             .or_else(|| self.derived.get(name.as_ref()).map(|t| (t.size, t.rank)));
         let Some((size, rank)) = dimensions else {
@@ -294,7 +315,10 @@ impl Parser {
             return Some(RelExpr::Bool(false));
         }
         let entry = indices.iter().fold(0u32, |n, i| n * size + i.unwrap_or(0));
-        let value = if own.is_some() {
+        if own && let Some(reason) = self.self_refusal {
+            self.recursive_error(at, reason);
+        }
+        let value = if own {
             RelExpr::Predicate {
                 name: Identifier::try_new(SELF).unwrap_or_else(fallback_identifier),
                 arguments: vec![ValueExpr::Int(i128::from(entry))].into_boxed_slice(),

@@ -224,6 +224,7 @@ fn parse_with_tables(
         counts: BTreeMap::new(),
         derived: BTreeMap::new(),
         defining: None,
+        self_refusal: None,
     };
     let parsed = parser.parse(limits.max_diagnostics());
     if parser.diagnostics.is_empty() {
@@ -281,6 +282,7 @@ struct Parser {
     key_paths: KeyPaths,
     derived: BTreeMap<String, recursive_tables::DerivedTable>,
     defining: Option<(String, u32, usize)>,
+    self_refusal: Option<&'static str>,
 }
 
 impl Parser {
@@ -2020,9 +2022,10 @@ impl Parser {
     }
     fn parse_not(&mut self) -> RelExpr {
         if self.take_symbol(&TokenKind::Bang) || self.take_keyword("not") {
-            let value = self.nested("formula.not", RelExpr::Bool(false), |parser| {
-                parser.parse_not()
-            });
+            let value = self
+                .with_self_refusal("a negation cannot read the table being defined", |parser| {
+                    parser.nested("formula.not", RelExpr::Bool(false), |p| p.parse_not())
+                });
             RelExpr::Not(Box::new(value))
         } else {
             self.parse_rel_atom()
@@ -2170,7 +2173,10 @@ impl Parser {
                 arguments: arguments.into_boxed_slice(),
             };
         }
-        let left = self.parse_value();
+        let left = self
+            .with_self_refusal("a comparison cannot read the table being defined", |p| {
+                p.parse_value()
+            });
         let op = if self.take_symbol(&TokenKind::EqEq) {
             Some(CompareOp::Eq)
         } else if self.take_symbol(&TokenKind::NotEq) {
@@ -2187,7 +2193,11 @@ impl Parser {
             None
         };
         if let Some(op) = op {
-            RelExpr::Compare(op, left, self.parse_value())
+            let right = self
+                .with_self_refusal("a comparison cannot read the table being defined", |p| {
+                    p.parse_value()
+                });
+            RelExpr::Compare(op, left, right)
         } else {
             self.error(
                 DiagnosticCode::ExpectedToken,
@@ -2660,9 +2670,12 @@ impl Parser {
         } else {
             let universal = keyword.as_str() == "forall";
             let entries: Vec<RelExpr> = self.per_entry(&variable, size, |parser| {
-                let condition = parser
-                    .take_keyword("where")
-                    .then(|| parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()));
+                let condition = parser.take_keyword("where").then(|| {
+                    parser.with_self_refusal(
+                        "a quantifier guard cannot read the table being defined",
+                        |q| q.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()),
+                    )
+                });
                 if parser.defining.is_some()
                     && condition.as_ref().is_some_and(recursive_tables::reads_self)
                 {
@@ -2714,12 +2727,14 @@ impl Parser {
     fn count_conditions(&mut self, variable: &Identifier, size: u32) -> Vec<RelExpr> {
         let start = self.current().span;
         let conditions = if matches!(self.current().kind, TokenKind::LBrace) {
-            self.per_entry(variable, size, |parser| {
-                parser.expect_symbol(TokenKind::LBrace, "table.count");
-                let condition =
-                    parser.nested("table.count", RelExpr::Bool(false), |p| p.parse_rel());
-                parser.expect_symbol(TokenKind::RBrace, "table.count");
-                condition
+            self.with_self_refusal("a count cannot read the table being defined", |p| {
+                p.per_entry(variable, size, |parser| {
+                    parser.expect_symbol(TokenKind::LBrace, "table.count");
+                    let condition =
+                        parser.nested("table.count", RelExpr::Bool(false), |p| p.parse_rel());
+                    parser.expect_symbol(TokenKind::RBrace, "table.count");
+                    condition
+                })
             })
         } else {
             vec![RelExpr::Bool(true); size as usize]
@@ -2840,15 +2855,20 @@ impl Parser {
             return ValueExpr::Int(0);
         };
         self.table_depth += 1;
-        let entries = self.per_entry(&variable, size, |parser| {
-            let condition = parser
-                .take_keyword("where")
-                .then(|| parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel()));
-            parser.expect_symbol(TokenKind::LBrace, "table.sum");
-            let body = parser.nested("table.sum", ValueExpr::Int(0), |p| p.parse_value());
-            parser.expect_symbol(TokenKind::RBrace, "table.sum");
-            (condition, body)
-        });
+        let entries = self.with_self_refusal(
+            "a numeric aggregate cannot read the table being defined",
+            |p| {
+                p.per_entry(&variable, size, |parser| {
+                    let condition = parser.take_keyword("where").then(|| {
+                        parser.nested("table.where", RelExpr::Bool(false), |p| p.parse_rel())
+                    });
+                    parser.expect_symbol(TokenKind::LBrace, "table.sum");
+                    let body = parser.nested("table.sum", ValueExpr::Int(0), |p| p.parse_value());
+                    parser.expect_symbol(TokenKind::RBrace, "table.sum");
+                    (condition, body)
+                })
+            },
+        );
         self.table_depth -= 1;
         self.table_values += 1;
         let mut kept = Vec::new();
