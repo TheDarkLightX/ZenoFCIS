@@ -31,6 +31,7 @@ use super::machine::{self, Inconclusive, Loaded, Machine, Observation};
 #[derive(Clone, Debug)]
 pub(crate) enum Profile {
     Measured(Value),
+    NoStartingState(Value),
     Inconclusive(Inconclusive),
 }
 
@@ -48,6 +49,9 @@ pub(crate) fn profile(
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Profile::Inconclusive(inconclusive)),
     };
+    if let Err(refusal) = &observation.machine.starting_state {
+        return Ok(Profile::NoStartingState(refusal.packet()));
+    }
     Ok(Profile::Measured(measure(&loaded, &observation)))
 }
 
@@ -101,6 +105,7 @@ fn measure(loaded: &Loaded, observation: &Observation) -> Value {
             "tuples": space.tuples(),
         },
         "genesis": crate::report_numbers::integers(&space.state(machine.genesis)),
+        "admissible_starting_states": 1,
         "state_laws": state_laws,
         "states": {
             "schema": space.states,

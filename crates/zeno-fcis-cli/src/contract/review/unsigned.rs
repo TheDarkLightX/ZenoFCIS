@@ -293,29 +293,11 @@ fn same_value(a: &evaluate::Value, b: Atom<'_>) -> bool {
     }
 }
 fn state_ids(d: &c::NumericDescriptor<'_>) -> Vec<u32> {
-    d.laws
-        .iter()
-        .filter(|l| {
-            l.genesis
-                && matches!(l.scope, l::Scope::Committing | l::Scope::Always)
-                && !matches!(l.kind, l::Kind::InitialCondition)
-        })
-        .map(|l| l.id)
-        .collect()
+    evaluate::state_law_ids(d.laws)
 }
 fn state_check(c: &Contract<'_>, row: &[Atom<'static>], laws: &LawSet<'_>) -> Option<u32> {
     let fs = fields(c, row, Source::State);
-    let f = l::Frame::Genesis {
-        initial: view(c, 0, &fs),
-    };
-    let (_, ds) = laws.on_frame(&f);
-    laws.ids()
-        .iter()
-        .find(|id| {
-            !ds.iter()
-                .any(|d| d.id == **id && d.verdict == l::Verdict::Satisfied)
-        })
-        .copied()
+    laws.first_unsatisfied_state_law(view(c, 0, &fs))
 }
 fn evaluate(
     c: &Contract<'_>,
@@ -1022,8 +1004,8 @@ pub(super) fn lemmas(
         let mut row = space.rows[0].clone();
         row[..space.state_width].copy_from_slice(&genesis);
         let frames = frame(&contract, &row)?;
-        if authority.genesis(&frames[0]).result().is_err() {
-            return Err(error("declared genesis refused by Authority"));
+        if let Err(refusal) = zeno_fcis_contract::internals::genesis::admit(authority, &frames[0]) {
+            return Ok(lemma::Lemmas::NoStartingState(refusal.packet()));
         }
         let per_state = space.rows.len() / space.states.len();
         let mut reachable = vec![false; space.states.len()];

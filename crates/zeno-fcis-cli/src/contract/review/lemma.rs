@@ -75,6 +75,7 @@ pub(super) fn induction<S: Clone + Ord>(
 pub(crate) enum Lemmas {
     /// Each lemma's verdict, in the order given.
     Judged(Vec<Value>),
+    NoStartingState(Value),
     Inconclusive(Inconclusive),
 }
 
@@ -115,6 +116,9 @@ pub(crate) fn judge(
         Ok(observation) => observation,
         Err(inconclusive) => return Ok(Lemmas::Inconclusive(inconclusive)),
     };
+    if let Err(refusal) = &observation.machine.starting_state {
+        return Ok(Lemmas::NoStartingState(refusal.packet()));
+    }
     let mut judged = Vec::new();
     for (index, formula) in lemmas.iter().enumerate() {
         let what = format!("lemma {}", index + 1);

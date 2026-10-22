@@ -289,14 +289,29 @@ impl Core {
         let contract = Contract::build(&declarations, &rules, commitment)?;
         let program = contract.program()?;
         let framer = Framer::new(&positions, &contract);
+        let genesis_values: Vec<i128> = positions[..state_width]
+            .iter()
+            .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
+                Some(Constant::U128(_)) => invalid("U128SubjectUnsupported"),
+                Some(Constant::Bool(b)) => Ok(i128::from(*b)),
+                Some(Constant::Int(v)) => Ok(*v),
+                None => invalid("v2/policy.json genesis misses a state field"),
+            })
+            .collect::<Result<_>>()?;
         let decided = policy::with_authority(&contract, &schema, |authority| {
-            (0..tuples)
-                .map(|ordinal| {
-                    let tuple = element(&values, ordinal);
-                    library::evaluate(authority, &framer, &tuple)
-                })
-                .collect::<Vec<Outcome>>()
-        })?;
+            let mut initial = genesis_values.clone();
+            initial.extend(element(&values[state_width..], 0));
+            zeno_fcis_contract::internals::genesis::admit(authority, &framer.frame(&initial)[0])
+                .map_err(|refusal| refusal.error())?;
+            Ok::<_, crate::contract::ContractError>(
+                (0..tuples)
+                    .map(|ordinal| {
+                        let tuple = element(&values, ordinal);
+                        library::evaluate(authority, &framer, &tuple)
+                    })
+                    .collect::<Vec<Outcome>>(),
+            )
+        })??;
         let state_values = &values[..state_width];
         let mut decisions = Vec::with_capacity(tuples);
         let mut native_deliveries = Vec::new();
@@ -351,15 +366,6 @@ impl Core {
                     .unwrap_or(usize::MAX)
             })
             .collect();
-        let genesis_values: Vec<i128> = positions[..state_width]
-            .iter()
-            .map(|p| match p.field.and_then(|f| rules.genesis.get(&f)) {
-                Some(Constant::U128(_)) => invalid("U128SubjectUnsupported"),
-                Some(Constant::Bool(b)) => Ok(i128::from(*b)),
-                Some(Constant::Int(v)) => Ok(*v),
-                None => invalid("v2/policy.json genesis misses a state field"),
-            })
-            .collect::<Result<_>>()?;
         let genesis = index_of(state_values, &genesis_values).ok_or_else(|| {
             Stop::Invalid("genesis lies outside the declared state domain".into())
         })?;
@@ -2325,6 +2331,21 @@ mod arithmetic_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn genesis_question_loader_refuses_law_500() {
+        let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps/library-loans");
+        let project =
+            std::fs::read_to_string(base.join("project.zeno")).unwrap_or_else(|e| panic!("{e}"));
+        let mut rules: Value = serde_json::from_str(
+            &std::fs::read_to_string(base.join("v2/policy.json")).unwrap_or_else(|e| panic!("{e}")),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        rules["genesis"] = json!({"110": 1, "111": 1, "112": 1});
+        let result = Core::from_sources(project, rules.to_string());
+        assert!(
+            matches!(result, Err(Stop::Invalid(ref reason)) if reason.contains("no admissible starting state") && reason.contains("law 500"))
+        );
+    }
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
 

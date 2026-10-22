@@ -256,6 +256,9 @@ pub(super) fn run(command: Command) -> u8 {
                 Ok(
                     match profile::profile(sources.project, sources.rules, common.max_tuples)? {
                         profile::Profile::Measured(value) => Judged::Done(value, OK, "measured"),
+                        profile::Profile::NoStartingState(value) => {
+                            Judged::Done(value, INVALID, "no-admissible-starting-state")
+                        }
                         profile::Profile::Inconclusive(inconclusive) => {
                             Judged::Inconclusive(inconclusive)
                         }
@@ -290,6 +293,9 @@ pub(super) fn run(command: Command) -> u8 {
                     } {
                         lemma::Lemmas::Inconclusive(inconclusive) => {
                             Judged::Inconclusive(inconclusive)
+                        }
+                        lemma::Lemmas::NoStartingState(value) => {
+                            Judged::Done(value, INVALID, "no-admissible-starting-state")
                         }
                         lemma::Lemmas::Judged(verdicts) => {
                             let any = |name: &str| {
@@ -365,6 +371,9 @@ pub(super) fn run(command: Command) -> u8 {
                                 OK,
                                 "answered",
                             ),
+                            probe::Answer::NoStartingState(value) => {
+                                Judged::Done(value, INVALID, "no-admissible-starting-state")
+                            }
                             probe::Answer::Inconclusive(inconclusive) => {
                                 Judged::Inconclusive(inconclusive)
                             }
@@ -508,7 +517,7 @@ fn judge(
     }
     crate::telemetry::observe(&packet);
     let text = crate::transform::canonical_json(&packet);
-    let premise = packet.get("premise");
+    let premise = packet.get("premise").or_else(|| packet.get("reason"));
     let line = match premise.and_then(Value::as_str) {
         Some(premise) => format!("{status} {application}: {schema}; {premise}"),
         None => format!("{status} {application}: {schema}"),

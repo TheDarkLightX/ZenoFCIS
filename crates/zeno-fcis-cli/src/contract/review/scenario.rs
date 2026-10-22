@@ -83,7 +83,7 @@ pub(crate) fn replay(
         let scenarios = group(text, parsed, label)?;
         let results: Vec<Option<Failure>> = scenarios
             .iter()
-            .map(|scenario| run(authority, framer, scenario, width))
+            .map(|scenario| run(authority, framer, scenario, width, genesis.as_deref()))
             .collect();
         Ok((scenarios, results))
     })?;
@@ -260,8 +260,34 @@ fn run(
     framer: &Framer,
     scenario: &Scenario,
     width: usize,
+    genesis: Option<&[i128]>,
 ) -> Option<Failure> {
     let mut state: Vec<i128> = scenario.steps[0].inputs[..width].to_vec();
+    let first = &scenario.steps[0];
+    let refusal = if genesis == Some(state.as_slice()) {
+        zeno_fcis_contract::internals::genesis::admit(authority, &framer.frame(&first.inputs)[0])
+            .err()
+            .map(|refusal| refusal.reason)
+    } else {
+        let descriptor = authority.descriptor();
+        evaluate::first_unsatisfied_state_law(
+            descriptor,
+            &evaluate::state_laws(descriptor),
+            framer,
+            &first.inputs,
+        )
+        .map(|id| {
+            format!("no admissible starting state: law {id}: stated pre-state violates a state law")
+        })
+    };
+    if let Some(reason) = refusal {
+        return Some(Failure {
+            step: 0,
+            line: first.line,
+            reason,
+            outcome: None,
+        });
+    }
     for (index, step) in scenario.steps.iter().enumerate() {
         if step.inputs[..width] != state[..] {
             return Some(Failure {
@@ -328,9 +354,18 @@ fn bind_and_run(
     scenarios: &[Scenario],
 ) -> Result<Vec<Option<Failure>>, ContractError> {
     loaded.bind(rules, |authority, framer| {
+        let genesis = genesis_values(loaded);
         Ok(scenarios
             .iter()
-            .map(|scenario| run(authority, framer, scenario, loaded.state_width))
+            .map(|scenario| {
+                run(
+                    authority,
+                    framer,
+                    scenario,
+                    loaded.state_width,
+                    genesis.as_deref(),
+                )
+            })
             .collect())
     })
 }

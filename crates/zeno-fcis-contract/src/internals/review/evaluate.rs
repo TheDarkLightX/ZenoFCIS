@@ -401,8 +401,13 @@ pub fn from_evaluation(
 /// genesis`, every `StateInvariant` among them, and those declared `on any,
 /// genesis` other than an `InitialCondition`.
 pub fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
-    descriptor
-        .laws
+    state_law_ids(descriptor.laws)
+}
+
+/// State-law selection shared by signed and full-width pre-state judges.
+/// Initial conditions constrain startup, not arbitrary committed pre-states.
+pub fn state_law_ids(declared: &[laws::Law<'_>]) -> Vec<u32> {
+    declared
         .iter()
         .filter(|law| {
             law.genesis
@@ -427,44 +432,10 @@ pub fn first_unsatisfied_state_law(
     framer: &Framer,
     tuple: &[i128],
 ) -> Option<u32> {
-    if state_laws.is_empty() {
-        return None;
-    }
-    let first = |law: &&laws::Law<'_>| state_laws.contains(&law.id);
-    let ordered: Vec<laws::Law<'_>> = state_laws
-        .iter()
-        .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
-        .chain(descriptor.laws.iter().filter(|law| !first(law)))
-        .map(|law| laws::Law {
-            id: law.id,
-            kind: law.kind,
-            scope: law.scope,
-            genesis: law.genesis,
-            program: laws::Program {
-                nodes: law.program.nodes,
-                root: law.program.root,
-            },
-        })
-        .collect();
     let root = &framer.roots[0];
     let fields = framer.fields(root, tuple);
-    let initial = match root.positions.first() {
-        Some((_, index)) if !root.record => {
-            laws::RootView::Leaf(atom(framer.kinds[*index], tuple[*index]))
-        }
-        _ => laws::RootView::Record(&fields),
-    };
-    let frame = laws::Frame::Genesis { initial };
-    let (_, _, diagnostics, _) =
-        laws::evaluate(&ordered, descriptor.required, &frame, descriptor.limits).into_parts();
-    for id in state_laws {
-        match diagnostics.iter().find(|diagnostic| diagnostic.id == *id) {
-            Some(diagnostic) if diagnostic.verdict == laws::Verdict::Satisfied => {}
-            Some(_) => return Some(*id),
-            None => return None,
-        }
-    }
-    None
+    LawSet::new(descriptor, state_laws)
+        .first_unsatisfied_state_law(framer.view(root, tuple, &fields))
 }
 
 /// A decision a judge proposes for a tuple, which need not be the one the
@@ -502,6 +473,29 @@ pub struct LawSet<'d> {
 }
 
 impl<'d> LawSet<'d> {
+    /// First refusing state law, using the shared pre-state classification.
+    /// A frame refusal that never reaches a state law remains a finding on
+    /// an unexcluded pre-state, rather than being hidden as an invalid state.
+    pub fn first_unsatisfied_state_law(&self, initial: laws::RootView<'_, '_>) -> Option<u32> {
+        if self.selected == 0 {
+            return None;
+        }
+        let frame = laws::Frame::Genesis { initial };
+        let (_, _, diagnostics, _) =
+            laws::evaluate(&self.laws, self.required, &frame, self.limits).into_parts();
+        for law in &self.laws[..self.selected] {
+            match diagnostics
+                .iter()
+                .find(|diagnostic| diagnostic.id == law.id)
+            {
+                Some(diagnostic) if diagnostic.verdict == laws::Verdict::Satisfied => {}
+                Some(_) => return Some(law.id),
+                None => return None,
+            }
+        }
+        None
+    }
+
     /// The descriptor's laws whose IDs `ids` lists, in that order, then
     /// every other law of the descriptor. An ID the descriptor lacks is
     /// skipped.

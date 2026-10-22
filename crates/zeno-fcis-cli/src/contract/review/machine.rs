@@ -19,6 +19,7 @@ use super::super::{policy, schema, schema_commitment};
 use super::domain::{self, Position};
 use super::evaluate::{self, Framer, Outcome, RefusalClass};
 use super::parallel;
+use zeno_fcis_contract::internals::genesis;
 use zeno_fcis_synthesis::finite::v2_authority::Authority;
 
 /// A contract read and compiled, ready to bind.
@@ -312,6 +313,8 @@ pub(super) struct Machine {
     deliveries: BTreeMap<usize, Vec<evaluate::Delivery>>,
     /// The index of the genesis state.
     pub(super) genesis: usize,
+    /// The Authority's admission of the declared starting state.
+    pub(super) starting_state: Result<(), genesis::Refusal>,
 }
 
 impl Machine {
@@ -328,6 +331,10 @@ impl Machine {
         rules: &Rules,
     ) -> Result<Self, ContractError> {
         let genesis = genesis(&space, positions, rules)?;
+        let starting_state = genesis::admit(
+            authority,
+            &framer.frame(&space.at(genesis * space.inputs))[0],
+        );
         let results = parallel(space.tuples(), |ordinal| {
             let tuple = space.at(ordinal);
             let outcome = evaluate::evaluate(authority, framer, &tuple);
@@ -354,6 +361,7 @@ impl Machine {
             outboxes,
             deliveries,
             genesis,
+            starting_state,
         })
     }
 
@@ -375,6 +383,9 @@ impl Machine {
     pub(super) fn reachable(&self) -> (Vec<bool>, Vec<Option<(usize, usize)>>) {
         let mut seen = vec![false; self.space.states];
         let mut parent = vec![None; self.space.states];
+        if self.starting_state.is_err() {
+            return (seen, parent);
+        }
         let mut queue = std::collections::VecDeque::from([self.genesis]);
         seen[self.genesis] = true;
         while let Some(state) = queue.pop_front() {

@@ -23,6 +23,8 @@ pub(crate) mod deliveries;
 mod examples;
 pub(crate) mod gaps;
 #[cfg(test)]
+mod genesis_tests;
+#[cfg(test)]
 mod judge_tests;
 pub(crate) mod lemma;
 mod machine;

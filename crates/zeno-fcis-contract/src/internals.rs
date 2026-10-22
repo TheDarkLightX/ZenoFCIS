@@ -9,6 +9,7 @@
 pub mod declarations;
 pub mod delivery;
 pub mod expr;
+pub mod genesis;
 pub mod graph;
 pub mod model;
 pub mod policy;

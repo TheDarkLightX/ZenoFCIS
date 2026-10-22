@@ -81,6 +81,7 @@ impl Question {
 #[derive(Clone, Debug)]
 pub(crate) enum Answer {
     Answered(Value),
+    NoStartingState(Value),
     Inconclusive(Inconclusive),
 }
 
@@ -120,6 +121,11 @@ pub(crate) fn probe(
         Err(inconclusive) => return Ok(Answer::Inconclusive(inconclusive)),
     };
     let machine = &observation.machine;
+    if matches!(question, Question::Reachable { .. })
+        && let Err(refusal) = &machine.starting_state
+    {
+        return Ok(Answer::NoStartingState(refusal.packet()));
+    }
     let space = &machine.space;
     let condition =
         |what: &str, formula: &str| conditions(project, &loaded, machine, what, formula);

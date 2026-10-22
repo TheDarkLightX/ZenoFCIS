@@ -101,6 +101,7 @@ impl Core {
             .unwrap_or_else(|error| panic!("{error}"))
         {
             Profile::Measured(value) => value,
+            Profile::NoStartingState(value) => panic!("no starting state {value}"),
             Profile::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
         }
     }
@@ -112,6 +113,7 @@ impl Core {
         {
             Lemmas::Judged(verdicts) => verdicts,
             Lemmas::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
+            Lemmas::NoStartingState(value) => panic!("no starting state {value}"),
         }
     }
 
@@ -121,6 +123,7 @@ impl Core {
         {
             Answer::Answered(value) => value,
             Answer::Inconclusive(inconclusive) => panic!("inconclusive {inconclusive:?}"),
+            Answer::NoStartingState(value) => panic!("no starting state {value}"),
         }
     }
 }
