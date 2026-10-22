@@ -380,7 +380,7 @@ fn symbolic_directory(
                 }
             }
         };
-        report["application"] = json!(review::application(rules).unwrap_or_default());
+        report["application"] = json!(review::application(project, rules).unwrap_or_default());
         if let Some(path) = out {
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
                 fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;
