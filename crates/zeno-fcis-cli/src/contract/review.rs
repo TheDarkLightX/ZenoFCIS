@@ -39,8 +39,6 @@ mod refusals;
 pub(crate) mod run_properties;
 pub(crate) mod scenario;
 pub(crate) mod seeds;
-#[cfg(test)]
-mod stateless_tests;
 mod table;
 #[cfg(test)]
 mod tests;

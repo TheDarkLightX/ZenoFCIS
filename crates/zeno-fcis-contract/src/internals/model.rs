@@ -30,8 +30,6 @@ const GENESIS_LAW: u32 = 990;
 const CONFORMANCE_LAW: u32 = 991;
 /// The structural reject law a template keeps beside its own `RejectNoAuthority` law.
 const REJECT_STRUCTURE_LAW: u32 = 909;
-/// The singleton empty state has the framework invariant `true`.
-const EMPTY_STATE_LAW: u32 = 907;
 /// Wire overhead of one framed envelope and per-value sizes, in bytes.
 const ENVELOPE_BYTES: u64 = 48;
 const RECORD_BYTES: u64 = 5;
@@ -329,7 +327,7 @@ impl<'d> Contract<'d> {
             .iter()
             .map(|field| (field.id, field.type_id))
             .collect();
-        if !matches!(declarations.get(100)?.form, Form::Record(_)) {
+        if state_fields.is_empty() {
             return Err(ContractError::new(
                 "project.zeno",
                 "the state root, type 100, must be a record",
@@ -923,24 +921,10 @@ fn laws(
         });
     }
     if !laws.iter().any(|law| law.kind == LawKind::StateInvariant) {
-        if !state_fields.is_empty() {
-            return Err(rules_error(
-                "law_kinds",
-                "needs a StateInvariant law, declared `on commit, genesis`",
-            ));
-        }
-        // The runtime still requires this law kind. An empty record has one
-        // value, so its invariant is true; keep runtime admission unchanged.
-        let mut graph = LawGraph::new(declarations).with_strict(rules.unsigned);
-        let root = graph.bool(true);
-        laws.push(Law {
-            id: EMPTY_STATE_LAW,
-            kind: LawKind::StateInvariant,
-            scope: LawScope::Committing,
-            genesis: true,
-            nodes: graph.table.nodes,
-            root: root.index,
-        });
+        return Err(rules_error(
+            "law_kinds",
+            "needs a StateInvariant law, declared `on commit, genesis`",
+        ));
     }
     let failed = |reason: String| rules_error("", reason);
     if !laws
