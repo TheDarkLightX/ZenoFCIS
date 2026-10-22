@@ -7,12 +7,10 @@ use std::path::Path;
 
 use super::identity::{CHECKER_SOURCES, Identity};
 
-/// Tests, package metadata and standalone diagnostic executables; none is
-/// linked into the library.
+/// Tests and package metadata; none is linked into the library.
 const REVIEWED_FILES: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.toml.orig",
-    "examples/recursive_table_vectors.rs",
     "src/checked_composition/assembly_differential_tests.rs",
     "src/checked_composition/assembly_tests.rs",
     "src/checked_composition/compose_tests.rs",

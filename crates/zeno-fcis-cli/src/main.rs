@@ -2207,6 +2207,13 @@ mod tests {
                     arguments.extend_from_slice(example(&line[..prefix]));
                     (parsed(&arguments), false)
                 }
+                ["contract", "risk", ..] => {
+                    // Its query selector is conditionally required, so it is
+                    // absent from the individually-required argument list.
+                    let mut arguments = line.clone();
+                    arguments.extend(["--where", "true"]);
+                    (parsed(&arguments), false)
+                }
                 ["transform", "check", ..] => {
                     let mut arguments = line.clone();
                     assert!(checker_process::contained_profile(&parsed(&arguments)).is_none());
