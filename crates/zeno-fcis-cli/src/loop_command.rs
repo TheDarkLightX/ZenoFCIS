@@ -104,7 +104,7 @@ pub(super) enum ProposerArg {
 pub(super) enum Command {
     #[command(
         about = "Admit a reference program and create a bounded proposal session.",
-        long_about = r#"Read --original as canonical program bytes (at most 65,536 bytes), admit it under --profile, and freeze the request and limits in a new or empty --session directory. No equivalence receipt is issued.
+        long_about = r#"Read --original as canonical program bytes (at most 65,536 bytes), admit it under --profile, and freeze the request and limits in a new or empty --session directory. No equivalence receipt is issued. functional-bool-v1 admits 0 to 6 Boolean inputs, 1 to 16 Boolean outputs and Input/Bool/And/Not/Select nodes (at most 64 tuples). checked-i128-v1 permits at most 100,000,000 input tuples; work admission can refuse a smaller domain.
 
 Attempts/checks/model calls are capped at 8/8/4; the invocation deadline is at most 20,000 ms. Work defaults scale with the original; explicit values may only reduce those ceilings. Hosted calls, disclosure and spending are disabled.
 
