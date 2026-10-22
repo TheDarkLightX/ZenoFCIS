@@ -203,3 +203,69 @@ fn count_witnesses_are_null_exactly_when_the_kind_is_absent()
     }
     Ok(())
 }
+
+#[test]
+fn comments_and_numeric_laws_do_not_occupy_property_ids_for_input_or_state_queries()
+-> Result<(), Box<dyn std::error::Error>> {
+    const LARGE_NUMBER: &str = "4294967295";
+
+    let comment_project = format!("{PROJECT}\n// external counter {LARGE_NUMBER}\n");
+
+    let constant_project = format!(
+        "{PROJECT}\nlaw 505 external_bound on commit, genesis = post.100.110 <= {LARGE_NUMBER};\n"
+    );
+    let mut constant_policy: Value = serde_json::from_str(POLICY)?;
+    constant_policy["law_kinds"]["505"] = json!("StateInvariant");
+    let constant_policy = serde_json::to_string(&constant_policy)?;
+
+    let declared_id_project = format!(
+        "{PROJECT}\nlaw {LARGE_NUMBER} external_id on commit, genesis = post.100.110 <= 4;\n"
+    );
+    let mut declared_id_policy: Value = serde_json::from_str(POLICY)?;
+    declared_id_policy["law_kinds"][LARGE_NUMBER] = json!("StateInvariant");
+    let declared_id_policy = serde_json::to_string(&declared_id_policy)?;
+
+    for (case, project, policy) in [
+        ("comment", comment_project.as_str(), POLICY),
+        (
+            "law constant",
+            constant_project.as_str(),
+            constant_policy.as_str(),
+        ),
+        (
+            "declared law ID",
+            declared_id_project.as_str(),
+            declared_id_policy.as_str(),
+        ),
+    ] {
+        let input = check(
+            project,
+            policy,
+            &Question::Inputs {
+                condition: "true".into(),
+            },
+            Limits::default(),
+        )
+        .map(|result| result.packet().clone())
+        .unwrap_or(Value::Null);
+        assert_eq!(input["status"], "checked", "{case}: input query");
+        assert_eq!(input["result"]["count"], "120", "{case}");
+        assert_eq!(input["result"]["total"], "120", "{case}");
+
+        let state = check(
+            project,
+            policy,
+            &Question::States {
+                condition: "true".into(),
+                steps: 0,
+            },
+            Limits::default(),
+        )
+        .map(|result| result.packet().clone())
+        .unwrap_or(Value::Null);
+        assert_eq!(state["status"], "checked", "{case}: state query");
+        assert_eq!(state["result"]["count"], "1", "{case}");
+        assert_eq!(state["result"]["total"], "1", "{case}");
+    }
+    Ok(())
+}

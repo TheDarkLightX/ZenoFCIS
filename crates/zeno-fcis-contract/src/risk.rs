@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use zeno_fcis_spec::{ProjectionRoot, Rational};
 use zeno_fcis_synthesis::finite::{
     v2_authority::Authority,
@@ -277,14 +277,7 @@ fn property_contract(
     {
         return Err(invalid("property must be one formula"));
     }
-    let id = project
-        .split(|c: char| !c.is_ascii_digit())
-        .filter_map(|v| v.parse::<u32>().ok())
-        .chain([990, 991, 909, rules.failure_law, rules.reject_law])
-        .max()
-        .unwrap_or(991)
-        .checked_add(1)
-        .ok_or_else(|| invalid("no free property ID"))?;
+    let id = next_property_id(project, rules)?;
     let scope = if state { "commit, genesis" } else { "any" };
     let source = format!("{project}\nlaw {id} risk_property_{id} on {scope} = {formula};\n");
     let mut extended = rules.clone();
@@ -301,6 +294,23 @@ fn property_contract(
         extended,
         id,
     ))
+}
+
+fn next_property_id(project: &str, rules: &Rules) -> Result<u32, ContractError> {
+    let declarations = Declarations::read(project, &rules.leaf_bindings)?;
+    let mut occupied: BTreeSet<u32> = declarations.laws.into_iter().map(|law| law.id).collect();
+    occupied.extend([990, 991, 909, rules.failure_law, rules.reject_law]);
+
+    let mut candidate = 992;
+    for id in occupied.range(candidate..) {
+        if *id > candidate {
+            break;
+        }
+        candidate = candidate
+            .checked_add(1)
+            .ok_or_else(|| invalid("no free property ID"))?;
+    }
+    Ok(candidate)
 }
 
 struct Engine<'a, 'b> {
