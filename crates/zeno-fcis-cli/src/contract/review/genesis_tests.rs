@@ -274,3 +274,26 @@ fn genesis_scenarios_check_genesis_and_stated_prestates() {
         0
     );
 }
+
+#[test]
+fn genesis_run_properties_refuse_law_500() {
+    let (project, rules) = loans([1, 1, 1]);
+    let properties = json!({
+        "schema":"zeno-fcis/run-properties/1",
+        "properties":[{"kind":"predicate","name":"tautology","formula":"true"}]
+    });
+    let result = super::run_properties::judge(
+        &project,
+        &rules,
+        &properties.to_string(),
+        DEFAULT_MAX_TUPLES,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        matches!(result, lemma::Lemmas::NoStartingState(_)),
+        "{result:?}"
+    );
+    if let lemma::Lemmas::NoStartingState(packet) = result {
+        refused(packet, 500);
+    }
+}

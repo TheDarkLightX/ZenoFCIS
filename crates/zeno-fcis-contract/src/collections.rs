@@ -347,6 +347,18 @@ pub fn check(
                 _ => values[i][0],
             })
             .collect();
+        if let Err(refusal) = crate::internals::genesis::admit(authority, &framer.frame(&start)[0])
+        {
+            return (
+                measured,
+                Some(json!({
+                    "obligation": "runtime genesis admission",
+                    "detail": refusal.reason,
+                    "law": refusal.law,
+                    "view": shape.view_json(&start),
+                })),
+            );
+        }
         if !laws.on_state(&framer, &start) {
             return (
                 measured,

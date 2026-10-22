@@ -143,3 +143,17 @@ fn collections_a_view_domain_beyond_the_limit_is_unknown() {
     assert_eq!(result.verdict(), Verdict::Unknown);
     assert!(result.packet()["claim"].is_null());
 }
+
+#[test]
+fn collections_genesis_obeys_all_runtime_startup_laws() {
+    let project = format!("{TOKENS}\nlaw 980 startup_guard on accept, genesis = false;\n");
+    let rules = rules_with(|r| r["law_kinds"]["980"] = serde_json::json!("FeeAndRounding"));
+    let result = check(&project, &rules, Limits::default()).unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(
+        result.packet()["result"]["obligation"],
+        "runtime genesis admission"
+    );
+    assert_eq!(result.packet()["result"]["law"], 980);
+    assert_eq!(result.packet()["measured"]["tuples"], 0);
+}

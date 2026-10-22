@@ -90,6 +90,9 @@ pub(crate) fn judge(
         Ok(o) => o,
         Err(stop) => return Ok(lemma::Lemmas::Inconclusive(stop)),
     };
+    if let Err(refusal) = &observation.machine.starting_state {
+        return Ok(lemma::Lemmas::NoStartingState(refusal.packet()));
+    }
     let mut names = std::collections::BTreeSet::new();
     let mut results = Vec::new();
     for property in &declaration.properties {

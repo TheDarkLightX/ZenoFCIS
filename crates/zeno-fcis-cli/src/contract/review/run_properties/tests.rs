@@ -16,6 +16,7 @@ fn results(project: &str, policy: &str, properties: &str) -> Vec<Value> {
     match judge(project, policy, properties, 1_048_576).unwrap_or_else(|e| panic!("{e}")) {
         lemma::Lemmas::Judged(values) => values,
         lemma::Lemmas::Inconclusive(stop) => panic!("{stop:?}"),
+        lemma::Lemmas::NoStartingState(value) => panic!("no starting state {value}"),
     }
 }
 

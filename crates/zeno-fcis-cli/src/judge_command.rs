@@ -203,6 +203,9 @@ pub(super) fn run(command: Command) -> u8 {
                             common.max_tuples,
                         )? {
                             lemma::Lemmas::Inconclusive(stop) => Judged::Inconclusive(stop),
+                            lemma::Lemmas::NoStartingState(value) => {
+                                Judged::Done(value, INVALID, "no-admissible-starting-state")
+                            }
                             lemma::Lemmas::Judged(properties) => {
                                 let (exit, status) =
                                     if properties.iter().any(|p| p["verdict"] == "false") {
