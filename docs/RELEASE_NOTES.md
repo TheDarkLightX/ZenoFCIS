@@ -2,8 +2,8 @@
 
 Code is LLM-generated or synthesized;
 acceptance depends on the stated check, domain and assumptions. The
-[installation guide](INSTALLATION.md) describes how to verify published assets
-once they are available.
+[installation guide](INSTALLATION.md) describes how to verify the
+[published Linux assets](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).
 
 ## Breaking change
 
