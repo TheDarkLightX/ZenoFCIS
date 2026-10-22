@@ -115,6 +115,23 @@ impl Bounds {
     fn new(lo: i128, hi: i128, unsigned: bool) -> Option<Self> {
         (lo <= hi && (!unsigned || lo >= 0)).then_some(Self { lo, hi, unsigned })
     }
+
+    fn fits_table(self, size: u32) -> bool {
+        if self.unsigned {
+            u128::try_from(self.lo)
+                .ok()
+                .zip(u128::try_from(self.hi).ok())
+                .is_some_and(|(min, max)| {
+                    crate::TableIndexRange::Unsigned { min, max }.fits_table(size)
+                })
+        } else {
+            crate::TableIndexRange::Signed {
+                min: self.lo,
+                max: self.hi,
+            }
+            .fits_table(size)
+        }
+    }
 }
 
 fn rounded(a: i128, b: i128, mode: DivisionMode) -> Option<i128> {
@@ -257,7 +274,7 @@ impl Parser {
         };
         let valid = self
             .position_bounds(&v)
-            .is_some_and(|r| r.lo >= 0 && r.hi < i128::from(size));
+            .is_some_and(|range| range.fits_table(size));
         if !valid {
             self.error_at(
                 at,

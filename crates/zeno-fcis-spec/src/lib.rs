@@ -48,7 +48,8 @@ pub use parser::{
     parse_table_expression, parse_table_read, table_index_sets,
 };
 pub use paths::{
-    DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
+    DeclaredDomain, PathResolution, TableIndexRange, claim_paths, declared_domain,
+    declared_table_index_range, law_paths, resolve_path,
 };
 pub use source::{SOURCE_FILES, source_digest};
 pub use substance::{

@@ -71,6 +71,37 @@ pub enum DeclaredDomain {
     /// The declared range of an `int` type.
     Range(IntRange),
 }
+
+/// Inclusive typed integer bounds used when proving a projection fits a
+/// finite table's zero-based index set.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TableIndexRange {
+    /// A signed `int` range.
+    Signed {
+        /// Inclusive lower bound.
+        min: i128,
+        /// Inclusive upper bound.
+        max: i128,
+    },
+    /// A `u128` range, retained unsigned during the table-bound check.
+    Unsigned {
+        /// Inclusive lower bound.
+        min: u128,
+        /// Inclusive upper bound.
+        max: u128,
+    },
+}
+
+impl TableIndexRange {
+    /// Returns true when every value lies in `0..size`.
+    #[must_use]
+    pub fn fits_table(self, size: u32) -> bool {
+        match self {
+            Self::Signed { min, max } => min >= 0 && max < i128::from(size),
+            Self::Unsigned { min, max } => min <= max && max < u128::from(size),
+        }
+    }
+}
 impl DeclaredDomain {
     /// Returns true when `value` lies in the domain.
     #[must_use]
@@ -111,6 +142,27 @@ pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<Decl
     match (declared.kind(), declared.range()) {
         (TypeKind::Bool, _) => Some(DeclaredDomain::Values(alloc::vec![0, 1])),
         (TypeKind::Int, Some(range)) => Some(DeclaredDomain::Range(range)),
+        _ => None,
+    }
+}
+
+/// Returns the declared integer bounds at a resolved projection, preserving
+/// the distinction between signed and unsigned inputs for table-index checks.
+#[must_use]
+pub fn declared_table_index_range(
+    spec: &ProjectSpec,
+    path: &ProjectionPath,
+) -> Option<TableIndexRange> {
+    let leaf = leaf_type(spec, path)?;
+    let declared = spec.types().iter().find(|declared| declared.id() == leaf)?;
+    match declared.kind() {
+        TypeKind::Int => declared.range().map(|range| TableIndexRange::Signed {
+            min: range.min(),
+            max: range.max(),
+        }),
+        TypeKind::U128 => declared
+            .unsigned_range()
+            .map(|(min, max)| TableIndexRange::Unsigned { min, max }),
         _ => None,
     }
 }

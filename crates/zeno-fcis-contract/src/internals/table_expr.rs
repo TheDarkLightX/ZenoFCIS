@@ -12,6 +12,21 @@ pub(in crate::internals) struct TableDeclarations {
     index_sets: std::collections::BTreeMap<u32, u32>,
 }
 
+pub(super) struct CheckedIndex {
+    value: Ast,
+    unsigned: bool,
+}
+
+impl CheckedIndex {
+    fn constant(&self, value: u32) -> Ast {
+        if self.unsigned {
+            Ast::U128(u128::from(value))
+        } else {
+            Ast::Int(i128::from(value))
+        }
+    }
+}
+
 impl TableDeclarations {
     pub(in crate::internals) fn read(source: &str) -> Result<Self, String> {
         let limits = SourceLimits::default();
@@ -58,10 +73,13 @@ impl TableDeclarations {
         }
         Ok((table, format!("{root}.{owner}")))
     }
-    pub(super) fn index(&self, text: &str, size: u32) -> Result<Ast, String> {
+    pub(super) fn index(&self, text: &str, size: u32) -> Result<CheckedIndex, String> {
         if let Ok(index) = text.parse::<i128>() {
             return if (0..i128::from(size)).contains(&index) {
-                Ok(Ast::Int(index))
+                Ok(CheckedIndex {
+                    value: Ast::Int(index),
+                    unsigned: false,
+                })
             } else {
                 Err(format!("table index must lie in 0..{}", size - 1))
             };
@@ -82,19 +100,24 @@ impl TableDeclarations {
             .collect::<Option<Vec<_>>>()
             .ok_or("invalid input index path")?;
         let path = ProjectionPath::try_new(root, segments).ok_or("invalid input index path")?;
-        let valid = match zeno_fcis_spec::declared_domain(&self.project, &path) {
-            Some(DeclaredDomain::Range(range)) => {
-                range.min() >= 0 && range.max() < i128::from(size)
-            }
-            Some(DeclaredDomain::Values(values)) => {
-                !values.is_empty() && values.iter().all(|v| (0..i128::from(size)).contains(v))
-            }
-            None => false,
-        };
+        let range = zeno_fcis_spec::declared_table_index_range(&self.project, &path);
+        let valid = range.is_some_and(|range| range.fits_table(size))
+            || matches!(
+                zeno_fcis_spec::declared_domain(&self.project, &path),
+                Some(DeclaredDomain::Values(values))
+                    if !values.is_empty()
+                        && values.iter().all(|v| (0..i128::from(size)).contains(v))
+            );
         if !valid {
             return Err(format!("input index range must lie in 0..{}", size - 1));
         }
-        Ok(Ast::Name(text.to_owned()))
+        Ok(CheckedIndex {
+            value: Ast::Name(text.to_owned()),
+            unsigned: matches!(
+                range,
+                Some(zeno_fcis_spec::TableIndexRange::Unsigned { .. })
+            ),
+        })
     }
     pub(in crate::internals) fn writes(
         &self,
@@ -123,14 +146,14 @@ impl TableDeclarations {
         for k in 0..table.size {
             let field = u16::try_from(table.id + k)
                 .map_err(|_| "table field exceeds contract field IDs")?;
-            let written = match &index {
+            let written = match &index.value {
                 Ast::Int(selected) if *selected == i128::from(k) => value.clone(),
                 Ast::Int(_) => continue,
                 _ => Ast::Choose(
                     Box::new(Ast::Binary(
                         Binary::Eq,
-                        Box::new(index.clone()),
-                        Box::new(Ast::Int(i128::from(k))),
+                        Box::new(index.value.clone()),
+                        Box::new(index.constant(k)),
                     )),
                     Box::new(value.clone()),
                     Box::new(Ast::Name(format!("pre.100.{}", table.id + k))),
@@ -172,8 +195,8 @@ impl<'t> Parser<'t> {
         {
             let index = declarations.index(&super::render(&indices[0]), table.size)?;
             let field = |k| Ast::Name(format!("{prefix}.{}", table.id + k));
-            if let Ast::Int(k) = index {
-                return Ok(field(k as u32));
+            if let Ast::Int(k) = &index.value {
+                return Ok(field(*k as u32));
             }
             self.expansion_work(table.size as usize * 4)?;
             let mut read = field(table.size - 1);
@@ -181,8 +204,8 @@ impl<'t> Parser<'t> {
                 read = Ast::Choose(
                     Box::new(Ast::Binary(
                         Binary::Eq,
-                        Box::new(index.clone()),
-                        Box::new(Ast::Int(i128::from(k))),
+                        Box::new(index.value.clone()),
+                        Box::new(index.constant(k)),
                     )),
                     Box::new(field(k)),
                     Box::new(read),

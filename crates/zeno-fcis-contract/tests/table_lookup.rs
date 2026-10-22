@@ -23,11 +23,27 @@ field 120 101 tier 106; field 130 100 fee 105; variant 140 102 Session none;
 component 400 quote { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 256; } merge [400];
 law 500 range on commit, genesis = post.100.130 >= 0 && post.100.130 <= 30;";
 
+const UNSIGNED_PROJECT: &str = "zeno 1; project 1 independent_tables;
+type 100 state S; type 101 command C; type 102 context X;
+type 105 int V in 0..=1; table 110 100 entries 105 size 2;
+type 106 u128 Idx in 0..=1; field 121 101 index 106; variant 130 102 Desk none;
+component 400 keep { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 4096; } merge [400];
+law 499 state_range on commit, genesis = true;
+law 500 checked on commit = true;";
+
 fn rules(value: &str) -> String {
     json!({"schema":"zeno-fcis/template-declarative-policy/2", "template":"fees",
         "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{},
         "variables":{"rate":value},"cases":[{"when":true,"class":"Accept","reason":null,"post":{"130":"rate"},"outbox":[]}],
         "genesis":{"130":30},"law_kinds":{"500":"StateInvariant"}}).to_string()
+}
+fn unsigned_policy(index: &str) -> String {
+    json!({"schema":"zeno-fcis/template-declarative-policy/4", "template":"independent-tables",
+        "roots":{"state":100,"command":101,"context":102}, "leaf_bindings":{}, "variables":{},
+        "cases":[{"when":true,"class":"Accept","reason":null,
+            "post":{"110":format!("pre.100.110[{index}]"),"111":"pre.100.111"},"outbox":[]}],
+        "genesis":{"110":0,"111":0}, "law_kinds":{"499":"StateInvariant","500":"FeeAndRounding"}})
+    .to_string()
 }
 fn bound<T>(source: &str, policy: &str, check: impl FnOnce(&Contract<'_>, &[u8]) -> T) -> T {
     let rules = Rules::read_for_project(source, policy).unwrap();
@@ -78,6 +94,28 @@ fn quote_policy(source: &str, policy_text: &str, expected: [i128; 4]) {
             .unwrap();
         }
     });
+}
+
+#[test]
+fn direct_unsigned_policy_index_uses_the_declared_u128_range() {
+    let direct = unsigned_policy("command.101.121");
+    let checked = Rules::read_for_project(UNSIGNED_PROJECT, &direct);
+    assert!(
+        checked.is_ok(),
+        "a declared u128 0..=1 table index must be accepted: {}",
+        checked
+            .as_ref()
+            .err()
+            .map(ToString::to_string)
+            .unwrap_or_default()
+    );
+    let loaded = checked.unwrap();
+    let expected = expr::parse_for_project(
+        UNSIGNED_PROJECT,
+        "choose(command.101.121 == u128(0), pre.100.110, pre.100.111)",
+    )
+    .unwrap();
+    assert_eq!(loaded.cases[0].post.get(&110), Some(&expected));
 }
 
 #[test]
