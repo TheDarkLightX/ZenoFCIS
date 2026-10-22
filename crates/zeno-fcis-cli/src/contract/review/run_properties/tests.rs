@@ -117,6 +117,29 @@ fn delivery_count_checks_every_delivery_and_fields_are_observable() {
 #[test]
 fn scenario_pins_delivery_and_idempotency_ordinals() {
     use super::super::{evaluate, examples};
+    let text = "# scenario pin_identity\n152 1 0 0 162 1 170 0 | accept - 153 0 1 0 | 300@0:0 1";
+    let good = super::super::scenario::replay(&small_project(), POLICY, text, "scenario")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(good.failed, 0, "{}", good.packet);
+    for (changed, reason) in [
+        ("300@1:0", "ordinal differs"),
+        ("300@0:1", "idempotency ordinal differs"),
+    ] {
+        let bad = super::super::scenario::replay(
+            &small_project(),
+            POLICY,
+            &text.replace("300@0:0", changed),
+            "scenario",
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(bad.failed, 1, "{}", bad.packet);
+        assert_eq!(bad.packet["scenarios"][0]["failure"]["step"], 1);
+        assert!(
+            bad.packet["scenarios"][0]["failure"]["reason"]
+                .as_str()
+                .is_some_and(|text| text.contains(reason))
+        );
+    }
     let loaded = Loaded::read(&small_project(), POLICY).unwrap_or_else(|e| panic!("{e}"));
     loaded
         .bind(&loaded.rules, |authority, framer| {

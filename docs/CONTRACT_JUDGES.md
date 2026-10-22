@@ -318,6 +318,16 @@ identity ordinals. Technical refusals use `inputs | refused CLASS STATE | -`,
 where CLASS is the reported refusal class and STATE repeats the pre-state.
 These are diagnostic scenario observations and cannot commit a decision.
 
+The scenario judge reports the earliest failing step, with `ordinal differs`
+or `idempotency ordinal differs` when a pinned identity value changes. The
+suffix is optional for each delivery, so older examples retain their meaning.
+Background: Glenford J. Myers, *The Art of Software Testing*, Wiley (1979),
+describes checking observed results against expected outcomes; Leslie Lamport, *Time, Clocks, and the Ordering of Events in a
+Distributed System*, Communications of the ACM 21(7), 1978, supplies background
+on ordered event identities. These comparisons concern declared delivery
+metadata, with no claim about receiver execution; prior-art search pending.
+
+
 ## Asking a question
 
 `contract probe` answers one exact question between edits:
