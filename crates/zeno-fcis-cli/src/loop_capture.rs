@@ -92,7 +92,7 @@ Exit 0 packet; 1 refused; 2 outer containment inconclusive. This operation creat
         about = "Proposer: check exposed examples, then compare with the complete frozen capture table.",
         long_about = r#"Load the existing private --session through the capture shell. Supply --candidate-json (finite-program JSON) or --expressions (zeno-fcis/capture-expressions/1: outputs over x0..xN without holes, parameters, keep or output references), at most 65,536 bytes. Match the frozen ABI.
 
-Reserve invocation work, check all exposed examples, then require full-table transform check and matching receipt replay. Decided proposals consume an attempt; early budget stops retain reservations without an attempt. A refutation can add a public counterexample; stored success keeps its receipt privately and closes further submissions. Limits come from capture open.
+Reserve invocation work, check all exposed examples, then require full-table transform check and matching receipt replay. Malformed/ABI-mismatched proposals, example refutations and completed equivalence/counterexample verdicts consume an attempt. Setup failures, checker refusal and budget stops can return without one; invocation work reservations remain charged. A refutation can add a public counterexample; stored success keeps its receipt privately and closes further submissions. Limits come from capture open.
 
 JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 precheck-refuted, candidate-refused, refuted or refused; 2 inconclusive. Example agreement alone is never acceptance. No new session or publication authority."#
     )]

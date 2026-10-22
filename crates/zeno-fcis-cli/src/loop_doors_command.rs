@@ -108,7 +108,7 @@ Inputs use finite-program ABI JSON or zeno-fcis/capture-expressions/1, not the o
         about = "Complete, repair, and simplify a hash-bound proposal with check and receipt replay.",
         long_about = r#"Read --original (canonical bytes) and --proposal (zeno-fcis/loop-pipeline/1), each at most 65,536 bytes. Use --packet first to obtain original_sha256 and implementation_sha256; both must match the proposal. Supply either program JSON or an expressions document, plus optional stages (at most five; default complete,repair,canonical).
 
-Stages run only when applicable: complete holes; repair refuted complete expressions; canonical or resubstitute a qualified program. Qualification always needs transform check over the full declared input domain and matching receipt replay. Shared limits bound tuples, check pairs, stages, work and time. --out writes evidence, and candidate/original bytes only on overall qualification.
+Stages run only when applicable: complete holes; repair refuted complete expressions; canonical or resubstitute a qualified program. The original must have at least one successful evaluation; all-original-observations-fail returns inconclusive (2). Qualification always needs transform check over the full declared input domain and matching receipt replay. Shared limits bound tuples, check pairs, stages, work and time. --out writes evidence, and candidate/original bytes only on overall qualification.
 
 No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 packet or qualified; 1 refused/refuted; 2 inconclusive; 3 I/O error. Prior successful checks do not qualify a later incomplete result."#
     )]
@@ -209,7 +209,7 @@ No session or attempts. JSON: zeno-fcis/loop-doors/2. Exit 0 qualified; 1 refuse
         about = "Enumerate expressions fitting examples; optionally qualify against a complete reference.",
         long_about = r#"Read --spec (ASCII zeno-fcis/loop-learn/1, at most 65,536 bytes): named Bool/Int inputs, output domains, declared vocabulary, max_size and complete examples. Integer bounds/labels here are JSON integers, unlike program JSON decimal strings. Enumerate expressions only within the declared vocabulary/size; the library evaluator independently rechecks the lowered examples. Uniqueness is an enumeration proposal.
 
-Default caps may only be reduced: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 conflict subsets. With --original, a fitting candidate must pass complete observed-table capture plus original-bound transform check and receipt replay; --out requires that reference and exports candidate bytes only when qualified. No session or attempts.
+Default caps may only be reduced: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 conflict subsets. With --original (canonical bytes, at most 65,536 bytes and the same ABI), every reference input must evaluate successfully within the 4,096-tuple cap. A fitting candidate must pass complete observed-table capture plus original-bound transform check and receipt replay; --out requires that reference and exports candidate bytes only when qualified. No session or attempts.
 
 JSON: zeno-fcis/loop-doors/2. Without qualification: determined=0, question=3, outside-vocabulary/ambiguous/refused=1, inconclusive=2. With a reference: qualified=0, refuted/refused=1, inconclusive=2; I/O errors can be 3. Example fit alone issues no equivalence receipt."#
     )]
@@ -260,11 +260,11 @@ One submitted completion or decided empty/malformed proposal consumes an attempt
     },
     #[command(
         about = "Check a parameterized program or sketch on each listed finite family instance.",
-        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Parameter values belong in the manifest; the family program must not supply its own. Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and parameter values. Each instance is limited to 131,072 input tuples.
+        long_about = r#"Read --instances (zeno-fcis/loop-family-manifest/1) and --program (zeno-fcis/loop-expressions/1 with $PARAMETERS). Parameter values belong in the manifest; the family program must not supply its own. Files and named canonical programs are at most 65,536 bytes; the manifest lists 1 to 10 instances with relative paths and signed-64-bit JSON integer parameter values. Each instance is limited to 131,072 input tuples.
 
 Lower or solve the program per instance, then require transform check plus matching receipt replay. --fit proposes affine hole values a*$P+b from instances marked for fitting and checks the lifted program on all listed instances. This establishes no unlisted-instance claim. No session or attempts; per-instance reports include receipt digests, not exported receipt files.
 
-JSON: zeno-fcis/loop-doors/2. Exit 0 accepted (all listed instances); 1 refuted or invalid input; 2 unrealizable/partial or containment inconclusive; 3 I/O error."#
+JSON: zeno-fcis/loop-doors/2. Exit 0 accepted summarizes the initial per-instance checks; the fitted template has a separate detail.lifted_check verdict, which does not change that exit. Exit 1 refuted or invalid input; 2 unrealizable/partial or containment inconclusive; 3 I/O error."#
     )]
     Family {
         /// Instance manifest (zeno-fcis/loop-family-manifest/1).
@@ -279,11 +279,11 @@ JSON: zeno-fcis/loop-doors/2. Exit 0 accepted (all listed instances); 1 refuted 
     },
     #[command(
         about = "Try a source program directly, as a sketch, then by repair on listed instances.",
-        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Source expressions must be plain and use literal constants, not $PARAMETERS. Use the supplied source parameter values to locate constants near changed target parameters; try direct use, open those constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
+        long_about = r#"Read --from (zeno-fcis/loop-expressions/1 with source parameters) and --to-instances (zeno-fcis/loop-family-manifest/1). Source parameter values are signed-64-bit JSON integers. Source expressions must be plain and use literal constants, not $PARAMETERS. Use the supplied source parameter values to locate constants near changed target parameters; try direct use, open those constants as choice holes, then try repair. Every successful target program needs transform check and matching receipt replay on that target reference domain.
 
 At most 10 listed instances, 131,072 tuples per instance, and 65,536 bytes per document/program; bounded search/check stages share the invocation deadline. No session or attempts; report receipt digests without exporting receipt files. Coverage is only the listed instances.
 
-JSON: zeno-fcis/loop-doors/2. Exit 0 transferred to all; 1 failed (none) or refused; 2 partial or containment inconclusive; 3 I/O error."#
+JSON: zeno-fcis/loop-doors/2. Exit 0 transferred to all; 1 failed (none) or refused; 2 partial or containment inconclusive. Per-target budget stops can aggregate to failed (1) or partial (2); inspect rows; 3 I/O error."#
     )]
     Transfer {
         /// Source program (zeno-fcis/loop-expressions/1) with its instance's parameters.
