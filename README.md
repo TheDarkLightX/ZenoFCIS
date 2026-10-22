@@ -1,6 +1,6 @@
 # ZenoFCIS
 
-**Toward a neurosymbolic software factory for high-assurance FCIS applications.**
+**A neurosymbolic software factory for high-assurance FCIS applications.**
 
 ZenoFCIS is a Rust library family for functional-core / imperative-shell
 (FCIS) systems. It combines LLM-assisted generation with symbolic checking: LLMs
@@ -74,10 +74,10 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-**2.5.0** is the current release source. It builds on the first stable V2
-line, 2.3.0; the [2.5.0 release notes](docs/RELEASE_NOTES.md) describe the
-new arithmetic, search, loop and contract-judge features. Final qualification
-and publication remain separate release gates. The initial release provides the
+**[2.5.0 is released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).**
+It builds on the first stable V2 line, 2.3.0; the
+[2.5.0 release notes](docs/RELEASE_NOTES.md) describe the new arithmetic,
+search, loop and contract-judge features. The initial release provides the
 **Linux x86_64 GNU CLI** (glibc 2.39 or later). A **macOS on Apple silicon**
 (`aarch64-apple-darwin`) binary will follow native platform validation.
 Every published archive must pass its build, custody and installed-binary checks. See
@@ -102,7 +102,7 @@ The normal V2 library route declares a complete checked program. It is
 available in the 2.5.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-After qualification and publication, check out the `v2.5.0` tag as the [installation guide](docs/INSTALLATION.md)
+Check out the `v2.5.0` tag as the [installation guide](docs/INSTALLATION.md)
 describes, then bind the dependency to that source:
 
 ```toml

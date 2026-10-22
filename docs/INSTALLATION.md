@@ -1,12 +1,11 @@
 # Installation
 
-ZenoFCIS `2.5.0` is the current release source. Final qualification and
-publication remain pending. ZenoFCIS 2.3.0 introduced the first stable V2 line.
+ZenoFCIS [2.5.0 is released](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.5.0).
+ZenoFCIS 2.3.0 introduced the first stable V2 line.
 The initial 2.5.0 release set includes the **Linux x86_64 GNU** CLI archive
 and offline Rustdoc. The **macOS on Apple silicon** archive is deferred until
-native platform validation is complete. After qualification and
-publication, the signed `DOWNLOADS.sha256` on the release page will list the
-assets available to install.
+native platform validation is complete. The signed `DOWNLOADS.sha256` on the
+release page lists the assets available to install.
 [Supported hosts](#supported-hosts) gives each host's requirements and
 qualification boundary. The [2.5.0 release notes](RELEASE_NOTES.md) describe
 the release's scope.
@@ -40,8 +39,7 @@ exact source pins, signed checksum assets and qualification limits.
 
 ## Install the 2.5.0 CLI
 
-Once the qualified 2.5.0 release is published and its signed `DOWNLOADS.sha256`
-lists the Linux archive, use the commands below. In the directory where you
+The signed `DOWNLOADS.sha256` lists the Linux archive. In the directory where you
 want to keep the archive and the executable, set `export VERSION=2.5.0`, then
 run:
 
@@ -77,8 +75,9 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-After the qualified 2.5.0 release is published, check that its signed
-`DOWNLOADS.sha256` lists `zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz`. Then set
+The initial release does not include a macOS archive. After native validation,
+check that the release's signed `DOWNLOADS.sha256` lists
+`zeno-fcis-2.5.0-aarch64-apple-darwin.tar.gz`. Then set
 `export VERSION=2.5.0` in your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
@@ -172,9 +171,7 @@ The current V2 API uses source or path dependencies on the source tag that
 matches your CLI. The historical `1.1.0` package keeps its own V1 API. Follow
 the release's source pin when you build generated applications.
 
-Before publication, use an explicitly pinned, reviewed source checkout. Once
-the matching 2.5.0 release and its source tag are published, clone into a fresh
-directory:
+Use the source tag that matches the installed CLI. Clone it into a fresh directory:
 
 ```bash
 git clone --branch v2.5.0 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
