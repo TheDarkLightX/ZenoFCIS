@@ -24,7 +24,9 @@ def main():
     parser.add_argument("--git-dir", type=Path)
     args = parser.parse_args()
     fixture = ROOT / "tests/fixtures/repair-pre-lemma"
-    wide_fixture = ROOT / "crates/zeno-fcis-cli/tests/fixtures/numeric-scale"
+    # Full swap laws run in pinned qualification. This sparse amount fixture
+    # replays the earlier wide-domain CLI integration without a large catalog.
+    wide_fixture = ROOT / "tests/fixtures/numeric-wide"
     for contract in (fixture, wide_fixture):
         for name in ("project.zeno", "v2/policy.json"):
             assert (contract / name).is_file(), f"missing evidence fixture: {contract / name}"
