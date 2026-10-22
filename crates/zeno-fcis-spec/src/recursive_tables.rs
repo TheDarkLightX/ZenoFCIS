@@ -309,22 +309,6 @@ impl Parser {
         }
         let at = self.current().span;
         self.advance();
-        let mut indices = Vec::new();
-        while self.take_symbol(&TokenKind::LBracket) {
-            let index = match self.current().kind.clone() {
-                TokenKind::Number(n) => {
-                    self.advance();
-                    u32::try_from(n).ok()
-                }
-                TokenKind::Ident(v) => {
-                    self.advance();
-                    self.index_value(&v).and_then(|n| u32::try_from(n).ok())
-                }
-                _ => None,
-            };
-            self.expect_symbol(TokenKind::RBracket, "derived.entry");
-            indices.push(index);
-        }
         let own = self
             .defining
             .as_ref()
@@ -342,14 +326,66 @@ impl Parser {
             );
             return Some(RelExpr::Bool(false));
         };
-        if indices.len() != rank || indices.iter().any(|n| n.is_none_or(|n| n >= size)) {
-            self.recursive_error(
-                at,
-                "derived indices must be bound table indices or in-range literals",
-            );
+        let mut indices = Vec::new();
+        while self.take_symbol(&TokenKind::LBracket) {
+            indices.push(self.position(size, at));
+            self.expect_symbol(TokenKind::RBracket, "derived.entry");
+            if indices.len() > 2 {
+                break;
+            }
+        }
+        if indices.len() != rank || indices.iter().any(Option::is_none) {
+            if indices.len() != rank {
+                self.recursive_error(
+                    at,
+                    "the number of indices must match the derived table rank",
+                );
+            }
             return Some(RelExpr::Bool(false));
         }
-        let entry = indices.iter().fold(0u32, |n, i| n * size + i.unwrap_or(0));
+        let indices: Vec<_> = indices.into_iter().flatten().collect();
+        let literal_indices = indices
+            .iter()
+            .map(table_lookup::literal)
+            .collect::<Option<Vec<_>>>();
+        if literal_indices.is_none() {
+            if own {
+                self.recursive_error(at, "active recursive entries use literal or bound indices");
+                return Some(RelExpr::Bool(false));
+            }
+            let mut entries = Vec::new();
+            let count = size.pow(rank as u32);
+            for k in 0..count {
+                let t = &self.derived[name.as_ref()];
+                let f = if let Some(constants) = &t.constants {
+                    RelExpr::Bool(constants[k as usize])
+                } else {
+                    t.circuit
+                        .at_output(t.outputs[k as usize])
+                        .map(|c| RelExpr::Circuit(Box::new(c)))
+                        .unwrap_or(RelExpr::Bool(false))
+                };
+                if !self.charge(at, formula_shape_rel(&f).0) {
+                    return Some(RelExpr::Bool(false));
+                }
+                entries.push(f);
+            }
+            for index in indices.iter().rev() {
+                entries = entries
+                    .chunks(size as usize)
+                    .map(|chunk| self.select_formulas(at, index, chunk.to_vec()))
+                    .collect();
+            }
+            let value = entries.pop().unwrap_or(RelExpr::Bool(false));
+            if self.table_depth == 0 {
+                self.rewrite_from(at, tables::rel_text(&value));
+            }
+            return Some(value);
+        }
+        let entry = literal_indices
+            .unwrap_or_default()
+            .iter()
+            .fold(0u32, |n, i| n * size + *i as u32);
         if own && let Some(reason) = self.self_refusal {
             self.recursive_error(at, reason);
         }

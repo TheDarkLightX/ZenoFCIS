@@ -263,6 +263,7 @@ pub(crate) fn implementation() -> String {
         include_str!("../../zeno-fcis-spec/src/bits.rs"),
         include_str!("../../zeno-fcis-spec/src/constant_tables.rs"),
         include_str!("../../zeno-fcis-spec/src/recursive_tables.rs"),
+        include_str!("../../zeno-fcis-spec/src/table_lookup.rs"),
         include_str!("../../zeno-fcis-contract/src/internals/genesis.rs"),
         include_str!("../../zeno-fcis-contract/src/internals/graph.rs"),
         include_str!("../../zeno-fcis-contract/src/internals/table_expr.rs"),

@@ -57,8 +57,8 @@ the same identity and the same checks. The rules are:
   project.
 - `type ID index Name of T;` is `type ID int Name in 0..=N-1;` for a table T
   of N entries.
-- `ROOT.OWNER.T[k]` is `ROOT.OWNER.(T + k)`. The index k is an integer literal
-  or an index variable that a table form binds; it must lie in 0..N-1.
+- `ROOT.OWNER.T[k]` is `ROOT.OWNER.(T + k)` for a literal or bound index k.
+  Computed integer positions use the checked Select expansion described below.
 - `forall i in table T { F }` is `F_0 && F_1 && ... && F_N-1`, joined left to
   right, where F_k is F with i replaced by the integer k. With `where C`, each
   entry is `(C_k -> F_k)`.
@@ -126,6 +126,33 @@ For a linear constant-bound form, write
 for K = 2. A nonconstant-bound count uses this linear form automatically.
 `check --expand` distinguishes Select terms from combinatorial clauses.
 
+### Computed positions in laws
+
+`ROOT.OWNER.T[e]`, `constant_name[e]` and completed derived entries accept
+integer expressions. For example, after a tier field has the declared range
+0..=3, `fee_bps[command.101.120 + 0]` reads the corresponding policy constant.
+The compiler checks an interval for e and refuses unless it is contained in
+0..N-1. Numeric input types and fields must be declared before this use.
+Ranges come from the project declarations, not a rule condition or example.
+
+Checked addition, subtraction, multiplication, floor/ceiling division, numeric
+casts and `choose` propagate conservative bounds. Both Select arms contribute
+to the range. Unknown bounds, incompatible kinds, possible bound overflow,
+division through zero or a range outside the table produce a source diagnostic.
+Correlations between repeated inputs are not assumed; rewrite the expression
+or narrow its declared type when the interval cannot establish containment.
+
+A literal or substituted bound index retains its direct entry. Other reads
+lower to `choose(e == 0, T[0], choose(e == 1, T[1], ... T[N-1]))`.
+Unsigned positions compare with unsigned constants. The last arm is safe
+because the independent range check has already excluded every other index;
+there is no out-of-range value. Every entry and condition is eager, retaining
+the existing Select's traps and ordinary measured work. Boolean reads use the
+same eager Select in a checked Boolean circuit. No runtime table is retained.
+The selection has N entries and N-1 Selects for a one-dimensional table;
+resource limits still apply to the entries and copied index expressions.
+Active recursive self references retain literal or bound indices.
+
 ## Recursive tables
 
 The ask: "a member may delegate a vote, but delegation must never form a
@@ -153,8 +180,9 @@ propagates a permission through parents, including cycles with no grant.
 
 `derived table ID name[i] in table T rounds M { ROWS default V; };` declares
 one Boolean entry per index of T. Use `name[i][j]` for a relation over pairs
-of that same table's indices. ID must be unused. Indices are literals or
-bound table indices. M is explicit and must equal the number of Boolean
+of that same table's indices. ID must be unused. Active self-reference indices
+are literals or bound table indices; completed entries also admit checked
+computed positions. M is explicit and must equal the number of Boolean
 entries: N for one index, N*N for a pair.
 
 Each row is `when G then V;`. The first true guard selects its value; when
@@ -216,7 +244,8 @@ const table 110 parents 105 size 3 [0,1,2];
 The scalar type 105 must be declared earlier. Entries are Bool, int or u128
 literals within that type's bounds; the size is 1 through 64. The table
 adds an index set, not fields or input-domain dimensions. Read `parents[i]`
-with a bound table index or in-range literal. IDs and names must be distinct.
+with a bound table index, in-range literal or checked computed position.
+IDs and names must be distinct.
 Constant and derived declarations are macros: the expanded project contains
 their effective scalar formulas; packets also bind the original source hash.
 
@@ -330,9 +359,8 @@ finite domains, with the existing resource limits.
   the judges are inconclusive, as for any contract.
 - An isolated constant-bound `count` retains C(N, K+1) clauses for `<= K`.
   Use the explicit Select sum for a linear constant-bound formula.
-- In law formulas an entry index is a literal or a bound index variable,
-  not an input. A dynamic entry is written as a `forall` with
-  `where i == command...`, as in the example.
+- Computed law positions require a declared range contained in the table.
+  Range inference is conservative and does not use surrounding law guards.
 - Policy table forms lower into the existing scalar rules and identity
   format. `ui.json` names entry IDs, and the interface shows each entry as a field.
 - Linear formulas reduce expansion size, not the finite input domain.

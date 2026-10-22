@@ -355,29 +355,64 @@ impl Parser {
         };
         let mut indices = Vec::new();
         while self.take_symbol(&TokenKind::LBracket) {
-            let n = match &self.current().kind {
-                TokenKind::Number(n) => u32::try_from(*n).ok(),
-                TokenKind::Ident(n) => self.index_value(n).and_then(|n| u32::try_from(n).ok()),
-                _ => None,
-            };
-            self.advance();
+            indices.push(self.position(size, at));
             self.expect_symbol(TokenKind::RBracket, "bits.index");
-            indices.push(n);
             if indices.len() > 2 {
                 break;
             }
         }
-        if actual != Some(width)
-            || indices.len() != rank
-            || indices.iter().any(|n| n.is_none_or(|n| n >= size))
-        {
-            self.recursive_error(
-                at,
-                "bit entry width and bound/literal indices must match its declaration",
-            );
+        if actual != Some(width) || indices.len() != rank || indices.iter().any(Option::is_none) {
+            if actual != Some(width) || indices.len() != rank {
+                self.recursive_error(
+                    at,
+                    "bit entry width and index count must match its declaration",
+                );
+            }
             return vec![RelExpr::Bool(false); width as usize];
         }
-        let entry = indices.iter().fold(0, |n, i| n * size + i.unwrap_or(0));
+        let indices: Vec<_> = indices.into_iter().flatten().collect();
+        let literal_indices = indices
+            .iter()
+            .map(table_lookup::literal)
+            .collect::<Option<Vec<_>>>();
+        if literal_indices.is_none() {
+            if own {
+                self.recursive_error(at, "active recursive entries use literal or bound indices");
+                return vec![RelExpr::Bool(false); width as usize];
+            }
+            let mut atoms = Vec::new();
+            for atom in 0..width as usize {
+                let mut entries = Vec::new();
+                for entry in 0..size.pow(rank as u32) as usize {
+                    let d = &self.derived[name.as_str()];
+                    let k = entry * width as usize + atom;
+                    let f = if let Some(constants) = &d.constants {
+                        RelExpr::Bool(constants[k])
+                    } else {
+                        d.circuit
+                            .at_output(d.outputs[k])
+                            .map(|c| RelExpr::Circuit(Box::new(c)))
+                            .unwrap_or(RelExpr::Bool(false))
+                    };
+                    if !self.charge(at, formula_shape_rel(&f).0) {
+                        return vec![RelExpr::Bool(false); width as usize];
+                    }
+                    entries.push(f);
+                }
+                for index in indices.iter().rev() {
+                    entries = entries
+                        .chunks(size as usize)
+                        .map(|chunk| self.select_formulas(at, index, chunk.to_vec()))
+                        .collect();
+                }
+                atoms.push(entries.pop().unwrap_or(RelExpr::Bool(false)));
+            }
+            return atoms;
+        }
+        let entry = literal_indices
+            .unwrap_or_default()
+            .iter()
+            .fold(0u32, |n, i| n * size + *i as u32);
         if own {
             if let Some(reason) = self.self_refusal {
                 self.recursive_error(at, reason);

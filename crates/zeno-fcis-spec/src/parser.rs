@@ -13,6 +13,8 @@ mod bits;
 mod constant_tables;
 #[path = "recursive_tables.rs"]
 mod recursive_tables;
+#[path = "table_lookup.rs"]
+mod table_lookup;
 
 use crate::ast::*;
 use crate::collections::{
@@ -2475,8 +2477,10 @@ impl Parser {
                     segments.push(id)
                 }
             }
-            if matches!(self.current().kind, TokenKind::LBracket) {
-                self.table_entry(&mut segments);
+            if matches!(self.current().kind, TokenKind::LBracket)
+                && let Some(value) = self.table_entry(root, &mut segments)
+            {
+                return value;
             }
             self.entry_path(start, &mut segments);
             if let Some(path) = ProjectionPath::try_new(root, segments) {
@@ -2569,53 +2573,44 @@ impl Parser {
             .find(|(bound, _)| bound.as_ref() == name)
             .and_then(|(_, value)| *value)
     }
-    /// Replaces the table ID ending `segments` with the ID of the entry the
-    /// following `[INDEX]` names: an integer literal or a table index.
-    fn table_entry(&mut self, segments: &mut [StableId]) {
+    /// Literal entries keep their projection; computed entries are eager values.
+    fn table_entry(
+        &mut self,
+        root: ProjectionRoot,
+        segments: &mut [StableId],
+    ) -> Option<ValueExpr> {
         let start = self.current().span;
         self.take_symbol(&TokenKind::LBracket);
-        let index = match self.current().kind.clone() {
-            TokenKind::Number(value) => {
-                self.advance();
-                i128::try_from(value).ok()
-            }
-            TokenKind::Ident(name) => {
-                self.advance();
-                self.index_value(&name)
-            }
-            _ => None,
-        };
+        let table = segments.last().map(|id| id.get());
+        let size = table
+            .and_then(|table| self.tables.get(&table).copied())
+            .filter(|size| {
+                (1..=MAX_TABLE_ENTRIES).contains(size)
+                    && table.is_some_and(|id| id.checked_add(size - 1).is_some())
+            });
+        let index = self.position(size.unwrap_or(0), start);
         self.expect_symbol(TokenKind::RBracket, "table.entry");
         self.table_values += 1;
-        let table = segments.last().map(|id| id.get());
-        let size = table.and_then(|table| self.tables.get(&table).copied());
-        let entry = match (table, size, index) {
-            (Some(table), Some(size), Some(index)) if (0..i128::from(size)).contains(&index) => {
-                u32::try_from(index)
-                    .ok()
-                    .and_then(|index| table.checked_add(index))
-                    .and_then(StableId::new)
-            }
-            _ => None,
+        let (Some(table), Some(size), Some(index)) = (table, size, index) else {
+            return None;
         };
-        match (entry, segments.last_mut()) {
-            (Some(entry), Some(last)) => *last = entry,
-            _ => self.error_at(
-                start,
-                DiagnosticCode::InvalidDeclaration,
-                "table.entry",
-                match size {
-                    Some(size) => format!(
-                        "an entry index 0..={} of table {}",
-                        size.max(1) - 1,
-                        table.unwrap_or(0)
-                    ),
-                    None => "a declared table ID before `[`".into(),
-                },
-                "invalid table entry",
-                "index a declared table with an integer literal or a table index variable",
-            ),
+        if let Some(k) = table_lookup::literal(&index) {
+            if let Some(last) = segments.last_mut() {
+                *last = table
+                    .checked_add(k as u32)
+                    .and_then(StableId::new)
+                    .unwrap_or(*last);
+            }
+            return None;
         }
+        let entries = (0..size)
+            .filter_map(|k| {
+                let mut path = segments.to_vec();
+                *path.last_mut()? = StableId::new(table.checked_add(k)?)?;
+                ProjectionPath::try_new(root, path).map(ValueExpr::Projection)
+            })
+            .collect();
+        Some(self.select_values(start, &index, entries))
     }
     /// Reads `VAR in table T`, after the form's keyword. Returns the
     /// variable and the table's size, or None after reporting why.

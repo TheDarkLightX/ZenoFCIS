@@ -211,33 +211,17 @@ impl Parser {
     pub(super) fn constant_name(&self) -> bool {
         matches!(&self.current().kind,TokenKind::Ident(n) if self.constants.contains_key(n.as_ref()))
     }
-    fn constant_entry(&mut self) -> Option<Constant> {
+    fn constant_entries(&mut self) -> Option<(ValueExpr, Vec<Constant>)> {
         let TokenKind::Ident(name) = self.current().kind.clone() else {
             return None;
         };
-        let size = self.constants.get(name.as_ref())?.values.len();
+        let size = self.constants.get(name.as_ref())?.values.len() as u32;
         let at = self.current().span;
         self.advance();
         self.expect_symbol(TokenKind::LBracket, "constant.index");
-        let index = match &self.current().kind {
-            TokenKind::Number(n) => usize::try_from(*n).ok(),
-            TokenKind::Ident(n) => self.index_value(n).and_then(|n| usize::try_from(n).ok()),
-            _ => None,
-        };
-        self.advance();
+        let index = self.position(size, at);
         self.expect_symbol(TokenKind::RBracket, "constant.index");
-        if let Some(k) = index.filter(|k| *k < size) {
-            return self
-                .constants
-                .get(name.as_ref())
-                .and_then(|t| t.values.get(k))
-                .cloned();
-        }
-        self.recursive_error(
-            at,
-            "constant indices must be bound table indices or in-range literals",
-        );
-        None
+        Some((index?, self.constants.get(name.as_ref())?.values.to_vec()))
     }
     pub(super) fn constant_bool(&mut self) -> Option<RelExpr> {
         let TokenKind::Ident(n) = &self.current().kind else {
@@ -251,9 +235,19 @@ impl Parser {
             return None;
         }
         let at = self.current().span;
-        let value = match self.constant_entry() {
-            Some(Constant::Bool(b)) => RelExpr::Bool(b),
-            _ => RelExpr::Bool(false),
+        let value = match self.constant_entries() {
+            Some((index, values)) => self.select_formulas(
+                at,
+                &index,
+                values
+                    .into_iter()
+                    .map(|v| match v {
+                        Constant::Bool(b) => RelExpr::Bool(b),
+                        _ => RelExpr::Bool(false),
+                    })
+                    .collect(),
+            ),
+            None => RelExpr::Bool(false),
         };
         if self.table_depth == 0 {
             self.rewrite_from(at, tables::rel_text(&value));
@@ -265,16 +259,26 @@ impl Parser {
             return None;
         }
         let at = self.current().span;
-        let value = match self.constant_entry() {
-            Some(Constant::Int(n)) => ValueExpr::Int(n),
-            Some(Constant::Unsigned(n)) => ValueExpr::U128(n),
-            _ => {
+        let value = match self.constant_entries() {
+            Some((index, values)) if values.iter().all(|v| !matches!(v, Constant::Bool(_))) => {
+                let values = values
+                    .into_iter()
+                    .map(|v| match v {
+                        Constant::Int(n) => ValueExpr::Int(n),
+                        Constant::Unsigned(n) => ValueExpr::U128(n),
+                        Constant::Bool(_) => ValueExpr::Int(0),
+                    })
+                    .collect();
+                self.select_values(at, &index, values)
+            }
+            Some(_) => {
                 self.recursive_error(
                     at,
                     "Boolean constant entries are formulas, not numeric values",
                 );
                 ValueExpr::Int(0)
             }
+            None => ValueExpr::Int(0),
         };
         self.table_values += 1;
         Some(value)
