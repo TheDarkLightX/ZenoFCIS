@@ -28,7 +28,7 @@ doors over the contract's whole declared domain ("Requirements" below).
 | Sketch | Expressions with holes (`loop sketch`) | `completed`, `unrealizable`, `not-found`, `inconclusive` or `refused` | `completed` passed `transform check` with replay; the session checks it or recognizes a byte duplicate; `unrealizable` is the doors' claim, with a witness input or a listed, exhausted, complete candidate space; `not-found` claims nothing |
 | Family | One program over family parameters (`loop family`) | A verdict per instance, the smallest failing instance, and fitted forms `a * $P + b` checked again | Holds on the checked instances only; only a checker counterexample makes an instance `refuted`, and an unrealizable sketch is labelled `unrealizable` |
 | Transfer | A program written for one instance (`loop transfer`) | Per target instance: carried over directly, by opening constants near a changed parameter, or by repair | Each result is checked on its instance |
-| Meaning | A complete program (`loop meaning`) | Its meaning key and whether it means what the original means | Equal keys exactly when `transform check` finds the programs equivalent, within its limits |
+| Meaning | A complete program (`loop meaning`) | Its meaning key and whether it means what the original means | Keys hash all eager output/failure observations over the declared domain; equality is collision-qualified and supplies no independent transform verdict |
 
 Each expression or sketch spends one session attempt, like a JSON
 candidate. A duplicate that passes the door's confirming check and replay
@@ -37,18 +37,19 @@ The door's confirming `transform check` and replay run first; if
 they do not complete in the invocation's time, the result is `inconclusive`,
 the attempt is not spent and the incumbent is unchanged. Family and transfer runs keep no session. A loop session refuses an
 original whose check would need more work than its per-check allowance
-(`work-infeasible`). Where that happens depends on the program's size as
-well as its input tuples: with the default allowance, the core components'
-programs reach it above roughly 6,000 tuples, and the smallest programs near
-18,000. On such a core only the family and transfer doors are available,
-and a workspace cannot be opened on it.
+(`work-infeasible`). The check and session work ceilings scale with the original within fixed
+hard caps; admission depends on graph size, declared tuples and projected
+whole-session work, not a fixed tuple threshold. See the current
+[loop work limits](../CLI_REFERENCE.md#loop-commands). Family and transfer
+have their own finite-door limits.
 
 ### The expression language
 
 It is the contract policy-expression grammar: fields by name, declared
 variant names (`action == Inc`), `true`, `false`, `!`, `&&`, `||`, `->`,
-`==`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, and `c ? a : b` at the lowest
-level. Boolean fields used as integers lower as `field ? 1 : 0`, including
+`==`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, checked `*`, and `c ? a : b`
+at the lowest level. The closed division and product functions listed in the
+[CLI expression grammar](../CLI_REFERENCE.md) are also supported. Boolean fields used as integers lower as `field ? 1 : 0`, including
 vote sums. The doors add:
 
 | Form | Meaning |
