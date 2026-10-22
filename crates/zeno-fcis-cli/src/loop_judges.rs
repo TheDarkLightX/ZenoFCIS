@@ -2695,28 +2695,62 @@ mod tests {
 
     #[test]
     fn every_offered_question_option_can_be_submitted_without_conflict() {
+        let mut omitted_updates = 0;
         for example in ["dual-approval", "guide-counter"] {
             let base = Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../examples")
                 .join(example);
             let core = Core::load(&base, true).unwrap();
             let report = question(&core, &[]).unwrap();
-            let offered = report["question"]["options"].as_array().unwrap();
-            assert!(!offered.is_empty(), "{example}: {report}");
-            for option in offered {
-                let mut answer = option.clone();
-                answer["where"] = report["question"]["where"].clone();
-                answer.as_object_mut().unwrap().remove("current");
-                let answers = core
-                    .answers(&json!({"schema":"zeno-fcis/loop-answers/1", "answers":[answer]}))
-                    .unwrap();
-                let submitted = question(&core, &answers).unwrap();
-                assert_ne!(
-                    submitted["status"], "conflict",
-                    "{example}: offered={option}; submitted={submitted}"
-                );
+            let mut questions = vec![(
+                report["question"]["where"].clone(),
+                report["question"]["options"].as_array().unwrap().clone(),
+            )];
+            let admitted = core.admissible(&[]).unwrap();
+            let freedom = core.freedom_from(admitted, &[], &[]);
+            // Exercise every eligible region, including smaller rejecting
+            // branches that the first largest-region question does not show.
+            assert!(freedom.regions.len() > 1, "{example}");
+            for region in &freedom.regions {
+                let mut mask = vec![false; core.tuples()];
+                for ordinal in &region.ordinals {
+                    mask[*ordinal] = true;
+                }
+                let formula = core.region_formula(&mask, Some(region.case)).unwrap();
+                let current = core.core_label(region.ordinals[0]);
+                let options = region
+                    .labels
+                    .iter()
+                    .map(|chosen| {
+                        core.offered_option(*chosen, region, &freedom.admitted, current)
+                            .unwrap()
+                    })
+                    .collect();
+                questions.push((json!(core.show(&formula)), options));
+            }
+            for (where_, offered) in questions {
+                assert!(!offered.is_empty(), "{example}: {report}");
+                for option in offered {
+                    omitted_updates +=
+                        usize::from(option["class"] != "Reject" && option.get("sets").is_none());
+                    let mut answer = option.clone();
+                    answer["where"] = where_.clone();
+                    answer.as_object_mut().unwrap().remove("current");
+                    let answers = core
+                        .answers(&json!({"schema":"zeno-fcis/loop-answers/1", "answers":[answer]}))
+                        .unwrap();
+                    let submitted = question(&core, &answers).unwrap();
+                    assert_ne!(
+                        submitted["status"], "conflict",
+                        "{example}: offered={option}; submitted={submitted}"
+                    );
+                }
             }
         }
+        assert!(
+            omitted_updates > 0,
+            "the examples must exercise an unlawful suggested update"
+        );
     }
 
     #[test]
