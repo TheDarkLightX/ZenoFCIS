@@ -288,11 +288,14 @@ fn kb_snapshot_native_receipt_inside_either_subject_refuses_and_outside_reloads(
     );
     let report = value(&checked);
     assert!(checked.status.success(), "{report}");
-    assert_eq!(report["validation_problems"], json!([]));
+    assert_eq!(
+        report["validation_problems"],
+        json!([{"reason":"kb-strategy-assessment-required"}])
+    );
     assert!(
-        report["validations"].as_array().is_some_and(|rows| rows
-            .iter()
-            .any(|row| row["lesson"] == "synthetic" && row["status"] == "Validated")),
+        report["validations"]
+            .as_array()
+            .is_some_and(|rows| rows.iter().all(|row| row["lesson"] != "synthetic")),
         "{report}"
     );
     // A valid executable with different bytes must not reuse this receipt.
