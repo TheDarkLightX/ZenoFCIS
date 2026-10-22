@@ -25,6 +25,9 @@ def knowledge_graph(arena, g):
     for i, node in enumerate(nodes):
         need(type(node) is dict and set(node) == {'belief','action'}, 'knowledge reads hidden state')
         B, a = node['belief'], node['action']
+        need(type(B) is list, 'belief encoding')
+        work += len(B)
+        need(work <= 1000000 and time.monotonic() < end, 'knowledge checker bound')
         need(type(B) is list and B and all(type(s) is int and 0 <= s < len(arena.owners) for s in B)
              and B == sorted(set(B)), 'belief encoding')
         need(len({arena.observations[s] for s in B}) == 1, 'belief observation uniformity')

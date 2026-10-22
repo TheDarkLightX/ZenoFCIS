@@ -75,6 +75,20 @@ class Knowledge(unittest.TestCase):
         packet['certificate']['hidden'] = [[0,'a'],[1,'b']]
         with self.assertRaisesRegex(ValueError,'hidden reads'): check(packet,arena)
 
+    def test_hidden_state_policy_rejected(self):
+        arena = game([0,0,1,1], [[('a',2),('b',3)],[('a',3),('b',2)],
+            [('stay',2)],[('stay',3)]], [3], ['hidden','hidden','safe','bad'],[0,1])
+        # The planted full-state policy splits indistinguishable initial states.
+        fake = arena.wire()
+        for i,node in enumerate(fake['nodes']): node['observation']=str(i)
+        forged=solve(parse(fake)); forged['game']=arena.wire()
+        with self.assertRaisesRegex(ValueError,'missing knowledge state'): check(forged,arena)
+
+    def test_missing_certificate_state_rejected(self):
+        arena=game([1,1],[[('stay',0)],[('stay',1)]],[1],roots=[0,1],partial=False)
+        packet=solve(arena); packet['certificate']['ranks']=[]
+        with self.assertRaisesRegex(ValueError,'certificate state coverage'): check(packet,arena)
+
     def test_missing_state_rejected(self):
         arena=memory_game(); packet=solve(arena)
         packet['knowledge']['nodes'].pop()
@@ -87,6 +101,9 @@ class Knowledge(unittest.TestCase):
 
     def test_snapshot_and_owned_result(self):
         arena=memory_game(); before=arena.wire(); packet=solve(arena)
+        snapshot=copy.deepcopy(packet); verdict=check(packet,arena)
+        verdict['winning_roots'].clear()
+        self.assertEqual(packet,snapshot)
         packet['game']['nodes'][0]['edges'].clear()
         self.assertEqual(arena.wire(),before)
 

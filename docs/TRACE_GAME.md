@@ -196,8 +196,9 @@ grammar described above. The legacy `reactive` API retains that narrower grammar
 use the explicit arena route for complete sure-safety synthesis.
 
 ```sh
-python3 -B tools/trace_game/arena.py solve --game arena.json --out ../arena-evidence
+python3 -B tools/trace_game/arena.py solve --game test-data/trace-games/observation-memory.json --out ../arena-evidence
 python3 -B tools/trace_game/arena.py check --out ../arena-evidence
+python3 -B tools/trace_game/certificate_check.py ../arena-evidence certificate.json
 ```
 
 The independent checker verifies every subset transition, initial belief,
@@ -283,4 +284,6 @@ The finite-game methods build on these published sources:
 What is new here: bounded input, evidence packaging and independent local
 checks for these established algorithms; no new synthesis algorithm is claimed.
 Scope: finite declared arenas, sure safety under partial observation, and
-perfect-information reachability and omega objectives under the stated conventions. This is separate from native contract execution and release qualification.
+perfect-information reachability and omega objectives under the stated
+conventions. This is separate from native contract execution and release
+qualification.

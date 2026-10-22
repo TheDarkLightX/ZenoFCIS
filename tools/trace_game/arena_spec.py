@@ -30,8 +30,9 @@ def parse(value):
     need(type(value) is dict and set(value) == {'schema', 'observation', 'roots', 'nodes', 'objective'}, 'arena fields')
     need(value['schema'] == 'zeno-fcis/arena/1', 'arena schema')
     need(value['observation'] in ('perfect', 'partial'), 'observation mode')
-    nodes = value['nodes']; n = len(nodes)
-    need(type(nodes) is list and 0 < n <= 10000, 'arena state bound')
+    nodes = value['nodes']
+    need(type(nodes) is list and 0 < len(nodes) <= 10000, 'arena state bound')
+    n = len(nodes)
     need(indices(value['roots'], n) and value['roots'], 'arena roots')
     owners, observations, edges = [], [], []
     size = 0; classes = {}
@@ -50,7 +51,9 @@ def parse(value):
             signature = (o, tuple(sorted(a for a, _ in row)) if o == 0 else ())
             need(classes.setdefault(b, signature) == signature, 'observation reveals owner and enabled actions')
         owners.append(o); observations.append(b); edges.append(tuple((a, t) for a, t in row))
-    objective = value['objective']; kind = objective.get('kind')
+    objective = value['objective']
+    need(type(objective) is dict, 'objective object')
+    kind = objective.get('kind')
     need(kind in ('safety', 'reachability', 'buchi', 'co-buchi', 'parity'), 'unsupported objective; quantitative objectives deferred')
     field = 'priorities' if kind == 'parity' else 'states'
     need(set(objective) == {'kind', field}, 'objective fields')

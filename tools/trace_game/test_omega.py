@@ -64,10 +64,10 @@ class Omega(unittest.TestCase):
 
     def test_parity_priority_off_by_one_rejected(self):
         arena=objective(game([0],[[('stay',0)]],partial=False),'parity',[0])
-        packet=solve(arena); self.assertEqual(check(packet,arena)['winning_roots'],[0])
+        packet=solve(arena); self.assertEqual(packet['certificate']['winning'],[0])
         # The off-by-one priority game really has the opposite winner.
         flipped=objective(arena,'parity',[1]); forged=solve(flipped)
-        self.assertEqual(check(forged,flipped)['losing_roots'],[0])
+        self.assertEqual(forged['certificate']['winning'],[])
         forged['game']=arena.wire()
         with self.assertRaisesRegex(ValueError,'adverse parity cycle'): check(forged,arena)
 

@@ -1,0 +1,97 @@
+{
+  "schema": "zeno-fcis/arena/1",
+  "observation": "partial",
+  "roots": [
+    0
+  ],
+  "objective": {
+    "kind": "safety",
+    "states": [
+      6
+    ]
+  },
+  "nodes": [
+    {
+      "owner": 1,
+      "observation": "start",
+      "edges": [
+        [
+          "red",
+          1
+        ],
+        [
+          "blue",
+          2
+        ]
+      ]
+    },
+    {
+      "owner": 1,
+      "observation": "red",
+      "edges": [
+        [
+          "next",
+          3
+        ]
+      ]
+    },
+    {
+      "owner": 1,
+      "observation": "blue",
+      "edges": [
+        [
+          "next",
+          4
+        ]
+      ]
+    },
+    {
+      "owner": 0,
+      "observation": "choose",
+      "edges": [
+        [
+          "a",
+          5
+        ],
+        [
+          "b",
+          6
+        ]
+      ]
+    },
+    {
+      "owner": 0,
+      "observation": "choose",
+      "edges": [
+        [
+          "a",
+          6
+        ],
+        [
+          "b",
+          5
+        ]
+      ]
+    },
+    {
+      "owner": 1,
+      "observation": "safe",
+      "edges": [
+        [
+          "stay",
+          5
+        ]
+      ]
+    },
+    {
+      "owner": 1,
+      "observation": "bad",
+      "edges": [
+        [
+          "stay",
+          6
+        ]
+      ]
+    }
+  ]
+}
