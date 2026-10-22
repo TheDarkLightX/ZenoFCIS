@@ -145,10 +145,15 @@ fn negative_constant_table_entries_roundtrip_through_scalar_literals() {
              const table 110 values 105 size 1 [{value}];
              law 500 matches = values[0] == {value};"
         );
-        let expanded = expand_tables(&source, SourceLimits::default()).unwrap();
+        let expanded = expand_tables(&source, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("constant roundtrip fixture failed: {error:?}"));
         assert_eq!(
-            project(&source).canonical_bytes().unwrap(),
-            project(&expanded.text).canonical_bytes().unwrap(),
+            project(&source)
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("constant roundtrip fixture failed: {error:?}")),
+            project(&expanded.text)
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("constant roundtrip fixture failed: {error:?}")),
             "constant entry {value} must have the scalar parser's canonical form"
         );
     }
