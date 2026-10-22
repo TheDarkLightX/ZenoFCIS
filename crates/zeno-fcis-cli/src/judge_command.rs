@@ -68,6 +68,30 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
+    /// Count declared inputs or bounded reachable states, or find both accumulated reward extremes. Exact finite domains only; no runtime authority.
+    Risk {
+        /// Property on input decisions, or a state property with --states.
+        #[arg(
+            long = "where",
+            required_unless_present = "reward",
+            conflicts_with = "reward"
+        )]
+        condition: Option<String>,
+        /// Count distinct reachable states instead of complete declared input tuples.
+        #[arg(long, requires = "steps", conflicts_with = "reward")]
+        states: bool,
+        /// Declared reward ID; find min and max sums, including the empty run.
+        #[arg(long, requires = "steps")]
+        reward: Option<u32>,
+        /// Inclusive number of commands from genesis (0..=64).
+        #[arg(long)]
+        steps: Option<u32>,
+        /// Maximum charged work; stops are UNKNOWN with consumed work retained.
+        #[arg(long, default_value_t = zeno_fcis_contract::risk::MAX_WORK)]
+        max_work: u64,
+        #[command(flatten)]
+        common: Common,
+    },
     /// Profile a contract's states, memory and robustness exactly over its declared domain: valid, reachable and Moore-minimal states, and what happens on pre-states that break a state law. Advisory; the application is not changed.
     Profile {
         #[command(flatten)]
@@ -250,6 +274,50 @@ pub(super) fn run(command: Command) -> u8 {
                 ))
             },
         ),
+        Command::Risk {
+            condition,
+            states,
+            reward,
+            steps,
+            max_work,
+            common,
+        } => {
+            use zeno_fcis_contract::risk::{self, Limits, Question};
+            let question = match (condition, states, reward, steps) {
+                (Some(condition), false, None, None) => Question::Inputs { condition },
+                (Some(condition), true, None, Some(steps)) => Question::States { condition, steps },
+                (None, false, Some(reward), Some(steps)) => Question::Extremes { reward, steps },
+                _ => {
+                    eprintln!(
+                        "risk requires --where, --states --where --steps, or --reward --steps"
+                    );
+                    return USAGE;
+                }
+            };
+            judge(
+                &common,
+                "zeno-fcis/contract-risk/1",
+                None,
+                true,
+                |sources| {
+                    let result = risk::check(
+                        sources.project,
+                        sources.rules,
+                        &question,
+                        Limits {
+                            max_tuples: common.max_tuples,
+                            max_work,
+                        },
+                    )?;
+                    let (exit, status) = if result.complete() {
+                        (OK, "checked")
+                    } else {
+                        (BLOCKED, "UNKNOWN")
+                    };
+                    Ok(Judged::Done(result.packet().clone(), exit, status))
+                },
+            )
+        }
         Command::Profile { common } => judge(
             &common,
             "zeno-fcis/contract-profile/2",

@@ -131,6 +131,7 @@ docs/PROJECT_NEUTRAL_UMBRELLA.md
 docs/PROJECT_RELATIONAL_LAWS.md
 docs/PUBLICATION_POLICY.md
 docs/QEMU_MINI_DETERMINATOR.md
+docs/QUANTITATIVE_RISK.md
 docs/QUICKSTART.md
 docs/RC3_AUTHORING_CONTRACT.md
 docs/RELEASE_ASSURANCE.md
@@ -380,6 +381,7 @@ examples/distribution-laws/payout-tie/README.md
 examples/distribution-laws/reporter-choice/README.md
 examples/distribution-laws/shortfall-reward/README.md
 examples/dual-approval/README.md
+examples/quantitative-risk/swap-pool/README.md
 experiments/proof-challenge/README.md
 integrations/commons/skills/commons-protocol/SKILL.md
 integrations/elite_archive/README.md

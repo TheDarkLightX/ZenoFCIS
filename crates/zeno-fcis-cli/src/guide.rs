@@ -24,6 +24,7 @@ const CARDS: &[&str] = &[
     include_str!("../guide-cards/contract-gaps.txt"),
     include_str!("../guide-cards/contract-lemma.txt"),
     include_str!("../guide-cards/contract-review.txt"),
+    include_str!("../guide-cards/contract-risk.txt"),
     include_str!("../guide-cards/contract-scenario.txt"),
     include_str!("../guide-cards/generate.txt"),
     include_str!("../guide-cards/knowledge.txt"),
@@ -244,6 +245,6 @@ mod tests {
                 assert!(!card[field].is_null(), "missing {field}");
             }
         }
-        assert_eq!(names.len(), 18);
+        assert_eq!(names.len(), 19);
     }
 }

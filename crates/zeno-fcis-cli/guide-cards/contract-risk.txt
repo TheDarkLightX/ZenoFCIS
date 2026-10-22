@@ -1,0 +1,92 @@
+```json
+{
+  "name": "contract-risk",
+  "title": "Count finite outcomes and bound accumulated rewards",
+  "synopsis": "zeno-fcis contract risk DIR --reward 610 --steps 3 --format json",
+  "engine": "Exact declared-domain counting and bounded min-plus/max-plus paths through the library Authority.",
+  "use_when": [
+    "count inputs satisfying a property",
+    "count reachable states within K commands",
+    "find best case and worst case accumulated cost"
+  ],
+  "not_for": [
+    "unbounded horizons",
+    "empirical risk probabilities",
+    "runtime authority"
+  ],
+  "inputs": [
+    "Contract DIR with finite scalar domains; --where, --states --where --steps K, or --reward ID --steps K."
+  ],
+  "outputs": [
+    "zeno-fcis/contract-risk/1: status, claim, result, limits, measured work and replayable witnesses."
+  ],
+  "exit_codes": {
+    "0": "checked",
+    "2": "UNKNOWN",
+    "3": "file failure",
+    "64": "usage",
+    "65": "malformed input"
+  },
+  "verdicts": {
+    "checked": "Exact finite answer, authority none.",
+    "UNKNOWN": "No exact claim; inspect reason and consumed work."
+  },
+  "limits": {
+    "max_tuples_default": 1048576,
+    "max_work_default": 16777216,
+    "max_steps": 64
+  },
+  "refusals": {
+    "unsupported": "Use the supported scalar finite fragment; no sampling fallback."
+  },
+  "cost": {
+    "measured_units": "invocations, folds, relaxation, discovery and scalar witness copies",
+    "example_wall_ms": "unknown"
+  },
+  "steps": [
+    {
+      "command": "zeno-fcis contract risk examples/quantitative-risk/swap-pool --where \"post.100.112 == 1\" --format json",
+      "exit": 0,
+      "expected": {
+        "status": "checked",
+        "schema": "zeno-fcis/contract-risk/1"
+      },
+      "contains": []
+    }
+  ],
+  "example": {
+    "command": "zeno-fcis contract risk examples/quantitative-risk/swap-pool --reward 610 --steps 3 --max-work 0 --format json",
+    "exit": 2,
+    "expected": {
+      "status": "UNKNOWN"
+    },
+    "contains": []
+  },
+  "sources": {
+    "engine": "Mohri, Semiring Frameworks and Algorithms for Shortest-Distance Problems, JALC 2002. VERIFY.",
+    "exit_codes": "zeno-fcis contract risk --help"
+  },
+  "commands": [
+    "contract risk"
+  ],
+  "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority."
+}
+```
+
+# Count and bound finite risk
+
+Read the question, complete status and witnesses in that order.
+
+```sh
+zeno-fcis contract risk examples/quantitative-risk/swap-pool --reward 610 --steps 3 --format json
+```
+
+Expected: exit 0, best 0 and worst 6, including a length-3 witness.
+Use --where for declared inputs; add --states --steps for distinct reachable states.
+UNKNOWN claims nothing. The packet grants no runtime or publication authority.
+
+Lineage: Valiant, SIAM J. Comput. 1979 (counting); Mohri, JALC 2002
+(path semirings); Kwiatkowska, Norman and Parker, CAV 2011 (PRISM);
+Dehnert, Junges, Katoen and Volk, CAV 2017 (Storm). VERIFY.
+Integration of established methods; prior-art search pending.
+Scope: complete finite domains and inclusive horizon only.

@@ -61,7 +61,8 @@ class GuideCli(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertEqual(report["schema"], "zeno-fcis/guide/1")
             self.assertEqual(report["authority"], "none")
-            self.assertEqual(len(report["cards"]), 18)
+            self.assertEqual(len(report["cards"]), 19)
+            self.assertIn("contract-risk", {c["name"] for c in report["cards"]})
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_unknown_card_has_actionable_refusal(self):

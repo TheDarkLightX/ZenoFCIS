@@ -832,6 +832,12 @@ effects! { crate::judge_command::Command {
                 false,
                 None,
             ));
+        "risk" => Self::Risk { .. } => declared((
+                &["application-contract"],
+                &["optional-judge-packet"],
+                false,
+                None,
+            ));
         "distribution" => Self::Distribution { .. } => declared((
                 &["application-contract"],
                 &["optional-judge-packet"],
