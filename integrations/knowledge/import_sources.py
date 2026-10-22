@@ -25,7 +25,7 @@ def candidate(body, source_hash, reference, family):
     # No scope or strategy is inferred from prose or similarity.
     scope = body.get("scope", {})
     if type(scope) is not dict or not set(scope) <= DIMENSIONS:
-        scope = {}
+        raise ValueError("scope-format")
     normal = {}
     for key, values in sorted(scope.items()):
         if type(values) is str:

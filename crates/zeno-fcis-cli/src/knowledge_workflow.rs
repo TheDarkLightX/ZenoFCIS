@@ -110,6 +110,16 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                     next.isa.extend(batch.isa);
                     for mut c in batch.candidates {
                         c.action.check()?;
+                        c.scope = c
+                            .scope
+                            .into_iter()
+                            .map(|(key, values)| {
+                                (
+                                    key,
+                                    values.into_iter().map(|v| v.trim().to_owned()).collect(),
+                                )
+                            })
+                            .collect();
                         if !c.origin.is_empty() {
                             c.evidence_refs.insert(c.origin.clone());
                         }

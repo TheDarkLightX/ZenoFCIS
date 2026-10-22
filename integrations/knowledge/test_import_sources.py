@@ -38,6 +38,10 @@ class ImportSources(unittest.TestCase):
             self.assertEqual(rows[0]["effect"],"limit");self.assertEqual(rows[0]["state"],"proposed")
             self.assertEqual(len(rows[0]["evidence_refs"]),2)
 
+    def test_invalid_scope_is_not_broadened(self):
+        with self.assertRaisesRegex(ValueError, "scope-format"):
+            I.candidate({"scope":{"undeclared":["counter"]}}, "a"*64, "source", {})
+
     def test_long_statements_do_not_merge_on_a_truncated_prefix(self):
         prefix = "x" * 4096
         self.assertNotEqual(I.prose_claim(prefix + "a"), I.prose_claim(prefix + "b"))

@@ -70,7 +70,23 @@ pub(crate) fn statement(c: &Candidate) -> Result<String, &'static str> {
     hash(&(&c.subject, &c.claim, &c.scope, &c.effect, &c.action))
 }
 pub(crate) fn error(reason: &str) -> Value {
-    json!({"schema":SCHEMA,"status":"refused","authority":"none","reason":reason})
+    let mut value = json!({"schema":SCHEMA,"status":"refused","authority":"none","reason":reason});
+    let next = match reason {
+        "kb-candidate-missing" => Some(
+            "Run kb assessment-queue with the same explicit layer; curate the candidate before assessing its identifier.",
+        ),
+        "kb-task-refused" => Some(
+            "Inspect the recorded task and containment preflight; replay with the pinned checker and declared budgets. A refused run cannot promote.",
+        ),
+        "kb-task-program" => Some(
+            "Use a supported finite program encoding and a declared proposal; pin the corrected input in a new frozen suite revision.",
+        ),
+        _ => None,
+    };
+    if let Some(next) = next {
+        value["next_step"] = json!(next);
+    }
+    value
 }
 pub(crate) fn engine() -> String {
     let sources = [
@@ -656,6 +672,16 @@ mod tests {
         c.statement_sha256 = statement(&c).unwrap();
         c
     }
+    #[test]
+    fn refusal_guidance_keeps_authority_absent() {
+        for reason in ["kb-candidate-missing", "kb-task-refused", "kb-task-program"] {
+            let value = error(reason);
+            assert_eq!(value["authority"], "none");
+            assert_eq!(value["reason"], reason);
+            assert!(value["next_step"].as_str().is_some_and(|s| !s.is_empty()));
+        }
+    }
+
     #[test]
     fn generalized_and_mined_records_cannot_self_promote() {
         for origin in ["isa-generalization", "failure-mining"] {

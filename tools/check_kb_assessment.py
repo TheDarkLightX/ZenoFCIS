@@ -95,6 +95,8 @@ def examples(cli, root):
                                 ("harmful", "resubstitute", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
                                 ("inapplicable", "canonical", {"family": ["absent-class"]})):
         row = proposal(name, stage, scope, suite["proposing_subjects"], development_tasks + [t["sha256"] for t in initial["tasks"]])
+        if name == "helpful":
+            row["scope"]["family"] = [" bounded-counter "]
         row["parents"] = [parent]
         candidates.append(row)
     curate("curate", candidates)
