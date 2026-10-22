@@ -78,7 +78,8 @@ Read the [M0 contract](BUILD_SPEC_M0.md), [temporal contract](TEMPORAL.md),
 [review checklist](REVIEW.md), [validation guide](VALIDATION.md), and
 [generated temporal examples](EXAMPLES.md). The two withdrawal statements are
 bound to the withdrawal-queue contract; the [withdrawal pilot](WITHDRAWAL_PILOT.md)
-states their evidence. The vault and interface examples use proposed
+states their evidence. [Contract-derived patterns](PATTERNS.md) show two short
+readings checked against four existing contracts. The vault and interface examples use proposed
 definitions, marked on every rung, awaiting owner confirmation.
 
 ## Lineage and scope

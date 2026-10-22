@@ -1,3 +1,4 @@
+
 AGENTS.md
 CHANGELOG.md
 CITATION.cff
@@ -349,6 +350,7 @@ docs/zal/REFINEMENT.md
 docs/zal/SPECIFICATION.md
 docs/zal/ladder/BUILD_SPEC_M0.md
 docs/zal/ladder/EXAMPLES.md
+docs/zal/ladder/PATTERNS.md
 docs/zal/ladder/README.md
 docs/zal/ladder/REVIEW.md
 docs/zal/ladder/TEMPORAL.md
