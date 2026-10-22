@@ -31,6 +31,26 @@ pub fn parse_formula(
     formula_source: &str,
     limits: SourceLimits,
 ) -> Result<RelExpr, DiagnosticSet> {
+    parse_formula_in(project_source, formula_source, None, limits)
+}
+
+/// Parses one formula with the same applicability-sensitive collection checks
+/// as a project law. In particular, genesis laws keep entry-local conjuncts.
+pub fn parse_law_formula(
+    project_source: &str,
+    formula_source: &str,
+    applicability: LawApplicability,
+    limits: SourceLimits,
+) -> Result<RelExpr, DiagnosticSet> {
+    parse_formula_in(project_source, formula_source, Some(applicability), limits)
+}
+
+fn parse_formula_in(
+    project_source: &str,
+    formula_source: &str,
+    applicability: Option<LawApplicability>,
+    limits: SourceLimits,
+) -> Result<RelExpr, DiagnosticSet> {
     let (parsed, mut parser) = parse_with_tables(project_source, limits)?;
     let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
     let (tokens, diagnostics) = lex(formula_source, limits);
@@ -38,7 +58,6 @@ pub fn parse_formula(
     parser.diagnostics = diagnostics;
     parser.index = 0;
     parser.nesting = 0;
-    parser.expanded = 0;
     parser.table_values = 0;
     parser.rewrites.clear();
     parser.counts.clear();
@@ -82,6 +101,24 @@ pub fn parse_formula(
             reason,
             "compare keys only for equality and read maps through entries",
         );
+    }
+    if applicability.is_some_and(|applicability| applicability.genesis()) {
+        let collections = project.collections();
+        let entries = crate::collections::entry_fields(collections.maps(), collections.entries());
+        let owner = project
+            .types()
+            .iter()
+            .find(|t| t.kind() == TypeKind::State)
+            .map_or(0, |t| t.id().get());
+        if !crate::collections::state_law_is_local(law.formula(), owner, &entries) {
+            parser.error(
+                DiagnosticCode::InvalidDeclaration,
+                "law.entries",
+                "a state law whose conjuncts each read one named entry or only scalar state",
+                "mixed entry reads",
+                "separate independent entry and scalar constraints",
+            );
+        }
     }
     if parser.diagnostics.is_empty() {
         Ok(law.formula)
@@ -922,16 +959,7 @@ impl Parser {
         // A state law, which the checker assumes on every pre-view, must stay
         // true while unnamed entries keep their values: each conjunct reads
         // one named entry, or only scalar state.
-        let entry_of: BTreeMap<u32, u32> = entries
-            .iter()
-            .flat_map(|entry| {
-                let width = maps
-                    .iter()
-                    .find(|m| m.id == entry.map)
-                    .map_or(0, |m| m.value_fields.len() as u32);
-                (0..=width).map(move |j| (entry.id.get() + j, entry.id.get()))
-            })
-            .collect();
+        let entry_of = crate::collections::entry_fields(&maps, &entries);
         let state_owner = state.unwrap_or(0);
         for spanned in &self.declarations {
             let Declaration::Law(law) = &spanned.declaration else {
@@ -940,20 +968,7 @@ impl Parser {
             if !law.applicability().is_some_and(|a| a.genesis()) {
                 continue;
             }
-            let mut conjuncts = Vec::new();
-            crate::collections::conjuncts(law.formula(), &mut conjuncts);
-            let mixed = conjuncts.iter().any(|conjunct| {
-                let mut reads = BTreeSet::new();
-                crate::collections::state_reads(conjunct, state_owner, &mut reads);
-                let named: BTreeSet<u32> = reads
-                    .iter()
-                    .filter_map(|f| entry_of.get(f))
-                    .copied()
-                    .collect();
-                named.len() > 1
-                    || (named.len() == 1 && reads.iter().any(|f| !entry_of.contains_key(f)))
-            });
-            if !entry_of.is_empty() && mixed {
+            if !crate::collections::state_law_is_local(law.formula(), state_owner, &entry_of) {
                 problems.push((
                     spanned.span,
                     "law.entries",

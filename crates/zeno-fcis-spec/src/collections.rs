@@ -389,6 +389,44 @@ impl KeyPaths {
     }
 }
 
+/// Every view field of a named entry, mapped to that entry's identity.
+pub(crate) fn entry_fields(maps: &[MapDecl], entries: &[EntryDecl]) -> BTreeMap<u32, u32> {
+    entries
+        .iter()
+        .flat_map(|entry| {
+            let width = maps
+                .iter()
+                .find(|map| map.id == entry.map)
+                .map_or(0, |map| map.value_fields.len() as u32);
+            (0..=width).map(move |offset| (entry.id.get() + offset, entry.id.get()))
+        })
+        .collect()
+}
+
+/// A genesis law stays valid when unnamed entries retain their values.
+pub(crate) fn state_law_is_local(
+    formula: &RelExpr,
+    owner: u32,
+    entries: &BTreeMap<u32, u32>,
+) -> bool {
+    if entries.is_empty() {
+        return true;
+    }
+    let mut parts = Vec::new();
+    conjuncts(formula, &mut parts);
+    parts.iter().all(|part| {
+        let mut reads = BTreeSet::new();
+        state_reads(part, owner, &mut reads);
+        let named: BTreeSet<u32> = reads
+            .iter()
+            .filter_map(|field| entries.get(field))
+            .copied()
+            .collect();
+        named.len() <= 1
+            && !(named.len() == 1 && reads.iter().any(|field| !entries.contains_key(field)))
+    })
+}
+
 /// Appends the collection declarations to a format-5 project encoding.
 pub(crate) fn encode(
     spec: &CollectionsSpec,

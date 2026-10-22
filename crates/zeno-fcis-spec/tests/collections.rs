@@ -275,3 +275,33 @@ fn collection_format_five_keeps_rewards_before_collection_metadata()
     assert_ne!(encoded, changed.canonical_bytes()?);
     Ok(())
 }
+
+#[test]
+fn standalone_state_law_keeps_collection_entry_locality() {
+    use zeno_fcis_spec::{LawApplicability, LawScope, parse_law_formula};
+    let state = LawApplicability::new(LawScope::Committing, true);
+    let step = LawApplicability::new(LawScope::Always, false);
+    for formula in [
+        "post.100.161 + post.100.171 <= 3",
+        "post.100.161 <= post.100.120",
+        "choose(true, post.100.161, post.100.171) >= 0",
+    ] {
+        assert!(
+            parse_law_formula(TOKENS, formula, state, SourceLimits::default()).is_err(),
+            "state law mixed entries: {formula}"
+        );
+        assert!(
+            parse_law_formula(TOKENS, formula, step, SourceLimits::default()).is_ok(),
+            "step formula: {formula}"
+        );
+    }
+    assert!(
+        parse_law_formula(
+            TOKENS,
+            "post.100.161 >= 0 && post.100.171 >= 0 && post.100.120 >= 0",
+            state,
+            SourceLimits::default()
+        )
+        .is_ok()
+    );
+}

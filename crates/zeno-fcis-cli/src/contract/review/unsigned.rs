@@ -1039,9 +1039,18 @@ pub(super) fn lemmas(
                 .max(1000)
                 .checked_add(1 + index as u32)
                 .ok_or_else(|| error("lemma ID overflow"))?;
-            let parsed = zeno_fcis_spec::parse_formula(
+            let applicability = zeno_fcis_spec::LawApplicability::new(
+                if transitions {
+                    zeno_fcis_spec::LawScope::Always
+                } else {
+                    zeno_fcis_spec::LawScope::Committing
+                },
+                !transitions,
+            );
+            let parsed = zeno_fcis_spec::parse_law_formula(
                 project,
                 formula,
+                applicability,
                 zeno_fcis_spec::SourceLimits::default(),
             )
             .map_err(|diagnostics| error(diagnostics.to_string()))?;
@@ -1059,12 +1068,8 @@ pub(super) fn lemmas(
             d.laws.push(super::super::declarations::Law {
                 id,
                 name: "unsigned_lemma".to_owned(),
-                scope: if transitions {
-                    zeno_fcis_spec::LawScope::Always
-                } else {
-                    zeno_fcis_spec::LawScope::Committing
-                },
-                genesis: !transitions,
+                scope: applicability.scope(),
+                genesis: applicability.genesis(),
                 formula: parsed,
             });
             let bytes = schema::encode(&d)?;

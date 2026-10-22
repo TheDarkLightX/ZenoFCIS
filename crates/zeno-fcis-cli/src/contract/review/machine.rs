@@ -611,16 +611,21 @@ pub(super) fn with_law(
     let id = highest
         .checked_add(1)
         .ok_or_else(|| invalid("has no free law ID".to_owned()))?;
-    let parsed =
-        zeno_fcis_spec::parse_formula(project, formula, zeno_fcis_spec::SourceLimits::default())
-            .map_err(|diagnostics| invalid(diagnostics.to_string()))?;
-    let formula = super::super::expr::law(&parsed).map_err(invalid)?;
     let (scope, genesis) = match scope {
         "commit, genesis" => (zeno_fcis_spec::LawScope::Committing, true),
         "commit" => (zeno_fcis_spec::LawScope::Committing, false),
         "any" => (zeno_fcis_spec::LawScope::Always, false),
         _ => return Err(invalid("unsupported formula scope".to_owned())),
     };
+    let applicability = zeno_fcis_spec::LawApplicability::new(scope, genesis);
+    let parsed = zeno_fcis_spec::parse_law_formula(
+        project,
+        formula,
+        applicability,
+        zeno_fcis_spec::SourceLimits::default(),
+    )
+    .map_err(|diagnostics| invalid(diagnostics.to_string()))?;
+    let formula = super::super::expr::law(&parsed).map_err(invalid)?;
     let mut extended = rules.clone();
     extended.law_kinds.insert(id, kind);
     let mut loaded = Loaded::with(project, extended)
