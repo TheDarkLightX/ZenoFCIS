@@ -21,6 +21,8 @@
 //! holds for every number of entries up to each map's capacity and for any
 //! key values. `docs/COLLECTIONS.md` gives the argument.
 
+pub mod runtime;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
