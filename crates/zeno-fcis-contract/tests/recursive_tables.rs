@@ -83,3 +83,82 @@ fn recursive_round_work_uses_the_actual_invocation_meter() {
         "denied work must preserve consumed-work accounting"
     );
 }
+
+fn execute_bits(recursive: bool, limit: Option<u64>) -> (bool, u64, bool) {
+    use zeno_fcis_synthesis::finite::{V2NumericAtom as Atom, canonical_v2::output};
+    let source=format!("zeno 1; project 1 bits_meter; type 100 state S; type 101 command C; type 102 context X;
+      type 105 bits Permissions width 2; type 106 int Zero in 0..=0; table 110 100 grants 105 size 2; field 120 101 query 106;
+      component 400 core {{ owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 8192; }} merge [400];
+      derived table 700 x[i] in table 110 bits 2 rounds 4 {{ when true then join(pre.100.110[i],join j in table 110 {{x[j]}}); default u128(0); }};
+      law 500 domain on commit, genesis = post.100.110 >= u128(0); law 501 query on commit = {};",if recursive {"subset(2,x[0],x[0])"}else{"true"});
+    let raw = json!({"schema":"zeno-fcis/template-declarative-policy/4","template":"bits-meter","roots":{"state":100,"command":101,"context":102},"leaf_bindings":{"102":["Bool"]},"variables":{},"cases":[{"when":true,"class":"Accept","reason":null,"post":{"110":"pre.100.110","111":"pre.100.111"},"outbox":[]}],"genesis":{"110":"u128(0)","111":"u128(0)"},"law_kinds":{"500":"StateInvariant","501":"DebitCreditEffectEquality"}});
+    let rules = Rules::read(&raw.to_string()).unwrap();
+    let declarations = Declarations::read(&source, &rules.leaf_bindings).unwrap();
+    let schema = schema::encode(&declarations).unwrap();
+    let mut contract =
+        Contract::build(&declarations, &rules, schema_commitment(&schema).unwrap()).unwrap();
+    if let Some(limit) = limit {
+        contract.budgets.step = limit;
+    }
+    let roots = [
+        vec![
+            c::Field {
+                id: 110,
+                value: Atom::U128(1),
+            },
+            c::Field {
+                id: 111,
+                value: Atom::U128(2),
+            },
+        ],
+        vec![c::Field {
+            id: 120,
+            value: Atom::I128(0),
+        }],
+        vec![],
+    ];
+    let mut frames = [Vec::new(), Vec::new(), Vec::new()];
+    for i in 0..3 {
+        let max = contract.frame_bytes[i] as usize;
+        let body = if i == 2 {
+            output::encode_atom(Atom::Bool(false), max)
+        } else {
+            output::encode_record(&roots[i], max)
+        }
+        .unwrap();
+        frames[i] =
+            output::encode_envelope(100 + i as u32, &contract.commitment, &body, max).unwrap();
+    }
+    let saved = frames.clone();
+    let result = policy::with_numeric_authority(&contract, &schema, |a| {
+        let e = a.evaluate(c::Raw {
+            state: &frames[0],
+            command: &frames[1],
+            context: &frames[2],
+        });
+        (
+            e.result().is_ok(),
+            e.usage().used(V2Resource::Step),
+            e.diagnostics().iter().any(|d| {
+                d.id == 501 && matches!(d.verdict, laws::Verdict::Refused(laws::Failure::Budget(_)))
+            }),
+        )
+    })
+    .unwrap();
+    assert_eq!(frames, saved);
+    result
+}
+
+#[test]
+fn atom_lift_work_is_metered_by_the_numeric_authority() {
+    let (plain, baseline, _) = execute_bits(false, None);
+    let (recursive, work, _) = execute_bits(true, None);
+    assert!(plain && recursive);
+    assert!(work > baseline, "lifted atoms consume actual work");
+    let (ok, used, law_refusal) = execute_bits(true, Some(baseline));
+    assert!(
+        !ok && law_refusal,
+        "low budget must refuse the recursive law without a candidate"
+    );
+    assert!(used <= baseline);
+}

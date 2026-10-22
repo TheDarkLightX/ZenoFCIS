@@ -7,6 +7,8 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
+#[path = "bits.rs"]
+mod bits;
 #[path = "recursive_tables.rs"]
 mod recursive_tables;
 
@@ -55,6 +57,7 @@ fn parse_formula_in(
     limits: SourceLimits,
 ) -> Result<RelExpr, DiagnosticSet> {
     let (parsed, mut parser) = parse_with_tables(project_source, limits)?;
+    parser.declarations = parsed.declarations.clone();
     let project = crate::elaborate_project(parsed, crate::ProjectLimits::default())?;
     let (tokens, diagnostics) = lex(formula_source, limits);
     parser.tokens = tokens;
@@ -225,6 +228,7 @@ fn parse_with_tables(
         derived: BTreeMap::new(),
         defining: None,
         self_refusal: None,
+        defining_bits: None,
     };
     let parsed = parser.parse(limits.max_diagnostics());
     if parser.diagnostics.is_empty() {
@@ -283,6 +287,7 @@ struct Parser {
     derived: BTreeMap<String, recursive_tables::DerivedTable>,
     defining: Option<(String, u32, usize)>,
     self_refusal: Option<&'static str>,
+    defining_bits: Option<u8>,
 }
 
 impl Parser {
@@ -409,6 +414,9 @@ impl Parser {
     fn parse_type(&mut self) -> Option<TypeDecl> {
         let id = self.take_id("type.id")?;
         let kind_name = self.take_identifier("type.kind")?;
+        if kind_name.as_str() == "bits" {
+            return self.parse_bits_type(id);
+        }
         if kind_name.as_str() == "index" {
             return self.parse_index_type(id);
         }
@@ -1340,6 +1348,9 @@ impl Parser {
     /// Records a rewrite from `start` to the last token consumed.
     fn rewrite_from(&mut self, start: SourceSpan, text: String) {
         let end = self.tokens[self.index.saturating_sub(1)].span.end();
+        // An outer scalar expansion already contains its nested expansions.
+        self.rewrites
+            .retain(|r| !(start.start() <= r.start && r.end <= end));
         self.rewrites.push(Rewrite {
             start: start.start(),
             end,
@@ -2068,6 +2079,9 @@ impl Parser {
         false
     }
     fn parse_rel_atom(&mut self) -> RelExpr {
+        if self.peek_keyword("subset") {
+            return self.parse_subset();
+        }
         if self.peek_keyword("circuit") {
             return self.parse_circuit();
         }
@@ -2150,7 +2164,7 @@ impl Parser {
             (&self.current().kind, self.tokens.get(self.index + 1)),
             (TokenKind::Ident(name), Some(next))
                 if matches!(next.kind, TokenKind::LParen)
-                    && !matches!(name.as_ref(), "choose" | "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor" | "u128" | "to_i128" | "to_u128")
+                    && !matches!(name.as_ref(), "choose" | "div_exact" | "div_floor" | "div_ceil" | "mul_div_floor" | "mul_div_ceil" | "signed_mul_div_floor" | "repeat_mul_div_floor" | "repeat_signed_mul_div_floor" | "join" | "meet" | "complement" | "u128" | "to_i128" | "to_u128")
         );
         if named_predicate {
             let name = self
@@ -2244,6 +2258,12 @@ impl Parser {
         value
     }
     fn parse_value_atom(&mut self) -> ValueExpr {
+        self.table_depth += 1;
+        let bits = self.bits_value();
+        self.table_depth -= 1;
+        if let Some(value) = bits {
+            return value;
+        }
         if self.take_keyword("choose") {
             self.expect_symbol(TokenKind::LParen, "value.choose");
             let condition = self.nested("value.choose.condition", RelExpr::Bool(false), |p| {

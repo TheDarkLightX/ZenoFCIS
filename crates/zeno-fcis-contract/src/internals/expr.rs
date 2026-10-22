@@ -128,15 +128,6 @@ const MAX_DEPTH: usize = 64;
 
 /// Parses one rule expression.
 pub fn parse(text: &str) -> Result<Ast, String> {
-    if text.contains("circuit {") {
-        let formula = zeno_fcis_spec::parse_table_expression(
-            "zeno 1; project 1 expression;",
-            text,
-            zeno_fcis_spec::SourceLimits::default(),
-        )
-        .map_err(|d| d.to_string())?;
-        return law(&formula);
-    }
     parse_in(text, None)
 }
 
@@ -154,6 +145,16 @@ pub(super) fn parse_tables(text: &str, tables: &TableDeclarations) -> Result<Ast
 }
 
 fn parse_in(text: &str, tables: Option<&TableDeclarations>) -> Result<Ast, String> {
+    if text.contains("circuit {") {
+        let formula = zeno_fcis_spec::parse_table_expression(
+            "zeno 1; project 1 expression;",
+            text,
+            zeno_fcis_spec::SourceLimits::default(),
+        )
+        .map_err(|d| d.to_string())?;
+        return law(&formula);
+    }
+
     let tokens = tokenize(text)?;
     let mut parser = Parser {
         tokens: &tokens,

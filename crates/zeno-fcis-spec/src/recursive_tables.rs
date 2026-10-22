@@ -8,10 +8,11 @@ pub(super) const SELF: &str = "__recursive_entry";
 pub(super) struct DerivedTable {
     id: StableId,
     span: SourceSpan,
-    size: u32,
-    rank: usize,
-    circuit: BoolCircuit<RelExpr>,
-    outputs: Vec<u32>,
+    pub(super) size: u32,
+    pub(super) rank: usize,
+    pub(super) circuit: BoolCircuit<RelExpr>,
+    pub(super) outputs: Vec<u32>,
+    pub(super) bits: Option<u8>,
 }
 
 /// Temporary references exist only during parsing and cannot escape in a project.
@@ -54,6 +55,7 @@ fn lower_value(v: &ValueExpr) -> bool {
                 | ProjectionRoot::Command
                 | ProjectionRoot::Context
         ),
+        ValueExpr::Select(c, a, b) => safe(c, true) && lower_value(a) && lower_value(b),
         ValueExpr::ToI128(a) | ValueExpr::ToU128(a) => lower_value(a),
         ValueExpr::Add(a, b)
         | ValueExpr::Sub(a, b)
@@ -146,6 +148,7 @@ impl Parser {
         self.expect_keyword("in", "derived.domain");
         self.expect_keyword("table", "derived.domain");
         let table = self.take_u32("derived.domain");
+        let bits = self.take_keyword("bits").then(|| self.bits_width());
         self.expect_keyword("rounds", "derived.bound");
         let rounds = self.take_u32("derived.bound").unwrap_or(0);
         let size = table
@@ -157,13 +160,14 @@ impl Parser {
         } else {
             size.saturating_mul(size)
         };
+        let atoms = entries.saturating_mul(u32::from(bits.unwrap_or(1)));
         if size == 0
             || size > MAX_TABLE_ENTRIES
             || rank == 0
-            || rounds != entries
-            || rounds.saturating_mul(entries) as usize > MAX_FORMULA_NODES
+            || rounds != atoms
+            || rounds.saturating_mul(atoms) as usize > MAX_FORMULA_NODES
         {
-            self.recursive_error(at, "declare one or two indices over a fixed-size table and exactly one round per Boolean entry, within the formula limit");
+            self.recursive_error(at, "declare one or two indices over a fixed-size table and exactly entries * width rounds (Boolean width is one), within the formula limit");
             self.recover_top();
             return;
         }
@@ -180,6 +184,7 @@ impl Parser {
         let mut rules = Vec::new();
         self.table_depth += 1;
         self.defining = Some((name.as_str().into(), size, rank));
+        self.defining_bits = bits;
         let before = self.diagnostics.len();
         for entry in 0..entries {
             self.index = start;
@@ -198,7 +203,7 @@ impl Parser {
                         p.parse_rel()
                     });
                 self.expect_keyword("then", "derived.row");
-                let value = self.parse_rel();
+                let value = self.parse_derived_value(bits);
                 self.expect_symbol(TokenKind::Semicolon, "derived.row");
                 if !safe(&guard, true) {
                     self.recursive_error(
@@ -206,21 +211,28 @@ impl Parser {
                         "a guard cannot read the table being defined or non-lower data",
                     );
                 }
-                if !safe(&value, false) {
+                if !value.iter().all(|v| safe(v, false)) {
                     self.recursive_error(at, "self entries occur only positively under and/or and bounded table quantifiers");
                 }
                 rows.push((guard, value));
             }
             self.expect_keyword("default", "derived.default");
-            let default = self.parse_rel();
+            let default = self.parse_derived_value(bits);
             self.expect_symbol(TokenKind::Semicolon, "derived.default");
-            if !safe(&default, false) {
+            if !default.iter().all(|v| safe(v, false)) {
                 self.recursive_error(
                     at,
                     "the explicit default must also be positive in self entries",
                 );
             }
-            rules.push((rows, default));
+            for (atom, default) in default.into_iter().enumerate() {
+                rules.push((
+                    rows.iter()
+                        .map(|(g, v)| (g.clone(), v[atom].clone()))
+                        .collect(),
+                    default,
+                ));
+            }
             for _ in 0..rank {
                 self.bound.pop();
             }
@@ -229,6 +241,7 @@ impl Parser {
             }
         }
         self.defining = None;
+        self.defining_bits = None;
         self.table_depth -= 1;
         self.expect_symbol(TokenKind::RBrace, "derived.rows");
         self.expect_symbol(TokenKind::Semicolon, "derived.table");
@@ -246,6 +259,7 @@ impl Parser {
                         rank,
                         circuit,
                         outputs,
+                        bits,
                     },
                 );
                 self.rewrite_declaration(String::new());
@@ -263,6 +277,9 @@ impl Parser {
 
     /// A direct Boolean entry reference, including temporary positive self reads.
     pub(super) fn derived_atom(&mut self) -> Option<RelExpr> {
+        if self.is_bits_entry() {
+            return None;
+        }
         let TokenKind::Ident(name) = self.current().kind.clone() else {
             return None;
         };
@@ -536,6 +553,10 @@ pub(super) fn share(f: RelExpr) -> Option<RelExpr> {
     if !has_circuit(&f) {
         return Some(f);
     }
+    shared(f)
+}
+
+pub(super) fn shared(f: RelExpr) -> Option<RelExpr> {
     let mut b = CircuitBuilder::default();
     let output = b.formula(&f, &[])?;
     Some(RelExpr::Circuit(Box::new(BoolCircuit::try_new(
