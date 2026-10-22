@@ -182,6 +182,8 @@ pub(crate) struct Assessment {
     pub tool_version: String,
     pub policy: Policy,
     pub cases: Vec<Case>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partial_runs: Vec<Run>,
     pub annotations: Vec<Annotation>,
     pub decision: Decision,
     pub reason: String,
@@ -191,6 +193,18 @@ pub(crate) struct Assessment {
     pub prior_assessment_work: u64,
     pub curation_work: u64,
 }
+/// Recorded loop counters plus eight declared validation units per completed run.
+pub(crate) fn recorded_work(cases: &[Case], partial: &[Run]) -> Result<u64, &'static str> {
+    let complete = cases.iter().flat_map(|c| [&c.off, &c.on, &c.off, &c.on]);
+    complete.chain(partial.iter()).try_fold(0u64, |total, run| {
+        run.work
+            .values()
+            .try_fold(total, |n, value| n.checked_add(*value))
+            .and_then(|n| n.checked_add(8))
+            .ok_or("kb-work-overflow")
+    })
+}
+
 pub(crate) fn digest(s: &str) -> bool {
     s.len() == 64
         && s.bytes()
@@ -413,6 +427,25 @@ mod tests {
             on: run(on),
         }
     }
+    #[test]
+    fn partial_replay_work_survives_a_later_stop() {
+        let run = Run {
+            task: "a".repeat(64),
+            seed: 0,
+            budget: 100,
+            inputs: "b".repeat(64),
+            verdict: Verdict::Accepted,
+            work: BTreeMap::from([("checks".into(), 7)]),
+            result_cost: Some([1, 1]),
+            budget_stop: false,
+            stopping_bound: None,
+            receipt_sha256: "c".repeat(64),
+            output_sha256: "d".repeat(64),
+        };
+        assert_eq!(recorded_work(&[], &[run.clone()]), Ok(15));
+        assert_eq!(recorded_work(&[], &[run.clone(), run]), Ok(30));
+    }
+
     #[test]
     fn pareto_matches_finite_product_order() {
         let mut cases = Vec::new();

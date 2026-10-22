@@ -22,6 +22,7 @@ def control(name, file, pattern, replacement, tests):
 
 
 CONTROLS = [
+    control("partial-refusal-work-dropped", "knowledge_assessment.rs", r"\.chain\(partial.iter\(\)\)", ".chain(partial.iter().take(0))", "knowledge_assessment::tests::partial_replay_work_survives_a_later_stop"),
     control("pareto-violation", "knowledge_assessment.rs", r"if regression \{", "if regression && false {", ["knowledge_assessment::tests::one_worse_task_cannot_be_hidden", "knowledge_assessment::tests::pareto_rejects_one_worse_measure"]),
     control("empty-evidence-promotion", "knowledge_assessment.rs", r'\(Decision::Inconclusive, "no-applicable-task"\)', '(Decision::Promote, "no-applicable-task")', "knowledge_assessment::tests::no_applicable_task_never_promotes"),
     control("wall-time-assessment", "knowledge_assessment.rs", r"if regression \{", "let wall_times=(2u64,1u64); regression=wall_times.1>wall_times.0; improvement=wall_times.1<wall_times.0; if regression {", "knowledge_assessment::tests::work_counters_determine_usefulness"),

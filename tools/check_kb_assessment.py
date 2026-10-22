@@ -63,8 +63,9 @@ def development(cli, root, suite):
 def examples(cli, root):
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     suite = json.loads(SUITE.read_text())
-    initial_path = SUITE.with_name("initial-suite.json")
+    initial_path = SUITE.with_name("initial-resource-suite.json")
     initial = json.loads(initial_path.read_text())
+    earlier_initial = json.loads(SUITE.with_name("initial-suite.json").read_text())
     episodes, development_tasks = development(cli, root, suite)
     layer = root / "layer.json"
     run(cli, root, "init", ["init", "--out", str(layer)])
@@ -94,7 +95,7 @@ def examples(cli, root):
     for name, stage, scope in (("helpful", "canonical", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
                                 ("harmful", "resubstitute", {"capability": ["immutable-proposal"], "family": ["bounded-counter"]}),
                                 ("inapplicable", "canonical", {"family": ["absent-class"]})):
-        row = proposal(name, stage, scope, suite["proposing_subjects"], development_tasks + [t["sha256"] for t in initial["tasks"]])
+        row = proposal(name, stage, scope, suite["proposing_subjects"], development_tasks + [t["sha256"] for t in initial["tasks"] + earlier_initial["tasks"]])
         if name == "helpful":
             row["scope"]["family"] = [" bounded-counter "]
         row["parents"] = [parent]

@@ -5,3 +5,11 @@ The initial six tasks remain in initial-suite.json. Their measured broad shortcu
 The current suite.json freezes six fresh native subjects before the revised candidate is assessed: counter capacities four, six and seven, a rate limiter, an idempotency slot and the synthesized inventory-reservation template. Counter capacities one and two are development subjects. Tasks come from the existing native loop-door/core-component fixtures and synthesized templates; the initial suite also retains counter-template completion.
 
 Never tune on an assessment result and re-label the same subject held out. Retain old suites and negative results; declare all proposing task and subject digests, including inherited parent cases. Create a new suite revision with disjoint members when results inform a new proposal. Scope matching is exact declared scope and directional isa only. Public fixtures are regression examples, not a secret representative population or a universal usefulness claim.
+
+Resource revision: the 10-second process allowance produced safe inconclusive
+records under contention before any comparison on the current held-out subjects.
+resource-1-suite.json preserves those declared tasks; suite.json freezes the same
+subjects, actions, seeds and work limits with a 22-second process allowance.
+initial-suite.json is retained; initial-resource-suite.json replays its original
+negative proposal under that allowance. No usefulness decision uses elapsed time.
+All initial subjects remain proposing subjects for the current candidate lessons.

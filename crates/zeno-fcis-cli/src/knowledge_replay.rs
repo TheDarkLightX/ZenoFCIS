@@ -352,7 +352,7 @@ pub(crate) fn assess(
     let mut next = layer.clone();
     let mut cases = Vec::new();
     let mut reserved = 0u64;
-    let mut assessment_work = 0u64;
+    let mut partial_runs = Vec::new();
     let mut stop = None;
     let suite_sha = S::hash(suite)?;
     next.outputs.insert(
@@ -360,7 +360,12 @@ pub(crate) fn assess(
         serde_json::to_value(suite).map_err(|_| "kb-encoding")?,
     );
     for (i, t) in suite.tasks.iter().enumerate() {
-        let needed = t.budget.work.checked_mul(4).ok_or("kb-work-overflow")?;
+        let needed = t
+            .budget
+            .work
+            .checked_add(8)
+            .and_then(|n| n.checked_mul(4))
+            .ok_or("kb-work-overflow")?;
         if needed > total_budget.saturating_sub(reserved) {
             stop = Some("total-work-budget".into());
             break;
@@ -378,14 +383,36 @@ pub(crate) fn assess(
             .enumerate()
         {
             match subprocess(t, &original, &action, &root, i * 4 + n) {
-                Ok(v) => results.push(v),
+                Ok(v) => {
+                    match measure(
+                        &v,
+                        t.sha256.clone(),
+                        t.seed,
+                        t.budget.work,
+                        t.subject.sha256.clone(),
+                    ) {
+                        Ok(run) => partial_runs.push(run),
+                        Err(e) => {
+                            stop = Some(e.into());
+                            break;
+                        }
+                    }
+                    next.outputs.insert(S::hash(&v)?, v.clone());
+                    if partial_runs
+                        .last()
+                        .is_some_and(|r| r.work.values().copied().sum::<u64>() > t.budget.work)
+                    {
+                        stop = Some("task-work-budget".into());
+                        break;
+                    }
+                    results.push(v);
+                }
                 Err(e) if e == "kb-task-timeout" => {
                     stop = Some(e.into());
                     break;
                 }
                 Err(e) => {
                     stop = Some(e.into());
-                    assessment_work = assessment_work.saturating_add(t.budget.work);
                     break;
                 }
             }
@@ -394,7 +421,8 @@ pub(crate) fn assess(
             break;
         }
         if results[0] != results[2] || results[1] != results[3] {
-            return Err("kb-nondeterministic-replay");
+            stop = Some("kb-nondeterministic-replay".into());
+            break;
         }
         let inputs = sha256_hex(&original);
         let off = measure(
@@ -405,20 +433,6 @@ pub(crate) fn assess(
             inputs.clone(),
         )?;
         let on = measure(&results[1], t.sha256.clone(), t.seed, t.budget.work, inputs)?;
-        for r in &results {
-            let measured = measure(
-                r,
-                t.sha256.clone(),
-                t.seed,
-                t.budget.work,
-                t.subject.sha256.clone(),
-            )?;
-            assessment_work = assessment_work
-                .checked_add(measured.work.values().copied().sum::<u64>())
-                .and_then(|n| n.checked_add(8))
-                .ok_or("kb-work-overflow")?;
-            next.outputs.insert(S::hash(r)?, r.clone());
-        }
         cases.push(Case {
             task: t.sha256.clone(),
             scope: t.scope.clone(),
@@ -426,7 +440,9 @@ pub(crate) fn assess(
             off,
             on,
         });
+        partial_runs.clear();
     }
+    let assessment_work = recorded_work(&cases, &partial_runs)?;
     let (mut decision, mut reason) = decide(&cases, &proposing, &policy, &annotations)?;
     if stop.is_some() && decision != Decision::Reject {
         decision = Decision::Inconclusive;
@@ -457,6 +473,7 @@ pub(crate) fn assess(
         tool_version: version,
         policy,
         cases,
+        partial_runs,
         annotations,
         decision,
         reason: reason.into(),
@@ -530,12 +547,6 @@ pub(crate) fn replay_record(
     {
         return Err("kb-replay-engine-or-checker");
     }
-    if a.resource_stop
-        .as_deref()
-        .is_some_and(|s| s != "total-work-budget")
-    {
-        return Err("kb-replay-resource-stop");
-    }
     S::private_root(private_parent)?;
     let root = private_parent.join(format!("replay-{}", std::process::id()));
     let mut builder = std::fs::DirBuilder::new();
@@ -586,12 +597,43 @@ pub(crate) fn replay_record(
             }
         }
     }
+    for (n, expected) in a.partial_runs.iter().enumerate() {
+        let task = suite
+            .tasks
+            .iter()
+            .find(|t| t.sha256 == expected.task)
+            .ok_or("kb-replay-task")?;
+        let original = S::bound(suite_root, &task.subject, 1_048_576)?;
+        let actions = if n % 2 == 0 {
+            vec![]
+        } else {
+            candidates
+                .iter()
+                .filter(|c| applies(&c.scope, &task.scope, &layer.isa))
+                .map(|c| c.action.clone())
+                .collect()
+        };
+        let output = subprocess(task, &original, &actions, &root, a.cases.len() * 2 + n)?;
+        let measured = measure(
+            &output,
+            task.sha256.clone(),
+            task.seed,
+            task.budget.work,
+            task.subject.sha256.clone(),
+        )?;
+        work = work
+            .checked_add(recorded_work(&[], std::slice::from_ref(&measured))?)
+            .ok_or("kb-work-overflow")?;
+        if measured != *expected {
+            return Err("kb-assessment-replay-mismatch");
+        }
+    }
     let (decision, reason) = decide(&a.cases, &a.proposing_tasks, &a.policy, &a.annotations)?;
     if a.resource_stop.is_none() && (decision != a.decision || reason != a.reason) {
         return Err("kb-assessment-decision");
     }
     Ok(
-        json!({"status":"assessment-replayed","authority":"none","assessment_sha256":key,"decision":a.decision,"replay_work":work,"layer_unchanged":true}),
+        json!({"status":"assessment-replayed","authority":"none","assessment_sha256":key,"decision":a.decision,"replay_work":work,"partial_runs_replayed":a.partial_runs.len(),"complete_assessment":a.resource_stop.is_none(),"recorded_resource_stop":a.resource_stop,"stop_condition_reproduced":a.resource_stop.is_none() || a.resource_stop.as_deref()==Some("total-work-budget"),"layer_unchanged":true}),
     )
 }
 

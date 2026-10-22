@@ -42,7 +42,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -51,7 +51,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "5d54ba909e61ea28bf9a5833c3d170352248f1148baf8e1a6c97162fd9222019"
+      "sha256": "01cbcd82f5924f3b628c2e0493c8005c0b4e2f783502c14a06727d2124957a6c"
     },
     {
       "name": "counter-c6",
@@ -84,7 +84,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -93,7 +93,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "a867e1944b39b3bdf1560c80fd982f9e7ca982aaaecb9c448fd68f4b9440da51"
+      "sha256": "84f0a21ec4711d670cb7ac0f3acd44217d7e663fe7b59edc39e4e6b70833be37"
     },
     {
       "name": "counter-c7",
@@ -126,7 +126,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -135,7 +135,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "969c050a2802b981d874a078d9bb6b743f67ca3187981d1074c47171d5d52819"
+      "sha256": "775ff3b40ca3cc70a93a53ba1ecb37dd442136e570d11a329d69341e8301ef18"
     },
     {
       "name": "rate-limiter",
@@ -168,7 +168,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -177,7 +177,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "35f9e4cf492af5c40a889e2e386e89c5fe93a74f5412c7e780142db6fed9f04c"
+      "sha256": "ddfeac9fc44a872e6e967af76ff55faeb16d750ffb02f7909599143e3f31a3f1"
     },
     {
       "name": "idempotency-slot",
@@ -210,7 +210,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -219,7 +219,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "e31f6e575aa5b78bc4939a1f67707820fb61c8a99786a2a241620d1ff3436453"
+      "sha256": "4f3922660bd92cfb5bbd25285ccc95399801a355be0b9e1713e128fb4a2c9378"
     },
     {
       "name": "inventory-template",
@@ -252,7 +252,7 @@
         "gate_pairs": 100000,
         "checks": 12,
         "search_work": 500000,
-        "timeout_ms": 10000
+        "timeout_ms": 22000
       },
       "proposal": {
         "program": "identity",
@@ -261,7 +261,7 @@
           "resubstitute"
         ]
       },
-      "sha256": "b35a858e9123f7021eed54f1139fb6727c7a34e7e5aabf220bda9f796625e710"
+      "sha256": "fc66c0d1256f7c7a18204473bedaa24fdfd2437d81d04657957aca63e8b646e9"
     }
   ]
 }

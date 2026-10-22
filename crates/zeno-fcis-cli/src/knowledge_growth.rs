@@ -474,98 +474,130 @@ pub(crate) fn add_cases(layer: &Layer, assessment: &str) -> Result<Layer, &'stat
         .assessments
         .get(assessment)
         .ok_or("kb-assessment-missing")?;
-    for c in &a.cases {
-        for (on, run) in [(false, &c.off), (true, &c.on)] {
-            let output = layer
-                .outputs
-                .get(&run.output_sha256)
-                .ok_or("kb-assessment-output")?;
-            let advice = a
-                .candidates
-                .iter()
-                .map(|id| AdviceUse {
-                    lesson: id.clone(),
-                    outcome: if on && c.applicable {
-                        "applied"
-                    } else {
-                        "consulted"
-                    }
-                    .into(),
-                })
-                .collect();
-            let episode = Episode {
-                schema: "zeno-fcis/kb-episode/1".into(),
-                task: run.task.clone(),
-                subject: Some(run.inputs.clone()),
-                scope: c.scope.clone(),
-                door: if on {
-                    format!("pipeline-on-{}", S::hash(&a.candidates)?)
+    let suite: crate::knowledge_replay::Suite = serde_json::from_value(
+        layer
+            .outputs
+            .get(&a.suite_sha256)
+            .ok_or("kb-assessment-suite")?
+            .clone(),
+    )
+    .map_err(|_| "kb-assessment-suite")?;
+    let mut records = a
+        .cases
+        .iter()
+        .flat_map(|c| {
+            [
+                (false, &c.off, &c.scope, c.applicable, true),
+                (true, &c.on, &c.scope, c.applicable, true),
+            ]
+        })
+        .collect::<Vec<_>>();
+    for (n, run) in a.partial_runs.iter().enumerate() {
+        let task = suite
+            .tasks
+            .iter()
+            .find(|t| t.sha256 == run.task)
+            .ok_or("kb-assessment-task")?;
+        let applicable = layer.candidates.iter().any(|c| {
+            a.candidates.contains(&c.statement_sha256) && applies(&c.scope, &task.scope, &layer.isa)
+        });
+        records.push((n % 2 == 1, run, &task.scope, applicable, false));
+    }
+    for (on, run, scope, applicable, complete) in records {
+        let output = layer
+            .outputs
+            .get(&run.output_sha256)
+            .ok_or("kb-assessment-output")?;
+        let advice = a
+            .candidates
+            .iter()
+            .map(|id| AdviceUse {
+                lesson: id.clone(),
+                outcome: if on && applicable {
+                    "applied"
                 } else {
-                    "pipeline-off".into()
-                },
-                steps: output["detail"]["execution_trace"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Value::as_str)
-                    .map(str::to_owned)
-                    .collect(),
-                advice,
-                counterexamples: output["detail"]["candidates"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter(|x| x["check"]["verdict"] == "counterexample")
-                    .map(|x| x["check"].clone())
-                    .collect(),
-                stopping_bound: run.stopping_bound.clone(),
-                verdict: Some(run.verdict),
-                receipt_sha256: Some(run.receipt_sha256.clone()),
-                work: run.work.clone(),
-                checker_sha256: a.checker_sha256.clone(),
-                engine_sha256: a.engine_sha256.clone(),
-                family: EvidenceFamily {
-                    subject: run.inputs.clone(),
-                    session: a.revision_sha256.clone(),
-                    actor: "assessment-process".into(),
-                    tool: a.tool_version.clone(),
-                    environment: "bounded-replay".into(),
-                },
-                result_cost: run.result_cost,
-                iterations: iterations(output).0,
-                iterations_truncated: iterations(output).1,
-                model_calls: Some(0),
-                tokens: Some(0),
-                money_reserved: Some(0),
-                owner_questions: Some(0),
-            };
-            episode.evidence()?;
-            let episode_key = S::hash(&episode)?;
-            next.episodes.insert(episode_key.clone(), episode.clone());
-            if on && c.applicable {
-                for candidate in &mut next.candidates {
-                    if a.candidates.contains(&candidate.statement_sha256) {
-                        candidate.episodes.insert(episode_key.clone());
-                    }
+                    "consulted"
+                }
+                .into(),
+            })
+            .collect();
+        let episode = Episode {
+            schema: "zeno-fcis/kb-episode/1".into(),
+            task: run.task.clone(),
+            subject: Some(run.inputs.clone()),
+            scope: scope.clone(),
+            door: if on {
+                format!("pipeline-on-{}", S::hash(&a.candidates)?)
+            } else {
+                "pipeline-off".into()
+            },
+            steps: output["detail"]["execution_trace"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect(),
+            advice,
+            counterexamples: output["detail"]["candidates"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|x| x["check"]["verdict"] == "counterexample")
+                .map(|x| x["check"].clone())
+                .collect(),
+            stopping_bound: run.stopping_bound.clone(),
+            verdict: Some(run.verdict),
+            receipt_sha256: Some(run.receipt_sha256.clone()),
+            work: run.work.clone(),
+            checker_sha256: a.checker_sha256.clone(),
+            engine_sha256: a.engine_sha256.clone(),
+            family: EvidenceFamily {
+                subject: run.inputs.clone(),
+                session: a.revision_sha256.clone(),
+                actor: "assessment-process".into(),
+                tool: a.tool_version.clone(),
+                environment: "bounded-replay".into(),
+            },
+            result_cost: run.result_cost,
+            iterations: iterations(output).0,
+            iterations_truncated: iterations(output).1,
+            model_calls: Some(0),
+            tokens: Some(0),
+            money_reserved: Some(0),
+            owner_questions: Some(0),
+        };
+        episode.evidence()?;
+        let episode_key = S::hash(&episode)?;
+        next.episodes.insert(episode_key.clone(), episode.clone());
+        if on && applicable {
+            for candidate in &mut next.candidates {
+                if a.candidates.contains(&candidate.statement_sha256) {
+                    candidate.episodes.insert(episode_key.clone());
                 }
             }
-            let (status, property) = artifact_property(output, run)?;
-            let fact = CertifiedFact {
-                subject: run.inputs.clone(),
-                checker_sha256: a.checker_sha256.clone(),
-                engine_sha256: a.engine_sha256.clone(),
-                tool_version: a.tool_version.clone(),
-                status,
-                property,
-                premises: c.scope.clone(),
-                door: episode.door.clone(),
-                run: run.clone(),
-                output_sha256: run.output_sha256.clone(),
-                episode: episode_key,
-                source: "held-out".into(),
-            };
-            next.facts.insert(S::hash(&fact)?, fact);
         }
+        let (status, property) = artifact_property(output, run)?;
+        let fact = CertifiedFact {
+            subject: run.inputs.clone(),
+            checker_sha256: a.checker_sha256.clone(),
+            engine_sha256: a.engine_sha256.clone(),
+            tool_version: a.tool_version.clone(),
+            status,
+            property,
+            premises: scope.clone(),
+            door: episode.door.clone(),
+            run: run.clone(),
+            output_sha256: run.output_sha256.clone(),
+            episode: episode_key,
+            source: if complete {
+                "held-out"
+            } else {
+                "observational"
+            }
+            .into(),
+        };
+        next.facts.insert(S::hash(&fact)?, fact);
     }
     Ok(next)
 }

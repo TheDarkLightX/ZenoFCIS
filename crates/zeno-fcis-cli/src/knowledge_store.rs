@@ -211,6 +211,9 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             || !digest(&a.engine_sha256)
             || !digest(&a.checker_sha256)
             || a.reserved_work > a.total_budget
+            || a.partial_runs.len() > 4
+            || !a.partial_runs.is_empty() && a.resource_stop.is_none()
+            || recorded_work(&a.cases, &a.partial_runs)? != a.assessment_work
         {
             return Err("kb-assessment-binding");
         }
@@ -249,6 +252,34 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             }
             if a.proposing_subjects.contains(&task.subject.sha256) {
                 return Err("kb-held-out-split");
+            }
+        }
+        for run in &a.partial_runs {
+            let task = suite
+                .tasks
+                .iter()
+                .find(|t| t.sha256 == run.task)
+                .ok_or("kb-assessment-task")?;
+            if run.inputs != task.subject.sha256
+                || run.seed != task.seed
+                || run.budget != task.budget.work
+            {
+                return Err("kb-assessment-task");
+            }
+            let output = layer
+                .outputs
+                .get(&run.output_sha256)
+                .ok_or("kb-assessment-output")?;
+            if hash(output)? != run.output_sha256
+                || crate::knowledge_replay::measure(
+                    output,
+                    run.task.clone(),
+                    run.seed,
+                    run.budget,
+                    run.inputs.clone(),
+                )? != *run
+            {
+                return Err("kb-assessment-output");
             }
         }
         let (decision, reason) = assessed_decision(a, proposing)?;
@@ -743,6 +774,7 @@ mod tests {
             tool_version: "v".into(),
             policy: Policy::default(),
             cases: vec![],
+            partial_runs: vec![],
             annotations: vec![],
             decision: Decision::Inconclusive,
             reason: "no-applicable-task".into(),
