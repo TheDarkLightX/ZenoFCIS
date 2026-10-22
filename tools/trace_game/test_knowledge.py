@@ -103,9 +103,40 @@ class Knowledge(unittest.TestCase):
         arena=memory_game(); before=arena.wire(); packet=solve(arena)
         snapshot=copy.deepcopy(packet); verdict=check(packet,arena)
         verdict['winning_roots'].clear()
+        self.assertEqual(verdict['winning_concrete_roots'],[0])
+        verdict['root_mapping'][0]['concrete_roots'].clear()
+        self.assertEqual(verdict['winning_concrete_roots'],[0])
         self.assertEqual(packet,snapshot)
         packet['game']['nodes'][0]['edges'].clear()
         self.assertEqual(arena.wire(),before)
+
+    def test_root_identifier_namespaces(self):
+        for partial in (False,True):
+            with self.subTest(partial=partial):
+                arena=game([1,1],[[('stay',0)],[('stay',1)]],[0],['bad','safe'],[1],partial)
+                result=check(solve(arena),arena)
+                self.assertEqual(result['winning_concrete_roots'],[1])
+                self.assertEqual(result['winning_roots'],[1])
+                self.assertEqual(result['losing_concrete_roots'],[])
+                self.assertEqual(result['losing_roots'],[])
+                self.assertEqual(result['winning_knowledge_roots'],[0] if partial else [])
+                self.assertEqual(result['losing_knowledge_roots'],[])
+                self.assertEqual(result['root_mapping'],
+                                 [dict(knowledge_root=0,concrete_roots=[1])] if partial else [])
+
+    def test_root_mapping_preserves_initial_uncertainty(self):
+        arena=game([0,0,1,1,1],[[('a',2),('b',3)],[('a',3),('b',2)],
+            [('stay',2)],[('stay',3)],[('stay',4)]],[3],
+            ['hidden','hidden','safe','bad','independent'],[0,1,4])
+        result=check(solve(arena),arena)
+        self.assertEqual(result['winning_concrete_roots'],[4])
+        self.assertEqual(result['losing_concrete_roots'],[0,1])
+        self.assertEqual(result['winning_roots'],[4])
+        self.assertEqual(result['losing_roots'],[0,1])
+        self.assertEqual(result['winning_knowledge_roots'],[1])
+        self.assertEqual(result['losing_knowledge_roots'],[0])
+        self.assertEqual(result['root_mapping'],[dict(knowledge_root=0,concrete_roots=[0,1]),
+                                               dict(knowledge_root=1,concrete_roots=[4])])
 
     def test_all_two_state_partial_games(self):
         count=0

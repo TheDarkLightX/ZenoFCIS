@@ -109,9 +109,18 @@ def check(packet, expected=None):
         W = safety(owners, edges, bad, cert)
     else:
         W = omega(arena, cert)
+    root_mapping = [dict(knowledge_root=i, concrete_roots=list(packet['knowledge']['nodes'][i]['belief']))
+                    for i in roots] if arena.partial else []
+    concrete_winning = {s for row in root_mapping if row['knowledge_root'] in W
+                        for s in row['concrete_roots']} if arena.partial else W
+    winning = [i for i in arena.roots if i in concrete_winning]
+    losing = [i for i in arena.roots if i not in concrete_winning]
     return dict(evidence='certified winning strategy' if set(roots) <= W else 'certified unrealizability',
-                objective=arena.kind, winning_roots=[i for i in roots if i in W],
-                losing_roots=[i for i in roots if i not in W], states=len(owners),
+                objective=arena.kind, winning_roots=list(winning), losing_roots=list(losing),
+                winning_concrete_roots=winning, losing_concrete_roots=losing,
+                winning_knowledge_roots=[i for i in roots if i in W] if arena.partial else [],
+                losing_knowledge_roots=[i for i in roots if i not in W] if arena.partial else [],
+                root_mapping=root_mapping, states=len(owners),
                 scope='sure winning in the declared finite arena; no native execution or runtime authority')
 
 

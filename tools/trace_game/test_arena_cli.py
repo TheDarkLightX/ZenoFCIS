@@ -60,6 +60,24 @@ class ArenaCLI(unittest.TestCase):
             self.assertFalse((out/'arena-binding.json').exists())
             self.assertFalse((out/'verdict.json').exists())
 
+    def test_root_namespaces_in_bound_verdict(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base=Path(folder); source=base/'game.json'
+            for partial in (False,True):
+                arena=game([1,1],[[('stay',0)],[('stay',1)]],[0],['bad','safe'],[1],partial)
+                source.write_text(json.dumps(arena.wire())); out=base/str(partial)
+                built=run(ROOT/'tools/trace_game/arena.py','solve','--game',source,'--out',out)
+                self.assertEqual(built.returncode,0,built.stdout+built.stderr)
+                verdict=json.loads(built.stdout)
+                self.assertEqual(verdict['winning_concrete_roots'],[1])
+                self.assertEqual(verdict['winning_knowledge_roots'],[0] if partial else [])
+                self.assertEqual(verdict['root_mapping'],
+                                 [dict(knowledge_root=0,concrete_roots=[1])] if partial else [])
+                self.assertEqual(json.loads((out/'verdict.json').read_text()),verdict)
+                checked=run(ROOT/'tools/trace_game/certificate_check.py',out,'certificate.json')
+                self.assertEqual(checked.returncode,0,checked.stdout+checked.stderr)
+                self.assertEqual(json.loads(checked.stdout),verdict)
+
     def test_partial_visibility_and_totality(self):
         value=game([0,0],[[('a',0)],[('b',1)]],partial=False).wire(); value['observation']='partial'
         for node in value['nodes']: node['observation']='same'

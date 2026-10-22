@@ -214,6 +214,24 @@ paths needing no fixed-point iterations. `--seconds 0` therefore returns UNKNOWN
 with exit code 2 and writes no binding or certified verdict. These checkpoints
 do not add fixed-point work units; the independent checker has its own deadline.
 
+Verdicts separate input node IDs from knowledge vertex IDs:
+
+- `winning_concrete_roots` and `losing_concrete_roots` partition the declared
+  input roots, in input order. The compatibility fields `winning_roots` and
+  `losing_roots` also use concrete IDs in both modes.
+- `winning_knowledge_roots` and `losing_knowledge_roots` partition the initial
+  knowledge vertices in partial mode. `root_mapping` lists
+  `{"knowledge_root": k, "concrete_roots": [...]}` for each initial belief.
+  These three fields are empty lists in perfect mode, which has no knowledge graph.
+
+For example, a safe concrete root `[1]` may map to knowledge root `0` with belief
+`[1]`. Its verdict reports `winning_concrete_roots: [1]`,
+`winning_knowledge_roots: [0]`, and that mapping. In partial mode every concrete
+member inherits its initial belief's result under the declared uncertainty;
+this does not claim that each losing member would lose if its identity were
+revealed. Earlier partial-mode verdicts used knowledge IDs in the compatibility
+fields; consumers needing those IDs should use the explicit knowledge fields.
+
 ## Explicit omega objectives
 
 The same explicit arena input supports perfect-information reachability,

@@ -43,7 +43,10 @@ def main():
         '{kind:safety|reachability|buchi|co-buchi, states:[...]} or '
         '{kind:parity, priorities:[0..255,...]}. Total graphs only. Greatest recurring '
         'priority even wins; partial observation supports sure safety. Limits count '
-        'knowledge action vertices too. UNKNOWN is never a certificate.'))
+        'knowledge action vertices too. Verdict winning_concrete_roots/losing_concrete_roots '
+        'use input node IDs; winning_knowledge_roots/losing_knowledge_roots use partial '
+        'knowledge IDs, with root_mapping to their concrete members. Legacy winning_roots/'
+        'losing_roots always use concrete IDs. UNKNOWN is never a certificate.'))
     parser.add_argument('mode', choices=('solve','check'))
     parser.add_argument('--game', type=Path, help='explicit zeno-fcis/arena/1 JSON (required for solve)')
     parser.add_argument('--out', type=Path, required=True, help='fresh evidence directory for solve; existing directory for check')
