@@ -301,14 +301,14 @@ fn subprocess(
 }
 pub(crate) fn assess(
     layer: &Layer,
-    suite: &Suite,
-    suite_root: &Path,
+    source: (&Suite, &Path),
     selected: &BTreeSet<String>,
     total_budget: u64,
     policy: Policy,
     annotations: Vec<Annotation>,
     private_parent: &Path,
 ) -> Result<(Layer, String), &'static str> {
+    let (suite, suite_root) = source;
     suite.check()?;
     if layer.assessments.len() >= 128
         || layer

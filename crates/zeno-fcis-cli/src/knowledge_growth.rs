@@ -691,27 +691,25 @@ pub(crate) fn telemetry(layer: &Layer) -> Value {
             let verdict = format!("{:?}", e.verdict);
             let n = row["checker_outcomes"][&verdict].as_u64().unwrap_or(0);
             row["checker_outcomes"][&verdict] = json!(n + 1);
-            if advice.outcome == "applied" {
-                if let Some(c) = layer.candidates.iter().find(|c| {
+            if advice.outcome == "applied"
+                && let Some(c) = layer.candidates.iter().find(|c| {
                     (c.id == advice.lesson || c.statement_sha256 == advice.lesson)
                         && c.state == State::Promoted
-                }) {
-                    if let Some(a) = c.assessment.as_ref().and_then(|a| layer.assessments.get(a)) {
-                        for case in &a.cases {
-                            if case.scope == e.scope
-                                && e.subject.as_ref() == Some(&case.off.inputs)
-                                && (e.verdict.is_some_and(|v| !v.solved())
-                                    && case.off.verdict.solved()
-                                    || e.result_cost.zip(case.off.result_cost).is_some_and(
-                                        |(on, off)| on.iter().zip(off).any(|(n, o)| *n > o),
-                                    )
-                                    || e.work.iter().any(|(k, v)| {
-                                        case.off.work.get(k).is_some_and(|base| v > base)
-                                    }))
-                            {
-                                row["reassessment_required"] = json!(true);
-                            }
-                        }
+                })
+                && let Some(a) = c.assessment.as_ref().and_then(|a| layer.assessments.get(a))
+            {
+                for case in &a.cases {
+                    if case.scope == e.scope
+                        && e.subject.as_ref() == Some(&case.off.inputs)
+                        && (e.verdict.is_some_and(|v| !v.solved()) && case.off.verdict.solved()
+                            || e.result_cost
+                                .zip(case.off.result_cost)
+                                .is_some_and(|(on, off)| on.iter().zip(off).any(|(n, o)| *n > o))
+                            || e.work
+                                .iter()
+                                .any(|(k, v)| case.off.work.get(k).is_some_and(|base| v > base)))
+                    {
+                        row["reassessment_required"] = json!(true);
                     }
                 }
             }

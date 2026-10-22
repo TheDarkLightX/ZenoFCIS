@@ -88,11 +88,13 @@ fn assessed(layer: &mut Layer, id: &str, scope: Scope, cases: Vec<Case>) {
 }
 #[test]
 fn generalization_carries_parents_and_reserves_all_parent_cases_for_proposing() {
-    let mut layer = Layer::default();
-    layer.isa = BTreeSet::from([
-        ("left".into(), "class".into()),
-        ("right".into(), "class".into()),
-    ]);
+    let mut layer = Layer {
+        isa: BTreeSet::from([
+            ("left".into(), "class".into()),
+            ("right".into(), "class".into()),
+        ]),
+        ..Layer::default()
+    };
     for family in ["left", "right"] {
         assessed(
             &mut layer,
@@ -128,11 +130,13 @@ fn generalization_carries_parents_and_reserves_all_parent_cases_for_proposing() 
 }
 #[test]
 fn generalization_requires_promoted_compatible_siblings() {
-    let mut layer = Layer::default();
-    layer.isa = BTreeSet::from([
-        ("left".into(), "class".into()),
-        ("right".into(), "class".into()),
-    ]);
+    let mut layer = Layer {
+        isa: BTreeSet::from([
+            ("left".into(), "class".into()),
+            ("right".into(), "class".into()),
+        ]),
+        ..Layer::default()
+    };
     for family in ["left", "right"] {
         assessed(
             &mut layer,

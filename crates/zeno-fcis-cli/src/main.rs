@@ -486,10 +486,9 @@ fn execute() -> u8 {
                 Command::Kb {
                     operation: knowledge_command::Operation::AssessmentTask { .. }
                 }
-            ) {
-                if let Command::Kb { operation } = cli.command {
-                    return knowledge_command::execute(&cli.kb, operation);
-                }
+            ) && let Command::Kb { operation } = cli.command
+            {
+                return knowledge_command::execute(&cli.kb, operation);
             }
             let admission = match checker_process::preflight(&cli.command, cli.containment_backend)
             {

@@ -442,7 +442,7 @@ mod tests {
             receipt_sha256: "c".repeat(64),
             output_sha256: "d".repeat(64),
         };
-        assert_eq!(recorded_work(&[], &[run.clone()]), Ok(15));
+        assert_eq!(recorded_work(&[], std::slice::from_ref(&run)), Ok(15));
         assert_eq!(recorded_work(&[], &[run.clone(), run]), Ok(30));
     }
 

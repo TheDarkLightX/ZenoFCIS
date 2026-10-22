@@ -3,7 +3,7 @@
   "name": "knowledge",
   "title": "Consult scoped usage advice",
   "synopsis": "zeno-fcis kb advise --task FACTS",
-  "engine": "Finite structured knowledge queries with source provenance; exact checkers retain acceptance authority.",
+  "engine": "Finite structured queries plus replay-bound held-out ON/OFF assessment; independent checkers retain program acceptance authority.",
   "use_when": [
     "choose a checker from usage advice",
     "inspect scoped knowledge",
@@ -12,10 +12,10 @@
   ],
   "not_for": [
     "proof from retrieved advice",
-    "kb assess in a command tree where it is absent"
+    "population-wide usefulness from the public regression suite"
   ],
   "inputs": [
-    "FACTS: structured task predicates; optional external KB layers. Schema and caps: unknown here. No private KB is needed for the public example."
+    "FACTS: structured task predicates. Assessment needs an explicit frozen --suite and one private --kb layer; see docs/KNOWLEDGE.md for the checked journey."
   ],
   "outputs": [
     "stdout zeno-fcis/usage-knowledge/1 for advise; inspect status, provenance and authority; read-only advise writes no application files."
@@ -36,7 +36,7 @@
     "all_defaults_and_caps": "unknown"
   },
   "refusals": {
-    "unknown-command": "This build has no kb assess; run kb --help and use a release exposing assessment before requesting it."
+    "assessment-resource-stop": "Retain measured and reserved work and the inconclusive record; inspect the reported resource cause before another bounded attempt."
   },
   "cost": {
     "measured_units": "unknown",
@@ -52,30 +52,32 @@
     },
     {
       "command": "zeno-fcis kb assess --help",
-      "exit": 64,
+      "exit": 0,
       "expected": {},
       "contains": [
-        "unrecognized subcommand"
+        "--suite",
+        "--candidate"
       ]
     }
   ],
   "example": {
     "command": "zeno-fcis kb assess --help",
-    "exit": 64,
+    "exit": 0,
     "expected": {},
     "contains": [
-      "unrecognized subcommand"
+      "--suite",
+      "--candidate"
     ]
   },
   "sources": {
-    "synopsis": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "engine": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "inputs": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "outputs": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "exit_codes": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "verdicts": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "limits": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help",
-    "refusals": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help"
+    "synopsis": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "engine": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "inputs": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "outputs": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "exit_codes": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "verdicts": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "limits": "docs/KNOWLEDGE.md; zeno-fcis kb --help",
+    "refusals": "docs/KNOWLEDGE.md; zeno-fcis kb --help"
   },
   "commands": [
     "kb",
@@ -85,7 +87,10 @@
     "kb explain",
     "kb check",
     "kb query",
-    "kb replay"
+    "kb replay",
+    "kb assess",
+    "kb assessment-queue",
+    "kb leaderboard"
   ],
   "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority."
 }
@@ -99,13 +104,13 @@ choose a checker from usage advice; inspect scoped knowledge; find a supported l
 
 ## Not for
 
-proof from retrieved advice; kb assess in a command tree where it is absent.
+proof from retrieved advice; population-wide usefulness from the public regression suite.
 
 ## Inputs
 
-FACTS: structured task predicates; optional external KB layers. Schema and caps: unknown here. No private KB is needed for the public example.
+FACTS: structured task predicates. Assessment needs an explicit frozen --suite and one private --kb layer; see docs/KNOWLEDGE.md for the checked journey.
 
-Engine: Finite structured knowledge queries with source provenance; exact checkers retain acceptance authority.
+Engine: Finite structured queries plus replay-bound held-out ON/OFF assessment; independent checkers retain program acceptance authority.
 
 Synopsis: "zeno-fcis kb advise --task FACTS"
 
@@ -123,7 +128,7 @@ Expected: exit 0; [].
 zeno-fcis kb assess --help
 ```
 
-Expected: exit 64; ["unrecognized subcommand"].
+Expected: exit 0; ["--suite", "--candidate"].
 
 ## Verdicts
 
@@ -151,7 +156,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 Read the result scope before revising the input. No report grants runtime or publication authority.
 
-Refusals and remedies: {"unknown-command": "This build has no kb assess; run kb --help and use a release exposing assessment before requesting it."}
+Refusals and remedies: {"assessment-resource-stop": "Retain measured and reserved work and the inconclusive record; inspect the reported resource cause before another bounded attempt."}
 
 ## Worked example
 
@@ -159,10 +164,25 @@ Refusals and remedies: {"unknown-command": "This build has no kb assess; run kb 
 zeno-fcis kb assess --help
 ```
 
-Expected: exit 64; ["unrecognized subcommand"].
+Expected: exit 0; ["--suite", "--candidate"].
 
 ## See also
 
-Sources: {"engine": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "exit_codes": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "inputs": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "limits": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "outputs": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "refusals": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "synopsis": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help", "verdicts": "docs/CLI_REFERENCE.md:2774-2796; zeno-fcis kb --help"}
+**Background.** Jon Doyle, “A Truth Maintenance System,” Artificial
+Intelligence 12(3), 1979, describes dependency maintenance. Maarten H. van
+Emden and Robert A. Kowalski, “The Semantics of Predicate Logic as a
+Programming Language,” Journal of the ACM 23(4), 1976, is background for
+logical fixed points.
+
+**What is new here.** The engine adds source-bound held-out strategy
+assessment and independently replayed exact facts. The comparative
+assessment is **prior-art search pending**.
+
+**Scope.** The help example discovers an available command and performs no
+assessment. Use the explicit private-layer journey for measured evidence;
+advice and descriptive points supply no program acceptance authority.
+
+
+Sources: {"engine": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "exit_codes": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "inputs": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "limits": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "outputs": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "refusals": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "synopsis": "docs/KNOWLEDGE.md; zeno-fcis kb --help", "verdicts": "docs/KNOWLEDGE.md; zeno-fcis kb --help"}
 
 Run `zeno-fcis guide find "choose a checker from usage advice"` for related cards.

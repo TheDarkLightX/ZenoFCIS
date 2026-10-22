@@ -112,10 +112,10 @@ pub(crate) fn profiles(
         let mut matrix = BTreeMap::<String, BTreeMap<String, &CertifiedFact>>::new();
         for f in facts {
             let row = matrix.entry(f.run.task.clone()).or_default();
-            if let Some(old) = row.insert(f.door.clone(), f) {
-                if old.run != f.run {
-                    return Err("kb-profile-conflicting-case");
-                }
+            if let Some(old) = row.insert(f.door.clone(), f)
+                && old.run != f.run
+            {
+                return Err("kb-profile-conflicting-case");
             }
         }
         let doors = matrix
@@ -271,11 +271,11 @@ pub(crate) fn profiles(
                 (solved.len() * 10000 / eligible.len()) as u64
             };
             let penalty = eligible.iter().map(|f| f.run.budget * 2).sum::<u64>();
-            let efficiency = if penalty == 0 {
-                0
-            } else {
-                penalty.saturating_sub(par).saturating_mul(10000) / penalty
-            };
+            let efficiency = penalty
+                .saturating_sub(par)
+                .saturating_mul(10000)
+                .checked_div(penalty)
+                .unwrap_or(0);
             let marginal = if matrix.is_empty() {
                 0
             } else {

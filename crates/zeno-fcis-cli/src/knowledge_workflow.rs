@@ -198,8 +198,7 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                     };
                     let (next, key) = crate::knowledge_replay::assess(
                         &layer,
-                        &suite_data,
-                        suite.parent().ok_or("kb-parent")?,
+                        (&suite_data, suite.parent().ok_or("kb-parent")?),
                         &selected,
                         total_budget,
                         Policy {
@@ -350,12 +349,11 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                     let mut parents = BTreeSet::new();
                     let mut todo = c.parents.iter().cloned().collect::<Vec<_>>();
                     while let Some(p) = todo.pop() {
-                        if parents.insert(p.clone()) {
-                            if let Some(parent) =
+                        if parents.insert(p.clone())
+                            && let Some(parent) =
                                 layer.candidates.iter().find(|c| c.statement_sha256 == p)
-                            {
-                                todo.extend(parent.parents.iter().cloned());
-                            }
+                        {
+                            todo.extend(parent.parents.iter().cloned());
                         }
                     }
                     let episodes = c
@@ -479,15 +477,14 @@ pub(crate) fn task_scope(facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact
     use zeno_fcis_loop_doors::strategy_knowledge::Value as V;
     let mut scope = BTreeMap::new();
     for f in facts {
-        if f.predicate == "task" {
-            if let [V::Text(k), V::Text(v)] = f.arguments.as_slice() {
-                if DIMENSIONS.contains(&k.as_str()) {
-                    scope
-                        .entry(k.clone())
-                        .or_insert_with(BTreeSet::new)
-                        .insert(v.clone());
-                }
-            }
+        if f.predicate == "task"
+            && let [V::Text(k), V::Text(v)] = f.arguments.as_slice()
+            && DIMENSIONS.contains(&k.as_str())
+        {
+            scope
+                .entry(k.clone())
+                .or_insert_with(BTreeSet::new)
+                .insert(v.clone());
         }
     }
     scope

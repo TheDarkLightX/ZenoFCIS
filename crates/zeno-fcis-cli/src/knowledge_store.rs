@@ -197,10 +197,10 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             if p == c.statement_sha256 {
                 return Err("kb-justification-cycle");
             }
-            if seen.insert(p.clone()) {
-                if let Some(parent) = layer.candidates.iter().find(|x| x.statement_sha256 == p) {
-                    todo.extend(parent.parents.iter().cloned());
-                }
+            if seen.insert(p.clone())
+                && let Some(parent) = layer.candidates.iter().find(|x| x.statement_sha256 == p)
+            {
+                todo.extend(parent.parents.iter().cloned());
             }
         }
     }
@@ -384,10 +384,10 @@ pub(crate) fn current(
     for c in &mut next.candidates {
         if c.state == State::Pending {
             for (p, expected) in &mut c.dependencies {
-                if let Some(actual) = dependencies.get(p) {
-                    if digest(actual) {
-                        *expected = actual.clone();
-                    }
+                if let Some(actual) = dependencies.get(p)
+                    && digest(actual)
+                {
+                    *expected = actual.clone();
                 }
             }
         }
@@ -434,19 +434,17 @@ pub(crate) fn conflicts(a: &Candidate, b: &Candidate, isa: &BTreeSet<(String, St
         if let (Some(av), Some(bv)) = (
             a.scope.get(k).and_then(|v| v.first()),
             b.scope.get(k).and_then(|v| v.first()),
-        ) {
-            if av != "any"
-                && bv != "any"
-                && av != bv
-                && !(matches!(k, "tool" | "family")
-                    && (member(av, bv, isa)
-                        || member(bv, av, isa)
-                        || isa
-                            .iter()
-                            .any(|(child, _)| member(child, av, isa) && member(child, bv, isa))))
-            {
-                return false;
-            }
+        ) && av != "any"
+            && bv != "any"
+            && av != bv
+            && !(matches!(k, "tool" | "family")
+                && (member(av, bv, isa)
+                    || member(bv, av, isa)
+                    || isa
+                        .iter()
+                        .any(|(child, _)| member(child, av, isa) && member(child, bv, isa))))
+        {
+            return false;
         }
     }
     true
@@ -665,7 +663,7 @@ fn commit_inner(
     durable(&staging, &descriptor)?;
     let result = (|| {
         let (_, report) = crate::knowledge_command::invoke(
-            &[staging.clone()],
+            std::slice::from_ref(&staging),
             crate::knowledge_command::Operation::Check,
         );
         if report["status"] != "consistent" {

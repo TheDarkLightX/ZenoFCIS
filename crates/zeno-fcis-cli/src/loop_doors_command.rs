@@ -2717,6 +2717,83 @@ pub(super) fn knowledge_session(command: &DoorCommand) -> Option<(&Path, bool)> 
     }
 }
 
+/// Assessment-only routing: the original exact checker and receipt replay stay in the pipeline.
+pub(crate) fn assessment_run(
+    original: &[u8],
+    specification: &Value,
+    actions: &[crate::knowledge_assessment::Action],
+    budget: &crate::knowledge_replay::TaskBudget,
+) -> Result<Value, &'static str> {
+    let mut proposal = specification.clone();
+    proposal["schema"] = json!(pipeline::PIPELINE_SCHEMA);
+    proposal["original_sha256"] = json!(sha256_hex(original));
+    proposal["implementation_sha256"] = json!(pipeline::implementation());
+    if proposal["program"] == "identity" {
+        proposal["program"] =
+            program_to_json(&import_program(original).map_err(|_| "kb-task-program")?);
+    }
+    let stages = pipeline::stages(
+        proposal
+            .get("stages")
+            .unwrap_or(&json!(["canonical", "resubstitute"])),
+    )
+    .map_err(|_| "kb-task-stages")?;
+    let task = pipeline::task(original.to_vec(), proposal).map_err(|_| "kb-task-proposal")?;
+    let limits = pipeline::SearchLimits {
+        max_tuples: budget.tuples,
+        max_gate_pairs: budget.gate_pairs,
+        max_search_work: budget.search_work,
+        max_cells: 1_048_576,
+        max_assignments: 128,
+        max_terms: 32,
+        max_checks: budget.checks,
+        deadline_ms: budget.timeout_ms,
+    };
+    if !limits.valid() {
+        return Err("kb-task-limits");
+    }
+    let mut counter = pipeline::Budget::new(limits);
+    if !actions.is_empty() {
+        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::from_actions(actions));
+    }
+    let mut run = pipeline::run(&task, &stages, &mut counter);
+    search_limits::annotate("pipeline", run.status, &mut run.report);
+    run.report["checker_limits"] = json!({"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":crate::transform::DEFAULT_MAX_INPUT_TUPLES});
+    Ok(json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":run.report}))
+}
+
+/// Exact finite artifact replay for tier-one facts; no strategy or publication authority.
+pub(crate) fn assessment_certificate(
+    original: &[u8],
+    candidate: &[u8],
+) -> Result<Value, &'static str> {
+    let op = import_program(original).map_err(|_| "kb-proof-original")?;
+    let cp = import_program(candidate).map_err(|_| "kb-proof-candidate")?;
+    let count = tuples(op.inputs());
+    if count > 4096 {
+        return Err("kb-proof-domain-budget");
+    }
+    let limits = crate::transform::Limits {
+        steps: crate::transform::DEFAULT_STEP_LIMIT,
+        input_tuples: 4096,
+    };
+    let check = match crate::transform::check(original, candidate, limits) {
+        Ok(eq) => {
+            let receipt = eq.receipt();
+            let replay = crate::transform::replay(&receipt, original, candidate, 4096);
+            json!({"verdict":"equivalent","replay":if replay==crate::transform::Replay::Matched{"matched"}else{"differs"},"receipt_sha256":sha256_hex(&receipt)})
+        }
+        Err(crate::transform::Rejection::Counterexample(c)) => {
+            json!({"verdict":"counterexample","ordinal":c.ordinal,"input":crate::transform::values_json(&c.input),"original":observation(&c.original),"candidate":observation(&c.candidate)})
+        }
+        Err(_) => return Err("kb-artifact-inconclusive"),
+    };
+    let accepted = check["verdict"] == "equivalent" && check["replay"] == "matched";
+    Ok(
+        json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":{"status":if accepted{"qualified"}else{"refuted"},"original":program_json(&op),"best":if accepted{program_json(&cp)}else{Value::Null},"best_check":if accepted{check.clone()}else{Value::Null},"candidates":[{"candidate":program_json(&cp),"check":check}],"execution_trace":["check-program","replay-receipt"],"checker_limits":{"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":4096},"trace":[],"reason":Value::Null,"work":{"check_requests":1,"gate_pairs_reserved":u64::try_from(count*2).map_err(|_|"kb-work-overflow")?,"search_stage_requests":0,"control_frames":0,"capture_work_reserved":0,"capture_cells_reserved":0}}}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2838,81 +2915,4 @@ mod tests {
         assert!(relative(Path::new("/m"), "/etc/x").is_err());
         assert!(relative(Path::new("/m"), "a/b.zcve").is_ok());
     }
-}
-
-/// Assessment-only routing: the original exact checker and receipt replay stay in the pipeline.
-pub(crate) fn assessment_run(
-    original: &[u8],
-    specification: &Value,
-    actions: &[crate::knowledge_assessment::Action],
-    budget: &crate::knowledge_replay::TaskBudget,
-) -> Result<Value, &'static str> {
-    let mut proposal = specification.clone();
-    proposal["schema"] = json!(pipeline::PIPELINE_SCHEMA);
-    proposal["original_sha256"] = json!(sha256_hex(original));
-    proposal["implementation_sha256"] = json!(pipeline::implementation());
-    if proposal["program"] == "identity" {
-        proposal["program"] =
-            program_to_json(&import_program(original).map_err(|_| "kb-task-program")?);
-    }
-    let stages = pipeline::stages(
-        proposal
-            .get("stages")
-            .unwrap_or(&json!(["canonical", "resubstitute"])),
-    )
-    .map_err(|_| "kb-task-stages")?;
-    let task = pipeline::task(original.to_vec(), proposal).map_err(|_| "kb-task-proposal")?;
-    let limits = pipeline::SearchLimits {
-        max_tuples: budget.tuples,
-        max_gate_pairs: budget.gate_pairs,
-        max_search_work: budget.search_work,
-        max_cells: 1_048_576,
-        max_assignments: 128,
-        max_terms: 32,
-        max_checks: budget.checks,
-        deadline_ms: budget.timeout_ms,
-    };
-    if !limits.valid() {
-        return Err("kb-task-limits");
-    }
-    let mut counter = pipeline::Budget::new(limits);
-    if !actions.is_empty() {
-        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::from_actions(actions));
-    }
-    let mut run = pipeline::run(&task, &stages, &mut counter);
-    search_limits::annotate("pipeline", run.status, &mut run.report);
-    run.report["checker_limits"] = json!({"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":crate::transform::DEFAULT_MAX_INPUT_TUPLES});
-    Ok(json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":run.report}))
-}
-
-/// Exact finite artifact replay for tier-one facts; no strategy or publication authority.
-pub(crate) fn assessment_certificate(
-    original: &[u8],
-    candidate: &[u8],
-) -> Result<Value, &'static str> {
-    let op = import_program(original).map_err(|_| "kb-proof-original")?;
-    let cp = import_program(candidate).map_err(|_| "kb-proof-candidate")?;
-    let count = tuples(op.inputs());
-    if count > 4096 {
-        return Err("kb-proof-domain-budget");
-    }
-    let limits = crate::transform::Limits {
-        steps: crate::transform::DEFAULT_STEP_LIMIT,
-        input_tuples: 4096,
-    };
-    let check = match crate::transform::check(original, candidate, limits) {
-        Ok(eq) => {
-            let receipt = eq.receipt();
-            let replay = crate::transform::replay(&receipt, original, candidate, 4096);
-            json!({"verdict":"equivalent","replay":if replay==crate::transform::Replay::Matched{"matched"}else{"differs"},"receipt_sha256":sha256_hex(&receipt)})
-        }
-        Err(crate::transform::Rejection::Counterexample(c)) => {
-            json!({"verdict":"counterexample","ordinal":c.ordinal,"input":crate::transform::values_json(&c.input),"original":observation(&c.original),"candidate":observation(&c.candidate)})
-        }
-        Err(_) => return Err("kb-artifact-inconclusive"),
-    };
-    let accepted = check["verdict"] == "equivalent" && check["replay"] == "matched";
-    Ok(
-        json!({"schema":"zeno-fcis/kb-task-output/1","authority":"none","detail":{"status":if accepted{"qualified"}else{"refuted"},"original":program_json(&op),"best":if accepted{program_json(&cp)}else{Value::Null},"best_check":if accepted{check.clone()}else{Value::Null},"candidates":[{"candidate":program_json(&cp),"check":check}],"execution_trace":["check-program","replay-receipt"],"checker_limits":{"steps":crate::transform::DEFAULT_STEP_LIMIT,"input_tuples":4096},"trace":[],"reason":Value::Null,"work":{"check_requests":1,"gate_pairs_reserved":u64::try_from(count*2).map_err(|_|"kb-work-overflow")?,"search_stage_requests":0,"control_frames":0,"capture_work_reserved":0,"capture_cells_reserved":0}}}),
-    )
 }

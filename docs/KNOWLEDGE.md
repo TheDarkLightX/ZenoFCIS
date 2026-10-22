@@ -367,3 +367,27 @@ equivalence/counterexample artifact replay. It does not establish whole-tool
 readiness, universal loop quality, a cost optimum, a production release, or a
 benefit beyond the declared frozen comparison. Source-bound assessment evidence must
 be refreshed after engine or checker changes.
+
+## Background
+
+Jon Doyle, “A Truth Maintenance System,” *Artificial Intelligence* 12(3),
+1979, describes maintaining beliefs through dependencies. Maarten H. van
+Emden and Robert A. Kowalski, “The Semantics of Predicate Logic as a
+Programming Language,” *Journal of the ACM* 23(4), 1976, supplies background
+for the logical fixed-point interpretation. The descriptive metric
+attributions listed above remain explicitly unverified offline.
+
+## What is new here
+
+This release combines replay-bound exact facts, held-out componentwise
+strategy assessment, dependency retraction and atomic private-layer
+publication. These are implementation additions; the comparative assessment
+of their combination is **prior-art search pending**.
+
+## Scope
+
+Facts retain their exact subject and checker binding. Strategy usefulness is
+measured only on its declared frozen comparison and explicit budgets. Public
+regression examples do not establish population-wide gains, net savings or
+runtime publication authority. Read each retained record's source and cost
+history before comparing it with another run.
