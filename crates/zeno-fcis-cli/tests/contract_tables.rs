@@ -148,11 +148,18 @@ fn contract_tables_example_generates_and_its_count_law_is_inductive() {
         "table-form lemma was refused: {}",
         String::from_utf8_lossy(&tabled.stderr)
     );
-    let tabled: Value = serde_json::from_slice(&tabled.stdout).unwrap();
+    let tabled: Value = serde_json::from_slice(&tabled.stdout)
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
     let mut scalar = value["lemmas"][0].clone();
     let mut table = tabled["lemmas"][0].clone();
-    scalar.as_object_mut().unwrap().remove("formula");
-    table.as_object_mut().unwrap().remove("formula");
+    scalar
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("lemma report must be an object"))
+        .remove("formula");
+    table
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("lemma report must be an object"))
+        .remove("formula");
     assert_eq!(scalar, table);
 
     std::fs::remove_dir_all(dir).unwrap_or_else(|error| panic!("{error:?}"));

@@ -501,7 +501,8 @@ fn table_value_counts_are_linear_and_match_conditional_sums() {
         );
         assert_eq!(bytes(&counted), bytes(&summed));
         assert_eq!(bytes(&counted), bytes(&filtered));
-        let expansion = expand_tables(&counted, SourceLimits::default()).unwrap();
+        let expansion = expand_tables(&counted, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
         assert_eq!(expansion.text.matches("choose(").count(), n);
         assert_eq!(bytes(&counted), bytes(&expansion.text));
         assert!(expansion.counts[0].linear);
@@ -541,7 +542,7 @@ fn table_value_count_limit_includes_the_boundary_and_refuses_three_under_two() {
             bytes(&source),
             bytes(
                 &expand_tables(&source, SourceLimits::default())
-                    .unwrap()
+                    .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"))
                     .text
             )
         );
@@ -551,7 +552,8 @@ fn table_value_count_limit_includes_the_boundary_and_refuses_three_under_two() {
 #[test]
 fn standalone_table_formula_consumes_all_text_and_resolves_paths() {
     let formula = "forall i in table 110 { post.100.110[i] >= 0 }";
-    let parsed = zeno_fcis_spec::parse_formula(LIBRARY, formula, SourceLimits::default()).unwrap();
+    let parsed = zeno_fcis_spec::parse_formula(LIBRARY, formula, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
     assert_eq!(
         parsed,
         law(
@@ -577,8 +579,8 @@ fn standalone_table_formula_consumes_all_text_and_resolves_paths() {
 fn table_count_sizes_before_and_after_linear_values() {
     for n in [6, 16, 64] {
         let prefix = format!("{HEADER}table 1000 100 slot 105 size {n};\n");
-        let old = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= 2;\n"), SourceLimits::default()).unwrap();
-        let new = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= command.101.121;\n"), SourceLimits::default()).unwrap();
+        let old = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= 2;\n"), SourceLimits::default()).unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
+        let new = expand_tables(&format!("{prefix}law 500 limit on commit = count j in table 1000 {{ post.100.1000[j] == command.101.120 }} <= command.101.121;\n"), SourceLimits::default()).unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
         let clauses = match n {
             6 => 20,
             16 => 560,
@@ -606,7 +608,8 @@ fn grouped_table_values_roundtrip_through_arithmetic() {
         let source = format!(
             "{HEADER}table 110 100 slot 105 size 6;\nlaw 500 arithmetic on commit = {formula};\n"
         );
-        let expansion = expand_tables(&source, SourceLimits::default()).unwrap();
+        let expansion = expand_tables(&source, SourceLimits::default())
+            .unwrap_or_else(|error| panic!("table fixture failed: {error:?}"));
         assert_eq!(bytes(&source), bytes(&expansion.text), "{formula}");
     }
 }
