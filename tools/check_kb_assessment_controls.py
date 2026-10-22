@@ -77,9 +77,9 @@ def main():
     parser.add_argument("--git-dir", type=Path, required=True)
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--only", choices=[c["name"] for c in CONTROLS])
+    parser.add_argument("--only", nargs="+", choices=[c["name"] for c in CONTROLS])
     args = parser.parse_args()
-    selected = [c for c in CONTROLS if args.only is None or c["name"] == args.only]
+    selected = [c for c in CONTROLS if args.only is None or c["name"] in args.only]
     args.out.mkdir(mode=0o700, parents=True, exist_ok=False)
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target.resolve()), CARGO_BUILD_JOBS="3", CARGO_INCREMENTAL="0")
     with tempfile.TemporaryDirectory(prefix="kb-controls-") as scratch:
