@@ -15,6 +15,7 @@ pub(crate) fn handles(op: &Operation) -> bool {
             | Operation::Assess { .. }
             | Operation::AssessmentQueue { .. }
             | Operation::AssessmentView
+            | Operation::ReplayAssessment { .. }
             | Operation::AssessmentTask { .. }
             | Operation::Grow
             | Operation::IngestEpisodes { .. }
@@ -79,6 +80,18 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
             let path = layer_path(given)?;
             let (layer, binding) = S::live(&path)?;
             match other {
+                Operation::ReplayAssessment { assessment, suite } => {
+                    let suite_data: crate::knowledge_replay::Suite =
+                        serde_json::from_slice(&S::read(&suite, 1_048_576)?)
+                            .map_err(|_| "kb-suite-schema")?;
+                    crate::knowledge_replay::replay_record(
+                        &layer,
+                        &assessment,
+                        &suite_data,
+                        suite.parent().ok_or("kb-parent")?,
+                        path.parent().ok_or("kb-parent")?,
+                    )
+                }
                 Operation::Curate { source } => {
                     let bytes = S::read(&source, 2 * 1024 * 1024)?;
                     #[derive(serde::Deserialize)]
@@ -97,6 +110,9 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                     next.isa.extend(batch.isa);
                     for mut c in batch.candidates {
                         c.action.check()?;
+                        if !c.origin.is_empty() {
+                            c.evidence_refs.insert(c.origin.clone());
+                        }
                         c.state = State::Proposed;
                         c.assessment = None;
                         c.statement_sha256 = S::statement(&c)?;
@@ -106,6 +122,7 @@ fn execute(given: &[PathBuf], op: Operation) -> Result<Value, &'static str> {
                             .find(|x| x.statement_sha256 == c.statement_sha256)
                         {
                             old.families.extend(c.families);
+                            old.evidence_refs.extend(c.evidence_refs);
                             old.episodes.extend(c.episodes);
                             old.proposing_tasks.extend(c.proposing_tasks);
                             old.observed_work = old.observed_work.max(c.observed_work);
@@ -408,7 +425,7 @@ pub(crate) fn queue(layer: &Layer, suite: Option<&crate::knowledge_replay::Suite
             .then(b.2.cmp(&a.2))
             .then(a.3.statement_sha256.cmp(&b.3.statement_sha256))
     });
-    json!(rows.into_iter().map(|(families,applicable,work,c)|json!({"id":c.id,"statement_sha256":c.statement_sha256,"state":c.state,"strength":if c.assessment.is_some(){"measured"}else if families>=2{"observed"}else{"proposed"},"independent_families":families,"applicable_tasks":applicable,"observed_work":work,"conflicts":layer.candidates.iter().filter(|other|other.statement_sha256!=c.statement_sha256 && S::conflicts(c,other,&layer.isa)).map(|c|&c.id).collect::<Vec<_>>()})).collect::<Vec<_>>())
+    json!(rows.into_iter().map(|(families,applicable,work,c)|json!({"id":c.id,"statement_sha256":c.statement_sha256,"state":c.state,"strength":if c.assessment.as_ref().and_then(|h|layer.assessments.get(h)).is_some_and(|a|a.cases.iter().any(|case|case.applicable)){"measured"}else if families>=2{"observed"}else{"proposed"},"independent_families":families,"applicable_tasks":applicable,"observed_work":work,"conflicts":layer.candidates.iter().filter(|other|other.statement_sha256!=c.statement_sha256 && S::conflicts(c,other,&layer.isa)).map(|c|&c.id).collect::<Vec<_>>()})).collect::<Vec<_>>())
 }
 pub(crate) fn task_scope(facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact]) -> Scope {
     use zeno_fcis_loop_doors::strategy_knowledge::Value as V;
@@ -428,14 +445,18 @@ pub(crate) fn task_scope(facts: &[zeno_fcis_loop_doors::strategy_knowledge::Fact
     scope
 }
 pub(crate) fn layer_conflict(layers: &[Layer]) -> bool {
-    let isa = layers.iter().flat_map(|l| l.isa.iter().cloned()).collect();
+    let isa: BTreeSet<(String, String)> =
+        layers.iter().flat_map(|l| l.isa.iter().cloned()).collect();
+    if isa.iter().any(|(c, p)| c == p || member(p, c, &isa)) {
+        return true;
+    }
     let candidates = layers
         .iter()
         .flat_map(|l| l.candidates.iter())
         .collect::<Vec<_>>();
     candidates.iter().enumerate().any(|(i, a)| {
         candidates.iter().skip(i + 1).any(|b| {
-            a.id == b.id && a.statement_sha256 != b.statement_sha256
+            a.id == b.id && *a != *b
                 || a.state == State::Promoted
                     && b.state == State::Promoted
                     && S::conflicts(a, b, &isa)
@@ -457,12 +478,16 @@ pub(crate) fn advice<'a>(
         return vec![];
     }
     let scope = task_scope(facts);
+    let mut seen = BTreeSet::new();
+    let isa: BTreeSet<(String, String)> =
+        layers.iter().flat_map(|l| l.isa.iter().cloned()).collect();
     layers
         .iter()
         .flat_map(|l| {
             l.candidates
                 .iter()
-                .filter(|c| c.state == State::Promoted && applies(&c.scope, &scope, &l.isa))
+                .filter(|c| c.state == State::Promoted && applies(&c.scope, &scope, &isa))
         })
+        .filter(|candidate| seen.insert(candidate.statement_sha256.clone()))
         .collect()
 }

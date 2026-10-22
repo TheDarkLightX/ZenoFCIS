@@ -68,9 +68,35 @@ pub(crate) fn profiles(
     engine: &str,
     population: &str,
 ) -> Result<Value, &'static str> {
+    let suite_sha = if population == "held-out" {
+        layer
+            .history
+            .iter()
+            .rev()
+            .filter_map(|h| layer.assessments.get(&h.evidence))
+            .find(|a| !a.cases.is_empty())
+            .map(|a| a.suite_sha256.clone())
+    } else {
+        None
+    };
+    let tasks = suite_sha
+        .as_ref()
+        .and_then(|sha| layer.outputs.get(sha))
+        .and_then(|v| serde_json::from_value::<crate::knowledge_replay::Suite>(v.clone()).ok())
+        .map(|s| {
+            s.tasks
+                .into_iter()
+                .map(|t| t.sha256)
+                .collect::<BTreeSet<_>>()
+        });
     let mut classes = BTreeMap::<String, Vec<&CertifiedFact>>::new();
     for f in layer.facts.values().filter(|f| {
-        f.checker_sha256 == checker && f.engine_sha256 == engine && f.source == population
+        f.checker_sha256 == checker
+            && f.engine_sha256 == engine
+            && f.source == population
+            && tasks
+                .as_ref()
+                .is_none_or(|tasks| tasks.contains(&f.run.task))
     }) {
         let class = f
             .premises
@@ -293,11 +319,11 @@ pub(crate) fn profiles(
                 })
                 .then(a["door"].as_str().cmp(&b["door"].as_str()))
         });
-        leaderboards.push(json!({"class":class,"comparable_tasks":common.len(),"vbs_par2_work":vbs,"sbs_par2_work":sbs,"profiles":profiles}));
+        leaderboards.push(json!({"class":class,"comparable_tasks":common.len(),"vbs_par2_work":if common.is_empty(){Value::Null}else{json!(vbs)},"sbs_par2_work":if common.is_empty(){Value::Null}else{json!(sbs)},"profiles":profiles}));
     }
     let impacts=layer.candidates.iter().filter_map(|c|c.assessment.as_ref().and_then(|k|layer.assessments.get(k)).map(|a|json!({"lesson":c.id,"state":c.state,"assessment_sha256":c.assessment,"assessed_delta":crate::knowledge_workflow::aggregate(a)}))).collect::<Vec<_>>();
     Ok(
-        json!({"schema":"zeno-fcis/kb-loop-values/1","authority":"none","population":population,"work_unit":"sum-of-declared-loop-counters-no-cpu-claim","ranking":"solved-descending; PAR-2-work-ascending; closed-gap-descending; lexical","points_never_promote_veto_or_exclude":true,"leaderboards":leaderboards,"breadth":breadth,"knowledge_impact":impacts,"cross_version_regressions":version_regressions(layer)}),
+        json!({"schema":"zeno-fcis/kb-loop-values/1","authority":"none","engine_sha256":engine,"checker_sha256":checker,"population":population,"suite_sha256":suite_sha,"work_unit":"sum-of-declared-loop-counters-no-cpu-claim","ranking":"solved-descending; PAR-2-work-ascending; closed-gap-descending; lexical","points_never_promote_veto_or_exclude":true,"leaderboards":leaderboards,"breadth":breadth,"knowledge_impact":impacts,"cross_version_regressions":version_regressions(layer)}),
     )
 }
 fn version_regressions(layer: &Layer) -> Value {
@@ -354,6 +380,46 @@ mod tests {
             source: source.into(),
             run,
         }
+    }
+    #[test]
+    fn profiles_are_not_strategy_advice() {
+        let candidate = Candidate {
+            id: "candidate".into(),
+            statement_sha256: "a".repeat(64),
+            subject: "pipeline".into(),
+            claim: String::new(),
+            scope: Scope::new(),
+            effect: "helps".into(),
+            action: Action {
+                skip: BTreeSet::new(),
+                order: vec![],
+            },
+            proposing_tasks: BTreeSet::new(),
+            families: BTreeSet::new(),
+            episodes: BTreeSet::new(),
+            parents: BTreeSet::new(),
+            dependencies: BTreeMap::new(),
+            state: State::Proposed,
+            assessment: None,
+            observed_work: 0,
+            evidence_refs: BTreeSet::new(),
+            origin: "profile-proposal".into(),
+        };
+        let layer = Layer {
+            candidates: vec![candidate],
+            facts: BTreeMap::from([("a".into(), fact("a", "door", Verdict::Accepted, "held-out"))]),
+            ..Layer::default()
+        };
+        let values = profiles(&layer, "checker", "engine", "held-out").unwrap();
+        assert!(!values["leaderboards"].as_array().unwrap().is_empty());
+        let current =
+            crate::knowledge_store::current(&layer, "engine", "checker", "v", &BTreeMap::new());
+        use zeno_fcis_loop_doors::strategy_knowledge::{Fact, Value as K};
+        let facts = [Fact {
+            predicate: "task".into(),
+            arguments: vec![K::Text("subject".into()), K::Text("pipeline".into())],
+        }];
+        assert!(crate::knowledge_workflow::advice(&[current], &facts).is_empty());
     }
     #[test]
     fn refused_runs_are_out_of_scope() {

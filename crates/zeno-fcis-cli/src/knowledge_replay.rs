@@ -506,6 +506,95 @@ pub(crate) fn assess(
     Ok((next, key))
 }
 
+/// Re-execute a frozen record without changing the knowledge layer.
+pub(crate) fn replay_record(
+    layer: &Layer,
+    key: &str,
+    suite: &Suite,
+    suite_root: &Path,
+    private_parent: &Path,
+) -> Result<Value, &'static str> {
+    S::check(layer)?;
+    suite.check()?;
+    let a = layer.assessments.get(key).ok_or("kb-assessment-missing")?;
+    if S::hash(suite)? != a.suite_sha256 {
+        return Err("kb-replay-suite");
+    }
+    let (engine, checker, version) = S::identity()?;
+    if (engine, checker, version)
+        != (
+            a.engine_sha256.clone(),
+            a.checker_sha256.clone(),
+            a.tool_version.clone(),
+        )
+    {
+        return Err("kb-replay-engine-or-checker");
+    }
+    if a.resource_stop
+        .as_deref()
+        .is_some_and(|s| s != "total-work-budget")
+    {
+        return Err("kb-replay-resource-stop");
+    }
+    S::private_root(private_parent)?;
+    let root = private_parent.join(format!("replay-{}", std::process::id()));
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&root).map_err(|_| "kb-assessment-scratch")?;
+    let _scratch = Scratch(root.clone());
+    let candidates = layer
+        .candidates
+        .iter()
+        .filter(|c| a.candidates.contains(&c.statement_sha256))
+        .collect::<Vec<_>>();
+    if candidates.len() != a.candidates.len() {
+        return Err("kb-replay-candidate");
+    }
+    let mut work = 0u64;
+    for (i, c) in a.cases.iter().enumerate() {
+        let task = suite
+            .tasks
+            .iter()
+            .find(|t| t.sha256 == c.task)
+            .ok_or("kb-replay-task")?;
+        let original = S::bound(suite_root, &task.subject, 1_048_576)?;
+        let actions = candidates
+            .iter()
+            .filter(|candidate| applies(&candidate.scope, &task.scope, &layer.isa))
+            .map(|c| c.action.clone())
+            .collect::<Vec<_>>();
+        for (n, (actions, expected)) in [(vec![], &c.off), (actions, &c.on)].into_iter().enumerate()
+        {
+            let output = subprocess(task, &original, &actions, &root, i * 2 + n)?;
+            let measured = measure(
+                &output,
+                task.sha256.clone(),
+                task.seed,
+                task.budget.work,
+                task.subject.sha256.clone(),
+            )?;
+            work = work
+                .checked_add(measured.work.values().copied().sum::<u64>())
+                .and_then(|w| w.checked_add(8))
+                .ok_or("kb-work-overflow")?;
+            if measured != *expected {
+                return Err("kb-assessment-replay-mismatch");
+            }
+        }
+    }
+    let (decision, reason) = decide(&a.cases, &a.proposing_tasks, &a.policy, &a.annotations)?;
+    if a.resource_stop.is_none() && (decision != a.decision || reason != a.reason) {
+        return Err("kb-assessment-decision");
+    }
+    Ok(
+        json!({"status":"assessment-replayed","authority":"none","assessment_sha256":key,"decision":a.decision,"replay_work":work,"layer_unchanged":true}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

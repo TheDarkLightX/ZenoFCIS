@@ -1,286 +1,327 @@
-# Scoped usage knowledge
+# Knowledge from checked work
 
-Configured loops consult curated usage records before work and propose new
-observations for review. Knowledge can change proposal routing; exact program
-checkers still decide acceptance. A derivation explains the loaded facts and
-rules. It does not establish that an empirical lesson generalizes.
+The engine keeps two kinds of knowledge. Exact facts enter after their artifacts
+replay. Strategy lessons enter advice only after a frozen held-out ON/OFF
+assessment. Program acceptance stays with the exact checker. Queue priority,
+corroboration, review notes and points cannot promote a strategy.
 
-## Commands and configuration
+## A lesson's journey
+
+A configured loop consults the explicit private layers, runs its checked work, and
+writes one inbox proposal plus bounded outcome and episode records. An episode
+records the task binding and scope, steps, advice use, counterexamples, stopping
+bound, verdict, receipt hash and deterministic counters. Missing observations stay
+missing. An incomplete episode can be retained for diagnosis but cannot serve as
+evidence. Iteration records retain available candidate-space sizes or checked
+factor counts, counterexample elimination, satisfied constraints, term size,
+abstraction size, spuriousness and per-iteration work. Untracked values stay
+`null`; a known zero elimination stays zero. Stage summaries do not invent inner
+solver observations. These data support later value-model experiments without
+changing the assessment gate.
+
+For example, two contributors encounter the same stopping bound on distinct subject
+revisions. Failure mining proposes a `limit` or `defect` record with the episodes as
+evidence. Curation normalises declared scope and deduplicates the structured
+statement. Distinct subject revisions, sessions, contributors, tool versions and
+environments are retained as evidence-family metadata; repeating the same family
+counts once. These labels do not authenticate independence. Corroboration changes
+queue priority, never advice eligibility.
+
+The candidate proposes a concrete optional-stage order or skip. Assess it on members
+that were not used to propose it. Both modes consume identical input bytes, seeds
+and budgets. Each pair runs again in separate contained processes; a mismatch
+refuses the assessment. The record binds the frozen suite, task and output digests,
+checker and engine identities, policy and both observations. No elapsed-time
+measurement enters usefulness.
+
+A helpful candidate is promoted only when no applicable task gets worse and at least
+one gets strictly better. A harmful candidate is rejected. An absent applicability
+scope or unchanged result is inconclusive and leaves the candidate proposed. A
+resource stop cannot pass. A reviewer may veto or ask for a narrower scope with
+episode references; approval supplies no promotion capability.
+
+Continuing the example, assessed sibling lessons with the same effect and compatible
+scopes can propose their declared `isa` parent. Their assessed members become
+proposing members for that new item: the class lesson must be assessed on different
+members. Mixed positive and negative episodes can instead propose specialisations
+along one declared scope dimension. Growth creates proposals, not evidence for those
+proposals. When a tool version changes, the affected justification and its
+descendants move to pending; unrelated branches remain available. This is an
+illustrative workflow, not a claim that a mined rule generalises before its own
+assessment.
 
 ```sh
-zeno-fcis kb advise --task 'task(subject,check-program).'
-zeno-fcis kb advise --task 'task(subject,observe). task(tool,zeno-fcis). task(version,v241). task(environment,sandbox).'
-zeno-fcis kb plan --have model,observations --want answer --task 'task(subject,observe). task(tool,zeno-fcis). task(version,v241). task(environment,sandbox).'
-zeno-fcis kb explain 'usage_applies(L,S)' --task 'task(subject,check-program).'
-zeno-fcis kb check --kb team.layer.json --kb personal.layer.json
-zeno-fcis loop open --original original.zcve --session session --kb personal.layer.json --kb-task 'task(tool,zeno-fcis). task(version,v241). task(environment,host).'
+zeno-fcis kb init --out private/kb.layer.json
+zeno-fcis kb curate --source candidates.json --kb private/kb.layer.json
+zeno-fcis kb assessment-queue --suite suite.json --kb private/kb.layer.json
+zeno-fcis kb assess --suite suite.json --candidate lesson-id --kb private/kb.layer.json
+zeno-fcis kb explain lesson-id --kb private/kb.layer.json
+zeno-fcis kb replay-assessment --assessment ASSESSMENT_SHA256 --suite suite.json --kb private/kb.layer.json
+zeno-fcis kb grow --kb private/kb.layer.json
+zeno-fcis kb telemetry --kb private/kb.layer.json
+zeno-fcis kb refresh --kb private/kb.layer.json
 ```
 
-`--kb PATH` is repeatable. `ZENO_FCIS_KB` supplies a platform path-separated
-list when no paths are passed. These settings apply to `kb` and `loop`.
-No private location is searched automatically. Raw UTF-8 knowledge files and
-explicit JSON layer descriptors must live outside a ZenoFCIS checkout.
-Descriptors name their knowledge file and validation files explicitly; neither
-an inbox nor a directory of lessons is scanned.
+Create the private parent directory outside the checkout with permissions `0700`
+before using these write commands. `--kb PATH` is repeatable for reads; assessment
+updates require exactly one explicit layer. `ZENO_FCIS_KB` supplies paths only when
+none are passed. No private directory is searched implicitly.
 
-The compiled public example loads first, followed by the given layers in order.
-A descriptor has this shape; replace the hash placeholders with actual SHA256
-values:
+A minimal candidate source has this shape. `proposing_tasks` and `families` are
+required declarations: empty means no proposing observations; otherwise include
+every known task digest and evidence family. A family records `subject` (revision
+digest), `session`, `actor`, `tool` and `environment`. Use actual lowercase SHA256
+values for digests. Mechanical statement hashes and lifecycle fields are computed by
+curation, which always proposes.
 
 ```json
 {
-  "schema": "zeno-fcis/kb-layer/1",
-  "knowledge": {"path": "lessons.kb", "sha256": "KNOWLEDGE_SHA256"},
-  "validations": [{"path": "validation.json", "sha256": "VALIDATION_SHA256"}]
+  "schema": "zeno-fcis/kb-candidates/1",
+  "isa": [],
+  "candidates": [{
+    "id": "try-one-optimizer",
+    "subject": "pipeline",
+    "scope": {"family": ["bounded-counter"], "capability": ["immutable-proposal"]},
+    "effect": "helps",
+    "action": {"skip": ["canonical"], "order": []},
+    "proposing_tasks": [],
+    "families": []
+  }]
 }
 ```
 
-Paths in a descriptor are relative to that descriptor. A raw knowledge file's
-inbox is beside that file. A descriptor's inbox is beside the descriptor. Use a
-root-level descriptor when the inbox should belong to the whole knowledge base.
+`integrations/knowledge/import_sources.py` imports explicitly selected Commons
+records or one inbox proposal to a new private candidate file. It opens the Commons
+database read-only and pins a read transaction. Structured scope and actions are
+preserved; prose supplies neither applicability nor an invented strategy. Factory
+events need structured door, class, subject revision and failure fields. Repetitions
+across distinct subjects produce proposals with evidence references. `kb
+ingest-episodes --source FILE` imports explicitly selected episode observations; `kb
+grow` also mines those. Import never writes to the source store and cannot promote.
 
-The older `loop strategy --kb-op query|check|plan` commands remain available.
-They also accept `advise` and `explain`; `--kb-task` supplies their task facts.
-Read-only knowledge operations do not open a contained loop session.
+## Formal model and authority
 
-## Vocabulary
+A strategy statement consists of subject, claim, normalised scope, effect and
+optional-stage action. Its canonical hash excludes lifecycle, evidence-family counts
+and assessment references. The current adapter's subject is `pipeline`; its action
+can order or skip `complete`, `repair`, `canonical` and `resubstitute`. It cannot
+replace the checker or its receipt replay.
 
-The usage schema is `zeno-fcis/usage-knowledge/1`. It adds thirteen record
-predicates to the existing structural catalog, plus `task/2` for a request.
+An owned candidate moves through these states:
 
-| Predicate | Meaning |
+- `proposed`: eligible for assessment, absent from advice;
+- `promoted`: justified by its own passing assessment;
+- `rejected`: a measured regression or review veto;
+- `pending`: a stale justification or observational regression needs reassessment;
+- `refuted`: an exact claim has a replaying counterexample; that claim stays refuted.
+
+The assessment record is the inspectable assessed state between proposal and
+outcome. Inconclusive is an assessment outcome, not promotion. A lesson's
+justification contains its assessment, dependency hashes and parent statements.
+Retraction is the least fixed point of those dependency edges. Read operations
+abstain immediately from stale advice; `kb refresh` persists the retraction history.
+Applied observational outcomes are compared with the lesson's own assessed baseline
+on comparable subject-and-scope observations. An unseen subject has no paired
+baseline; it supplies observational evidence rather than a fabricated regression
+comparison. Regressions trigger reassessment and never promote by themselves.
+
+For every applicable held-out task, compare exact verdict class, every declared work
+counter, and both node count and encoded byte size when a result is accepted. No
+measure may worsen; at least one must strictly improve. Decisive but different
+verdict classes are not interchangeable. A policy's optional minimum effect in basis
+points limits improvements credited as useful; it does not permit a regression. A
+budget stop in an applicable comparison, an assessment resource stop or an
+incomplete suite cannot promote. The checker decides correctness independently of
+this threshold.
+
+The suite and record declare all per-task limits and the total reserved work budget.
+Assessment records retain consumed loop counters and assessment comparison charges,
+including the repeated independent replay. Reserved work is recorded separately.
+Curation work and all earlier assessment work at the KB revision are retained too;
+failed and inconclusive learning is not free. These are declared deterministic
+accounting units, not CPU instructions.
+
+### Exact facts and reuse
+
+`proved`, `refuted` and `certified` facts are keyed by exact subject digest and
+checker/engine identity. They carry premises and a replay artifact. A proof of
+finite equivalence proves that property for that pair, not an efficiency claim or a
+capability on other subjects. Counterexamples refute the exact recorded claim
+immediately. Certified bounded not-found and telemetry observations are facts about
+that run and its budget only.
+
+```sh
+zeno-fcis kb certify --original original.zcve --candidate candidate.zcve --kb private/kb.layer.json
+zeno-fcis kb facts --subject SUBJECT_SHA256 --kb private/kb.layer.json
+zeno-fcis kb reuse --fact FACT_SHA256 --subject original.zcve --kb private/kb.layer.json
+```
+
+`certify` replays finite transform equivalence or its counterexample without
+requiring usefulness assessment. `--refutes lesson-id` additionally requires that
+lesson's exact `equivalent:SUBJECT_SHA256:CANDIDATE_SHA256` claim to match; it
+retracts that claim's dependents. `reuse` checks the supplied subject and current
+checker and replays the artifact again. Merely retrieving a fact never accepts its
+result. The current reuse adapter handles these finite artifacts; other bounded-run
+results need their recorded task replay. Lean and Verus proof adapters are not
+supplied by this implementation.
+
+### Frozen cases and the aggregate measure
+
+The public regression suite is
+`crates/zeno-fcis-cli/tests/data/knowledge-suite/suite.json`. It contains six small
+native loop-door, core-component and template-derived tasks. The retained initial
+suite also includes counter-template completion. Every task has a digest, input
+digest, scope, fixed seed and budgets. Capacities one and two are development
+subjects; the current revision uses capacities four, six and seven and three other
+pinned programs as held-out subjects. The retained initial revision used capacities
+three, five and eight; after its broad shortcut was rejected, all its subjects
+became proposing subjects for the next revision. The engine refuses a task or
+subject revision used to propose the candidate, including parent cases used for
+generalisation. Renaming a subject does not make it held out. Cases retain their
+ON/OFF observations for exact-scope reuse.
+
+To add tasks, create a new frozen suite revision before observing its outcomes,
+retain the previous suite, and declare the proposing/held-out split. Once a result
+informs a proposal, reserve different members for the next assessment. Public
+regression fixtures are not a secret or representative population.
+
+```sh
+zeno-fcis kb assess --suite suite.json --kb private/kb.layer.json
+```
+
+Without `--candidate`, this runs all current promoted lessons against none and
+records the effect at that KB revision. Only this frozen ON/OFF result is evidence
+for a **compounding** claim: tasks solved and deterministic work on that suite.
+Inspect `aggregate`: it also reports assessment and curation work, including prior
+learning and recorded proposing-run work, and the ON cost with that overhead. A
+reduction in loop work alone does not establish a net saving or a benefit on other
+tasks.
+
+### How to read a loop's value
+
+```sh
+zeno-fcis kb leaderboard --kb private/kb.layer.json
+zeno-fcis kb leaderboard --population observational --kb private/kb.layer.json
+```
+
+Profiles are per loop configuration and problem class. The held-out view uses the
+latest recorded nonempty suite revision, so earlier proposing subjects do not leak
+into a later portfolio comparison. Held-out certified facts and field observations
+are separate populations. Primary order is solved count descending, PAR-2 work
+ascending, closed gap descending, then lexical. Profiles and points are descriptive
+trial menus, never strategy advice or acceptance gates. Their selection bias remains
+visible.
+
+For a worked arithmetic example, take a two-task class with budget 100 per task. A
+loop solving one task in 20 work units and stopping on the other after 80 has solve
+rate 1/2, PAR-2 sum `20 + 2*100 = 220`, and ERT `(20 + 80)/1 = 100`. A refusal is
+outside scope and is omitted from that loop's PAR-2 denominator; it still reduces
+applicability. If exactly two loops solve a task, its coverage-game Shapley credit
+is 1/2 each. Unique solves and marginal coverage count tasks lost on removal. These
+definitions are also computed on the frozen suite; unavailable observations are
+`null`.
+
+| Metric | Definition or interpretation |
 | --- | --- |
-| `lesson(Id, Subject)` | Stable identifier and applicable tool or class |
-| `scope(Id, Key, Value)` | A required scope condition |
-| `strength(Id, Level)` | `declared`, `observed`, `measured`, `preregistered`, or `proposed`; not a truth score |
-| `effect(Id, Kind)` | `helps`, `hurts`, `neutral`, `defect`, or `limit` |
-| `evidence(Id, Recipe, Hash)` | Evidence binding; a command string alone is insufficient |
-| `record(Id, State, Schema, Dependencies, Mode, Family)` | Promotion state, `usage-v1`, dependency hash, evidence role, evidence family |
-| `isa(Child, Parent)` | Directional class membership, closed transitively |
-| `limit(Id, Metric, Maximum, Unit)` | Nonnegative bound with `count`, `bytes`, or `work` units |
-| `blocker(Id, Environment)` | A declared environment exclusion |
-| `cost(Id, Metric, Amount)` | Declared or observed nonnegative data, not a calibrated estimate |
-| `prefer(Id, Preferred, Other)` | Explicit advisory order; no default inference |
-| `supersedes(New, Old)` | Replacement only where the validated new record applies |
-| `conflict(A, B)` | Explicit opposition, optionally derived by safe rules |
-| `task(Key, Value)` | Facts supplied for this request |
+| Effectiveness | Solved/rate, decisive verdicts, counterexample yield, unique solves, marginal coverage and exact coverage-game Shapley credit |
+| Efficiency | Nearest-rank median/p90 work to solve; PAR-2 charges unsolved applicable tasks twice their budget; ERT is total consumed work divided by solves |
+| Anytime | Solve counts at declared budget points and exact step-profile area normalised by budget and applicability |
+| Portfolio | VBS is per-task best; SBS is best fixed configuration, on a complete common applicable matrix; closed gap is `(SBS-loop)/(SBS-VBS)`, undefined when the denominator is zero |
+| Performance profile | Fraction within factors 1, 2, 4 and 10 of best known solved work |
+| Quality | Accepted node-cost gap to best recorded result; checked node-improvement rate |
+| Reliability | Receipt replay, refusals, applicability, classes with positive marginal coverage and recorded version regressions |
+| Cost | Calls, tokens, reserved money and owner questions per solve only where invocation accounting is available; unknown values stay `null` |
+| Knowledge impact | Each lesson's bound assessment and ON/OFF delta |
 
-States are `proposed`, `promoted`, and `rejected`. Evidence modes are
-`observation`, `exact-precondition`, and `reproduced-blocker`. Only the latter
-two may enforce exclusions, and only after validation. Observation records
-remain advisory even when their effect is `limit`. Repeating an evidence
-record supplies no extra strength or replication weight.
+The scalar work view sums the declared loop counters with unit weights; the Pareto
+gate continues to inspect every counter independently. Counterexample prefix work is
+unknown when the underlying loop did not record it.
 
-Identifiers are nonempty lowercase letters, digits, and hyphens, up to 96
-bytes. A lesson has one subject, strength, effect, and lifecycle record.
-Missing evidence, invalid enums, dangling or cyclic supersession, an `isa`
-cycle, conflicting scalar scopes, and unresolved overlapping conflicts fail `check`. Promoted records
-without current validation also fail `check`. Proposed records never become
-advice merely because their syntax is valid. Integrity failures conservatively
-abstain from all actionable advice; they never select a conflicting record.
+Loop value points range from 0 to 100. The displayed components have weights 40%
+solved rate, 25% PAR-2 efficiency, 20% marginal contribution and 15% receipt replay.
+Efficiency is `1 - PAR2/(2*sum of applicable budgets)`, floored at zero. Grades are
+A at 85, B at 70, C at 50, and D below 50. Weights and components are in each
+profile and are recomputed on demand. **Points never promote, veto or exclude
+anything.** They are a reading aid, not the objective threshold.
 
-Lesson metadata and hierarchy edges are declared facts. User rules may derive
-conflicts and extension views; they cannot manufacture lifecycle or validation
-records. The internal `usage_` namespace and stored `task` facts are reserved.
+The requested external references could not be verified from primary sources in the
+offline source tree. The attribution remains **unverified**, including PAR-2/SAT
+competitions; ERT/COCO-BBOB; Dolan and More (2002), performance profiles; Frechette
+et al. (AAAI 2016), Shapley portfolio analysis; and the VBS/SBS closed-gap
+convention. The formulas above are the implementation contract; the bibliographic
+attributions require verification before use as publication evidence.
 
-## Applicability and absence
+## Difference from the earlier knowledge engine
 
-Supported scope dimensions are `tool`, `version`, `family`, `environment`,
-`capability`, and `prerequisite`. Every scope row must match. Tool and family
-values can match through directional `isa`; versions and environments match
-exactly. Capabilities and prerequisites may have multiple required values.
-The scalar task dimensions and each numeric measurement have one value.
+The earlier engine provided typed Datalog applicability, provenance, replayed
+positive/boundary cases, layering, automatic consultation and inbox outcomes. It did
+not assess empirical usefulness. Those logical checks remain; a pair of
+reproductions does not by itself qualify a strategy for advice now.
 
-An omitted scope dimension imposes no restriction. Explicit `any` requires a
-known value for that dimension. An omitted task fact or the value `unknown`
-does not satisfy a condition. Missing assumptions are returned separately;
-they never establish permission or safety. No similarity search supplies scope.
+`kb migrate --source old.layer.json --out private/kb.layer.json` preserves the
+version-one knowledge text as pending legacy evidence. It does not silently promote
+curator decisions. The retained legacy facts and rules remain available to explicit
+logical queries and explanations as a pending read projection; they cannot activate
+strategy advice. Version-one files remain readable for explicit queries and replay,
+but their external validations cannot activate strategy advice. Translate the
+desired routing into candidate records and assess it. The compiled public
+declarations remain a separate fixed demonstration policy; they are not a measured
+empirical generalisation.
 
-Numeric facts include their unit in the key: a `tuples` limit with unit `count`
-uses `task(tuples-count,4096)`. Bytes are a different measurement. Equality at
-the maximum is allowed. An unknown size is reported without enforcing a
-numeric exclusion. Subject membership alone never discharges other conditions.
+The logical language remains finite, function-free, safe stratified Datalog.
+Positive strata reach a least fixed point; negation reads completed lower strata.
+Recursion through negation refuses. Closed-world absence means not derivable in this
+snapshot, never false in reality. Each answer retains one bounded derivation with
+rule, premises, source layer, negative lookups and typed comparisons. `kb explain
+'usage_applies(L,S)' --task 'task(subject,check-program).'` continues to provide
+those witnesses; a lesson identifier shows its assessment, episodes and parent
+chain.
 
-Advice contains all and only applicable, promoted, currently validated records.
-A validated narrow replacement defeats an older record only in their matching
-overlap. Outside it, the older record remains available. An unpromoted or stale
-replacement does not retire it. Conflicts are checked over overlapping scopes,
-including a known common subclass; disjoint versions do not conflict.
+Scope dimensions remain `tool`, `version`, `family`, `environment`, `capability` and
+`prerequisite`. Every declared condition must match. Tool and family follow
+directional `isa`; version and environment match exactly. An explicit `any` requires
+a known fact. Missing or `unknown` task facts do not satisfy a requirement. Numeric
+K1 limits retain explicit units. Similarity, global age decay and strength vetoes
+are not implemented. Conflicts are reported; incompatible overlapping promoted
+actions refuse publication.
 
-The layer override key is a lesson ID with its complete record block. A later
-block wins the effective data view. Changed blocks produce a layer conflict;
-both versions are retained in the explicit query report, and advice abstains.
-Use distinct IDs and scoped `supersedes` for a deliberate narrow exception.
-Layers cannot replace executable steps, checker gates, or the public type
-catalog. The complete reserved structural relations still have to match code.
+## Storage, privacy and supported scope
 
-## Logic and explanations
+Version-two descriptors contain `schema: zeno-fcis/kb-layer/2` and one `state`
+path/hash binding to an immutable content-addressed snapshot. A writer locks the
+layer, compares the expected descriptor hash, validates the complete snapshot,
+writes and fsyncs it, runs `kb check` on the staged descriptor, then renames and
+syncs the descriptor. Failure retains or restores the old complete layer. Readers
+verify the descriptor and snapshot; a half-written data file is never published as
+the current layer. Locks are process-owned; immutable old snapshots support
+recovery. This is local filesystem durability, not distributed consensus or
+authenticated provenance.
 
-The language is function-free, safe, stratified Datalog over finite constants.
-Positive strata reach least fixed points; negation refers only to completed
-lower strata. Negation through recursion is refused. The closed-world meaning
-of `not p(...)` is “not derivable in this snapshot,” never “false in reality.”
+All acquisition uses explicit files outside a checkout. Private text, scope,
+episodes and traces stay in those private layers and inboxes. Ordinary loop logs and
+receipts carry paths, hashes and public status only. Explicit `kb` responses contain
+the requested private data; keep their destination private. Nothing is uploaded or
+embedded in a package. Only the public neutral example and public regression
+fixtures are shipped.
 
-Constants are names, JSON strings, and signed 64-bit integers. `=`, `!=`, `<`,
-`<=`, `>`, and `>=` are supported. Ordering requires integers and performs no
-arithmetic or coercion. Named head, negative, and comparison variables must
-occur in positive literals. `_` is anonymous in queries and literals, and is
-refused in heads and comparisons. Every predicate has one arity.
+MCP retains read-only advice, planning and explanation. One additional
+`kb_assessment_view` exposes assessments, queue, telemetry or the leaderboard. It
+cannot assess, import, certify, grow, refresh or write a layer. Other MCP loop
+adapters suppress ambient and saved-session knowledge configuration. Read-only
+access cannot control a caller's own logging.
 
-Each answer has one deterministic finite derivation: ground conclusion, rule
-index, bindings, source layer, parent facts, grounded negative lookups, and
-typed comparisons. Parent facts precede conclusions. Exclusions also expose
-the constraint and observed task inputs. Override reports retain both sides;
-ranking reports state the declared ordering data and tie-break. Layer hashes
-identify the frozen source snapshot. The engine does not enumerate all proofs.
+The K1 logical limits remain 64 KiB combined text, eight layers, 8,192 tokens per
+text, 128 rules and predicates, 4,096 facts and bindings, arity eight, sixteen body
+literals and planning steps, 32 variables, 8,192 relation rows, 4,096 planning
+states and 2,000,000 logical work units. Acquisition and process deadlines refuse
+expired results; they are not a host wall-time guarantee. Version-two snapshots are
+limited to 16 MiB, 128 candidates and assessments, 64 tasks per suite, 128 hierarchy
+edges, 4,096 retained episodes/facts and bounded per-task output. All returned data
+is owned; no mutable global knowledge cache or caller alias supplies decision
+authority.
 
-## Evidence and invalidation
-
-Curators promote records explicitly. A versioned replay recipe binds the lesson
-statement, runner, checker binary, declared inputs and dependencies, expected
-exit, and a JSON output assertion. Each actionable record needs a positive case
-and a nearby negative or boundary case. The structured statement excludes the
-self-referential evidence and lifecycle hashes; changing scope, effect, limits,
-or preferences invalidates its old validation.
-
-`kb replay --recipe recipe.json --out ./validation.json` runs an approved bounded
-shell adapter. It never executes a raw lesson command string and never promotes
-a lesson. The first external runner, `zeno-fcis-readonly-v1`, admits fixed native
-`transform check --original FILE --candidate FILE` and
-`contract review DIR [--gaps]` shapes. It refuses export, arbitrary
-tools, and free-form command flags. Cases have bounded input/output sizes and
-process deadlines. Missing inputs, changed hashes, timeouts, and assertion
-mismatches remain distinct failures. Declare the full relevant source and
-policy dependencies, including files outside the command's subjects.
-Both transform subjects must be hashed case inputs. Contract review requires
-its `project.zeno`, `v2/policy.json`, and examples file when present as inputs.
-
-Each case runs in a fresh private snapshot containing its declared dependencies
-and inputs, both transform files or the entire contract directory. Undeclared
-contract files and empty directories are included. Hashes are checked on the
-copies, and the dependency digest binds both complete snapshot inventories
-and the checker binary. The child reads those copies; source changes cannot
-replace the bytes it consumes. A final live inventory check also refuses
-changes that persist after replay.
-
-Copied paths must be relative to the recipe directory. Absolute paths, `..`,
-non-UTF-8 names, symlinks and special files refuse. Each snapshot admits at most
-64 MiB of file data, 4,096 entries counting files and every created directory
-(including implicit parents, excluding the staging root), and depth 128.
-Declared inputs retain their 1 MiB per-file limit. Snapshot preparation
-requires Unix; other platforms refuse. Child scratch is removed with staging;
-no child output is written back to the source tree.
-
-Choose a new `--out` file in an existing parent directory, outside the checkout
-and both copied contract trees, including their subdirectories. Destinations
-inside either tree refuse with `kb-evidence-output-subject`, including aliases
-through a symlinked parent.
-The receipt is the only replay output retained on disk. Creating it inside a
-subject would immediately invalidate the inventory it records.
-
-A recipe uses schema `zeno-fcis/kb-recipe/1`, `runner`, `lesson`, `family`, `mode`,
-`checker_sha256`, `dependencies`, `statement`, `positive`, and `negative`.
-Each input is `{ "path": "...", "sha256": "..." }`. A statement row is
-`{ "predicate": "scope", "arguments": ["lesson-id", "version", "v241"] }`.
-A case supplies `arguments`, `inputs`, `expected_exit`, and
-`assertion: { "pointer": "/status", "equals": "expected-status" }`.
-Use the actual checker response schema for the assertion.
-
-Validation files retain the recipe binding, dependency digest, both observed
-outputs and assertions, and last validation time. Loading a layer rechecks the
-bindings and current dependencies. A change makes that validation stale pending
-explicit replay. There is no global age decay. Validation files are local
-curator evidence, not authenticated receipts or program publication authority.
-A replay validates the recorded cases, not an empirical generalization.
-Receipts with the older declared-input-only dependency identity require
-explicit replay under the current checker. Rebind the recipe's
-`checker_sha256` and refresh the layer's validation-file hash after replay;
-the recipe and validation schema identifiers remain unchanged.
-
-The compiled example has a separate `compiled-public-policy-v1` runner. It
-replays fixed positive and boundary fixtures against the actual pure engine
-for the public declarations only. Its evidence hashes bind the public source;
-it cannot admit a private record or establish real host availability. The
-example's sandbox restriction is a declared demonstration policy. Its work
-units are declared ordering data. They are not private measurements.
-
-## Planning and automatic feedback
-
-Planning first retains the structural catalog check and existing type algebra.
-It filters evidenced environment blockers and exceeded numeric limits. Search
-finds a shortest monotone type path. Declared preference penalties, declared
-work units, and lexical ties order the frontier; this is not a cost optimum or
-an empirical strategy recommendation. Preferences attached to a defect or
-negative effect do not recommend that observed bad ordering.
-
-Execute only `next_step`, then use `kb replan` with the artifacts actually
-produced. A failed or unknown step contributes no imagined products. Artifacts
-in a plan are names, not checked runtime values. Program qualification still
-requires the unchanged exact checker and matching full-domain replay.
-
-Configured loop invocations consult before dispatch. Program pipelines and
-strategy trials filter and order their optional stages from that advice, and
-re-evaluate guards after actual search and checker outcomes. A blocked direct
-operation is skipped. Unavailable advice retains the ordinary checked proposer
-path. The contained child checks the parent's snapshot binding before using
-its own acquired data. No mutable global knowledge cache is retained.
-
-After each configured invocation, exactly one structured proposed lesson is
-written to the last layer's `inbox/`, alongside private observation evidence.
-The files record consultation, application or blocking, observed checker fields
-when available, and costs. Session accounting counters are labeled cumulative,
-separately from invocation counters. A loop outcome never invents a matched
-replay, and invocation duration excludes proposal-file I/O. Missing checker observations remain unknown. They
-never imply success. No file is added to promoted lessons. Inbox directories
-require private permissions and files use exclusive creation. This does not
-promise crash-safe exactly-once feedback or an authenticated curator.
-
-## Privacy and bounds
-
-Only the public example is compiled or packaged. User knowledge is acquired
-from explicit external files. Ordinary loop diagnostics and receipts carry
-paths, hashes, and public status metadata; lesson text, identifiers, scopes,
-and rule traces stay out of them. Explicit `kb` responses contain requested
-private data: keep their destination private.
-
-MCP exposes only `kb_advise`, `kb_plan`, and `kb_explain`, marked read-only.
-These calls do not write proposals, replay recipes, or promote records. They
-use only the paths given to that call. Other MCP loop tools suppress ambient
-KB configuration, so they do not create a KB write path. A client can still
-record a tool response; read-only access does not control a client's logs.
-The engine has no upload operation.
-
-The pure caps remain 64 KiB of combined knowledge text, eight layers, 8,192
-tokens per parsed text, 128 rules including the fixed usage rules, 128
-predicates, 4,096 declared facts, arity eight, body length sixteen, and 32
-named variables. Relations admit at most 8,192 rows; joins and query answers
-at most 4,096 bindings. Planning has at most 4,096 states and sixteen steps.
-Trace copying is charged and bounded. The work ceiling is 2,000,000 logical
-units per consultation, including public policy replay preparation. Stops
-retain charged work and return no partial answers or candidate plan.
-
-A contained invocation consults in the parent and child separately, with each
-cost recorded separately. Search/check budgets remain their own accounting;
-logical work is not measured CPU time. Acquisition and completion deadlines
-suppress expired results without a host wall-time guarantee. The loader caps
-external validation files at 32. It does not discover facts from prose, learn
-rules, implement stable models, decay knowledge by age, estimate success, or
-establish a compounding advantage.
-
-A successful configured `loop open` or `loop capture open` freezes the KB
-snapshot and task configuration for later commands on that session. A sibling
-`SESSION.knowledge.json` contains only the private configuration path and hash;
-the task facts and explicit KB paths live in the last layer's private inbox.
-This sidecar is outside the authoritative session store. Later commands reuse
-that configuration. Changed layers, validation dependencies or task context
-make consultation unavailable; ordinary exact checks remain available. Open a
-new session to change the frozen context. `--no-kb` explicitly disables automatic
-consultation, including stored session configuration. MCP loop adapters always
-use this flag. Stateless commands use one snapshot per invocation.
-
-The neutral learner example also requires family `finite-learner`, capability
-`finite-domain`, and prerequisite `vocabulary`. These are explicit descriptions
-of the finite vocabulary workflow, not facts guessed from a task's text. For
-that example, pass all three alongside tool, version, and environment facts;
-missing any one abstains. Its transitive learner membership preserves every
-one of those conditions.
+The current assessment adapter covers finite guarded program pipelines and finite
+equivalence/counterexample artifact replay. It does not establish whole-tool
+readiness, universal loop quality, a cost optimum, a production release, or a
+benefit beyond the declared frozen comparison. Source-bound assessment evidence must
+be refreshed after engine or checker changes.

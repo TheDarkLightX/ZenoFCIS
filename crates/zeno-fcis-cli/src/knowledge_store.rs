@@ -135,6 +135,8 @@ pub(crate) fn check(layer: &Layer) -> Result<(), &'static str> {
             || statement(c)? != c.statement_sha256
             || !ids.insert(&c.id)
             || !statements.insert(&c.statement_sha256)
+            || c.evidence_refs.len() > 1024
+            || c.evidence_refs.iter().any(|s| s.len() > 4096)
             || c.families.len() > 128
             || c.episodes.len() > 512
             || c.parents.len() > 32
@@ -648,6 +650,7 @@ mod tests {
             state: State::Proposed,
             assessment: None,
             observed_work: 0,
+            evidence_refs: BTreeSet::new(),
             origin: "test".into(),
         };
         c.statement_sha256 = statement(&c).unwrap();
@@ -744,6 +747,22 @@ mod tests {
                 .iter()
                 .any(|h| h.kind == "justification-invalidated")
         );
+    }
+    #[test]
+    fn changed_lifecycle_in_same_layer_key_is_a_conflict() {
+        let a = candidate("same");
+        let mut b = a.clone();
+        b.state = State::Rejected;
+        assert!(crate::knowledge_workflow::layer_conflict(&[
+            Layer {
+                candidates: vec![a],
+                ..Layer::default()
+            },
+            Layer {
+                candidates: vec![b],
+                ..Layer::default()
+            }
+        ]));
     }
     #[test]
     fn unassessed_sources_never_become_advice() {

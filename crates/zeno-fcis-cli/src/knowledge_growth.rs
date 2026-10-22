@@ -13,6 +13,130 @@ pub(crate) struct AdviceUse {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct Iteration {
+    pub index: u32,
+    pub kind: String,
+    pub outcome_kind: Option<String>,
+    pub candidate_space_before: Option<u64>,
+    pub candidate_space_after: Option<u64>,
+    pub space_factors_before: Vec<u64>,
+    pub space_factors_after: Vec<u64>,
+    pub eliminated_candidates: Option<u64>,
+    pub counterexample_eliminated: Option<bool>,
+    pub constraints_satisfied: Option<u64>,
+    pub constraints_total: Option<u64>,
+    pub term_size: Option<u64>,
+    pub abstraction_size: Option<u64>,
+    pub spurious: Option<bool>,
+    pub work: Option<BTreeMap<String, u64>>,
+}
+fn space_factors(value: &Value) -> Vec<u64> {
+    value
+        .as_array()
+        .filter(|v| v.len() <= 64)
+        .and_then(|v| v.iter().map(Value::as_u64).collect::<Option<Vec<_>>>())
+        .unwrap_or_default()
+}
+fn space_size(value: &Value, factors: &[u64]) -> Option<u64> {
+    value.as_u64().or_else(|| {
+        if factors.is_empty() {
+            None
+        } else {
+            factors.iter().try_fold(1u64, |a, b| a.checked_mul(*b))
+        }
+    })
+}
+fn iteration(row: &Value, index: usize, kind: &str) -> Iteration {
+    let before = space_factors(&row["before"]);
+    let after = space_factors(&row["counts"]);
+    let eliminated = row["eliminated_candidates"].as_u64();
+    let mut work = BTreeMap::new();
+    for key in [
+        "check_requests",
+        "gate_pairs_reserved",
+        "search_stage_requests",
+        "control_frames",
+        "synthesis_work_used",
+        "work_used",
+        "work",
+    ] {
+        if let Some(n) = row["work"][key]
+            .as_u64()
+            .or_else(|| row[key].as_u64())
+            .or_else(|| {
+                if key == "work" {
+                    row["usage"]["work"].as_u64()
+                } else {
+                    None
+                }
+            })
+        {
+            work.insert(key.into(), n);
+        }
+    }
+    Iteration {
+        index: index as u32,
+        kind: kind.into(),
+        outcome_kind: row["status"]
+            .as_str()
+            .or_else(|| row["learning_status"].as_str())
+            .or_else(|| row["proposal_status"].as_str())
+            .map(|s| s.chars().take(64).collect()),
+        candidate_space_before: space_size(&row["candidate_space_before"], &before),
+        candidate_space_after: space_size(
+            row.get("candidate_space_after").unwrap_or(&row["count"]),
+            &after,
+        ),
+        space_factors_before: before,
+        space_factors_after: after,
+        eliminated_candidates: eliminated,
+        counterexample_eliminated: eliminated
+            .map(|n| n > 0)
+            .or_else(|| row["counterexample_eliminated"].as_bool()),
+        constraints_satisfied: row["constraints_satisfied"].as_u64(),
+        constraints_total: row["constraints_total"].as_u64(),
+        term_size: row["term_size"]
+            .as_u64()
+            .or_else(|| row["best"]["nodes"].as_u64()),
+        abstraction_size: row["abstraction_size"].as_u64(),
+        spurious: row["spurious"].as_bool(),
+        work: (!work.is_empty()).then_some(work),
+    }
+}
+pub(crate) fn iterations(output: &Value) -> (Vec<Iteration>, bool) {
+    let root = output.get("detail").unwrap_or(output);
+    let detail = if root["door"].is_object() {
+        &root["door"]
+    } else {
+        root
+    };
+    if !detail.is_object() {
+        return (vec![], false);
+    }
+    let rows = detail["iterations"]
+        .as_array()
+        .or_else(|| detail["trace"].as_array());
+    let kind = if detail["iterations"].is_array() {
+        "iteration"
+    } else {
+        "stage"
+    };
+    let mut records = rows
+        .into_iter()
+        .flatten()
+        .take(256)
+        .enumerate()
+        .map(|(i, r)| iteration(r, i, kind))
+        .collect::<Vec<_>>();
+    let truncated = rows.is_some_and(|r| r.len() > 256);
+    let summary = iteration(detail, records.len(), "invocation-summary");
+    if records.len() < 256 {
+        records.push(summary);
+    }
+    (records, truncated)
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct Episode {
     pub schema: String,
     pub task: String,
@@ -29,6 +153,12 @@ pub(crate) struct Episode {
     pub checker_sha256: String,
     pub engine_sha256: String,
     pub family: EvidenceFamily,
+    #[serde(default)]
+    pub result_cost: Option<[u64; 2]>,
+    #[serde(default)]
+    pub iterations: Vec<Iteration>,
+    #[serde(default)]
+    pub iterations_truncated: bool,
     pub model_calls: Option<u64>,
     pub tokens: Option<u64>,
     pub money_reserved: Option<u64>,
@@ -49,6 +179,23 @@ impl Episode {
                 .values()
                 .try_fold(0u64, |a, b| a.checked_add(*b))
                 .is_none_or(|w| w > 1_000_000_000)
+            || self.iterations.len() > 256
+            || self.iterations.iter().any(|i| {
+                i.constraints_satisfied
+                    .zip(i.constraints_total)
+                    .is_some_and(|(a, b)| a > b)
+                    || i.eliminated_candidates
+                        .zip(i.counterexample_eliminated)
+                        .is_some_and(|(n, b)| (n > 0) != b)
+                    || i.space_factors_before.len() > 64
+                    || i.space_factors_after.len() > 64
+                    || i.work.as_ref().is_some_and(|w| {
+                        w.len() > 16
+                            || w.values()
+                                .try_fold(0u64, |a, b| a.checked_add(*b))
+                                .is_none()
+                    })
+            })
             || self.steps.len() > 64
             || self.counterexamples.len() > 64
             || self.advice.len() > 128
@@ -177,6 +324,41 @@ pub(crate) fn replay_refutation(output: &Value, run: &Run) -> Result<(), &'stati
     }
     Ok(())
 }
+fn artifact_property(output: &Value, run: &Run) -> Result<(FactStatus, String), &'static str> {
+    if output["detail"]["best_check"]["verdict"] == "equivalent"
+        && output["detail"]["best_check"]["replay"] == "matched"
+    {
+        replay_proof(output, run)?;
+        let candidate = output["detail"]["best"]["sha256"]
+            .as_str()
+            .filter(|s| digest(s))
+            .ok_or("kb-proof-candidate")?;
+        return Ok((
+            FactStatus::Proved,
+            format!("equivalent:{}:{candidate}", run.inputs),
+        ));
+    }
+    if let Some(case) = output["detail"]["candidates"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|c| c["check"]["verdict"] == "counterexample")
+    {
+        replay_refutation(output, run)?;
+        let candidate = case["candidate"]["sha256"]
+            .as_str()
+            .filter(|s| digest(s))
+            .ok_or("kb-proof-candidate")?;
+        return Ok((
+            FactStatus::Refuted,
+            format!("equivalent:{}:{candidate}", run.inputs),
+        ));
+    }
+    Ok((
+        FactStatus::Certified,
+        format!("bounded-run:{}:{}", run.task, run.budget),
+    ))
+}
 pub(crate) fn certify(
     layer: &Layer,
     output: &Value,
@@ -200,17 +382,10 @@ pub(crate) fn certify(
     let task = S::hash(&(&property, &scope))?;
     let run =
         crate::knowledge_replay::measure(output, task.clone(), 0, 10_000_000, subject.clone())?;
-    let status = match run.verdict {
-        Verdict::Accepted => {
-            replay_proof(output, &run)?;
-            FactStatus::Proved
-        }
-        Verdict::Counterexample => {
-            replay_refutation(output, &run)?;
-            FactStatus::Refuted
-        }
-        _ => return Err("kb-artifact-inconclusive"),
-    };
+    let (status, checked_property) = artifact_property(output, &run)?;
+    if status == FactStatus::Certified || checked_property != property {
+        return Err("kb-artifact-inconclusive");
+    }
     let episode = Episode {
         schema: "zeno-fcis/kb-episode/1".into(),
         task,
@@ -237,6 +412,9 @@ pub(crate) fn certify(
             tool: version.clone(),
             environment: "finite-checker".into(),
         },
+        result_cost: run.result_cost,
+        iterations: iterations(output).0,
+        iterations_truncated: iterations(output).1,
         model_calls: None,
         tokens: None,
         money_reserved: None,
@@ -353,6 +531,9 @@ pub(crate) fn add_cases(layer: &Layer, assessment: &str) -> Result<Layer, &'stat
                     tool: a.tool_version.clone(),
                     environment: "bounded-replay".into(),
                 },
+                result_cost: run.result_cost,
+                iterations: iterations(output).0,
+                iterations_truncated: iterations(output).1,
                 model_calls: Some(0),
                 tokens: Some(0),
                 money_reserved: Some(0),
@@ -368,26 +549,14 @@ pub(crate) fn add_cases(layer: &Layer, assessment: &str) -> Result<Layer, &'stat
                     }
                 }
             }
-            let status = if run.verdict == Verdict::Accepted {
-                replay_proof(output, run)?;
-                FactStatus::Proved
-            } else if run.verdict == Verdict::Counterexample {
-                FactStatus::Refuted
-            } else {
-                FactStatus::Certified
-            };
+            let (status, property) = artifact_property(output, run)?;
             let fact = CertifiedFact {
                 subject: run.inputs.clone(),
                 checker_sha256: a.checker_sha256.clone(),
                 engine_sha256: a.engine_sha256.clone(),
                 tool_version: a.tool_version.clone(),
                 status,
-                property: if run.verdict.solved() {
-                    "finite-program-equivalence"
-                } else {
-                    "exact-bounded-run"
-                }
-                .into(),
+                property,
                 premises: c.scope.clone(),
                 door: episode.door.clone(),
                 run: run.clone(),
@@ -424,6 +593,7 @@ pub(crate) fn validate(layer: &Layer) -> Result<(), &'static str> {
             || e.subject.as_ref() != Some(&f.subject)
             || e.verdict != Some(f.run.verdict)
             || e.work != f.run.work
+            || e.result_cost != f.run.result_cost
             || e.receipt_sha256.as_ref() != Some(&f.run.receipt_sha256)
         {
             return Err("kb-fact-episode");
@@ -463,14 +633,9 @@ pub(crate) fn validate(layer: &Layer) -> Result<(), &'static str> {
         {
             return Err("kb-fact-artifact-measurements");
         }
-        if f.status == FactStatus::Proved {
-            replay_proof(output, &f.run)?;
-        }
-        if f.status == FactStatus::Refuted {
-            if f.run.verdict != Verdict::Counterexample {
-                return Err("kb-refutation-artifact");
-            }
-            replay_refutation(output, &f.run)?;
+        let (status, property) = artifact_property(output, &f.run)?;
+        if status != f.status || property != f.property {
+            return Err("kb-fact-artifact-property");
         }
     }
     Ok(())
@@ -479,7 +644,13 @@ pub(crate) fn telemetry(layer: &Layer) -> Value {
     let mut rows = BTreeMap::<(String, String), Value>::new();
     for e in layer.episodes.values() {
         for advice in &e.advice {
-            let key = (advice.lesson.clone(), S::hash(&e.scope).unwrap_or_default());
+            let lesson = layer
+                .candidates
+                .iter()
+                .find(|c| c.id == advice.lesson || c.statement_sha256 == advice.lesson)
+                .map(|c| c.statement_sha256.clone())
+                .unwrap_or_else(|| advice.lesson.clone());
+            let key = (lesson, S::hash(&e.scope).unwrap_or_default());
             let row=rows.entry(key).or_insert_with(||json!({"applied":0,"overridden":0,"blocked":0,"consulted":0,"checker_outcomes":{},"work":0,"reassessment_required":false}));
             let n = row[&advice.outcome].as_u64().unwrap_or(0);
             row[&advice.outcome] = json!(n + 1);
@@ -489,16 +660,19 @@ pub(crate) fn telemetry(layer: &Layer) -> Value {
             let n = row["checker_outcomes"][&verdict].as_u64().unwrap_or(0);
             row["checker_outcomes"][&verdict] = json!(n + 1);
             if advice.outcome == "applied" {
-                if let Some(c) = layer
-                    .candidates
-                    .iter()
-                    .find(|c| c.id == advice.lesson || c.statement_sha256 == advice.lesson)
-                {
+                if let Some(c) = layer.candidates.iter().find(|c| {
+                    (c.id == advice.lesson || c.statement_sha256 == advice.lesson)
+                        && c.state == State::Promoted
+                }) {
                     if let Some(a) = c.assessment.as_ref().and_then(|a| layer.assessments.get(a)) {
                         for case in &a.cases {
                             if case.scope == e.scope
+                                && e.subject.as_ref() == Some(&case.off.inputs)
                                 && (e.verdict.is_some_and(|v| !v.solved())
                                     && case.off.verdict.solved()
+                                    || e.result_cost.zip(case.off.result_cost).is_some_and(
+                                        |(on, off)| on.iter().zip(off).any(|(n, o)| *n > o),
+                                    )
                                     || e.work.iter().any(|(k, v)| {
                                         case.off.work.get(k).is_some_and(|base| v > base)
                                     }))
@@ -564,6 +738,7 @@ pub(crate) fn grow(layer: &Layer) -> Result<Vec<Candidate>, &'static str> {
                         c.proposing_tasks.extend(p.proposing_tasks.iter().cloned());
                         c.families.extend(p.families.iter().cloned());
                         c.episodes.extend(p.episodes.iter().cloned());
+                        c.evidence_refs.extend(p.evidence_refs.iter().cloned());
                         if let Some(r) =
                             p.assessment.as_ref().and_then(|h| layer.assessments.get(h))
                         {
@@ -700,6 +875,7 @@ pub(crate) fn mine(episodes: &BTreeMap<String, Episode>) -> Result<Vec<Candidate
                 .iter()
                 .map(|(_, e)| e.work.values().copied().sum::<u64>())
                 .sum(),
+            evidence_refs: BTreeSet::new(),
             origin: format!("failure-signature:{door}:{reason}"),
         };
         out.push(proposal(c, "failure-mining")?);
@@ -709,6 +885,17 @@ pub(crate) fn mine(episodes: &BTreeMap<String, Episode>) -> Result<Vec<Candidate
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn iteration_records_keep_known_zero_and_unknown_separate() {
+        let (rows, truncated) = iterations(
+            &json!({"detail":{"iterations":[{"candidate_space_before":8,"candidate_space_after":8,"eliminated_candidates":0,"counterexample_eliminated":true,"work":{"work":12}}]}}),
+        );
+        assert!(!truncated);
+        assert_eq!(rows[0].counterexample_eliminated, Some(false));
+        assert_eq!(rows[0].candidate_space_after, Some(8));
+        assert_eq!(rows[0].constraints_satisfied, None);
+        assert_eq!(rows[0].work.as_ref().unwrap()["work"], 12);
+    }
     #[test]
     fn proved_artifact_requires_replay_and_exact_limits() {
         let bytes =
@@ -730,6 +917,42 @@ mod tests {
         let mut absent = output;
         absent["detail"]["best"]["program"] = Value::Null;
         assert!(replay_proof(&absent, &run).is_err());
+    }
+    #[test]
+    fn proof_property_does_not_claim_a_within_budget_solve() {
+        let bytes =
+            include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
+        let output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let run = crate::knowledge_replay::measure(
+            &output,
+            "a".repeat(64),
+            0,
+            1,
+            crate::transform::sha256_hex(bytes),
+        )
+        .unwrap();
+        assert_eq!(run.verdict, Verdict::Inconclusive);
+        assert!(run.budget_stop);
+        assert_eq!(
+            artifact_property(&output, &run).unwrap().0,
+            FactStatus::Proved
+        );
+    }
+    #[test]
+    fn proved_status_requires_a_replaying_artifact() {
+        let bytes =
+            include_bytes!("../tests/fixtures/i128-door-programs/bounded-counter-c3.original.zcve");
+        let mut output = crate::loop_command::doors::assessment_certificate(bytes, bytes).unwrap();
+        let run = crate::knowledge_replay::measure(
+            &output,
+            "a".repeat(64),
+            0,
+            100000,
+            crate::transform::sha256_hex(bytes),
+        )
+        .unwrap();
+        output["detail"]["best"]["program"] = Value::Null;
+        assert!(replay_proof(&output, &run).is_err());
     }
     #[test]
     fn reused_result_must_replay_receipt() {
@@ -802,6 +1025,9 @@ mod tests {
                 tool: "v".into(),
                 environment: "e".into(),
             },
+            result_cost: None,
+            iterations: vec![],
+            iterations_truncated: false,
             model_calls: None,
             tokens: None,
             money_reserved: None,

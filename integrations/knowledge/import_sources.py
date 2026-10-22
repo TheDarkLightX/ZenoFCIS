@@ -16,6 +16,11 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def prose_claim(text):
+    normal = " ".join(text.split())
+    return normal if len(normal) <= 4096 else "source-text:" + digest(text.encode())
+
+
 def candidate(body, source_hash, reference, family):
     # No scope or strategy is inferred from prose or similarity.
     scope = body.get("scope", {})
@@ -34,10 +39,10 @@ def candidate(body, source_hash, reference, family):
     # Private imported statements remain inspectable even if no executable routing is proposed.
     statement = body.get("statement_sha256") or source_hash
     return {"id": "import-" + source_hash[:24], "statement_sha256": "", "subject": "pipeline",
-            "claim": body.get("claim", "source-statement:" + str(statement)), "scope": normal, "effect": body.get("effect", "neutral"), "action": action,
+            "claim": body.get("claim", "" if "action" in body else "source-statement:" + str(statement)), "scope": normal, "effect": body.get("effect", "neutral"), "action": action,
             "proposing_tasks": body.get("proposing_tasks", []), "families": [family],
             "episodes": body.get("episodes", []), "parents": [], "dependencies": {}, "state": "proposed",
-            "assessment": None, "observed_work": body.get("work", 0),
+            "assessment": None, "observed_work": body.get("work", 0), "evidence_refs": [reference + ":" + source_hash],
             "origin": "source:" + reference + ":" + str(statement)}
 
 
@@ -56,11 +61,11 @@ def commons(path):
         try:
             body = json.loads(text)
         except (ValueError, TypeError):
-            body = {"claim": " ".join(text.split())[:4096]}
+            body = {"claim": prose_claim(text)}
         if type(body) is not dict:
-            body = {"claim": " ".join(text.split())[:4096]}
+            body = {"claim": prose_claim(text)}
         h = digest(text.encode())
-        family = {"subject": body.get("subject_sha256", h), "session": str(revision), "actor": actor,
+        family = {"subject": body.get("subject_sha256", "unknown"), "session": body.get("session", "unknown"), "actor": actor,
                   "tool": body.get("tool_version", "unknown"), "environment": body.get("environment", "unknown")}
         rows.append(candidate(body, h, "commons-record:" + key, family))
     failures = {}
@@ -80,18 +85,19 @@ def commons(path):
         if not all(type(x) is str and x for x in (reason, door, problem_class, subject_digest)):
             continue
         signature = door, problem_class, reason
-        failures.setdefault(signature, {})[subject_digest] = (body, event_hash, actor)
+        family_key = (subject_digest, body.get("session", "unknown"), actor, body.get("tool_version", "unknown"), body.get("environment", "unknown"))
+        failures.setdefault(signature, {})[family_key] = (body, event_hash, actor)
     connection.rollback()
     connection.close()
     for (door, problem_class, reason), subjects in sorted(failures.items()):
-        if len(subjects) < 2:
+        if len({key[0] for key in subjects}) < 2:
             continue
         body = {"claim": "failure:" + door + ":" + reason, "scope": {"family": [problem_class]}, "effect": "limit" if "budget" in reason else "defect"}
         h = digest(json.dumps([door, problem_class, reason], separators=(",", ":")).encode())
         row = candidate(body, h, "factory-signature:" + h, {"subject": h, "session": "unknown", "actor": "unknown", "tool": "unknown", "environment": "unknown"})
-        row["families"] = [{"subject": subject, "session": b.get("session", event), "actor": actor,
-                            "tool": b.get("tool_version", "unknown"), "environment": b.get("environment", "unknown")}
-                           for subject, (b, event, actor) in sorted(subjects.items())]
+        row["families"] = [{"subject": key[0], "session": key[1], "actor": key[2], "tool": key[3], "environment": key[4]}
+                           for key in sorted(subjects)]
+        row["evidence_refs"] = ["factory-event:" + event for _, event, _ in subjects.values()]
         row["origin"] += ":evidence:" + ",".join(event for _, event, _ in subjects.values())
         rows.append(row)
     return rows
@@ -99,12 +105,15 @@ def commons(path):
 
 def inbox(path):
     # An explicit single K1 proposal is read; directories are never scanned.
-    data = path.read_bytes()
+    if path.is_symlink() or not path.is_file() or path.stat().st_size>65536:
+        raise ValueError("inbox-source-bound")
+    with path.open("rb") as file:
+        data=file.read(65537)
     if len(data) > 65536:
         raise ValueError("inbox-source-bound")
     h = digest(data)
-    family = {"subject": h, "session": h, "actor": "unknown", "tool": "unknown", "environment": "unknown"}
-    return [candidate({"claim": " ".join(data.decode("utf-8").split())[:4096]}, h, "inbox:" + h, family)]
+    family = {"subject": "unknown", "session": "unknown", "actor": "unknown", "tool": "unknown", "environment": "unknown"}
+    return [candidate({"claim": prose_claim(data.decode("utf-8"))}, h, "inbox:" + h, family)]
 
 
 def main():

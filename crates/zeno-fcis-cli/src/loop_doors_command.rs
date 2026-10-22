@@ -2877,7 +2877,7 @@ pub(crate) fn assessment_run(
     }
     let mut counter = pipeline::Budget::new(limits);
     if !actions.is_empty() {
-        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::assessed(actions));
+        counter.knowledge = Some(crate::loop_knowledge::LoopPolicy::from_actions(actions));
     }
     let mut run = pipeline::run(&task, &stages, &mut counter);
     search_limits::annotate("pipeline", run.status, &mut run.report);

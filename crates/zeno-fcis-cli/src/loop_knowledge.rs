@@ -22,10 +22,18 @@ pub(crate) struct LoopPolicy {
     lesson_actions: std::collections::BTreeMap<String, crate::knowledge_assessment::Action>,
 }
 impl LoopPolicy {
-    pub(crate) fn assessed(actions: &[crate::knowledge_assessment::Action]) -> Self {
+    pub(crate) fn from_actions(actions: &[crate::knowledge_assessment::Action]) -> Self {
         let mut policy = Self::default();
         for action in actions {
             policy.excluded.extend(action.skip.iter().cloned());
+            if !action.order.is_empty() {
+                for stage in crate::knowledge_assessment::STAGES {
+                    policy
+                        .ranks
+                        .entry(stage.into())
+                        .or_insert((action.order.len() as u64, 0));
+                }
+            }
             for (i, step) in action.order.iter().enumerate() {
                 policy.ranks.insert(step.clone(), (i as u64, 0));
             }
@@ -33,7 +41,7 @@ impl LoopPolicy {
         policy
     }
     pub(crate) fn add_assessed(&mut self, actions: &[crate::knowledge_assessment::Action]) {
-        let trial = Self::assessed(actions);
+        let trial = Self::from_actions(actions);
         self.excluded.extend(trial.excluded);
         self.ranks.extend(trial.ranks);
     }
@@ -276,6 +284,16 @@ impl LoopPolicy {
                 tool: env!("CARGO_PKG_VERSION").into(),
                 environment: "configured".into(),
             },
+            result_cost: if verdict == Some(Verdict::Accepted) {
+                report["detail"]["best"]["nodes"]
+                    .as_u64()
+                    .zip(report["detail"]["best"]["bytes"].as_u64())
+                    .map(|(n, b)| [n, b])
+            } else {
+                None
+            },
+            iterations: crate::knowledge_growth::iterations(report).0,
+            iterations_truncated: crate::knowledge_growth::iterations(report).1,
             model_calls: None,
             tokens: None,
             money_reserved: None,
@@ -519,12 +537,16 @@ pub(crate) fn prepare(
         .collect::<Vec<_>>()
         .join(" ");
     policy.command_sha256 = sha256_hex(command.as_bytes());
+    let counts = (
+        advice.lessons.len() + assessed.len(),
+        advice.exclusions.len(),
+    );
     Ok(Some(Consultation {
         loaded,
         subjects,
         command,
         blocked,
-        counts: (advice.lessons.len(), advice.exclusions.len()),
+        counts,
         consulted_work: report.work,
         consultation_micros: started.elapsed().as_micros(),
         started,
@@ -715,6 +737,15 @@ fn read_session_config(marker: &std::path::Path) -> Result<SessionConfig, Value>
 mod tests {
     use super::*;
     use clap::Parser;
+    #[test]
+    fn listed_assessment_stages_precede_unlisted_stages() {
+        let actions = [crate::knowledge_assessment::Action {
+            skip: std::collections::BTreeSet::new(),
+            order: vec!["resubstitute".into()],
+        }];
+        let policy = LoopPolicy::from_actions(&actions);
+        assert!(policy.rank("resubstitute") < policy.rank("canonical"));
+    }
     #[test]
     fn kb_usage_session_configuration_reuses_snapshot_and_invalidates_changes() {
         // Preparation/serialization test only. No checked loop execution is

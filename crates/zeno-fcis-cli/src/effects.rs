@@ -926,6 +926,7 @@ effects! { crate::knowledge_command::Operation {
         "migrate" => Self::Migrate { .. } => declared((&["explicit-legacy-layer"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
         "curate" => Self::Curate { .. } => declared((&["explicit-candidates", "explicit-knowledge-layers"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
         "assess" => Self::Assess { .. } => declared((&["frozen-suite", "explicit-knowledge-layers", "bound-inputs"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock", "temporary-checker-files"], true, None));
+        "replay-assessment" => Self::ReplayAssessment{..} => declared((&["explicit-knowledge-layers", "frozen-suite", "bound-inputs"], &["temporary-checker-files"], true, None));
         "assessment-queue" => Self::AssessmentQueue{..} => declared((&["explicit-knowledge-layers"], &[], false, None));
         "grow" => Self::Grow => declared((&["explicit-knowledge-layers", "private-case-base"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));
         "ingest-episodes" => Self::IngestEpisodes {..} => declared((&["explicit-episode-records"], &["private-layer-descriptor", "private-state-snapshot", "private-layer-lock"], false, None));

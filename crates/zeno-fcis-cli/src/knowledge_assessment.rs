@@ -44,9 +44,10 @@ pub(crate) struct EvidenceFamily {
     pub tool: String,
     pub environment: String,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum State {
+    #[default]
     Proposed,
     Promoted,
     Rejected,
@@ -57,6 +58,7 @@ pub(crate) enum State {
 #[serde(deny_unknown_fields)]
 pub(crate) struct Candidate {
     pub id: String,
+    #[serde(default)]
     pub statement_sha256: String,
     pub subject: String,
     #[serde(default)]
@@ -66,12 +68,21 @@ pub(crate) struct Candidate {
     pub action: Action,
     pub proposing_tasks: BTreeSet<String>,
     pub families: BTreeSet<EvidenceFamily>,
+    #[serde(default)]
     pub episodes: BTreeSet<String>,
+    #[serde(default)]
     pub parents: BTreeSet<String>,
+    #[serde(default)]
     pub dependencies: BTreeMap<String, String>,
+    #[serde(default)]
     pub state: State,
+    #[serde(default)]
     pub assessment: Option<String>,
+    #[serde(default)]
     pub observed_work: u64,
+    #[serde(default)]
+    pub evidence_refs: BTreeSet<String>,
+    #[serde(default)]
     pub origin: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -604,6 +615,7 @@ mod tests {
             state: State::Promoted,
             assessment: None,
             observed_work: 0,
+            evidence_refs: BTreeSet::new(),
             origin: "test".into(),
         };
         let mut b = c.clone();
