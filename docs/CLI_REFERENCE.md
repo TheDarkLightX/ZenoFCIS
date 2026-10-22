@@ -1430,6 +1430,48 @@ fields, these two lines are the same example:
 150 161 160 | 140 | 162 | accept - 151 161 162 | 162 161
 ```
 
+## Replay and compare recorded JSON run artifacts
+
+From a source checkout, `tools/replay_run.py` runs an explicit replay command
+and compares selected JSON artifacts with a recorded run in one invocation:
+
+```sh
+python3 tools/replay_run.py recorded-run --out replayed-run \
+  --file run.json --ignore run.json:/elapsed_ms \
+  -- tool replay --input '{recorded}/input.json' --out '{out}'
+```
+
+Replace the command after `--` with the run's actual replay invocation. The
+output directory must be fresh; the replay command creates it. Each token's
+`{recorded}` and `{out}` expands to the respective absolute directory. The
+command executes directly, without a shell, with a 300-second default timeout
+(`--timeout SECONDS` overrides it). Its stdout and stderr are retained in
+sibling `OUTPUT.stdout.log` and `OUTPUT.stderr.log` files. The recorded files
+are read before execution and never rewritten by the comparison tool.
+
+Repeat `--file` to select more JSON files. Exact scalar JSON pointers supplied
+as `--ignore FILE:POINTER` declare nondeterministic observations; no timing,
+path, digest or manifest field is silently ignored. Object keys, list order,
+lengths and scalar kinds still compare. Absolute paths beginning with each
+run's own directory normalize to the same relative run path. Other absolute
+paths and hashes remain exact: explicitly select stable artifact fields or
+declare the precise derived digest observations to ignore. Files are compared
+in filename order, object keys in key order, and arrays in index order. The
+result reports the earliest difference as `file` and JSON `pointer`, together
+with the two values or a missing-field indication.
+
+Exit 0 means the selected artifacts matched within that declared scope; 1
+means a difference or unsuccessful replay; 2 means malformed input, a missing
+artifact, I/O failure or timeout. Equality supplies no checker, release or
+publication authority and makes no claim about unselected artifacts. JSON
+artifacts are limited to 16 MiB each; duplicate keys and nonfinite values
+refuse. Use only a replay command whose effects you intend to execute.
+
+Background: Glenford J. Myers, *The Art of Software Testing*, Wiley (1979),
+describes expected-result comparisons; Bryan and Zyp, *JSON Pointer*, RFC 6901,
+IETF (2013), defines the difference locations. This is a scoped replay wrapper
+with explicit nondeterminism declarations; prior-art search pending.
+
 ## Contract representation refinement (2.6, unreleased)
 
 The [construction guide](CONSTRUCTION.md) describes how a frozen requirements reference and different
