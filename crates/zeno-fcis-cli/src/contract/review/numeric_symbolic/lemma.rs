@@ -1,5 +1,6 @@
 //! Symbolic induction or relations on native admitted committing decisions.
 //! Proposed lemmas are never installed as admission laws of the subject.
+use super::super::lemma::PreStates;
 use super::*;
 use crate::contract::{
     graph::{Graph, LawGraph},
@@ -200,6 +201,12 @@ pub(crate) fn check(
             results.push(json!({"formula":formula,"status":"UNKNOWN","reason":"lemma encoding supports scalar input and state observations"}));continue;
         }
         let mut e = Encoding::new(&c, &format!("lemma{index}"), Script::default(), None)?;
+        let pre_states = if transition {
+            PreStates::TRANSITION
+        } else {
+            PreStates::Lawful
+        };
+        let pre_state = pre_states.predicate(Term::Bool(true), || e.lawful.clone());
         let pre = e.law(&c, &law, None, "lemma_pre")?;
         let mut post = Vec::new();
         for i in 0..c.branches.len() {
@@ -290,7 +297,7 @@ pub(crate) fn check(
                     .filter(|(i, _)| c.branches[*i].class != Class::Reject)
                     .map(|(_, case)| {
                         Term::and(vec![
-                            e.lawful.clone(),
+                            pre_state.clone(),
                             case.selected.clone(),
                             case.constructed.clone(),
                             Term::and(case.laws.iter().map(|(_, t)| t.clone()).collect()),
@@ -329,7 +336,7 @@ pub(crate) fn check(
                 continue;
             }
             let mut bad = vec![
-                e.lawful.clone(),
+                pre_state.clone(),
                 case.selected.clone(),
                 case.constructed.clone(),
                 Term::and(case.laws.iter().map(|(_, t)| t.clone()).collect()),

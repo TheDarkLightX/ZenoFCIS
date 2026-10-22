@@ -1,4 +1,6 @@
 use super::*;
+#[path = "lemma_tests.rs"]
+mod lemma_tests;
 
 fn answers(cvc5: Answer, z3: Answer) -> Answers {
     Answers {

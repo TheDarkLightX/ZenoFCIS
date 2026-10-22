@@ -1,0 +1,14 @@
+zeno 1;
+project 1 repair_pre_lemma;
+namespace 2 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 105 int StateValue in 0..=2;
+type 106 int Zero in 0..=0;
+field 110 100 balance 105;
+field 120 101 unused 106;
+reason 300 Stop precedence 0;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 4096; }
+merge [400];
+law 500 positive on commit, genesis = post.100.110 >= 1;

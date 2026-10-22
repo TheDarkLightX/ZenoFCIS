@@ -1080,6 +1080,13 @@ pub(super) fn lemmas(
                         (0usize, 0usize, 0usize, 0usize);
                     let mut witness = None;
                     for (i, row) in space.rows.iter().enumerate() {
+                        if !lemma::PreStates::TRANSITION.predicate(true, || {
+                            let ids = state_ids(authority.descriptor());
+                            let laws = LawSet::new_numeric(authority.descriptor(), &ids);
+                            state_check(&contract, row, &laws).is_none()
+                        }) {
+                            continue;
+                        }
                         let f = frame(&contract, row)?;
                         let evaluation = authority.evaluate(c::Raw {
                             state: &f[0],

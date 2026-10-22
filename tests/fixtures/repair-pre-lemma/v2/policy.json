@@ -1,0 +1,39 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/3",
+  "template": "repair-pre-lemma",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "Bool"
+    ]
+  },
+  "variables": {},
+  "cases": [
+    {
+      "when": false,
+      "class": "Reject",
+      "reason": 300,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": true,
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "1"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 1
+  },
+  "law_kinds": {
+    "500": "StateInvariant"
+  }
+}

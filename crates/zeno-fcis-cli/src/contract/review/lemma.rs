@@ -70,6 +70,27 @@ pub(super) fn induction<S: Clone + Ord>(
     Ok((states.len(), None))
 }
 
+/// Which declared pre-states a lemma obligation covers. The finite and
+/// symbolic transition judges must use the same scope, including repairs.
+#[derive(Clone, Copy)]
+pub(super) enum PreStates {
+    Declared,
+    Lawful,
+}
+
+impl PreStates {
+    pub(super) const TRANSITION: Self = Self::Declared;
+
+    /// Select either the whole declared domain or its lawful subset. The
+    /// predicate can be a native Boolean or a symbolic Boolean term.
+    pub(super) fn predicate<T>(self, declared: T, lawful: impl FnOnce() -> T) -> T {
+        match self {
+            Self::Declared => declared,
+            Self::Lawful => lawful(),
+        }
+    }
+}
+
 /// The lemma judge's result.
 #[derive(Clone, Debug)]
 pub(crate) enum Lemmas {
@@ -167,11 +188,15 @@ pub(crate) fn judge_transitions(
             &format!("transition lemma {}", index + 1),
             formula,
         )?;
+        let in_scope = |ordinal: usize| {
+            PreStates::TRANSITION.predicate(true, || observation.valid[ordinal / space.inputs])
+                && machine.observed[ordinal].commits()
+        };
         let count = |truth| {
             truths
                 .iter()
-                .zip(&machine.observed)
-                .filter(|(value, outcome)| outcome.commits() && **value == truth)
+                .enumerate()
+                .filter(|(ordinal, value)| in_scope(*ordinal) && **value == truth)
                 .count()
         };
         let failed = count(Truth::Fails);
@@ -184,7 +209,8 @@ pub(crate) fn judge_transitions(
         let admitted = machine
             .observed
             .iter()
-            .filter(|outcome| outcome.commits())
+            .enumerate()
+            .filter(|(ordinal, _)| in_scope(*ordinal))
             .count();
         let verdict = if failed != 0 {
             "false"
@@ -211,8 +237,8 @@ pub(crate) fn judge_transitions(
         };
         if let Some(ordinal) = truths
             .iter()
-            .zip(&machine.observed)
-            .position(|(truth, outcome)| outcome.commits() && *truth == witness)
+            .enumerate()
+            .position(|(ordinal, truth)| in_scope(ordinal) && *truth == witness)
         {
             result["counterexample"] = json!({
                 "ordinal": ordinal,
