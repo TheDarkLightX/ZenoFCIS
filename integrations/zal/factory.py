@@ -186,6 +186,8 @@ def _partial(node, accepted):
 
 def lower_machine(model: behavior2.Machine) -> dict[str, str]:
     """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
+    if model.players or model.games:
+        raise Refusal("unsupported lowering: game players and properties; use export-game")
     safety = []
     for name, formula in model.properties:
         shape = behavior2.property_shape(formula)

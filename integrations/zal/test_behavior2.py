@@ -298,6 +298,22 @@ class Profile2Tests(unittest.TestCase):
                 factory.lower(parse(source))
         with self.assertRaisesRegex(Refusal, "unsupported lowering: unresolved arithmetic"):
             factory.lower(parse(ORDER + "unresolved arithmetic: fees round down;\n"))
+        game = parse("""zal 2;
+machine simple_game;
+states aa, bb;
+events tick;
+context none;
+initial aa;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule advance: aa + tick [true] -> accept bb;
+rule remain: bb + tick [true] -> accept bb;
+player operator moves in bb;
+player user moves in aa;
+property reaches: user can force eventually (state == bb);
+""")
+        with self.assertRaisesRegex(Refusal, "unsupported lowering: game players and properties; use export-game"):
+            factory.lower(game)
         files = factory.lower(parse(ORDER))
         self.assertIn("law 520 require_approve_only_if_authorized_accept on accept = "
                       "((command.101 == 120 && post.100.110 == 150) -> context.102.160 == 1);", files["project.zeno"])
