@@ -19,7 +19,8 @@ pub use table_lookup::{TableReadExpression, parse_table_read, table_index_sets};
 
 use crate::ast::*;
 use crate::collections::{
-    CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, Scan, SummaryDecl, SummaryKind,
+    CollectionsSpec, EntryDecl, KeyPaths, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, Scan,
+    SummaryDecl, SummaryKind,
 };
 use crate::diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan, text,
@@ -254,7 +255,8 @@ fn parse_with_tables(
 /// whole file is parsed and their view can be emitted.
 #[derive(Default)]
 struct Drafts {
-    keys: Vec<(StableId, Identifier, SourceSpan, u32)>,
+    keys: Vec<(StableId, Identifier, SourceSpan, u32, Option<IntRange>)>,
+    order_reads: Vec<(OrderReadDecl, SourceSpan, u32)>,
     maps: Vec<(MapDecl, SourceSpan, u32)>,
     entries: Vec<(EntryDecl, SourceSpan, u32)>,
     summaries: Vec<(SummaryDecl, SourceSpan)>,
@@ -365,6 +367,9 @@ impl Parser {
             } else if self.take_keyword("entry") {
                 self.parse_entry();
                 None
+            } else if self.take_keyword("order") {
+                self.parse_order_read();
+                None
             } else if self.take_keyword("summary") {
                 self.parse_summary().map(Declaration::Field)
             } else if self.take_keyword("variant") {
@@ -407,7 +412,7 @@ impl Parser {
         self.refuse_table_collisions(project_id);
         self.refuse_constant_collisions(project_id);
         self.refuse_derived_collisions(project_id);
-        let collections = self.finish_collections();
+        let collections = self.finish_collections(project_id);
         ParsedProject {
             version,
             project_id,
@@ -434,13 +439,33 @@ impl Parser {
         if kind_name.as_str() == "index" {
             return self.parse_index_type(id);
         }
-        if kind_name.as_str() == "key" {
+        if matches!(kind_name.as_str(), "key" | "ordered") {
             let name = self.take_identifier("type.name")?;
+            let order = if kind_name.as_str() == "ordered" {
+                self.expect_keyword("in", "type.order");
+                let lo = self.take_i128("type.order.min")?;
+                self.expect_symbol(TokenKind::Range, "type.order");
+                self.expect_symbol(TokenKind::Equal, "type.order");
+                let hi = self.take_i128("type.order.max")?;
+                let range = IntRange::try_new(lo, hi);
+                if range.is_none() {
+                    self.error(
+                        DiagnosticCode::InvalidDeclaration,
+                        "type.order",
+                        "MIN <= MAX",
+                        "reversed",
+                        "use inclusive bounds",
+                    );
+                }
+                range
+            } else {
+                None
+            };
             self.expect_symbol(TokenKind::Semicolon, "type");
             let end = self.last_end();
             self.drafts
                 .keys
-                .push((id, name, self.declaration_start, end));
+                .push((id, name, self.declaration_start, end, order));
             return None;
         }
         let kind = match kind_name.as_str() {
@@ -741,12 +766,13 @@ impl Parser {
     /// Validates the collection declarations, emits their view declarations
     /// and rewrites, checks how formulas use keys and maps, and returns the
     /// collections metadata. See [`crate::CollectionsSpec`].
-    fn finish_collections(&mut self) -> CollectionsSpec {
+    fn finish_collections(&mut self, project_id: StableId) -> CollectionsSpec {
         let drafts = core::mem::take(&mut self.drafts);
         if drafts.keys.is_empty()
             && drafts.maps.is_empty()
             && drafts.entries.is_empty()
             && drafts.summaries.is_empty()
+            && drafts.order_reads.is_empty()
         {
             return CollectionsSpec::default();
         }
@@ -799,7 +825,15 @@ impl Parser {
         };
         let mut problems: Vec<(SourceSpan, &'static str, &'static str, String)> = Vec::new();
         let mut emitted: Vec<(Declaration, SourceSpan)> = Vec::new();
-        let mut key_paths = KeyPaths::default();
+        let mut key_paths = KeyPaths {
+            ordered: drafts
+                .keys
+                .iter()
+                .filter(|k| k.4.is_some())
+                .map(|k| k.0.get())
+                .collect(),
+            ..KeyPaths::default()
+        };
 
         // Maps: their presence type is the map's ID.
         let mut maps = Vec::new();
@@ -974,7 +1008,7 @@ impl Parser {
 
         // Key types: one class per key position of the type.
         let mut keys = Vec::new();
-        for (id, name, span, end) in drafts.keys {
+        for (id, name, span, end, order) in drafts.keys {
             let positions = inputs.get(&id.get()).copied().unwrap_or(0)
                 + stored.get(&id.get()).copied().unwrap_or(0);
             let max = i128::from(positions.max(1) - 1);
@@ -992,7 +1026,100 @@ impl Parser {
                 id,
                 name,
                 positions,
+                order,
             });
+        }
+
+        // Order observations are external pre-state inputs, never writable state.
+        let mut order_reads = Vec::new();
+        let mut outputs = BTreeSet::new();
+        let mut read_ids = BTreeSet::new();
+        for (read, span, end) in drafts.order_reads {
+            let map = maps.iter().find(|m| m.id == read.map);
+            let field_type = |path: &ProjectionPath| {
+                let owner = match path.root() {
+                    ProjectionRoot::Command => command,
+                    ProjectionRoot::Context => context,
+                    _ => None,
+                };
+                let seg = path.segments();
+                (seg.len() == 2 && Some(seg[0].get()) == owner)
+                    .then(|| fields.get(&seg[0].get()))
+                    .flatten()
+                    .and_then(|fs| fs.iter().find(|(id, ..)| *id == seg[1]))
+                    .map(|(_, _, t, _)| *t)
+            };
+            let endpoints: Vec<&ProjectionPath> = match &read.kind {
+                OrderReadKind::Min | OrderReadKind::Max => vec![],
+                OrderReadKind::Successor(at) | OrderReadKind::Predecessor(at) => vec![at],
+                OrderReadKind::Range(lo, hi) => vec![lo, hi],
+            };
+            let valid = map.is_some_and(|map| {
+                key_paths.ordered.contains(&map.key_type.get())
+                    && read.result.root() == ProjectionRoot::Context
+                    && field_type(&read.result) == Some(map.key_type)
+                    && read.found.root() == ProjectionRoot::Context
+                    && field_type(&read.found)
+                        .and_then(|t| kinds.get(&t.get()))
+                        .is_some_and(|(k, r)| {
+                            *k == TypeKind::Int && r.is_some_and(|r| r.min() == 0 && r.max() == 1)
+                        })
+                    && endpoints
+                        .iter()
+                        .all(|p| field_type(p) == Some(map.key_type))
+            });
+            let result = (read.result.root(), read.result.segments().to_vec());
+            let found = (read.found.root(), read.found.segments().to_vec());
+            let occupied = read.id == project_id
+                || self.declarations.iter().any(|s| {
+                    declaration_ids(&s.declaration)
+                        .iter()
+                        .any(|(id, _)| *id == read.id.get())
+                })
+                || emitted.iter().any(|(d, _)| {
+                    declaration_ids(d)
+                        .iter()
+                        .any(|(id, _)| *id == read.id.get())
+                })
+                || entries.iter().any(|e| e.id == read.id)
+                || !read_ids.insert(read.id);
+            if !valid
+                || occupied
+                || outputs.contains(&result)
+                || outputs.contains(&found)
+                || order_reads.len() >= 4
+            {
+                problems.push((span, "order.read", "at most four reads on ordered maps with unique IDs and distinct context key/0..=1 outputs and same-type input endpoints", text(read.id.get()).into()));
+            } else {
+                outputs.insert(result);
+                outputs.insert(found);
+                self.rewrites.push(Rewrite {
+                    start: span.start(),
+                    end,
+                    text: String::new(),
+                });
+                order_reads.push(read);
+            }
+        }
+        // Query outputs cannot also be query endpoints: there is one fixed,
+        // simultaneous observation layer, with no data-dependent read chain.
+        for read in &order_reads {
+            let endpoints: Vec<&ProjectionPath> = match &read.kind {
+                OrderReadKind::Min | OrderReadKind::Max => vec![],
+                OrderReadKind::Successor(at) | OrderReadKind::Predecessor(at) => vec![at],
+                OrderReadKind::Range(lo, hi) => vec![lo, hi],
+            };
+            if endpoints
+                .iter()
+                .any(|p| outputs.contains(&(p.root(), p.segments().to_vec())))
+            {
+                problems.push((
+                    self.declaration_start,
+                    "order.endpoint",
+                    "command or context inputs independent of read outputs",
+                    text(read.id.get()).into(),
+                ));
+            }
         }
 
         // Summaries: a ranged integer field over a declared map.
@@ -1036,6 +1163,59 @@ impl Parser {
             };
             if !law.applicability().is_some_and(|a| a.genesis()) {
                 continue;
+            }
+            if !key_paths.ordered.is_empty() && formula_has_input(law.formula()) {
+                problems.push((
+                    spanned.span,
+                    "law.order",
+                    "ordered state invariants independent of command and context observations",
+                    text(law.id().get()).into(),
+                ));
+            }
+            let mut conjuncts = Vec::new();
+            crate::collections::conjuncts(law.formula(), &mut conjuncts);
+            if !key_paths.ordered.is_empty() {
+                for conjunct in &conjuncts {
+                    let mut reads = BTreeSet::new();
+                    crate::collections::state_reads(conjunct, state_owner, &mut reads);
+                    let named: BTreeSet<u32> = reads
+                        .iter()
+                        .filter_map(|f| entry_of.get(f))
+                        .copied()
+                        .collect();
+                    if named.len() != 1 || reads.iter().any(|f| !entry_of.contains_key(f)) {
+                        continue;
+                    }
+                    let entry_id = *named.iter().next().unwrap_or(&0);
+                    let Some(entry) = entries.iter().find(|e| e.id.get() == entry_id) else {
+                        continue;
+                    };
+                    let normalized =
+                        crate::collections::entry_predicate(conjunct, state_owner, entry_id);
+                    let uniform = entries.iter().filter(|e| e.map == entry.map).all(|other| {
+                        conjuncts.iter().any(|candidate| {
+                            let mut fields = BTreeSet::new();
+                            crate::collections::state_reads(candidate, state_owner, &mut fields);
+                            !fields.is_empty()
+                                && fields
+                                    .iter()
+                                    .all(|f| entry_of.get(f) == Some(&other.id.get()))
+                                && crate::collections::entry_predicate(
+                                    candidate,
+                                    state_owner,
+                                    other.id.get(),
+                                ) == normalized
+                        })
+                    });
+                    if !uniform {
+                        problems.push((
+                            spanned.span,
+                            "law.order",
+                            "the same entry-local state predicate on every named entry of its map",
+                            text(law.id().get()).into(),
+                        ));
+                    }
+                }
             }
             if !crate::collections::state_law_is_local(law.formula(), state_owner, &entry_of) {
                 problems.push((
@@ -1086,6 +1266,10 @@ impl Parser {
             maps: maps.into_boxed_slice(),
             entries: entries.into_boxed_slice(),
             summaries: summaries.into_boxed_slice(),
+            order_reads: {
+                order_reads.sort_by_key(|r| r.id);
+                order_reads.into_boxed_slice()
+            },
         }
     }
     /// Refuses a table whose entry IDs, `ID` to `ID + N - 1`, meet the ID of
@@ -1179,6 +1363,63 @@ impl Parser {
         };
         self.expect_symbol(TokenKind::Semicolon, "entry");
         Some(EntryDecl { id, name, map, key })
+    }
+    /// Parses one fixed pre-state order observation.
+    fn parse_order_read(&mut self) {
+        let start = self.declaration_start;
+        let Some(read) = self.parse_order_header() else {
+            self.recover_top();
+            return;
+        };
+        let end = self.last_end();
+        self.drafts.order_reads.push((read, start, end));
+    }
+    fn parse_order_path(&mut self) -> Option<ProjectionPath> {
+        if let ValueExpr::Projection(path) = self.parse_value() {
+            Some(path)
+        } else {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "order.path",
+                "ROOT.TYPE.FIELD",
+                "expression",
+                "name one command or context field",
+            );
+            None
+        }
+    }
+    fn parse_order_header(&mut self) -> Option<OrderReadDecl> {
+        let id = self.take_id("order.id")?;
+        let name = self.take_identifier("order.name")?;
+        self.expect_keyword("of", "order.map");
+        let map = self.take_id("order.map")?;
+        let kind = if self.take_keyword("min") {
+            OrderReadKind::Min
+        } else if self.take_keyword("max") {
+            OrderReadKind::Max
+        } else if self.take_keyword("successor") {
+            OrderReadKind::Successor(self.parse_order_path()?)
+        } else if self.take_keyword("predecessor") {
+            OrderReadKind::Predecessor(self.parse_order_path()?)
+        } else {
+            self.expect_keyword("range", "order.kind");
+            let lo = self.parse_order_path()?;
+            self.expect_keyword("to", "order.range");
+            OrderReadKind::Range(lo, self.parse_order_path()?)
+        };
+        self.expect_keyword("into", "order.result");
+        let result = self.parse_order_path()?;
+        self.expect_keyword("found", "order.found");
+        let found = self.parse_order_path()?;
+        self.expect_symbol(TokenKind::Semicolon, "order");
+        Some(OrderReadDecl {
+            id,
+            name,
+            map,
+            kind,
+            result,
+            found,
+        })
     }
     /// Parses `summary ID OWNER name TYPE sum MAP.FIELD;` or
     /// `summary ID OWNER name TYPE count MAP;`: an ordinary state field whose
@@ -3433,5 +3674,38 @@ fn describe_kind(kind: &TokenKind) -> &'static str {
         TokenKind::Bang => "!",
         TokenKind::Arrow => "->",
         TokenKind::Eof => "end of file",
+    }
+}
+
+fn formula_has_input(formula: &RelExpr) -> bool {
+    fn value(v: &ValueExpr) -> bool {
+        match v {
+            ValueExpr::Projection(p) => {
+                matches!(p.root(), ProjectionRoot::Command | ProjectionRoot::Context)
+            }
+            ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => false,
+            ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {
+                value(a)
+            }
+            ValueExpr::Add(a, b)
+            | ValueExpr::Sub(a, b)
+            | ValueExpr::Mul(a, b)
+            | ValueExpr::Div(_, a, b) => value(a) || value(b),
+            ValueExpr::MulDiv(_, a, b, c)
+            | ValueExpr::SignedMulDivFloor(a, b, c)
+            | ValueExpr::ScaledMulDiv(_, _, a, b, c, _)
+            | ValueExpr::RepeatMulDiv(_, a, b, c, _) => value(a) || value(b) || value(c),
+        }
+    }
+    match formula {
+        RelExpr::Bool(_) => false,
+        RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
+            formula_has_input(a)
+        }
+        RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
+            formula_has_input(a) || formula_has_input(b)
+        }
+        RelExpr::Compare(_, a, b) => value(a) || value(b),
+        RelExpr::Predicate { arguments, .. } => arguments.iter().any(value),
     }
 }

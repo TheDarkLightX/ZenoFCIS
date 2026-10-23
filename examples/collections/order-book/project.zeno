@@ -1,0 +1,36 @@
+zeno 1;
+project 1 tiny_order_book;
+namespace 2 book;
+type 100 state Book;
+type 101 command Order;
+type 102 context Market;
+type 103 ordered Price in 0..=1000000;
+type 104 data Level;
+type 105 int Quantity in 0..=1;
+type 106 int Found in 0..=1;
+type 107 data Action;
+field 140 104 quantity 105;
+map 110 100 bids 103 104 capacity 1000000;
+field 130 101 action 107;
+field 131 101 price 103;
+field 132 102 best_price 103;
+field 133 102 best_found 106;
+variant 150 107 Place none;
+variant 151 107 Cancel none;
+variant 152 107 Fill none;
+order 180 best_bid of 110 max into context.102.132 found context.102.133;
+entry 160 level of 110 at command.101.131;
+entry 170 best of 110 at context.102.132;
+reason 200 no_fill precedence 0;
+component 400 book {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 fill_at_best on commit = command.101.130 == 152 ->
+  context.102.133 == 1 && pre.100.160 == 1 && command.101.131 >= context.102.132;
+law 501 absent_levels_hold_nothing on commit, genesis =
+  forall e in entries 110 { post.100.e == 1 || post.100.e.140 == 0 };

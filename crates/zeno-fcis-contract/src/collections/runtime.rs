@@ -142,6 +142,11 @@ impl Layout {
         let declarations = Declarations::read(project, &rules.leaf_bindings)?;
         let positions = domain::positions(&declarations)?;
         let collections = spec.collections();
+        if collections.has_ordered_keys() {
+            return Err(invalid(
+                "ordered collection framing is not supported by Layout".to_owned(),
+            ));
+        }
         let key_types: BTreeSet<u32> = collections.keys().iter().map(|k| k.id().get()).collect();
         let at = |name: String| {
             positions

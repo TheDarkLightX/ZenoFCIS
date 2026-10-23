@@ -31,12 +31,13 @@ use crate::ast::{ProjectionRoot, RelExpr, ValueExpr};
 use crate::lexer::{Token, TokenKind};
 use crate::{Identifier, ProjectionPath, StableId};
 
-/// An opaque 32-byte key type and the key classes its view admits.
+/// An opaque or ordered key type and the key classes its view admits.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyTypeDecl {
     pub(crate) id: StableId,
     pub(crate) name: Identifier,
     pub(crate) positions: u32,
+    pub(crate) order: Option<crate::IntRange>,
 }
 
 impl KeyTypeDecl {
@@ -47,6 +48,14 @@ impl KeyTypeDecl {
     /// The type's name.
     pub const fn name(&self) -> &Identifier {
         &self.name
+    }
+    /// Concrete integer bounds for an ordered key; opaque keys have none.
+    pub const fn order_range(&self) -> Option<crate::IntRange> {
+        self.order
+    }
+    /// Whether same-type ordering comparisons are allowed.
+    pub const fn is_ordered(&self) -> bool {
+        self.order.is_some()
     }
     /// Key positions of this type in the view: input fields, then stored
     /// fields of named entries.
@@ -174,6 +183,59 @@ impl SummaryDecl {
     }
 }
 
+/// A bounded observation of a map's pre-state key order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OrderReadKind {
+    /// Least key, if any.
+    Min,
+    /// Greatest key, if any.
+    Max,
+    /// Least key strictly greater than this input key.
+    Successor(ProjectionPath),
+    /// Greatest key strictly less than this input key.
+    Predecessor(ProjectionPath),
+    /// A witness in the closed interval, if any; reversed intervals are empty.
+    Range(ProjectionPath, ProjectionPath),
+}
+
+/// A read with a context key result and an integer 0/1 found flag.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OrderReadDecl {
+    pub(crate) id: StableId,
+    pub(crate) name: Identifier,
+    pub(crate) map: StableId,
+    pub(crate) kind: OrderReadKind,
+    pub(crate) result: ProjectionPath,
+    pub(crate) found: ProjectionPath,
+}
+
+impl OrderReadDecl {
+    /// Declaration ID.
+    pub const fn id(&self) -> StableId {
+        self.id
+    }
+    /// Declaration name.
+    pub const fn name(&self) -> &Identifier {
+        &self.name
+    }
+    /// Observed map.
+    pub const fn map(&self) -> StableId {
+        self.map
+    }
+    /// Query and its command/context endpoints.
+    pub const fn kind(&self) -> &OrderReadKind {
+        &self.kind
+    }
+    /// Context key result. When not found its value is unconstrained.
+    pub const fn result(&self) -> &ProjectionPath {
+        &self.result
+    }
+    /// Context integer 0/1 found flag.
+    pub const fn found(&self) -> &ProjectionPath {
+        &self.found
+    }
+}
+
 /// Every collection declaration of a project, in stable-ID order.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CollectionsSpec {
@@ -181,6 +243,7 @@ pub struct CollectionsSpec {
     pub(crate) maps: Box<[MapDecl]>,
     pub(crate) entries: Box<[EntryDecl]>,
     pub(crate) summaries: Box<[SummaryDecl]>,
+    pub(crate) order_reads: Box<[OrderReadDecl]>,
 }
 
 impl CollectionsSpec {
@@ -199,6 +262,14 @@ impl CollectionsSpec {
     /// Summaries.
     pub const fn summaries(&self) -> &[SummaryDecl] {
         &self.summaries
+    }
+    /// Bounded order observations, at most four per project.
+    pub const fn order_reads(&self) -> &[OrderReadDecl] {
+        &self.order_reads
+    }
+    /// Whether ordered key metadata requires format 6.
+    pub fn has_ordered_keys(&self) -> bool {
+        self.keys.iter().any(KeyTypeDecl::is_ordered)
     }
     /// True when the project declares no collection.
     pub fn is_empty(&self) -> bool {
@@ -297,6 +368,7 @@ pub(crate) struct KeyPaths {
     pub(crate) keys: BTreeMap<(ProjectionRoot, Vec<u32>), u32>,
     /// `(state record, map)` pairs.
     pub(crate) maps: BTreeSet<(u32, u32)>,
+    pub(crate) ordered: BTreeSet<u32>,
 }
 
 impl KeyPaths {
@@ -328,8 +400,8 @@ impl KeyPaths {
         }
     }
 
-    /// The first misuse of a key or a map in a formula: keys only compare
-    /// for (in)equality with keys of the same type, and no formula reads a
+    /// The first misuse of a key or map: same-type key comparisons only,
+    /// with order comparisons restricted to ordered types. No formula reads a
     /// map except through its named entries.
     pub(crate) fn misuse(&self, formula: &RelExpr) -> Option<&'static str> {
         match formula {
@@ -346,10 +418,9 @@ impl KeyPaths {
                 self.misuse(a).or_else(|| self.misuse(b))
             }
             RelExpr::Compare(op, a, b) => match (self.key_type(a), self.key_type(b)) {
-                (Some(x), Some(y)) if x == y => {
-                    (!matches!(op, crate::CompareOp::Eq | crate::CompareOp::NotEq))
-                        .then_some("keys are compared only with == and !=")
-                }
+                (Some(x), Some(y)) if x == y => (!self.ordered.contains(&x)
+                    && !matches!(op, crate::CompareOp::Eq | crate::CompareOp::NotEq))
+                .then_some("keys are compared only with == and !="),
                 (Some(_), Some(_)) => Some("keys of different types are never compared"),
                 (Some(_), None) | (None, Some(_)) => {
                     Some("a key is compared only with another key of its type")
@@ -482,6 +553,47 @@ pub(crate) fn encode(
             SummaryKind::Count => output.push(1),
         }
     }
+    if spec.has_ordered_keys() {
+        // Format 6 preserves the format-5 prefix, then binds all new semantics.
+        output.extend_from_slice(b"ORDERED-READS\0");
+        put_length(output, spec.keys.len())?;
+        for key in &spec.keys {
+            key.id.encode_to(output)?;
+            match key.order {
+                None => output.push(0),
+                Some(range) => {
+                    output.push(1);
+                    output.extend_from_slice(&range.min().to_be_bytes());
+                    output.extend_from_slice(&range.max().to_be_bytes());
+                }
+            }
+        }
+        put_length(output, spec.order_reads.len())?;
+        for read in &spec.order_reads {
+            read.id.encode_to(output)?;
+            read.name.encode_to(output)?;
+            read.map.encode_to(output)?;
+            match &read.kind {
+                OrderReadKind::Min => output.push(0),
+                OrderReadKind::Max => output.push(1),
+                OrderReadKind::Successor(at) => {
+                    output.push(2);
+                    encode_path(at, output)?;
+                }
+                OrderReadKind::Predecessor(at) => {
+                    output.push(3);
+                    encode_path(at, output)?;
+                }
+                OrderReadKind::Range(lo, hi) => {
+                    output.push(4);
+                    encode_path(lo, output)?;
+                    encode_path(hi, output)?;
+                }
+            }
+            encode_path(&read.result, output)?;
+            encode_path(&read.found, output)?;
+        }
+    }
     Ok(())
 }
 
@@ -560,4 +672,69 @@ pub(crate) fn state_reads(formula: &RelExpr, owner: u32, out: &mut BTreeSet<u32>
             }
         }
     }
+}
+
+/// Normalizes one entry-local predicate so that identical predicates on
+/// different named entries compare structurally. Mutation owns this clone.
+pub(crate) fn entry_predicate(formula: &RelExpr, owner: u32, entry: u32) -> RelExpr {
+    fn value(v: &mut ValueExpr, owner: u32, entry: u32) {
+        match v {
+            ValueExpr::Projection(p) => {
+                if matches!(p.root, ProjectionRoot::Pre | ProjectionRoot::Post)
+                    && p.segments.len() == 2
+                    && p.segments[0].get() == owner
+                    && let Some(id) = p.segments[1]
+                        .get()
+                        .checked_sub(entry)
+                        .and_then(|n| n.checked_add(1))
+                        .and_then(StableId::new)
+                {
+                    p.segments[1] = id;
+                }
+            }
+            ValueExpr::Int(_) | ValueExpr::U128(_) | ValueExpr::Var(_) => {}
+            ValueExpr::ToI128(a) | ValueExpr::ToU128(a) | ValueExpr::Sum { body: a, .. } => {
+                value(a, owner, entry)
+            }
+            ValueExpr::Add(a, b)
+            | ValueExpr::Sub(a, b)
+            | ValueExpr::Mul(a, b)
+            | ValueExpr::Div(_, a, b) => {
+                value(a, owner, entry);
+                value(b, owner, entry);
+            }
+            ValueExpr::MulDiv(_, a, b, c)
+            | ValueExpr::SignedMulDivFloor(a, b, c)
+            | ValueExpr::ScaledMulDiv(_, _, a, b, c, _)
+            | ValueExpr::RepeatMulDiv(_, a, b, c, _) => {
+                value(a, owner, entry);
+                value(b, owner, entry);
+                value(c, owner, entry);
+            }
+        }
+    }
+    fn rel(f: &mut RelExpr, owner: u32, entry: u32) {
+        match f {
+            RelExpr::Bool(_) => {}
+            RelExpr::Not(a) | RelExpr::ForAll { body: a, .. } | RelExpr::Exists { body: a, .. } => {
+                rel(a, owner, entry)
+            }
+            RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
+                rel(a, owner, entry);
+                rel(b, owner, entry);
+            }
+            RelExpr::Compare(_, a, b) => {
+                value(a, owner, entry);
+                value(b, owner, entry);
+            }
+            RelExpr::Predicate { arguments, .. } => {
+                for a in arguments.iter_mut() {
+                    value(a, owner, entry);
+                }
+            }
+        }
+    }
+    let mut normalized = formula.clone();
+    rel(&mut normalized, owner, entry);
+    normalized
 }

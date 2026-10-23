@@ -29,7 +29,10 @@ mod views;
 pub use ast::*;
 pub use bool_circuit::{BoolCircuit, BoolNode};
 pub use builder::{CompositionAstBuilder, ProjectSpecBuilder};
-pub use collections::{CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, SummaryDecl, SummaryKind};
+pub use collections::{
+    CollectionsSpec, EntryDecl, KeyTypeDecl, MapDecl, OrderReadDecl, OrderReadKind, SummaryDecl,
+    SummaryKind,
+};
 pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
