@@ -99,8 +99,11 @@ cast or division failure in the other operand. Counts, filtered sums and
 derived-table specialization may replace an expression with a constant only
 when its removed evaluations have been checked total. Unknown or failed
 constant evaluation keeps the expression for the ordinary eager evaluator;
-it never becomes a Boolean answer. Thus a partial predicate still refuses
-at `count <= N`, `count <= N+1` and `count >= 0`.
+it never becomes a Boolean answer. On a given input tuple, an undefined
+predicate in `count`, `exists` or `forall`, or an undefined guard or body in
+`sum`, refuses with the same Undefined class as its direct scalar evaluation.
+This includes a false quantifier guard and the degenerate bounds
+`count <= N`, `count <= N+1` and `count >= 0`.
 
 So the example's law 500 is six implications, one per copy k: when field
 110+k is not 0, none of the 20 sets of three copies all have copy k's holder.

@@ -132,6 +132,47 @@ fn constant_counts_preserve_eager_boolean_definedness() {
 }
 
 #[test]
+fn table_aggregates_refuse_undefined_predicates_on_authority() {
+    for trap in [
+        "div_floor(1,0) == 0".to_owned(),
+        format!("{} + 1 == 0", i128::MAX),
+    ] {
+        for predicate in [
+            format!("true || {trap}"),
+            format!("false && {trap}"),
+            format!("false -> {trap}"),
+        ] {
+            let direct = outcomes("", &predicate);
+            for outcome in &direct {
+                assert_undefined(outcome);
+            }
+            let mut forms: Vec<_> = ["== 2", "<= 2", "<= 3", ">= 0", "<= 1"]
+                .into_iter()
+                .map(|comparison| format!("count j in table 110 {{ {predicate} }} {comparison}"))
+                .collect();
+            forms.extend([
+                format!("sum j in table 110 {{ choose({predicate},1,0) }} == 2"),
+                format!("sum j in table 110 where {predicate} {{ 1 }} == 2"),
+                format!("exists j in table 110 {{ {predicate} }}"),
+                format!("forall j in table 110 {{ {predicate} }}"),
+                format!("exists j in table 110 where false {{ {predicate} }}"),
+                format!("forall j in table 110 where false {{ {predicate} }}"),
+                format!("exists j in table 110 where {predicate} {{ true }}"),
+                format!("forall j in table 110 where {predicate} {{ true }}"),
+                format!("count j in table 110 {{ exists k in table 110 {{ {predicate} }} }} == 2"),
+            ]);
+            for form in forms {
+                assert_eq!(
+                    outcomes("", &form),
+                    direct,
+                    "every aggregate must retain the scalar Undefined refusal: {form}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn filtered_sums_keep_false_guard_body_and_guard_traps() {
     for (guard, body) in [
         ("false".to_owned(), format!("{} + 1", i128::MAX)),

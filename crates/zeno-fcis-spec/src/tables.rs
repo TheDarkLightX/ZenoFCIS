@@ -319,9 +319,16 @@ pub(crate) fn static_truth(value: &RelExpr) -> Option<bool> {
         RelExpr::Circuit(c) => c.evaluate(static_truth)?,
         RelExpr::Bool(value) => *value,
         RelExpr::Not(inner) => !static_truth(inner)?,
-        RelExpr::And(a, b) => static_truth(a)? & static_truth(b)?,
-        RelExpr::Or(a, b) => static_truth(a)? | static_truth(b)?,
-        RelExpr::Implies(a, b) => !static_truth(a)? | static_truth(b)?,
+        RelExpr::And(a, b) | RelExpr::Or(a, b) | RelExpr::Implies(a, b) => {
+            // Establish both operands' definedness before applying Boolean logic.
+            // Short-circuiting the recursive calls would turn a trap into a truth.
+            let (left, right) = (static_truth(a)?, static_truth(b)?);
+            match value {
+                RelExpr::And(..) => left && right,
+                RelExpr::Or(..) => left || right,
+                _ => !left || right,
+            }
+        }
         RelExpr::Compare(op, a, b) => {
             let (a, b) = (static_value(a)?, static_value(b)?);
             match op {
