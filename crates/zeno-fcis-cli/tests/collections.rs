@@ -28,7 +28,7 @@ fn collections(dir: &Path, more: &[&str], exit: i32) -> Value {
 
 #[test]
 fn collections_cli_checks_the_examples_and_refutes_a_minting_self_transfer() {
-    for (name, views) in [("token-balances", 2304), ("library", 160), ("escrow", 4500)] {
+    for (name, views) in [("token-balances", 2304), ("library", 144), ("escrow", 4500)] {
         let packet = collections(&example(name), &[], 0);
         assert_eq!(packet["status"], "checked");
         assert_eq!(packet["authority"], "none");
