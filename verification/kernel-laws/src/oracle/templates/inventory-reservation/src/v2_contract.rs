@@ -1,5 +1,5 @@
 // Generated declarative data. Review v2/policy.json and project.zeno.
-// Regenerate/check with tools/check_template_contracts_v2.py; no runtime mapper.
+// Regenerate or check with `zeno-fcis generate contract`; no runtime mapper.
 extern crate alloc;
 use alloc::{vec, vec::Vec};
 use zeno_fcis_synthesis::finite::{Domain as ScalarDomain, Op, V2ScalarProgram};
@@ -141,6 +141,17 @@ pub const FRAMING: c::Framing = c::Framing {
 };
 /// Exact channel to original destination and payload type links.
 pub const CHANNEL_ROOTS: &[(u32, u32, u32)] = &[(300, 103, 104)];
+/// The genesis state law 990 requires, field by field.
+pub const GENESIS: &[c::Field<'static>] = &[
+    c::Field {
+        id: 110,
+        value: c::Atom::I128(0),
+    },
+    c::Field {
+        id: 111,
+        value: c::Atom::I128(0),
+    },
+];
 /// Complete ordered decisions selected only by actual graph output.
 pub const BRANCHES: &[c::Branch<'static>] = &[
     c::Branch {
@@ -396,7 +407,163 @@ const LAW_502: &[l::Op<'static>] = &[
     l::Op::Not(59),
     l::Op::And(51, 60),
 ];
-const LAW_908: &[l::Op<'static>] = &[l::Op::Literal(l::Atom::Bool(false))];
+const LAW_503: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::Context(130)),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Eq(1, 2),
+    l::Op::Observe(l::Observation::Reason),
+    l::Op::ToI128(4),
+    l::Op::Literal(l::Atom::I128(200)),
+    l::Op::Eq(5, 6),
+    l::Op::And(3, 7),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Eq(1, 9),
+    l::Op::Observe(l::Observation::Command(120)),
+    l::Op::ToI128(11),
+    l::Op::Literal(l::Atom::I128(150)),
+    l::Op::Eq(12, 13),
+    l::Op::And(10, 14),
+    l::Op::Observe(l::Observation::Command(121)),
+    l::Op::ToI128(16),
+    l::Op::Observe(l::Observation::Pre(110)),
+    l::Op::ToI128(18),
+    l::Op::Lt(19, 17),
+    l::Op::And(15, 20),
+    l::Op::Literal(l::Atom::I128(201)),
+    l::Op::Eq(5, 22),
+    l::Op::And(21, 23),
+    l::Op::Not(8),
+    l::Op::Not(24),
+    l::Op::And(25, 26),
+    l::Op::Not(27),
+    l::Op::Literal(l::Atom::I128(151)),
+    l::Op::Eq(12, 29),
+    l::Op::Literal(l::Atom::I128(152)),
+    l::Op::Eq(12, 31),
+    l::Op::Not(30),
+    l::Op::Not(32),
+    l::Op::And(33, 34),
+    l::Op::Not(35),
+    l::Op::And(10, 36),
+    l::Op::Observe(l::Observation::Pre(111)),
+    l::Op::ToI128(38),
+    l::Op::Lt(39, 17),
+    l::Op::And(37, 40),
+    l::Op::Literal(l::Atom::I128(202)),
+    l::Op::Eq(5, 42),
+    l::Op::And(41, 43),
+    l::Op::Not(28),
+    l::Op::Not(44),
+    l::Op::And(45, 46),
+    l::Op::Not(47),
+    l::Op::And(14, 20),
+    l::Op::Not(49),
+    l::Op::And(10, 50),
+    l::Op::And(36, 40),
+    l::Op::Not(52),
+    l::Op::And(51, 53),
+    l::Op::Add(39, 17),
+    l::Op::Literal(l::Atom::I128(5)),
+    l::Op::Lt(56, 55),
+    l::Op::And(14, 57),
+    l::Op::Literal(l::Atom::I128(153)),
+    l::Op::Eq(12, 59),
+    l::Op::Not(60),
+    l::Op::And(33, 61),
+    l::Op::Not(62),
+    l::Op::Add(19, 17),
+    l::Op::Lt(56, 64),
+    l::Op::And(63, 65),
+    l::Op::Not(58),
+    l::Op::Not(66),
+    l::Op::And(67, 68),
+    l::Op::Not(69),
+    l::Op::And(54, 70),
+    l::Op::Literal(l::Atom::I128(203)),
+    l::Op::Eq(5, 72),
+    l::Op::And(71, 73),
+    l::Op::Not(48),
+    l::Op::Not(74),
+    l::Op::And(75, 76),
+    l::Op::Not(77),
+];
+const LAW_510: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::OutboxLength),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Lt(2, 1),
+    l::Op::Not(3),
+    l::Op::Literal(l::Atom::I128(300)),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(6, 1),
+    l::Op::ObserveWhen(7, l::Observation::OutboxChannel(0), l::Atom::I128(0)),
+    l::Op::Eq(8, 5),
+    l::Op::And(7, 9),
+    l::Op::Select(10, 2, 6),
+    l::Op::Add(6, 11),
+    l::Op::ObserveWhen(10, l::Observation::OutboxPayload(0, 140), l::Atom::I128(0)),
+    l::Op::Add(6, 13),
+    l::Op::Observe(l::Observation::Command(120)),
+    l::Op::ToI128(15),
+    l::Op::Literal(l::Atom::I128(152)),
+    l::Op::Eq(16, 17),
+    l::Op::Eq(12, 2),
+    l::Op::Observe(l::Observation::Command(121)),
+    l::Op::ToI128(20),
+    l::Op::Eq(14, 21),
+    l::Op::And(19, 22),
+    l::Op::Observe(l::Observation::Post(111)),
+    l::Op::ToI128(24),
+    l::Op::Add(14, 25),
+    l::Op::Observe(l::Observation::Pre(111)),
+    l::Op::ToI128(27),
+    l::Op::Eq(26, 28),
+    l::Op::And(23, 29),
+    l::Op::Not(18),
+    l::Op::Not(31),
+    l::Op::Not(30),
+    l::Op::And(32, 33),
+    l::Op::Not(34),
+    l::Op::Eq(12, 6),
+    l::Op::Not(32),
+    l::Op::Not(36),
+    l::Op::And(37, 38),
+    l::Op::Not(39),
+    l::Op::And(35, 40),
+    l::Op::And(4, 41),
+];
+const LAW_511: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::OutboxLength),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Lt(2, 1),
+    l::Op::Not(3),
+    l::Op::Literal(l::Atom::I128(300)),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(6, 1),
+    l::Op::ObserveWhen(7, l::Observation::OutboxChannel(0), l::Atom::I128(0)),
+    l::Op::Eq(8, 5),
+    l::Op::And(7, 9),
+    l::Op::ObserveWhen(10, l::Observation::OutboxDestination(0), l::Atom::Text(b"")),
+    l::Op::Literal(l::Atom::Text(b"warehouse")),
+    l::Op::Eq(11, 12),
+    l::Op::And(10, 13),
+    l::Op::Select(14, 2, 6),
+    l::Op::Add(6, 15),
+    l::Op::Observe(l::Observation::Command(120)),
+    l::Op::ToI128(17),
+    l::Op::Literal(l::Atom::I128(152)),
+    l::Op::Eq(18, 19),
+    l::Op::Eq(16, 2),
+    l::Op::Not(20),
+    l::Op::Not(22),
+    l::Op::Not(21),
+    l::Op::And(23, 24),
+    l::Op::Not(25),
+    l::Op::And(4, 26),
+];
+const LAW_508: &[l::Op<'static>] = &[l::Op::Literal(l::Atom::Bool(false))];
 const LAW_909: &[l::Op<'static>] = &[
     l::Op::Observe(l::Observation::PostLength),
     l::Op::ToI128(0),
@@ -674,18 +841,48 @@ pub const LAWS: &[l::Law<'static>] = &[
         },
     },
     l::Law {
-        id: 908,
+        id: 503,
+        kind: l::Kind::RejectNoAuthority,
+        scope: l::Scope::Reject,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_503,
+            root: 78,
+        },
+    },
+    l::Law {
+        id: 510,
+        kind: l::Kind::DebitCreditEffectEquality,
+        scope: l::Scope::Accept,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_510,
+            root: 42,
+        },
+    },
+    l::Law {
+        id: 511,
+        kind: l::Kind::DebitCreditEffectEquality,
+        scope: l::Scope::Accept,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_511,
+            root: 27,
+        },
+    },
+    l::Law {
+        id: 508,
         kind: l::Kind::CommittedFailureEffects,
         scope: l::Scope::CommittedFailure,
         genesis: false,
         program: l::Program {
-            nodes: LAW_908,
+            nodes: LAW_508,
             root: 0,
         },
     },
     l::Law {
         id: 909,
-        kind: l::Kind::RejectNoAuthority,
+        kind: l::Kind::AuthoritySubjectRecipient,
         scope: l::Scope::Reject,
         genesis: false,
         program: l::Program {
@@ -715,7 +912,7 @@ pub const LAWS: &[l::Law<'static>] = &[
     },
 ];
 /// No declared law is optional at descriptor admission.
-pub const REQUIRED: &[u32] = &[500, 501, 502, 908, 909, 990, 991];
+pub const REQUIRED: &[u32] = &[500, 501, 502, 503, 510, 511, 508, 909, 990, 991];
 /// Owns declarative input/output type tables; evaluation stays in the library.
 pub struct Contract {
     state: Vec<InputField>,
@@ -770,20 +967,20 @@ impl Contract {
             output_types: vec![
                 InputLeaf::I128 { min: 0, max: 7 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
                 InputLeaf::I128 {
-                    min: -9223372036854775808,
-                    max: 9223372036854775807,
+                    min: -170141183460469231731687303715884105728,
+                    max: 170141183460469231731687303715884105727,
                 },
             ],
         }
@@ -806,20 +1003,20 @@ impl Contract {
                 outputs: &[
                     ScalarDomain::Int { min: 0, max: 7 },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                     ScalarDomain::Int {
-                        min: -9223372036854775808,
-                        max: 9223372036854775807,
+                        min: -170141183460469231731687303715884105728,
+                        max: 170141183460469231731687303715884105727,
                     },
                 ],
                 nodes: &[
@@ -933,14 +1130,14 @@ impl Contract {
             laws: LAWS,
             required: REQUIRED,
             limits: v2_zero_limits()
-                .with_limit(Resource::Read, 127)
+                .with_limit(Resource::Read, 144)
                 .with_limit(Resource::Write, 2)
                 .with_limit(Resource::Candidate, 1)
                 .with_limit(Resource::Effect, 1)
                 .with_limit(Resource::Byte, 229)
                 .with_limit(Resource::WitnessByte, 0)
                 .with_limit(Resource::Depth, 0)
-                .with_limit(Resource::Step, 420),
+                .with_limit(Resource::Step, 570),
         }
     }
 }
@@ -968,6 +1165,7 @@ pub fn checked_catalog<'a>(
 }
 /// Ordered refusal at checked catalog or private Authority construction.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BindFailure {
     /// Complete original schema/policy correspondence refused.
     Catalog(catalog::Failure),
@@ -980,4 +1178,24 @@ pub fn checked_authority<'a>(
 ) -> Result<authority::Authority<'a>, BindFailure> {
     let catalog = checked_catalog(descriptor).map_err(BindFailure::Catalog)?;
     authority::bind(&catalog).map_err(BindFailure::Authority)
+}
+/// Original schema labels for a lineage version, for historical reports.
+pub fn schema_description(version: usize) -> Option<&'static s::Description<'static>> {
+    match version {
+        1 => Some(&DESCRIPTION),
+        _ => None,
+    }
+}
+/// Position in this application's contract lineage: 1 before any adoption.
+pub const VERSION: u32 = 1;
+/// Every contract version's checked catalog, oldest first and this one last,
+/// for a store upgrade or a lineage open. Each binding checks that version's
+/// complete retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
+) -> Result<R, catalog::Failure> {
+    let contract = Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = checked_catalog(&descriptor)?;
+    Ok(f(&[&catalog]))
 }
