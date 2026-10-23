@@ -15,6 +15,7 @@
 
 pub mod codec;
 pub mod driver;
+pub mod durable;
 pub mod explore;
 pub mod handler;
 pub mod laws;

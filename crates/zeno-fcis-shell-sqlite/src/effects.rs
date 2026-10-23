@@ -15,6 +15,8 @@ use zeno_fcis_synthesis::finite::{
     v2_composition::{DescriptorData, Raw},
 };
 
+/// Durable reservation byte storage; restoration remains a pure shell function.
+pub mod durable;
 /// The production SQLite handler behind the shell-effects ports.
 pub mod production;
 
