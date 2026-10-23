@@ -168,6 +168,21 @@ class NativeCoverageTests(unittest.TestCase):
                               cwd=ROOT, text=True, capture_output=True,
                               env={**os.environ, "ZENO_FCIS_BIN": os.environ["COVERAGE_TEST_BIN"]})
 
+    def test_unsigned_proposal_requires_genesis(self):
+        contract = ROOT / "crates/zeno-fcis-cli/tests/test-data/genesis-proposals/u128-zero-one"
+        with tempfile.TemporaryDirectory() as tmp:
+            proposal = Path(tmp) / "proposed.zeno"
+            proposal.write_text("law 9000 p on commit, genesis = post.100.110 == u128(1);\n")
+            result = subprocess.run([os.environ["COVERAGE_TEST_BIN"], "--no-kb", "contract", "review",
+                                     str(contract), "--gaps", "--gaps-laws", str(proposal),
+                                     "--format", "json"], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1, "unsigned_proposal_requires_genesis: " + result.stderr)
+            packet = json.loads(result.stdout)
+            verdict, detail = coverage.assess(packet, result.returncode, None, None, None)
+            self.assertEqual(verdict, "disagreeing", "unsigned_proposal_requires_genesis")
+            self.assertEqual(detail["witness"], {"law": 9000, "at": "genesis",
+                                               "state": [{"kind": "u128", "value": "0"}]})
+
     def test_kept_invariant_requires_genesis(self):
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)

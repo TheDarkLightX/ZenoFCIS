@@ -87,6 +87,162 @@ fn u128_finite_gaps_proposals_and_limits() {
     });
     assert!(over.packet().contains("work-exceeds-limit"));
 }
+
+fn genesis_fixture(name: &str) -> (String, String) {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/test-data/genesis-proposals")
+        .join(name);
+    let read = |file| std::fs::read_to_string(path.join(file)).unwrap_or_else(|e| panic!("{e}"));
+    (read("project.zeno"), read("v2/policy.json"))
+}
+
+// A fixed, unsigned state field selects the numeric lane without changing the
+// signed witness's transitions, control labels, or genesis obligations.
+fn unsigned_genesis_twin(name: &str) -> (String, String) {
+    let (mut p, r) = genesis_fixture(name);
+    p.push_str("\ntype 108 u128 UnsignedUnit in 0..=0;\nfield 180 100 unsigned_unit 108;\n");
+    let mut r: Value = serde_json::from_str(&r).unwrap_or_else(|e| panic!("{e}"));
+    r["schema"] = json!("zeno-fcis/template-declarative-policy/4");
+    r["genesis"]["180"] = json!("u128(0)");
+    (p, r.to_string())
+}
+
+fn genesis_review(p: &str, r: &str, formula: &str, genesis: bool) -> Value {
+    let scope = if genesis { "commit, genesis" } else { "commit" };
+    let proposal = format!("law 9000 p on {scope} = {formula};");
+    let result = review::review_with_gaps(
+        review_sources(p, r, None),
+        review::gaps::Options {
+            mutants: true,
+            max_tuples: 1000,
+            max_work: 1000000,
+            proposals: Some(&proposal),
+        },
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    serde_json::from_str(result.packet()).unwrap_or_else(|e| panic!("{e}"))
+}
+
+fn assert_unsigned_genesis_alarm(p: &str, r: &str, formula: &str, state: Value) {
+    let packet = genesis_review(p, r, formula, true);
+    assert_eq!(
+        packet["gaps"]["status"], "proposal-false-alarm",
+        "unsigned_genesis_scoped_proposal_requires_initiation"
+    );
+    assert_eq!(
+        packet["gaps"]["false_alarm"],
+        json!({"law":9000,"at":"genesis","state":state})
+    );
+    assert_eq!(packet["gaps"]["proposals"][0]["active"], 0);
+    assert!(packet["gaps"]["proposals"].get("after").is_none());
+    let review::lemma::Lemmas::Judged(result) =
+        review::lemma::judge(p, r, &[formula.into()], 1000).unwrap_or_else(|e| panic!("{e}"))
+    else {
+        panic!("finite genesis witness")
+    };
+    assert_eq!(result[0]["initiation"], false);
+}
+
+#[test]
+fn u128_genesis_proposals_reject_zero_to_one() {
+    let (p, r) = genesis_fixture("u128-zero-one");
+    assert_unsigned_genesis_alarm(
+        &p,
+        &r,
+        "post.100.110 == u128(1)",
+        json!([{"kind":"u128","value":"0"}]),
+    );
+}
+
+#[test]
+fn numeric_i128_genesis_proposals_require_initiation() {
+    let (p, r) = genesis_fixture("u128-zero-one");
+    let p = p
+        .replace("type 105 u128", "type 105 int")
+        .replace("u128(0)", "0");
+    let mut r: Value = serde_json::from_str(&r).unwrap_or_else(|e| panic!("{e}"));
+    r["genesis"]["110"] = json!(0);
+    r["cases"][1]["post"]["110"] = json!("1");
+    assert_unsigned_genesis_alarm(
+        &p,
+        &r.to_string(),
+        "post.100.110 == 1",
+        json!([{"kind":"i128","value":"0"}]),
+    );
+}
+
+#[test]
+fn u128_genesis_proposals_reject_false_without_commits() {
+    let (p, r) = unsigned_genesis_twin("no-commits");
+    assert_unsigned_genesis_alarm(
+        &p,
+        &r,
+        "false",
+        json!([{"kind":"i128","value":"150"},{"kind":"u128","value":"0"}]),
+    );
+}
+
+#[test]
+fn u128_genesis_proposals_reject_running_at_idle_genesis() {
+    let (p, r) = unsigned_genesis_twin("start-once");
+    assert_unsigned_genesis_alarm(
+        &p,
+        &r,
+        "post.100.110 == 151",
+        json!([{"kind":"i128","value":"150"},{"kind":"u128","value":"0"}]),
+    );
+}
+
+#[test]
+fn u128_genesis_proposals_reject_shipped_running_invariant() {
+    let (p, r) = unsigned_genesis_twin("context-free");
+    assert_unsigned_genesis_alarm(
+        &p,
+        &r,
+        "post.100.110 == 151",
+        json!([{"kind":"i128","value":"150"},{"kind":"i128","value":"0"},{"kind":"u128","value":"0"}]),
+    );
+}
+
+#[test]
+fn u128_genesis_proposals_reject_undefined_at_genesis() {
+    let (p, r) = unsigned_genesis_twin("context-free");
+    let packet = genesis_review(&p, &r, "div_floor(1, post.100.170) == 1", true);
+    assert_eq!(packet["gaps"]["status"], "proposal-false-alarm");
+    assert_eq!(packet["gaps"]["false_alarm"]["at"], "genesis");
+    assert_eq!(packet["gaps"]["proposals"][0]["active"], 0);
+}
+
+#[test]
+fn u128_genesis_proposals_accept_true_invariant() {
+    let (p, r) = genesis_fixture("u128-zero-one");
+    let packet = genesis_review(&p, &r, "post.100.110 <= u128(1)", true);
+    assert_eq!(packet["gaps"]["status"], "measured");
+    // Genesis is checked, but never added to the eight transition activations.
+    assert_eq!(packet["gaps"]["proposals"]["laws"][0]["active"], 8);
+    assert!(packet["gaps"]["proposals"]["after"].is_object());
+    let packet = genesis_review(
+        &project(H, H + 1),
+        &rules(H),
+        &format!("post.100.110 >= u128({H})"),
+        true,
+    );
+    assert_eq!(packet["gaps"]["status"], "measured");
+    assert_eq!(packet["gaps"]["proposals"]["laws"][0]["active"], 8);
+}
+
+#[test]
+fn u128_genesis_proposals_leave_transition_only_scope_unchanged() {
+    let (p, r) = genesis_fixture("u128-zero-one");
+    let packet = genesis_review(&p, &r, "post.100.110 == u128(1)", false);
+    assert_eq!(packet["gaps"]["status"], "measured");
+    assert_eq!(packet["gaps"]["proposals"]["laws"][0]["active"], 8);
+    let (p, r) = unsigned_genesis_twin("no-commits");
+    let packet = genesis_review(&p, &r, "false", false);
+    assert_eq!(packet["gaps"]["status"], "measured");
+    assert_eq!(packet["gaps"]["proposals"]["laws"][0]["active"], 0);
+}
+
 #[test]
 fn u128_lemma_state_transition_and_inconclusive() {
     let p = project(H, H + 1);

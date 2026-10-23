@@ -1081,9 +1081,39 @@ fn extend(
     Ok((Loaded::with(&source, extended)?, ids, lines))
 }
 
-/// Each proposal, alone, at genesis when scoped there, then on the contract's
-/// decision of every tuple where it decides. Genesis admission is separate
-/// from the transition activation counts.
+/// Shared initiation check for signed and full-width numeric proposals.
+/// Genesis admission is separate from the transition activation counts.
+pub(super) fn proposal_genesis_alarm(
+    declarations: &Declarations,
+    ids: &[u32],
+    sets: &[LawSet<'_>],
+    initial: zeno_fcis_synthesis::finite::v2_laws::RootView<'_, '_>,
+    state: Value,
+) -> Option<Value> {
+    use zeno_fcis_synthesis::finite::v2_laws::{Frame, Verdict};
+    let frame = Frame::Genesis { initial };
+    for (id, set) in ids.iter().zip(sets) {
+        if declarations
+            .laws
+            .iter()
+            .any(|law| law.id == *id && law.genesis)
+        {
+            // The library's own genesis-frame evaluator supplies the verdict.
+            // Skipped, undefined or missing diagnostics cannot satisfy initiation.
+            let (ok, diagnostics) = set.on_frame(&frame);
+            if !ok
+                || !diagnostics
+                    .iter()
+                    .any(|d| d.id == *id && d.verdict == Verdict::Satisfied)
+            {
+                return Some(json!({"law": id, "at": "genesis", "state": state}));
+            }
+        }
+    }
+    None
+}
+
+/// Check initiation, then each proposal on every actual decided transition.
 fn check_proposals(
     extended: &Loaded,
     ids: &[u32],
@@ -1098,25 +1128,21 @@ fn check_proposals(
             .collect();
         let space = &machine.space;
         let genesis = space.at(machine.genesis * space.inputs);
-        for (id, set) in ids.iter().zip(&sets) {
-            if extended
-                .declarations
-                .laws
-                .iter()
-                .any(|law| law.id == *id && law.genesis)
-                && !set.on_state(framer, &genesis)
-            {
-                return Ok(Checked {
-                    ids: ids.to_vec(),
-                    texts,
-                    applies: vec![0; ids.len()],
-                    false_alarm: Some(json!({
-                        "law": id,
-                        "at": "genesis",
-                        "state": crate::report_numbers::integers(&space.state(machine.genesis)),
-                    })),
-                });
-            }
+        let root = &framer.roots[0];
+        let fields = framer.fields(root, &genesis);
+        if let Some(alarm) = proposal_genesis_alarm(
+            &extended.declarations,
+            ids,
+            &sets,
+            framer.view(root, &genesis, &fields),
+            crate::report_numbers::integers(&space.state(machine.genesis)),
+        ) {
+            return Ok(Checked {
+                ids: ids.to_vec(),
+                texts,
+                applies: vec![0; ids.len()],
+                false_alarm: Some(alarm),
+            });
         }
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let verdicts = parallel(space.tuples(), |ordinal| {

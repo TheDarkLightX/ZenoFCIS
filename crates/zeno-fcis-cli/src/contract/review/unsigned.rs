@@ -308,6 +308,21 @@ fn state_check(c: &Contract<'_>, row: &[Atom<'static>], laws: &LawSet<'_>) -> Op
     let fs = fields(c, row, Source::State);
     laws.first_unsatisfied_state_law(view(c, 0, &fs))
 }
+fn genesis_state(
+    c: &Contract<'_>,
+    rules: &Rules,
+    width: usize,
+) -> Result<Vec<Atom<'static>>, ContractError> {
+    c.bindings[..width]
+        .iter()
+        .map(|(_, id)| match id.and_then(|id| rules.genesis.get(&id)) {
+            Some(Constant::Bool(v)) => Ok(Atom::Bool(*v)),
+            Some(Constant::Int(v)) => Ok(Atom::I128(*v)),
+            Some(Constant::U128(v)) => Ok(Atom::U128(*v)),
+            None => Err(error("missing explicit genesis value")),
+        })
+        .collect()
+}
 fn evaluate(
     c: &Contract<'_>,
     a: &NumericAuthority<'_>,
@@ -700,12 +715,36 @@ fn gap_measure(
     let bytes = schema::encode(&decl)?;
     let probe = Contract::build(&decl, &r, schema_commitment(&bytes)?)?;
     policy::with_numeric_authority(&probe, &bytes, |pa| {
+        let sets: Vec<_> = ids
+            .iter()
+            .map(|id| LawSet::new_numeric(pa.descriptor(), &[*id]))
+            .collect();
+        if decl
+            .laws
+            .iter()
+            .any(|law| ids.contains(&law.id) && law.genesis)
+        {
+            let genesis = genesis_state(c, rules, space.state_width)?;
+            let fs = fields(c, &genesis, Source::State);
+            if let Some(alarm) = gaps::proposal_genesis_alarm(
+                &decl,
+                &ids,
+                &sets,
+                view(c, 0, &fs),
+                json!(genesis.iter().copied().map(atom_json).collect::<Vec<_>>()),
+            ) {
+                return Ok(gaps::Gaps::FalseAlarm(json!({
+                    "status": "proposal-false-alarm",
+                    "false_alarm": alarm,
+                    "proposals": ids.iter().map(|id| json!({"id": id, "active": 0})).collect::<Vec<_>>(),
+                })));
+            }
+        }
         let mut activation = Vec::new();
-        for id in &ids {
-            let laws = LawSet::new_numeric(pa.descriptor(), &[*id]);
+        for (id, laws) in ids.iter().zip(&sets) {
             let mut active = 0;
             for (i, row) in space.rows.iter().enumerate() {
-                if let Some((ok, ds)) = actual_laws(c, a, row, &laws)? {
+                if let Some((ok, ds)) = actual_laws(c, a, row, laws)? {
                     if let Some(diag) = ds.iter().find(|diag| diag.id == *id)
                         && !matches!(diag.verdict, l::Verdict::Skipped)
                     {
@@ -996,15 +1035,7 @@ pub(super) fn lemmas(
             .enumerate()
             .map(|(i, o)| next_state(&space, i, o))
             .collect::<Result<_, _>>()?;
-        let genesis: Vec<_> = contract.bindings[..space.state_width]
-            .iter()
-            .map(|(_, id)| match id.and_then(|id| rules.genesis.get(&id)) {
-                Some(Constant::Bool(v)) => Ok(Atom::Bool(*v)),
-                Some(Constant::Int(v)) => Ok(Atom::I128(*v)),
-                Some(Constant::U128(v)) => Ok(Atom::U128(*v)),
-                None => Err(error("missing explicit genesis value")),
-            })
-            .collect::<Result<_, _>>()?;
+        let genesis = genesis_state(&contract, &rules, space.state_width)?;
         let initial = space
             .states
             .iter()
