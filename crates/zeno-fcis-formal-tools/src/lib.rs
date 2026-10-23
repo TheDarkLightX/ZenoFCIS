@@ -223,6 +223,8 @@ impl Default for ExportLimits {
 }
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+/// Names tried for one private executable copy before admission fails.
+const MAX_PRIVATE_NAME_ATTEMPTS: u32 = 1024;
 
 fn open_untrusted_read(path: &Path) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
@@ -918,17 +920,7 @@ impl PrivateExecutable {
         Self::create_named(&format!("{backend:?}"), bytes)
     }
     fn create_named(name: &str, bytes: &[u8]) -> Result<Self, ToolFailure> {
-        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let extension = if cfg!(windows) { ".exe" } else { "" };
-        let path = std::env::temp_dir().join(format!(
-            "zeno-fcis-checked-{}-{name}-{sequence}{extension}",
-            std::process::id()
-        ));
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
-            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let (path, mut file) = Self::new_file(name)?;
         let result = (|| {
             file.write_all(bytes)?;
             #[cfg(unix)]
@@ -945,6 +937,31 @@ impl PrivateExecutable {
             return Err(ToolFailure::Io(error.to_string()));
         }
         Ok(Self { path })
+    }
+    /// Creates a new, exclusive file for one copy. A process killed before
+    /// `Drop` leaves its copy behind, and runs in fresh PID namespaces reuse
+    /// process IDs, so a name may already be taken: take the next sequence
+    /// number instead of failing admission. Existing files are never opened.
+    fn new_file(name: &str) -> Result<(PathBuf, fs::File), ToolFailure> {
+        let extension = if cfg!(windows) { ".exe" } else { "" };
+        for _ in 0..MAX_PRIVATE_NAME_ATTEMPTS {
+            let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = Self::path_for(name, sequence, extension);
+            match OpenOptions::new().create_new(true).write(true).open(&path) {
+                Ok(file) => return Ok((path, file)),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(ToolFailure::Io(error.to_string())),
+            }
+        }
+        Err(ToolFailure::Io(format!(
+            "no free private executable name after {MAX_PRIVATE_NAME_ATTEMPTS} attempts"
+        )))
+    }
+    fn path_for(name: &str, sequence: u64, extension: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "zeno-fcis-checked-{}-{name}-{sequence}{extension}",
+            std::process::id()
+        ))
     }
     fn path(&self) -> &Path {
         &self.path
@@ -6301,6 +6318,31 @@ mod tests {
             Some(ToolFailure::ToolchainHashMismatch)
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn private_executable_skips_a_copy_left_by_a_killed_process() {
+        // A killed run leaves `zeno-fcis-checked-PID-NAME-SEQ`; a later run with
+        // the same process ID must take another name, not fail admission.
+        let name = "StaleCopyRegression";
+        let next = TEMP_SEQUENCE.load(Ordering::Relaxed);
+        let stale: Vec<PathBuf> = (next..next + 64)
+            .map(|sequence| PrivateExecutable::path_for(name, sequence, ""))
+            .collect();
+        for path in &stale {
+            fs::write(path, b"stale").unwrap_or_else(|error| panic!("plant stale copy: {error}"));
+        }
+        let admitted = PrivateExecutable::create_named(name, b"fresh")
+            .unwrap_or_else(|error| panic!("admit beside stale copies: {error:?}"));
+        assert!(!stale.contains(&admitted.path().to_path_buf()));
+        assert_eq!(
+            fs::read(admitted.path()).ok().as_deref(),
+            Some(&b"fresh"[..])
+        );
+        for path in &stale {
+            assert_eq!(fs::read(path).ok().as_deref(), Some(&b"stale"[..]));
+            let _ = fs::remove_file(path);
+        }
     }
 
     #[test]
