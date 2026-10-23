@@ -84,7 +84,7 @@
     "contract review",
     "contract profile"
   ],
-  "pitfalls": "Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority."
+  "pitfalls": "Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority. A boundary-probe review covers only its reported inputs; delivery counterpolicies can differ on interior inputs. For the withdrawal-queue template, use --max-tuples 2000000 to review the complete 1,866,240-input domain and state whether counterpolicy evidence used that full domain."
 }
 ```
 
@@ -146,7 +146,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 ## Pitfalls
 
-Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority.
+Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority. A boundary-probe review covers only its reported inputs; delivery counterpolicies can differ on interior inputs. For the withdrawal-queue template, use --max-tuples 2000000 to review the complete 1,866,240-input domain and state whether counterpolicy evidence used that full domain.
 
 Refusals and remedies: {"contract-invalid": "Repair the named declaration or policy entry; generate contract DIR to diagnose."}
 

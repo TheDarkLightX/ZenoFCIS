@@ -1058,7 +1058,7 @@ private session schema and protocol, distinct from ordinary proposal sessions.
 
 Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
 0; malformed command-line usage exits 64. Operation exits are not interchangeable:
-`run` can exit 0 without improvement, `meaning` can exit 0 with different keys,
+`run` can exit 0 without improvement; unequal `meaning` keys exit 1.
 `teach-back` exits 1 for wrong/refused rules and 2 for vacuous/incomplete rules.
 `strategy --tasks` can exit 0 with unqualified evaluation tasks; an open
 `learn` question exits 2.
@@ -2821,8 +2821,8 @@ closed division/product operations of the expression grammar are supported.
 An unbounded integer constant or expression hole returns inconclusive.
 
 Reports use `zeno-fcis/loop-version-space/2`, with `authority: none` and
-`attempts_spent: 0`. Completed `question`, `determined` and `no-completion`
-reports all exit 0; refusal exits 1 and an incomplete computation exits 2.
+`attempts_spent: 0`. A completed `determined` report exits 0;
+`no-completion` or refusal exits 1, and `question` or an incomplete computation exits 2.
 Early document-read errors can use `zeno-fcis/transform-loop/1`. `question` contains
 an exact proposed count, the chosen input and all output buckets with survivor
 counts. `determined` contains a single representative, its full-domain law

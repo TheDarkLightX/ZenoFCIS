@@ -98,3 +98,12 @@ recovery remains available in that terminal phase; no operator clock reset is
 needed. This does not automatically submit a refund or release.
 The typed `invoke_at` helper uses the same terminal phase, records the bounded
 logical day, and continues to refuse negative times.
+
+## Review scope
+
+The default review uses boundary probes for this template. Those probes can miss
+wrong-amount payouts on interior inputs. Review the complete declared domain with
+`zeno-fcis contract review crates/zeno-fcis-cli/templates/withdrawal-queue --max-tuples 2000000 --format json`.
+That run covers 1,866,240 inputs. State whether counterpolicy evidence used the
+full-domain review or only the default boundary probes; neither establishes
+behavior outside the declared domain.

@@ -186,7 +186,7 @@ private session schema and protocol, distinct from ordinary proposal sessions.
 
 Use `zeno-fcis loop COMMAND --help` for accepted flags and defaults. Help exits
 0; malformed command-line usage exits 64. Operation exits are not interchangeable:
-`run` can exit 0 without improvement, `meaning` can exit 0 with different keys,
+`run` can exit 0 without improvement; unequal `meaning` keys exit 1.
 `teach-back` exits 1 for wrong/refused rules and 2 for vacuous/incomplete rules.
 `strategy --tasks` can exit 0 with unqualified evaluation tasks; an open
 `learn` question exits 2.
