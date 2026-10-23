@@ -260,6 +260,7 @@ impl Inputs {
                 })
             })
             .collect::<Result<_, Failure>>()?;
+        crate::contract::genesis_domain::check(&project, &rules)?;
         Ok(Self {
             project,
             rules,

@@ -205,6 +205,12 @@ fn review_directory(
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
+        let invalid = |error: crate::contract::ContractError| Failure::Invalid {
+            place: error.place().to_owned(),
+            reason: error.reason().to_owned(),
+        };
+        // Admit the same immutable snapshot that the review receives.
+        review::application(&project, &rules).map_err(invalid)?;
         let sources = ReviewSources {
             project: &project,
             rules: &rules,
@@ -232,10 +238,6 @@ fn review_directory(
                     },
                 )
             }
-        };
-        let invalid = |error: crate::contract::ContractError| Failure::Invalid {
-            place: error.place().to_owned(),
-            reason: error.reason().to_owned(),
         };
         let review = reviewed.map_err(invalid)?;
         let seeds = match mutant_programs {
@@ -338,6 +340,11 @@ fn symbolic_directory(
     unsupported_options: bool,
 ) -> u8 {
     let result = (|| {
+        let application =
+            review::application(project, rules).map_err(|error| Failure::Invalid {
+                place: error.place().to_owned(),
+                reason: error.reason().to_owned(),
+            })?;
         let examples = match read_input(&dir.join(EXAMPLES)) {
             Ok(b) => Some(text(EXAMPLES, b)?),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -380,7 +387,7 @@ fn symbolic_directory(
                 }
             }
         };
-        report["application"] = json!(review::application(project, rules).unwrap_or_default());
+        report["application"] = json!(application);
         if let Some(path) = out {
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
                 fs::create_dir_all(parent).map_err(|e| Failure::Read(e.to_string()))?;

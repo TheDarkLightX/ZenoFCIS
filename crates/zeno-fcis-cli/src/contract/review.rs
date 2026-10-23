@@ -541,7 +541,7 @@ fn review_with(
 /// # Errors
 /// The rules file's refusal.
 pub(crate) fn application(project: &str, rules: &str) -> Result<String, ContractError> {
-    Ok(Rules::read_for_project(project, rules)?.template)
+    super::genesis_domain::application(project, rules)
 }
 
 /// Drafting uses the same example grammar, framing and observation comparison

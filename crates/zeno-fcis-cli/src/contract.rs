@@ -36,6 +36,7 @@ pub(crate) mod diff;
 pub(crate) mod draft;
 #[cfg(test)]
 mod draft_tests;
+pub(crate) mod genesis_domain;
 mod layout;
 mod migration;
 mod render;

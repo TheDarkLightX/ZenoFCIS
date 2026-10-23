@@ -229,8 +229,10 @@ fn import(
 
 fn export(dir: &Path, out: &Path, max_tuples: u64, samples: usize) -> Result<Value, String> {
     unavailable(out)?;
-    let inputs = contract_files::Inputs::read(dir)
-        .map_err(|_| "application inputs could not be read".to_owned())?;
+    let inputs = contract_files::Inputs::read(dir).map_err(|error| match error {
+        contract_files::Failure::Invalid { place, reason } => format!("{place}: {reason}"),
+        _ => "application inputs could not be read".to_owned(),
+    })?;
     inputs
         .generate()
         .map_err(|_| "native contract generation refused the application".to_owned())?;
