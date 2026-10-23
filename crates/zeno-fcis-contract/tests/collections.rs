@@ -238,6 +238,60 @@ fn opaque_collection_invariants_are_uniform_and_input_independent() {
     }
 }
 
+/// A record written under one entry role can be named under another by a
+/// later command, so a state law about one role is unsound as a run claim.
+const ROLE_CLOSURE: &str = "zeno 1; project 1 entry_role_closure; namespace 2 witness;
+type 100 state Ledger; type 101 command Command; type 102 context Context;
+type 103 key Key; type 104 data Record; type 105 int Bit in 0..=1;
+field 140 104 value 105; map 110 100 records 103 104 capacity 2;
+field 131 101 left 103; field 132 101 right 103;
+variant 180 102 Desk none;
+entry 160 left of 110 at command.101.131;
+entry 170 right of 110 at command.101.132;
+reason 200 same_key precedence 0;
+component 400 ledger { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 128; }
+merge [400];
+law 500 left_is_zero on commit, genesis = LAW;";
+
+/// Writes 1 under the right role whenever the two keys differ.
+const ROLE_CLOSURE_RULES: &str = r#"{"schema":"zeno-fcis/template-declarative-policy/2",
+"template":"entry-role-closure","roots":{"state":100,"command":101,"context":102},
+"leaf_bindings":{},"variables":{},
+"cases":[{"rule":"same key","when":"command.101.131 == command.101.132","class":"Reject","reason":200,"post":{},"outbox":[]},
+{"rule":"write right","when":"true","class":"Accept","reason":null,"post":{"170":"1","171":"1"},"outbox":[]}],
+"genesis":{"160":0,"161":0,"170":0,"171":0},"law_kinds":{"500":"StateInvariant"}}"#;
+
+#[test]
+fn a_state_law_about_one_entry_role_is_refused_in_either_path_form() {
+    for law in ["post.100.160.140 == 0", "post.100.161 == 0"] {
+        let error = check(
+            &ROLE_CLOSURE.replace("LAW", law),
+            ROLE_CLOSURE_RULES,
+            Limits::default(),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{law}: a role-specific state law was accepted"));
+        assert!(
+            format!("{error:?}").contains("law.order"),
+            "{law}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn the_uniform_form_of_that_law_refutes_a_write_under_the_other_role()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = ROLE_CLOSURE.replace("LAW", "forall e in entries 110 { post.100.e.140 == 0 }");
+    let result = check(&project, ROLE_CLOSURE_RULES, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["law"], 500, "{}", result.packet());
+    // Writing 0 instead keeps every record lawful in every role.
+    let rules = ROLE_CLOSURE_RULES.replace(r#""171":"1""#, r#""171":"0""#);
+    let result = check(&project, &rules, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    Ok(())
+}
+
 #[test]
 fn stored_post_keys_require_a_concrete_pre_invocation_binding()
 -> Result<(), Box<dyn std::error::Error>> {

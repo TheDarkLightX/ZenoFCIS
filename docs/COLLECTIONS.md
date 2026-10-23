@@ -140,6 +140,13 @@ on all data with the same equality pattern.
    checks on the post-view, and P3 makes every other conjunct depend only on
    one unwritten entry or on scalars the Authority also checked. So each
    state law holds at every choice of keys after every step.
+   The uniform form is what makes this step sound. A record written under one
+   entry role can be named under another role by the next command, so a state
+   law about only one role, such as `post.100.160.140 == 0` beside a second
+   entry of the same map, would hold on every checked view and still fail on
+   the next one. The parser refuses such a law (`law.order`); write it as
+   `forall e in entries 110 { post.100.e.140 == 0 }`, which the checker then
+   enforces on every named entry after every step.
 4. *Summaries.* At genesis every summary is 0 and every map is empty. A
    step leaves unnamed entries unchanged, by P4, and the checker found the
    summary change equal to the change of the distinct named entries on every
