@@ -96,7 +96,7 @@ pub(crate) enum DoorCommand {
         about = "Capture references: owner whole/open/status, public packet, proposer candidate.",
         long_about = r#"Five operations share a bounded reference-capture protocol. The owner uses whole for one complete paged arithmetic comparison, or open to freeze an executable observation table in a private capture session. Packet exposes only the ABI, round and selected examples; the proposer submits candidate. Status returns owner-only evidence and rechecks stored success. These roles are a data-separation convention, not authenticated identities.
 
-Inputs use finite-program ABI JSON or zeno-fcis/capture-expressions/1, not the ordinary loop-expressions document. Acceptance requires the existing transform checker and matching receipt replay over the complete observed finite domain. See each child for bounds and exits; results use zeno-fcis/black-box-capture/2. No runtime publication authority."#
+Inputs use finite-program ABI JSON or zeno-fcis/capture-expressions/1, not the ordinary loop-expressions document. Acceptance requires the existing transform checker and matching receipt replay over the complete observed finite domain. See each child for bounds and exits. Normal handlers use zeno-fcis/black-box-capture/2. Outer unavailable containment returns refused (1) under zeno-fcis/black-box-capture/1; an outer stop returns inconclusive (2) under that diagnostic schema. No runtime publication authority."#
     )]
     Capture {
         #[command(subcommand)]
@@ -339,7 +339,7 @@ Lower the expression and use the library evaluator with a full signed-i128 or Bo
         about = "Find open contract decisions, or ask which finite sketch completion is intended.",
         long_about = r#"Choose --contract (project.zeno and v2/policy.json) with optional zeno-fcis/loop-answers/1 --answers, or --specification (zeno-fcis/loop-version-space/1). Contract mode compares laws and answers with the existing core on the declared finite domain and asks about the largest ambiguous region; answers are not adopted. At most 131,072 tuples and 4,000,000 admissibility checks.
 
-Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Default ceilings: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells, 10,000 subsets. The five --max-* flags apply only to --specification; contract mode accepts but ignores them and uses its own limits above.
+Requirements-only mode enumerates finite sketch completions under laws/examples and proposes a distinguishing input or conflict. A singleton is checked using the library law evaluator, transform check and receipt replay. Defaults: 2,000,000 work, 4,096 tuples/meanings, 1,000,000 cells and 10,000 subsets. Hard caps: 100,000,000 work, 65,536 tuples, 16,384 meanings, 8,000,000 cells and 1,000,000 subsets. The five --max-* flags apply to --specification; contract mode accepts but ignores them and uses its own limits above.
 
 Contract determination includes the door's reason and delivery constraints; it need not equal a separate gaps-judge result on exported answer laws. Disagreeing answers exit 1; inspect detail.answers as well as status.
 

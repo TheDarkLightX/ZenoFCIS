@@ -99,6 +99,40 @@ class GuideCli(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, expected)
 
+    def test_owner_questions_are_discoverable(self):
+        result = self.call("guide", "find", "owner questions")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["cards"][0]["name"], "loop-question")
+
+    def test_contract_question_ignores_specification_limits(self):
+        args = ("loop", "question", "--contract", "examples/guide-counter")
+        baseline = self.call(*args)
+        result = self.call(*args, "--max-work", "0", "--max-domain", "0",
+                           "--max-meanings", "0", "--max-cells", "0", "--max-conflict-subsets", "0")
+        self.assertEqual(baseline.returncode, 0, baseline.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        before, after = json.loads(baseline.stdout), json.loads(result.stdout)
+        self.assertEqual(after["status"], before["status"])
+        self.assertEqual(after["detail"], before["detail"])
+
+    def test_capture_unavailable_backend_has_the_documented_refusal_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            abi = work / "abi.json"
+            reference = work / "reference.py"
+            abi.write_text('{"inputs":[],"outputs":[]}')
+            reference.write_text('def reference(point):\n    return []\n')
+            session = work / "capture"
+            result = self.call("--containment-backend", "posix", "loop", "capture", "open",
+                               "--spec", str(abi), "--reference", str(reference), "--session", str(session))
+            self.assertEqual(result.returncode, 1, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertEqual(report["schema"], "zeno-fcis/black-box-capture/1")
+            self.assertEqual(report["status"], "refused")
+            self.assertEqual(report["detail"]["reason"], "capture-containment-unavailable")
+            self.assertFalse(report["containment"]["final"]["application_work_started"])
+            self.assertFalse(session.exists())
+
     def test_unknown_card_has_actionable_refusal(self):
         result = self.call("guide", "show", "missing-card")
         self.assertEqual(result.returncode, 64)

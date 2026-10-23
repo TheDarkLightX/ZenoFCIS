@@ -37,7 +37,7 @@ pub(crate) enum Command {
 
 --max-tuples is points per page (at most 4,096), not a total-domain cap. At most 20 pages fit the 62-frame budget; --node-visits bounds cumulative work (at most 10,000,000). Every point must be covered; partial coverage is inconclusive. Linux x86-64 contained Python runtime required.
 
-No session; report coverage and chained receipt digests, not one exported whole-program receipt. JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 refuted/refused; 2 inconclusive. Exactness concerns the observed finite domain under the deterministic-reference assumption."#
+No session; report coverage and chained receipt digests, not one exported whole-program receipt. JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 captured-exact; 1 refuted/refused; 2 inconclusive. Exactness concerns the observed finite domain under the deterministic-reference assumption."#
     )]
     Whole {
         #[command(flatten)]
@@ -49,7 +49,7 @@ No session; report coverage and chained receipt digests, not one exported whole-
 
 Input files: 65,536 bytes; complete table: at most 4,096 tuples and encodable in 256 nodes; stored protocol/session: 2 MiB. Bounds may be reduced: rounds default 32/max 64, examples default/max 4,096, node visits default 2,000,000/max 10,000,000.
 
-JSON: zeno-fcis/black-box-capture/2. Exit 0 opened; 1 refused (including unsupported runtime or reference-local failure); 2 outer containment or search budget inconclusive. Keep session/status private; only packet and candidate replies are proposer-facing."#
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 opened; 1 refused (including unsupported runtime or reference-local failure); 2 outer stop or search budget inconclusive. Keep session/status private; only packet and candidate replies are proposer-facing."#
     )]
     Open {
         /// ABI JSON with exactly inputs and outputs in finite-program JSON; at most 65,536 bytes.
@@ -79,9 +79,9 @@ JSON: zeno-fcis/black-box-capture/2. Exit 0 opened; 1 refused (including unsuppo
     },
     #[command(
         about = "Public: read the capture ABI, round, and selected examples without private evidence.",
-        long_about = r#"Load --session (zeno-fcis/capture-session/1), verify its bindings, and return the allowlisted profile, ABI, round and selected examples. No reference source, path, digest, full table or receipt enters this packet. The schema is zeno-fcis/black-box-capture/2.
+        long_about = r#"Load --session (zeno-fcis/capture-session/1), verify its bindings, and return the allowlisted profile, ABI, round and selected examples. No reference source, path, digest, full table or receipt enters this packet. The schema is zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2).
 
-Exit 0 packet; 1 refused; 2 outer containment inconclusive. This operation creates no session, consumes no candidate attempt, and issues no receipt. Roles rely on callers keeping owner evidence private; they are not authenticated identities."#
+Exit 0 packet; 1 refused; 2 outer stop inconclusive. This operation creates no session, consumes no candidate attempt, and issues no receipt. Roles rely on callers keeping owner evidence private; they are not authenticated identities."#
     )]
     Packet {
         /// Private capture directory; open requires a new path, other operations require an existing one.
@@ -94,7 +94,7 @@ Exit 0 packet; 1 refused; 2 outer containment inconclusive. This operation creat
 
 Reserve invocation work, check all exposed examples, then require full-table transform check and matching receipt replay. Malformed/ABI-mismatched proposals, example refutations and completed equivalence/counterexample verdicts consume an attempt. Setup failures, checker refusal and budget stops can return without one; invocation work reservations remain charged. A refutation can add a public counterexample; stored success keeps its receipt privately and closes further submissions. Limits come from capture open.
 
-JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 precheck-refuted, candidate-refused, refuted or refused; 2 inconclusive. Example agreement alone is never acceptance. No new session or publication authority."#
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit 0 captured-exact; 1 precheck-refuted, candidate-refused, refuted or refused; 2 inconclusive. Example agreement alone is never acceptance. No new session or publication authority."#
     )]
     Candidate {
         /// Private capture directory; open requires a new path, other operations require an existing one.
@@ -115,7 +115,7 @@ JSON: zeno-fcis/black-box-capture/2. Exit 0 captured-exact; 1 precheck-refuted, 
         about = "Owner: inspect private capture evidence and freshly recheck any retained success.",
         long_about = r#"Load and validate --session. Report private identities, budgets and progress; if a captured candidate exists, repeat transform check and receipt replay and require the stored receipt to match. --full includes table rows, events, candidate and receipt only if the report fits the 1 MiB output cap. Never forward owner status to a proposer.
 
-JSON: zeno-fcis/black-box-capture/2. Exit follows stored state: opened/ready/captured-exact=0, refused/refuted/precheck-refuted/candidate-refused=1, inconclusive=2; fresh validation/replay may refuse or stop inconclusive. Creates no session, spends no candidate attempt and does not issue a new publication capability."#
+JSON: zeno-fcis/black-box-capture/2 for normal handler results. Outer unavailable containment uses zeno-fcis/black-box-capture/1, refused (1); an outer stop uses that diagnostic schema, inconclusive (2). Exit follows stored state: opened/ready/captured-exact=0, refused/refuted/precheck-refuted/candidate-refused=1, inconclusive=2; fresh validation/replay may refuse or stop inconclusive. Creates no session, spends no candidate attempt and does not issue a new publication capability."#
     )]
     Status {
         /// Private capture directory; open requires a new path, other operations require an existing one.

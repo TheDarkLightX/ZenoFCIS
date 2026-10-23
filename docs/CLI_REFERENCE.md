@@ -2786,10 +2786,19 @@ zeno-fcis loop question --specification FILE [--max-work N] [--max-domain N] \
 This is an alternative to `loop question --contract DIR [--answers FILE]`.
 The specification mode reads no prior core and refuses `--contract` or
 `--answers` together with `--specification`. The five `--max-*` flags above
-apply only to specification mode: contract mode accepts but ignores them,
-using its own 131,072-tuple and 4,000,000-admissibility-check limits.
-The bounded ASCII JSON document (64 KiB maximum, unique properties,
-integral numbers) has exactly these fields:
+apply to specification mode; contract mode accepts but ignores them and uses
+its own 131,072-tuple and 4,000,000-admissibility-check limits.
+
+| Specification flag | Default | Hard cap |
+| --- | ---: | ---: |
+| --max-work | 2,000,000 | 100,000,000 |
+| --max-domain | 4,096 | 65,536 |
+| --max-meanings | 4,096 | 16,384 |
+| --max-cells | 1,000,000 | 8,000,000 |
+| --max-conflict-subsets | 10,000 | 1,000,000 |
+The bounded ASCII JSON document has at most 64 KiB and unique properties.
+Int domain bounds and integer example coordinates are signed-64-bit JSON
+integers; Boolean coordinates accept booleans or 0/1. It has exactly these fields:
 
 ```json
 {
@@ -2857,7 +2866,12 @@ coverage, not one exported whole-program receipt. Partial coverage is
 inconclusive. It exits 0 `captured-exact`, 1 `refuted`/`refused`, or 2
 `inconclusive`.
 
-All five operations use `zeno-fcis/black-box-capture/2`. `open` succeeds as
+Normal results of all five operations use `zeno-fcis/black-box-capture/2`.
+Outer unavailable containment returns `refused`, exit 1, under
+`zeno-fcis/black-box-capture/1`; an outer stop uses that diagnostic schema
+with `inconclusive`, exit 2. Such diagnostics retain unknown child accounting
+and cannot establish application work or candidate acceptance.
+ `open` succeeds as
 `opened` (0), and `packet` as `packet` (0). `status` preserves the stored
 state's exit class (ready/success 0, decided refusal/refutation 1,
 inconclusive 2), subject to fresh validation/replay. Role names do not

@@ -193,8 +193,8 @@ Containment may return inconclusive, exit 2, before application work starts.
 `rules` can qualify an unchanged original with no rewrite checks: inspect
 `baseline_check`, `checks`, `improved` and `claim`. Unsupported rule-mining
 arithmetic does not prevent the independent baseline check/replay.
-Question's five `--max-*` flags apply only to `--specification`; contract
-mode accepts but ignores them. Contract determination includes reason and
+Question's five `--max-*` flags apply to `--specification`; contract mode
+accepts but ignores them and uses its own limits. Contract determination includes reason and
 delivery constraints, so it need not match the gaps judge on exported laws;
 a completed report can also contain disagreeing answers.
 Neither a proposer, a hash, a role label nor a session file grants publication

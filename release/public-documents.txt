@@ -329,7 +329,15 @@ docs/loops/contract-risk.md
 docs/loops/contract-scenario.md
 docs/loops/generate.md
 docs/loops/knowledge.md
+docs/loops/loop-capture.md
+docs/loops/loop-family.md
+docs/loops/loop-learn.md
+docs/loops/loop-pipeline.md
+docs/loops/loop-question.md
 docs/loops/loop-rules.md
+docs/loops/loop-strategy.md
+docs/loops/loop-teach-back.md
+docs/loops/loop-transfer.md
 docs/loops/loop-workspace.md
 docs/loops/new.md
 docs/loops/program-search.md
