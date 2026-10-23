@@ -582,7 +582,7 @@ class LoopWorkspace:
         original = self.data / state.get("original_program", "original.zcve")
         code, report = doors.meaning(self.cli(state), original, path)
         detail = report.get("detail") or {}
-        if code != 0 or report.get("status") != "keyed" or detail.get("same_as_original"):
+        if code != 1 or report.get("status") != "keyed" or detail.get("same_as_original") is not False:
             return None
         key = detail.get("key")
         return key if isinstance(key, str) and re.fullmatch(r"[0-9a-f]{64}", key) else None

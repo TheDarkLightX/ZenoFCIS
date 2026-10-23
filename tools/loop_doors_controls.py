@@ -378,7 +378,11 @@ def encoded(cli: Path, program: dict, path: Path) -> Path:
 
 def keyed(cli: Path, original: Path, document: Path) -> dict:
     code, report = run(cli, "loop", "meaning", "--original", original, "--expressions", document)
-    return report.get("detail") or {} if code == 0 and report.get("status") == "keyed" else {"refused": report}
+    detail = report.get("detail") or {}
+    same = detail.get("same_as_original")
+    if report.get("status") == "keyed" and isinstance(same, bool) and code == (0 if same else 1):
+        return detail
+    return {"refused": report}
 
 
 def checked_equivalent(cli: Path, a: Path, b: Path) -> bool | None:
