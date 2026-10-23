@@ -364,3 +364,11 @@ provides background for finite graph model checking. Checked closure sets and
 decreasing ranks establish only their declared finite-game claims. The JSON
 interface and evidence binding are implementation choices; no new game-solving
 method is claimed here.
+
+The [shared exit contract](CLI_REFERENCE.md#exit-codes) applies to `game.py`
+and the standalone certificate checker. A counterexample or exhausted guard
+class exits 1; UNKNOWN diagnostics exit 2 even when their binding replays.
+Campaign runners report completion of the whole test harness separately.
+
+Background for process exits: IEEE and The Open Group, *POSIX.1-2024*,
+Shell Command Language, 2024. Game semantics and certificate scope are unchanged.

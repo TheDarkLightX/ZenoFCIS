@@ -329,12 +329,22 @@ def load_bound(directory):
                             for name in ('lawful','guard-true','guard-false','lawful-composition')})
 
 
+def verdict_exit(verdict):
+    """Map the checked evidence class to the shared CLI verdict contract."""
+    evidence = verdict.get('evidence')
+    if evidence in {'counterexample', 'no guard in class', 'exhausted fixed grammar', 'certified unrealizability'}:
+        return 1
+    if evidence in {'checked up to K', 'certified safety', 'certified reachability', 'certified guard', 'certified winning strategy'}:
+        return 0
+    return 2
+
+
 def main():
     try:
         from guide_help import example_help
     except ImportError:
         example_help = lambda _: ""
-    parser=argparse.ArgumentParser(description=__doc__, epilog=example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter); parser.add_argument('directory',type=Path)
+    parser=argparse.ArgumentParser(description=__doc__, epilog='Exit 0 checked/certified, 1 counterexample/no solution in class, 2 UNKNOWN/refused.\n'+example_help("trace-game"), formatter_class=argparse.RawDescriptionHelpFormatter); parser.add_argument('directory',type=Path)
     parser.add_argument('certificate'); args=parser.parse_args()
     try:
         if (args.directory/'arena-binding.json').exists():
@@ -351,7 +361,9 @@ def main():
         path=args.directory/args.certificate
         binding=json.loads((args.directory/('game-binding.json' if user_game else 'binding.json')).read_text())
         need(args.certificate in binding['artifacts'],'unbound certificate')
-        print(json.dumps(check(json.loads(path.read_text()),tables),sort_keys=True))
+        verdict = check(json.loads(path.read_text()),tables)
+        print(json.dumps(verdict,sort_keys=True))
+        return verdict_exit(verdict)
     except (ImportError,ValueError,KeyError,TypeError,IndexError,OSError,RecursionError,subprocess.SubprocessError) as error:
         parser.exit(2,f'certificate refused: {error}\n')
 
@@ -366,5 +378,5 @@ if __name__ == "__main__":
         # Reporting is optional, including for a standalone copy of this tool.
         run_cli = lambda function: function()
     def _entrypoint():
-        main()
+        raise SystemExit(main())
     run_cli(_entrypoint)

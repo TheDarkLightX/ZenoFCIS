@@ -108,7 +108,8 @@ def main():
                                  profile=dict(toolchain='1.97.1',locked=True,offline=True,debug=0,jobs=2,repository_checks='not-run' if args.certificates_only else 'required')))
     results={}
     for name in CERTIFICATES:
-        measure([sys.executable,'-B','tools/trace_game/certificate_check.py',out,f'{name}.json'],out,f'check-{name}',env)
+        measure([sys.executable,'-B','tools/trace_game/certificate_check.py',out,f'{name}.json'],out,f'check-{name}',env,
+                expected=1 if name in {'quantifier-no-guard','oracle-unrealizability'} else 0)
         results[name]=json.loads((out/f'check-{name}.log').read_text())
     tests=['test_product','test_certificate','test_guards','test_unrealizable','test_strategy','test_admission',
            'test_check.Check','test_check.Standalone.test_standalone_refuses_specimen']

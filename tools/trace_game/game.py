@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import time
 
-from certificate_check import check
+from certificate_check import check, verdict_exit
 from game_spec import load, description, expand, native_numbers, SCOPE
 from solve import certify, Meter
 
@@ -114,6 +114,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog=(
         'Example: nice -n 19 ionice -c3 python3 -B tools/trace_game/game.py certify --game '
         'test-data/trace-games/escrow-safe.json --out ../escrow-game-evidence\n\n'
+        'Exit 0 checked/certified, 1 counterexample/no guard in class, 2 UNKNOWN.\n'
         'Input: schema="zeno-fcis/game/1"; contract=directory relative to the game file.\n'
         'actors[] = {id:string, compromised:boolean, command:{position:[integer,...]},\n'
         '            context:{position:[integer,...]}}; specify every input position.\n'
@@ -138,7 +139,7 @@ def main():
     parser.add_argument('--native',type=Path,help='prebuilt trace_game_input executable; otherwise build offline')
     args=parser.parse_args()
     try:
-        verdict=run(args); code=0
+        verdict=run(args); code=verdict_exit(verdict)
     except (ValueError,KeyError,TypeError,IndexError,OverflowError,RecursionError,OSError,subprocess.SubprocessError) as error:
         verdict=dict(evidence='UNKNOWN',limit=str(error),claim='no certificate established',scope=SCOPE)
         if getattr(args,'created',False):

@@ -151,7 +151,7 @@ law 500 bounded on commit, genesis = post.100.110 >= {large};
             self.assertEqual(json.loads(completed.stdout)['evidence'],'UNKNOWN')
             checked=subprocess.run(['nice','-n','19','ionice','-c3','python3','-B',
                 str(ROOT/'tools/trace_game/certificate_check.py'),str(out),'certificate.json'],capture_output=True,text=True)
-            self.assertEqual(checked.returncode,0,checked.stderr)
+            self.assertEqual(checked.returncode,2,checked.stderr)
             self.assertEqual(json.loads(checked.stdout)['evidence'],'UNKNOWN')
             before={p.name:p.read_bytes() for p in out.iterdir()}
             completed=subprocess.run(command,capture_output=True,text=True)
@@ -166,7 +166,7 @@ law 500 bounded on commit, genesis = post.100.110 >= {large};
                 verdict=run(SimpleNamespace(mode='certify',game=ROOT/f'test-data/trace-games/escrow-{label}.json',out=out,native=self.binary))
                 completed=subprocess.run(['nice','-n','19','ionice','-c3','python3','-B',
                     str(ROOT/'tools/trace_game/certificate_check.py'),str(out),'certificate.json'],capture_output=True,text=True)
-                self.assertEqual(completed.returncode,0,completed.stderr)
+                self.assertEqual(completed.returncode,0 if label == 'safe' else 1,completed.stderr)
                 self.assertEqual(json.loads(completed.stdout)['evidence'],verdict['evidence'])
             original=json.loads((ROOT/'test-data/trace-games/escrow-planted.json').read_text())
             original['contract']=str(ROOT/'test-data/trace-games/escrow-planted')
