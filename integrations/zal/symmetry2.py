@@ -33,7 +33,7 @@ def parse_declarations(items, english=False):
 
 def validate_declarations(model):
     items = model.symmetries
-    if not isinstance(items, tuple):
+    if type(items) is not tuple:
         refuse("declarations", "declaration", "symmetries must be owned tuples")
     seen = set()
     variables = {v.name: (v.low, v.high, v.initial) for v in model.variables}
@@ -44,19 +44,19 @@ def validate_declarations(model):
     object_ids.update(n for n, *_ in model.games)
     object_ids.update(n for n, _ in model.players)
     for item in items:
-        if not isinstance(item, tuple) or len(item) != 2 or not isinstance(item[0], str):
+        if type(item) is not tuple or len(item) != 2 or type(item[0]) is not str:
             refuse("declarations", "declaration", "expected (ID, pairs) tuples")
         name, pairs = item
         if (not re.fullmatch(b.NAME, name) or name in b.RESERVED or name in seen or name in object_ids
-                or not isinstance(pairs, tuple) or not pairs):
+                or type(pairs) is not tuple or not pairs):
             refuse(name, "declaration", "distinct statement ID and nonempty owned pairs required")
         seen.add(name)
         if len(seen) > 4:
             refuse(name, "finiteness", "at most four generators")
         used = set()
         for pair in pairs:
-            if (not isinstance(pair, tuple) or len(pair) != 2
-                    or any(not isinstance(x, str) for x in pair)):
+            if (type(pair) is not tuple or len(pair) != 2
+                    or any(type(x) is not str for x in pair)):
                 refuse(name, "declaration", "expected owned name pairs")
             a, c = pair
             if a == c or used & set(pair) or not any(set(pair) <= kind for kind in kinds):

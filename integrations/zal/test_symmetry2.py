@@ -46,6 +46,13 @@ class SymmetryDeclarationTests(unittest.TestCase):
         self.assertNotIn("symmetry", plain.data())
         self.assertNotEqual(model.revision, plain.revision)
 
+    def test_symmetry_statement_is_registered_in_help(self):
+        model = b.parse(BASE)
+        entries = [e for e in b.legend(model)['entries'] if e['concept'] == 'symmetry']
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(b.help_topic(model, 'symmetry:rivals')['entries'], entries)
+        self.assertEqual(b.help_topic(model, 'grammar:symmetry')['entries'], entries)
+
     def test_declaration_refusals_name_statement(self):
         for text in ['(aa aa)', '(aa bb) (aa tick)', '(aa tick)', '(missing bb)', '(env aa)', 'aa bb']:
             with self.subTest(text=text), self.assertRaisesRegex(b.Refusal, "Symmetry rivals: declaration"):
@@ -73,9 +80,28 @@ class SymmetryDeclarationTests(unittest.TestCase):
 
     def test_owned_ir(self):
         model = b.parse(BASE)
-        for items in [[], [('rivals', [('aa', 'bb')])], (('rivals', (['aa', 'bb'],)),)]:
+        class TupleAlias(tuple):
+            def __new__(cls, values):
+                obj = super().__new__(cls, values)
+                obj.values = list(values)
+                return obj
+            def __iter__(self):
+                return iter(self.values)
+        class NameAlias(str):
+            pass
+        pairs = model.symmetries[0][1]
+        for items in [[], [('rivals', [('aa', 'bb')])], (('rivals', (['aa', 'bb'],)),),
+                      TupleAlias(model.symmetries), (TupleAlias(model.symmetries[0]),),
+                      ((NameAlias('rivals'), pairs),), (('rivals', TupleAlias(pairs)),),
+                      (('rivals', (TupleAlias(pairs[0]), pairs[1])),),
+                      (('rivals', ((NameAlias('aa'), 'bb'), pairs[1])),)]:
             with self.assertRaises(b.Refusal):
                 replace(model, symmetries=items)
+
+    def test_no_symmetry_option_is_boolean(self):
+        for option in [0, 1, [], {}, 'false']:
+            with self.assertRaisesRegex(b.Refusal, 'no_symmetry must be Boolean'):
+                b.check(b.parse(BASE), no_symmetry=option)
 
     def test_automorphism_control(self):
         model = b.parse(BASE.replace('rule borrow_b: user + right [bb == 0] -> accept env, bb = 1;', ''))

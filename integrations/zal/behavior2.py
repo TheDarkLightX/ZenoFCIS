@@ -672,7 +672,7 @@ class Machine:
     symmetries: tuple = ()
 
     def __post_init__(self):
-        if not isinstance(self.symmetries, tuple):
+        if type(self.symmetries) is not tuple:
             raise Refusal("Symmetry declarations: declaration: symmetries must be owned tuples")
         validate_machine(self)
         index = {}
@@ -939,7 +939,7 @@ def validate_machine(model: Machine):
         if model.symmetries:
             from symmetry2 import refuse
             item = model.symmetries[0]
-            name = item[0] if isinstance(item, tuple) and item and isinstance(item[0], str) else "declarations"
+            name = item[0] if type(item) is tuple and item and type(item[0]) is str else "declarations"
             refuse(name, "finiteness", detail)
         raise Refusal(detail)
     for values, maximum in [(model.rules, 32), (model.invariants, 8), (model.requirements, 8),
@@ -2046,6 +2046,8 @@ def _check_property(graph, model, name, formula):
 
 
 def check(model: Machine, checker_identity="unbound", *, no_symmetry=False) -> dict:
+    if type(no_symmetry) is not bool:
+        raise Refusal("Symmetry option: no_symmetry must be Boolean")
     if model.symmetries:
         from symmetry2 import check as check_symmetry
         return check_symmetry(model, checker_identity, no_symmetry)
@@ -2559,6 +2561,10 @@ CONSTRUCTS = {
              "Property ID: NAME can force (FORMULA) to happen within K steps. | "
              "Property ID: NAME can force (Q1) and (Q2) to each happen infinitely often.",
              "Game properties check whether their player can force a state goal over every play under the declared objective and fairness assumptions."),
+    "symmetry": ("symmetry ID: swap (a b) (c d);",
+                 "Symmetry ID: swapping a with b and c with d changes nothing.",
+                 "A generator must preserve outcomes, claims, player ownership and the finite domain. "
+                 "Checked orbits reduce reachable claims and games; an observed party must remain fixed."),
     "unresolved": ("unresolved KIND: TEXT;", "Unresolved KIND: TEXT.",
                    "This records an unsupported requirement. It remains visible and blocks factory lowering."),
 }
@@ -2614,6 +2620,7 @@ def _objects(model):
             **{"property:" + n: "property" for n, _ in model.properties},
             **{"player:" + name: "player" for name, _ in model.players},
             **{"property:" + name: "game" for name, _, _, _ in model.games},
+            **{"symmetry:" + name: "symmetry" for name, _ in model.symmetries},
             "initial": "initial", "default": "default", "frame": "frame"}
 
 
@@ -2652,7 +2659,7 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
         title, meaning = "Meaning of " + topic, CONSTRUCTS[category][2]
         prefix = {"rule": "rule", "invariant": "invariant", "require": "require", "fairness": "fairness",
                   "property": "property", "game": "property", "input": "input", "var": "var",
-                  "player": "player"}.get(category)
+                  "player": "player", "symmetry": "symmetry"}.get(category)
         name = topic.partition(":")[2]
         marker = (f"{prefix} {name} " if category in {"input", "var", "player"}
                   else f"{prefix} {name}:")
