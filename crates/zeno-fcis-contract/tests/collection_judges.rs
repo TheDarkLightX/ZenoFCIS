@@ -193,7 +193,12 @@ fn initial_conditions_are_checked_only_at_empty_map_genesis()
     let bad = project.replace("post.100.161 == 0", "post.100.161 == 2");
     let result = check(&bad, &good, Limits::default())?;
     assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
-    assert_eq!(result.packet()["result"]["obligation"], "genesis laws");
+    assert_eq!(
+        result.packet()["result"]["obligation"],
+        "runtime genesis admission"
+    );
+    assert_eq!(result.packet()["result"]["law"], 501);
+    assert_eq!(result.packet()["measured"]["tuples"], 0);
     assert!(judges::scenarios(&bad, &good, &genesis_scenario()).is_err());
     assert!(judges::profile(&bad, &good, 1, Limits::default()).is_err());
     Ok(())
