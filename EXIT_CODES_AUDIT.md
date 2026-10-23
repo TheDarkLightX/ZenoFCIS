@@ -44,7 +44,7 @@ Input/usage/IO errors retain their existing codes (including 3, 64 and 65).
 | loop learn | determined/qualified 0; outside-vocabulary/ambiguous/refuted 1; inconclusive 2; question 3 | loop_learn.rs:369 |
 | loop capture open/packet/status/candidate/whole | opened/packet/ready/captured-exact 0; refuted/refused 1; inconclusive 2 | loop_capture.rs:151 |
 | synth run/verify; completion find/verify/replay | checked 0; refuted/unrealizable 1; incomplete/unsupported 2 | synth/mod.rs:122,158; synth/completion.rs:243,362 |
-| purity; backend verify; doctor | confined/verified/available 0; violations 1; unreadable/unavailable 2 | main.rs:1700,1713,1731 |
+| purity; backend verify; doctor | confined/verified/available 0; violations 1; unreadable purity input 3; unavailable backend/doctor 2 | main.rs:1700,1707,1713,1731 |
 | generate [contract] --check | unchanged 0; drift/invalid 1 | main.rs:1323; contract_files.rs |
 | trace_game/game.py check/certify/select-guard | checked/certified/counterexample/no guard in class 0; UNKNOWN 2 | tools/trace_game/game.py:141 |
 | trace_game/certificate_check.py | any replayed evidence (including counterexample/UNKNOWN/unrealizability) 0; refused 2 | tools/trace_game/certificate_check.py:329 |
