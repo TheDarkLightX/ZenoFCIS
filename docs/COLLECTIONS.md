@@ -108,11 +108,11 @@ at every choice of keys. The argument follows Wolper's data independence
 (POPL 1986): a program that only compares data for equality behaves alike
 on all data with the same equality pattern.
 
-| Premise | Enforced by |
+| Premise | Enforcement or proof obligation |
 |---|---|
 | P1. Keys are compared only for equality, with keys of the same type, and copied only into stored key fields. | The parser refuses any other key use in a law; the checker refuses it in a rule. |
 | P2. A decision reads only scalar state, named entries, and command and context scalars and key classes. | Structure: a map has no view field, and the parser refuses any formula that reads one. |
-| P3. Each conjunct of a state law reads one named entry or only scalar state; aggregates are summaries. | The parser refuses other state laws and any aggregate over a map's entries. |
+| P3. Entry invariants use the same scalar-independent predicate at every entry, including absence, and every named post-entry satisfies it. Scalar invariants read only scalars; aggregates are summaries. | Parser restrictions establish read locality. Uniform closure across all named writes is an additional obligation, explicit in the Lean model's `Checked` premise; this proof does not establish executable enforcement. |
 | P4. The runtime frames each decision from the stored entries at the named keys and writes back only the merged writes of named entries. | The runtime, outside this check. |
 
 1. *Abstraction.* For a real state and input, build the view: scalars as
@@ -151,7 +151,7 @@ serialization and ownership; see the [proof scope](../verification/lean/README.m
 
 The model's `run_preserves` additionally requires a uniform, scalar-independent
 entry predicate at every stored entry and every named post-entry, including
-absence, plus lawful empty genesis and merged-write framing. P3's locality
+absence, plus lawful empty genesis and merged-write framing. Read locality
 alone is insufficient: `role_only_counterexample` preserves a law at role `a`,
 writes an unlawful value at distinct role `b`, and violates the law when that
 key is later selected as `a`. The model makes this closure an explicit
