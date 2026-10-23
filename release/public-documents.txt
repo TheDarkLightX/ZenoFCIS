@@ -368,6 +368,7 @@ examples/collections/README.md
 examples/collections/escrow/README.md
 examples/collections/library/README.md
 examples/collections/token-balances/README.md
+examples/composition-service/README.md
 examples/contract-tables/README.md
 examples/contract-tables/constant-role-hierarchy/README.md
 examples/contract-tables/delegation/README.md
