@@ -52,6 +52,8 @@ class Candidate:
     plain: str
     zal: str | None = None
     template: str | None = None
+    idiom: str | None = None
+    source_note: str | None = None
 
 
 class JudgeStop(Exception):
@@ -142,10 +144,15 @@ class Judge:
         self.binary, self.contract, self.out = binary, contract, out
         self.max_work, self.calls = max_work, 0
         self.binary_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
+        self.subject_hashes = {key: hashlib.sha256((contract / name).read_bytes()).hexdigest()
+                               for key, name in (("project_sha256", "project.zeno"), ("rules_sha256", "v2/policy.json"))}
 
     def review(self, laws=()):
         if hashlib.sha256(self.binary.read_bytes()).hexdigest() != self.binary_hash:
             raise JudgeStop(3, "binary-changed")
+        for key, name in (("project_sha256", "project.zeno"), ("rules_sha256", "v2/policy.json")):
+            if hashlib.sha256((self.contract / name).read_bytes()).hexdigest() != self.subject_hashes[key]:
+                raise JudgeStop(3, "subject-changed")
         self.calls += 1
         stem = self.out / "packets" / f"{self.calls:04d}"
         stem.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +175,11 @@ class Judge:
                 raise ValueError("not an object")
         except ValueError:
             raise JudgeStop(run.returncode if run.returncode else 65, "missing-review-packet") from None
+        # A budget/usage refusal can precede source reporting. A measured
+        # verdict must bind the exact subject bytes captured at invocation.
+        if packet.get("gaps", {}).get("status") == "measured" and any(
+                packet.get("sources", {}).get(key) != digest for key, digest in self.subject_hashes.items()):
+            raise JudgeStop(3, "subject-binding-mismatch")
         return run.returncode, packet, f"packets/{stem.name}.stdout"
 
 
@@ -216,14 +228,27 @@ def synthesize(packet, policy, before, allocate):
     propose("coverage_rejects_only_when_needed", "reject",
             " || ".join(f"({policy_expression(c['when'], policy, positions)})" for c, _ in rejects) or "false",
             "a rejection must satisfy a declared rejection guard")
+    propose("coverage_reject_relation", "reject",
+            " || ".join(f"(({g}) && decision_reason == {c['reason']})" for c, g in rejects) or "false",
+            "a rejection follows its declared ordered relation and reason")
     for reason in sorted({c["reason"] for c, _ in rejects}):
         propose(f"coverage_reason_{reason}", f"reject:{reason}",
                 " || ".join(f"({g})" for c, g in rejects if c["reason"] == reason),
                 "rejection reasons preserve ordered rule precedence")
     for cls, scope in [("Accept", "accept"), ("CommittedFailure", "failure")]:
         cases = [(c, g) for c, g in rows if c["class"] == cls]
-        propose(f"coverage_{scope}_relation", scope, " || ".join(f"({g})" for _, g in cases) or "false",
-                "a decision outside its declared input relation is refused")
+        relations = []
+        for case, guard in cases:
+            constraints = [f"({guard})"]
+            if cls == "CommittedFailure":
+                constraints.append(f"decision_reason == {case['reason']}")
+            for field in state:
+                expression = policy_expression(case.get("post", {}).get(str(field["field"]), field["name"]),
+                                               policy, positions, value=True)
+                constraints.append(f"post.{roots['state']}.{field['field']} == {expression}")
+            relations.append("(" + " && ".join(constraints) + ")")
+        propose(f"coverage_{scope}_relation", scope, " || ".join(relations) or "false",
+                "a decision follows its complete declared input, reason and successor relation")
         for field in state:
             number = str(field["field"])
             terms = []
@@ -253,7 +278,7 @@ def synthesize(packet, policy, before, allocate):
     return candidates
 
 
-def proposals(path, zal_path, project, allocate):
+def proposals(path, zal_path, project, allocate, *, idioms=False):
     """One law or profile-2 statement per line, with optional # targets: TAG,..."""
     if path is None:
         return []
@@ -275,14 +300,31 @@ def proposals(path, zal_path, project, allocate):
         expected_variants |= {(120 + i, 101, "event_" + n) for i, n in enumerate(model.events)}
         if not expected_variants <= variants:
             raise ValueError("ZAL model and contract do not share the profile-2 lowering variants")
+    if idioms:
+        instances = json.loads(read_text(path))
+        if not isinstance(instances, list) or len(instances) > MAX_PROPOSALS:
+            raise ValueError("--idioms requires a JSON list of at most 128 instances")
+        for row in instances:
+            if (not isinstance(row, dict) or set(row) != {"schema", "idiom", "law", "dimension", "source"}
+                    or row["schema"] != "zeno-fcis/design-idiom-instance/1"
+                    or not all(isinstance(row[k], str) and row[k].strip() for k in row)
+                    or row["dimension"] not in DIMENSIONS or "\n" in row["law"]):
+                raise ValueError("invalid design idiom instance")
+        lines = [(row["law"], row) for row in instances]
+    else:
+        lines = [(line, {}) for line in read_text(path).splitlines()]
     result = []
-    for number, line in enumerate(read_text(path).splitlines(), 1):
+    for number, (line, metadata) in enumerate(lines, 1):
         text, _, comment = line.partition("#")
         text = text.strip()
         if not text:
+            if idioms:
+                raise ValueError("an idiom instance needs a law or ZAL statement")
             continue
         target = re.fullmatch(r"\s*targets:\s*(.+?)\s*", comment)
         tags = tuple(t.strip() for t in target[1].split(",")) if target else ("unclassified",)
+        if idioms:
+            tags = (metadata["dimension"],)
         if any(not t for t in tags):
             raise ValueError(f"empty proposal target at line {number}")
         zal = None
@@ -311,7 +353,9 @@ def proposals(path, zal_path, project, allocate):
                 allocate()
             plain = f"{'Invariant' if kind == 'invariant' else 'Requirement'} {name}: {formula.render(True)}."
             zal = text
-        result.append(Candidate(f"proposed-line-{number}", "proposed", laws, tags, plain, zal))
+        source = "idiom" if idioms else "proposed"
+        result.append(Candidate(f"{source}-line-{number}", source, laws, tags, plain, zal,
+                                idiom=metadata.get("idiom"), source_note=metadata.get("source")))
         if len(result) > MAX_PROPOSALS:
             raise ValueError(f"at most {MAX_PROPOSALS} proposals")
     return result
@@ -330,7 +374,7 @@ def markdown(report):
         for d in DIMENSIONS:
             x, y = a["per_dimension"][d], b["per_dimension"][d]
             lines.append(f"| {d} | {x['gap']} / {y['gap']} | {x['mutant']} / {y['mutant']} |")
-        for source in ("synthesized", "proposed"):
+        for source in ("synthesized", "proposed", "idiom"):
             lines += ["", f"### {source.capitalize()}", ""]
             for verdict in ("kept", "rejected", "disagreeing"):
                 for c in rnd[verdict]:
@@ -339,6 +383,8 @@ def markdown(report):
                     lines += [f"- {verdict}: {c['id']}; targets {', '.join(c['targets'])}.",
                               "  Reading: " + c["plain"], "  Laws: " + " ".join(c["laws"]),
                               "  Evidence: " + c["packet"]]
+                    if c.get("idiom"):
+                        lines.append(f"  Idiom: {c['idiom']}; source: {c['source_note']}")
                     if c.get("closed_witnesses"):
                         lines.append("  Closes: " + ", ".join(w["id"] for w in c["closed_witnesses"]))
                     if verdict == "disagreeing":
@@ -383,6 +429,7 @@ def run(options):
         next_id += 1
         return result
     supplied = proposals(options.proposals, options.zal, project, allocate)
+    supplied += proposals(getattr(options, "idioms", None), options.zal, project, allocate, idioms=True)
     binary = Path(os.environ.get("ZENO_FCIS_BIN", DEFAULT_BIN)).resolve()
     report = {"schema": SCHEMA, "authority": "none", "status": "ran", "exit_code": 0, "rounds": [],
               "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -460,6 +507,7 @@ def add_command(subparsers):
     parser.add_argument("directory", type=Path)
     parser.add_argument("--zal", type=Path)
     parser.add_argument("--proposals", type=Path)
+    parser.add_argument("--idioms", type=Path, help="JSON list of design-idiom-instance/1 candidates")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--rounds", type=int, default=3, choices=range(1, 33), metavar="N")
     parser.add_argument("--max-work", type=int, help="forward the gap judge's law-check budget")

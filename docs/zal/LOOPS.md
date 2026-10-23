@@ -353,6 +353,98 @@ inputs it misses), so equal keys give equal verdicts. The same
 invariant or rule in other words is answered from memory with its earlier
 verdict (`same i2 as i1: 9 states, event 3, inductive;`).
 
+## Coverage expansion
+
+The coverage loop measures behaviours the declared laws leave open, proposes
+additional laws, and asks the native gap judge whether each proposal agrees
+with the actual decisions and closes an open input or rejects an admitted
+mutant. It retains only proposals meeting both conditions. Nothing is adopted:
+read and confirm each proposed law before editing the contract.
+
+Set `ZENO_FCIS_BIN` to a compatible `zeno-fcis` binary, and `WORK` to a fresh
+writable directory outside the contract. From the repository root:
+
+```sh
+python3 integrations/zal/run.py coverage examples/guide-counter --out "$WORK/counter"
+```
+
+Expected stdout (exit 0):
+
+```json
+{"schema": "zeno-fcis/coverage-loop/1", "status": "no-residual-witness", "exit": 0, "before": {"gaps": 12, "admitted_mutants": 9}, "after": {"gaps": 0, "admitted_mutants": 0}}
+```
+
+The first synthesized template recovers the rejection guard described in
+[the gap-judge tutorial](../CONTRACT_JUDGES.md#do-the-laws-pin-the-contract-down):
+the counter rejects only an unauthorized change or a change at a bound.
+Reason templates preserve the ordered cases' precedence. Field templates
+state the accepted update or unchanged frame. Input templates name the
+individual native witnesses. These suggestions restate existing decisions;
+they do not independently establish that those decisions express the intent.
+
+For a deliberately insufficient judge budget:
+
+```sh
+python3 integrations/zal/run.py coverage examples/guide-counter --max-work 1 --out "$WORK/budget"
+```
+
+Expected stdout (exit 2):
+
+```json
+{"schema": "zeno-fcis/coverage-loop/1", "status": "inconclusive", "exit": 2, "before": {"gaps": null, "admitted_mutants": null}, "after": {"gaps": null, "admitted_mutants": null}}
+```
+
+Optional `--proposals FILE` supplies one contract law per line. Tag its target
+with `# targets: authority,gap-ID` (a dimension, an emitted witness ID, or both).
+An omitted tag remains visible as `unclassified`. The output separates these
+`proposed` laws from the deterministic templates' `synthesized` laws. Fresh
+numeric IDs are assigned without changing the supplied law body.
+
+`--idioms FILE` supplies a third source: a JSON list whose entries have
+`schema: "zeno-fcis/design-idiom-instance/1"`, an `idiom` ID, one `law`, a
+`dimension`, and a `source` note. These library instances follow the same
+native agreement and coverage-gain checks as other proposals, and appear
+separately as `idiom`, with their ID and source note retained. With `--zal`,
+the `law` string may be an `invariant` or `require` statement. This input
+consumes instantiated candidates; it does not interpret an idiom library.
+
+With `--zal MODEL.zal`, lines may instead contain profile-2 `invariant` or
+`require` statements, for example `require authorized_change: accepted => authorized;`
+when the model declares `authorized`. The model and contract must share the
+lowering vocabulary. The shared profile-2 syntax lowering produces the laws;
+no Python model check decides whether a proposal is true. Each statement's ZAL
+text, lowered laws and existing controlled-English reading stay together.
+One requirement may lower to separate accept and reject laws; it is judged
+as a single proposal. A tautology that lowers to no laws closes nothing.
+
+`--rounds N` defaults to 3 (1–32). Each native check includes all earlier kept
+laws. The loop stops when no witness remains, a round keeps nothing, or the
+round limit is reached. `--max-work` forwards the native law-check budget.
+Exit 0 means the loop ran, even with residual witnesses; exit 1 retains a
+disagreement and its native input; exit 2 preserves an inconclusive judge.
+Malformed proposals and filesystem failures retain refusal codes.
+
+`OUT/coverage.json` uses `zeno-fcis/coverage-loop/1`; `OUT/COVERAGE.md` presents
+the readings, proposed laws and witnesses for confirmation. Each round gives
+exact open-input and admitted-mutant totals before and after. Per-dimension
+counts cover **emitted witnesses only**: the judge samples open inputs. Tags
+use explicit name/rule patterns for value, authority, state, input, order,
+privacy, liveness, failure, time and resources, and story. They may overlap.
+Every tag records its rule; unmatched witnesses remain `unclassified`.
+The owned subject copy, adapter/binary hashes, law files, native requests,
+stdout, stderr and exit codes remain beside the report. Reports are local
+evidence, not publication permission or authenticated attestations.
+
+Background: E. M. Clarke, O. Grumberg, S. Jha, Y. Lu and H. Veith,
+*Counterexample-Guided Abstraction Refinement*, CAV 2000; R. A. DeMillo,
+R. J. Lipton and F. G. Sayward, *Hints on Test Data Selection: Help for the
+Practicing Programmer*, Computer, 1978. Their methods provide background on
+witness refinement and mutation testing. What is new here: prior-art search
+pending; no novelty claim. Scope: coverage here means witnessed by the gap
+judge's mutants and gaps, not every possible behaviour. A dimension tag is
+not a two-run privacy/order check, a liveness proof, or a check of the story.
+The [coverage card](COVERAGE_CARD.md) repeats the tested commands and outputs.
+
 ## MCP tools
 
 `integrations/zal/mcp.py` offers, for the workspace named by

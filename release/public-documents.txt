@@ -343,6 +343,7 @@ docs/tutorials/FORMAL_TOOLS.md
 docs/tutorials/LANGUAGE.md
 docs/tutorials/MINI_DETERMINATOR.md
 docs/tutorials/TEMPORAL.md
+docs/zal/COVERAGE_CARD.md
 docs/zal/EFFECTS.md
 docs/zal/GRAMMAR.md
 docs/zal/HARNESS_INTEGRATION.md
