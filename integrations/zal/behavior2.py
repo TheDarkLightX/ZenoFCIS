@@ -1169,6 +1169,338 @@ class _Graph:
         return {"state": self.configs[ci][0], "variables": dict(self.value_dicts[ci])}
 
 
+@dataclass(frozen=True)
+class _GameGraph:
+    """Owned finite game graph; both solvers receive only this immutable value."""
+    successors: tuple[tuple[int, ...], ...]
+    owners: tuple[int, ...]
+    goal: tuple[bool, ...]
+    fairness: tuple[tuple[bool, ...], ...]
+    configurations: tuple[tuple, ...]
+    configuration_nodes: tuple[int, ...]
+    initial: int
+    numbered_names: bool
+
+
+def _game_graph(graph, model, player):
+    state_owner = {state: owner for owner, states in model.players for state in states}
+    config_index = {ci: index for index, ci in enumerate(graph.order)}
+    descriptors = [
+        ("configuration", graph.configs[ci][0], tuple(zip(graph.names, graph.configs[ci][1])))
+        for ci in graph.order
+    ]
+    owners = [0 if state_owner[graph.configs[ci][0]] == player else 1 for ci in graph.order]
+    successors = [[] for _ in graph.order]
+    has_context = bool(model.facts or model.inputs)
+    for ci in graph.order:
+        source = config_index[ci]
+        state = graph.configs[ci][0]
+        rows = graph.steps[ci]
+        if state_owner[state] == player and has_context:
+            for event in model.events:
+                choices = [step for step in rows if step.event == event]
+                intermediate = len(owners)
+                descriptors.append(("context", state, tuple(zip(graph.names, graph.configs[ci][1])), event))
+                owners.append(1)
+                successors.append([config_index[step.post] for step in choices])
+                successors[source].append(intermediate)
+        else:
+            successors[source].extend(config_index[step.post] for step in rows)
+    false_labels = tuple(False for _ in descriptors)
+    return _GameGraph(tuple(tuple(row) for row in successors), tuple(owners), false_labels, (),
+                      tuple(descriptors), tuple(range(len(graph.order))), config_index[graph.start],
+                      bool(model.variables or model.facts or model.inputs))
+
+
+def _configuration_holds(formula, descriptor):
+    if descriptor[0] != "configuration":
+        return False
+    _, state, pairs = descriptor
+    values = dict(pairs)
+    step = _Step(state, values, None, {})
+    step.post_state, step.post_values = state, values
+    return holds(formula, step)
+
+
+def _reduce_game(graph, model, objective, formula):
+    goal = [_configuration_holds(formula, node) for node in graph.configurations]
+    successors = [tuple(row) for row in graph.successors]
+    if objective == "always":
+        fairness = (tuple(True for _ in graph.successors),)
+        goal = [True for _ in graph.successors]
+        for node in graph.configuration_nodes:
+            if not _configuration_holds(formula, graph.configurations[node]):
+                goal[node] = False
+                successors[node] = (node,)
+        return _GameGraph(tuple(successors), graph.owners, tuple(goal), fairness,
+                          graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names)
+
+    if model.fairness:
+        fairness = [tuple(_configuration_holds(item, node) for node in graph.configurations)
+                    for _, item in model.fairness]
+    else:
+        fairness = [tuple(True for _ in graph.successors)]
+    if objective == "eventually":
+        for node in graph.configuration_nodes:
+            if goal[node]:
+                successors[node] = (node,)
+                for index in range(len(fairness)):
+                    row = list(fairness[index])
+                    row[node] = True
+                    fairness[index] = tuple(row)
+    return _GameGraph(tuple(successors), graph.owners, tuple(goal), tuple(fairness),
+                      graph.configurations, graph.configuration_nodes, graph.initial, graph.numbered_names)
+
+
+def _fixed_point_strata(graph):
+    """Solver A returns its winning set and the first stable outer/middle strata."""
+    universe = set(range(len(graph.successors)))
+
+    def cpre(target):
+        return {node for node, choices in enumerate(graph.successors)
+                if ((graph.owners[node] == 0 and any(child in target for child in choices))
+                    or (graph.owners[node] == 1 and all(child in target for child in choices)))}
+
+    z = set(universe)
+    z_chain = [frozenset(z)]
+    levels, middle_chains = {}, {}
+    outer = 0
+    while True:
+        outer += 1
+        cpre_z = cpre(z)
+        y = set()
+        y_chain = [frozenset(y)]
+        level = 0
+        while True:
+            level += 1
+            cpre_y = cpre(y)
+            union = set()
+            for assumption in graph.fairness:
+                x = set(universe)
+                while True:
+                    cpre_x = cpre(x)
+                    updated_x = {
+                        node for node in universe
+                        if ((graph.goal[node] and node in cpre_z)
+                            or node in cpre_y
+                            or (not assumption[node] and node in cpre_x))
+                    }
+                    if updated_x == x:
+                        break
+                    x = updated_x
+                union.update(x)
+            y_chain.append(frozenset(union))
+            if union == y:
+                break
+            y = union
+        levels[outer] = level
+        middle_chains[outer] = tuple(y_chain)
+        z_chain.append(frozenset(y))
+        if y == z:
+            return outer, levels, tuple(z_chain), middle_chains
+        z = y
+
+
+def _fixed_point_winners(graph):
+    """Solver A: iterate the stated nested nu/mu/nu fixed points to stability."""
+    _, _, z_chain, _ = _fixed_point_strata(graph)
+    return z_chain[-1]
+
+
+def _parity_winners(graph):
+    """Solver B: round-robin parity product, solved by Zielonka recursion."""
+    count = len(graph.successors)
+    assumptions = len(graph.fairness)
+    product_size = count * assumptions
+    owners, priorities, successors = [], [], []
+    for node in range(count):
+        for counter in range(assumptions):
+            owners.append(graph.owners[node])
+            priorities.append(2 if graph.goal[node] else
+                              1 if graph.fairness[counter][node] and counter == assumptions - 1 else 0)
+            next_counter = ((counter + 1) % assumptions
+                            if graph.fairness[counter][node] else counter)
+            successors.append(tuple(child * assumptions + next_counter for child in graph.successors[node]))
+
+    def attractor(player, target, subgame):
+        reached = set(target)
+        while True:
+            added = set()
+            for node in subgame - reached:
+                choices = [child for child in successors[node] if child in subgame]
+                if ((owners[node] == player and any(child in reached for child in choices))
+                        or (owners[node] != player and all(child in reached for child in choices))):
+                    added.add(node)
+            if not added:
+                return reached
+            reached.update(added)
+
+    def zielonka(subgame):
+        if not subgame:
+            return set(), set()
+        highest = max(priorities[node] for node in subgame)
+        player = highest % 2
+        top = {node for node in subgame if priorities[node] == highest}
+        first_attractor = attractor(player, top, subgame)
+        first_even, first_odd = zielonka(subgame - first_attractor)
+        first_winners = [first_even, first_odd]
+        opponent = 1 - player
+        if not first_winners[opponent]:
+            first_winners[player].update(first_attractor)
+            return first_winners[0], first_winners[1]
+        second_attractor = attractor(opponent, first_winners[opponent], subgame)
+        second_even, second_odd = zielonka(subgame - second_attractor)
+        second_winners = [second_even, second_odd]
+        second_winners[opponent].update(second_attractor)
+        return second_winners[0], second_winners[1]
+
+    even_wins, _ = zielonka(set(range(product_size)))
+    return frozenset(node for node in range(count) if node * assumptions in even_wins)
+
+
+def _game_table_project(graph, proposed_strata=None):
+    """Render a reduced game using solver-proposed strata and a checked stability table."""
+    count, assumptions = len(graph.successors), graph.fairness
+    if proposed_strata is None:
+        outer, levels, _, _ = _fixed_point_strata(graph)
+    else:
+        outer, levels = proposed_strata
+    if outer < 1 or set(levels) != set(range(1, outer + 1)) or any(levels[k] < 1 for k in levels):
+        raise Refusal("Invalid fixed-point stratum proposal")
+    slots = tuple(tuple(dict.fromkeys(row)) for row in graph.successors)
+    width = max(len(row) for row in slots)
+    goal_table = max(840, 800 + width)
+    fairness_table = max(860, goal_table + 1)
+    listing = lambda values: "[" + ",".join(map(str, values)) + "]"
+    source = [
+        "zeno 1;",
+        "project 1 constant_role_hierarchy;",
+        "namespace 2 permissions;",
+        "type 100 state Roles;",
+        "type 101 command Request;",
+        "type 102 context Session;",
+        f"type 105 int Parent in 0..={count};",
+        "type 106 index Role of 110;",
+        "type 107 int Grant in 0..=1;",
+        "// Who moves: 0 = the property's player, 1 = the other player.",
+        f"const table 110 mover 107 size {count} {listing(graph.owners)};",
+    ]
+    for slot in range(width):
+        values = [row[slot] + 1 if slot < len(row) else 0 for row in slots]
+        source.append(f"const table {800 + slot} next{slot} 105 size {count} {listing(values)};")
+    source.append(f"const table {goal_table} goal 107 size {count} {listing(int(value) for value in graph.goal)};")
+    for index, row in enumerate(assumptions):
+        name = "fair" if len(assumptions) == 1 else f"fair{index}"
+        source.append(f"const table {fairness_table + index} {name} 107 size {count} {listing(int(value) for value in row)};")
+    source += [
+        f"table 210 100 grants 107 size {count};",
+        "field 120 101 role 106;",
+        "variant 130 102 Session none;",
+        "reason 200 permission_required precedence 0;",
+        "component 400 inheritance {",
+        "  owns 100;",
+        "  reads pre.100;",
+        "  writes post.100;",
+        "  contexts context.102;",
+        "  budget steps 4096;",
+        "}",
+        "merge [400];",
+    ]
+    edge = "(" + " || ".join(f"next{slot}[s] == t + 1" for slot in range(width)) + ")"
+    has_successor = "(" + " || ".join(f"next{slot}[s] != 0" for slot in range(width)) + ")"
+
+    def other_predecessor(target):
+        return (f"((mover[s] == 0 && forall t in table 110 {{ !{edge} || {target} }})"
+                f" || (mover[s] == 1 && (!{has_successor} || exists t in table 110 {{ {edge} && {target} }})))")
+
+    def escape(k, level, fair, at):
+        return f"w{k}_{level}_{fair}[{at}]"
+
+    def not_y(k, level, at):
+        if level == 0:
+            return "true"
+        return "(" + " && ".join(escape(k, level, i, at) for i in range(len(assumptions))) + ")"
+
+    def not_z(k, at):
+        if k == 0:
+            return "false"
+        return "(" + " && ".join(escape(k, levels[k], i, at) for i in range(len(assumptions))) + ")"
+
+    next_table = max(1000, fairness_table + len(assumptions))
+    source.append("// w(k,l,i)[s]: the other player can escape middle stratum (k,l) through assumption i.")
+    for outer_index in range(1, outer + 1):
+        for level in range(1, levels[outer_index] + 1):
+            for fair_index in range(len(assumptions)):
+                fair_name = "fair" if len(assumptions) == 1 else f"fair{fair_index}"
+                not_a = (f"((goal[s] == 0 || {other_predecessor(not_z(outer_index - 1, 't'))}) && "
+                         f"{other_predecessor(not_y(outer_index, level - 1, 't'))})")
+                body = (f"{not_a} && ({fair_name}[s] == 1 || "
+                        f"{other_predecessor(escape(outer_index, level, fair_index, 't'))})")
+                source += [f"derived table {next_table} w{outer_index}_{level}_{fair_index}[s] "
+                           f"in table 110 rounds {count} {{",
+                           f"  when true then {body};",
+                           "  default false;",
+                           "};"]
+                next_table += 1
+    source += ["// win[s]: the property player wins from s under the fairness assumptions.",
+               f"derived table {next_table} win[s] in table 110 rounds {count} {{",
+               f"  when true then !{not_z(outer, 's')};",
+               "  default false;",
+               "};"]
+    next_table += 1
+
+    def same(left, right):
+        return f"(({left} && {right}) || (!{left} && !{right}))"
+
+    stable_conditions = [same(not_z(outer, "t"), not_z(outer - 1, "t"))]
+    stable_conditions.extend(same(not_y(index, levels[index], "t"),
+                                  not_y(index, levels[index] - 1, "t"))
+                             for index in range(1, outer + 1))
+    stable_body = "forall t in table 110 { " + " && ".join(stable_conditions) + " }"
+    source += [f"derived table {next_table} stable[s] in table 110 rounds {count} {{",
+               f"  when true then {stable_body};",
+               "  default false;",
+               "};",
+               "law 500 domains on commit, genesis = forall s in table 110 { post.100.210[s] >= 0 && post.100.210[s] <= 1 };",
+               "law 510 stable on commit = stable[0];"]
+    for node, descriptor in enumerate(graph.configurations):
+        if graph.numbered_names:
+            law_name = f"from_n{node}"
+            if descriptor[0] == "configuration":
+                _, state, pairs = descriptor
+                detail = f"configuration state={state} variables={','.join(f'{name}={value}' for name, value in pairs)}"
+            else:
+                _, state, pairs, event = descriptor
+                detail = f"context choice state={state} variables={','.join(f'{name}={value}' for name, value in pairs)} event={event}"
+            source.append(f"// n{node}: {detail}")
+        else:
+            law_name = f"from_{descriptor[1]}"
+        source.append(f"law {600 + node} {law_name} on commit = win[{node}];")
+    return "\n".join(source) + "\n"
+
+
+def export_game_project(model, property_id):
+    """Lower one game's reduced reachable graph; table export never changes check authority."""
+    selected = next((item for item in model.games if item[0] == property_id), None)
+    if selected is None:
+        raise Refusal(f"Game property {property_id} is not declared")
+    graph = _Graph(model)
+    steps = [[] for _ in graph.configs]
+    for ci, _, _, result in graph.raw():
+        if result[0] == "overlap":
+            raise Refusal("Game export needs a deterministic transition graph")
+        if result[0] == "trap":
+            raise Refusal("Game export needs every accepted transition to stay within variable ranges")
+        steps[ci].append(result[1])
+    graph.explore(steps)
+    _, player, objective, formula = selected
+    reduced = _reduce_game(_game_graph(graph, model, player), model, objective, formula)
+    count = len(reduced.successors)
+    if count > 64:
+        raise Refusal(f"The table form of this game has {count} nodes; a table holds at most 64")
+    return _game_table_project(reduced), count
+
+
 def _shortest_path(graph, sources, targets, allowed):
     """Shortest path of allowed steps from any source to a target configuration; None if none."""
     parent = {s: None for s in sources}
@@ -1352,6 +1684,8 @@ def check(model: Machine, checker_identity="unbound") -> dict:
               "update_ranges": "not-run", "coverage_with_explicit_default": "not-run",
               "reachable_invariants": "not-run", "invariant_preservation": "not-run",
               "transition_requirements": "not-run", "temporal_properties": "not-run"}
+    if model.games:
+        checks["game_properties"] = "not-run"
     graph = _Graph(model)
     steps, traps, defaults = [[] for _ in graph.configs], {}, []
     for ci, event, context, result in graph.raw():
@@ -1434,28 +1768,68 @@ def check(model: Machine, checker_identity="unbound") -> dict:
                                   property=name, witness=witness)
         results[name] = {"status": "pass-with-scope", "kind": shape["kind"], "mode": mode}
     checks["temporal_properties"] = "pass-with-scope"
-    return {"status": "unsupported" if model.obligations else "pass-with-scope",
-            "revision": model.revision, "profile": PROFILE, "checker": checker_identity,
-            "scope": ("Finite atomic steps over declared control states and integer variables; context ranges over "
-                      "fresh Boolean and integer inputs on every step. Ranges, invariant preservation and "
-                      "requirements cover every admissible configuration (declared and satisfying every invariant); "
-                      "properties range over every infinite execution from the initial configuration, liveness "
-                      "only over executions satisfying every fairness declaration"),
-            "checks": checks, "input_tuples": graph.tuples,
-            "configurations": len(graph.configs), "admissible_configurations": len(admissible),
-            "reachable_configurations": len(graph.order),
-            "reachable_states": sorted({graph.configs[ci][0] for ci in graph.order}),
-            "unreachable_rules": sorted({r.id for r in model.rules} - {s.rule for s in graph.reachable_steps()}),
-            "invariant_count": len(model.invariants), "requirement_count": len(model.requirements),
-            "property_count": len(model.properties), "fairness_count": len(model.fairness),
-            "properties": results, "advisories": _advisories(model, graph, [s for row in steps for s in row], admitted_steps),
-            "default_count": len(defaults), "default_witness": step_data(defaults[0]) if defaults else None,
-            "unresolved": list(model.obligations), "factory": "not-run", "authority": "none"}
+    for name, player, objective, formula in model.games:
+        base = _game_graph(graph, model, player)
+        game = _reduce_game(base, model, objective, formula)
+        fixed = _fixed_point_winners(game)
+        parity = _parity_winners(game)
+        english_objective = {"eventually": "to happen eventually", "always": "to hold always",
+                             "infinitely often": "to happen infinitely often"}[objective]
+        english = f"Property {name}: {player} can force ({_bare(formula.render(True))}) {english_objective}."
+        config_data = lambda node: {"state": game.configurations[node][1],
+                                    "variables": dict(game.configurations[node][2])}
+        winning_configs = [node for node in game.configuration_nodes if node in fixed]
+        if fixed != parity:
+            result = counterexample(model, checker_identity, "game", {**checks, "game_properties": "unknown"},
+                                    property=name, english=english, player=player, objective=objective,
+                                    initial=config_data(game.initial),
+                                    winning_configurations=[config_data(node) for node in winning_configs[:16]],
+                                    winning_configuration_count=len(winning_configs),
+                                    diagnostic="solvers disagree")
+            result["status"] = "unknown"
+            return result
+        if game.initial not in fixed:
+            return counterexample(model, checker_identity, "game", {**checks, "game_properties": "counterexample"},
+                                  property=name, english=english, player=player, objective=objective,
+                                  initial=config_data(game.initial),
+                                  winning_configurations=[config_data(node) for node in winning_configs[:16]],
+                                  winning_configuration_count=len(winning_configs))
+        results[name] = {"status": "pass-with-scope", "kind": "game", "player": player,
+                         "objective": objective, "english": english,
+                         "configurations": len(game.configuration_nodes),
+                         "winning_configurations": len(winning_configs), "initial_wins": True,
+                         "solvers": ["fixed-point", "parity"]}
+    if model.games:
+        checks["game_properties"] = "pass-with-scope"
+    scope = ("Finite atomic steps over declared control states and integer variables; context ranges over "
+             "fresh Boolean and integer inputs on every step. Ranges, invariant preservation and "
+             "requirements cover every admissible configuration (declared and satisfying every invariant); "
+             "properties range over every infinite execution from the initial configuration, liveness "
+             "only over executions satisfying every fairness declaration")
+    if model.games:
+        scope += ("; game properties range over every play from the initial configuration in which each player "
+                  "chooses the event in its own states and the other player chooses the context.")
+    report = {"status": "unsupported" if model.obligations else "pass-with-scope",
+              "revision": model.revision, "profile": PROFILE, "checker": checker_identity,
+              "scope": scope,
+              "checks": checks, "input_tuples": graph.tuples,
+              "configurations": len(graph.configs), "admissible_configurations": len(admissible),
+              "reachable_configurations": len(graph.order),
+              "reachable_states": sorted({graph.configs[ci][0] for ci in graph.order}),
+              "unreachable_rules": sorted({r.id for r in model.rules} - {s.rule for s in graph.reachable_steps()}),
+              "invariant_count": len(model.invariants), "requirement_count": len(model.requirements),
+              "property_count": len(model.properties) + len(model.games), "fairness_count": len(model.fairness),
+              "properties": results, "advisories": _advisories(model, graph, [s for row in steps for s in row], admitted_steps),
+              "default_count": len(defaults), "default_witness": step_data(defaults[0]) if defaults else None,
+              "unresolved": list(model.obligations), "factory": "not-run", "authority": "none"}
+    if model.games:
+        report["game_property_count"] = len(model.games)
+    return report
 
 
 def _advisories(model, graph, raw_steps, admitted_steps):
     advisories = []
-    if not (model.invariants or model.requirements or model.properties):
+    if not (model.invariants or model.requirements or model.properties or model.games):
         advisories.append({"kind": "no-application-claims",
                            "message": "No invariants, requirements or properties declared; no unstated application "
                                       "safety, authorization or progress policy has been checked."})

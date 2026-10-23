@@ -242,3 +242,99 @@ property t4: always(state == aa);
     def test_existing_example_revisions_are_unchanged(self):
         paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name != "withdrawal_game2.zal")
         self.assertEqual({path.name: parse_example(path).revision for path in paths}, EXAMPLE_REVISIONS)
+
+    def test_withdrawal_example_and_its_variants(self):
+        path = EXAMPLES / "withdrawal_game2.zal"
+        self.assertEqual(path.read_text(encoding="ascii"), WITHDRAWAL_SOURCE)
+        model = b.parse(WITHDRAWAL_SOURCE)
+        self.assertEqual(b.parse(model.render(True), "english"), model)
+        report = b.check(model)
+        self.assertEqual(report["properties"]["keep_withdrawing"]["initial_wins"], True)
+        without_fairness = WITHDRAWAL_SOURCE.replace(
+            "fairness reopens: infinitely often (state' == open);\n", "")
+        failed = b.check(b.parse(without_fairness))
+        self.assertEqual((failed["status"], failed["obligation"], failed["property"]),
+                         ("counterexample", "game", "keep_withdrawing"))
+        eventual = without_fairness.replace("can force infinitely often", "can force eventually")
+        reached = b.check(b.parse(eventual))
+        self.assertTrue(reached["properties"]["keep_withdrawing"]["initial_wins"])
+
+
+class GameSolverTests(unittest.TestCase):
+    CONTEXT_GAME = """zal 2;
+machine context_game;
+states open, paused, withdrawn;
+events idle, try;
+context authorized;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule take: open + try [authorized] -> accept withdrawn;
+player user moves in open;
+player operator moves in paused, withdrawn;
+property reaches: user can force eventually (state == withdrawn);
+"""
+
+    def test_eventually_goal_is_absorbing_and_makes_fairness_true(self):
+        model = b.parse(GAME_SOURCE + "rule leave_goal: bb + tick [true] -> accept aa;\n")
+        game = reduced_for(model)
+        goals = [node for node in game.configuration_nodes if game.goal[node]]
+        self.assertTrue(goals)
+        for node in goals:
+            self.assertEqual(game.successors[node], (node,))
+            self.assertTrue(all(row[node] for row in game.fairness))
+
+    def test_always_reduction_marks_every_safe_node_and_ignores_fairness(self):
+        source = self.CONTEXT_GAME.replace("eventually", "always").replace("state == withdrawn", "state == open")
+        model = b.parse(source + "fairness current: infinitely often (state == open);\n")
+        game = reduced_for(model)
+        self.assertEqual(game.fairness, (tuple(True for _ in game.successors),))
+        intermediate = [node for node, descriptor in enumerate(game.configurations) if descriptor[0] == "context"]
+        self.assertTrue(intermediate)
+        self.assertTrue(all(game.goal[node] for node in intermediate))
+        bad = [node for node in game.configuration_nodes if not game.goal[node]]
+        self.assertTrue(bad)
+        self.assertTrue(all(game.successors[node] == (node,) for node in bad))
+
+    def test_success_record_and_game_scope_are_exact(self):
+        result = b.check(b.parse(GAME_SOURCE))
+        self.assertEqual(result["checks"]["game_properties"], "pass-with-scope")
+        self.assertEqual(result["properties"]["reaches"], {
+            "status": "pass-with-scope", "kind": "game", "player": "user", "objective": "eventually",
+            "english": "Property reaches: user can force (state is bb) to happen eventually.",
+            "configurations": 2, "winning_configurations": 2, "initial_wins": True,
+            "solvers": ["fixed-point", "parity"]})
+        self.assertIn("game properties range over every play from the initial configuration in which each player "
+                      "chooses the event in its own states and the other player chooses the context", result["scope"])
+
+    def test_context_choice_belongs_to_opponent(self):
+        result = b.check(b.parse(self.CONTEXT_GAME))
+        self.assertEqual(result["status"], "counterexample")
+        self.assertEqual(result["obligation"], "game")
+        self.assertEqual((result["property"], result["player"], result["objective"], result["initial"]["state"]),
+                         ("reaches", "user", "eventually", "open"))
+        self.assertLessEqual(len(result["winning_configurations"]), 16)
+        self.assertFalse(result["initial"].get("variables"))
+
+    def test_game_runs_after_existing_temporal_properties(self):
+        source = GAME_SOURCE + "property prior_safety: never(state == bb);\n"
+        result = b.check(b.parse(source))
+        self.assertEqual((result["status"], result["obligation"], result["property"]),
+                         ("counterexample", "property", "prior_safety"))
+
+    def test_solver_disagreement_is_unknown_and_not_a_pass(self):
+        with patch.object(b, "_parity_winners", return_value=frozenset()):
+            result = b.check(b.parse(GAME_SOURCE))
+        self.assertEqual((result["status"], result["diagnostic"]), ("unknown", "solvers disagree"))
+        self.assertNotEqual(result["status"], "pass-with-scope")
+
+    def test_solver_agreement_2000_random_machines_on_every_node(self):
+        rng = random.Random(20261022)
+        for case in range(2000):
+            model = b.parse(random_game_source(rng, case))
+            game = reduced_for(model)
+            fixed = b._fixed_point_winners(game)
+            parity = b._parity_winners(game)
+            self.assertEqual(fixed, parity, f"solver disagreement in random machine {case}")
+
+
