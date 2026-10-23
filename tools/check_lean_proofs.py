@@ -46,23 +46,43 @@ def controls(version, path, source):
     # First the unmodified model is compiled by main. Each added assertion
     # states a concrete false claim, so rejection must be a proof failure.
     if path.name == "Collections.lean":
-        name = "role_uniformity_control"
-        assertion = """
+        cases = {"role_uniformity_control": """
 theorem role_uniformity_control :
     Collections.zeroEntry
       (Collections.roleStep (fun _ : Bool => none) false true true) := by
   change (some true : Option Bool) ≠ some true
   decide
-"""
+"""}
+    elif path.name == "FixedPoints.lean":
+        cases = {"top_seed_control": """
+-- Incorrect least-chain seed: identity is monotone and stable from top,
+-- but its alleged least result must be below the fixed point bottom.
+theorem top_seed_control :
+    FixedPoints.iter (fun x : FixedPoints.Bits 1 => x)
+      FixedPoints.top 0 (0 : Fin 1) = FixedPoints.bottom (0 : Fin 1) := by
+  change true = false
+  decide
+""", "monotonicity_control": """
+-- Without monotonicity the one-bit negation chain oscillates. It need not
+-- repeat by comparison n+1 (here n=1).
+theorem monotonicity_control :
+    FixedPoints.iter (fun x : FixedPoints.Bits 1 => fun i => !(x i))
+      FixedPoints.bottom 1 (0 : Fin 1) =
+    FixedPoints.iter (fun x : FixedPoints.Bits 1 => fun i => !(x i))
+      FixedPoints.bottom 2 (0 : Fin 1) := by
+  change true = false
+  decide
+"""}
     else:
-        return
-    with tempfile.TemporaryDirectory(prefix="lean-proof-control-") as directory:
-        mutant = Path(directory) / path.name
-        mutant.write_text(source + assertion)
-        code, output = lean(version, mutant)
-    print(f"CONTROL {version} {name}: exit {code}\n{output}", flush=True)
-    if code != 1 or "error:" not in output or "decide" not in output or "false" not in output:
-        raise ValueError(f"{name} did not fail on the expected false assertion")
+        raise ValueError(f"no defect control defined for {path.name}")
+    for name, assertion in cases.items():
+        with tempfile.TemporaryDirectory(prefix="lean-proof-control-") as directory:
+            mutant = Path(directory) / path.name
+            mutant.write_text(source + assertion)
+            code, output = lean(version, mutant)
+        print(f"CONTROL {version} {name}: exit {code}\n{output}", flush=True)
+        if code != 1 or not re.search(r"error: Tactic `decide` proved that the proposition\n[\s\S]*?\nis false", output):
+            raise ValueError(f"{name} did not fail on the expected false assertion")
 
 
 def main():
