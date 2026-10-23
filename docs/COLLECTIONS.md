@@ -157,6 +157,14 @@ writes an unlawful value at distinct role `b`, and violates the law when that
 key is later selected as `a`. The model makes this closure an explicit
 `Checked` premise; it does not prove that the executable checker enforces it.
 
+For the state-law induction, two further obligations are required: entry-local
+state predicates must be uniform across a map and independent of invocation
+inputs, and declared laws must hold on the alias-merged successor. The legacy
+equality-only branch does not establish these additional obligations. Its view
+verdict alone therefore does not establish the all-size state-law claim without
+separate evidence for them. Ordered projects enforce both obligations as
+specified below; this does not upgrade the legacy branch's assurance.
+
 ## Difference
 
 A fixed table, `table ID OWNER name TYPE size N`, has N fields, and every
@@ -191,8 +199,9 @@ combination is **prior-art search pending**.
 - State laws relate one entry, or scalars. A law over two entries, such as
   conservation between a sender and a receiver, is written as a step law
   (`on commit`) or through a summary.
-- Rules may not read an unnamed entry, iterate a map, or order keys. Range
-  queries, iteration and ordered keys are future work.
+- Rules may not read an unnamed entry or iterate a map. Ordered key types
+  and at most four fixed order reads are supported by the collections
+  checker as described below; opaque keys remain equality-only.
 - Cross-entry invariants that relate two maps, such as a member's loan
   count and the copies that member holds, are not expressible; rules must
   then defend against every admissible view, as the library's return rule
@@ -233,3 +242,135 @@ copies, through the library Authority on each framed view. After every
 committed decision the supply equals the sum of every stored balance, each
 member's loan count equals the copies it holds, every root equals its
 rebuild, and no decision reads more than its two named entries.
+
+## Ordered keys and bounded reads
+
+An ordered key is an integer from declared inclusive bounds, observed only
+through same-type comparisons and copying. Its numeric value, distance,
+arithmetic, constants and casts are unavailable to decisions. Prices and
+times can use this order-only interface:
+
+```text
+type 103 ordered Price in 0..=1000000;
+type 106 int Found in 0..=1;
+field 132 102 best_price 103;
+field 133 102 best_found 106;
+order 180 best_bid of 110 max into context.102.132 found context.102.133;
+entry 170 best of 110 at context.102.132;
+```
+
+`order ID NAME of MAP QUERY into KEY found FLAG;` observes the pre-state
+map. KEY is a context field of its ordered key type and FLAG is a distinct
+context integer field with range `0..=1`. There are at most four reads in a
+project, so every command has a fixed bound. Read IDs and output fields are
+unique. Endpoints are command or context key fields of the same type;
+query outputs cannot also be endpoints. Queries are:
+
+| QUERY | Result when found | When not found |
+|---|---|---|
+| `min` | Least key | The map is empty |
+| `max` | Greatest key | The map is empty |
+| `successor PATH` | Least key strictly greater than PATH | No key is greater than PATH |
+| `predecessor PATH` | Greatest key strictly less than PATH | No key is less than PATH |
+| `range LOWER to UPPER` | A key in the closed interval | No key is in that interval |
+
+A reversed range is empty. When FLAG is 0, KEY is an arbitrary key of its
+type and carries no membership fact. Guard uses of a result with FLAG. A
+range result is an existence witness: the checker considers every matching
+key, while the pure `ordered_key` helper chooses the least matching one.
+There is no map iterator, dynamic query loop, key literal or arithmetic.
+
+The [tiny order book](../examples/collections/order-book/README.md) uses a
+maximum read and checks that every fill uses an existing price at least as
+good as the best bid. The ordinary finite view is still available through
+`--expand`; its bare scalar checks do not establish map order facts. Use
+`contract collections` for that conditional claim.
+
+### Why the ordered check covers every size
+
+This argument extends the view reduction itself; equality-only renaming
+is insufficient for order. Its claim is conditional on P1–P4 above, with P1
+extended to comparisons of ordered keys, and the following premises:
+
+| Premise | Enforcement or remaining obligation |
+|---|---|
+| O1. Each ordered key domain is a fixed integer interval with its total order. Decisions observe only equality/order of same-type keys and copy keys. | The parser requires inclusive bounds, rejects mixed types, arithmetic, constants and casts in laws; the collections checker applies the same restrictions to policy expressions and stored-key writes. Concrete input bounds are a framing obligation. |
+| O2. All reads are a fixed, simultaneous observation of one immutable pre-state map snapshot. | The parser accepts at most four reads, distinct context outputs, same-type input endpoints and no output-to-endpoint dependencies. The runtime must obtain these observations from that snapshot. |
+| O3. A successful read names a present key. Every extremal/neighbour read and every failed range read supplies its empty interval. | The checker constructs present/absent point sets and explicit open/closed empty intervals, and refuses inconsistent views. |
+| O4. Entry-local state predicates apply uniformly across each map's named entries, and do not depend on invocation observations. | Existing `law.entries` and summary checks remain. Ordered projects reject input-dependent state invariants and require structurally identical predicates, modulo entry field IDs, on every named entry of that map. `forall e in entries MAP` supplies this form. |
+| O5. Only named-entry writes are merged and published; query facts are pre-state observations, never retained state. | This is a runtime obligation. The current `Layout` refuses ordered projects rather than frame unsupported observations. The pure query helper supplies no decision or publication authority. |
+
+1. *Abstraction.* Collect all command/context keys, all read-result keys
+   (including arbitrary placeholders for failed reads), and stored keys of
+   present named entries, separately for each key type. Replace ordered keys
+   by their ranks among the distinct collected keys. Every comparison and
+   copy has the same result; stored scalar values remain unchanged. O1 and
+   the existing named-entry boundary make the decision depend on this view.
+   A global order automorphism of a bounded integer interval is unnecessary:
+   the argument preserves the finite observations of this invocation.
+2. *Coverage by weak orderings.* For p collected positions, every ordered
+   equality partition is represented by a contiguous assignment of ranks
+   `0..b-1`, where b is the number of blocks. The checker enumerates all
+   assignments and retains exactly the contiguous ones for active ordered
+   positions. Thus both `a < b` and `b < a`, and every alias, occur. Opaque
+   keys retain first-occurrence labels. Absent stored fields hold defaults
+   and do not introduce active positions. Declared position counts bound
+   these ranks; the existing tuple cap yields UNKNOWN before exploration
+   when the declared domain is too large.
+3. *Absence facts.* A found minimum r establishes `(-infinity,r)` empty;
+   a maximum establishes `(r,+infinity)` empty. A found successor of a
+   establishes `(a,r)` empty and `a < r`; a predecessor establishes `(r,a)`
+   empty and `r < a`. A failed neighbour read establishes the corresponding
+   open half-line empty. Failed min/max establish the whole map empty.
+   A failed range establishes `[lo,hi]` empty; a successful range adds a
+   present witness within it. The checker compares every known present
+   point, including all other successful results, with these intervals and
+   with named absent points. Endpoints and open/closed flags are explicit:
+   adjacent ranks alone never mean that the real map has no key between.
+4. *Unnamed keys.* Real observations satisfy these facts by O2–O3. Their
+   intervals also constrain unnamed keys in the real map, even though these
+   keys are not individually represented. The checker need only check
+   consistency of observable points: all further observations have already
+   supplied their witnesses or empty intervals. Additional unobserved keys
+   outside empty intervals cannot change the current decision. The abstract
+   views can overapproximate real maps: finite-domain cardinality, capacity
+   and summary realizability are not completely characterized. This may
+   produce conservative counterexamples; it never omits a real view.
+5. *Induction.* Empty genesis and every reachable real pre-state map
+   project into a checked admissible view, by steps 1–4 and the existing
+   summary/state-law induction. The Authority checks step laws, and the
+   checker retains alias-merge and summary-delta obligations, then checks
+   all declared transition laws again on the merged successor, including
+   its outbox. O4 establishes a uniform predicate for every stored entry,
+   preserving state laws when unnamed entries remain unchanged; O5 frames
+   the actual update. Query facts expire after the invocation and are
+   recomputed for the next snapshot, so no post-state extremality is
+   assumed after insertion or deletion. Each real decision is therefore
+   covered regardless of map size, subject to these premises and capacity.
+
+The integer bounds, ordered/read metadata and endpoints are bound by
+project encoding format 6. Equality-only projects retain their format-5
+bytes. This is a mathematical reduction argument with executable finite
+checks, not a machine-checked proof of the reduction or an ordered-storage
+implementation. The helper reads an immutable `BTreeSet<i128>` and returns one copied
+integer, with no escaping iterator, custom comparator, cache or mutable alias.
+
+### Lineage
+
+**Background.** P. Wolper, *Expressing Interesting Properties of Programs in
+Propositional Temporal Logic*, POPL, 1986, supplies the equality-only data
+independence background. Candidate ordered-data lineage is R. Lazić and
+D. Nowak, CONCUR 2000 (title and ordering theorem scope await verification),
+and R. Lazić, *A Semantic Study of Data Independence with Applications to
+Model Checking*, doctoral thesis, 1999 (bibliographic details await
+verification). The ordered argument above stands on its stated premises;
+these candidate references are not invoked as a theorem proving it.
+
+**What is new here.** This integration combines bounded observations,
+weak-order views and explicit absence intervals. Prior-art search pending;
+no novelty claim is made.
+
+**Scope.** The checker exhaustively checks the declared view domains when
+within its tuple limit. Independent small-map comparisons and planted
+controls test the implementation; they do not establish the reduction for
+all maps, storage framing, publication authority or release readiness.

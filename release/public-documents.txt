@@ -367,6 +367,7 @@ examples/arithmetic-quote/README.md
 examples/collections/README.md
 examples/collections/escrow/README.md
 examples/collections/library/README.md
+examples/collections/order-book/README.md
 examples/collections/token-balances/README.md
 examples/composition-service/README.md
 examples/contract-tables/README.md
