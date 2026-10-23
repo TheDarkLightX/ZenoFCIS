@@ -1,0 +1,90 @@
+//! Generated local audit service. Full internal state/receipts; no caller privacy or authentication claim.
+mod store;
+use std::{io::{Read,Write},net::{TcpListener},path::Path,time::Duration};
+use serde::Deserialize;
+use serde_json::{Value,json};
+use zeno_fcis_contract::checked_composition::{LeafSources,service::{ServiceAuthority,ServiceRequest}};
+use store::Store;
+fn authority()->Result<ServiceAuthority,String>{
+    let sources=vec![__SOURCES__];
+    ServiceAuthority::from_sources(include_str!("../contract/service.json"),&sources)
+}
+fn hex(bytes:&[u8])->String{bytes.iter().map(|b|format!("{b:02x}")).collect()}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Request{principal:String,key:String,values:Vec<i128>}
+fn respond(stream:&mut impl Write,status:u16,body:Value)->std::io::Result<()>{
+    let bytes=serde_json::to_vec(&body)?;
+    write!(stream,"HTTP/1.1 {status} audit\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n",bytes.len())?;
+    stream.write_all(&bytes)
+}
+fn read_request(stream:&mut impl Read)->Result<(String,Vec<u8>),String>{
+    let mut bytes=Vec::new();let header_end=loop{
+        if let Some(at)=bytes.windows(4).position(|w|w==b"\r\n\r\n"){break at+4;}
+        if bytes.len()>=8192{return Err("headers-too-large".into());}
+        let mut block=[0u8;1024];let n=stream.read(&mut block).map_err(|e|e.to_string())?;
+        if n==0{return Err("short-headers".into());}bytes.extend(&block[..n]);
+    };
+    if header_end>8192{return Err("headers-too-large".into());}
+    let headers=std::str::from_utf8(&bytes[..header_end]).map_err(|_|"headers-utf8")?;
+    let mut lines=headers.split("\r\n");let first=lines.next().ok_or("request-line")?.to_owned();
+    let mut length=None;
+    for line in lines.filter(|line|!line.is_empty()){
+        let (name,value)=line.split_once(':').ok_or("header")?;
+        if name.eq_ignore_ascii_case("transfer-encoding"){return Err("transfer-encoding-unsupported".into());}
+        if name.eq_ignore_ascii_case("content-length"){
+            if length.is_some(){return Err("duplicate-content-length".into());}
+            let raw=value.trim();if raw.is_empty()||!raw.bytes().all(|b|b.is_ascii_digit()){return Err("content-length".into());}
+            length=Some(raw.parse::<usize>().map_err(|_|"content-length")?);
+        }
+    }
+    let length=length.unwrap_or(0);if length>16384{return Err("body-too-large".into());}
+    let end=header_end+length;
+    if bytes.len()>end{return Err("trailing-request-bytes".into());}
+    while bytes.len()<end{
+        let mut block=[0u8;1024];let remaining=(end-bytes.len()).min(block.len());
+        let n=stream.read(&mut block[..remaining]).map_err(|e|e.to_string())?;
+        if n==0{return Err("short-body".into());}bytes.extend(&block[..n]);
+    }Ok((first,bytes[header_end..].to_vec()))
+}
+fn handle(stream:&mut (impl Read + Write),authority:&ServiceAuthority,store:&mut Store)->std::io::Result<()>{
+    let (request,body)=match read_request(stream){Ok(v)=>v,Err(reason)=>return respond(stream,400,json!({"error":reason}))};
+    match request.as_str(){
+        "GET /health HTTP/1.1"=>respond(stream,200,json!({"profile":"local-scalar-audit","service":hex(authority.identity())})),
+        "GET /state HTTP/1.1"=>match store.snapshot(authority){Ok(s)=>respond(stream,200,json!({"version":s.version,"state":s.state.values(),"root":hex(&s.root)})),Err(e)=>respond(stream,503,json!({"error":e.reason}))},
+        "POST /request HTTP/1.1"=>{
+            let request:Request=match serde_json::from_slice(&body){Ok(r)=>r,Err(_)=>return respond(stream,400,json!({"error":"request-shape"}))};
+            let request=match ServiceRequest::new(&request.principal,&request.key,&request.values){Ok(r)=>r,Err(reason)=>return respond(stream,400,json!({"error":reason}))};
+            match store.execute(authority,&request){
+                Ok(result)=>respond(stream,200,json!({"version":result.version,"receipt":hex(&result.receipt),"recovered":result.recovered})),
+                Err(error)=>respond(stream,422,json!({"error":error.reason,"usage":error.usage.map(|u|json!({"core":u.core(),"wrapper":u.wrapper()}))})),
+            }
+        },
+        _=>respond(stream,404,json!({"error":"route"})),
+    }
+}
+struct MemoryStream {input:std::io::Cursor<Vec<u8>>,output:Vec<u8>}
+impl Read for MemoryStream {fn read(&mut self,b:&mut [u8])->std::io::Result<usize>{self.input.read(b)}}
+impl Write for MemoryStream {fn write(&mut self,b:&[u8])->std::io::Result<usize>{self.output.write(b)}fn flush(&mut self)->std::io::Result<()>{Ok(())}}
+fn main()->Result<(),Box<dyn std::error::Error>>{
+    let args:Vec<String>=std::env::args().collect();let mode=args.get(1).map(String::as_str).unwrap_or("help");
+    if mode=="help"{println!("local audit example: serve DB PORT | audit DB | replay SOURCE_DB FRESH_DB");return Ok(());}
+    let authority=authority()?;let path=Path::new(args.get(2).ok_or("database path required")?);
+    let mut store=Store::open(path,&authority)?;
+    match mode{
+        "http-stdio"=>{
+            let mut bytes=Vec::new();std::io::stdin().take(24577).read_to_end(&mut bytes)?;
+            if bytes.len()>24576{return Err("request-too-large".into());}
+            let mut stream=MemoryStream{input:std::io::Cursor::new(bytes),output:Vec::new()};
+            handle(&mut stream,&authority,&mut store)?;std::io::stdout().write_all(&stream.output)?;
+        },
+        "audit"=>{store.audit(&authority)?;println!("{}",json!({"status":"audited","version":store.snapshot(&authority)?.version}));},
+        "replay"=>{let target=Path::new(args.get(3).ok_or("fresh replay path required")?);if target.exists(){return Err("replay target must not exist".into());}let mut fresh=Store::open(target,&authority)?;println!("{}",json!({"status":"replayed","receipts":store.replay_into(&authority,&mut fresh)?}));},
+        "serve"=>{
+            let port=args.get(3).ok_or("port required")?.parse::<u16>()?;
+            let listener=TcpListener::bind((std::net::Ipv4Addr::LOCALHOST,port))?;
+            println!("{}",json!({"listening":listener.local_addr()?.to_string(),"profile":"local-scalar-audit","service":hex(authority.identity())}));std::io::stdout().flush()?;
+            for stream in listener.incoming(){let mut stream=stream?;stream.set_read_timeout(Some(Duration::from_secs(5)))?;stream.set_write_timeout(Some(Duration::from_secs(5)))?;if let Err(error)=handle(&mut stream,&authority,&mut store){eprintln!("connection:{error}");}}
+        },_=>return Err("unknown mode".into()),
+    }Ok(())
+}

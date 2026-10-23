@@ -6,6 +6,9 @@
 
 #![forbid(unsafe_code)]
 
+/// Existing SQLite storage primitives for generated service shells; no decision or publication authority.
+pub use rusqlite as sqlite;
+
 /// Keyed-entry storage under incremental Merkle roots and a chained journal.
 pub mod collections;
 
