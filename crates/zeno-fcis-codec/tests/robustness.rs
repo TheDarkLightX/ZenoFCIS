@@ -3,7 +3,6 @@
 //! mutates the encodings. Every input must decode without a panic; a decoded
 //! input must be exactly canonical and round-trip. Set
 //! `ZENO_FCIS_ROBUSTNESS_ITERATIONS` for a longer run; a failure prints its seed.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
@@ -173,8 +172,8 @@ fn check(input: &[u8], seed: u64) {
             canonical, input,
             "a non-canonical input decoded; seed {seed}, input {input:02x?}"
         );
-        let again =
-            decode_value(&canonical, DecodeLimits::default()).expect("canonical bytes decode");
+        let again = decode_value(&canonical, DecodeLimits::default())
+            .unwrap_or_else(|error| panic!("canonical bytes decode: {error:?}"));
         assert_eq!(again, value, "round trip changed the value; seed {seed}");
     }
 }

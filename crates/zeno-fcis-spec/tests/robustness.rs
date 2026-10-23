@@ -3,7 +3,6 @@
 //! `examples/`; a seeded generator mutates them at the token and byte level.
 //! Every input must parse and elaborate to a result or a diagnostic, never a
 //! panic. Set `ZENO_FCIS_ROBUSTNESS_ITERATIONS` for a longer run.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};

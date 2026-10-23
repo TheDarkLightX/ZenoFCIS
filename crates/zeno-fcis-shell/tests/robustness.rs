@@ -6,7 +6,6 @@
 //! decodes only if it is byte-for-byte one that was sealed; a decoded bundle
 //! commits once, replays idempotently and is refused against any other root.
 //! Set `ZENO_FCIS_ROBUSTNESS_ITERATIONS` for a longer run.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
@@ -53,11 +52,13 @@ fn iterations() -> u64 {
 }
 
 fn domain() -> Domain<'static> {
-    Domain::new("robustness/candidate-state", 1).expect("fixed domain is valid")
+    Domain::new("robustness/candidate-state", 1)
+        .unwrap_or_else(|error| panic!("fixed domain is valid: {error:?}"))
 }
 
 fn pre_state() -> Value {
-    Value::record_canonical(Vec::new()).expect("the empty record is canonical")
+    Value::record_canonical(Vec::new())
+        .unwrap_or_else(|error| panic!("the empty record is canonical: {error:?}"))
 }
 
 fn payload(rng: &mut Rng) -> Value {
@@ -66,17 +67,20 @@ fn payload(rng: &mut Rng) -> Value {
         1 => Value::boolean(rng.below(2) == 0),
         _ => {
             let len = rng.below(64) as usize;
-            Value::bytes((0..len).map(|_| rng.next() as u8).collect()).expect("short bytes")
+            Value::bytes((0..len).map(|_| rng.next() as u8).collect())
+                .unwrap_or_else(|error| panic!("short bytes: {error:?}"))
         }
     }
 }
 
 fn component_hash(domain: Domain<'_>, bytes: &[u8]) -> Hash32 {
-    commitment::<H>(domain, bytes).expect("bounded component commits")
+    commitment::<H>(domain, bytes)
+        .unwrap_or_else(|error| panic!("bounded component commits: {error:?}"))
 }
 
 fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) {
-    let length = u32::try_from(bytes.len()).expect("bounded component length");
+    let length = u32::try_from(bytes.len())
+        .unwrap_or_else(|error| panic!("bounded component length: {error:?}"));
     output.extend_from_slice(&length.to_be_bytes());
     output.extend_from_slice(bytes);
 }
@@ -93,7 +97,8 @@ struct Sealed {
 /// record, with a random commit plan and outbox.
 fn sealed(rng: &mut Rng) -> Sealed {
     let pre = pre_state();
-    let pre_root = hash_value::<H>(domain(), &pre).expect("bounded pre-state hashes");
+    let pre_root = hash_value::<H>(domain(), &pre)
+        .unwrap_or_else(|error| panic!("bounded pre-state hashes: {error:?}"));
     let mut fields: Vec<u16> = (0..=rng.below(3)).map(|_| rng.below(64) as u16).collect();
     fields.sort_unstable();
     fields.dedup();
@@ -105,7 +110,8 @@ fn sealed(rng: &mut Rng) -> Sealed {
             value: payload(rng),
         })
         .collect();
-    let patch = CanonicalPatch::try_new(1, pre_root, ops).expect("distinct inserts form a patch");
+    let patch = CanonicalPatch::try_new(1, pre_root, ops)
+        .unwrap_or_else(|error| panic!("distinct inserts form a patch: {error:?}"));
     let commit_plan = CommitPlan::try_new(
         (0..rng.below(3) as u32)
             .map(|ordinal| {
@@ -119,19 +125,25 @@ fn sealed(rng: &mut Rng) -> Sealed {
             })
             .collect(),
     )
-    .expect("distinct ordinals form a plan");
+    .unwrap_or_else(|error| panic!("distinct ordinals form a plan: {error:?}"));
     let outbox = OutboxPlan::try_new(
         (0..rng.below(3) as u32)
             .map(|ordinal| OutboxEntry::new(ordinal, rng.next() as u32, payload(rng), payload(rng)))
             .collect(),
     )
-    .expect("distinct ordinals form an outbox");
+    .unwrap_or_else(|error| panic!("distinct ordinals form an outbox: {error:?}"));
     let applied = patch
         .apply::<H>(&pre, domain())
-        .expect("inserts apply to the empty record");
-    let patch_bytes = patch.canonical_bytes().expect("patch encodes");
-    let commit_plan_bytes = commit_plan.canonical_bytes().expect("plan encodes");
-    let outbox_bytes = outbox.canonical_bytes().expect("outbox encodes");
+        .unwrap_or_else(|error| panic!("inserts apply to the empty record: {error:?}"));
+    let patch_bytes = patch
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("patch encodes: {error:?}"));
+    let commit_plan_bytes = commit_plan
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("plan encodes: {error:?}"));
+    let outbox_bytes = outbox
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("outbox encodes: {error:?}"));
 
     // Accepted candidate body: decision, no failure reason, the six bindings,
     // then the pre-root, post-root and the three component commitments.
@@ -266,13 +278,14 @@ fn sealed_bundles_decode_commit_once_and_replay() {
             "seed {seed}"
         );
 
-        let shell = ShellState::new::<H>(pre_state(), domain()).expect("shell starts");
+        let shell = ShellState::new::<H>(pre_state(), domain())
+            .unwrap_or_else(|error| panic!("shell starts: {error:?}"));
         let replay_a = rng.hash();
-        let first =
-            apply_reference_bundle::<H>(&shell, domain(), replay_a, &bundle).expect("commits");
+        let first = apply_reference_bundle::<H>(&shell, domain(), replay_a, &bundle)
+            .unwrap_or_else(|error| panic!("commits: {error:?}"));
         assert_eq!(first.status(), CommitStatus::Committed, "seed {seed}");
         let again = apply_reference_bundle::<H>(first.state(), domain(), replay_a, &bundle)
-            .expect("replays");
+            .unwrap_or_else(|error| panic!("replays: {error:?}"));
         assert_eq!(
             again.status(),
             CommitStatus::IdempotentReplay,
@@ -282,7 +295,8 @@ fn sealed_bundles_decode_commit_once_and_replay() {
 
         // A second bundle sealed against the same pre-state is refused once
         // the root has moved, and cannot reuse the first replay identity.
-        let other = decode(&b.encoded).expect("second sealed bundle decodes");
+        let other = decode(&b.encoded)
+            .unwrap_or_else(|error| panic!("second sealed bundle decodes: {error:?}"));
         if other.candidate_id() != bundle.candidate_id() {
             let moved = apply_reference_bundle::<H>(first.state(), domain(), rng.hash(), &other);
             assert!(

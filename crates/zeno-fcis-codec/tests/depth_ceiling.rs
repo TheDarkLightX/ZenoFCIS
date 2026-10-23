@@ -1,7 +1,6 @@
 //! Regressions for the decoder's depth ceiling: nesting deeper than
 //! `ValueLimits::MAX_SUPPORTED_DEPTH` is refused, even under limits that admit
 //! more, before recursion can exhaust the stack.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeError, DecodeLimits, EncodeError, canonical_value_bytes_with_limits,
@@ -12,11 +11,13 @@ use zeno_fcis_value::{Value, ValueError, ValueLimits};
 /// The encoding of `depth` nested singleton tuples around a unit, built
 /// without constructing the deep value.
 fn nested_tuples(depth: usize) -> Vec<u8> {
-    let unit = Value::unit().canonical_bytes().unwrap();
-    let one = Value::tuple(vec![Value::unit()])
-        .unwrap()
+    let unit = Value::unit()
         .canonical_bytes()
-        .unwrap();
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    let one = Value::tuple(vec![Value::unit()])
+        .unwrap_or_else(|error| panic!("{error:?}"))
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("{error:?}"));
     let mut bytes = one[..one.len() - unit.len()].repeat(depth);
     bytes.extend_from_slice(&unit);
     bytes
@@ -41,9 +42,9 @@ fn on_ceiling_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -
     std::thread::Builder::new()
         .stack_size(16 << 20)
         .spawn(f)
-        .unwrap()
+        .unwrap_or_else(|error| panic!("{error:?}"))
         .join()
-        .unwrap()
+        .unwrap_or_else(|error| panic!("{error:?}"))
 }
 
 #[test]
@@ -68,7 +69,7 @@ fn validation_and_encoding_refuse_beyond_the_supported_depth() {
     let (validated, encoded) = on_ceiling_stack(|| {
         let mut value = Value::unit();
         for _ in 0..=ValueLimits::MAX_SUPPORTED_DEPTH {
-            value = Value::tuple(vec![value]).unwrap();
+            value = Value::tuple(vec![value]).unwrap_or_else(|error| panic!("{error:?}"));
         }
         (
             value.validate_limits(permissive().value).err(),
@@ -87,8 +88,10 @@ fn validation_and_encoding_refuse_beyond_the_supported_depth() {
 fn the_supported_depth_decodes_and_round_trips() {
     let bytes = nested_tuples(ValueLimits::MAX_SUPPORTED_DEPTH as usize);
     let same = on_ceiling_stack(move || {
-        let value = decode_value(&bytes, permissive()).unwrap();
-        canonical_value_bytes_with_limits(&value, permissive().value).unwrap() == bytes
+        let value = decode_value(&bytes, permissive()).unwrap_or_else(|error| panic!("{error:?}"));
+        canonical_value_bytes_with_limits(&value, permissive().value)
+            .unwrap_or_else(|error| panic!("{error:?}"))
+            == bytes
     });
     assert!(same);
 }
