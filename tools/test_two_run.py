@@ -110,6 +110,29 @@ class TwoRunCli(unittest.TestCase):
         self.assertEqual(packet['result']['first_difference']['kind'],'decision_class')
         (EVIDENCE/'swap-capacity.json').write_text(p.stdout)
 
+    def test_public_subset_does_not_compose(self):
+        folder=ROOT/'test-data/two-run/two-step-leak'
+        c=Contract((folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()))
+        for public,verdict,exit_code in [('post.100.110','checked',0),('post.100.110,post.100.112','refuted',1)]:
+            self.assertEqual(c.noninterference(['pre.100.111'],public.split(','))[0],verdict)
+            p=self.run_cli([str(folder),'--noninterference','--secret','pre.100.111','--public',public])
+            self.assertEqual(p.returncode,exit_code,p.stderr)
+            (EVIDENCE/('two-step-ni-'+verdict+'.json')).write_text(p.stdout)
+        histories=[]
+        for secret in (0,1):
+            state=(0,secret,0);history=[state]
+            for inp in ((0,0),(1,0)):
+                state=c.after(state,c.outcome(state,inp));history.append(state)
+            histories.append(history)
+        self.assertEqual([h[-1][0] for h in histories],[0,1])
+        (EVIDENCE/'two-step-histories.json').write_text(json.dumps(histories)+'\n')
+        p=subprocess.run([str(BIN),'contract','runs',str(folder),'--no-kb'],cwd=ROOT,capture_output=True,text=True)
+        self.assertEqual(p.returncode,1,p.stderr)
+        packet=json.loads(p.stdout)
+        (EVIDENCE/'two-step-runs.json').write_text(p.stdout)
+        self.assertEqual(packet['properties'][0]['verdict'],'false')
+        self.assertEqual(packet['properties'][0]['trace_from_genesis'],[[0,0],[1,0]])
+
     def test_order_invocation_limit_is_unknown_before_execution(self):
         with tempfile.TemporaryDirectory(dir=BIN.parents[1]) as tmp:
             folder=Path(tmp);(folder/'v2').mkdir()

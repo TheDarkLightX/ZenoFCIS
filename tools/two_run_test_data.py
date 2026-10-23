@@ -74,6 +74,17 @@ def examples():
         yield name,*ledger,[privacy()]
 
 
+def regressions():
+    name='two-step-leak'
+    project,policy=base(name,'type 105 int Bit in 0..=1;',
+        'field 110 100 public_value 105; field 111 100 secret 105; field 112 100 hidden_copy 105; field 120 101 input 105;',
+        {'110':0,'111':1,'112':0},
+        [accept({'110':'choose(command.101.120 == 1, pre.100.112, pre.100.110)',
+                 '112':'choose(command.101.120 == 0, pre.100.111, pre.100.112)'})])
+    yield name,project,policy,[privacy(secret='pre.100.111',public=['post.100.110']),
+                              privacy(secret='pre.100.111',public=['post.100.110','post.100.112'])]
+
+
 def contracts(rng, count):
     for name, _, _, questions in examples():
         folder=ROOT/'examples/two-run'/name
@@ -81,6 +92,9 @@ def contracts(rng, count):
     for name in ('refusal-reason-only','no-admissible','invalid-payload'):
         folder=ROOT/'test-data/two-run'/name
         yield 'regression:'+name,(folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()),[privacy(secret='pre.100.111',public=['post.100.110'])]
+    for name,_,_,questions in regressions():
+        folder=ROOT/'test-data/two-run'/name
+        yield 'regression:'+name,(folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()),questions
     # Isolate each observed channel: public state and class cannot mask a leak.
     for index in range(8):
         bound=index%3+1
@@ -133,8 +147,13 @@ def contracts(rng, count):
 
 
 if __name__=='__main__':
-    for name,project,policy,_ in examples():
-        folder=ROOT/'examples/two-run'/name
+    import argparse
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--regressions',action='store_true');args=ap.parse_args()
+    for name,project,policy,_ in regressions() if args.regressions else examples():
+        folder=ROOT/('test-data/two-run' if args.regressions else 'examples/two-run')/name
         (folder/'v2').mkdir(parents=True,exist_ok=True)
         (folder/'project.zeno').write_text(project)
         (folder/'v2/policy.json').write_text(json.dumps(policy,indent=2)+'\n')
+        if args.regressions:
+            properties={'schema':'zeno-fcis/run-properties/1','properties':[{'kind':'predicate','name':'public_stays_zero','formula':'post.100.110 == 0'}]}
+            (folder/'v2/run-properties.json').write_text(json.dumps(properties,indent=2)+'\n')

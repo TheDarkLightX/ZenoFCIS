@@ -41,6 +41,24 @@ compares each outcome with its group's representative. Equality is transitive,
 so this needs one Authority invocation per admissible state/input tuple rather
 than all state pairs. Group lookup uses direct finite-domain indices.
 
+When `--public` lists every nonsecret state field, public successor equality
+is step consistency for the same relation used to group initial states.
+Equality of the decision class, reason and outbox supplies output consistency.
+For a fixed deterministic model with admissible effective successors, these
+are the synchronized-input form of the classical unwinding condition
+(Goguen and Meseguer 1984; Rushby 1992). Reject and Refused use no-op successors.
+The private-ledger command below includes all its nonsecret fields. This judge
+still reports only the one-step result; it issues no all-lengths verdict.
+
+A proper public subset need not preserve that relation. In the synthesized
+`test-data/two-run/two-step-leak` fixture, input 0 copies the secret into an
+unobserved nonsecret field, then input 1 copies that field into the public
+value. The one-step check with only `post.100.110` public holds; including
+`post.100.112` refutes it. The run-property check finds the public-value change
+after inputs 0, 1. `tools/test_two_run.py` checks both one-step verdicts and
+replays the two-step histories. This illustrates the scope boundary and does
+not widen the two-run verdict.
+
 Paths identify scalar state fields by ID, such as `pre.100.110` or
 `post.100.110`; both spellings designate the same field in these options.
 Unknown fields, duplicates, a field designated both secret and public, and
@@ -166,6 +184,11 @@ actual checked subject.
 
 **Background.** Goguen and Meseguer, *Security Policies and Security Models*,
 IEEE Symposium on Security and Privacy, 1982, introduced noninterference.
+Goguen and Meseguer, *Unwinding and Inference Control*, IEEE Symposium on
+Security and Privacy, 1984, developed unwinding conditions. Rushby,
+*Noninterference, Transitivity, and Channel-Control Security Policies*,
+SRI Computer Science Laboratory Technical Report CSL-92-02, 1992, treats
+unwinding and its security-policy premises.
 Barthe, D'Argenio and Rezk, *Secure Information Flow by Self-Composition*, IEEE
 Computer Security Foundations Workshop, 2004, developed self-composition for
 information-flow verification. Clarkson and Schneider, *Hyperproperties*,
