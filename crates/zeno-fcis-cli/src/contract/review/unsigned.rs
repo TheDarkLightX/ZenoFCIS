@@ -13,6 +13,7 @@ use super::{
     ContractError, Review, ReviewSources, Summary, gaps, lemma, mutants, refusals, table::Table,
 };
 use serde_json::{Value, json};
+use zeno_fcis_spec::TableIndexRange;
 use zeno_fcis_synthesis::finite::{
     self, V2NumericAtom as Atom, V2NumericDomain as Domain, canonical_v2::output,
     v2_composition as c, v2_laws as l,
@@ -32,11 +33,12 @@ pub(super) fn count_probe(
 fn error(reason: impl Into<String>) -> ContractError {
     ContractError::new("numeric review", reason)
 }
+// One cardinality for every integer domain: the spec's typed calculation.
 fn count(d: Domain<'_>) -> Option<u128> {
     match d {
         Domain::Bool => Some(2),
-        Domain::I128 { min, max } => min.abs_diff(max).checked_add(1),
-        Domain::U128 { min, max } => max.checked_sub(min)?.checked_add(1),
+        Domain::I128 { min, max } => TableIndexRange::Signed { min, max }.cardinality(),
+        Domain::U128 { min, max } => TableIndexRange::Unsigned { min, max }.cardinality(),
         _ => None,
     }
 }
