@@ -292,6 +292,24 @@ class Profile2Tests(unittest.TestCase):
         with self.assertRaisesRegex(Refusal, "updates need an Accept"):
             dataclasses.replace(model, rules=(*model.rules[:3], reject, *model.rules[4:]))
 
+    def test_player_name_cannot_shadow_a_rule_rejection_reason(self):
+        source = (HERE / "examples/withdrawal_game2.zal").read_text()
+        source = source.replace("open + withdraw [true] -> accept withdrawn",
+                                "open + withdraw [true] -> reject blocked unchanged")
+        source = source.replace("player user moves in open", "player blocked moves in open")
+        source = source.replace("user can force", "blocked can force")
+        message = "Players need distinct names and disjoint declared states; at most two players"
+        with self.assertRaisesRegex(Refusal, message):
+            parse(source)
+
+        valid = parse((HERE / "examples/withdrawal_game2.zal").read_text())
+        rejected = dataclasses.replace(valid.rules[0], target=None, reason="blocked", updates=())
+        players = (("blocked", ("open",)), ("operator", ("paused", "withdrawn")))
+        games = tuple((name, "blocked" if player == "user" else player, objective, payload)
+                      for name, player, objective, payload in valid.games)
+        with self.assertRaisesRegex(Refusal, message):
+            dataclasses.replace(valid, players=players, games=games, rules=(rejected, *valid.rules[1:]))
+
     def test_lowering_profile2(self):
         for source, name in [(LANE, "temporal property never_freezes"), (KEEPER, "temporal property must_serve_pays_next")]:
             with self.assertRaisesRegex(Refusal, "unsupported lowering: " + name):

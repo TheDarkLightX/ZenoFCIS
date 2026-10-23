@@ -925,6 +925,9 @@ def validate_machine(model: Machine):
         identifiers.append(rule.id)
     if [r.id for r in model.rules] != sorted(r.id for r in model.rules):
         raise Refusal("IR transition IDs must be canonically sorted")
+    occupied_names.update(rule.reason for rule in model.rules if rule.reason is not None)
+    if set(player_names) & occupied_names:
+        raise Refusal(player_error)
     for collection, scope in [(model.invariants, "invariant"), (model.requirements, "step"),
                               (model.fairness, "step"), (model.properties, "property")]:
         for item in collection:
