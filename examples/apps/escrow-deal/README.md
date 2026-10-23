@@ -91,8 +91,8 @@ ZENO_APP_PARTIES=run/parties.json ZENO_APP_CLOCK_FILE=run/day \
 
 `ZENO_APP_CLOCK_FILE` sets the day for trying the example; write another
 number to the file to move it. Without it the server counts days from the
-epoch by its system clock, so after 2026-11-15 every new request is refused
-with `Clock`.
+epoch by its system clock. After 2026-11-15 the clock holds its final admitted
+day, so late recovery stays available (see the end of this page).
 
 Adjust the `cp` source to where your checkout is. Give each person their own
 credential. The example gives the seller a view without the buyer's refunds:
