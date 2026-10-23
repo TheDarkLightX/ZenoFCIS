@@ -29,7 +29,7 @@ fn literal_table_has_only_its_selector_and_ordinary_bytes_are_unchanged() {
     assert_eq!(compiled.program_roots.len(), 1);
     assert!(matches!(
         roots[0].domain,
-        ScalarDomain::Int { min: 0, max: 156 }
+        ScalarDomain::Int { min: 0, max } if max == rules.cases.len() as i128 - 1
     ));
     assert_eq!(
         program_bytes(&ordinary.program().unwrap_or_else(|e| panic!("{e}"))),

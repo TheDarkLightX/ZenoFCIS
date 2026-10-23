@@ -17,6 +17,7 @@ EXAMPLE = ROOT / "examples/contract-refinement/reservation"
 
 
 def project(label, maximum, valid=None):
+    invalid_reason = "reason 204 invalid_state precedence 4;\n" if valid is not None else ""
     text = f"""// SPDX-License-Identifier: MIT OR Apache-2.0
 // LLM-generated example; qualification runs through the contract Authority.
 zeno 1;
@@ -38,8 +39,7 @@ reason 200 already_active precedence 0;
 reason 201 retired precedence 1;
 reason 202 full precedence 2;
 reason 203 not_active precedence 3;
-reason 204 invalid_state precedence 4;
-channel 300 events destination 103 payload 104;
+{invalid_reason}channel 300 events destination 103 payload 104;
 component 400 reservation {{
   owns 100;
   reads pre.100;
@@ -67,11 +67,17 @@ def case(state, command, successor, reason):
 
 
 def policy(label, cases, concrete=False):
+    if concrete:
+        cases = cases + [{"when": "true", "class": "Reject", "reason": 204, "post": {}, "outbox": []}]
+    else:
+        # Abstract rows enumerate the whole declared domain. The final real row
+        # supplies the compiler's required catch-all without an unreachable rule.
+        cases = cases[:-1] + [dict(cases[-1], when="true")]
     return {"schema": "zeno-fcis/template-declarative-policy/2", "template": f"reservation-{label}",
             "roots": {"state": 100, "command": 101, "context": 102},
             "leaf_bindings": {"103": ["Text", 1, 32]},
             "variables": {"state": "pre.100.110", "action": "command.101.120"},
-            "cases": cases + [{"when": "true", "class": "Reject", "reason": 204, "post": {}, "outbox": []}],
+            "cases": cases,
             "genesis": {"110": 0}, "law_kinds": ({"500": "AuthoritySubjectRecipient", "501": "StateInvariant"}
                                                 if concrete else {"501": "StateInvariant"})}
 

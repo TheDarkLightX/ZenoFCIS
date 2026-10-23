@@ -19,7 +19,6 @@ reason 200 already_active precedence 0;
 reason 201 retired precedence 1;
 reason 202 full precedence 2;
 reason 203 not_active precedence 3;
-reason 204 invalid_state precedence 4;
 channel 300 events destination 103 payload 104;
 component 400 reservation {
   owns 100;

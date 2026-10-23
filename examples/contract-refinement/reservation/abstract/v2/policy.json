@@ -1680,16 +1680,9 @@
       "outbox": []
     },
     {
-      "when": "state == 25 && action == 5",
-      "class": "Reject",
-      "reason": 203,
-      "post": {},
-      "outbox": []
-    },
-    {
       "when": "true",
       "class": "Reject",
-      "reason": 204,
+      "reason": 203,
       "post": {},
       "outbox": []
     }
