@@ -1,0 +1,23 @@
+zeno 1;
+project 1 start_once;
+namespace 2 dialogue;
+type 100 state ControlState;
+type 101 command Event;
+type 102 context Observations;
+type 105 data ControlLabel;
+type 106 int UnitContext in 0..=0;
+field 160 102 unit 106;
+field 110 100 control 105;
+variant 150 105 state_idle none;
+variant 151 105 state_running none;
+variant 120 101 event_start none;
+reason 200 refused_not_enabled precedence 0;
+component 400 control {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 declared_control_domain on commit, genesis = post.100.110 == 150 || post.100.110 == 151;

@@ -1,0 +1,50 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "counter",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {},
+  "cases": [
+    {
+      "rule": "start_counter",
+      "when": "pre.100.110 == 150 && command.101 == 120 && (true)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151
+      },
+      "outbox": []
+    },
+    {
+      "rule": "tick_counter",
+      "when": "pre.100.110 == 151 && command.101 == 121 && ((pre.100.170 < 2))",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "170": "pre.100.170 + 1"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "default",
+      "when": "true",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "170": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "StateInvariant"
+  }
+}

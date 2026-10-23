@@ -25,7 +25,8 @@
 //!   otherwise; an admitted mutant is a concrete decision table the laws
 //!   allow and the contract excludes.
 //! - proposed laws: each must hold wherever it applies to the contract's
-//!   decisions; the judge then repeats the measures with them.
+//!   decisions and, when declared, at genesis; the judge then repeats the
+//!   measures with them.
 //!
 //! The framework laws generation adds are not among the declared laws: law
 //! 991 admits only the case table's own decision, so with it every tuple
@@ -1080,8 +1081,9 @@ fn extend(
     Ok((Loaded::with(&source, extended)?, ids, lines))
 }
 
-/// Each proposal, alone, on the contract's decision of every tuple where it
-/// decides: where the proposal applies, and the first tuple where it fails.
+/// Each proposal, alone, at genesis when scoped there, then on the contract's
+/// decision of every tuple where it decides. Genesis admission is separate
+/// from the transition activation counts.
 fn check_proposals(
     extended: &Loaded,
     ids: &[u32],
@@ -1095,6 +1097,27 @@ fn check_proposals(
             .map(|id| LawSet::new(authority.descriptor(), &[*id]))
             .collect();
         let space = &machine.space;
+        let genesis = space.at(machine.genesis * space.inputs);
+        for (id, set) in ids.iter().zip(&sets) {
+            if extended
+                .declarations
+                .laws
+                .iter()
+                .any(|law| law.id == *id && law.genesis)
+                && !set.on_state(framer, &genesis)
+            {
+                return Ok(Checked {
+                    ids: ids.to_vec(),
+                    texts,
+                    applies: vec![0; ids.len()],
+                    false_alarm: Some(json!({
+                        "law": id,
+                        "at": "genesis",
+                        "state": crate::report_numbers::integers(&space.state(machine.genesis)),
+                    })),
+                });
+            }
+        }
         let states: Vec<Vec<i128>> = (0..space.states).map(|state| space.state(state)).collect();
         let verdicts = parallel(space.tuples(), |ordinal| {
             let Observed::Decided {

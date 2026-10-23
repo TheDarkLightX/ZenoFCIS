@@ -141,6 +141,94 @@ fn count(value: &Value) -> u64 {
         .unwrap_or_else(|| panic!("{value} is not a count"))
 }
 
+/// Profile-2 lowerings of the two minimal machines and context_free2.zal.
+fn genesis_proposal_core(name: &str) -> Core {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/test-data/genesis-proposals")
+        .join(name);
+    Core {
+        project: fs::read_to_string(base.join("project.zeno"))
+            .unwrap_or_else(|error| panic!("{error}")),
+        rules: fs::read_to_string(base.join("v2/policy.json"))
+            .unwrap_or_else(|error| panic!("{error}")),
+    }
+}
+
+fn assert_genesis_alarm(core: &Core, formula: &str, state: Value) {
+    let result = core.gaps(Some(&format!(
+        "law 9000 proposed_invariant on commit, genesis = {formula};\n"
+    )));
+    assert_eq!(
+        result.status(),
+        "proposal-false-alarm",
+        "genesis_scoped_proposal_requires_initiation"
+    );
+    let packet = result.json();
+    assert_eq!(
+        packet["false_alarm"],
+        json!({"law":9000,"at":"genesis","state":state})
+    );
+    assert_eq!(packet["proposals"][0]["applies_on"], 0);
+    assert!(packet["proposals"].get("after").is_none());
+}
+
+#[test]
+fn genesis_proposals_reject_false_without_commits() {
+    assert_genesis_alarm(&genesis_proposal_core("no-commits"), "false", json!([150]));
+}
+
+#[test]
+fn genesis_proposals_reject_running_at_idle_genesis() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("start-once"),
+        "post.100.110 == 151",
+        json!([150]),
+    );
+}
+
+#[test]
+fn genesis_proposals_reject_shipped_running_invariant() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("context-free"),
+        "post.100.110 == 151",
+        json!([150, 0]),
+    );
+}
+
+#[test]
+fn genesis_proposals_reject_undefined_at_genesis() {
+    assert_genesis_alarm(
+        &genesis_proposal_core("context-free"),
+        "div_floor(1, post.100.170) == 1",
+        json!([150, 0]),
+    );
+}
+
+#[test]
+fn genesis_proposals_accept_true_invariant() {
+    let core = genesis_proposal_core("context-free");
+    let result = core.gaps(Some(
+        "law 9000 initial_idle_count on commit, genesis = post.100.110 == 151 || post.100.170 == 0;\n",
+    ));
+    let packet = measured(&result);
+    assert!(count(&packet["proposals"]["laws"][0]["applies_on"]) > 0);
+    assert!(
+        count(&packet["proposals"]["after"]["mutation"]["full"]["admitted"])
+            < count(&packet["mutation"]["full"]["admitted"])
+            || count(&packet["proposals"]["after"]["admissible"]["full"]["determined"])
+                > count(&packet["admissible"]["full"]["determined"])
+    );
+}
+
+#[test]
+fn genesis_proposals_leave_transition_only_scope_unchanged() {
+    let core = genesis_proposal_core("no-commits");
+    let result = core.gaps(Some("law 9000 transition_only on commit = false;\n"));
+    let packet = measured(&result);
+    assert_eq!(packet["proposals"]["laws"][0]["applies_on"], 0);
+    assert_eq!(packet["proposals"]["determined"]["full"], json!([0, 2]));
+}
+
 #[test]
 fn the_declared_laws_of_a_bounded_counter_determine_no_tuple_and_admit_rejecting_everything() {
     let counter = Core::new("bounded-counter", &[("C", 2)]);
