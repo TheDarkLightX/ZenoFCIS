@@ -8,6 +8,7 @@ built application is never changed. Default execution uses real loopback;
 """
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -33,6 +34,8 @@ CONTROLS = [
     ("clock-clamped", "server_clock_journey", "out-of-range clock clamped",
      "if time < self.range.0 || time > self.range.1 {",
      "let time = time.clamp(self.range.0, self.range.1);\n        if false {"),
+    ("clock-terminal-disabled", "terminal_clock_keeps_honest_recovery_available", "snapshot for buyer",
+     'Some("hold") => true,', 'Some("hold") => false,'),
     ("view-hidden-in-state", "parties_journey", "a hidden field appears in /state",
      "hide(self.view(principal), &mut values);", ""),
     ("view-from-request", "parties_journey", "the view is chosen from the request",
@@ -114,9 +117,11 @@ def main() -> int:
             build, _ = run(app, cargo + ["--no-run"], name + "-build")
             code, log = run(app, check, name + "-mutant")
             target.write_text(original)
+            assert target.read_bytes() == original.encode(), "control restore differs byte for byte"
             restored, baseline = run(app, check, name + "-baseline-after")
             killed = code == 101 and marker in log and "test result: FAILED" in log
-            row = dict(control=name, check=test, marker=marker, build=build, mutant=code, baseline=restored,
+            row = dict(control=name, check=test, marker=marker, normal=0, build=build, mutant=code, baseline=restored,
+                       restored_byte_identical=True, restored_sha256=hashlib.sha256(target.read_bytes()).hexdigest(),
                        killed=killed, transport="memory" if args.memory else "loopback")
             rows.append(row)
             args.out.write_text(json.dumps(rows, indent=2) + "\n")

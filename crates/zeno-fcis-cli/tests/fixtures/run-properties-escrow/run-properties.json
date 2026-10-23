@@ -1,0 +1,21 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "properties": [
+    {
+      "kind": "at_most_once",
+      "name": "seller_paid_at_most_once",
+      "channel": 300
+    },
+    {
+      "kind": "never_after",
+      "name": "no_payout_after_refund",
+      "a": 301,
+      "b": 300
+    },
+    {
+      "kind": "predicate",
+      "name": "one_payout_per_decision",
+      "formula": "outbox.300 <= 1"
+    }
+  ]
+}

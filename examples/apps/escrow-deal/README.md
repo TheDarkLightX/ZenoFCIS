@@ -1,16 +1,16 @@
 # Escrow deal
 
 "An escrow app: a buyer deposits, the seller marks it shipped, then the buyer
-releases the money or the operator refunds it; money is never created or
-lost." The operator may refund only after day 7, the seller's shipping
-deadline.
+releases the money or a timeout refunds it; money is never created or
+lost." Any authenticated party can return an unconfirmed payment to the buyer
+after day 7. The original operator Refund command keeps the same deadline.
 
 ## The journey
 
 One server serves three people, each with their own credential. The buyer
 signs in and deposits 2 units on day 1. The seller signs in and marks the
-goods shipped on day 3; a refund from the seller is refused, because only
-the operator refunds. On day 5 the operator's refund is refused: the
+goods shipped on day 3; the seller's original Refund command is refused,
+because that command belongs to Operator. On day 5 the operator's refund is refused: the
 deadline has not passed. On day 8 it is accepted, and the buyer's refund of
 2 units is delivered. Had the buyer released the money instead, the
 seller's payout would have been delivered. Everyone sees the same deal, and
@@ -22,25 +22,27 @@ server sets the day; nobody types it.
 This directory is a contract: `project.zeno`, `v2/policy.json`, `ui.json`
 and `tests/decision-examples.txt`. `parties/` holds an example parties file.
 
-- The state is one deal: its stage (Open, Funded, Shipped, Released or
-  Refunded), the units held, the units paid to the seller and the units
-  refunded to the buyer. A deposit is 1 to 3 units.
-- A command is Deposit, Mark shipped, Release or Refund, with an amount that
-  only Deposit reads. The context is the party, Buyer, Seller or Operator,
-  and the day, 0 to 14, which the server sets as the declared
-  [server clock](../../../docs/CONTRACT_RULES.md#server-clock), counted in
-  days from the epoch 2026-11-01.
-- The rules, first match decides: the buyer deposits and releases, the
-  seller marks shipped and the operator refunds (reason 200); each step
-  needs its stage (reason 201); the operator refunds only after day 7
-  (reason 202). A refund is allowed when the deal is funded or shipped, so
-  a deposit never sticks. Release pays the held units on the
-  seller channel; refund pays them on the buyer channel.
-- The laws: each stage holds exactly the money it should; money is
-  conserved, and only a deposit adds to the total; the right party takes
-  each step; the operator refunds only after day 7; and every unit paid out
-  is an actual delivery on that payee's channel, with at most one delivery
-  per decision.
+- The state records one deal's stage, held units, seller payments and buyer refunds. Stage deadlines are fixed constants
+  in the laws. Deposits contain 1 to 3 units.
+- Deposit belongs to Buyer; MarkShipped belongs to Seller. Buyer can explicitly
+  Release a shipped deal immediately, waiving the dispute window, as before.
+  The original Refund command belongs to Operator and works after day 7.
+- TimeoutRefund is available to every party after day 7 while Funded or Shipped;
+  it always refunds Buyer, even when Seller invokes it. This supplies recovery
+  without an available operator or a cooperative seller.
+- Buyer may ConfirmDelivery while Shipped through day 7. Buyer may DisputeDelivery before day 9 for a refund;
+  at or after day 9, anyone may ReleaseConfirmed, which always pays Seller.
+  This fixed calendar leaves at least two days between the confirmation cutoff
+  and release, within the 0..14 clock. Earlier confirmation gives a longer window.
+- The server supplies the day as the declared [server clock](../../../docs/CONTRACT_RULES.md#server-clock),
+  counted from 2026-11-01. Timed recovery assumes that the host keeps accepting
+  requests through the deadline and authenticates each party correctly.
+- Independent laws bind the action, caller, predecessor stage, exact successor,
+  first failed guard, conservation, deadline, delivery count, amount and destination.
+  Shipping alone cannot pay Seller, and a release cannot precede shipping.
+- The reachable run properties in `v2/run-properties.json` establish at most
+  one seller payout, no seller payout after a buyer refund, and at most one
+  payout request per decision, over the declared finite domain.
 
 ## Check and build
 
@@ -56,10 +58,12 @@ target/debug/zeno-fcis contract lemma examples/apps/escrow-deal \
 target/debug/zeno-fcis new escrow-deal --contract examples/apps/escrow-deal --app
 ```
 
-The review enumerates all 172,800 inputs, every day included: the 13
-examples agree with the contract, no law refuses a decision from a lawful
-state, and 107 of 118 rule mutants are distinguished. The lemma judge finds both lemmas, never paid and
-refunded and never more than 3 units, inductive over the declared domain.
+The revised source has 13 shipped examples and additional timeout, dispute,
+terminal-clock and repeated-request scenarios. The former 172,800-input review
+count described the previous schema; it does not qualify this revision. The
+repair evidence records the new native games, table attractors and replayed
+certificates with their exact capabilities. The final finite-game check records each reachable held-state instance and
+an honest-buyer exit without the operator.
 `tools/check_app_factory.py --tcp` runs the three-party journey in
 `test-data/app-journeys/escrow-deal.json` on one server, with a test clock,
 and `tools/check_app_controls.py` plants the clock defects its tests catch.
@@ -101,10 +105,26 @@ describes the parties file and the HTTP API.
 ## Scope
 
 - One deal per store, with small amounts and a two-week day range, so the
-  review can enumerate every input.
+  declared state and clock bounds are explicit. No unbounded-time claim is made.
 - Deliveries go to the example file receiver, which keeps each payload with
   an envelope naming its destination, `seller` or `buyer`. Paying anyone
   needs a reviewed transport, and a successful delivery does not show that a
   payment settled.
 - The decision examples were LLM-generated together with the rules, so they
   are not an independent oracle.
+
+## Background and changes
+
+Deadline recovery and explicit lifecycle guards follow the conventional escrow
+pattern and guarded transitions (E. W. Dijkstra, “Guarded commands,
+nondeterminacy and formal derivation of programs”, CACM 18(8), 1975,
+DOI 10.1145/360933.360975). This revision adds independent transition and delivery
+laws, a payer timeout and a delivery-confirmed dispute cutoff at day 9. It makes no
+novelty claim; prior-art search pending because this repair was offline.
+A successful local delivery is a durable request to the receiver, not proof of
+external settlement. Receiver deduplication and real-world delivery confirmation
+remain deployment obligations.
+
+The server clock holds its final admitted day after the finite horizon. Late
+recovery remains available in that terminal phase; no operator clock reset is
+needed. This does not automatically submit a refund or release.

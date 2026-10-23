@@ -60,8 +60,32 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 515, outcome)
 
+    def test_escrow_seller_cannot_pay_itself_when_marking_shipped(self):
+        def mutate(policy):
+            ship = next(c for c in policy['cases'] if c['when'] == 'action == 161')
+            release = next(c for c in policy['cases'] if c['when'] == 'action == 162')
+            ship['post'] = dict(release['post'])
+            ship['outbox'] = release['outbox']
+        outcome = self.probe('examples/apps/escrow-deal', mutate, '151 2 0 0 161 1 171 3')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 512, outcome)
 
+    def test_escrow_cannot_release_before_shipping(self):
+        def mutate(policy):
+            policy['cases'][1]['when'] = policy['cases'][1]['when'].replace(
+                '(action == 162 && status != 152)', '(action == 162 && status != 151 && status != 152)')
+        outcome = self.probe('examples/apps/escrow-deal', mutate, '151 2 0 0 162 1 170 3')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 512, outcome)
 
+    def test_escrow_wrong_destination_cannot_receive_the_payout(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'thief'
+        outcome = self.probe('examples/apps/escrow-deal', mutate, '152 2 0 0 162 1 170 2')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 517, outcome)
 
 
 

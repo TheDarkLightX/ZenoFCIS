@@ -300,9 +300,12 @@ refuses the request with status 503. It is a test and operator tool, not a
 security boundary: whoever controls the server's configuration or system
 time controls the clock. The clock has a single time zone, UTC. A preview is
 advice: when the time changes between a preview and its command, the
-command is decided at the new time. After the range's upper bound the store
-refuses every new request, so choose the range and epoch for the
-deployment's lifetime.
+command is decided at the new time. By default, time above the range's upper
+bound refuses every new request. Contracts with `clock.after_max: hold` instead
+keep their maximum time as a terminal phase, allowing late refunds and releases.
+Use this setting only when the final phase can discharge every outstanding
+obligation without requiring a later time; it does not schedule those requests.
+Earlier admitted times and refusal below the minimum are unchanged.
 
 ## HTTP API
 
@@ -549,3 +552,8 @@ Simulation, finite checks and
 browser tests have separate evidence scopes. No whole-application proof,
 power-loss guarantee, exactly-once external delivery, multi-writer support
 or release qualification is claimed.
+
+Terminal clock phases use the standard finite-state abstraction of times beyond
+the last relevant bound; see Baier and Katoen,
+[*Principles of Model Checking*](https://mitpress.mit.edu/9780262026499/principles-of-model-checking/).
+The configured terminal phase still needs checked recovery rules.

@@ -1,9 +1,9 @@
 use super::*;
 
-const PROJECT: &str = include_str!("../../../../../../examples/apps/escrow-deal/project.zeno");
-const POLICY: &str = include_str!("../../../../../../examples/apps/escrow-deal/v2/policy.json");
+const PROJECT: &str = include_str!("../../../../tests/fixtures/run-properties-escrow/project.zeno");
+const POLICY: &str = include_str!("../../../../tests/fixtures/run-properties-escrow/policy.json");
 const PROPERTIES: &str =
-    include_str!("../../../../../../examples/apps/escrow-deal/v2/run-properties.json");
+    include_str!("../../../../tests/fixtures/run-properties-escrow/run-properties.json");
 
 fn small_project() -> String {
     PROJECT
@@ -245,4 +245,22 @@ fn technical_refusals_update_observers_and_replay_as_scenario_lines() {
     let long = "1 + ".repeat(2000) + "0 == 0";
     let names = BTreeMap::new();
     assert!(Expression::compile(&long, &names, true).is_err());
+}
+
+#[test]
+fn current_escrow_with_recovery_preserves_all_run_properties() {
+    let project = include_str!("../../../../../../examples/apps/escrow-deal/project.zeno");
+    let policy = include_str!("../../../../../../examples/apps/escrow-deal/v2/policy.json");
+    let properties =
+        include_str!("../../../../../../examples/apps/escrow-deal/v2/run-properties.json");
+    // The at-most-once observer multiplies the 414,720 input tuples by three.
+    let checked =
+        match judge(project, policy, properties, 1_244_160).unwrap_or_else(|e| panic!("{e}")) {
+            lemma::Lemmas::Judged(values) => values,
+            lemma::Lemmas::Inconclusive(stop) => panic!("{stop:?}"),
+        };
+    assert!(
+        checked.iter().all(|p| p["verdict"] == "inductive"),
+        "{checked:?}"
+    );
 }

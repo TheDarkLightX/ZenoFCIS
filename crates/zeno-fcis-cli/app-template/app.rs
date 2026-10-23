@@ -117,6 +117,7 @@ pub struct ServerClock {
     unit: i128,
     epoch: i128,
     range: (i128, i128),
+    hold_after_max: bool,
     source: Option<PathBuf>,
 }
 impl ServerClock {
@@ -151,6 +152,12 @@ impl ServerClock {
             _ => return Err("clock unit".into()),
         };
         let epoch = clock["epoch"].as_str().ok_or("clock epoch")?;
+        let hold_after_max = match clock.get("after_max").and_then(Value::as_str) {
+            None if clock.get("after_max").is_none() => false,
+            Some("refuse") => false,
+            Some("hold") => true,
+            _ => return Err("clock after_max".into()),
+        };
         let date = |range: std::ops::Range<usize>| {
             epoch
                 .get(range)
@@ -169,6 +176,7 @@ impl ServerClock {
             unit,
             epoch: (era * 146_097 + of_cycle - 719_468) * 86_400,
             range: (bound("min")?, bound("max")?),
+            hold_after_max,
             source,
         }))
     }
@@ -194,15 +202,22 @@ impl ServerClock {
             }
         }
     }
-    // Never earlier than the last committed time; refused outside the range.
+    // Never earlier than the last committed time. An explicitly terminal clock
+    // stays at its maximum so recovery remains available after the horizon.
     fn admitted(&self, last: Option<i128>) -> Result<i128, Refusal> {
         let time = self.now()?.max(last.unwrap_or(i128::MIN));
+        let time = if self.hold_after_max {
+            time.min(self.range.1)
+        } else {
+            time
+        };
         if time < self.range.0 || time > self.range.1 {
             return Err(Refusal::Clock);
         }
         Ok(time)
     }
 }
+
 fn context_numbers(authority: &Authority<'_>, context: &[u8]) -> Result<Vec<i128>, Refusal> {
     crate::session::root_numbers(authority.descriptor().context, context).map_err(failed)
 }
@@ -1252,4 +1267,41 @@ pub fn run() -> AppResult<()> {
             }
         })
     })
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+
+    #[test]
+    fn terminal_clock_is_opt_in_and_preserves_admitted_times() {
+        let source = std::env::temp_dir().join(format!("terminal-clock-{}", std::process::id()));
+        for hold_after_max in [false, true] {
+            let clock = ServerClock {
+                position: 0,
+                unit: 1,
+                epoch: 0,
+                range: (0, 14),
+                hold_after_max,
+                source: Some(source.clone()),
+            };
+            for day in 0..=14 {
+                std::fs::write(&source, day.to_string()).unwrap();
+                assert_eq!(clock.admitted(None), Ok(day));
+            }
+            for day in [15, 1_000_000, i128::MAX] {
+                std::fs::write(&source, day.to_string()).unwrap();
+                if hold_after_max {
+                    assert_eq!(clock.admitted(None), Ok(14));
+                } else {
+                    assert!(matches!(clock.admitted(None), Err(Refusal::Clock)));
+                }
+            }
+            std::fs::write(&source, "-1").unwrap();
+            assert!(matches!(clock.admitted(None), Err(Refusal::Clock)));
+            assert_eq!(clock.admitted(Some(7)), Ok(7));
+            assert_eq!(clock.admitted(Some(14)), Ok(14));
+        }
+        std::fs::remove_file(source).unwrap();
+    }
 }

@@ -436,3 +436,4 @@ examples/two-run/constant-product/README.md
 examples/two-run/ledger-leak/README.md
 examples/two-run/ledger-private/README.md
 examples/two-run/uniform-price/README.md
+crates/zeno-fcis-cli/tests/fixtures/run-properties-escrow/README.md

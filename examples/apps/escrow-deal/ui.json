@@ -3,14 +3,38 @@
   "title": "Escrow deal",
   "action": "command.101.120",
   "fields": {
-    "pre.100.110": {"label": "Stage", "unit": "unitless"},
-    "pre.100.111": {"label": "Held in escrow", "unit": "units"},
-    "pre.100.112": {"label": "Paid to seller", "unit": "units"},
-    "pre.100.113": {"label": "Refunded to buyer", "unit": "units"},
-    "command.101.120": {"label": "Command", "unit": "unitless"},
-    "command.101.121": {"label": "Deposit amount (used by Deposit only)", "unit": "units"},
-    "context.102.130": {"label": "Party", "unit": "unitless"},
-    "context.102.131": {"label": "Day", "unit": "unitless"}
+    "pre.100.110": {
+      "label": "Stage",
+      "unit": "unitless"
+    },
+    "pre.100.111": {
+      "label": "Held in escrow",
+      "unit": "units"
+    },
+    "pre.100.112": {
+      "label": "Paid to seller",
+      "unit": "units"
+    },
+    "pre.100.113": {
+      "label": "Refunded to buyer",
+      "unit": "units"
+    },
+    "command.101.120": {
+      "label": "Command",
+      "unit": "unitless"
+    },
+    "command.101.121": {
+      "label": "Deposit amount (used by Deposit only)",
+      "unit": "units"
+    },
+    "context.102.130": {
+      "label": "Party",
+      "unit": "unitless"
+    },
+    "context.102.131": {
+      "label": "Day (14 means day 14 or later)",
+      "unit": "unitless"
+    }
   },
   "variants": {
     "150": "Open",
@@ -24,17 +48,51 @@
     "163": "Refund to buyer",
     "170": "Buyer",
     "171": "Seller",
-    "172": "Operator"
+    "172": "Operator",
+    "155": "Delivery confirmed",
+    "164": "Refund after timeout",
+    "165": "Confirm delivery",
+    "166": "Release after dispute window",
+    "167": "Dispute and refund"
   },
   "commands": {
-    "160": {"label": "Deposit", "consequential": true},
-    "161": {"label": "Mark shipped", "consequential": true},
-    "162": {"label": "Release to seller", "consequential": true},
-    "163": {"label": "Refund to buyer", "consequential": true}
+    "160": {
+      "label": "Deposit",
+      "consequential": true
+    },
+    "161": {
+      "label": "Mark shipped",
+      "consequential": true
+    },
+    "162": {
+      "label": "Release to seller",
+      "consequential": true
+    },
+    "163": {
+      "label": "Refund to buyer",
+      "consequential": true
+    },
+    "164": {
+      "label": "Refund after timeout",
+      "consequential": true
+    },
+    "165": {
+      "label": "Confirm delivery",
+      "consequential": true
+    },
+    "166": {
+      "label": "Release after dispute window",
+      "consequential": true
+    },
+    "167": {
+      "label": "Dispute and refund",
+      "consequential": true
+    }
   },
   "reasons": {
-    "200": "This party cannot take that step. The buyer deposits and releases, the seller ships, and the operator refunds.",
+    "200": "Only the buyer may deposit, confirm, dispute or release early; only the seller may mark shipped; only the operator may use the manual refund.",
     "201": "The deal is not at the right stage for that step.",
-    "202": "The operator can refund only after day 7, the seller's shipping deadline."
+    "202": "The deadline or dispute window does not permit this step.",
+    "203": "Delivery confirmation closes after day 7, leaving at least two days to dispute."
   }
 }

@@ -946,6 +946,9 @@ fn server_clock_journey() {
     let catalogs = [&catalog];
     let lineage = ok(Lineage::bind(&catalogs, &[]));
     let mut server = serve(&journey, &lineage);
+    journey.set_clock("-1");
+    let (status, _) = snapshot(&mut server, &journey.credential(&journey.parties[0].name));
+    assert_eq!(status, 503, "out-of-range clock clamped");
     let steps = journey.fixture["steps"].as_array().unwrap().clone();
     let mut last = None;
     for (index, step) in steps.iter().enumerate() {
@@ -989,10 +992,17 @@ fn server_clock_journey() {
         json!(committed.to_string()),
         "clock went backward after a restart"
     );
-    // A time outside the declared range is refused, never clamped.
+    // Overflow is refused by default. An explicit terminal clock keeps its
+    // final admitted phase available without writing during a snapshot.
     let before = ok(application::current(&journey.path));
     journey.set_clock("1000000");
-    let (status, _) = snapshot(&mut server, &journey.credential(&name));
+    let (status, state) = snapshot(&mut server, &journey.credential(&name));
+    if let Some(terminal) = journey.fixture["terminal_time"].as_str() {
+        assert_eq!(status, 200, "terminal clock refused recovery");
+        assert_eq!(state["context"][clock.position()], terminal);
+        assert_eq!(ok(application::current(&journey.path)), before);
+        return;
+    }
     assert_eq!(status, 503, "out-of-range clock clamped");
     let body = encode_command(
         RustCryptoSha256::hash(ok(application::authority(&descriptor)).identity()),
@@ -1006,6 +1016,65 @@ fn server_clock_journey() {
     assert_eq!(status, 503, "out-of-range clock clamped");
     assert_eq!(bytes, b"Clock");
     assert_eq!(ok(application::current(&journey.path)), before);
+}
+
+#[test]
+fn terminal_clock_keeps_honest_recovery_available() {
+    let fixture: Value = ok(serde_json::from_slice(include_bytes!(
+        "../app-checks/journey.json"
+    )));
+    let Some(recoveries) = fixture["terminal_recoveries"].as_array() else {
+        return;
+    };
+    for (case, recovery) in recoveries.iter().enumerate() {
+        let journey = Journey::new(&format!("terminal-{case}")).expect("recovery parties");
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let catalog = ok(v2_contract::checked_catalog(&descriptor));
+        let catalogs = [&catalog];
+        let lineage = ok(Lineage::bind(&catalogs, &[]));
+        let mut server = serve(&journey, &lineage);
+        for (index, step) in recovery["steps"].as_array().unwrap().iter().enumerate() {
+            journey.set_clock(step["clock"].as_str().unwrap());
+            let (status, reply, _, _) = send(
+                &mut server,
+                &journey,
+                step["party"].as_str().unwrap(),
+                step["command"].as_array().unwrap(),
+                u8::try_from(index + 1).unwrap(),
+            );
+            assert_eq!(status, 200, "terminal recovery step {index}: {reply}");
+            assert_eq!(reply["class"], "Accept");
+            let published = application::current(&journey.path).unwrap().state;
+            let post = json!(
+                published
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(post, step["post"], "terminal recovery state");
+            println!(
+                "terminal recovery case={case} party={} clock={} post={post}",
+                step["party"], step["clock"]
+            );
+        }
+        assert_eq!(
+            received(&journey.receiver) as u64,
+            recovery["deliveries"].as_u64().unwrap()
+        );
+        let owner = recovery["steps"].as_array().unwrap().last().unwrap()["party"]
+            .as_str()
+            .unwrap();
+        drop(server);
+        journey.set_clock("1000001");
+        let mut server = serve(&journey, &lineage);
+        let (status, state) = snapshot(&mut server, &journey.credential(owner));
+        assert_eq!(status, 200, "recovery survives restart beyond horizon");
+        assert_eq!(
+            state["context"][journey.clock().unwrap().position()],
+            fixture["terminal_time"]
+        );
+    }
 }
 // The framed command of an original request body, as hexadecimal.
 fn original_command(body: &[u8]) -> String {

@@ -55,3 +55,28 @@
 151 3 0 0 | 163 1 | 172 12 | accept - 154 0 0 3 | 301@0:0 3
 154 0 0 3 | 160 1 | 170 12 | reject 201 154 0 0 3 | -
 154 0 0 3 | 161 1 | 171 12 | reject 201 154 0 0 3 | -
+
+
+# Fixed-calendar recovery regressions (LLM-generated; owner review pending).
+# scenario buyer_timeout_without_operator
+150 0 0 0 160 2 170 1 | accept - 151 2 0 0 | -
+151 2 0 0 164 1 170 7 | reject 202 151 2 0 0 | -
+151 2 0 0 164 1 170 8 | accept - 154 0 0 2 | 301 2
+154 0 0 2 164 1 170 8 | reject 201 154 0 0 2 | -
+# scenario seller_timeout_refunds_buyer
+150 0 0 0 160 3 170 1 | accept - 151 3 0 0 | -
+151 3 0 0 161 1 171 2 | accept - 152 3 0 0 | -
+152 3 0 0 164 1 171 8 | accept - 154 0 0 3 | 301 3
+# scenario delivery_then_dispute_window_then_seller_release
+150 0 0 0 160 2 170 1 | accept - 151 2 0 0 | -
+151 2 0 0 161 1 171 2 | accept - 152 2 0 0 | -
+152 2 0 0 165 1 170 6 | accept - 155 2 0 0 | -
+155 2 0 0 166 1 171 7 | reject 202 155 2 0 0 | -
+155 2 0 0 166 1 171 9 | accept - 153 0 2 0 | 300 2
+153 0 2 0 166 1 171 9 | reject 201 153 0 2 0 | -
+# scenario timely_buyer_dispute_refunds_once
+150 0 0 0 160 1 170 1 | accept - 151 1 0 0 | -
+151 1 0 0 161 1 171 2 | accept - 152 1 0 0 | -
+152 1 0 0 165 1 170 7 | accept - 155 1 0 0 | -
+155 1 0 0 167 1 170 8 | accept - 154 0 0 1 | 301 1
+154 0 0 1 166 1 171 14 | reject 201 154 0 0 1 | -
