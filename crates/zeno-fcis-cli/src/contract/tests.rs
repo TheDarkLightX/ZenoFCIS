@@ -448,6 +448,8 @@ fn prepared_counter_shape_bounds_and_all_216_inputs() {
             (501, LawScope::Accept, false),
             (502, LawScope::CommittedFailure, false),
             (503, LawScope::Reject, false),
+            (510, LawScope::Committing, false),
+            (511, LawScope::Committing, false),
         ]
     );
     let channels: Vec<(u32, u32, u32)> = declarations

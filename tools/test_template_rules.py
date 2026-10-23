@@ -35,6 +35,37 @@ class TemplateRules(unittest.TestCase):
                 shutil.copytree(path, Path(directory) / identity, dirs_exist_ok=True)
             return outcome
 
+    def test_prepared_notification_contains_the_final_count(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['payload']['112'] = 0
+        outcome = self.probe('crates/zeno-fcis-cli/templates/prepared-counter', mutate,
+                             '0 1 1 1 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_prepared_notification_uses_the_local_observer(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'other-observer'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/prepared-counter', mutate,
+                             '0 1 1 1 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
+
+    def test_prepared_every_accepted_batch_must_notify(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        for values in ['0 1 1 1 1', '1 0 0 0 1', '1 1 -1 0 1', '3 -1 -1 -1 1']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/prepared-counter',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 510, outcome)
+
     def test_account_eligible_login_cannot_be_arbitrarily_rejected(self):
         def mutate(policy):
             policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': 200,
