@@ -657,11 +657,16 @@ impl Shape<'_> {
         // A summary includes at least its distinct present entries, when
         // entries add nonnegative amounts.
         for summary in self.summaries.iter().filter(|s| s.nonnegative) {
-            let named: i128 = self
+            let named = self
                 .classes(summary.map, tuple)
                 .iter()
                 .map(|entry| self.contribution(summary, entry, tuple))
-                .sum();
+                .try_fold(0i128, i128::checked_add);
+            // With nonnegative contributions, an overflowing named sum
+            // exceeds every representable whole-map summary.
+            let Some(named) = named else {
+                return false;
+            };
             if tuple[summary.position] < named {
                 return false;
             }
@@ -846,14 +851,24 @@ impl Shape<'_> {
             }
         }
         for summary in self.summaries {
-            let entries_delta: i128 = self
+            let entries_delta = self
                 .classes(summary.map, tuple)
                 .iter()
                 .map(|e| {
-                    self.contribution(summary, e, &merged) - self.contribution(summary, e, tuple)
+                    self.contribution(summary, e, &merged)
+                        .checked_sub(self.contribution(summary, e, tuple))
                 })
-                .sum();
-            let summary_delta = read(summary.position) - tuple[summary.position];
+                .try_fold(0i128, |sum, delta| sum.checked_add(delta?));
+            let summary_delta = read(summary.position).checked_sub(tuple[summary.position]);
+            let (Some(entries_delta), Some(summary_delta)) = (entries_delta, summary_delta) else {
+                return Some((
+                    "summary arithmetic",
+                    format!(
+                        "summary {} delta exceeds the checked integer domain",
+                        summary.id
+                    ),
+                ));
+            };
             if entries_delta != summary_delta {
                 return Some((
                     "summary delta",

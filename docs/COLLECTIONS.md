@@ -99,6 +99,9 @@ the change of its distinct named entries (summary delta). The genesis state
 must have every entry absent, its fields at their declared defaults, and every
 summary 0. Every genesis-applicable law, including an `InitialCondition`, is
 checked there. Initial conditions are not assumed on later pre-views.
+Summary arithmetic is checked: an overflowing nonnegative named sum cannot
+fit a representable whole-map summary and is inadmissible. A summary delta
+outside the checked integer domain is refused, including signed deltas.
 Every stored key in a present successor entry must resolve to a concrete key
 bound by a command/context field or a present pre-entry's stored key of that
 type. An absent field's default class alone supplies no concrete key. The

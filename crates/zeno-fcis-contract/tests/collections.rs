@@ -6,6 +6,62 @@ const TOKENS: &str = include_str!("../../../examples/collections/token-balances/
 const TOKEN_RULES: &str =
     include_str!("../../../examples/collections/token-balances/v2/policy.json");
 
+const ARITHMETIC_PROJECT: &str = r#"
+zeno 1; project 1 amounts; namespace 2 amounts;
+type 100 state Store; type 101 command Command; type 102 context Desk;
+type 103 key Id; type 104 data Record; type 105 int Amount in LOWER..=UPPER;
+type 106 int Total in 0..=1;
+field 140 104 amount 105; map 110 100 amounts 103 104 capacity 4;
+summary 120 100 total 106 sum 110.140;
+field 130 101 first 103; field 131 101 second 103;
+entry 160 first of 110 at command.101.130;
+entry 170 second of 110 at command.101.131;
+variant 180 102 Librarian none;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 128; }
+merge [400]; law 500 marker on commit, genesis = true;
+"#;
+fn arithmetic_rules(default: i128, post: serde_json::Value) -> String {
+    serde_json::json!({"schema":"zeno-fcis/template-declarative-policy/2","template":"amounts",
+        "roots":{"state":100,"command":101,"context":102},"leaf_bindings":{},"variables":{},
+        "cases":[{"rule":"step","when":"true","class":"Accept","reason":null,"post":post,"outbox":[]}],
+        "genesis":{"120":0,"160":0,"161":"DEFAULT","170":0,"171":"DEFAULT"},
+        "law_kinds":{"500":"StateInvariant"}}).to_string().replace("\"DEFAULT\"", &default.to_string())
+}
+#[test]
+fn overflowing_nonnegative_named_sum_is_an_inadmissible_view()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = ARITHMETIC_PROJECT
+        .replace("LOWER", &(i128::MAX - 1).to_string())
+        .replace("UPPER", &i128::MAX.to_string());
+    let result = check(
+        &project,
+        &arithmetic_rules(i128::MAX - 1, serde_json::json!({})),
+        Limits::default(),
+    )?;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    assert!(
+        result.packet()["measured"]["admissible_views"]
+            .as_u64()
+            .is_some_and(|n| n > 0)
+    );
+    Ok(())
+}
+#[test]
+fn overflowing_signed_summary_delta_is_a_scoped_refutation()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = ARITHMETIC_PROJECT
+        .replace("LOWER", &i128::MIN.to_string())
+        .replace("UPPER", &(i128::MIN + 1).to_string());
+    let rules = arithmetic_rules(i128::MIN, serde_json::json!({"160":"0"}));
+    let result = check(&project, &rules, Limits::default())?;
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(
+        result.packet()["result"]["obligation"],
+        "summary arithmetic"
+    );
+    Ok(())
+}
+
 fn rules_with(edit: impl FnOnce(&mut serde_json::Value)) -> String {
     let mut rules: serde_json::Value =
         serde_json::from_str(TOKEN_RULES).unwrap_or_else(|error| panic!("{error:?}"));
