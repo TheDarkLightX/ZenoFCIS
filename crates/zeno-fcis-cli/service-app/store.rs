@@ -12,6 +12,11 @@ const HEAD: &str = "CREATE TABLE service_head (id INTEGER PRIMARY KEY CHECK(id=0
 const JOURNAL: &str = "CREATE TABLE service_journal (version INTEGER PRIMARY KEY CHECK(version>=0), principal TEXT NOT NULL, replay_key TEXT NOT NULL, request BLOB NOT NULL, receipt BLOB NOT NULL, state BLOB NOT NULL, chain BLOB NOT NULL, UNIQUE(principal,replay_key))";
 const MAX_ROWS: u64 = 65536;
 const MAX_JOURNAL_BYTES: i64 = 64 * 1024 * 1024;
+
+// Stored head: version, root, state, receipt and chain.
+type HeadRow = (i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
+// Stored journal: version, principal, replay key, request, receipt, state and chain.
+type JournalRow = (u64, String, String, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 #[derive(Debug)]
 pub(crate) struct Error {
     pub(crate) reason: String,
@@ -247,7 +252,7 @@ impl Store {
             let tx = self
                 .db
                 .transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let current: Option<(i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)> = tx
+            let current: Option<HeadRow> = tx
                 .query_row(
                     "SELECT version,root,state,chain,identity FROM service_head WHERE id=0",
                     [],
@@ -312,9 +317,7 @@ impl Store {
                 error
             })
     }
-    fn rows(
-        &self,
-    ) -> Result<Vec<(u64, String, String, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)>, Error> {
+    fn rows(&self) -> Result<Vec<JournalRow>, Error> {
         let count: i64 = self
             .db
             .query_row("SELECT COUNT(*) FROM service_journal", [], |r| r.get(0))?;
