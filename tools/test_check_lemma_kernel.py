@@ -204,7 +204,7 @@ fn f<'a>(value: &'a str) { let c = '['; let quote = '\\''; }
         line = mutant[:mutant.index('    #[cfg(not(verus_keep_ghost))] let verdict')].count('\n') + 1
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for path in (gate.SUBJECT, gate.PROFILE, gate.verifier.PIN):
+            for path in (gate.SUBJECT, gate.SPEC, gate.PROFILE, gate.verifier.PIN):
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_bytes((gate.ROOT / path).read_bytes())
             (root / gate.SUBJECT).write_text(mutant)

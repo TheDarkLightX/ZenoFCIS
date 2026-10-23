@@ -24,12 +24,16 @@ mod collection_tests;
 pub(crate) mod decision_space;
 pub(crate) mod deliveries;
 mod examples;
+#[cfg(verus_keep_ghost)]
+#[path = "../../../../verification/verus/finite_machine_spec.rs"]
+mod finite_machine_spec;
 pub(crate) mod gaps;
 #[cfg(test)]
 mod genesis_tests;
 #[cfg(test)]
 mod judge_tests;
 pub(crate) mod lemma;
+mod lemma_kernel;
 mod machine;
 mod mutants;
 pub(crate) mod numeric_symbolic;

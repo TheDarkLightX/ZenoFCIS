@@ -100,8 +100,7 @@ pub(crate) enum Lemmas {
     Inconclusive(Inconclusive),
 }
 
-#[path = "lemma_kernel.rs"]
-mod kernel;
+use super::lemma_kernel as kernel;
 
 pub(crate) use kernel::Verdict;
 

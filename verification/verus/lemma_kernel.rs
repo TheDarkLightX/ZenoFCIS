@@ -3,6 +3,9 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]
 extern crate alloc;
+#[cfg(verus_keep_ghost)]
+#[path = "finite_machine_spec.rs"]
+pub mod finite_machine_spec;
 #[cfg(test)]
 extern crate std;
 #[path = "../../crates/zeno-fcis-cli/src/contract/review/lemma_kernel.rs"]

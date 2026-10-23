@@ -21,10 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/lemma_kernel.rs')
 SUBJECT = Path('crates/zeno-fcis-cli/src/contract/review/lemma_kernel.rs')
 TESTS = Path('verification/verus/lemma_kernel_tests.rs')
+SPEC = Path('verification/verus/finite_machine_spec.rs')
 PROFILE = Path('verification/verus/lemma-kernel.json')
 ADAPTER = SUBJECT.with_name('lemma.rs')
 NAMESPACE = 'lemma_kernel::lemma_kernel::'
-UNIT = (HARNESS, SUBJECT, TESTS)
+COVERAGE_NAMESPACE = 'lemma_kernel::'
+UNIT = (HARNESS, SUBJECT, TESTS, SPEC)
 SOURCES = (*UNIT, PROFILE, ADAPTER, verifier.PIN,
     Path('tools/check_lemma_kernel.py'), Path('tools/test_check_lemma_kernel.py'),
     Path('tools/check_verus.py'), Path('tools/verus_coverage.py'),
@@ -78,9 +80,9 @@ def source_controls(source: str) -> dict[str, tuple[str, str, str]]:
 
 
 def check_inventory(vir: str, profile: dict) -> dict:
-    if profile.get('namespace') != NAMESPACE:
+    if profile.get('namespace') != COVERAGE_NAMESPACE:
         raise ValueError('unexpected kernel namespace')
-    actual = inventory(vir, NAMESPACE, tuple(profile['body_covered_functions']))
+    actual = inventory(vir, COVERAGE_NAMESPACE, tuple(profile['body_covered_functions']))
     if actual != profile['functions']:
         changed = sorted(k for k in set(actual) | set(profile['functions'])
             if actual.get(k) != profile['functions'].get(k))
@@ -146,12 +148,14 @@ def native_command(pin: dict, root: Path, binary: Path) -> list[str]:
 def check(cache: Path, install: bool, directory: Path) -> dict:
     before = snapshot()
     source = (ROOT / SUBJECT).read_text()
-    if FORBIDDEN.search(re.sub(r'//[^\n]*', '', source)):
-        raise RuntimeError('kernel has an untrusted proof escape or unsafe code')
+    for path in (SUBJECT, SPEC):
+        if FORBIDDEN.search(re.sub(r'//[^\n]*', '', (ROOT / path).read_text())):
+            raise RuntimeError(f'kernel source has an untrusted proof escape or unsafe code: {path}')
     pin = json.loads((ROOT / verifier.PIN).read_text())
     profile = json.loads((ROOT / PROFILE).read_text())
     configuration = verifier.check_native_configuration(source, SUBJECT,
         profile['native_configuration_exceptions'])
+    verifier.check_native_configuration((ROOT / SPEC).read_text(), SPEC)
     tool_directory = verifier.prepare_tools(cache, pin, install)
     environment = {k: v for k, v in os.environ.items()
         if not k.startswith(('VERUS_', 'VARGO_')) and k not in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS')}
