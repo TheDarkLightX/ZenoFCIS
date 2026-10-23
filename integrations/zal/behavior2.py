@@ -2034,7 +2034,9 @@ def explain(model: Machine, state: str, variables: dict, event: str, context: di
                    **assumption_groups(context),
                    "scope": "Deterministic explanation of one supplied input; context values are assumptions, "
                             "not authenticated external truth. Temporal properties are judged over executions; "
-                            "see the check report or a finite trace judgment.",
+                            "see the check report or a finite trace judgment. Game readings describe the declared "
+                            "objective and scope; they do not disclose a strategy.",
+                   "readings": game_readings(model),
                    "method": "typed AST evaluation; no language model", "authority": "none"}
     if result[0] == "trap":
         _, rule, name, value = result
@@ -2056,6 +2058,34 @@ def explain(model: Machine, state: str, variables: dict, event: str, context: di
     if len(canonical(explanation).encode()) > 512 * 1024:
         raise Refusal("Explanation exceeds the 512 KiB output bound")
     return explanation
+
+
+def game_readings(model: Machine):
+    """Build display-only ATL formula and plain-language rungs for declared game properties."""
+    modal = {"eventually": "◇", "always": "□", "infinitely often": "□◇"}
+    readings = []
+    for name, player, objective, formula in model.games:
+        other = next(owner for owner, _ in model.players if owner != player)
+        formula_text = formula.render().replace(" == ", " = ").replace(" != ", " ≠ ")
+        formula_rung = f"⟨⟨{player}⟩⟩ {modal[objective]} ({formula_text})"
+        if formula.op == "state":
+            condition = f"the state is {formula.args[0]}"
+            lead = "make sure "
+        else:
+            condition = f"the condition ({formula.render(True)}) holds"
+            lead = "make sure that "
+        if objective == "infinitely often":
+            outcome = f"{lead}{condition} again and again"
+        elif objective == "eventually":
+            outcome = f"{lead}{condition} at least once"
+        else:
+            outcome = f"{lead}{condition} at every step"
+        fairness = (", provided every declared fairness condition holds infinitely often"
+                    if objective != "always" and model.fairness else "")
+        readings.append({"property": name, "player": player, "objective": objective,
+                         "formula_rung": formula_rung,
+                         "plain_rung": f"The {player} can {outcome}, whatever the {other} does{fairness}."})
+    return readings
 
 
 # The construct registry: one entry per statement concept, shared by the legend and help.
@@ -2136,7 +2166,7 @@ def legend(model: Machine):
         kind = next((k for k, p in singletons.items() if re.fullmatch(p, symbolic)), None)
         kind = kind or next((k for k, p in repeated.items() if re.fullmatch(p, symbolic)), symbolic.split()[0])
         entries.append({"concept": kind, "symbolic": symbolic, "english": english})
-    return {"profile": PROFILE, "entries": entries,
+    return {"profile": PROFILE, "entries": entries, "readings": game_readings(model),
             "operators": [{"symbol": s, "english": e} for s, (e, _, _) in OPERATORS.items()],
             "unsupported": sorted(FUTURE), "reserved": sorted(RESERVED),
             "identifiers": "ASCII lowercase letters, digits and underscores; max 32 characters"}

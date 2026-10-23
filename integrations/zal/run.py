@@ -54,7 +54,7 @@ def main():
             p.add_argument("--topic", default="", help="port:NAME or type:NAME to explain; a construct or object ID for guide")
             p.add_argument("--human", action="store_true", help="Print plain text instead of JSON")
         if command == "explain":
-            p.add_argument("--input", help="Typed machines: JSON object of state, variables, event and context")
+            p.add_argument("--input", help="JSON object of state, variables, event and context")
         if command == "ui":
             p.add_argument("--port", type=int, default=8765)
             p.add_argument("--workspace", type=Path, help="Use an existing terminal/MCP shared workspace")
@@ -66,8 +66,8 @@ def main():
         first = next((line.strip() for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
         if first in {"zal effects 1;", "ZAL effects version 1.", "zal typed 1;", "ZAL typed version 1."}:
             return typed_or_effects(options, source, first)
-        if options.command in {"explain", "guide"}:
-            raise behavior.Refusal(f"The {options.command} command supports zal/effects/1 and zal/typed-fsm/1 sources")
+        if options.command == "guide":
+            raise behavior.Refusal("The guide command supports zal/effects/1 and zal/typed-fsm/1 sources")
         model = behavior2.parse_any(source, options.syntax)
         profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
         if options.command == "render":
@@ -75,6 +75,17 @@ def main():
             return 0
         if options.command == "check":
             result = profile.check(model, checker_identity())
+        elif options.command == "explain":
+            if profile is not behavior2:
+                raise behavior.Refusal("The explain command supports zal/effects/1 and zal/typed-fsm/1 sources")
+            if options.input is None:
+                raise behavior.Refusal("Profile-2 explain needs --input with state, variables, event and context")
+            given = json.loads(options.input)
+            keys = {"state", "variables", "event", "context"}
+            if not isinstance(given, dict) or set(given) != keys:
+                raise behavior.Refusal("Profile-2 explain input names exactly state, variables, event and context")
+            result = profile.explain(model, given["state"], given["variables"], given["event"],
+                                    given["context"], checker_identity())
         elif options.command == "legend":
             result = profile.legend(model)
         elif options.command == "diff":

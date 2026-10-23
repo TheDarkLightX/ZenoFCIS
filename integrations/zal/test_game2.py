@@ -1,9 +1,11 @@
 import hashlib
+import json
 import os
 from pathlib import Path
 import random
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -243,6 +245,25 @@ property t4: always(state == aa);
         paths = sorted(path for path in EXAMPLES.rglob("*.zal") if path.name != "withdrawal_game2.zal")
         self.assertEqual({path.name: parse_example(path).revision for path in paths}, EXAMPLE_REVISIONS)
 
+    def test_game_readings_have_formula_and_plain_rungs(self):
+        model = b.parse(WITHDRAWAL_SOURCE)
+        reading, = b.game_readings(model)
+        self.assertEqual(reading["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn)")
+        self.assertEqual(reading["plain_rung"],
+                         "The user can make sure the state is withdrawn again and again, whatever the operator does, "
+                         "provided every declared fairness condition holds infinitely often.")
+        self.assertEqual(b.legend(model)["readings"], [reading])
+        explanation = b.explain(model, "open", {}, "pause", {})
+        self.assertEqual(explanation["readings"], [reading])
+
+        objectives = b.parse(GAME_SOURCE + "property stays: user can force always (state == aa);\n"
+                             "property returns: user can force infinitely often (state == bb);\n")
+        by_id = {item["property"]: item for item in b.game_readings(objectives)}
+        self.assertEqual(by_id["reaches"]["formula_rung"], "⟨⟨user⟩⟩ ◇ (state = bb)")
+        self.assertEqual(by_id["stays"]["formula_rung"], "⟨⟨user⟩⟩ □ (state = aa)")
+        self.assertEqual(by_id["returns"]["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = bb)")
+        self.assertNotIn("provided", by_id["stays"]["plain_rung"])
+
     def test_withdrawal_example_and_its_variants(self):
         path = EXAMPLES / "withdrawal_game2.zal"
         self.assertEqual(path.read_text(encoding="ascii"), WITHDRAWAL_SOURCE)
@@ -339,6 +360,23 @@ property reaches: user can force eventually (state == withdrawn);
 
 
 class GameTableTests(unittest.TestCase):
+    def test_cli_explain_and_legend_readings(self):
+        source = EXAMPLES / "withdrawal_game2.zal"
+        given = '{"state":"open","variables":{},"event":"pause","context":{}}'
+        explained = subprocess.run([sys.executable, "-B", str(REPOSITORY / "integrations/zal/run.py"),
+                                    "explain", str(source), "--input", given],
+                                   cwd=REPOSITORY, text=True, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, timeout=120)
+        self.assertEqual(explained.returncode, 0, explained.stderr)
+        result = json.loads(explained.stdout)
+        self.assertEqual(result["readings"][0]["formula_rung"], "⟨⟨user⟩⟩ □◇ (state = withdrawn)")
+        self.assertEqual(result["authority"], "none")
+        read = subprocess.run([sys.executable, "-B", str(REPOSITORY / "integrations/zal/run.py"),
+                               "legend", str(source)], cwd=REPOSITORY, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+        self.assertEqual(read.returncode, 0, read.stderr)
+        self.assertEqual(json.loads(read.stdout)["readings"], result["readings"])
+
     def test_readme_commands_and_exact_output(self):
         readme = README.read_text(encoding="utf-8")
 
