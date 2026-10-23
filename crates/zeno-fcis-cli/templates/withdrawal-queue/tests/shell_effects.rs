@@ -413,3 +413,89 @@ fn default_bytes_unchanged() {
         "default byte vector changed"
     );
 }
+
+struct HiddenSuccess {
+    payments: Rc<std::cell::RefCell<Vec<Hash32>>>,
+    panic_once: Rc<Cell<bool>>,
+}
+impl Transport for HiddenSuccess {
+    fn provenance(&self) -> Option<zeno_fcis_shell_sqlite::effects::production::AdapterProvenance> {
+        Some(
+            zeno_fcis_shell_sqlite::effects::production::AdapterProvenance {
+                source: zeno_fcis_shell::effects::registry::source_digest(&[(
+                    "payment-transport.rs",
+                    include_bytes!("shell_effects.rs"),
+                )]),
+                configuration: (self.payments.borrow().len() as u64).to_be_bytes().to_vec(),
+                seed: 0,
+            },
+        )
+    }
+    fn send(&mut self, delivery: &zeno_fcis_shell::effects::port::Delivery) -> Sent {
+        // This provider deliberately has no idempotency: each call pays once,
+        // then loses its reply. A retry would pay the same invoice again.
+        self.payments.borrow_mut().push(delivery.id);
+        assert!(
+            !self.panic_once.replace(false),
+            "lost control after payment"
+        );
+        Sent::Unknown(Fault::Io)
+    }
+}
+
+fn payment_policy_case(unwind: bool) {
+    use zeno_fcis_shell::effects::{
+        policy::{Policy, Verdict},
+        record::Entry,
+    };
+    let temp = Temp::new();
+    let path = temp.0.join("payment-policy.sqlite");
+    withdrawal_queue::payouts(&path).unwrap();
+    let before = withdrawal_queue::relay_export(&path).unwrap();
+    v2_contract::with_lineage(|catalogs| {
+        let lineage = Lineage::bind(catalogs, &[]).unwrap();
+        let payments = Rc::new(std::cell::RefCell::new(Vec::new()));
+        let mut shell = Effects::open_with_policies(&path, &lineage,
+            HiddenSuccess { payments: payments.clone(), panic_once: Rc::new(Cell::new(unwind)) },
+            Ticks::default(), vec![Policy::AtMostOne { capacity: 8 }],
+        ).unwrap();
+        shell.record_private(false); // A monitored lifetime still requires evidence.
+        if unwind {
+            assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| shell.deliver(1))).is_err());
+        } else {
+            assert_eq!(shell.deliver(1).unwrap(), Outcome::Unknown(Fault::Io));
+        }
+        assert_eq!(payments.borrow().len(), 1, "double payment after hidden success");
+        assert!(matches!(shell.deliver(2).unwrap(), Outcome::Refused(
+            zeno_fcis_shell::effects::port::Code::PolicyDuplicate)));
+        assert_eq!(payments.borrow().len(), 1, "a fresh run forgot the invoice reservation");
+        assert_eq!(withdrawal_queue::relay_export(&path).unwrap(), before,
+            "policy refusal silently removed an authorized invoice");
+        let transcript = shell.transcript().expect("policy verdict transcript missing");
+        transcript.verify().unwrap();
+        assert!(transcript.links.iter().any(|link| matches!(&link.entry,
+            Entry::Policy(_, check) if check.decisions.iter().any(|d|
+                d.verdict == Verdict::Reject(zeno_fcis_shell::effects::port::Code::PolicyDuplicate)))));
+        let first = zeno_fcis_shell::effects::program::DeliveryProgram::start(
+            zeno_fcis_shell::effects::program::DeliveryInvocation { epoch: 2, store: shell.store() },
+            zeno_fcis_shell::effects::program::DeliveryPolicy {
+                retries: RETRIES, backoff: 10, jitter: std::num::NonZeroU64::MIN,
+            },
+        );
+        zeno_fcis_shell::effects::record::replay::<zeno_fcis_shell::effects::program::DeliveryProgram>(
+            transcript, &transcript.manifest.start, 2, first,
+            |outcome| zeno_fcis_shell::effects::codec::outcome(outcome,
+                match outcome { Outcome::Ok(n) => Some(*n), _ => None }),
+        ).unwrap();
+    }).unwrap();
+}
+
+#[test]
+fn payment_policy_blocks_hidden_success_retry() {
+    payment_policy_case(false);
+}
+
+#[test]
+fn payment_policy_reservation_survives_terminal_unwind() {
+    payment_policy_case(true);
+}

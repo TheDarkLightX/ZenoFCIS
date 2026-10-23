@@ -7,6 +7,7 @@ use zeno_fcis_shell::effects::{
     codec,
     driver::{Driver, Reply},
     handler::{self, Handled, Layer, Stack, Terminal},
+    policy::{Monitor, Policy},
     port::{CommitReceipt, Fault, Operation, Outcome, Response, Store},
     program::{
         CommitInvocation, CommitPolicy, CommitProgram, DeliveryInvocation, DeliveryPolicy,
@@ -31,6 +32,7 @@ pub struct Effects<'a, 'p, T: Transport, C: Time> {
     production: Production<'a, 'p, T, C>,
     record: bool,
     last_transcript: Option<Transcript>,
+    stack: Stack,
 }
 
 impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
@@ -41,10 +43,32 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
         transport: T,
         time: C,
     ) -> Result<Self, Error> {
+        Self::open_with_policies(path, lineage, transport, time, Vec::new())
+    }
+
+    /// Opens a policy lifetime before any effect. Reservations survive every
+    /// run and terminal unwind on this handle. Policies require private capture
+    /// and adapter provenance. Process loss requires durable restoration;
+    /// opening a fresh handle is not recovery of a previous reservation log.
+    pub fn open_with_policies(
+        path: &Path,
+        lineage: &'a Lineage<'a, 'p>,
+        transport: T,
+        time: C,
+        policies: Vec<Policy>,
+    ) -> Result<Self, Error> {
+        let record = !policies.is_empty();
         Ok(Self {
             production: Production::open(path, lineage, 0, transport, Some(time))?,
-            record: false,
+            record,
             last_transcript: None,
+            stack: Stack {
+                layers: policies
+                    .into_iter()
+                    .map(Monitor::new)
+                    .map(Layer::Policy)
+                    .collect(),
+            },
         })
     }
 
@@ -53,10 +77,16 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
         self.production.store()
     }
 
-    /// Enables private capture for subsequent runs. Disabling discards it.
+    /// Enables private capture for subsequent runs. Policies require capture;
+    /// disabling it on an unmonitored handle discards the previous transcript.
     /// No transcript is written to disk, exported or supplied to Authority.
     pub fn record_private(&mut self, enabled: bool) {
-        self.record = enabled;
+        self.record = enabled
+            || self
+                .stack
+                .layers
+                .iter()
+                .any(|l| matches!(l, Layer::Policy(_)));
         self.last_transcript = None;
     }
 
@@ -162,12 +192,25 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
         handler::bind(self.production.ports(), P::PORTS).map_err(|e| format!("{e:?}"))?;
         let mut driver =
             Driver::<P>::start(REGISTRY, epoch, first).map_err(|e| format!("{e:?}"))?;
-        let mut stack = Stack::default();
+        // The field owns reservations before terminal invocation, including
+        // when a transport unwinds. Remove only the previous run's recording.
+        self.stack
+            .layers
+            .retain(|layer| !matches!(layer, Layer::Record(_)));
         if self.record {
             let mut manifest = self
                 .production
                 .manifest(start)
                 .ok_or("private recording requires transport and time source/configuration/seed")?;
+            let policy_count = self
+                .stack
+                .layers
+                .iter()
+                .filter(|l| matches!(l, Layer::Policy(_)))
+                .count();
+            for _ in 0..policy_count {
+                manifest.stack.insert(0, "policy");
+            }
             manifest.implementations.push(Implementation {
                 name: "withdrawal-queue",
                 source: registry::source_digest(&[(
@@ -179,8 +222,11 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
             manifest
                 .configuration
                 .extend_from_slice(&(MAX_REQUESTS as u64).to_be_bytes());
-            stack.layers.push(Layer::Record(Transcript::new(manifest)));
+            self.stack
+                .layers
+                .push(Layer::Record(Transcript::new(manifest)));
         }
+        let stack = &mut self.stack;
         let result = (|| {
             for _ in 0..MAX_REQUESTS {
                 if let Some(outcome) = driver.outcome() {
@@ -208,10 +254,13 @@ impl<'a, 'p, T: Transport, C: Time> Effects<'a, 'p, T, C> {
             // transcript or report non-execution when this bound stops a run.
             Ok(Outcome::Unknown(Fault::Io))
         })();
-        self.last_transcript = stack.layers.into_iter().find_map(|layer| match layer {
-            Layer::Record(transcript) => Some(transcript),
+        self.last_transcript = stack.layers.iter().find_map(|layer| match layer {
+            Layer::Record(transcript) => Some(transcript.clone()),
             Layer::Identity | Layer::Policy(_) => None,
         });
+        stack
+            .layers
+            .retain(|layer| !matches!(layer, Layer::Record(_)));
         result
     }
 }
