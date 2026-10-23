@@ -109,7 +109,7 @@ class WideCliReports(unittest.TestCase):
         for index, value in enumerate(ENDPOINTS):
             with self.subTest(value=value):
                 spec = self.root / f'learn-{index}.json';spec.write_text(json.dumps(declaration(value)))
-                report = self.run_cli('loop', 'learn', '--spec', spec, exits=(0, 3))
+                report = self.run_cli('loop', 'learn', '--spec', spec, exits=(0,) if value == 0 else (2,))
                 if value == 0:
                     self.assertEqual(report['status'], 'determined');continue
                 self.assertEqual(report['status'], 'question')
