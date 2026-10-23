@@ -13,16 +13,28 @@ from factory import lower, qualify, write_new
 from workflow import checker_identity
 
 
+def verdict_exit(result):
+    """Map core verdict fields to exits; successful query results stay successful."""
+    if "comparison" in result:
+        return {"same-functional-observations-on-declared-domain": 0, "different": 1}.get(result["comparison"], 2)
+    if result.get("status") in {"counterexample", "fail", "none-in-scope"}:
+        return 1
+    if result.get("status") in {"unfinished", "unsupported", "UNKNOWN", "inconclusive"}:
+        return 2
+    return 0
+
+
 def main():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
     from guide_help import example_help
-    parser = argparse.ArgumentParser(description=__doc__, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
+    exit_help = "Exit 0 positive/answered, 1 counterexample/different/none-in-scope, 2 UNKNOWN/unfinished/unsupported/refused."
+    parser = argparse.ArgumentParser(description=__doc__, epilog=exit_help + example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     import loop_coverage
     loop_coverage.add_command(sub)
     for command in ["legend", "check", "render", "export", "export-game", "qualify", "diff", "ui", "story", "why-not", "what-if",
                     "lower", "refine-check", "explain", "guide"]:
-        p = sub.add_parser(command, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
+        p = sub.add_parser(command, epilog=exit_help + example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
                        default=Path(__file__).parent / "examples/order.zal")
         p.add_argument("--syntax", choices=["symbolic", "english"], default="symbolic")
@@ -146,7 +158,7 @@ def main():
             serve(source if options.syntax == "symbolic" else model.render(), Path.cwd(), options.port, options.workspace)
             return 0
         print(json.dumps(result, indent=2))
-        return 1 if result.get("status") in {"counterexample", "unfinished", "unknown"} else 3 if result.get("status") == "unsupported" else 0
+        return verdict_exit(result)
     except (ValueError, OSError) as error:
         from diagnostics import describe
         print(json.dumps({"status": "refused", "diagnostic": str(error),
@@ -202,7 +214,7 @@ def typed_or_effects(options, source, first):
         print(effects_guide.human_text(result))
     else:
         print(json.dumps(result, indent=2))
-    return 1 if result.get("status") in {"counterexample", "fail"} else 3 if result.get("status") == "unsupported" else 0
+    return verdict_exit(result)
 
 
 if __name__ == "__main__":

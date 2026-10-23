@@ -409,7 +409,7 @@ class CommandLineTests(unittest.TestCase):
                 code = CLI.main()
         story = json.loads(output.getvalue())
         self.assertEqual((code, story["status"], story["check_status"], story["diagnostic"]),
-                         (1, "unknown", "unknown", "solvers disagree"))
+                         (2, "unknown", "unknown", "solvers disagree"))
 
 
 if __name__ == "__main__":

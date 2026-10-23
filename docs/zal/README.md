@@ -417,9 +417,16 @@ tests. Its temporary application lockfile is normalized offline; the repository
 lockfile is unchanged. Inspect every report entry and terminal status. None of
 these commands adopts, publishes, upgrades, releases or deploys an application.
 
-CLI exit codes are 0 for a completed operation, 1 for `counterexample` or
-`unfinished`, 2 for refused input/operation, and 3 for `unsupported`. A diff's
-`different` or `domain-changed` result is data, not an exit-code failure.
+The [shared exit contract](../CLI_REFERENCE.md#exit-codes) applies.
+`diff` returns 1 for `different` and 2 for `domain-changed` or
+`invalid-overlap`; a changed domain supplies no equivalence verdict.
+`why-not` returns 1 for `none-in-scope`. `unfinished` and `unsupported`
+return 2; input/operation refusal still returns 2. Rendered stories and
+`what-if` results remain completed diagnostic queries.
+
+Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language,
+2024, defines shell exit status conventions; these mappings apply them to
+the existing finite checker verdicts without changing their scope.
 
 ## Reproduce checks
 

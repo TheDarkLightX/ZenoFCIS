@@ -74,7 +74,7 @@ class GameExportResultTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "nested/game.zeno"
             for result in [accepted, replace(accepted, text=None, status_json='{"status": "unknown"}',
-                                              exit_code=1, to_stderr=True)]:
+                                              exit_code=2, to_stderr=True)]:
                 output.unlink(missing_ok=True)
                 stdout, stderr = io.StringIO(), io.StringIO()
                 with patch.object(sys, "argv", ["run.py", "export-game", str(source), "--property", model.games[0][0], "--out", str(output)]), patch.object(b, "export_game_decision", return_value=result), redirect_stdout(stdout), redirect_stderr(stderr):
