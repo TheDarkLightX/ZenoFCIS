@@ -536,6 +536,18 @@ contract, mathematical function and executable body and fixes the obligation
 count. Internal helper preconditions are discharged by the unconditional
 `decide` boundary after table validation.
 
+Before translation, the shared `check_native_configuration` helper in
+`tools/check_verus.py` checks configuration at every lexical scope in the kernel.
+It admits direct `cfg(verus_keep_ghost)` guards and
+`cfg_attr(verus_keep_ghost, verus_spec(...))` annotations. Other configuration
+forms, including unknown target/feature predicates, nested conditional removal
+and `cfg!` expressions, refuse with a source line. The profile's exact exception
+list records the full native-only `Verdict` derive attribute, its declaration
+and a reason. Missing, moved, duplicated or changed exceptions refuse. This is
+a conservative source guard; macro expansion and compiler correspondence remain
+trusted. The other gates can call the shared helper but do not thereby inherit
+this gate's configuration qualification.
+
 ```sh
 python3 tools/test_check_lemma_kernel.py
 python3 tools/check_lemma_kernel.py --out evidence/lemma-kernel.json
@@ -543,12 +555,14 @@ python3 tools/check_lemma_kernel.py --out evidence/lemma-kernel.json
 
 The gate checks the pinned whole crate with `--no-cheating`, native allocation,
 slice, vector, option and checked-product contracts, an independent FIFO oracle
-on every small table, and transitive-closure verdict comparisons. Four planted
-defects must compile, fail their named native assertion and fail a Verus
+on every small table, and transitive-closure verdict comparisons. Six planted
+defects must compile and fail their named native assertion. Five fail a Verus
 obligation: omitted initiation, approval of an excluded genesis, a noncommit
 treated as a commit, premature search exit and an admitted counterexample
-successor. Each specimen is restored
-byte for byte and its SHA-256 recorded.
+successor. The sixth inserts a native-only verdict override: its translated
+proof still passes, but the configuration guard must reject its exact line.
+Each specimen is restored byte for byte, its SHA-256 recorded, then rebuilt,
+tested and verified again.
 
 The method builds on Klein et al., *seL4: Formal Verification of an OS Kernel*
 (SOSP 2009), and the [seL4 refinement proof organization](https://github.com/seL4/l4v).
