@@ -426,4 +426,5 @@ verification/kernel-laws/src/oracle/templates/prepared-counter/README.md
 verification/kernel-laws/src/oracle/templates/prepared-counter/original/README.md
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/README.md
 verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/README.md
+verification/lean/README.md
 verification/verus/README.md
