@@ -5,6 +5,7 @@ native-build  debug harnesses for the unit tests
 run           the bounded claim through length 12 (release replay) and, with
               --lean and --lean-root, the unbounded claim's kernel check
 planted       the four planted defects, each against its named test
+bind-source   refresh the statements' source revision from the contract bytes
 """
 import argparse
 import hashlib
@@ -43,6 +44,16 @@ def native_build(env,release=False):
 
 
 def target(env,profile,name):return Path(env['CARGO_TARGET_DIR'])/profile/'examples'/name
+
+
+def bind_source():
+    """Refresh only the derived source binding, preserving the statements."""
+    revision='withdrawal-queue contract sources, sha256 '+w.contract_identity()
+    for name in ('alarm_withdrawal.json','alarm_withdrawal_bounded.json'):
+        path=w.EXAMPLES/name
+        data=json.loads(path.read_text())
+        data['trace']['source_revision']=revision
+        path.write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n')
 
 
 def export_lean(env,claim,out):
@@ -171,11 +182,12 @@ def planted(env,logs,lean):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('command',choices=('native-build','run','planted'))
+    parser.add_argument('command',choices=('native-build','run','planted','bind-source'))
     parser.add_argument('--length',type=int,default=w.HORIZON)
     parser.add_argument('--lean',type=Path);parser.add_argument('--lean-root',type=Path)
     parser.add_argument('--receipt',type=Path);parser.add_argument('--logs',type=Path)
     args=parser.parse_args();env=environment()
+    if args.command=='bind-source':bind_source();return 0
     if args.lean and not args.lean_root:parser.error('--lean needs --lean-root')
     if args.command=='native-build':native_build(env);return 0
     if args.command=='run':return run(env,args.length,args.lean,args.lean_root,args.receipt)

@@ -32,6 +32,8 @@ KEEPER=193
 SETTLEMENT=300
 LANES={'lane_a':(170,1,2),'lane_b':(171,3,4)}  # variant, status index, amount index
 DOMAIN={'action':[160,161,162],'lane':[170,171],'amount':[1,2],'caller':[190,191,192,193],'alarm':[0,1]}
+# This controller pilot excludes timeout withdrawals and fixes the clock.
+FIXED_CONTEXT={'now':0}
 # k is the contract's response bound: a presented lane is paid on or before
 # the eighth tick, counting the presenting tick (README, controller bound).
 K=7
@@ -56,6 +58,7 @@ def load_graph(text):
         raise AdapterRefusal('adapter:graph-profile')
     if graph.get('complete') is not True:raise AdapterRefusal('adapter:incomplete-graph')
     if graph.get('domain')!=DOMAIN:raise AdapterRefusal('adapter:declared-domain')
+    if graph.get('fixed_context')!=FIXED_CONTEXT:raise AdapterRefusal('adapter:fixed-context')
     return graph
 
 

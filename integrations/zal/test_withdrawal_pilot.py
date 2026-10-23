@@ -63,8 +63,9 @@ class WithdrawalPilotChecks(unittest.TestCase):
     def test_adapter_obligations(self):
         try:counts=w.check_adapter(self.graph)
         except w.AdapterRefusal as exc:self.fail(str(exc))
-        # The contract's own conformance grid: 420 reachable vaults, and
-        # every one decided over the 96-tuple declared command and context domain.
+        # The pilot's conformance grid at now = 0, without timeout actions:
+        # 420 reachable vaults, each decided over the 96-tuple pilot domain.
+        self.assertEqual(self.graph['fixed_context'],{'now':0})
         self.assertEqual((counts['vaults'],counts['decisions']),(420,420*96))
         # A tick ignores lane and amount: two of each, times both alarm values.
         self.assertEqual(counts['ticks'],420*8)

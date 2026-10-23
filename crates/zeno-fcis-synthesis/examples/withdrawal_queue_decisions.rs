@@ -1,7 +1,9 @@
 //! Diagnostic decision graph of the withdrawal-queue contract; authority: none.
 //! Explores every vault reachable from the contract's genesis under the
-//! complete declared command and context domain, through the checked V2
+//! pilot's declared command and context domain, through the checked V2
 //! Authority of the generated contract, and prints each decision as JSON.
+//! The pilot covers deposits, requests and ticks at now = 0. Timeout
+//! withdrawals are outside this controller projection.
 #[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs"]
 mod vault;
@@ -33,8 +35,8 @@ const COMMAND: &[(u16, Leaf)] = &[
     (131, Leaf::Sum(108)),
     (132, Leaf::Int),
 ];
-const CONTEXT: &[(u16, Leaf)] = &[(140, Leaf::Sum(112)), (141, Leaf::Bool)];
-// The declared command and context domains: action, lane, amount, caller, alarm.
+const CONTEXT: &[(u16, Leaf)] = &[(140, Leaf::Sum(112)), (141, Leaf::Bool), (142, Leaf::Int)];
+// The pilot's domains: action, lane, amount, caller, alarm, with now fixed at 0.
 const ACTIONS: [i128; 3] = [160, 161, 162];
 const LANES: [i128; 2] = [170, 171];
 const AMOUNTS: [i128; 2] = [1, 2];
@@ -140,7 +142,7 @@ fn main() {
             let raw = [
                 frame(&framing.state, record(STATE, &state)),
                 frame(&framing.command, record(COMMAND, &[action, lane, amount])),
-                frame(&framing.context, record(CONTEXT, &[caller, alarm])),
+                frame(&framing.context, record(CONTEXT, &[caller, alarm, 0])),
             ];
             let output = authority.evaluate(c::Raw {
                 state: &raw[0],
@@ -193,6 +195,7 @@ fn main() {
     println!(
         "{{\"profile\":\"withdrawal-queue/decision-graph/1\",\"authority\":\"none\",\
 \"complete\":true,\"genesis_commits\":{commits},\"changed_genesis_refused\":{changed_refused},\
+\"fixed_context\":{{\"now\":0}},\
 \"domain\":{{\"action\":{},\"lane\":{},\"amount\":{},\"caller\":{},\"alarm\":{}}},\
 \"vaults\":[{}],\"decisions\":[{decisions}]}}",
         list(&ACTIONS),

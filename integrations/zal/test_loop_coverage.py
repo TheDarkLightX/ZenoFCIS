@@ -322,13 +322,27 @@ class NativeCoverageTests(unittest.TestCase):
             policy_path = work / "contract/v2/policy.json"
             policy = json.loads(policy_path.read_text())
             policy["cases"][-1]["when"] = True
-            policy["cases"].insert(0, {"when": False, "class": "Reject", "reason": 200, "post": {}, "outbox": []})
             policy_path.write_text(json.dumps(policy))
             result = self.call([work / "contract", "--out", work / "out"])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             report = json.loads((work / "out/coverage.json").read_text())
             self.assertEqual(report["residual"]["gaps"], 0)
             self.assertEqual(report["residual"]["admitted_mutants"], 0)
+            positions = json.loads((work / "out/packets/0001.stdout").read_text())["inputs"]["positions"]
+            self.assertEqual(coverage.policy_expression(False, policy, positions), "false")
+            self.assertEqual(coverage.policy_expression(True, policy, positions), "true")
+            # The dead-case judge must retain an explicitly false guard as a
+            # finding, rather than certify coverage around an unreachable case.
+            policy["cases"].insert(0, {"when": False, "class": "Reject", "reason": 200, "post": {}, "outbox": []})
+            policy_path.write_text(json.dumps(policy))
+            result = self.call([work / "contract", "--out", work / "dead-case"])
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            stopped = json.loads((work / "dead-case/coverage.json").read_text())
+            self.assertEqual(stopped["status"], "disagreement")
+            self.assertEqual(stopped["rounds"], [])
+            finding, = stopped["baseline_disagreement"]["findings"]
+            self.assertEqual((finding["kind"], finding["case"], finding["when"], finding["guard_true"]),
+                             ("case-never-decides", 0, "false", 0))
 
 
 class ProposalLoweringTests(unittest.TestCase):
