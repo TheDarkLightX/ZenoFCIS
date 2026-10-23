@@ -1,0 +1,23 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "tiny-order-book",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {},
+  "variables": {
+    "action": "command.101.130",
+    "price": "command.101.131",
+    "best": "context.102.132"
+  },
+  "cases": [
+    {"rule": "place one unit", "when": "action == 150", "class": "Accept", "reason": null,
+      "post": {"160": "1", "161": "1"}, "outbox": []},
+    {"rule": "cancel the named level", "when": "action == 151", "class": "Accept", "reason": null,
+      "post": {"160": "0", "161": "0"}, "outbox": []},
+    {"rule": "a fill needs the best level", "when": "context.102.133 == 0 || pre.100.160 == 0 || price != best",
+      "class": "Reject", "reason": 200, "post": {}, "outbox": []},
+    {"rule": "fill one best unit", "when": "true", "class": "Accept", "reason": null,
+      "post": {"160": "0", "161": "0"}, "outbox": []}
+  ],
+  "genesis": {"160": 0, "161": 0, "170": 0, "171": 0},
+  "law_kinds": {"500": "AuthoritySubjectRecipient", "501": "StateInvariant"}
+}

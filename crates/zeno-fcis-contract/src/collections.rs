@@ -2,8 +2,9 @@
 //!
 //! A project with maps lowers each map to the entries its commands and
 //! contexts name: the view contract the library Authority decides. Keys
-//! become classes, one restricted-growth assignment per equality pattern, so
-//! the view never holds a key's value, only which named keys are equal.
+//! become classes: opaque keys use one restricted-growth assignment per
+//! equality pattern; ordered keys use every weak ordering. The view holds
+//! equality and permitted order observations, never concrete key values.
 //!
 //! This checker enumerates every admissible view: every class pattern; each
 //! named entry absent, with default values, or present with every value of
@@ -26,7 +27,7 @@ pub mod runtime;
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
-use zeno_fcis_spec::{ProjectionPath, ProjectionRoot, SummaryKind, TypeKind};
+use zeno_fcis_spec::{OrderReadKind, ProjectionPath, ProjectionRoot, SummaryKind, TypeKind};
 
 use crate::ContractError;
 use crate::internals::{
@@ -49,6 +50,13 @@ pub const PREMISES: [&str; 4] = [
     "a decision reads and writes only scalar state and the entries its command and context keys name",
     "laws are per entry or over named entries, and aggregates are declared summaries whose changes are checked",
     "the runtime frames each decision from the stored entries at those keys and writes back only them",
+];
+
+/// Additional premises for ordered collection views.
+pub const ORDERED_PREMISES: [&str; 3] = [
+    "ordered keys admit only same-type comparisons and copying; ranks enumerate every weak ordering",
+    "each fixed pre-state order read supplies a present witness or empty interval; all observations share one snapshot",
+    "the runtime must establish order observations from the real map; the equality-only Layout refuses ordered projects",
 ];
 
 /// The claim a checked result makes.
@@ -135,7 +143,7 @@ struct SummaryView {
 }
 
 /// Checks a collections contract. Invalid declarations, rules that use a
-/// key other than by equality, and a genesis with entries are errors.
+/// key outside same-type permitted comparisons, and a genesis with entries are errors.
 pub fn check(
     project: &str,
     policy_source: &str,
@@ -260,7 +268,29 @@ pub fn check(
             nonnegative,
         });
     }
-    refuse_key_values(&rules, &key_names)?;
+    let ordered: BTreeSet<u32> = collections
+        .keys()
+        .iter()
+        .filter(|k| k.is_ordered())
+        .map(|k| k.id().get())
+        .collect();
+    let mut order_reads = Vec::new();
+    for read in collections.order_reads() {
+        let kind = match read.kind() {
+            OrderReadKind::Min => ReadKind::Min,
+            OrderReadKind::Max => ReadKind::Max,
+            OrderReadKind::Successor(p) => ReadKind::Successor(at(path_name(p))?),
+            OrderReadKind::Predecessor(p) => ReadKind::Predecessor(at(path_name(p))?),
+            OrderReadKind::Range(lo, hi) => ReadKind::Range(at(path_name(lo))?, at(path_name(hi))?),
+        };
+        order_reads.push(OrderView {
+            map: read.map().get(),
+            kind,
+            result: at(path_name(read.result()))?,
+            found: at(path_name(read.found()))?,
+        });
+    }
+    refuse_key_values(&rules, &key_names, &ordered)?;
     let genesis = |position: usize| {
         positions[position]
             .field
@@ -310,12 +340,26 @@ pub fn check(
         })).collect::<Vec<_>>(),
         "key_types": collections.keys().iter().map(|key| json!({
             "id": key.id().get(), "name": key.name().as_str(), "positions": key.positions(),
-            "patterns": bell(key.positions()).to_string(),
+            "patterns": if key.is_ordered() { weak_orders(key.positions()) } else { bell(key.positions()) }.to_string(),
+            "ordered": key.is_ordered(),
         })).collect::<Vec<_>>(),
         "summaries": summaries.iter().map(|s| s.id).collect::<Vec<_>>(),
         "view_domain": size.map(|n| n.to_string()),
         "limits": {"max_tuples": limits.max_tuples.min(MAX_TUPLES)},
     });
+    if !ordered.is_empty() {
+        packet["premises"][0] = json!(
+            "opaque keys admit equality only; ordered keys admit same-type equality and order comparisons"
+        );
+        packet["ordered_premises"] = json!(ORDERED_PREMISES);
+        packet["order_reads"] = json!(
+            collections
+                .order_reads()
+                .iter()
+                .map(|r| r.id().get())
+                .collect::<Vec<_>>()
+        );
+    }
     if values.is_empty()
         || size.is_none_or(|n| n == 0 || n > u128::from(limits.max_tuples.min(MAX_TUPLES)))
     {
@@ -332,10 +376,14 @@ pub fn check(
         keys: &keys,
         entries: &entries,
         summaries: &summaries,
+        ordered: &ordered,
+        order_reads: &order_reads,
     };
     let outcome = policy::with_authority(&contract, &schema, |authority| {
         let state_laws = evaluate::state_laws(authority.descriptor());
         let laws = LawSet::new(authority.descriptor(), &state_laws);
+        let all_ids: Vec<u32> = declarations.laws.iter().map(|l| l.id).collect();
+        let transition_laws = LawSet::new(authority.descriptor(), &all_ids);
         let mut measured = Measured::default();
         // Genesis: every map empty, so every view at every choice of keys is
         // this one, and every state law must hold on it.
@@ -397,7 +445,22 @@ pub fn check(
                                 .iter()
                                 .filter_map(|(id, v)| Some((*id, v.number()?)))
                                 .collect();
-                            if let Some(failure) = shape.obligations(&tuple, &post) {
+                            if let Some(failure) = shape.obligations(&tuple, &post, |merged| {
+                                if ordered.is_empty() {
+                                    return true;
+                                }
+                                let result = transition_laws.on_transition_with_outbox(
+                                    &framer,
+                                    &tuple,
+                                    &evaluate::Proposed {
+                                        class: decision.class,
+                                        reason: decision.reason,
+                                        post: merged,
+                                    },
+                                    &decision.outbox,
+                                );
+                                result.0
+                            }) {
                                 return (
                                     measured,
                                     Some(json!({
@@ -449,6 +512,8 @@ struct Shape<'a> {
     keys: &'a BTreeMap<usize, u32>,
     entries: &'a [EntryView],
     summaries: &'a [SummaryView],
+    ordered: &'a BTreeSet<u32>,
+    order_reads: &'a [OrderView],
 }
 
 impl Shape<'_> {
@@ -480,12 +545,32 @@ impl Shape<'_> {
             .chain(stored.iter())
             .collect::<BTreeMap<_, _>>()
         {
+            if self.ordered.contains(key_type) {
+                continue;
+            }
             let seen = highest.entry(*key_type).or_insert(-1);
             let class = tuple[*position];
             if class > *seen + 1 {
                 return false;
             }
             *seen = (*seen).max(class);
+        }
+        // Ordered classes are contiguous ranks, with every permutation of
+        // the equality blocks, rather than first-occurrence block labels.
+        for key_type in self.ordered {
+            let ranks: BTreeSet<i128> = self
+                .keys
+                .iter()
+                .chain(stored.iter())
+                .filter(|(_, t)| *t == key_type)
+                .map(|(p, _)| tuple[*p])
+                .collect();
+            if ranks.iter().copied().ne(0..ranks.len() as i128) {
+                return false;
+            }
+        }
+        if !order_consistent(self.order_reads, self.entries, tuple) {
+            return false;
         }
         // Entries of one map at one key are one entry.
         for (i, a) in self.entries.iter().enumerate() {
@@ -538,6 +623,7 @@ impl Shape<'_> {
         &self,
         tuple: &[i128],
         post: &BTreeMap<u16, i128>,
+        merged_lawful: impl FnOnce(&[i128]) -> bool,
     ) -> Option<(&'static str, String)> {
         let read = |position: usize| {
             self.positions[position]
@@ -547,7 +633,18 @@ impl Shape<'_> {
         };
         // The merged post view of each entry: at most one aliased entry
         // writes a new value.
-        let mut merged: Vec<i128> = tuple.to_vec();
+        let mut merged: Vec<i128> = self
+            .positions
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                if p.source == Source::State {
+                    read(i)
+                } else {
+                    tuple[i]
+                }
+            })
+            .collect();
         let maps: BTreeSet<u32> = self.entries.iter().map(|e| e.map).collect();
         for map in &maps {
             let classes: BTreeSet<i128> = self
@@ -616,6 +713,12 @@ impl Shape<'_> {
                 ));
             }
         }
+        if !merged_lawful(&merged) {
+            return Some((
+                "merged post laws",
+                "the alias-merged successor violates a law".to_owned(),
+            ));
+        }
         None
     }
 
@@ -662,7 +765,11 @@ fn bell(n: u32) -> u128 {
 /// of its type: a key has no value, order or arithmetic.
 /// A stored key field of an entry may be written a key of its type: the
 /// entry then holds that key's class.
-fn refuse_key_values(rules: &Rules, keys: &BTreeMap<String, u32>) -> Result<(), ContractError> {
+fn refuse_key_values(
+    rules: &Rules,
+    keys: &BTreeMap<String, u32>,
+    ordered: &BTreeSet<u32>,
+) -> Result<(), ContractError> {
     for (index, case) in rules.cases.iter().enumerate() {
         let place = format!("v2/policy.json cases[{index}]");
         let mut expressions = vec![&case.when];
@@ -688,10 +795,10 @@ fn refuse_key_values(rules: &Rules, keys: &BTreeMap<String, u32>) -> Result<(), 
         for ast in expressions {
             let expanded = expr::expand(ast, &rules.variables)
                 .map_err(|reason| ContractError::new(&place, reason))?;
-            if misuses_key(&expanded, keys) {
+            if misuses_key(&expanded, keys, ordered) {
                 return Err(ContractError::new(
                     &place,
-                    "a key is compared only with == or != against a key of its type",
+                    "a key is compared only with keys of its type; opaque keys allow only == or !=",
                 ));
             }
         }
@@ -699,26 +806,185 @@ fn refuse_key_values(rules: &Rules, keys: &BTreeMap<String, u32>) -> Result<(), 
     Ok(())
 }
 
-fn misuses_key(ast: &Ast, keys: &BTreeMap<String, u32>) -> bool {
+fn misuses_key(ast: &Ast, keys: &BTreeMap<String, u32>, ordered: &BTreeSet<u32>) -> bool {
     match ast {
-        Ast::Circuit(c) => c.formulas().any(|f| misuses_key(f, keys)),
-        Ast::Binary(Binary::Eq | Binary::Ne, a, b) => match (a.as_ref(), b.as_ref()) {
+        Ast::Circuit(c) => c.formulas().any(|f| misuses_key(f, keys, ordered)),
+        Ast::Binary(
+            op @ (Binary::Eq | Binary::Ne | Binary::Lt | Binary::Le | Binary::Gt | Binary::Ge),
+            a,
+            b,
+        ) => match (a.as_ref(), b.as_ref()) {
             (Ast::Name(x), Ast::Name(y)) if keys.contains_key(x) || keys.contains_key(y) => {
-                keys.get(x).is_none() || keys.get(x) != keys.get(y)
+                keys.get(x).is_none()
+                    || keys.get(x) != keys.get(y)
+                    || (!matches!(op, Binary::Eq | Binary::Ne)
+                        && !keys.get(x).is_some_and(|t| ordered.contains(t)))
             }
-            _ => misuses_key(a, keys) || misuses_key(b, keys),
+            _ => misuses_key(a, keys, ordered) || misuses_key(b, keys, ordered),
         },
         Ast::Name(name) => keys.contains_key(name),
         Ast::Bool(_) | Ast::Int(_) | Ast::U128(_) | Ast::DecisionReason => false,
-        Ast::ToI128(a) | Ast::ToU128(a) | Ast::Not(a) | Ast::Neg(a) => misuses_key(a, keys),
-        Ast::Binary(_, a, b) | Ast::Div(_, a, b) => misuses_key(a, keys) || misuses_key(b, keys),
+        Ast::ToI128(a) | Ast::ToU128(a) | Ast::Not(a) | Ast::Neg(a) => {
+            misuses_key(a, keys, ordered)
+        }
+        Ast::Binary(_, a, b) | Ast::Div(_, a, b) => {
+            misuses_key(a, keys, ordered) || misuses_key(b, keys, ordered)
+        }
         Ast::Choose(a, b, c)
         | Ast::MulDiv(_, a, b, c)
         | Ast::SignedMulDivFloor(a, b, c)
         | Ast::ScaledMulDiv(_, _, a, b, c, _)
         | Ast::RepeatMulDiv(_, a, b, c, _) => {
-            misuses_key(a, keys) || misuses_key(b, keys) || misuses_key(c, keys)
+            misuses_key(a, keys, ordered)
+                || misuses_key(b, keys, ordered)
+                || misuses_key(c, keys, ordered)
         }
-        Ast::ProductsGe(arguments) => arguments.iter().any(|a| misuses_key(a, keys)),
+        Ast::ProductsGe(arguments) => arguments.iter().any(|a| misuses_key(a, keys, ordered)),
     }
+}
+
+/// A pure ordered-key query; it confers no framing or publication authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OrderedQuery {
+    /// Least key.
+    Min,
+    /// Greatest key.
+    Max,
+    /// Strict successor.
+    Successor(i128),
+    /// Strict predecessor.
+    Predecessor(i128),
+    /// Closed range; reversed endpoints give no witness.
+    Range(i128, i128),
+}
+
+/// Reads an immutable key set. Range returns its least matching witness.
+/// Only the fixed observation is returned; no iterator or borrowed alias escapes.
+pub fn ordered_key(keys: &BTreeSet<i128>, query: OrderedQuery) -> Option<i128> {
+    use std::ops::Bound::{Excluded, Unbounded};
+    match query {
+        OrderedQuery::Min => keys.first().copied(),
+        OrderedQuery::Max => keys.last().copied(),
+        OrderedQuery::Successor(k) => keys.range((Excluded(k), Unbounded)).next().copied(),
+        OrderedQuery::Predecessor(k) => keys.range((Unbounded, Excluded(k))).next_back().copied(),
+        OrderedQuery::Range(lo, hi) if lo <= hi => keys.range(lo..=hi).next().copied(),
+        OrderedQuery::Range(_, _) => None,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ReadKind {
+    Min,
+    Max,
+    Successor(usize),
+    Predecessor(usize),
+    Range(usize, usize),
+}
+struct OrderView {
+    map: u32,
+    kind: ReadKind,
+    result: usize,
+    found: usize,
+}
+
+/// Missing endpoints are infinities. Boolean endpoint flags mean inclusive.
+struct EmptyInterval {
+    map: u32,
+    lo: Option<(i128, bool)>,
+    hi: Option<(i128, bool)>,
+}
+impl EmptyInterval {
+    fn contains(&self, k: i128) -> bool {
+        self.lo
+            .is_none_or(|(lo, closed)| k > lo || (closed && k == lo))
+            && self
+                .hi
+                .is_none_or(|(hi, closed)| k < hi || (closed && k == hi))
+    }
+}
+
+fn order_consistent(reads: &[OrderView], entries: &[EntryView], tuple: &[i128]) -> bool {
+    if reads.is_empty() {
+        return true;
+    }
+    let mut present: BTreeSet<(u32, i128)> = entries
+        .iter()
+        .filter(|e| tuple[e.presence] == 1)
+        .map(|e| (e.map, tuple[e.key]))
+        .collect();
+    let absent: BTreeSet<(u32, i128)> = entries
+        .iter()
+        .filter(|e| tuple[e.presence] == 0)
+        .map(|e| (e.map, tuple[e.key]))
+        .collect();
+    let mut empty = Vec::new();
+    for read in reads {
+        let found = tuple[read.found] == 1;
+        let r = tuple[read.result];
+        if found {
+            present.insert((read.map, r));
+        }
+        let gap = match read.kind {
+            ReadKind::Min => Some((None, found.then_some((r, false)))),
+            ReadKind::Max => Some((found.then_some((r, false)), None)),
+            ReadKind::Successor(at) => {
+                let k = tuple[at];
+                if found && r <= k {
+                    return false;
+                }
+                Some((Some((k, false)), found.then_some((r, false))))
+            }
+            ReadKind::Predecessor(at) => {
+                let k = tuple[at];
+                if found && r >= k {
+                    return false;
+                }
+                Some((found.then_some((r, false)), Some((k, false))))
+            }
+            ReadKind::Range(lo, hi) => {
+                let (lo, hi) = (tuple[lo], tuple[hi]);
+                if found && !(lo <= r && r <= hi) {
+                    return false;
+                }
+                (!found).then_some((Some((lo, true)), Some((hi, true))))
+            }
+        };
+        if let Some((lo, hi)) = gap {
+            empty.push(EmptyInterval {
+                map: read.map,
+                lo,
+                hi,
+            });
+        }
+    }
+    for &(map, key) in &present {
+        if absent.contains(&(map, key)) {
+            return false;
+        }
+        if empty.iter().any(|gap| gap.map == map && gap.contains(key)) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Ordered Bell numbers: sum over partitions of the permutations of their blocks.
+fn weak_orders(n: u32) -> u128 {
+    let mut stirling = vec![0u128; n as usize + 1];
+    stirling[0] = 1;
+    for i in 1..=n as usize {
+        for k in (1..=i).rev() {
+            stirling[k] = stirling[k - 1].saturating_add((k as u128).saturating_mul(stirling[k]));
+        }
+        stirling[0] = 0;
+    }
+    let mut factorial = 1u128;
+    let mut sum = 0u128;
+    for (k, s) in stirling.iter().enumerate() {
+        if k > 0 {
+            factorial = factorial.saturating_mul(k as u128);
+        }
+        sum = sum.saturating_add(s.saturating_mul(factorial));
+    }
+    sum
 }
