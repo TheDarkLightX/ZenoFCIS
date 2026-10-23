@@ -4,7 +4,7 @@ Policy consists only of owned tuples. All maps, tables and search queues below
 belong to one check invocation; none are retained on the decision machine.
 """
 
-from collections import deque
+from collections import Counter, deque
 import re
 
 import behavior2 as b
@@ -144,7 +144,9 @@ def check_automorphism(model, name, permutation):
     initial = model.initial, model.initial_values()
     if configuration(model, permutation, *initial) != initial:
         refuse(name, "automorphism", "initial configuration is moved")
-    mapping = {"default": "default"}
+    normal = {rule.id: [] for rule in model.rules}
+    normal["default"] = []
+    transported = {rule: [] for rule in normal}
     for state, values, event, context in model.inputs_domain():
         other_state, other_values = configuration(model, permutation, state, values)
         other_event = permutation.get(event, event)
@@ -154,12 +156,21 @@ def check_automorphism(model, name, permutation):
                          other_state, other_values, other_event, context, {})
         if left[0] != right[0] or [row[0] for row in left[1]] != [row[0] for row in right[1]]:
             refuse(name, "automorphism", f"outcome changes at {state}, {values}, {event}, {context}")
-        for (_, source), (_, target) in zip(left[1], right[1]):
-            if source in mapping and mapping[source] != target:
-                refuse(name, "automorphism", f"rule outcome {source} has no consistent renaming")
-            mapping[source] = target
-    if any(mapping.get(target) != source for source, target in mapping.items()):
-        refuse(name, "automorphism", "rule outcomes do not form an involution")
+        key = (other_state, tuple(other_values[v.name] for v in model.variables),
+               other_event, tuple(sorted(context.items())))
+        for effect, rule in left[1]:
+            transported[rule].append((key, b.canonical(effect)))
+        for effect, rule in right[1]:
+            normal[rule].append((key, b.canonical(effect)))
+    # Match whole enabledness/outcome tables, never independently zip an
+    # overlap's sorted IDs. Equal signature classes admit a bijection; since
+    # this generator is involutive, matching sorted IDs between paired classes
+    # gives an involutive rule renaming as well. Unobserved rules have empty
+    # signatures. The explicit default label must remain fixed.
+    signatures = lambda table: Counter(tuple(sorted(rows)) for rule, rows in table.items() if rule != "default")
+    if (signatures(normal) != signatures(transported)
+            or sorted(normal["default"]) != sorted(transported["default"])):
+        refuse(name, "automorphism", "rule outcomes have no consistent bijective renaming")
 
 
 def check_claims(model, name, permutation):

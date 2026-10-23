@@ -232,6 +232,28 @@ symmetry rivals: swap (xx yy) (left right);
         with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: automorphism'):
             b.check(b.parse(rejection))
 
+    def test_overlap_uses_whole_rule_signatures(self):
+        source = '''zal 2;
+machine overlapping_mirror;
+states idle;
+events tick;
+context none;
+var aa in 0..=1 initially 0;
+var bb in 0..=1 initially 0;
+initial idle;
+step atomic; frame control_and_variables;
+default reject unavailable unchanged;
+rule r1: idle + tick [aa == 0] -> accept idle;
+rule r2: idle + tick [true] -> accept idle;
+rule r3: idle + tick [bb == 0] -> accept idle;
+symmetry rivals: swap (aa bb);
+'''
+        model = b.parse(source)
+        result = b.check(model)
+        self.assertEqual(result['obligation'], 'determinism')
+        self.assertEqual(result['rules'], ['r1', 'r2', 'r3'])
+        self.assertEqual(result, b.check(model, no_symmetry=True))
+
     def test_example_and_legacy_revision_pins(self):
         from test_game2 import EXAMPLE_REVISIONS, parse_example
         here = Path(__file__).parent / 'examples'
