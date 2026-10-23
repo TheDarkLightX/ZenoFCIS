@@ -189,3 +189,55 @@ fn ordered_laws_are_rechecked_after_alias_merge() -> Result<(), Box<dyn std::err
     assert_eq!(result.packet()["result"]["obligation"], "merged post laws");
     Ok(())
 }
+
+// Cancel retains the raw payload; concrete map deletion reframes it to the
+// declared default. The transition law must not be certified on raw payloads.
+#[test]
+fn deletion_cannot_check_laws_on_noncanonical_absent_payloads()
+-> Result<(), Box<dyn std::error::Error>> {
+    let project = BOOK[..BOOK.find("law 500").ok_or("law500")?]
+        .replace("reason 200 no_fill precedence 0;", "")
+        + "law 500 deletion on commit = command.101.130 == 151 && pre.100.160 == 1 && pre.100.161 == 1 -> post.100.161 == 1;\nlaw 501 marker on commit, genesis = true;\n";
+    let mut rules: serde_json::Value = serde_json::from_str(RULES)?;
+    rules["cases"] = serde_json::json!([
+        {"rule":"place one", "when":"action == 150", "class":"Accept", "reason":null, "post":{"160":"1","161":"1"}, "outbox":[]},
+        {"rule":"delete existing one", "when":"action == 151 && pre.100.160 == 1 && pre.100.161 == 1", "class":"Accept", "reason":null, "post":{"160":"0"}, "outbox":[]},
+        {"rule":"other", "when":"true", "class":"Accept", "reason":null, "post":{}, "outbox":[]}
+    ]);
+    let result = checked(&project, &rules.to_string())?;
+    assert_eq!(
+        result.verdict(),
+        Verdict::Refuted,
+        "canonical deletion was certified: {}",
+        result.packet()
+    );
+    assert_eq!(result.packet()["result"]["obligation"], "merged post laws");
+    Ok(())
+}
+
+#[test]
+fn bounded_summary_overflow_returns_instead_of_panicking() -> Result<(), Box<dyn std::error::Error>>
+{
+    let project = BOOK[..BOOK.find("law 500").ok_or("law500")?]
+        .replace("reason 200 no_fill precedence 0;", "")
+        .replace("type 105 int Quantity in 0..=1;", &format!("type 105 int Quantity in {}..={};\ntype 108 int Total in 0..=1;\nsummary 120 100 total 108 sum 110.140;", i128::MAX - 1, i128::MAX))
+        + "law 501 marker on commit, genesis = true;\n";
+    let rules = format!(
+        r#"{{"schema":"zeno-fcis/template-declarative-policy/2","template":"tiny-order-book",
+        "roots":{{"state":100,"command":101,"context":102}},"leaf_bindings":{{}},
+        "variables":{{"action":"command.101.130","price":"command.101.131","best":"context.102.132"}},
+        "cases":[{{"rule":"observe","when":"true","class":"Accept","reason":null,"post":{{}},"outbox":[]}}],
+        "genesis":{{"160":0,"161":{0},"170":0,"171":{0},"120":0}},
+        "law_kinds":{{"501":"StateInvariant"}}}}"#,
+        i128::MAX - 1
+    );
+    let returned = std::panic::catch_unwind(|| check(&project, &rules, Limits::default()));
+    assert!(
+        returned.is_ok(),
+        "bounded summary arithmetic must return a verdict or refusal, never panic"
+    );
+    let result = returned.map_err(|_| "checker panicked")??;
+    assert_eq!(result.verdict(), Verdict::Checked, "{}", result.packet());
+    assert_eq!(result.packet()["view_domain"], "768");
+    Ok(())
+}
