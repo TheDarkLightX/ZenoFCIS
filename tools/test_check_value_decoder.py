@@ -253,6 +253,24 @@ fn outside() {}
                      function="Cursor")
         self.refused("struct Cursor;\n#[cfg_attr(verus_keep_ghost, cfg(any()))]\n"
                      "struct Cursor;\nfn reader() {}", 2, function="Cursor")
+        self.refused("#[cfg(verus_keep_ghost)]\ntype Cursor = u8;\n"
+                     "#[cfg(not(verus_keep_ghost))]\ntype Cursor = fn() -> u8;\nfn reader() {}",
+                     3, function="Cursor")
+
+    def test_function_pointer_types_do_not_change_declaration_kind(self):
+        items = gate.source_items("type Callback = fn(u8) -> u8;\n"
+                                  "const CALLBACK: fn(u8) -> u8 = reader;\n"
+                                  "const fn reader(callback: fn(u8) -> u8) -> u8 { 1 }", "root")
+        self.assertEqual([(item.name, item.kind) for item in items],
+                         [("root::Callback", "type"), ("root::CALLBACK", "const"), ("root::reader", "fn")])
+
+    def test_native_import_alternatives_refuse(self):
+        self.refused("fn reader() {}\n#[cfg(not(verus_keep_ghost))]\n"
+                     "use other::replacement as reader;", 2)
+        self.refused("struct Cursor;\nfn reader() {}\n#[cfg(not(verus_keep_ghost))]\n"
+                     "use other::{Replacement as Cursor};", 3, function="Cursor")
+        self.audit("fn reader() {}\n#[cfg(not(verus_keep_ghost))]\n"
+                   "pub use other::{Unrelated, Another};")
 
     def test_generated_clone_constant_and_projection_map_to_declarations(self):
         bindings = self.audit("#[cfg_attr(verus_keep_ghost, derive(Clone))]\nstruct Cursor;\n"

@@ -156,7 +156,17 @@ def source_items(source: str, namespace: str) -> list[SourceItem]:
                 break
             header = [token.text for token in tokens[start:cursor]]
             end = pairs[cursor] if tokens[cursor].text == "{" else cursor
-            if "fn" in header and tokens[cursor].text == "{":
+            # The first declaration keyword decides the item. A type alias or
+            # constant may contain a function-pointer type later in its header.
+            kind = next((word for offset, word in enumerate(header)
+                         if word in ("fn", "impl", "mod", "struct", "enum", "type", "const", "static", "use")
+                         and not (word == "const" and offset + 1 < len(header)
+                                  and header[offset + 1] in ("fn", "unsafe", "extern"))), None)
+            if kind == "use" and tokens[cursor].text == "{":
+                if end + 1 == last or tokens[end + 1].text != ";":
+                    raise ValueError(f"unsupported use tree in {scope}")
+                end += 1
+            if kind == "fn" and tokens[cursor].text == "{":
                 # Verus contract expressions may themselves have braces (if,
                 # match, forall). Continue through those to the actual body.
                 item_starts = {"#", "}", "pub", "fn", "proof", "spec", "exec", "open", "closed",
@@ -175,8 +185,6 @@ def source_items(source: str, namespace: str) -> list[SourceItem]:
                         raise ValueError(f"cannot locate complete function body in {scope}")
                     end = pairs[cursor]
             attrs = (*inherited, *attributes)
-            kind = next((key for key in ("fn", "impl", "mod", "struct", "enum", "type", "const", "static")
-                         if key in header), None)
             if kind in ("fn", "struct", "enum", "type", "const", "static"):
                 name = header[header.index(kind) + 1]
                 items.append(SourceItem(f"{scope}::{name}", kind, tokens[start].start,
@@ -200,6 +208,8 @@ def source_items(source: str, namespace: str) -> list[SourceItem]:
                                         tokens[end].end, attrs))
                 if tokens[cursor].text == "{":
                     walk(cursor + 1, end, name, attrs)
+            elif kind == "use":
+                items.append(SourceItem(scope, kind, tokens[start].start, tokens[end].end, attrs))
             elif header == ["verus", "!"]:
                 walk(cursor + 1, end, scope, attrs)
             attributes = []
@@ -344,6 +354,18 @@ def audit_native_binding(root: Path, report: dict) -> list[dict]:
             for attribute in item.attributes:
                 if erasing_attribute(attribute) and risky_attribute(attribute):
                     raise NativeBindingRefused(path, sources[path].count("\n", 0, attribute[0].start) + 1, item.name)
+    # An import can supply an alternate function/type binding without declaring
+    # fn/type locally. Conservatively reserve reported leaf names for native-only
+    # imports; ordinary imports and unrelated native exports remain permitted.
+    reserved = {name.rsplit("::", 1)[-1]: name for name in sorted(set(inventory) | verified_types)}
+    for path, item in declarations:
+        if item.kind == "use":
+            guards = [a for a in item.attributes if risky_attribute(a)]
+            if guards:
+                for token in rust_tokens(sources[path][item.start:item.end]):
+                    if token.text in reserved:
+                        raise NativeBindingRefused(path,
+                            sources[path].count("\n", 0, guards[0][0].start) + 1, reserved[token.text])
     return bindings
 
 
