@@ -1,0 +1,23 @@
+{
+  "schema": "zeno-fcis/run-properties/1",
+  "observer": {
+    "last_intent": {
+      "min": 0,
+      "max": 11,
+      "initial": 0,
+      "update": "choose(outbox.300 > 0, outbox.300.160, before.last_intent)"
+    }
+  },
+  "properties": [
+    {
+      "kind": "predicate",
+      "name": "an_intent_is_never_queued_twice",
+      "formula": "outbox.300 > 0 -> outbox.300.160 > before.last_intent"
+    },
+    {
+      "kind": "predicate",
+      "name": "cleared_swap_has_no_held_amount",
+      "formula": "post.100.134 == 170 -> post.100.135 == 0"
+    }
+  ]
+}

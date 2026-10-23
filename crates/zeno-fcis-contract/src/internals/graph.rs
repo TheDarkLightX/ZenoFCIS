@@ -635,7 +635,29 @@ impl Graph for ScalarGraph<'_> {
             TypeKind::Sum(_) if self.strict() => Kind::Variant,
             _ => Kind::Int,
         };
-        Ok(self.table.put(ScalarOp::Input(index), kind))
+        let raw = self.table.put(ScalarOp::Input(index), kind);
+        if !self.strict()
+            && let TypeKind::Sum(variants) = self
+                .declarations
+                .kind(input.type_id)
+                .map_err(|e| e.to_string())?
+            && !variants.windows(2).all(|p| p[1].id == p[0].id + 1)
+        {
+            let first = i128::from(variants[0].id);
+            let ids: Vec<_> = variants.iter().map(|v| i128::from(v.id)).collect();
+            let mut decoded = self.int(*ids.last().ok_or("empty sum")?)?;
+            for (position, id) in ids.iter().enumerate().rev().skip(1) {
+                let code = self.int(first + position as i128)?;
+                let matches = self.op(Op::Eq(raw.index, code.index), Kind::Bool)?;
+                let value = self.int(*id)?;
+                decoded = self.op(
+                    Op::Select(matches.index, value.index, decoded.index),
+                    Kind::Int,
+                )?;
+            }
+            return Ok(decoded);
+        }
+        Ok(raw)
     }
 
     fn numeric(&mut self, node: Ref) -> Result<Ref, String> {

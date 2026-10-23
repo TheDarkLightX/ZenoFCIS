@@ -84,7 +84,7 @@
     "model": "context.102.154",
     "proposes": "action == 175",
     "buys": "direction == 173",
-    "sender": "choose(proposes, 178, 179)",
+    "sender": "choose(proposes || action == 185, 178, 179)",
     "new_day": "choose(now < 4, 0, choose(now < 8, 1, 2)) > choose(seen < 4, 0, choose(seen < 8, 1, 2))",
     "spent_now": "choose(new_day, 0, spent)",
     "value": "choose(buys || price == 1, amount, amount + amount)",
@@ -174,6 +174,50 @@
       "class": "Reject",
       "reason": 211,
       "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && now > 9",
+      "class": "Reject",
+      "reason": 213,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 185 && now < seen + 2",
+      "class": "Reject",
+      "reason": 214,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 185 && pending == 171",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "quote + held",
+        "131": "base",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 185",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "quote",
+        "131": "base + held",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
       "outbox": []
     },
     {
@@ -315,7 +359,63 @@
     "505": "AssetConservation",
     "506": "DebitCreditEffectEquality",
     "507": "FeeAndRounding",
-    "508": "CommittedFailureEffects"
+    "508": "CommittedFailureEffects",
+    "510": "StateInvariant",
+    "511": "AssetConservation",
+    "512": "RejectNoAuthority",
+    "513": "DebitCreditEffectEquality",
+    "514": "StateInvariant",
+    "515": "AuthoritySubjectRecipient",
+    "516": "AuthoritySubjectRecipient"
   },
-  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509,
+  "delivery_laws": {
+    "513": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.160": {
+          "channel": 300,
+          "field": 160
+        },
+        "outbox.104.163": {
+          "channel": 300,
+          "field": 163
+        },
+        "outbox.104.164": {
+          "channel": 300,
+          "field": 164
+        },
+        "outbox.104.165": {
+          "channel": 300,
+          "field": 165
+        }
+      }
+    },
+    "515": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104.161": {
+          "channel": 300,
+          "field": 161
+        },
+        "outbox.104.162": {
+          "channel": 300,
+          "field": 162
+        }
+      }
+    },
+    "516": {
+      "max_deliveries": 1,
+      "observations": {
+        "outbox.104": {
+          "channel": 300,
+          "destination": "zenodex"
+        }
+      }
+    }
+  }
 }

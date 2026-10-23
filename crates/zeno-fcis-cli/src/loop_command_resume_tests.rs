@@ -322,13 +322,13 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// was replayed through every existing status assertion before these three
 /// source/profile-bound digests were refreshed; no field is filtered.
 const METERED_EVALUATOR_IDENTITY: &str =
-    "b04918d93dfc61306751d5679ccc632d24375b4022161d91bce1f9412749c812";
+    "04f345b05404782b55908a52c45733b8f0a108afb2ee6b2c05d3d4e6a5c9ea13";
 const METERED_LEDGER_SHA256: &str =
-    "fdb2c35f93730e5b769ac8d376cc20b20d631c427ee5d29487993bac206816f8";
+    "b654b6af465178042ca547dd50c7dd0feb933f20bc8df06912947ef8b9dd407e";
 const METERED_HEAD_SHA256: &str =
-    "e1ef048d3f150231cd85fb0e89ee601f3955a9252dfa624bb3fea2990744e4ea";
+    "4dac85ce19e817fbd71339b58d8341bfb02602ffe9d0a069034acdc42e13634c";
 const METERED_DIRECT_OUTPUTS_SHA256: &str =
-    "46c19007a7838e848e6cee25046f2af336e66cf929cb51d18de5c336c9c4ee84";
+    "943f3ba911b8fc381b25678dbfac78c3164e099a1ecdc401e546a9e5695584f7";
 
 fn metered_journey_bytes() -> [Vec<u8>; 3] {
     let scratch = Scratch::new();

@@ -4,7 +4,7 @@
 #[path = "v2_contract.rs"]
 pub mod v2_contract;
 
-pub use super::{bindings, generated, delivery, profile};
+pub use super::{bindings, delivery, generated, profile};
 
 use bindings::GeneratedProject;
 use delivery::Destination;
@@ -29,6 +29,19 @@ pub type AppResult<T> = Result<T, String>;
 
 fn checked<T, E: std::fmt::Debug>(value: Result<T, E>) -> AppResult<T> {
     value.map_err(|error| format!("{error:?}"))
+}
+
+// The historical typed oracle admits the old action subset. Reframe the same
+// values under the revised schema before invoking the current checked policy.
+fn current_frame(envelope: &zeno_fcis_codec::AdmittedEnvelope) -> AppResult<Vec<u8>> {
+    checked(
+        zeno_fcis_codec::Envelope::new(
+            envelope.type_id(),
+            zeno_fcis_codec::Hash32::new(v2_contract::FRAMING.state.schema),
+            envelope.value().value().clone(),
+        )
+        .canonical_bytes(),
+    )
 }
 
 /// The treasury before any request: 6 quote, 1 base, nothing spent, tick 0,
@@ -162,7 +175,7 @@ pub fn create<'a, 'p>(path: &Path, authority: &'a Authority<'p>) -> AppResult<Sh
     let initial = checked(
         project.admit_root::<RustCryptoSha256>(&genesis_state(), ValidationLimits::default()),
     )?;
-    let initial = checked(initial.envelope().canonical_bytes())?;
+    let initial = current_frame(initial.envelope())?;
     let genesis = match authority.publish_genesis(&initial) {
         PublicationOutcome::Commit(genesis) => genesis,
         PublicationOutcome::Refused { evaluation, error } => {
@@ -191,8 +204,8 @@ pub fn invoke(
         checked(project.admit_command::<RustCryptoSha256>(command, ValidationLimits::default()))?;
     let context =
         checked(project.admit_context::<RustCryptoSha256>(context, ValidationLimits::default()))?;
-    let command = checked(command.admitted().envelope().canonical_bytes())?;
-    let context = checked(context.admitted().envelope().canonical_bytes())?;
+    let command = current_frame(command.admitted().envelope())?;
+    let context = current_frame(context.admitted().envelope())?;
     let original = composition::Raw {
         state: snapshot.state(),
         command: &command,

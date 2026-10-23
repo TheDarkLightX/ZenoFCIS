@@ -548,6 +548,9 @@ fn reference(app: usize, s: &[i128], cmd: &[i128], ctx: &[i128]) -> Expected {
             {
                 return reject(211);
             }
+            if proposes && now > 9 {
+                return reject(213);
+            }
             out.post[3] = now;
             out.post[2] = spent;
             if proposes {
@@ -634,6 +637,10 @@ fn check_report(
         match refusal {
             "law500" => assert!(
                 matches!(error, a::Refusal::Core(c::Failure::Law(_))),
+                "{error:?}; {expected:?}"
+            ),
+            "ingress" => assert!(
+                matches!(error, a::Refusal::Core(c::Failure::Ingress(..))),
                 "{error:?}; {expected:?}"
             ),
             "schema" => assert!(
@@ -1389,6 +1396,7 @@ const TREASURY_PROPOSALS: Corpus = Corpus {
         "reject 208",
         "reject 209",
         "reject 210",
+        "reject 213",
     ],
     boundaries: &[
         ("clock equals last seen", |d| d[2] == d[1]),
@@ -1429,6 +1437,7 @@ const TREASURY_PROPOSALS: Corpus = Corpus {
         &[0, 7, 3, 173, 1, 0, 1, 170],
         &[0, 8, 8, 173, 1, 0, 1, 170],
         &[0, 9, 9, 173, 1, 0, 1, 170],
+        &[0, 9, 10, 173, 1, 1, 1, 170],
         &[0, 10, 10, 173, 1, 0, 1, 170],
         &[0, 11, 11, 173, 1, 0, 1, 170],
         &[1, 0, 1, 173, 3, 1, 2, 170],
@@ -2070,7 +2079,7 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
 }
 
 /// Checks one corpus's bounded profile against its pins and its pinned count.
-/// The eight profile tests below together run 92 cases: 5, 7, 11, 9, 10, 12, 22
+/// The eight profile tests below together run 93 cases: 5, 7, 11, 9, 10, 13, 22
 /// and 16. The 131 retained examples run under Miri in their exact groups; they are
 /// not drawn from these corpora and are not counted against them.
 fn check_bounded(observed: Observation<'_>, cases: usize) {
@@ -2116,7 +2125,7 @@ fn miri_bounded_profile_withdrawal_queue() {
 fn miri_bounded_profile_treasury_proposals() {
     check_bounded(
         with_app!(treasury, |a, f| bounded(&TREASURY_PROPOSALS, a, f)),
-        12,
+        13,
     );
 }
 #[test]

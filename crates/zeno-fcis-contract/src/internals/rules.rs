@@ -312,7 +312,7 @@ pub const FILE_KEYS: [&str; 16] = [
     "original_domain",
 ];
 /// The keys of `clock`.
-pub const CLOCK_KEYS: [&str; 3] = ["field", "unit", "epoch"];
+pub const CLOCK_KEYS: [&str; 4] = ["field", "unit", "epoch", "after_max"];
 /// The keys of `roots`.
 pub const ROOT_KEYS: [&str; 3] = ["state", "command", "context"];
 /// The keys of one case; `rule` names the rule for reviewers only.
@@ -458,8 +458,10 @@ pub struct DeliveryLaw {
 #[derive(Clone, Debug)]
 pub struct DeliveryObservation {
     pub channel: u32,
-    /// None counts deliveries; Some sums this payload field as I128.
+    /// None counts deliveries; Some sums numeric values or declared variant IDs.
     pub field: Option<u16>,
+    /// Optional exact destination filter, evaluated on the actual delivery.
+    pub destination: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1256,11 +1258,15 @@ fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, Contra
                 .entries()
                 .map(|(name, value)| {
                     let observation = Object::new(value, &observations.place_of(name))?;
-                    observation.only(&["channel", "field"])?;
+                    observation.only(&["channel", "field", "destination"])?;
                     Ok((
                         name.to_owned(),
                         DeliveryObservation {
                             channel: observation.number("channel")?,
+                            destination: observation
+                                .optional("destination")
+                                .map(|_| observation.text("destination").map(str::to_owned))
+                                .transpose()?,
                             field: observation
                                 .optional("field")
                                 .map(|_| observation.number("field"))
@@ -1295,6 +1301,11 @@ fn check_clock(clock: &Object<'_>) -> Result<(), ContractError> {
     }
     if !utc_date(clock.text("epoch")?) {
         return Err(clock.error("epoch", "must be a UTC date `YYYY-MM-DD` from 1970-01-01"));
+    }
+    if clock.optional("after_max").is_some()
+        && !["refuse", "hold"].contains(&clock.text("after_max")?)
+    {
+        return Err(clock.error("after_max", "must be `refuse` or `hold`"));
     }
     Ok(())
 }

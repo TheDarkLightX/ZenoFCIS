@@ -760,12 +760,13 @@ fn input_leaf(leaf: &model::InputLeaf) -> InputLeaf {
         model::InputLeaf::Sum { type_id, variants } => InputLeaf::Sum {
             type_id: *type_id,
             min: variants.first().copied().map_or(0, i128::from),
-            max: variants.last().copied().map_or(0, i128::from),
+            max: variants.first().copied().map_or(0, i128::from) + variants.len() as i128 - 1,
             variants: variants
                 .iter()
-                .map(|id| InputVariant {
+                .enumerate()
+                .map(|(index, id)| InputVariant {
                     id: *id,
-                    code: i128::from(*id),
+                    code: variants.first().copied().map_or(0, i128::from) + index as i128,
                 })
                 .collect(),
         },

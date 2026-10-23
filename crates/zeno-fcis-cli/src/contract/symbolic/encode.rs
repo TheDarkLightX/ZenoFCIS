@@ -168,7 +168,7 @@ fn leaf(leaf: &Leaf, code: &Term) -> Result<(Values, Typed), Unsupported> {
         |type_id: u32, variants: &[zeno_fcis_synthesis::finite::V2InputVariant], sum: bool| {
             let codes: Vec<i128> = variants.iter().map(|variant| variant.code).collect();
             // A variant's ID is the value its atom carries; its code is the
-            // program's. A contract gives every variant its ID as its code.
+            // program's. Sparse public IDs have dense private program codes.
             let mut id = Term::Int(0);
             for variant in variants.iter().rev() {
                 id = Term::ite(
@@ -240,7 +240,10 @@ fn leaf(leaf: &Leaf, code: &Term) -> Result<(Values, Typed), Unsupported> {
 }
 
 /// The input leaf a binding reads, from the descriptor's schemas.
-fn bound_leaf<'d>(descriptor: &'d c::Descriptor<'d>, binding: &c::Binding) -> Option<&'d Leaf> {
+pub(super) fn bound_leaf<'d>(
+    descriptor: &'d c::Descriptor<'d>,
+    binding: &c::Binding,
+) -> Option<&'d Leaf> {
     let schema = match binding.source {
         c::Source::State => descriptor.state,
         c::Source::Command => descriptor.command,
@@ -316,8 +319,30 @@ impl Decision {
             }
             let leaf_type = bound_leaf(descriptor, binding)
                 .ok_or_else(|| Unsupported::new(format!("input {index} reads no declared leaf")))?;
-            let code = Term::name(&format!("x{index}"));
+            // Query models and replay tuples use public variant IDs. Apply
+            // the descriptor's ingress map before executing scalar nodes.
+            let public = Term::name(&format!("x{index}"));
+            let (code, public_values) = match leaf_type {
+                Leaf::Sum { variants, .. } | Leaf::Enum { variants, .. } => {
+                    let mut code = Term::Int(0);
+                    for variant in variants.iter().rev() {
+                        code = Term::ite(
+                            Term::eq(public.clone(), Term::Int(i128::from(variant.id))),
+                            Term::Int(variant.code),
+                            code,
+                        );
+                    }
+                    (
+                        code,
+                        Some(Values::Set(
+                            variants.iter().map(|v| i128::from(v.id)).collect(),
+                        )),
+                    )
+                }
+                _ => (public, None),
+            };
             let (values, typed) = leaf(leaf_type, &code)?;
+            let values = public_values.unwrap_or(values);
             script.constant(&format!("x{index}"), values);
             if let Some(domain) = descriptor.program.inputs.get(index) {
                 let (min, max) = domain.bounds();

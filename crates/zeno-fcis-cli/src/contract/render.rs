@@ -252,7 +252,11 @@ pub fn checked_authority<'a>(
 /// The second declaration block uses only the frozen released data types.
 /// It exposes a checked replay context, never a released publication constructor.
 pub(super) fn attach_released_24(text: &mut String) {
-    let metadata = text.replace("zeno_fcis_synthesis::finite::", "zeno_fcis_synthesis::finite::historical_i64::")
+    let metadata = text
+        .replace(
+            "zeno_fcis_synthesis::finite::",
+            "zeno_fcis_synthesis::finite::historical_i64::",
+        )
         .replace("v2_authority as authority,", "")
         .replace(BINDING, "");
     text.push_str("\n/// Released declaration data for exact retained-evidence verification.\npub mod released_24_data {\n");
@@ -268,15 +272,25 @@ pub fn with_released_24<R>(f: impl FnOnce(&zeno_fcis_synthesis::finite::historic
 }
 
 pub(super) fn released_24_lineage(text: &mut String, versions: &[u32], current: u32) {
-    let members = (1..=current).map(|version| if versions.contains(&version) {
-        format!("Some(h{version})")
-    } else { "None".to_owned() }).collect::<Vec<_>>().join(", ");
+    let members = (1..=current)
+        .map(|version| {
+            if versions.contains(&version) {
+                format!("Some(h{version})")
+            } else {
+                "None".to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut expression = format!("Ok(f(&[{members}]))");
     for version in versions.iter().rev() {
         expression = format!("v{version}::with_released_24(|h{version}| {expression})?");
     }
-    let _ = writeln!(text, "\n/// Checked released predecessor contexts, in lineage order.\n\
-pub fn with_released_24_lineage<R>(f: impl FnOnce(&[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>]) -> R) -> Result<R, catalog::Failure> {{\n    {expression}\n}}");
+    let _ = writeln!(
+        text,
+        "\n/// Checked released predecessor contexts, in lineage order.\n\
+pub fn with_released_24_lineage<R>(f: impl FnOnce(&[Option<&zeno_fcis_synthesis::finite::historical::HistoricalContext<'_>>]) -> R) -> Result<R, catalog::Failure> {{\n    {expression}\n}}"
+    );
 }
 
 pub(super) fn source(
@@ -1124,19 +1138,28 @@ fn input_leaf(leaf: &InputLeaf) -> Syntax {
                 ),
                 (
                     "max",
-                    Syntax::literal(variants.last().copied().unwrap_or(0)),
+                    Syntax::literal(
+                        usize::from(variants.first().copied().unwrap_or(0)) + variants.len() - 1,
+                    ),
                 ),
                 (
                     "variants",
                     Syntax::vec(
                         variants
                             .iter()
-                            .map(|id| {
+                            .enumerate()
+                            .map(|(index, id)| {
                                 record(
                                     "InputVariant",
                                     vec![
                                         ("id", Syntax::literal(id)),
-                                        ("code", Syntax::literal(id)),
+                                        (
+                                            "code",
+                                            Syntax::literal(
+                                                usize::from(variants.first().copied().unwrap_or(0))
+                                                    + index,
+                                            ),
+                                        ),
                                     ],
                                 )
                             })

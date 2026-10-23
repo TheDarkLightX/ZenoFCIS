@@ -100,6 +100,23 @@ pub(super) fn verdict_name(verdict: Option<l::Verdict>) -> &'static str {
 /// The descriptor's program on a tuple, at a budget no admitted program
 /// exhausts.
 pub(super) fn run(descriptor: &c::Descriptor<'_>, tuple: &[i128]) -> Option<Vec<i128>> {
+    if tuple.len() != descriptor.bindings.len() {
+        return None;
+    }
+    let inputs: Option<Vec<i128>> = descriptor
+        .bindings
+        .iter()
+        .zip(tuple)
+        .map(
+            |(binding, value)| match super::encode::bound_leaf(descriptor, binding)? {
+                Leaf::Sum { variants, .. } | Leaf::Enum { variants, .. } => variants
+                    .iter()
+                    .find(|variant| i128::from(variant.id) == *value)
+                    .map(|variant| variant.code),
+                _ => Some(*value),
+            },
+        )
+        .collect();
     let program = &descriptor.program;
     let meter = v2_zero_limits().with_limit(V2Resource::Step, crate::transform::FULL_BUDGET);
     execute_v2(
@@ -107,7 +124,7 @@ pub(super) fn run(descriptor: &c::Descriptor<'_>, tuple: &[i128]) -> Option<Vec<
         program.outputs,
         program.nodes,
         program.roots,
-        tuple,
+        &inputs?,
         meter,
     )
     .into_parts()

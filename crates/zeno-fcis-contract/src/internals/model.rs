@@ -217,22 +217,39 @@ impl<'d> Contract<'d> {
         commitment: [u8; 32],
     ) -> Result<Self, ContractError> {
         if rules.unsigned || rules.quantities {
-            return Err(rules_error("schema", "requires the released policy/2 revision"));
+            return Err(rules_error(
+                "schema",
+                "requires the released policy/2 revision",
+            ));
         }
         let mut compiled = Self::build(declarations, rules, commitment)?;
         // The released compiler widened computed signed outputs to i64.
         // Declared input domains, graph order, laws and budgets stay intact.
         for leaf in &mut compiled.output_types {
-            if matches!(leaf, InputLeaf::I128 { min: i128::MIN, max: i128::MAX }) {
+            if matches!(
+                leaf,
+                InputLeaf::I128 {
+                    min: i128::MIN,
+                    max: i128::MAX
+                }
+            ) {
                 *leaf = InputLeaf::I128 {
-                    min: i128::from(i64::MIN), max: i128::from(i64::MAX),
+                    min: i128::from(i64::MIN),
+                    max: i128::from(i64::MAX),
                 };
             }
         }
         for domain in &mut compiled.output_domains {
-            if matches!(domain, ScalarDomain::Int { min: i128::MIN, max: i128::MAX }) {
+            if matches!(
+                domain,
+                ScalarDomain::Int {
+                    min: i128::MIN,
+                    max: i128::MAX
+                }
+            ) {
                 *domain = ScalarDomain::Int {
-                    min: i128::from(i64::MIN), max: i128::from(i64::MAX),
+                    min: i128::from(i64::MIN),
+                    max: i128::from(i64::MAX),
                 };
             }
         }
@@ -791,6 +808,14 @@ impl Outputs {
                 }
                 check_program(declarations, inputs, ast, place, bounded)?;
                 let kind = declarations.kind(type_id)?;
+                if let TypeKind::Sum(variants) = &kind
+                    && !variants.windows(2).all(|p| p[1].id == p[0].id + 1)
+                {
+                    return Err(rules_error(
+                        place,
+                        "computed sparse sums are unsupported; use constant branches or direct copies",
+                    ));
+                }
                 let wide = matches!(kind, TypeKind::I128 { .. } | TypeKind::U128 { .. });
                 let leaf = input_leaf(declarations, type_id, wide)?;
                 let domain = scalar_domain(declarations, type_id, wide)?;
@@ -1502,26 +1527,11 @@ pub fn input_leaf(
 ) -> Result<InputLeaf, ContractError> {
     Ok(match declarations.kind(type_id)? {
         TypeKind::Bool => InputLeaf::Bool,
-        // Each variant's ID is its program code, and the library requires
-        // the codes of a sum to fill one interval.
-        TypeKind::Sum(variants)
-            if variants
-                .windows(2)
-                .all(|pair| u32::from(pair[1].id) == u32::from(pair[0].id) + 1) =>
-        {
-            InputLeaf::Sum {
-                type_id,
-                variants: variants.iter().map(|variant| variant.id).collect(),
-            }
-        }
-        TypeKind::Sum(_) => {
-            return Err(ContractError::new(
-                "project.zeno",
-                format!(
-                    "sum type {type_id} needs consecutive variant IDs to be a program input or output"
-                ),
-            ));
-        }
+        // The wire ID is stable; the scalar ABI uses a dense private code.
+        TypeKind::Sum(variants) => InputLeaf::Sum {
+            type_id,
+            variants: variants.iter().map(|variant| variant.id).collect(),
+        },
         TypeKind::U128 { min, max } => InputLeaf::U128 {
             min: if wide { 0 } else { min },
             max: if wide { u128::MAX } else { max },
@@ -1551,7 +1561,7 @@ fn scalar_domain(
         InputLeaf::I128 { min, max } => ScalarDomain::Int { min, max },
         InputLeaf::Sum { variants, .. } => ScalarDomain::Int {
             min: variants.first().copied().map_or(0, i128::from),
-            max: variants.last().copied().map_or(0, i128::from),
+            max: variants.first().copied().map_or(0, i128::from) + variants.len() as i128 - 1,
         },
     })
 }

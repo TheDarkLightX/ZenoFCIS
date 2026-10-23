@@ -616,6 +616,7 @@ fn u128_delivery_amounts_and_checked_sums_use_actual_outbox() {
                     DeliveryObservation {
                         channel: 300,
                         field: Some(202),
+                        destination: None,
                     },
                 )]),
             },

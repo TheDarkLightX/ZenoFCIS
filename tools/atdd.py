@@ -53,6 +53,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "app-factory-journey": AcceptanceScenario(
         "Generate and run the checked core, shell, ingress and UI together",
         (("cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "template"),
+         ("cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis"),
+         ("env", "ZF_BIN=" + str(ROOT / Path(os.environ.get("CARGO_TARGET_DIR", "target")) / "debug/zeno-fcis"), "python3", "tools/test_template_rules.py"),
          ("python3", "tools/test_zenoui_text.py"),
          ("python3", "tools/test_zenoui_refusal.py"),
          ("python3", "tools/test_app_factory.py"),

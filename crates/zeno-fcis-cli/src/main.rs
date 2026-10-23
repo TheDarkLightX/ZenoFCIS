@@ -2487,11 +2487,12 @@ mod tests {
                 _ => None,
             })
             .unwrap_or_else(|| panic!("{directory}: missing REQUIRED"));
-        let required: Vec<_> = declared_array(&required.expr)
+        let mut required: Vec<_> = declared_array(&required.expr)
             .elems
             .iter()
             .map(literal_law_id)
             .collect();
+        required.sort_unstable();
         assert_eq!(
             required,
             laws.keys().copied().collect::<Vec<_>>(),

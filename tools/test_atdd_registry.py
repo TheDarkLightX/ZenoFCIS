@@ -198,8 +198,8 @@ def template_profile_problems(source):
         if int(pinned.group(1)) != len(profile):
             problems.append(f"{const} bounded count must be pinned as {len(profile)}")
         cases.append(len(profile))
-    if sum(cases) != 92:
-        problems.append(f"the bounded profile must keep 92 cases, not {cases}")
+    if sum(cases) != 93:
+        problems.append(f"the bounded profile must keep 93 cases, not {cases}")
     if re.search(r"cfg!?\(\s*(?:not\(\s*)?miri|cfg_attr\(\s*(?:not\(\s*)?miri|env::var", source):
         problems.append("template tests must not branch on Miri or the environment")
     return problems

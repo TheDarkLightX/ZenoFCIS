@@ -362,6 +362,13 @@ fn templates_declare_complete_types_and_scoped_laws() {
             (506, LawScope::Accept, false),
             (507, LawScope::Accept, false),
             (508, LawScope::CommittedFailure, false),
+            (510, LawScope::Committing, true),
+            (511, LawScope::Accept, false),
+            (512, LawScope::Reject, false),
+            (513, LawScope::Committing, false),
+            (514, LawScope::Committing, true),
+            (515, LawScope::Committing, false),
+            (516, LawScope::Committing, false),
         ]
     );
 }
@@ -865,14 +872,7 @@ fn library_rules_are_refused_where_they_are_written() {
     // Each project edit, with the rules edit that keeps the rest consistent.
     // A changed schema no longer matches the template's schema origin, so
     // these contracts are generated without one.
-    let declared: [(&str, &str, Edit, &str, &str); 4] = [
-        (
-            "variant 121 101 RecordFailure none;",
-            "variant 122 101 RecordFailure none;",
-            Box::new(|_| {}),
-            "project.zeno",
-            "sum type 101 needs consecutive variant IDs to be a program input or output",
-        ),
+    let declared: [(&str, &str, Edit, &str, &str); 3] = [
         (
             "law 503 reject_no_authority",
             "law 909 reject_no_authority",
@@ -2145,4 +2145,43 @@ fn adoption_preserves_empty_array_trivia_and_decoded_key_spellings() {
             assert!(twice.contains(&format!("\"{key}\"")));
         }
     }
+}
+
+#[test]
+fn sparse_action_ids_keep_wire_identity_and_refuse_undeclared_holes() {
+    let mut files = template("durable-counter");
+    files.project = files.project.replace("121", "129");
+    files.rules = files.rules.replace("121", "129");
+    let rules = files.rules();
+    let declarations = files.declarations();
+    let bytes = schema::encode(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let commitment = schema_commitment(&bytes).unwrap_or_else(|error| panic!("{error}"));
+    let contract = Contract::build(&declarations, &rules, commitment)
+        .unwrap_or_else(|error| panic!("{error}"));
+    generate_contract(ContractSources {
+        schema_origin: None,
+        ..files.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    policy::with_authority(&contract, &bytes, |authority| {
+        for (command, expected) in [
+            (120, Some(c::Class::Accept)),
+            (129, Some(c::Class::CommittedFailure)),
+            (121, None),
+            (128, None),
+        ] {
+            let raw = counter_input(&commitment, 0, command);
+            let evaluation = authority.evaluate(c::Raw {
+                state: &raw[0],
+                command: &raw[1],
+                context: &raw[2],
+            });
+            assert_eq!(
+                evaluation.result().ok().map(|v| v.class()),
+                expected,
+                "wire action {command}"
+            );
+        }
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
 }

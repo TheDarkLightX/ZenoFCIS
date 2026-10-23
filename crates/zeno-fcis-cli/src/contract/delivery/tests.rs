@@ -760,3 +760,52 @@ fn symbolic_delivery_observations_are_explicitly_inconclusive() {
                     && text.contains("510")))
     );
 }
+
+#[test]
+fn variant_and_destination_delivery_observations_bind_actual_atoms() {
+    let mapping = json!({"max_deliveries":1,"observations":{
+        "outbox.104":{"channel":300,"destination":"payments-desk"},
+        "outbox.104.140":{"channel":300,"field":140,"destination":"payments-desk"}}});
+    let mut d = delivery(0, 300, None);
+    d.payload = vec![l::Field {
+        id: 140,
+        value: l::Atom::Sum {
+            type_id: 106,
+            variant: 162,
+        },
+    }];
+    let check = |d: &l::Delivery<'_>, code| {
+        raw_law(
+            PROJECT,
+            mapping.clone(),
+            &format!("outbox.104 == 1 && outbox.104.140 == {code}"),
+            std::slice::from_ref(d),
+            l::Class::Accept,
+            l::Scope::Committing,
+            limits(),
+        )
+        .into_parts()
+        .0
+    };
+    assert_eq!(check(&d, 162), Ok(()));
+    assert!(check(&d, 161).is_err());
+    d.destination = l::Atom::Text(b"attacker");
+    assert!(check(&d, 162).is_err());
+    d.destination = l::Atom::Text(b"payments-desk");
+    for atom in [
+        l::Atom::I128(162),
+        l::Atom::Bool(true),
+        l::Atom::Sum {
+            type_id: 999,
+            variant: 162,
+        },
+        l::Atom::Sum {
+            type_id: 106,
+            variant: 999,
+        },
+    ] {
+        d.payload[0].value = atom;
+        // Invalid sums cannot use the inactive zero projection to pass.
+        assert!(check(&d, 0).is_err());
+    }
+}

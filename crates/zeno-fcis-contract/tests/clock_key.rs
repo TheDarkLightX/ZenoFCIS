@@ -39,9 +39,25 @@ fn a_clock_is_checked_and_leaves_the_contract_identity_unchanged()
 -> Result<(), Box<dyn std::error::Error>> {
     let clock = json!({"field":131,"unit":"days","epoch":"2026-10-21"});
     assert_eq!(canonical(&rules(Some(clock)))?, canonical(&rules(None))?);
+    for mode in ["refuse", "hold"] {
+        let terminal = json!({"field":131,"unit":"days","epoch":"2026-10-21","after_max":mode});
+        assert_eq!(canonical(&rules(Some(terminal)))?, canonical(&rules(None))?);
+    }
     let minutes = json!({"field":131,"unit":"minutes","epoch":"2024-02-29"});
     assert!(Rules::read(&rules(Some(minutes)).to_string()).is_ok());
     for (bad, place) in [
+        (
+            json!({"field":131,"unit":"days","epoch":"2026-10-21","after_max":"wrap"}),
+            "after_max",
+        ),
+        (
+            json!({"field":131,"unit":"days","epoch":"2026-10-21","after_max":true}),
+            "after_max",
+        ),
+        (
+            json!({"field":131,"unit":"days","epoch":"2026-10-21","after_max":null}),
+            "after_max",
+        ),
         (
             json!({"field":131,"unit":"hours","epoch":"2026-10-21"}),
             "unit",

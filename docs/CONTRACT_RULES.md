@@ -44,7 +44,7 @@ sign or leading zero.
 | `cases` | yes | The ordered decision table; see [Cases](#cases). |
 | `genesis` | yes | State field ID to its value in the genesis state, for every state field: a JSON boolean, an integer, or a variant ID for a sum field. |
 | `law_kinds` | yes | Law ID to [law kind](#law-kinds), for exactly the laws `project.zeno` declares. |
-| `delivery_laws` | no | Law ID to bounded channel counts and numeric payload observations; see [Delivery laws](#delivery-laws). |
+| `delivery_laws` | no | Law ID to bounded channel counts, numeric or variant payload observations and destination filters; see [Delivery laws](#delivery-laws). |
 | `framework_failure_law` | no | Nonzero ID of the [framework committed-failure law](#framework-laws); default 908. |
 | `framework_reject_law` | no | Nonzero ID of the [framework reject law](#framework-laws); default 909. |
 | `adoptions` | no | Written by `zeno-fcis contract adopt`; see [Adoptions](#adoptions). |
@@ -388,8 +388,13 @@ deliveries. Funding increases held funds without paying out, so a bare
 
 `outbox.P` counts deliveries on its explicitly bound channel, whose payload
 type must be `P`. `outbox.P.F` sums field `F` of that channel's payloads as
-checked signed 128-bit integers. `F` must be an I128 field of payload record
-`P`; boolean, sum, text, nested and unsigned amounts are unsupported. Root
+checked integers in the field's signed or unsigned domain. A declared sum field
+contributes its stable variant ID as an I128 integer, after checking both the
+type ID and the variant; a numeric atom cannot impersonate a variant. Boolean,
+text and nested fields are unsupported. An observation may add
+`"destination": "seller"` to count or sum only deliveries whose actual destination
+is that exact text. Use an unfiltered count law as well when all other deliveries
+must be absent. Root
 paths use payload **type** IDs, while the JSON mapping supplies **channel**
 IDs. Multiple distinct payload types/channels can appear in one law. Channels
 sharing a payload type need separate laws; ambiguous mappings are refused.
@@ -405,7 +410,8 @@ The usual law-kind scope requirements still apply; delivery laws bearing
 
 The compiler conjoins `actual_outbox_length <= max_deliveries` with the
 formula. For each bounded slot it guards the channel read by actual length,
-and guards a payload read by both length and channel equality. Missing slots
+and guards a payload read by length, channel equality and any declared destination
+filter. Missing slots
 and nonmatching channels contribute zero; their absent fields are not read.
 A matching missing field, wrong atom type or checked addition overflow
 refuses the whole decision. A false bound never authorizes truncating a
@@ -476,10 +482,13 @@ contract declares one context field as the server clock:
 | `field` | A context field of integer type with a declared range, such as `type 115 int Day in 0..=14;`. |
 | `unit` | `days` or `minutes`. |
 | `epoch` | The UTC date, `YYYY-MM-DD` from 1970-01-01, at which the field counts 0. |
+| `after_max` | Optional: `refuse` (default) refuses time above the range; `hold` keeps the maximum value as a terminal phase so deadline recovery remains available. Time below the minimum is still refused. |
 
 Rules and laws read the field like any other context field, for example
 `action == 163 && context.102.131 <= 7`. The field's declared range bounds
-the time a store accepts. Because that range is already part of the finite
+the context values a store accepts. With `after_max: hold`, later wall time
+maps to the same final phase; use this only when that phase admits recovery
+and new obligations cannot require a later time. Because that range is already part of the finite
 input domain, `contract review`, the judges and the interface build check
 every time without change. Generation checks only the key's form; the
 application build checks that the field is a context integer with a
@@ -711,3 +720,16 @@ background for explicit program assertions. The contract syntax and finite
 compiler are implementation choices; no new proof method is claimed here.
 Generation checks supported declarations and binding. Exhaustive review and
 transform checks cover only their declared finite domains and limits.
+
+### Background for delivery observations
+
+These checks apply design-by-contract assertions to the actual output record
+(Bertrand Meyer, “Applying Design by Contract”, IEEE Computer 25(10), 1992,
+DOI 10.1109/2.161279). Variant validation and optional destination filtering
+extend the existing bounded projection compiler; they add no new evaluator or
+publication authority. Prior-art search pending; no novelty claim is made.
+
+Terminal clock phases use the standard finite-state abstraction of times beyond
+the last relevant bound; see Baier and Katoen,
+[*Principles of Model Checking*](https://mitpress.mit.edu/9780262026499/principles-of-model-checking/).
+The configured terminal phase still needs checked recovery rules.
