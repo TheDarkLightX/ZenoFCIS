@@ -2,6 +2,67 @@
  "authority": "none",
  "instances": {
   "approval-queue-k1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 144,
+      "guard_true": 144,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 144,
+      "guard_true": 216,
+      "law_consistent": 144
+     },
+     {
+      "case": 2,
+      "decided": 93,
+      "guard_true": 288,
+      "law_consistent": 93
+     },
+     {
+      "case": 3,
+      "decided": 12,
+      "guard_true": 72,
+      "law_consistent": 12
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 18,
+      "law_consistent": 3
+     },
+     {
+      "case": 5,
+      "decided": 3,
+      "guard_true": 144,
+      "law_consistent": 3
+     },
+     {
+      "case": 6,
+      "decided": 12,
+      "guard_true": 144,
+      "law_consistent": 12
+     },
+     {
+      "case": 7,
+      "decided": 21,
+      "guard_true": 432,
+      "law_consistent": 21
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 432
+   },
    "first_input": [
     150,
     0,
@@ -228,7 +289,7 @@
      "states_sha256": "afe85add97e1d4ba706d364c6219e7fa8e3ca93ab2abe6dbba2c909196217ef4"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -248,6 +309,67 @@
    }
   },
   "approval-queue-k2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 198,
+      "guard_true": 198,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 117,
+      "guard_true": 216,
+      "law_consistent": 117
+     },
+     {
+      "case": 2,
+      "decided": 66,
+      "guard_true": 288,
+      "law_consistent": 66
+     },
+     {
+      "case": 3,
+      "decided": 12,
+      "guard_true": 72,
+      "law_consistent": 12
+     },
+     {
+      "case": 4,
+      "decided": 12,
+      "guard_true": 72,
+      "law_consistent": 12
+     },
+     {
+      "case": 5,
+      "decided": 3,
+      "guard_true": 144,
+      "law_consistent": 3
+     },
+     {
+      "case": 6,
+      "decided": 12,
+      "guard_true": 144,
+      "law_consistent": 12
+     },
+     {
+      "case": 7,
+      "decided": 12,
+      "guard_true": 432,
+      "law_consistent": 12
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 432
+   },
    "first_input": [
     150,
     0,
@@ -474,7 +596,7 @@
      "states_sha256": "ca787bec27de96023e8b1cb895ddedb40d28f49a0a0b15e2a5c9bad4d758aaeb"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -494,6 +616,67 @@
    }
   },
   "approval-queue-k3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 252,
+      "guard_true": 252,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 90,
+      "guard_true": 216,
+      "law_consistent": 90
+     },
+     {
+      "case": 2,
+      "decided": 39,
+      "guard_true": 288,
+      "law_consistent": 39
+     },
+     {
+      "case": 3,
+      "decided": 12,
+      "guard_true": 72,
+      "law_consistent": 12
+     },
+     {
+      "case": 4,
+      "decided": 21,
+      "guard_true": 126,
+      "law_consistent": 21
+     },
+     {
+      "case": 5,
+      "decided": 3,
+      "guard_true": 144,
+      "law_consistent": 3
+     },
+     {
+      "case": 6,
+      "decided": 12,
+      "guard_true": 144,
+      "law_consistent": 12
+     },
+     {
+      "case": 7,
+      "decided": 3,
+      "guard_true": 432,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 432
+   },
    "first_input": [
     150,
     0,
@@ -720,7 +903,7 @@
      "states_sha256": "d9cb60102709b9342b2738a2694cf7fc8d8e4152a823edda7ea87bf9b609f963"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -740,6 +923,43 @@
    }
   },
   "bounded-counter-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 4,
+      "guard_true": 4,
+      "law_consistent": 4
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 8
+   },
    "first_input": [
     0,
     150,
@@ -957,6 +1177,43 @@
    }
   },
   "bounded-counter-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6,
+      "guard_true": 6,
+      "law_consistent": 6
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 2,
+      "guard_true": 6,
+      "law_consistent": 2
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 12,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 12
+   },
    "first_input": [
     0,
     150,
@@ -1174,6 +1431,43 @@
    }
   },
   "bounded-counter-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8,
+      "guard_true": 8,
+      "law_consistent": 8
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 3,
+      "guard_true": 8,
+      "law_consistent": 3
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 16,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 16
+   },
    "first_input": [
     0,
     150,
@@ -1391,6 +1685,43 @@
    }
   },
   "bounded-counter-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 10,
+      "guard_true": 10,
+      "law_consistent": 10
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 4,
+      "guard_true": 10,
+      "law_consistent": 4
+     },
+     {
+      "case": 4,
+      "decided": 4,
+      "guard_true": 20,
+      "law_consistent": 4
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 20
+   },
    "first_input": [
     0,
     150,
@@ -1608,6 +1939,43 @@
    }
   },
   "bounded-counter-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 12,
+      "guard_true": 12,
+      "law_consistent": 12
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 5,
+      "guard_true": 12,
+      "law_consistent": 5
+     },
+     {
+      "case": 4,
+      "decided": 5,
+      "guard_true": 24,
+      "law_consistent": 5
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 24
+   },
    "first_input": [
     0,
     150,
@@ -1825,6 +2193,43 @@
    }
   },
   "bounded-counter-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 14,
+      "guard_true": 14,
+      "law_consistent": 14
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 6,
+      "guard_true": 14,
+      "law_consistent": 6
+     },
+     {
+      "case": 4,
+      "decided": 6,
+      "guard_true": 28,
+      "law_consistent": 6
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 28
+   },
    "first_input": [
     0,
     150,
@@ -2042,6 +2447,43 @@
    }
   },
   "bounded-counter-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 7,
+      "guard_true": 16,
+      "law_consistent": 7
+     },
+     {
+      "case": 4,
+      "decided": 7,
+      "guard_true": 32,
+      "law_consistent": 7
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     150,
@@ -2259,6 +2701,43 @@
    }
   },
   "bounded-counter-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 18,
+      "guard_true": 18,
+      "law_consistent": 18
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 8,
+      "guard_true": 18,
+      "law_consistent": 8
+     },
+     {
+      "case": 4,
+      "decided": 8,
+      "guard_true": 36,
+      "law_consistent": 8
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 36
+   },
    "first_input": [
     0,
     150,
@@ -2476,6 +2955,31 @@
    }
   },
   "consumable-budget-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 4,
+      "guard_true": 4,
+      "law_consistent": 4
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 3,
+      "guard_true": 8,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 8
+   },
    "first_input": [
     0,
     0,
@@ -2690,6 +3194,31 @@
    }
   },
   "consumable-budget-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 9,
+      "guard_true": 9,
+      "law_consistent": 9
+     },
+     {
+      "case": 1,
+      "decided": 3,
+      "guard_true": 6,
+      "law_consistent": 3
+     },
+     {
+      "case": 2,
+      "decided": 6,
+      "guard_true": 18,
+      "law_consistent": 6
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 18
+   },
    "first_input": [
     0,
     0,
@@ -2904,6 +3433,31 @@
    }
   },
   "consumable-budget-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 6,
+      "guard_true": 12,
+      "law_consistent": 6
+     },
+     {
+      "case": 2,
+      "decided": 10,
+      "guard_true": 32,
+      "law_consistent": 10
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -3118,6 +3672,31 @@
    }
   },
   "consumable-budget-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 25,
+      "guard_true": 25,
+      "law_consistent": 25
+     },
+     {
+      "case": 1,
+      "decided": 10,
+      "guard_true": 20,
+      "law_consistent": 10
+     },
+     {
+      "case": 2,
+      "decided": 15,
+      "guard_true": 50,
+      "law_consistent": 15
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 50
+   },
    "first_input": [
     0,
     0,
@@ -3332,6 +3911,31 @@
    }
   },
   "consumable-budget-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 36,
+      "guard_true": 36,
+      "law_consistent": 36
+     },
+     {
+      "case": 1,
+      "decided": 15,
+      "guard_true": 30,
+      "law_consistent": 15
+     },
+     {
+      "case": 2,
+      "decided": 21,
+      "guard_true": 72,
+      "law_consistent": 21
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 72
+   },
    "first_input": [
     0,
     0,
@@ -3546,6 +4150,31 @@
    }
   },
   "consumable-budget-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 49,
+      "guard_true": 49,
+      "law_consistent": 49
+     },
+     {
+      "case": 1,
+      "decided": 21,
+      "guard_true": 42,
+      "law_consistent": 21
+     },
+     {
+      "case": 2,
+      "decided": 28,
+      "guard_true": 98,
+      "law_consistent": 28
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 98
+   },
    "first_input": [
     0,
     0,
@@ -3760,6 +4389,31 @@
    }
   },
   "consumable-budget-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 64,
+      "guard_true": 64,
+      "law_consistent": 64
+     },
+     {
+      "case": 1,
+      "decided": 28,
+      "guard_true": 56,
+      "law_consistent": 28
+     },
+     {
+      "case": 2,
+      "decided": 36,
+      "guard_true": 128,
+      "law_consistent": 36
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 128
+   },
    "first_input": [
     0,
     0,
@@ -3974,6 +4628,31 @@
    }
   },
   "consumable-budget-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 81,
+      "guard_true": 81,
+      "law_consistent": 81
+     },
+     {
+      "case": 1,
+      "decided": 36,
+      "guard_true": 72,
+      "law_consistent": 36
+     },
+     {
+      "case": 2,
+      "decided": 45,
+      "guard_true": 162,
+      "law_consistent": 45
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 162
+   },
    "first_input": [
     0,
     0,
@@ -4188,6 +4867,43 @@
    }
   },
   "finite-phase-machine-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 4,
+      "guard_true": 4,
+      "law_consistent": 4
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 8
+   },
    "first_input": [
     0,
     0,
@@ -4405,6 +5121,43 @@
    }
   },
   "finite-phase-machine-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6,
+      "guard_true": 6,
+      "law_consistent": 6
+     },
+     {
+      "case": 1,
+      "decided": 2,
+      "guard_true": 4,
+      "law_consistent": 2
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 6,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 12,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 12
+   },
    "first_input": [
     0,
     0,
@@ -4622,6 +5375,43 @@
    }
   },
   "finite-phase-machine-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8,
+      "guard_true": 8,
+      "law_consistent": 8
+     },
+     {
+      "case": 1,
+      "decided": 3,
+      "guard_true": 6,
+      "law_consistent": 3
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 16,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 16
+   },
    "first_input": [
     0,
     0,
@@ -4839,6 +5629,43 @@
    }
   },
   "finite-phase-machine-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 10,
+      "guard_true": 10,
+      "law_consistent": 10
+     },
+     {
+      "case": 1,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 10,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 4,
+      "guard_true": 20,
+      "law_consistent": 4
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 20
+   },
    "first_input": [
     0,
     0,
@@ -5056,6 +5883,43 @@
    }
   },
   "finite-phase-machine-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 12,
+      "guard_true": 12,
+      "law_consistent": 12
+     },
+     {
+      "case": 1,
+      "decided": 5,
+      "guard_true": 10,
+      "law_consistent": 5
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 12,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 5,
+      "guard_true": 24,
+      "law_consistent": 5
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 24
+   },
    "first_input": [
     0,
     0,
@@ -5273,6 +6137,43 @@
    }
   },
   "finite-phase-machine-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 14,
+      "guard_true": 14,
+      "law_consistent": 14
+     },
+     {
+      "case": 1,
+      "decided": 6,
+      "guard_true": 12,
+      "law_consistent": 6
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 14,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 6,
+      "guard_true": 28,
+      "law_consistent": 6
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 28
+   },
    "first_input": [
     0,
     0,
@@ -5490,6 +6391,43 @@
    }
   },
   "finite-phase-machine-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 7,
+      "guard_true": 14,
+      "law_consistent": 7
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 16,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 7,
+      "guard_true": 32,
+      "law_consistent": 7
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -5707,6 +6645,43 @@
    }
   },
   "finite-phase-machine-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 18,
+      "guard_true": 18,
+      "law_consistent": 18
+     },
+     {
+      "case": 1,
+      "decided": 8,
+      "guard_true": 16,
+      "law_consistent": 8
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 18,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 8,
+      "guard_true": 36,
+      "law_consistent": 8
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 36
+   },
    "first_input": [
     0,
     0,
@@ -5924,6 +6899,31 @@
    }
   },
   "idempotency-slot-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 32,
+      "guard_true": 32,
+      "law_consistent": 32
+     },
+     {
+      "case": 1,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 2,
+      "decided": 28,
+      "guard_true": 64,
+      "law_consistent": 28
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 64
+   },
    "first_input": [
     0,
     0,
@@ -6155,6 +7155,31 @@
    }
   },
   "idempotency-slot-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 162,
+      "guard_true": 162,
+      "law_consistent": 162
+     },
+     {
+      "case": 1,
+      "decided": 18,
+      "guard_true": 36,
+      "law_consistent": 18
+     },
+     {
+      "case": 2,
+      "decided": 144,
+      "guard_true": 324,
+      "law_consistent": 144
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 324
+   },
    "first_input": [
     0,
     0,
@@ -6386,6 +7411,31 @@
    }
   },
   "idempotency-slot-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 512,
+      "guard_true": 512,
+      "law_consistent": 512
+     },
+     {
+      "case": 1,
+      "decided": 48,
+      "guard_true": 96,
+      "law_consistent": 48
+     },
+     {
+      "case": 2,
+      "decided": 464,
+      "guard_true": 1024,
+      "law_consistent": 464
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 1024
+   },
    "first_input": [
     0,
     0,
@@ -6617,6 +7667,31 @@
    }
   },
   "idempotency-slot-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 1250,
+      "guard_true": 1250,
+      "law_consistent": 1250
+     },
+     {
+      "case": 1,
+      "decided": 100,
+      "guard_true": 200,
+      "law_consistent": 100
+     },
+     {
+      "case": 2,
+      "decided": 1150,
+      "guard_true": 2500,
+      "law_consistent": 1150
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 2500
+   },
    "first_input": [
     0,
     0,
@@ -6848,6 +7923,31 @@
    }
   },
   "idempotency-slot-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 2592,
+      "guard_true": 2592,
+      "law_consistent": 2592
+     },
+     {
+      "case": 1,
+      "decided": 180,
+      "guard_true": 360,
+      "law_consistent": 180
+     },
+     {
+      "case": 2,
+      "decided": 2412,
+      "guard_true": 5184,
+      "law_consistent": 2412
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 5184
+   },
    "first_input": [
     0,
     0,
@@ -7079,6 +8179,31 @@
    }
   },
   "idempotency-slot-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 4802,
+      "guard_true": 4802,
+      "law_consistent": 4802
+     },
+     {
+      "case": 1,
+      "decided": 294,
+      "guard_true": 588,
+      "law_consistent": 294
+     },
+     {
+      "case": 2,
+      "decided": 4508,
+      "guard_true": 9604,
+      "law_consistent": 4508
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 9604
+   },
    "first_input": [
     0,
     0,
@@ -7310,6 +8435,31 @@
    }
   },
   "idempotency-slot-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8192,
+      "guard_true": 8192,
+      "law_consistent": 8192
+     },
+     {
+      "case": 1,
+      "decided": 448,
+      "guard_true": 896,
+      "law_consistent": 448
+     },
+     {
+      "case": 2,
+      "decided": 7744,
+      "guard_true": 16384,
+      "law_consistent": 7744
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 16384
+   },
    "first_input": [
     0,
     0,
@@ -7541,6 +8691,31 @@
    }
   },
   "idempotency-slot-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 13122,
+      "guard_true": 13122,
+      "law_consistent": 13122
+     },
+     {
+      "case": 1,
+      "decided": 648,
+      "guard_true": 1296,
+      "law_consistent": 648
+     },
+     {
+      "case": 2,
+      "decided": 12474,
+      "guard_true": 26244,
+      "law_consistent": 12474
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 26244
+   },
    "first_input": [
     0,
     0,
@@ -7772,6 +8947,43 @@
    }
   },
   "logical-deadline-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 2,
+      "decided": 6,
+      "guard_true": 16,
+      "law_consistent": 6
+     },
+     {
+      "case": 3,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     },
+     {
+      "case": 4,
+      "decided": 5,
+      "guard_true": 32,
+      "law_consistent": 5
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -8033,6 +9245,43 @@
    }
   },
   "logical-deadline-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 54,
+      "guard_true": 54,
+      "law_consistent": 54
+     },
+     {
+      "case": 1,
+      "decided": 18,
+      "guard_true": 36,
+      "law_consistent": 18
+     },
+     {
+      "case": 2,
+      "decided": 18,
+      "guard_true": 54,
+      "law_consistent": 18
+     },
+     {
+      "case": 3,
+      "decided": 4,
+      "guard_true": 36,
+      "law_consistent": 4
+     },
+     {
+      "case": 4,
+      "decided": 14,
+      "guard_true": 108,
+      "law_consistent": 14
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 108
+   },
    "first_input": [
     0,
     0,
@@ -8294,6 +9543,43 @@
    }
   },
   "logical-deadline-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 128,
+      "guard_true": 128,
+      "law_consistent": 128
+     },
+     {
+      "case": 1,
+      "decided": 48,
+      "guard_true": 96,
+      "law_consistent": 48
+     },
+     {
+      "case": 2,
+      "decided": 40,
+      "guard_true": 128,
+      "law_consistent": 40
+     },
+     {
+      "case": 3,
+      "decided": 10,
+      "guard_true": 96,
+      "law_consistent": 10
+     },
+     {
+      "case": 4,
+      "decided": 30,
+      "guard_true": 256,
+      "law_consistent": 30
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 256
+   },
    "first_input": [
     0,
     0,
@@ -8555,6 +9841,43 @@
    }
   },
   "logical-deadline-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 250,
+      "guard_true": 250,
+      "law_consistent": 250
+     },
+     {
+      "case": 1,
+      "decided": 100,
+      "guard_true": 200,
+      "law_consistent": 100
+     },
+     {
+      "case": 2,
+      "decided": 75,
+      "guard_true": 250,
+      "law_consistent": 75
+     },
+     {
+      "case": 3,
+      "decided": 20,
+      "guard_true": 200,
+      "law_consistent": 20
+     },
+     {
+      "case": 4,
+      "decided": 55,
+      "guard_true": 500,
+      "law_consistent": 55
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 500
+   },
    "first_input": [
     0,
     0,
@@ -8816,6 +10139,43 @@
    }
   },
   "logical-deadline-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 432,
+      "guard_true": 432,
+      "law_consistent": 432
+     },
+     {
+      "case": 1,
+      "decided": 180,
+      "guard_true": 360,
+      "law_consistent": 180
+     },
+     {
+      "case": 2,
+      "decided": 126,
+      "guard_true": 432,
+      "law_consistent": 126
+     },
+     {
+      "case": 3,
+      "decided": 35,
+      "guard_true": 360,
+      "law_consistent": 35
+     },
+     {
+      "case": 4,
+      "decided": 91,
+      "guard_true": 864,
+      "law_consistent": 91
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 864
+   },
    "first_input": [
     0,
     0,
@@ -9077,6 +10437,43 @@
    }
   },
   "logical-deadline-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 686,
+      "guard_true": 686,
+      "law_consistent": 686
+     },
+     {
+      "case": 1,
+      "decided": 294,
+      "guard_true": 588,
+      "law_consistent": 294
+     },
+     {
+      "case": 2,
+      "decided": 196,
+      "guard_true": 686,
+      "law_consistent": 196
+     },
+     {
+      "case": 3,
+      "decided": 56,
+      "guard_true": 588,
+      "law_consistent": 56
+     },
+     {
+      "case": 4,
+      "decided": 140,
+      "guard_true": 1372,
+      "law_consistent": 140
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 1372
+   },
    "first_input": [
     0,
     0,
@@ -9338,6 +10735,43 @@
    }
   },
   "logical-deadline-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 1024,
+      "guard_true": 1024,
+      "law_consistent": 1024
+     },
+     {
+      "case": 1,
+      "decided": 448,
+      "guard_true": 896,
+      "law_consistent": 448
+     },
+     {
+      "case": 2,
+      "decided": 288,
+      "guard_true": 1024,
+      "law_consistent": 288
+     },
+     {
+      "case": 3,
+      "decided": 84,
+      "guard_true": 896,
+      "law_consistent": 84
+     },
+     {
+      "case": 4,
+      "decided": 204,
+      "guard_true": 2048,
+      "law_consistent": 204
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 2048
+   },
    "first_input": [
     0,
     0,
@@ -9599,6 +11033,43 @@
    }
   },
   "logical-deadline-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 1458,
+      "guard_true": 1458,
+      "law_consistent": 1458
+     },
+     {
+      "case": 1,
+      "decided": 648,
+      "guard_true": 1296,
+      "law_consistent": 648
+     },
+     {
+      "case": 2,
+      "decided": 405,
+      "guard_true": 1458,
+      "law_consistent": 405
+     },
+     {
+      "case": 3,
+      "decided": 120,
+      "guard_true": 1296,
+      "law_consistent": 120
+     },
+     {
+      "case": 4,
+      "decided": 285,
+      "guard_true": 2916,
+      "law_consistent": 285
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 2916
+   },
    "first_input": [
     0,
     0,
@@ -9860,6 +11331,43 @@
    }
   },
   "rate-limiter-n1-w1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 98,
+      "guard_true": 98,
+      "law_consistent": 98
+     },
+     {
+      "case": 1,
+      "decided": 42,
+      "guard_true": 84,
+      "law_consistent": 42
+     },
+     {
+      "case": 2,
+      "decided": 7,
+      "guard_true": 56,
+      "law_consistent": 7
+     },
+     {
+      "case": 3,
+      "decided": 42,
+      "guard_true": 84,
+      "law_consistent": 42
+     },
+     {
+      "case": 4,
+      "decided": 7,
+      "guard_true": 196,
+      "law_consistent": 7
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 196
+   },
    "first_input": [
     0,
     0,
@@ -10086,6 +11594,43 @@
    }
   },
   "rate-limiter-n1-w2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 98,
+      "guard_true": 98,
+      "law_consistent": 98
+     },
+     {
+      "case": 1,
+      "decided": 42,
+      "guard_true": 84,
+      "law_consistent": 42
+     },
+     {
+      "case": 2,
+      "decided": 13,
+      "guard_true": 68,
+      "law_consistent": 13
+     },
+     {
+      "case": 3,
+      "decided": 30,
+      "guard_true": 60,
+      "law_consistent": 30
+     },
+     {
+      "case": 4,
+      "decided": 13,
+      "guard_true": 196,
+      "law_consistent": 13
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 196
+   },
    "first_input": [
     0,
     0,
@@ -10340,6 +11885,43 @@
    }
   },
   "rate-limiter-n1-w3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 98,
+      "guard_true": 98,
+      "law_consistent": 98
+     },
+     {
+      "case": 1,
+      "decided": 42,
+      "guard_true": 84,
+      "law_consistent": 42
+     },
+     {
+      "case": 2,
+      "decided": 18,
+      "guard_true": 78,
+      "law_consistent": 18
+     },
+     {
+      "case": 3,
+      "decided": 20,
+      "guard_true": 40,
+      "law_consistent": 20
+     },
+     {
+      "case": 4,
+      "decided": 18,
+      "guard_true": 196,
+      "law_consistent": 18
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 196
+   },
    "first_input": [
     0,
     0,
@@ -10594,6 +12176,43 @@
    }
   },
   "rate-limiter-n2-w1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 147,
+      "guard_true": 147,
+      "law_consistent": 147
+     },
+     {
+      "case": 1,
+      "decided": 63,
+      "guard_true": 126,
+      "law_consistent": 63
+     },
+     {
+      "case": 2,
+      "decided": 7,
+      "guard_true": 56,
+      "law_consistent": 7
+     },
+     {
+      "case": 3,
+      "decided": 63,
+      "guard_true": 126,
+      "law_consistent": 63
+     },
+     {
+      "case": 4,
+      "decided": 14,
+      "guard_true": 294,
+      "law_consistent": 14
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 294
+   },
    "first_input": [
     0,
     0,
@@ -10820,6 +12439,43 @@
    }
   },
   "rate-limiter-n2-w2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 147,
+      "guard_true": 147,
+      "law_consistent": 147
+     },
+     {
+      "case": 1,
+      "decided": 63,
+      "guard_true": 126,
+      "law_consistent": 63
+     },
+     {
+      "case": 2,
+      "decided": 13,
+      "guard_true": 68,
+      "law_consistent": 13
+     },
+     {
+      "case": 3,
+      "decided": 45,
+      "guard_true": 90,
+      "law_consistent": 45
+     },
+     {
+      "case": 4,
+      "decided": 26,
+      "guard_true": 294,
+      "law_consistent": 26
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 294
+   },
    "first_input": [
     0,
     0,
@@ -11074,6 +12730,43 @@
    }
   },
   "rate-limiter-n2-w3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 147,
+      "guard_true": 147,
+      "law_consistent": 147
+     },
+     {
+      "case": 1,
+      "decided": 63,
+      "guard_true": 126,
+      "law_consistent": 63
+     },
+     {
+      "case": 2,
+      "decided": 18,
+      "guard_true": 78,
+      "law_consistent": 18
+     },
+     {
+      "case": 3,
+      "decided": 30,
+      "guard_true": 60,
+      "law_consistent": 30
+     },
+     {
+      "case": 4,
+      "decided": 36,
+      "guard_true": 294,
+      "law_consistent": 36
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 294
+   },
    "first_input": [
     0,
     0,
@@ -11328,6 +13021,43 @@
    }
   },
   "rate-limiter-n3-w1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 196,
+      "guard_true": 196,
+      "law_consistent": 196
+     },
+     {
+      "case": 1,
+      "decided": 84,
+      "guard_true": 168,
+      "law_consistent": 84
+     },
+     {
+      "case": 2,
+      "decided": 7,
+      "guard_true": 56,
+      "law_consistent": 7
+     },
+     {
+      "case": 3,
+      "decided": 84,
+      "guard_true": 168,
+      "law_consistent": 84
+     },
+     {
+      "case": 4,
+      "decided": 21,
+      "guard_true": 392,
+      "law_consistent": 21
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 392
+   },
    "first_input": [
     0,
     0,
@@ -11554,6 +13284,43 @@
    }
   },
   "rate-limiter-n3-w2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 196,
+      "guard_true": 196,
+      "law_consistent": 196
+     },
+     {
+      "case": 1,
+      "decided": 84,
+      "guard_true": 168,
+      "law_consistent": 84
+     },
+     {
+      "case": 2,
+      "decided": 13,
+      "guard_true": 68,
+      "law_consistent": 13
+     },
+     {
+      "case": 3,
+      "decided": 60,
+      "guard_true": 120,
+      "law_consistent": 60
+     },
+     {
+      "case": 4,
+      "decided": 39,
+      "guard_true": 392,
+      "law_consistent": 39
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 392
+   },
    "first_input": [
     0,
     0,
@@ -11808,6 +13575,43 @@
    }
   },
   "rate-limiter-n3-w3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 196,
+      "guard_true": 196,
+      "law_consistent": 196
+     },
+     {
+      "case": 1,
+      "decided": 84,
+      "guard_true": 168,
+      "law_consistent": 84
+     },
+     {
+      "case": 2,
+      "decided": 18,
+      "guard_true": 78,
+      "law_consistent": 18
+     },
+     {
+      "case": 3,
+      "decided": 40,
+      "guard_true": 80,
+      "law_consistent": 40
+     },
+     {
+      "case": 4,
+      "decided": 54,
+      "guard_true": 392,
+      "law_consistent": 54
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 392
+   },
    "first_input": [
     0,
     0,
@@ -12062,6 +13866,73 @@
    }
   },
   "reservation-pool-c1-q1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8,
+      "guard_true": 8,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 12,
+      "guard_true": 16,
+      "law_consistent": 12
+     },
+     {
+      "case": 2,
+      "decided": 2,
+      "guard_true": 4,
+      "law_consistent": 2
+     },
+     {
+      "case": 3,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 6,
+      "law_consistent": 2
+     },
+     {
+      "case": 5,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     },
+     {
+      "case": 6,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     },
+     {
+      "case": 7,
+      "decided": 1,
+      "guard_true": 8,
+      "law_consistent": 1
+     },
+     {
+      "case": 8,
+      "decided": 1,
+      "guard_true": 32,
+      "law_consistent": 1
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -12276,7 +14147,7 @@
      "states_sha256": "0220edba0be8246a2428f75e84ed2415d27f58b31eae87873fc5f9ad375f05ec"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -12296,6 +14167,73 @@
    }
   },
   "reservation-pool-c2-q1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 24,
+      "guard_true": 24,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 24,
+      "guard_true": 36,
+      "law_consistent": 24
+     },
+     {
+      "case": 2,
+      "decided": 3,
+      "guard_true": 6,
+      "law_consistent": 3
+     },
+     {
+      "case": 3,
+      "decided": 6,
+      "guard_true": 12,
+      "law_consistent": 6
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 12,
+      "law_consistent": 3
+     },
+     {
+      "case": 5,
+      "decided": 3,
+      "guard_true": 18,
+      "law_consistent": 3
+     },
+     {
+      "case": 6,
+      "decided": 3,
+      "guard_true": 18,
+      "law_consistent": 3
+     },
+     {
+      "case": 7,
+      "decided": 3,
+      "guard_true": 18,
+      "law_consistent": 3
+     },
+     {
+      "case": 8,
+      "decided": 3,
+      "guard_true": 72,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 72
+   },
    "first_input": [
     0,
     0,
@@ -12510,7 +14448,7 @@
      "states_sha256": "753e0a5d3425f94b4bbb3efe5bb4fcb02c89a4624e98cc530fb731c8d2b798da"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -12530,6 +14468,73 @@
    }
   },
   "reservation-pool-c2-q2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 48,
+      "guard_true": 48,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 48,
+      "guard_true": 72,
+      "law_consistent": 48
+     },
+     {
+      "case": 2,
+      "decided": 8,
+      "guard_true": 18,
+      "law_consistent": 8
+     },
+     {
+      "case": 3,
+      "decided": 16,
+      "guard_true": 36,
+      "law_consistent": 16
+     },
+     {
+      "case": 4,
+      "decided": 8,
+      "guard_true": 28,
+      "law_consistent": 8
+     },
+     {
+      "case": 5,
+      "decided": 4,
+      "guard_true": 36,
+      "law_consistent": 4
+     },
+     {
+      "case": 6,
+      "decided": 4,
+      "guard_true": 36,
+      "law_consistent": 4
+     },
+     {
+      "case": 7,
+      "decided": 4,
+      "guard_true": 36,
+      "law_consistent": 4
+     },
+     {
+      "case": 8,
+      "decided": 4,
+      "guard_true": 144,
+      "law_consistent": 4
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 144
+   },
    "first_input": [
     0,
     0,
@@ -12744,7 +14749,7 @@
      "states_sha256": "753e0a5d3425f94b4bbb3efe5bb4fcb02c89a4624e98cc530fb731c8d2b798da"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -12764,6 +14769,73 @@
    }
   },
   "reservation-pool-c3-q1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 48,
+      "guard_true": 48,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 40,
+      "guard_true": 64,
+      "law_consistent": 40
+     },
+     {
+      "case": 2,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 3,
+      "decided": 8,
+      "guard_true": 16,
+      "law_consistent": 8
+     },
+     {
+      "case": 4,
+      "decided": 4,
+      "guard_true": 20,
+      "law_consistent": 4
+     },
+     {
+      "case": 5,
+      "decided": 6,
+      "guard_true": 32,
+      "law_consistent": 6
+     },
+     {
+      "case": 6,
+      "decided": 6,
+      "guard_true": 32,
+      "law_consistent": 6
+     },
+     {
+      "case": 7,
+      "decided": 6,
+      "guard_true": 32,
+      "law_consistent": 6
+     },
+     {
+      "case": 8,
+      "decided": 6,
+      "guard_true": 128,
+      "law_consistent": 6
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 128
+   },
    "first_input": [
     0,
     0,
@@ -12978,7 +15050,7 @@
      "states_sha256": "f423ddce83fd9011efe166a3afb7329940e219f4161c380e1c664b2a8113a475"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -12998,6 +15070,73 @@
    }
   },
   "reservation-pool-c3-q2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 96,
+      "guard_true": 96,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 80,
+      "guard_true": 128,
+      "law_consistent": 80
+     },
+     {
+      "case": 2,
+      "decided": 11,
+      "guard_true": 24,
+      "law_consistent": 11
+     },
+     {
+      "case": 3,
+      "decided": 22,
+      "guard_true": 48,
+      "law_consistent": 22
+     },
+     {
+      "case": 4,
+      "decided": 11,
+      "guard_true": 46,
+      "law_consistent": 11
+     },
+     {
+      "case": 5,
+      "decided": 9,
+      "guard_true": 64,
+      "law_consistent": 9
+     },
+     {
+      "case": 6,
+      "decided": 9,
+      "guard_true": 64,
+      "law_consistent": 9
+     },
+     {
+      "case": 7,
+      "decided": 9,
+      "guard_true": 64,
+      "law_consistent": 9
+     },
+     {
+      "case": 8,
+      "decided": 9,
+      "guard_true": 256,
+      "law_consistent": 9
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 256
+   },
    "first_input": [
     0,
     0,
@@ -13212,7 +15351,7 @@
      "states_sha256": "f423ddce83fd9011efe166a3afb7329940e219f4161c380e1c664b2a8113a475"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -13232,6 +15371,73 @@
    }
   },
   "reservation-pool-c3-q3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 144,
+      "guard_true": 144,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 120,
+      "guard_true": 192,
+      "law_consistent": 120
+     },
+     {
+      "case": 2,
+      "decided": 20,
+      "guard_true": 48,
+      "law_consistent": 20
+     },
+     {
+      "case": 3,
+      "decided": 40,
+      "guard_true": 96,
+      "law_consistent": 40
+     },
+     {
+      "case": 4,
+      "decided": 20,
+      "guard_true": 76,
+      "law_consistent": 20
+     },
+     {
+      "case": 5,
+      "decided": 10,
+      "guard_true": 96,
+      "law_consistent": 10
+     },
+     {
+      "case": 6,
+      "decided": 10,
+      "guard_true": 96,
+      "law_consistent": 10
+     },
+     {
+      "case": 7,
+      "decided": 10,
+      "guard_true": 96,
+      "law_consistent": 10
+     },
+     {
+      "case": 8,
+      "decided": 10,
+      "guard_true": 384,
+      "law_consistent": 10
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 384
+   },
    "first_input": [
     0,
     0,
@@ -13446,7 +15652,7 @@
      "states_sha256": "f423ddce83fd9011efe166a3afb7329940e219f4161c380e1c664b2a8113a475"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -13466,6 +15672,73 @@
    }
   },
   "reservation-pool-c4-q1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 80,
+      "guard_true": 80,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 60,
+      "guard_true": 100,
+      "law_consistent": 60
+     },
+     {
+      "case": 2,
+      "decided": 5,
+      "guard_true": 10,
+      "law_consistent": 5
+     },
+     {
+      "case": 3,
+      "decided": 10,
+      "guard_true": 20,
+      "law_consistent": 10
+     },
+     {
+      "case": 4,
+      "decided": 5,
+      "guard_true": 30,
+      "law_consistent": 5
+     },
+     {
+      "case": 5,
+      "decided": 10,
+      "guard_true": 50,
+      "law_consistent": 10
+     },
+     {
+      "case": 6,
+      "decided": 10,
+      "guard_true": 50,
+      "law_consistent": 10
+     },
+     {
+      "case": 7,
+      "decided": 10,
+      "guard_true": 50,
+      "law_consistent": 10
+     },
+     {
+      "case": 8,
+      "decided": 10,
+      "guard_true": 200,
+      "law_consistent": 10
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 200
+   },
    "first_input": [
     0,
     0,
@@ -13680,7 +15953,7 @@
      "states_sha256": "39eb7fe40d4b9b739d465e9e99700a6db3dc135fed33b3fd347e4b49d3717f71"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -13700,6 +15973,73 @@
    }
   },
   "reservation-pool-c4-q2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 160,
+      "guard_true": 160,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 120,
+      "guard_true": 200,
+      "law_consistent": 120
+     },
+     {
+      "case": 2,
+      "decided": 14,
+      "guard_true": 30,
+      "law_consistent": 14
+     },
+     {
+      "case": 3,
+      "decided": 28,
+      "guard_true": 60,
+      "law_consistent": 28
+     },
+     {
+      "case": 4,
+      "decided": 14,
+      "guard_true": 68,
+      "law_consistent": 14
+     },
+     {
+      "case": 5,
+      "decided": 16,
+      "guard_true": 100,
+      "law_consistent": 16
+     },
+     {
+      "case": 6,
+      "decided": 16,
+      "guard_true": 100,
+      "law_consistent": 16
+     },
+     {
+      "case": 7,
+      "decided": 16,
+      "guard_true": 100,
+      "law_consistent": 16
+     },
+     {
+      "case": 8,
+      "decided": 16,
+      "guard_true": 400,
+      "law_consistent": 16
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 400
+   },
    "first_input": [
     0,
     0,
@@ -13914,7 +16254,7 @@
      "states_sha256": "39eb7fe40d4b9b739d465e9e99700a6db3dc135fed33b3fd347e4b49d3717f71"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -13934,6 +16274,73 @@
    }
   },
   "reservation-pool-c4-q3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 240,
+      "guard_true": 240,
+      "law_consistent": 0
+     },
+     {
+      "case": 1,
+      "decided": 180,
+      "guard_true": 300,
+      "law_consistent": 180
+     },
+     {
+      "case": 2,
+      "decided": 26,
+      "guard_true": 60,
+      "law_consistent": 26
+     },
+     {
+      "case": 3,
+      "decided": 52,
+      "guard_true": 120,
+      "law_consistent": 52
+     },
+     {
+      "case": 4,
+      "decided": 26,
+      "guard_true": 112,
+      "law_consistent": 26
+     },
+     {
+      "case": 5,
+      "decided": 19,
+      "guard_true": 150,
+      "law_consistent": 19
+     },
+     {
+      "case": 6,
+      "decided": 19,
+      "guard_true": 150,
+      "law_consistent": 19
+     },
+     {
+      "case": 7,
+      "decided": 19,
+      "guard_true": 150,
+      "law_consistent": 19
+     },
+     {
+      "case": 8,
+      "decided": 19,
+      "guard_true": 600,
+      "law_consistent": 19
+     }
+    ],
+    "findings": [
+     {
+      "case": 0,
+      "cause": null,
+      "kind": "case-only-on-excluded-pre-states"
+     }
+    ],
+    "status": "checked",
+    "tuples": 600
+   },
    "first_input": [
     0,
     0,
@@ -14148,7 +16555,7 @@
      "states_sha256": "39eb7fe40d4b9b739d465e9e99700a6db3dc135fed33b3fd347e4b49d3717f71"
     }
    },
-   "review_exit": 0,
+   "review_exit": 1,
    "scenario": {
     "reject_everything_killed": true,
     "scenarios": [
@@ -14168,6 +16575,43 @@
    }
   },
   "retry-budget-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8,
+      "guard_true": 8,
+      "law_consistent": 8
+     },
+     {
+      "case": 1,
+      "decided": 4,
+      "guard_true": 8,
+      "law_consistent": 4
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 2,
+      "guard_true": 8,
+      "law_consistent": 2
+     },
+     {
+      "case": 4,
+      "decided": 1,
+      "guard_true": 16,
+      "law_consistent": 1
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 16
+   },
    "first_input": [
     0,
     0,
@@ -14393,6 +16837,43 @@
    }
   },
   "retry-budget-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 12,
+      "guard_true": 12,
+      "law_consistent": 12
+     },
+     {
+      "case": 1,
+      "decided": 6,
+      "guard_true": 12,
+      "law_consistent": 6
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 3,
+      "guard_true": 12,
+      "law_consistent": 3
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 24,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 24
+   },
    "first_input": [
     0,
     0,
@@ -14618,6 +17099,43 @@
    }
   },
   "retry-budget-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 8,
+      "guard_true": 16,
+      "law_consistent": 8
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 4,
+      "guard_true": 16,
+      "law_consistent": 4
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 32,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -14843,6 +17361,43 @@
    }
   },
   "retry-budget-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 20,
+      "guard_true": 20,
+      "law_consistent": 20
+     },
+     {
+      "case": 1,
+      "decided": 10,
+      "guard_true": 20,
+      "law_consistent": 10
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 5,
+      "guard_true": 20,
+      "law_consistent": 5
+     },
+     {
+      "case": 4,
+      "decided": 4,
+      "guard_true": 40,
+      "law_consistent": 4
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 40
+   },
    "first_input": [
     0,
     0,
@@ -15068,6 +17623,43 @@
    }
   },
   "retry-budget-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 24,
+      "guard_true": 24,
+      "law_consistent": 24
+     },
+     {
+      "case": 1,
+      "decided": 12,
+      "guard_true": 24,
+      "law_consistent": 12
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 6,
+      "guard_true": 24,
+      "law_consistent": 6
+     },
+     {
+      "case": 4,
+      "decided": 5,
+      "guard_true": 48,
+      "law_consistent": 5
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 48
+   },
    "first_input": [
     0,
     0,
@@ -15293,6 +17885,43 @@
    }
   },
   "retry-budget-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 28,
+      "guard_true": 28,
+      "law_consistent": 28
+     },
+     {
+      "case": 1,
+      "decided": 14,
+      "guard_true": 28,
+      "law_consistent": 14
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 7,
+      "guard_true": 28,
+      "law_consistent": 7
+     },
+     {
+      "case": 4,
+      "decided": 6,
+      "guard_true": 56,
+      "law_consistent": 6
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 56
+   },
    "first_input": [
     0,
     0,
@@ -15518,6 +18147,43 @@
    }
   },
   "retry-budget-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 32,
+      "guard_true": 32,
+      "law_consistent": 32
+     },
+     {
+      "case": 1,
+      "decided": 16,
+      "guard_true": 32,
+      "law_consistent": 16
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 8,
+      "guard_true": 32,
+      "law_consistent": 8
+     },
+     {
+      "case": 4,
+      "decided": 7,
+      "guard_true": 64,
+      "law_consistent": 7
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 64
+   },
    "first_input": [
     0,
     0,
@@ -15743,6 +18409,43 @@
    }
   },
   "retry-budget-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 36,
+      "guard_true": 36,
+      "law_consistent": 36
+     },
+     {
+      "case": 1,
+      "decided": 18,
+      "guard_true": 36,
+      "law_consistent": 18
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 4,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 9,
+      "guard_true": 36,
+      "law_consistent": 9
+     },
+     {
+      "case": 4,
+      "decided": 8,
+      "guard_true": 72,
+      "law_consistent": 8
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 72
+   },
    "first_input": [
     0,
     0,
@@ -15968,6 +18671,43 @@
    }
   },
   "variant-bounded-counter-c2-determining": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6,
+      "guard_true": 6,
+      "law_consistent": 6
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 2,
+      "guard_true": 6,
+      "law_consistent": 2
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 12,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 12
+   },
    "first_input": [
     0,
     150,
@@ -16173,6 +18913,43 @@
    }
   },
   "variant-bounded-counter-c2-failure": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6,
+      "guard_true": 6,
+      "law_consistent": 6
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 2,
+      "guard_true": 6,
+      "law_consistent": 2
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 12,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 12
+   },
    "first_input": [
     0,
     150,
@@ -16216,7 +18993,7 @@
       "tuples": 12
      }
     },
-    "admissible_sha256": "c5e567c1277eb4a14c46d2254f10a2684f7479daab3e7d8903eb9bbd2fbbe360",
+    "admissible_sha256": "eef4ca197f8167da61ffe23ccf6610324d598f3483913581839881c7eb9aa88a",
     "reject_everything": {
      "admitted_where_the_contract_decides": true,
      "refused_where_the_contract_decides": 0,
@@ -16378,6 +19155,43 @@
    }
   },
   "variant-bounded-counter-c2-refusal": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6,
+      "guard_true": 6,
+      "law_consistent": 6
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 2,
+      "guard_true": 6,
+      "law_consistent": 2
+     },
+     {
+      "case": 4,
+      "decided": 2,
+      "guard_true": 12,
+      "law_consistent": 2
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 12
+   },
    "first_input": [
     0,
     150,
@@ -16584,6 +19398,43 @@
    }
   },
   "variant-bounded-counter-c3-all": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 8,
+      "guard_true": 8,
+      "law_consistent": 8
+     },
+     {
+      "case": 1,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 2,
+      "decided": 1,
+      "guard_true": 2,
+      "law_consistent": 1
+     },
+     {
+      "case": 3,
+      "decided": 3,
+      "guard_true": 8,
+      "law_consistent": 3
+     },
+     {
+      "case": 4,
+      "decided": 3,
+      "guard_true": 16,
+      "law_consistent": 3
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 16
+   },
    "first_input": [
     0,
     150,
@@ -16631,7 +19482,7 @@
       "tuples": 16
      }
     },
-    "admissible_sha256": "f2e2a598644cb641b88ed022a0268027a28128325c6ad47fa94732c7f2bcb556",
+    "admissible_sha256": "f20bd83e5889bfc70c9050e3c8cf29873dc1cf742fa041fb84844e474b2a11b0",
     "reject_everything": {
      "admitted_where_the_contract_decides": false,
      "refused_where_the_contract_decides": 5,
@@ -16794,6 +19645,37 @@
    }
   },
   "versioned-register-c1": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 16,
+      "guard_true": 16,
+      "law_consistent": 16
+     },
+     {
+      "case": 1,
+      "decided": 8,
+      "guard_true": 16,
+      "law_consistent": 8
+     },
+     {
+      "case": 2,
+      "decided": 4,
+      "guard_true": 16,
+      "law_consistent": 4
+     },
+     {
+      "case": 3,
+      "decided": 4,
+      "guard_true": 32,
+      "law_consistent": 4
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 32
+   },
    "first_input": [
     0,
     0,
@@ -17022,6 +19904,37 @@
    }
   },
   "versioned-register-c2": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 81,
+      "guard_true": 81,
+      "law_consistent": 81
+     },
+     {
+      "case": 1,
+      "decided": 54,
+      "guard_true": 108,
+      "law_consistent": 54
+     },
+     {
+      "case": 2,
+      "decided": 9,
+      "guard_true": 54,
+      "law_consistent": 9
+     },
+     {
+      "case": 3,
+      "decided": 18,
+      "guard_true": 162,
+      "law_consistent": 18
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 162
+   },
    "first_input": [
     0,
     0,
@@ -17250,6 +20163,37 @@
    }
   },
   "versioned-register-c3": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 256,
+      "guard_true": 256,
+      "law_consistent": 256
+     },
+     {
+      "case": 1,
+      "decided": 192,
+      "guard_true": 384,
+      "law_consistent": 192
+     },
+     {
+      "case": 2,
+      "decided": 16,
+      "guard_true": 128,
+      "law_consistent": 16
+     },
+     {
+      "case": 3,
+      "decided": 48,
+      "guard_true": 512,
+      "law_consistent": 48
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 512
+   },
    "first_input": [
     0,
     0,
@@ -17478,6 +20422,37 @@
    }
   },
   "versioned-register-c4": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 625,
+      "guard_true": 625,
+      "law_consistent": 625
+     },
+     {
+      "case": 1,
+      "decided": 500,
+      "guard_true": 1000,
+      "law_consistent": 500
+     },
+     {
+      "case": 2,
+      "decided": 25,
+      "guard_true": 250,
+      "law_consistent": 25
+     },
+     {
+      "case": 3,
+      "decided": 100,
+      "guard_true": 1250,
+      "law_consistent": 100
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 1250
+   },
    "first_input": [
     0,
     0,
@@ -17706,6 +20681,37 @@
    }
   },
   "versioned-register-c5": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 1296,
+      "guard_true": 1296,
+      "law_consistent": 1296
+     },
+     {
+      "case": 1,
+      "decided": 1080,
+      "guard_true": 2160,
+      "law_consistent": 1080
+     },
+     {
+      "case": 2,
+      "decided": 36,
+      "guard_true": 432,
+      "law_consistent": 36
+     },
+     {
+      "case": 3,
+      "decided": 180,
+      "guard_true": 2592,
+      "law_consistent": 180
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 2592
+   },
    "first_input": [
     0,
     0,
@@ -17934,6 +20940,37 @@
    }
   },
   "versioned-register-c6": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 2401,
+      "guard_true": 2401,
+      "law_consistent": 2401
+     },
+     {
+      "case": 1,
+      "decided": 2058,
+      "guard_true": 4116,
+      "law_consistent": 2058
+     },
+     {
+      "case": 2,
+      "decided": 49,
+      "guard_true": 686,
+      "law_consistent": 49
+     },
+     {
+      "case": 3,
+      "decided": 294,
+      "guard_true": 4802,
+      "law_consistent": 294
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 4802
+   },
    "first_input": [
     0,
     0,
@@ -18162,6 +21199,37 @@
    }
   },
   "versioned-register-c7": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 4096,
+      "guard_true": 4096,
+      "law_consistent": 4096
+     },
+     {
+      "case": 1,
+      "decided": 3584,
+      "guard_true": 7168,
+      "law_consistent": 3584
+     },
+     {
+      "case": 2,
+      "decided": 64,
+      "guard_true": 1024,
+      "law_consistent": 64
+     },
+     {
+      "case": 3,
+      "decided": 448,
+      "guard_true": 8192,
+      "law_consistent": 448
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 8192
+   },
    "first_input": [
     0,
     0,
@@ -18390,6 +21458,37 @@
    }
   },
   "versioned-register-c8": {
+   "case_coverage": {
+    "cases": [
+     {
+      "case": 0,
+      "decided": 6561,
+      "guard_true": 6561,
+      "law_consistent": 6561
+     },
+     {
+      "case": 1,
+      "decided": 5832,
+      "guard_true": 11664,
+      "law_consistent": 5832
+     },
+     {
+      "case": 2,
+      "decided": 81,
+      "guard_true": 1458,
+      "law_consistent": 81
+     },
+     {
+      "case": 3,
+      "decided": 648,
+      "guard_true": 13122,
+      "law_consistent": 648
+     }
+    ],
+    "findings": [],
+    "status": "checked",
+    "tuples": 13122
+   },
    "first_input": [
     0,
     0,
