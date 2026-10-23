@@ -67,7 +67,7 @@
     "exit": 0,
     "expected": {
       "status": "checked",
-      "measured.admissible_views": 160
+      "measured.admissible_views": 144
     },
     "contains": []
   },
@@ -146,7 +146,11 @@ Keys support equality only. Use named entries for map access and declared summar
 zeno-fcis contract collections examples/collections/library
 ```
 
-Expected: exit 0; {"status": "checked", "measured.admissible_views": 160}.
+Expected: exit 0; {"status": "checked", "measured.admissible_views": 144}.
+
+The loan tally excludes a named on-loan copy whose holder has zero loans.
+The 18 canonical state views, four actions and two desk contexts give 144
+admissible views. Runtime framing remains a separate premise.
 
 ## See also
 
