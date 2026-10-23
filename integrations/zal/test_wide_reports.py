@@ -146,9 +146,20 @@ class WideCliReports(unittest.TestCase):
                 self.assertIn(str(value), text)
                 probe = self.run_cli('contract', 'probe', 'explain', folder, '--input', f'0 {value} {value} 0')
                 self.assertEqual(N.integer(probe['result']['input']['command.101.120']), value)
-                gaps = self.run_cli('contract', 'review', folder, '--gaps', '--format', 'json')
+                # The fixture's first guard is true, so its required fallback
+                # is dead. Keep those semantics and check the diagnostic as
+                # well as the lossless gap witnesses.
+                gaps = self.run_cli('contract', 'review', folder, '--gaps', '--format', 'json', exits=(1,))
                 self.assertEqual(gaps['schema'], 'zeno-fcis/contract-review/4')
                 self.assertIn(str(value), json.dumps(gaps['gaps']))
+                self.assertEqual(gaps['summary']['case_findings'], 1)
+                self.assertEqual(gaps['case_coverage']['status'], 'checked')
+                finding, = gaps['findings']
+                self.assertEqual((finding['case'], finding['kind'], finding['cause']),
+                                 (1, 'case-never-decides', 'covered by earlier cases'))
+                self.assertEqual(finding['covered_by'], [
+                    {'case': 0, 'when': 'true', 'witness': {
+                        'ordinal': 0, 'input': ['0', str(value), str(value), '0']}}])
                 architecture = self.root / f'architecture-{index}.json'
                 architecture.write_text(json.dumps({'schema': 'zeno-fcis/loop-architecture/1', 'components': [
                     {'name': 'calculate', 'owns': ['value', 'anchor'], 'reads': ['amount', 'context'], 'decides': []}]}))
