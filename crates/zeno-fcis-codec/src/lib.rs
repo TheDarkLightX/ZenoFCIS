@@ -1272,6 +1272,8 @@ fn decode_fields(
                 count as nat, None, old(state).nodes as nat, old(state).payload_bytes as nat),
     decreases if depth <= 1024 { 1025 - depth as int } else { 0 }, 2nat,
 ))]
+// Preserve the recursive frame shape while keeping a separate proof contract.
+#[inline(always)]
 fn decode_entries(
     cursor: &mut Cursor<'_>,
     state: &mut DecodeState,

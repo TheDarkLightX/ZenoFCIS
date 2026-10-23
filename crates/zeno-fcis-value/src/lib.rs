@@ -1477,10 +1477,10 @@ impl ValueLimits {
     /// Largest nesting depth any limits admit; a larger `max_depth` is
     /// capped here. It equals the catalog's value-depth ceiling.
     ///
-    /// Validation, encoding and decoding recurse once per level. At this
-    /// depth, decoding needs at most 1 MiB of stack in an optimized x86-64
-    /// build (Rust 1.97.1), within a default 2 MiB thread; an unoptimized
-    /// build needs up to 8 MiB. Without the cap, 60,000 levels exhausted an
+    /// Validation, encoding and decoding are recursive. Native x86-64
+    /// samples at this depth fit a 1 MiB optimized stack and an 8 MiB
+    /// unoptimized stack with Rust 1.97.1. These measurements do not prove
+    /// a stack-byte bound. Without the cap, 60,000 levels exhausted an
     /// 8 MiB stack.
     #[cfg_attr(verus_keep_ghost, verus_verify)]
     pub const MAX_SUPPORTED_DEPTH: u32 = 1_024;
