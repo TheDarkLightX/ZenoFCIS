@@ -184,31 +184,17 @@ def _partial(node, accepted):
     return node
 
 
-def lower_machine(model: behavior2.Machine) -> dict[str, str]:
-    """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
-    if model.players or model.games:
-        raise Refusal("unsupported lowering: game players and properties; use export-game")
-    safety = []
-    for name, formula in model.properties:
-        shape = behavior2.property_shape(formula)
-        if shape["kind"] != "safety":
-            raise Refusal(f"unsupported lowering: temporal property {name}")
-        safety.append((name, shape["goal"]))
-    for name, _ in model.fairness:
-        raise Refusal(f"unsupported lowering: fairness assumption {name}")
-    for kind, _ in model.obligations:
-        raise Refusal(f"unsupported lowering: unresolved {kind}")
-    report = behavior2.check(model, checker_identity())
-    if report["status"] != "pass-with-scope":
-        raise Refusal("Lowering needs passing finite-profile checks and no unresolved obligations")
-    if len(model.states) < 2:
-        raise Refusal("This factory-qualified subset requires at least two states for its independent rejected-genesis check")
+def profile2_expressions(model):
+    """Pure syntax lowering shared by export and advisory law proposals.
+
+    No model execution or law verdict occurs here. Returned closures own only
+    fresh name maps; the caller cannot mutate them or the immutable model.
+    """
     states = {name: 150 + i for i, name in enumerate(model.states)}
     events = {name: 120 + i for i, name in enumerate(model.events)}
     facts = {name: 160 + i for i, name in enumerate(model.facts)}
     inputs = {item.name: 164 + i for i, item in enumerate(model.inputs)}
     variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
-    reasons = {name: 200 + i for i, name in enumerate(sorted({model.default, *[r.reason for r in model.rules if r.reason]}))}
 
     def term(node, root):
         """root names where variables are read: pre, post, or the requirement law's pre/post pair."""
@@ -244,6 +230,58 @@ def lower_machine(model: behavior2.Machine) -> dict[str, str]:
         if op == "cmp":
             return f"({term(node.args[1], root)} {node.args[0]} {term(node.args[2], root)})"
         raise Refusal(f"unsupported lowering: {op}")
+
+    return term, expression
+
+
+def profile2_proposal(model, kind, name, formula, first_id):
+    """Lower an invariant/requirement without checking whether it is true.
+
+    Export uses these same expressions and outcome folding. The binary must
+    check the returned laws; even a false proposal must reach that checker.
+    """
+    _, expression = profile2_expressions(model)
+    if kind == "invariant":
+        return (f"law {first_id} invariant_{name} on commit, genesis = "
+                f"{expression(formula, ('post', 'post'), True)};",)
+    laws = []
+    for scope, accepted, roots in [("accept", True, ("pre", "post")),
+                                   ("reject", False, ("pre", "pre"))]:
+        folded = _partial(formula, accepted)
+        if folded is True:
+            continue
+        body = "false" if folded is False else expression(folded, roots, True)
+        laws.append(f"law {first_id + len(laws)} require_{name}_{scope} on {scope} = {body};")
+    return tuple(laws)
+
+
+def lower_machine(model: behavior2.Machine) -> dict[str, str]:
+    """Lower profile 2 to the contract; constructs without a contract form refuse by name."""
+    if model.players or model.games:
+        raise Refusal("unsupported lowering: game players and properties; use export-game")
+    safety = []
+    for name, formula in model.properties:
+        shape = behavior2.property_shape(formula)
+        if shape["kind"] != "safety":
+            raise Refusal(f"unsupported lowering: temporal property {name}")
+        safety.append((name, shape["goal"]))
+    for name, _ in model.fairness:
+        raise Refusal(f"unsupported lowering: fairness assumption {name}")
+    for kind, _ in model.obligations:
+        raise Refusal(f"unsupported lowering: unresolved {kind}")
+    report = behavior2.check(model, checker_identity())
+    if report["status"] != "pass-with-scope":
+        raise Refusal("Lowering needs passing finite-profile checks and no unresolved obligations")
+    if len(model.states) < 2:
+        raise Refusal("This factory-qualified subset requires at least two states for its independent rejected-genesis check")
+    states = {name: 150 + i for i, name in enumerate(model.states)}
+    events = {name: 120 + i for i, name in enumerate(model.events)}
+    facts = {name: 160 + i for i, name in enumerate(model.facts)}
+    inputs = {item.name: 164 + i for i, item in enumerate(model.inputs)}
+    variables = {item.name: 170 + i for i, item in enumerate(model.variables)}
+    reasons = {name: 200 + i for i, name in enumerate(sorted({model.default, *[r.reason for r in model.rules if r.reason]}))}
+
+    term, expression = profile2_expressions(model)
 
     observed = bool(facts or inputs)
     project = ["zeno 1;", f"project 1 {model.name};", "namespace 2 dialogue;",
