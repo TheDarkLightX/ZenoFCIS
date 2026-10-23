@@ -159,6 +159,46 @@ zeno-fcis contract two-run examples/two-run/ledger-leak --noninterference --secr
 refuted ledger-leak: zeno-fcis/two-run/1
 ```
 
+## Example specification coverage
+
+This table covers the four finite examples, not an exchange or private service.
+T means the exact two-run command above for that column (both K values for the
+swap). P means its independent one-step dependency probe below. A refuted
+property is measured evidence of a difference, not a guarantee. Law 500 in each
+example states only that its first state field is nonnegative at genesis and
+on commits; it does not state conservation or authentication.
+
+| Dimension | Constant-product | Uniform-price | Ledger-private | Ledger-leak |
+| --- | --- | --- | --- | --- |
+| Value | Not covered: no conservation law; law 500 bounds reserve_x. | Not covered: no conservation law; law 500 bounds price. | Not covered: no conservation law; law 500 bounds balance. | Not covered: no conservation law; law 500 bounds balance. |
+| Authority | Not covered: user selects a slot without authentication. | Not covered: user selects a slot without authentication. | Not covered: no caller roles. | Not covered: no caller roles. |
+| Every state | T: all 256 admissible states, including empty reserve_y and full reserve_x. | T: all 72 admissible states, including empty/full slots. | T: all 12 admissible states, both flags and balance endpoints. | T: all 12 admissible states, both flags and balance endpoints. |
+| Every input | T: all 4 complete inputs; users 0/1, amounts 1/2. P: user dependency yes. | T: all 4 complete inputs; users 0/1, amounts 0/1. P: user dependency yes. | T: both amounts 0/1. P: amount dependency yes. | T: both amounts 0/1. P: amount dependency no. |
+| Order | T: refuted at K=0 and K=1, including refusal asymmetry. | T: checked at K=0 for both users' slots. | Not covered: no order claim. | Not covered: no order claim. |
+| Privacy | Not covered: no secret designated. | Not covered: no secret designated. | T: checked; both nonsecret fields public. | T: refuted; flag changes public balance. |
+| Liveness | Not covered: no progress or fairness claim. | Not covered: no progress or fairness claim. | Not covered: no progress or fairness claim. | Not covered: no progress or fairness claim. |
+| Failure | T: capacity refusals compared; chained gains not covered. | T: all accepts; failures not modeled. | T: balance-limit refusals compared; chained gains not covered. | T: all accepts; failures not modeled. |
+| Time/resources | T: 1,024 tuples, component budget 256 steps; no deadlines. | T: 288 tuples, component budget 256 steps; no deadlines. | T: 24 tuples, component budget 256 steps; no deadlines. | T: 24 tuples, component budget 256 steps; no deadlines. |
+| Story | T refutes order independence; no rounding-bound promise. | T checks fixed-price allocated quantities. | T checks the public flag-independence question. | T refutes that same privacy question. |
+
+The P commands all exit 0 (`answered`); their answers in order are yes, yes,
+yes, no. They compare complete one-step outcomes, not the two-run public
+projection, and cannot establish noninterference. These commands and answers
+are checked by `tools/test_two_run.py`.
+
+```sh
+zeno-fcis contract probe depends examples/two-run/constant-product --position command.101.120 --no-kb
+zeno-fcis contract probe depends examples/two-run/uniform-price --position command.101.120 --no-kb
+zeno-fcis contract probe depends examples/two-run/ledger-private --position command.101.120 --no-kb
+zeno-fcis contract probe depends examples/two-run/ledger-leak --position command.101.120 --no-kb
+```
+
+All input claims above concern declared well-formed scalar values. Malformed
+wire encodings, external delivery failures, authentication, conservation,
+application-wide resource quotas and availability remain outside these examples.
+The judge's tuple and invocation caps are measured separately by the boundary
+checks in `tools/test_two_run.py`; they grant no resource authority.
+
 ## Scope and limits
 
 Every packet includes this scope sentence:

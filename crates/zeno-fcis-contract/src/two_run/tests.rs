@@ -221,7 +221,7 @@ fn distance_handles_signed_endpoints_without_overflow() {
             &run(i128::MAX),
             &[0],
             u128::MAX - 1,
-            &[p.clone()]
+            std::slice::from_ref(&p)
         )
         .is_some()
     );

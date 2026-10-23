@@ -110,6 +110,14 @@ class TwoRunCli(unittest.TestCase):
         self.assertEqual(packet['result']['first_difference']['kind'],'decision_class')
         (EVIDENCE/'swap-capacity.json').write_text(p.stdout)
 
+    def test_documented_dependency_probes(self):
+        for name,answer in [('constant-product','yes'),('uniform-price','yes'),('ledger-private','yes'),('ledger-leak','no')]:
+            cmd=[str(BIN),'contract','probe','depends','examples/two-run/'+name,'--position','command.101.120','--no-kb']
+            p=subprocess.run(cmd,cwd=ROOT,capture_output=True,text=True)
+            self.assertEqual(p.returncode,0,p.stderr);packet=json.loads(p.stdout)
+            self.assertEqual(packet['status'],'answered');self.assertEqual(packet['result']['answer'],answer)
+            (EVIDENCE/('depends-'+name+'.json')).write_text(p.stdout)
+
     def test_public_subset_does_not_compose(self):
         folder=ROOT/'test-data/two-run/two-step-leak'
         c=Contract((folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()))
