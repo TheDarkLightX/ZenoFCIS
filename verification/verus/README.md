@@ -6,7 +6,7 @@ law projection and signed-law division projection require fresh whole-source
 proofs and reviewed translated inventories. Historical counts and receipts
 below do not qualify these changed bytes. Qualification is pending.
 
-The [Verus workflow](../../.github/workflows/verus.yml) runs 21 qualification
+The [Verus workflow](../../.github/workflows/verus.yml) runs 22 qualification
 gates. Each gate first runs its script's own tests, then the script itself;
 for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
 `python3 tools/check_verus.py --out` with an evidence path. The script requires
@@ -22,6 +22,7 @@ checks the authority and synthesis crates without default features.
 | `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
 | `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
 | `lemma-kernel` | `check_lemma_kernel.py` | [State lemma decision core](#state-lemma-decision-core) over validated finite tables |
+| `reachable-probe` | `check_reachable_probe.py` | [Reachable probe](#reachable-probe-and-shared-fixed-points), effective traces and fixed-point verdict forms |
 | `canonical-bytes` | `check_canonical_bytes.py` | [Production V2 integer byte readers](#v2-integer-byte-interpretation); not schema admission |
 | `protected-input` | `check_protected_input.py` | [Owned V2 protected record projection](#v2-protected-flat-record-projection) |
 | `envelope-frame` | `check_envelope_frame_v2.py` | Original-envelope framing and exact payload custody |
@@ -573,3 +574,61 @@ contracts. Shortest-trace minimality, the Machine/table adapter, `state_holds`,
 the law evaluator, generic `induction<S>`, unsigned/symbolic routes and JSON
 rendering are outside this theorem; adapter behavior and rendering are checked
 separately. No evaluator identity or application authority is changed.
+
+## Reachable probe and shared fixed points
+
+The [shared specification](finite_machine_spec.rs) defines declared state and
+input ordinals, genesis, raw successor and commit tables, the effective step,
+`F(X) = {genesis} union post(X)`, and Reach. A noncommitting outcome keeps its
+source state. The specification has no dependency on either judge.
+[Shared proofs](finite_machine_proofs.rs) establish that Reach is a fixed point
+and is contained in every pre-fixed point. They follow D. Park, *Fixpoint
+induction and proofs of program properties*, Machine Intelligence 5 (1969),
+and the specification/refinement organization described by
+[seL4](https://sel4.systems/Verification/proofs.html).
+
+The [verdict theorem](lemma_fixed_point.rs) proves the fixed-point forms:
+`Inductive` iff `F(H)` is a subset of `H`; `NotInductive` iff Reach is a subset
+of `H` but `F(H)` is not; `False` iff Reach is not a subset of `H`.
+The lemma harness retains its 32 obligations. Its profile now covers the shared
+definitions too. Its six original controls remain required.
+
+The [probe harness](probe_kernel.rs) includes the production
+[probe core](../../crates/zeno-fcis-cli/src/contract/review/probe_kernel.rs)
+and the same verified FIFO search and parent traversal. For a complete valid
+table within the tuple limit, it returns a matching state exactly when some
+state satisfying the query is in Reach. It selects the least matching state
+ordinal, preserving the CLI's choice even when another match has a shorter
+trace. The witness starts at genesis, follows effective steps, and ends at the
+selected state. A singleton query specializes this to exact state membership.
+An answer of no means no matching state is reachable, and includes the complete
+reachable-state count used by the renderer.
+
+Invalid tables refuse separately. Exceeding the tuple limit returns an
+`Unknown` variant with no answer, count or witness fields. The shared size
+predicate also refuses overflowed/unknown domain sizes. The existing adapter
+checks the domain limit before enumeration and reports invalid genesis as a
+separate refusal. No partial search is promoted to an answer.
+
+```sh
+python3 tools/test_check_reachable_probe.py
+python3 tools/check_reachable_probe.py --out evidence/reachable-probe.json
+```
+
+The [profile](reachable-probe.json) freezes 58 records and 48 whole-crate
+obligations, including the lemma unit and shared fixed-point proofs. These
+counts overlap the lemma gate and must not be added. Both gates use the shared
+native-configuration guard and the exact derive exception. Two probe controls
+ignore commit flags or stop the FIFO search early; each must compile, fail a
+named native assertion, fail its intended obligation, restore SHA-identically,
+and rebuild/test/verify successfully. Native tests compare 1,127,116 cases with
+independent transitive closure and simulate every reported trace.
+
+The Machine/table and predicate projections, domain enumeration and JSON/exit
+rendering remain tested boundaries. Native comparison with the prior search
+and CLI differentials cover their behavior on the retained example and fixture
+corpus; they do not supply a universal adapter theorem. Verus/vstd/Z3, Rust
+compilation and erasure, standard-library contracts, the allocator and host
+remain trusted. Shortest-trace minimality, physical cost/OOM, unsigned/symbolic
+reachability and whole-CLI correctness remain outside this proof. The probe
+remains advisory and grants no application authority.
