@@ -58,6 +58,7 @@ def refresh(cli, contract, oracle=False):
         commitment = bytes(int(n.strip(), 0) for n in values.split(',') if n.strip()).hex()
         schema = (staged / 'v2/schema.zcve').read_bytes()
         for name in ('src/v2_contract.rs', 'v2/schema.zcve', 'v2/policy.zcve'):
+            (contract / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(staged / name, contract / name)
         origin = contract / 'v2/schema-origin.json'
         if origin.exists():
