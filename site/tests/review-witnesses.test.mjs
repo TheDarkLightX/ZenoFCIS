@@ -94,7 +94,12 @@ const INVENTORY_CONTRADICTIONS={
  'differences without a witness':['m0002',r=>{r.first_difference=null;r.grid.first_ordinal=null;}],
  'witness without differences':['m0049',r=>{r.first_difference=native['inventory/m0002'].first_difference;}],
  'status beside the witness':['m0002',r=>{r.status='equivalent over the full domain';}],
- 'witness decisions identical':['m0054',r=>{r.first_difference.mutant=clone(r.first_difference.original);}],
+ 'witness decisions identical':['m0054',r=>{
+  // Keep class/count bindings consistent so only decision equality rejects it.
+  r.grid.cells[r.grid.first_ordinal].mutant_class=r.first_difference.original.class;
+  r.mutant_passed=r.grid.cells.filter(c=>c.mutant_class!=='Refused').length;
+  r.first_difference.mutant=clone(r.first_difference.original);
+ }],
  'missing names':['m0002',r=>{delete r.names;}],
 };
 test('L6_rereview_contradictory_inventory_payloads_never_promote_a_verdict',()=>{
