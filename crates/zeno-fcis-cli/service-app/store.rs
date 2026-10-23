@@ -13,7 +13,7 @@ const JOURNAL: &str = "CREATE TABLE service_journal (version INTEGER PRIMARY KEY
 const MAX_ROWS: u64 = 65536;
 const MAX_JOURNAL_BYTES: i64 = 64 * 1024 * 1024;
 
-// Stored head: version, root, state, receipt and chain.
+// Commit-fence head fields: version, root, state, chain and service identity.
 type HeadRow = (i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 // Stored journal: version, principal, replay key, request, receipt, state and chain.
 type JournalRow = (u64, String, String, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
