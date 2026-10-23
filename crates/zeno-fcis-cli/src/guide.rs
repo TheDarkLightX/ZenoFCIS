@@ -23,6 +23,7 @@ const CARDS: &[&str] = &[
     include_str!("../guide-cards/contract-distribution.txt"),
     include_str!("../guide-cards/contract-gaps.txt"),
     include_str!("../guide-cards/contract-lemma.txt"),
+    include_str!("../guide-cards/contract-probe.txt"),
     include_str!("../guide-cards/contract-review.txt"),
     include_str!("../guide-cards/contract-risk.txt"),
     include_str!("../guide-cards/contract-scenario.txt"),

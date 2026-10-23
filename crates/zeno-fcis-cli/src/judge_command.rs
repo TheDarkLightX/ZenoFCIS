@@ -162,7 +162,10 @@ pub(super) enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Ask an exact question about a contract's decisions over its declared domain. Advisory.
+    /// Ask an exact question about a contract's decisions over its declared domain. Exit 0 answered/yes, 1 no, 2 vacuous/inconclusive; advisory.
+    #[command(
+        after_help = "Example (exit 1, with a counterexample):\nzeno-fcis contract probe implies examples/guide-counter --if true --then false"
+    )]
     Probe {
         #[command(subcommand)]
         question: ProbeCommand,
@@ -179,7 +182,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// A shortest trace from genesis to a state satisfying a state formula, or that no reachable state does.
+    /// A shortest trace from genesis to a state satisfying a state formula. Exit 0 reachable, 1 unreachable, 2 inconclusive.
     Reachable {
         /// A state formula, written as a state law over post. state fields.
         #[arg(long)]
@@ -195,7 +198,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// The first input where one condition holds on the contract's decision and another does not.
+    /// Check an implication and report the first counterexample. Exit 0 holds, 1 fails, 2 vacuous/inconclusive.
     Implies {
         /// The condition that must imply the other.
         #[arg(long = "if")]
@@ -214,7 +217,7 @@ pub(super) enum ProbeCommand {
         #[command(flatten)]
         common: Common,
     },
-    /// Two inputs that differ only in one position and are decided differently, or that none are.
+    /// Two inputs that differ only in one position and are decided differently. Exit 0 depends, 1 independent, 2 vacuous/inconclusive.
     Depends {
         /// The input position, as the review names it: pre.100.110, command.101 or context.102.130.
         #[arg(long)]
@@ -562,11 +565,14 @@ pub(super) fn run(command: Command) -> u8 {
                                     "vacuous",
                                 )
                             }
-                            probe::Answer::Answered(value) => Judged::Done(
-                                json!({"question": question.name(), "result": value}),
-                                OK,
-                                "answered",
-                            ),
+                            probe::Answer::Answered(value) => {
+                                let exit = if value["answer"] == "no" { INVALID } else { OK };
+                                Judged::Done(
+                                    json!({"question": question.name(), "result": value}),
+                                    exit,
+                                    "answered",
+                                )
+                            }
                             probe::Answer::NoStartingState(value) => {
                                 Judged::Done(value, INVALID, "no-admissible-starting-state")
                             }

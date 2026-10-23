@@ -13,7 +13,8 @@ class GuideTests(unittest.TestCase):
     def test_offline_list_show_find(self):
         names = [card["name"] for card in guide_list()["cards"]]
         self.assertEqual(names, sorted(names))
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 20)
+        self.assertIn("contract-probe", names)
         self.assertIn("## Worked example", guide_show("check")["card"])
         first = guide_find("find modulo bias")
         self.assertEqual(first, guide_find("find modulo bias"))

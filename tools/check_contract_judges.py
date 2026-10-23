@@ -253,9 +253,9 @@ def cli_answers(binary: Path, directory: Path, known: dict, log: Path, strict: b
     decisions = cli(binary, ["contract", "probe", "decisions", app], exit_of(0), log)
     depends = {}
     for position in known["positions"]:
-        vacuous = known["probes"]["depends"].get(position) == "vacuous"
+        expected = known["probes"]["depends"].get(position)
         answer = cli(binary, ["contract", "probe", "depends", app, "--position", position],
-                     exit_of(2 if vacuous else 0), log)
+                     exit_of({"yes": 0, "no": 1, "vacuous": 2}[expected]), log)
         depends[position] = answer["result"]["answer"]
     first = " ".join(map(str, known["first_input"]))
     explain = cli(binary, ["contract", "probe", "explain", app, "--input", first], exit_of(0), log)

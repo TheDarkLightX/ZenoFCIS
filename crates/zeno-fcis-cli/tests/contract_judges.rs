@@ -536,6 +536,49 @@ fn every_judge_writes_an_advisory_packet_and_exits_by_its_verdict() {
 }
 
 #[test]
+fn probe_verdict_exits_distinguish_yes_no_and_unknown() {
+    let root = TempRoot::new("probe-exits");
+    let app = counter(&root);
+    let app = text(&app);
+    for (question, positive, negative) in [
+        (
+            "implies",
+            vec!["--if", "true", "--then", "true"],
+            vec!["--if", "true", "--then", "false"],
+        ),
+        (
+            "reachable",
+            vec!["--state", "true"],
+            vec!["--state", "false"],
+        ),
+        (
+            "depends",
+            vec!["--position", "pre.100.110"],
+            vec![
+                "--position",
+                "pre.100.110",
+                "--where",
+                "context.102.130 == 0",
+            ],
+        ),
+    ] {
+        for (options, exit, answer) in [(&positive, 0, "yes"), (&negative, 1, "no")] {
+            let args = [vec!["contract", "probe", question, app], options.clone()].concat();
+            let report = run(&args, exit);
+            assert_eq!(report["result"]["answer"], answer, "{report}");
+            assert_eq!(report["authority"], "none");
+        }
+        let args = [
+            vec!["contract", "probe", question, app],
+            positive,
+            vec!["--max-tuples", "1"],
+        ]
+        .concat();
+        assert_eq!(run(&args, 2)["status"], "inconclusive");
+    }
+}
+
+#[test]
 fn every_judge_is_described_with_its_effects() {
     for (path, reads) in [
         (vec!["contract", "profile"], vec!["application-contract"]),
