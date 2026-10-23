@@ -10,6 +10,7 @@ Input/usage/IO errors retain their existing codes (including 3, 64 and 65).
 | --- | --- | --- |
 | check; explain | valid 0; invalid/vacuous 1 | main.rs:1006,1393 |
 | check --expand | expanded 0; invalid 1; read/expansion failure 3 | table_expansion.rs:25 |
+| construct | candidate-checked 0; failed/refused 1; incomplete 2; transport/IO 3; malformed/unsupported family 65 | main.rs:604; ../examples/construction_pilot.rs:191,230; ../examples/construction_pilot/phases.rs:431-450 |
 | prove | checked 0; refuted/undefined 1; unknown 2; execution failure 3 | main.rs:1942 |
 | counterexample | refuted/undefined 0; checked/unknown 2; failure 3 | main.rs:1942 |
 | transform check; replay | equivalent/replayed 0; counterexample/refused 1; inconclusive 2 | transform_command.rs:595,644 |
@@ -53,5 +54,6 @@ Input/usage/IO errors retain their existing codes (including 3, 64 and 65).
 | ZAL why-not | already/found/none-in-scope 0 | integrations/zal/run.py:114 |
 | ZAL story/what-if/explain/guide/legend/render/lower/export/ui | query/render/export completed 0; refused 2 (story retains check_status) | integrations/zal/run.py:68,114,117,130,155 |
 
-Commands without verdicts: describe, guide, new, graph, discovery, backend listings,
-Commons records/leases/status and workflow/query operations identified above.
+Exceptions: command-group help (root and all namespaces); describe; guide *; new; graph;
+synth discover; synth completion discover; backend list/inspect/inventory-lean; Commons
+records/leases/status. These return help/query/artifact completion, not a claim verdict.
