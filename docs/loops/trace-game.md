@@ -157,8 +157,6 @@ Exit codes: {"0": "checked or certified positive verdict", "1": "counterexample,
 
 `UNKNOWN`: No safety/impossibility claim; certificate_check may accept only the diagnostic binding.
 
-Exit codes: {"0": "game.py completed, including counterexample or no guard in class; certificate_check accepted the evidence, including UNKNOWN diagnostics", "2": "game.py malformed input/resource stop (UNKNOWN), or certificate_check refusal/argument error", "other": "legacy run.py/run_v11.py failures; inspect their retained logs"}
-
 Outputs: ["Retained tables, certificates and bindings; game.py writes game-binding.json, native-table.json, certificate.json and verdict.json. Read evidence and claim; fixed-game result schemas differ."]
 
 ## Cost
