@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Counterpolicy regression checks through the generated contract Authority."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,7 +30,84 @@ class TemplateRules(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             outcome = json.loads(packet.read_text())['result']['authority']
             print(json.dumps({'input': values, 'outcome': outcome}, sort_keys=True), flush=True)
+            if directory := os.environ.get('ZF_CONTROL_OUTPUT'):
+                identity = hashlib.sha256((relative + values + json.dumps(policy)).encode()).hexdigest()[:16]
+                shutil.copytree(path, Path(directory) / identity, dirs_exist_ok=True)
             return outcome
+
+    def test_account_eligible_login_cannot_be_arbitrarily_rejected(self):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': 200,
+                                       'post': {}, 'outbox': []})
+        outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout', mutate,
+                             '0 0 0 120 1 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_account_rejection_reasons_keep_the_documented_precedence(self):
+        for index, reason, values in [(0, 201, '0 901 1 120 0 0'),
+                                      (1, 200, '0 901 1 120 1 0'),
+                                      (2, 201, '0 901 1 122 1 0')]:
+            with self.subTest(guard=index):
+                def mutate(policy):
+                    case = dict(policy['cases'][index])
+                    case['reason'] = reason
+                    policy['cases'].insert(0, case)
+                outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_account_failed_login_has_the_exact_failure_reason(self):
+        def mutate(policy):
+            # A reason has one decision class. Keep 203 on the third-failure
+            # branch, and move 202 from the unused guard to the tested failure.
+            policy['cases'][2]['reason'] = 200
+            policy['cases'][5]['reason'] = 202
+        outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout', mutate,
+                             '0 0 0 121 1 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 505, outcome)
+
+    def test_account_third_failure_delivers_the_locked_kind(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                if case['class'] == 'CommittedFailure':
+                    for delivery in case['outbox']:
+                        delivery['payload']['140'] = 151
+        outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout', mutate,
+                             '2 0 0 121 1 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_account_alert_uses_the_security_destination(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                for delivery in case['outbox']:
+                    delivery['destination'] = 'other-desk'
+        outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout', mutate,
+                             '0 0 0 122 1 1')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 511, outcome)
+
+    def test_account_alerts_cannot_be_omitted(self):
+        def mutate(policy):
+            for case in policy['cases']:
+                case['outbox'] = []
+        for values in ['2 0 0 121 1 0', '0 0 0 122 1 1']:
+            with self.subTest(input=values):
+                outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout',
+                                     mutate, values)
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], 510, outcome)
+
+    def test_account_login_success_cannot_send_an_alert(self):
+        def mutate(policy):
+            policy['cases'][3]['outbox'] = policy['cases'][-1]['outbox']
+        outcome = self.probe('crates/zeno-fcis-cli/templates/account-lockout', mutate,
+                             '0 0 0 120 1 0')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 510, outcome)
 
     def test_treasury_last_tick_proposal_is_refused_by_law(self):
         def mutate(policy):

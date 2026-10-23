@@ -53,6 +53,14 @@ law 502 admin_unlock_clears_lock on accept = command.101 == 122 -> context.102.1
 // A failed login outside a lock is recorded; the third in a row locks the
 // account for 900 seconds and resets the count.
 law 503 failed_login_is_recorded on failure = command.101 == 121 && context.102.130 >= pre.100.112 && context.102.130 >= pre.100.111 && post.100.112 == context.102.130 && (pre.100.110 < 2 -> post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111) && (pre.100.110 == 2 -> post.100.110 == 0 && post.100.111 == context.102.130 + 900);
+// Reject only for the first documented guard. Otherwise the action laws
+// require the successful login/unlock or the recorded failed login.
+law 504 reject_only_for_first_failed_guard on reject = (context.102.130 < pre.100.112 && decision_reason == 200) || (context.102.130 >= pre.100.112 && command.101 != 122 && context.102.130 < pre.100.111 && decision_reason == 201) || (context.102.130 >= pre.100.112 && command.101 == 122 && context.102.131 == 0 && decision_reason == 202);
+law 505 failure_names_login_failed on failure = decision_reason == 203;
+// One alert for the third failed login or an administrator unlock, with the
+// exact post-decision deadline. Other committing actions send nothing.
+law 510 alerts_match_the_account_transition on commit = (command.101 == 122 -> outbox.104 == 1 && outbox.104.140 == 151 && outbox.104.141 == 0) && (command.101 == 121 && pre.100.110 == 2 -> outbox.104 == 1 && outbox.104.140 == 150 && outbox.104.141 == context.102.130 + 900) && (command.101 == 120 || (command.101 == 121 && pre.100.110 < 2) -> outbox.104 == 0);
+law 511 alerts_go_to_the_security_team on commit = (command.101 == 122 || (command.101 == 121 && pre.100.110 == 2)) -> outbox.104 == 1;
 // Law 500 by induction, for `zeno-fcis prove`: the action laws alone keep
 // every committed account consistent. `tests/claims.rs` checks the rest.
 claim 600 lock_state_stays_consistent all inductive accept [501, 502] failure [503] = pre.100.111 <= pre.100.112 + 900 && (pre.100.111 > pre.100.112 -> pre.100.110 == 0);

@@ -13,7 +13,7 @@ use zeno_fcis_spec::{ProjectLimits, ProjectSpec, SourceLimits, elaborate_project
 /// The rejection law. The framework checks it for every rejection: a
 /// rejection commits no state, effect, or outbox entry. It has no formula, so
 /// it is registered here instead of as an always-true law in `project.zeno`.
-pub const REJECT_PUBLISHES_NOTHING: u32 = 509;
+pub const REJECT_PUBLISHES_NOTHING: u32 = 909;
 
 pub fn digest(label: &str, bytes: &[u8]) -> Hash32 {
     commitment::<RustCryptoSha256>(Domain::new(label, 1).expect("static domain"), bytes)
@@ -125,9 +125,19 @@ pub fn manifest() -> LawManifest {
                     DecisionScope::Accept,
                     no_genesis(),
                 ),
-                503 => (
+                503 | 505 => (
                     LawKind::CommittedFailureEffects,
                     DecisionScope::CommittedFailure,
+                    no_genesis(),
+                ),
+                504 => (
+                    LawKind::RejectNoAuthority,
+                    DecisionScope::Reject,
+                    no_genesis(),
+                ),
+                510 | 511 => (
+                    LawKind::AuthoritySubjectRecipient,
+                    DecisionScope::Committing,
                     no_genesis(),
                 ),
                 _ => panic!("a new law needs a reviewed runtime binding"),
@@ -151,7 +161,7 @@ pub fn manifest() -> LawManifest {
         LawDefinition::try_new(
             id(REJECT_PUBLISHES_NOTHING),
             name("reject_publishes_nothing"),
-            LawKind::RejectNoAuthority,
+            LawKind::AuthoritySubjectRecipient,
             DecisionScope::Reject,
             no_genesis(),
             digest(

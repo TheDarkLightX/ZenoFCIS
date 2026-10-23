@@ -43,6 +43,21 @@ def refresh_site_law_fixture(contract):
     fixture.write_text(text)
 
 
+def refresh_draft_law_bindings(contract):
+    """Keep independent draft cases; refresh only their declared-law bindings."""
+    fixture = ROOT / 'crates/zeno-fcis-cli/tests/fixtures/contract-draft' / (contract.name + '.rules.json')
+    if not fixture.exists():
+        return
+    policy = json.loads((contract / 'v2/policy.json').read_text())
+    proposal = json.loads(fixture.read_text())
+    for key in ('law_kinds', 'delivery_laws'):
+        if key in policy:
+            proposal[key] = policy[key]
+        else:
+            proposal.pop(key, None)
+    fixture.write_text(json.dumps(proposal, indent=2) + '\n')
+
+
 def refresh(cli, contract, oracle=False):
     def run(*args):
         subprocess.run(['nice', '-n', '19', 'ionice', '-c3', str(cli), '--no-kb', *map(str, args)], check=True)
@@ -83,6 +98,7 @@ def refresh(cli, contract, oracle=False):
             run('generate', 'contract', contract, '--out', retained)
             run('generate', 'contract', retained, '--check')
         refresh_site_law_fixture(contract)
+        refresh_draft_law_bindings(contract)
 
 
 if __name__ == '__main__':
