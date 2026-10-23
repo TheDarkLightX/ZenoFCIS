@@ -17,7 +17,8 @@ Each `from_<state>` law expands to `true` where the controller wins and `false` 
 A game declares, for each state `i`:
 - who moves there (`mover[i]`: 0 for the controller, 1 for the environment);
 - whether it is a goal (`goal[i]`);
-- its moves, as successor slots `next0[i]`, `next1[i]`, ... (value `j+1`, or 0 for none).
+- its moves, as successor slots `next0[i]`, `next1[i]`, ... (value `j+1`, or 0 for none);
+- for a fairness question, whether the environment's assumption holds there (`fair[i]`).
 
 The controllable predecessor of a set X holds at state i when one of these holds:
 - the controller moves at i and some move leads into X;
@@ -41,9 +42,9 @@ The controllable predecessor of a set X holds at state i when one of these holds
 ## Examples
 | Example | Question | Answer |
 |---|---|---|
-| `games/release-pipeline` | Can the maintainer force a release? | No, from draft: the reviewer can request changes forever. |
+| `games/release-pipeline` | Can the maintainer force a release? | No, from draft, in review or changes requested: the reviewer can request changes forever. Yes, from approved and released. |
 | `games/release-pipeline-bounded` | The same with at most two review rounds, then escalation | Yes, from every state. |
-| `games/withdrawal-window` | Can a user withdraw infinitely often while the operator may pause? | No: the operator can keep the window paused. |
+| `games/withdrawal-window` | Can a user withdraw infinitely often while the operator may pause? | No, from every state: the operator can keep the window paused. |
 | `games/withdrawal-window-auto-resume` | The same, where a pause lasts one step | Yes, from every state. |
 | `games/withdrawal-window-fair` | The same as the first withdrawal question, assuming the operator reopens the window infinitely often | Yes, from every state (No without the assumption). |
 | `games/release-pipeline-fair` | Can changes be released infinitely often, assuming the reviewer approves infinitely often? | Yes, from every state (No without the assumption). |

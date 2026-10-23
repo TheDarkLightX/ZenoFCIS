@@ -156,6 +156,7 @@ docs/STRICT_CANONICAL_PLAN_DECODERS.md
 docs/SUPPLY_CHAIN_EXCEPTIONS.md
 docs/SYMBOLIC_CHECKS.md
 docs/SYSTEM_PROPERTIES.md
+docs/TABLE_GAMES.md
 docs/TAU_KIT.md
 docs/TELEMETRY.md
 docs/TEMPORAL_LOGIC_V1.md
@@ -371,6 +372,7 @@ examples/contract-tables/README.md
 examples/contract-tables/constant-role-hierarchy/README.md
 examples/contract-tables/delegation/README.md
 examples/contract-tables/fee-tiers/README.md
+examples/contract-tables/games/README.md
 examples/contract-tables/library-limits/README.md
 examples/contract-tables/library-loans/README.md
 examples/contract-tables/permission-words/README.md
