@@ -243,6 +243,50 @@ const LAW_503: &[l::Op<'static>] = &[
     l::Op::And(36, 37),
     l::Op::Not(38),
 ];
+const LAW_510: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::OutboxLength),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Lt(2, 1),
+    l::Op::Not(3),
+    l::Op::Literal(l::Atom::I128(300)),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(6, 1),
+    l::Op::ObserveWhen(7, l::Observation::OutboxChannel(0), l::Atom::I128(0)),
+    l::Op::Eq(8, 5),
+    l::Op::And(7, 9),
+    l::Op::Select(10, 2, 6),
+    l::Op::Add(6, 11),
+    l::Op::ObserveWhen(10, l::Observation::OutboxPayload(0, 112), l::Atom::I128(0)),
+    l::Op::Add(6, 13),
+    l::Op::Eq(12, 2),
+    l::Op::Observe(l::Observation::Post(110)),
+    l::Op::ToI128(16),
+    l::Op::Eq(14, 17),
+    l::Op::And(15, 18),
+    l::Op::And(4, 19),
+];
+const LAW_511: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::OutboxLength),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Lt(2, 1),
+    l::Op::Not(3),
+    l::Op::Literal(l::Atom::I128(300)),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(6, 1),
+    l::Op::ObserveWhen(7, l::Observation::OutboxChannel(0), l::Atom::I128(0)),
+    l::Op::Eq(8, 5),
+    l::Op::And(7, 9),
+    l::Op::ObserveWhen(10, l::Observation::OutboxDestination(0), l::Atom::Text(b"")),
+    l::Op::Literal(l::Atom::Text(b"local-observer")),
+    l::Op::Eq(11, 12),
+    l::Op::And(10, 13),
+    l::Op::Select(14, 2, 6),
+    l::Op::Add(6, 15),
+    l::Op::Eq(16, 2),
+    l::Op::And(4, 17),
+];
 const LAW_909: &[l::Op<'static>] = &[
     l::Op::Observe(l::Observation::PostLength),
     l::Op::ToI128(0),
@@ -448,6 +492,26 @@ pub const LAWS: &[l::Law<'static>] = &[
         },
     },
     l::Law {
+        id: 510,
+        kind: l::Kind::AuthoritySubjectRecipient,
+        scope: l::Scope::Committing,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_510,
+            root: 20,
+        },
+    },
+    l::Law {
+        id: 511,
+        kind: l::Kind::AuthoritySubjectRecipient,
+        scope: l::Scope::Committing,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_511,
+            root: 18,
+        },
+    },
+    l::Law {
         id: 909,
         kind: l::Kind::AuthoritySubjectRecipient,
         scope: l::Scope::Reject,
@@ -479,7 +543,7 @@ pub const LAWS: &[l::Law<'static>] = &[
     },
 ];
 /// No declared law is optional at descriptor admission.
-pub const REQUIRED: &[u32] = &[500, 501, 502, 503, 909, 990, 991];
+pub const REQUIRED: &[u32] = &[500, 501, 502, 503, 510, 511, 909, 990, 991];
 /// Owns declarative input/output type tables; evaluation stays in the library.
 pub struct Contract {
     state: Vec<InputField>,
@@ -639,14 +703,14 @@ impl Contract {
             laws: LAWS,
             required: REQUIRED,
             limits: v2_zero_limits()
-                .with_limit(Resource::Read, 114)
+                .with_limit(Resource::Read, 121)
                 .with_limit(Resource::Write, 1)
                 .with_limit(Resource::Candidate, 1)
                 .with_limit(Resource::Effect, 1)
                 .with_limit(Resource::Byte, 231)
                 .with_limit(Resource::WitnessByte, 0)
                 .with_limit(Resource::Depth, 0)
-                .with_limit(Resource::Step, 281),
+                .with_limit(Resource::Step, 321),
         }
     }
 }

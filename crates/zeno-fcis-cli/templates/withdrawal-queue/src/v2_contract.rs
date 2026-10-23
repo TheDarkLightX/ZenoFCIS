@@ -1898,6 +1898,73 @@ const LAW_513: &[l::Op<'static>] = &[
     l::Op::And(151, 152),
     l::Op::Not(153),
 ];
+const LAW_514: &[l::Op<'static>] = &[
+    l::Op::Observe(l::Observation::OutboxLength),
+    l::Op::ToI128(0),
+    l::Op::Literal(l::Atom::I128(1)),
+    l::Op::Lt(2, 1),
+    l::Op::Not(3),
+    l::Op::Literal(l::Atom::I128(300)),
+    l::Op::Literal(l::Atom::I128(0)),
+    l::Op::Lt(6, 1),
+    l::Op::ObserveWhen(7, l::Observation::OutboxChannel(0), l::Atom::I128(0)),
+    l::Op::Eq(8, 5),
+    l::Op::And(7, 9),
+    l::Op::Select(10, 2, 6),
+    l::Op::Add(6, 11),
+    l::Op::Observe(l::Observation::Command(130)),
+    l::Op::ToI128(13),
+    l::Op::Literal(l::Atom::I128(163)),
+    l::Op::Eq(14, 15),
+    l::Op::Literal(l::Atom::I128(162)),
+    l::Op::Eq(14, 17),
+    l::Op::Observe(l::Observation::Pre(125)),
+    l::Op::ToI128(19),
+    l::Op::Eq(20, 6),
+    l::Op::And(18, 21),
+    l::Op::Observe(l::Observation::Context(141)),
+    l::Op::ToI128(23),
+    l::Op::Eq(24, 6),
+    l::Op::Observe(l::Observation::Pre(126)),
+    l::Op::ToI128(26),
+    l::Op::Eq(27, 2),
+    l::Op::Not(25),
+    l::Op::Not(28),
+    l::Op::And(29, 30),
+    l::Op::Not(31),
+    l::Op::And(22, 32),
+    l::Op::Observe(l::Observation::Pre(121)),
+    l::Op::ToI128(34),
+    l::Op::Literal(l::Atom::I128(180)),
+    l::Op::Eq(35, 36),
+    l::Op::Not(37),
+    l::Op::Observe(l::Observation::Pre(123)),
+    l::Op::ToI128(39),
+    l::Op::Eq(40, 36),
+    l::Op::Not(41),
+    l::Op::Not(38),
+    l::Op::Not(42),
+    l::Op::And(43, 44),
+    l::Op::Not(45),
+    l::Op::And(33, 46),
+    l::Op::Not(16),
+    l::Op::Not(47),
+    l::Op::And(48, 49),
+    l::Op::Not(50),
+    l::Op::Eq(12, 2),
+    l::Op::Not(51),
+    l::Op::Not(53),
+    l::Op::Not(52),
+    l::Op::And(54, 55),
+    l::Op::Not(56),
+    l::Op::Eq(12, 6),
+    l::Op::Not(54),
+    l::Op::Not(58),
+    l::Op::And(59, 60),
+    l::Op::Not(61),
+    l::Op::And(57, 62),
+    l::Op::And(4, 63),
+];
 const LAW_508: &[l::Op<'static>] = &[l::Op::Literal(l::Atom::Bool(false))];
 const LAW_909: &[l::Op<'static>] = &[
     l::Op::Observe(l::Observation::PostLength),
@@ -2981,6 +3048,16 @@ pub const LAWS: &[l::Law<'static>] = &[
         },
     },
     l::Law {
+        id: 514,
+        kind: l::Kind::DebitCreditEffectEquality,
+        scope: l::Scope::Committing,
+        genesis: false,
+        program: l::Program {
+            nodes: LAW_514,
+            root: 64,
+        },
+    },
+    l::Law {
         id: 508,
         kind: l::Kind::CommittedFailureEffects,
         scope: l::Scope::CommittedFailure,
@@ -3023,7 +3100,7 @@ pub const LAWS: &[l::Law<'static>] = &[
 ];
 /// No declared law is optional at descriptor admission.
 pub const REQUIRED: &[u32] = &[
-    500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 513, 508, 909, 990, 991,
+    500, 501, 502, 503, 504, 505, 506, 510, 511, 512, 513, 514, 508, 909, 990, 991,
 ];
 /// Owns declarative input/output type tables; evaluation stays in the library.
 pub struct Contract {
@@ -3504,14 +3581,14 @@ impl Contract {
             laws: LAWS,
             required: REQUIRED,
             limits: v2_zero_limits()
-                .with_limit(Resource::Read, 345)
+                .with_limit(Resource::Read, 353)
                 .with_limit(Resource::Write, 8)
                 .with_limit(Resource::Candidate, 1)
                 .with_limit(Resource::Effect, 1)
                 .with_limit(Resource::Byte, 339)
                 .with_limit(Resource::WitnessByte, 0)
                 .with_limit(Resource::Depth, 0)
-                .with_limit(Resource::Step, 1830),
+                .with_limit(Resource::Step, 1895),
         }
     }
 }
