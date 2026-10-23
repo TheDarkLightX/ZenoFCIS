@@ -5,7 +5,12 @@ use std::{
     process::{Command, Stdio},
 };
 
-pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
+pub(crate) fn scaffold(
+    dir: &Path,
+    contract: &Path,
+    source: Option<&Path>,
+    scratch: Option<&Path>,
+) -> u8 {
     // Collection applications use the same checked producer and a plain form.
     // Their original key inputs are not the finite scalar UI's class inputs.
     if let Ok(inputs) = crate::contract_files::Inputs::read(contract)
@@ -50,7 +55,9 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
     println!(
         "app build: running the pinned Python app factory and ZenoUI checks; see app-manifest.json"
     );
-    match Command::new("python3")
+    let mut command = Command::new("python3");
+    command
+        .arg("-B")
         .arg(binding.tree.join("tools/app_factory.py"))
         .arg("--cli")
         .arg(executable)
@@ -58,9 +65,11 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
         .arg(contract)
         .arg("--out")
         .arg(dir)
-        .stdin(Stdio::null())
-        .status()
-    {
+        .stdin(Stdio::null());
+    if let Some(scratch) = scratch {
+        command.arg("--scratch").arg(scratch);
+    }
+    match command.status() {
         Ok(status) if status.success() => 0,
         Ok(_) => FAILURE,
         Err(error) => {

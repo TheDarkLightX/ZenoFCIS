@@ -286,9 +286,12 @@ All commands are bounded. The contained loop worker has a 64 MiB memory limit an
         /// Build the checked UI and authenticated SQLite application using the pinned Python generator.
         #[arg(long, requires = "contract")]
         app: bool,
-        /// ZenoFCIS source tree a Cargo application's ZenoFCIS packages resolve to. Default: the tree this CLI was built from, while it exists.
+        /// Read-only ZenoFCIS source tree a Cargo application's packages resolve to. Default: the tree this CLI was built from, while it exists. App build files go to temporary scratch, never this tree.
         #[arg(long)]
         source: Option<PathBuf>,
+        /// Parent for temporary app build files, including the six demonstration libraries. Default: the system temporary directory. Must be outside --source. Temporary build directories are removed; the parent remains. CARGO_TARGET_DIR, when set, is retained outside --source.
+        #[arg(long, requires = "app")]
+        scratch: Option<PathBuf>,
     },
     /// Parse and elaborate a .zeno project with accumulated diagnostics.
     Check {
@@ -652,9 +655,15 @@ fn run(command: Command) -> u8 {
             contract,
             app,
             source,
+            scratch,
         } => {
             if app {
-                app_factory::scaffold(&dir, contract.as_deref().unwrap_or(&dir), source.as_deref())
+                app_factory::scaffold(
+                    &dir,
+                    contract.as_deref().unwrap_or(&dir),
+                    source.as_deref(),
+                    scratch.as_deref(),
+                )
             } else {
                 new_project(&dir, template, contract.as_deref(), source.as_deref())
             }

@@ -6,6 +6,7 @@ import unittest
 import io
 import json
 import hashlib
+import os
 import sys
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -82,7 +83,7 @@ class LibraryPreparationTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        self.destination = self.root / "site/apps/withdrawal-queue"
+        self.destination = self.root / "scratch/site/apps/withdrawal-queue"
         self.root_patch = patch.object(app_factory, "ROOT", self.root)
         self.root_patch.start()
         self.addCleanup(self.root_patch.stop)
@@ -107,11 +108,11 @@ class LibraryPreparationTests(unittest.TestCase):
 
         with patch.object(app_factory, "run", side_effect=failed):
             with self.assertRaises(subprocess.CalledProcessError):
-                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertFalse(self.destination.exists())
         self.assertEqual(list(self.destination.parent.iterdir()), [])
         with patch.object(app_factory, "run", side_effect=self.generate):
-            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertTrue((self.destination / "src/lib.rs").is_file())
         self.assertNotIn("[patch.crates-io]", (self.destination / "Cargo.toml").read_text())
         self.assertFalse((self.destination / "Cargo.lock").exists())
@@ -123,38 +124,132 @@ class LibraryPreparationTests(unittest.TestCase):
         before = app_factory.hashes(self.destination)
         with patch.object(app_factory, "run", side_effect=self.generate):
             with self.assertRaisesRegex(ValueError, "AppLibraryIncompleteOrChanged"):
-                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertEqual(app_factory.hashes(self.destination), before)
         self.assertEqual(list(self.destination.parent.iterdir()), [self.destination])
 
     def test_manifest_alone_does_not_make_a_library_complete(self):
         with patch.object(app_factory, "run", side_effect=self.generate):
-            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
             (self.destination / "src/lib.rs").unlink()
             before = app_factory.hashes(self.destination)
             with self.assertRaisesRegex(ValueError, "AppLibraryIncompleteOrChanged"):
-                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertEqual(app_factory.hashes(self.destination), before)
 
     def test_changed_library_is_refused_without_overwriting(self):
         with patch.object(app_factory, "run", side_effect=self.generate):
-            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
             (self.destination / "src/lib.rs").write_text("retained edited output")
             before = app_factory.hashes(self.destination)
             with self.assertRaisesRegex(ValueError, "AppLibraryIncompleteOrChanged"):
-                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+                app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertEqual(app_factory.hashes(self.destination), before)
 
     def test_complete_library_is_checked_and_extra_build_files_are_preserved(self):
         with patch.object(app_factory, "run", side_effect=self.generate) as generate:
-            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
             extra = self.destination / "target/retained"
             extra.parent.mkdir()
             extra.write_text("build output")
             before = app_factory.hashes(self.destination)
-            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue")
+            app_factory.prepare_library(Path("test-cli"), "withdrawal-queue", self.destination.parent.parent)
         self.assertEqual(generate.call_count, 2)
         self.assertEqual(app_factory.hashes(self.destination), before)
+
+
+class WorkspacePreparationTests(unittest.TestCase):
+    def test_default_temporary_directory_discovery_never_probes_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, scratch = root / "source", root / "scratch"
+            (source / "v2").mkdir(parents=True)
+            (source / "v2/policy.json").write_text("{}")
+            (source / "ui.json").write_text("{}")
+            scratch.mkdir()
+            probes = []
+            original_open = os.open
+            def opened(path, flags, *args, **kwargs):
+                if Path(path).is_relative_to(source):
+                    probes.append(str(path))
+                return original_open(path, flags, *args, **kwargs)
+            arguments = ["app_factory", "--cli", "test-cli", "--contract", str(source), "--out", str(root / "app")]
+            refusal = None
+            with patch.object(sys, "argv", arguments), patch.object(app_factory, "ROOT", source), patch.dict(os.environ, {"TMPDIR": str(source), "TEMP": str(scratch), "TMP": str(scratch)}), patch.object(tempfile, "tempdir", None), patch.object(os, "open", side_effect=opened), patch.object(app_factory.subprocess, "check_output", return_value="v22.0.0"), patch.object(app_factory, "contract_review", return_value={}), patch.object(app_factory, "build", side_effect=ValueError("planted build refusal")):
+                try:
+                    app_factory.main()
+                except ValueError as error:
+                    refusal = str(error)
+            self.assertFalse(probes, "temporary-directory discovery must not probe the source for writing")
+            self.assertEqual(refusal, "planted build refusal")
+            self.assertEqual(list(scratch.iterdir()), [])
+
+    def test_main_cleans_invocation_scratch_on_refusal_and_overrides_source_tmpdir(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, contract = root / "source", root / "contract"
+            source.mkdir()
+            (contract / "v2").mkdir(parents=True)
+            (contract / "v2/policy.json").write_text("{}")
+            (contract / "ui.json").write_text("{}")
+            for explicit in [False, True]:
+                scratch = root / ("explicit" if explicit else "default")
+                scratch.mkdir()
+                arguments = ["app_factory", "--cli", "test-cli", "--contract", str(contract), "--out", str(root / "app")]
+                if explicit:
+                    arguments += ["--scratch", str(scratch)]
+                def review(cli, subject, work):
+                    self.assertEqual(work.parent, scratch)
+                    self.assertTrue(work.is_dir())
+                    self.assertFalse(work.is_relative_to(source))
+                    return {}
+                with patch.object(sys, "argv", arguments), patch.object(app_factory, "ROOT", source), patch.dict(os.environ, {"TMPDIR": str(source if explicit else scratch)}), patch.object(app_factory.subprocess, "check_output", return_value="v22.0.0"), patch.object(app_factory, "contract_review", side_effect=review), patch.object(app_factory, "build", side_effect=ValueError("planted build refusal")):
+                    with self.assertRaisesRegex(ValueError, "planted build refusal"):
+                        app_factory.main()
+                self.assertEqual(list(scratch.iterdir()), [])
+                self.assertEqual(list(source.iterdir()), [])
+                self.assertFalse((root / "app").exists())
+
+    def test_read_only_source_is_unchanged_and_libraries_are_staged_in_scratch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, work = root / "source", root / "scratch"
+            (source / "site/common").mkdir(parents=True)
+            (source / "crates/example").mkdir(parents=True)
+            (source / "site/Cargo.toml").write_text('[patch.crates-io]\nexample = { path = "../crates/example" }\n')
+            (source / "site/common/input.rs").write_text("retained source")
+            work.mkdir()
+            before = app_factory.hashes(source)
+            paths = [source, *source.rglob("*")]
+            for path in paths:
+                path.chmod(0o555 if path.is_dir() else 0o444)
+            def generate(cli, template, site):
+                destination = site / "apps" / template
+                destination.mkdir(parents=True)
+                (destination / "Cargo.toml").write_text(template)
+            try:
+                with patch.object(app_factory, "ROOT", source), patch.object(app_factory, "prepare_library", side_effect=generate):
+                    site = app_factory.prepare_workspace(Path("test-cli"), work)
+                self.assertEqual(app_factory.hashes(source), before)
+                self.assertFalse((source / "site/apps").exists())
+                self.assertEqual(len(list((site / "apps").iterdir())), 6)
+                self.assertIn(str(source / "crates/example"), (site / "Cargo.toml").read_text())
+                self.assertEqual((site / "common/input.rs").read_text(), "retained source")
+            finally:
+                for path in paths:
+                    path.chmod(0o755 if path.is_dir() else 0o644)
+
+    def test_writable_paths_cannot_resolve_into_the_source_tree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (root / "alias").symlink_to(source, target_is_directory=True)
+            with patch.object(app_factory, "ROOT", source):
+                for path in [source, source / "target", root / "alias/scratch"]:
+                    with self.assertRaisesRegex(ValueError, "AppBuildPathInsideSource"):
+                        app_factory.outside_source(path)
+                self.assertEqual(app_factory.outside_source(root / "scratch"), root / "scratch")
 
 
 if __name__ == "__main__":

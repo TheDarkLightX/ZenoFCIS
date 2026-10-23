@@ -51,8 +51,19 @@ must be cached. The command builds the native descriptor checker and shared
 UI runtime offline, checks the complete finite input domain and the eight
 ZenoUI laws with planted defects, and checks the mounted shared components.
 There is no network step. Unsupported descriptors and missing metadata refuse.
-The first build also generates the six demonstration libraries required by
-the existing site workspace, if they are absent.
+Each build copies the site workspace and generates its six demonstration
+libraries under a fresh temporary build directory, never in `--source`.
+Use `--scratch DIR` to choose the parent of that directory; otherwise the
+system temporary directory is used. The temporary workspace and its default
+Cargo target are removed after the build, including on refusal. To retain
+compiled files between builds, set `CARGO_TARGET_DIR` outside `--source`.
+The app is written to the output directory named after `new`; output,
+scratch and Cargo targets must all be outside the selected source tree.
+Temporary-directory environment settings inside the source tree are skipped
+before any directory is tested for writing.
+This isolation uses the temporary-directory lifecycle described in the
+Python Software Foundation's [Python 3.11 Library Reference, tempfile
+(2022)](https://docs.python.org/3.11/library/tempfile.html).
 
 The output contains the core, SQLite session, an `app-server` binary target,
 static UI assets, `context.json`, the copied and reconciled Cargo lock,
