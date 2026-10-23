@@ -7,7 +7,7 @@
     "python3 -B tools/trace_game/run_v11.py --certificates-only --out OUT",
     "python3 -B tools/trace_game/certificate_check.py OUT withdrawal-safety.json"
   ],
-  "engine": "Bounded complete prefix search; complete finite product graph and greatest fixed point; separate certificate checker reconstructs moves and closure.",
+  "engine": "Native reachable-state acquisition; bounded complete prefix search; complete finite product graph and greatest fixed point; separate certificate checker reconstructs moves and closure.",
   "use_when": [
     "find an adversarial history",
     "check bounded attacker traces",
@@ -115,7 +115,7 @@ additional attacker moves outside the declared alphabet; real schedulers or depl
 
 Repository withdrawal/composition fixtures, or user game JSON zeno-fcis/game/1 through tools/trace_game/game.py. Use fresh evidence outside source; --certificates-only skips repository-wide checks.
 
-Engine: Bounded complete prefix search; complete finite product graph and greatest fixed point; separate certificate checker reconstructs moves and closure.
+Engine: Native reachable-state acquisition; bounded complete prefix search; complete finite product graph and greatest fixed point; separate certificate checker reconstructs moves and closure.
 
 Synopsis: ["python3 -B tools/trace_game/run.py --out OUT", "python3 -B tools/trace_game/run_v11.py --certificates-only --out OUT", "python3 -B tools/trace_game/certificate_check.py OUT withdrawal-safety.json"]
 
@@ -196,3 +196,5 @@ Run `zeno-fcis guide find "find an adversarial history"` for related cards.
 Background: IEEE and The Open Group, *POSIX.1-2024*, Shell Command Language, 2024,
 defines shell exit status conventions. See the [shared exit contract](../CLI_REFERENCE.md#exit-codes)
 for this interface; the packet defines the finite scope of each verdict.
+
+Native acquisition budgets distinct states reachable from admitted genesis under the declared events and supplied guards, rather than the full Cartesian domain. Its native closure conservatively supplies the fixed-coalition/fixed-guard products; state, row or time stops remain UNKNOWN. Background: Christel Baier and Joost-Pieter Katoen, *Principles of Model Checking*, MIT Press, 2008. This applies established reachable-state exploration; no new method is claimed.

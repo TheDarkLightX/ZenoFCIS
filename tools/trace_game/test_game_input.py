@@ -88,7 +88,14 @@ class NativeGame(unittest.TestCase):
         spec,table,packet=self.safe
         self.assertEqual(self.verdict(self.safe)['evidence'],'certified safety')
         self.assertTrue(packet['genesis_replayed'])
-        refused=[r for r in table.values() if r['class']=='Refused']
+        # Invalid Cartesian pre-states are no longer acquired. Make a real
+        # reachable refusal: the deposit violates the unchanged money laws.
+        game,contract=game_spec.load(ROOT/'test-data/trace-games/escrow-safe.json')
+        policy=json.loads((contract/'v2/policy.json').read_text())
+        policy['cases'][3]['post']['111']=0
+        refusal_packet=native(self.binary,dict(project=(contract/'project.zeno').read_text(),
+            policy=json.dumps(policy),events=spec['events'],formula='false',guards=['true']))
+        refused=[r for r in refusal_packet['rows'] if r['class']=='Refused']
         self.assertTrue(refused)
         self.assertTrue(all(r['refusal_repeated'] and r['usage_steps']>0 and r['usage_reads']>0 for r in refused))
         self.assertTrue(all(r['publication_replayed'] for r in table.values() if r['class']!='Refused'))

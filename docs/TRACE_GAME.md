@@ -327,9 +327,28 @@ frames without narrowing. Explicit arena certificates do not remove this native
 provenance requirement. This follows the supervisory-control separation between
 a declared plant model and its controller, cited in Background.
 
+Acquisition starts at the admitted genesis and closes the native Authority
+successor relation over the declared capability events. Rejects and technical
+refusals keep the state; accepts and committed failures use the checked
+successor. A transition disabled by every supplied guard does not add a state.
+The 10,000 native-state budget counts distinct discovered states, and the
+100,000-row budget counts acquired state/event pairs. Wide declared Cartesian
+state domains are not enumerated. A state, row or 30-second acquisition stop
+remains UNKNOWN; it cannot supply a partial certificate.
+
+This native closure may mix actors and supplied guards, so it conservatively
+supplies the later products. The existing product construction separately
+fixes each coalition and selected guard and applies objective terminals.
+Its independent certificate checks and budgets are unchanged. Every acquired
+row retains publication replay or repeated refusal and its original measured
+steps and reads. This is ordinary reachable-state exploration, rather than a
+new game-solving method.
+
 ## Background
 
-The finite-game methods build on these published sources:
+The finite-game methods and native state exploration build on these published sources:
+
+- Christel Baier and Joost-Pieter Katoen, *Principles of Model Checking*, MIT Press, 2008.
 
 - Alonzo Church, “Applications of Recursive Arithmetic to the Problem of Circuit
   Synthesis,” Summaries of the Summer Institute of Symbolic Logic, 1957.
