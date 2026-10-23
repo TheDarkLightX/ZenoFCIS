@@ -157,3 +157,27 @@ fn collections_genesis_obeys_all_runtime_startup_laws() {
     assert_eq!(result.packet()["result"]["law"], 980);
     assert_eq!(result.packet()["measured"]["tuples"], 0);
 }
+
+#[test]
+fn opaque_collection_laws_are_rechecked_after_alias_merge() {
+    let project = format!(
+        "{TOKENS}\nlaw 504 merged_sender on commit = command.101.130 != 150 || post.100.161 == pre.100.161;\n"
+    );
+    let rules = rules_with(|r| r["law_kinds"]["504"] = "DebitCreditEffectEquality".into());
+    let result =
+        check(&project, &rules, Limits::default()).unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(result.verdict(), Verdict::Refuted, "{}", result.packet());
+    assert_eq!(result.packet()["result"]["obligation"], "merged post laws");
+}
+
+#[test]
+fn opaque_collection_invariants_are_uniform_and_input_independent() {
+    for formula in ["post.100.161 == 0", "command.101.130 == 150"] {
+        let project =
+            format!("{TOKENS}\nlaw 504 unsafe_invariant on commit, genesis = {formula};\n");
+        assert!(
+            zeno_fcis_spec::parse_project(&project, Default::default()).is_err(),
+            "{formula}"
+        );
+    }
+}

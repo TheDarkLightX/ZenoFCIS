@@ -1164,17 +1164,17 @@ impl Parser {
             if !law.applicability().is_some_and(|a| a.genesis()) {
                 continue;
             }
-            if !key_paths.ordered.is_empty() && formula_has_input(law.formula()) {
+            if !entries.is_empty() && formula_has_input(law.formula()) {
                 problems.push((
                     spanned.span,
                     "law.order",
-                    "ordered state invariants independent of command and context observations",
+                    "collection state invariants independent of command and context observations",
                     text(law.id().get()).into(),
                 ));
             }
             let mut conjuncts = Vec::new();
             crate::collections::conjuncts(law.formula(), &mut conjuncts);
-            if !key_paths.ordered.is_empty() {
+            if !entries.is_empty() {
                 for conjunct in &conjuncts {
                     let mut reads = BTreeSet::new();
                     crate::collections::state_reads(conjunct, state_owner, &mut reads);

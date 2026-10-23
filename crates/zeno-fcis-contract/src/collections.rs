@@ -446,9 +446,6 @@ pub fn check(
                                 .filter_map(|(id, v)| Some((*id, v.number()?)))
                                 .collect();
                             if let Some(failure) = shape.obligations(&tuple, &post, |merged| {
-                                if ordered.is_empty() {
-                                    return true;
-                                }
                                 let result = transition_laws.on_transition_with_outbox(
                                     &framer,
                                     &tuple,
