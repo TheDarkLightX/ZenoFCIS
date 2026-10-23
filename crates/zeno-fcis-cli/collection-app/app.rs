@@ -220,14 +220,25 @@ impl<'a, 'p> Application<'a, 'p> {
             .collect::<Result<BTreeMap<_, _>, Refusal>>()?;
         let reply = json!({"input":numbers(&framed.tuple),"class":format!("{:?}",candidate.class()),"reason":candidate.reason(),"post":post.iter().map(|(id,v)| (id.to_string(),v.to_string())).collect::<BTreeMap<_,_>>(),"loads":loads});
         let (writes, subject) = match outcome {
-            PublicationOutcome::Commit(publication) => (
-                Some(
-                    self.layout
-                        .writes(&framed, &post)
-                        .map_err(|_| Refusal::Decision)?,
-                ),
-                Some(publication.subject().to_vec()),
-            ),
+            PublicationOutcome::Commit(publication) => {
+                let writes = self
+                    .layout
+                    .writes(&framed, &post)
+                    .map_err(|_| Refusal::Decision)?;
+                let checked = self
+                    .layout
+                    .check_successor(
+                        self.authority.descriptor(),
+                        &framed,
+                        &writes,
+                        publication.evaluation(),
+                    )
+                    .map_err(|_| Refusal::Decision)?;
+                if checked.into_parts().0.is_err() {
+                    return Err(Refusal::Decision);
+                }
+                (Some(writes), Some(publication.subject().to_vec()))
+            }
             PublicationOutcome::Reject(_) => (None, None),
             _ => return Err(Refusal::Decision),
         };

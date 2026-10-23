@@ -132,6 +132,20 @@ struct EntryView {
     stored_keys: Vec<(usize, u32)>,
 }
 
+/// The stored absence has no payload. Use each declared domain's least
+/// value in every view of that absence, independent of its previous bytes.
+fn canonical_absent_view(
+    positions: &[Position],
+    presence: usize,
+    values: impl IntoIterator<Item = usize>,
+    view: &mut [i128],
+) {
+    view[presence] = 0;
+    for position in values {
+        view[position] = positions[position].domain.least().unwrap_or(0);
+    }
+}
+
 /// One summary's view position and what it adds up.
 struct SummaryView {
     id: u32,
@@ -818,9 +832,12 @@ impl Shape<'_> {
         // boundary; stored field bytes do not survive a removal.
         for entry in self.entries {
             if merged[entry.presence] == 0 {
-                for position in &entry.values {
-                    merged[*position] = self.positions[*position].domain.least().unwrap_or(0);
-                }
+                canonical_absent_view(
+                    self.positions,
+                    entry.presence,
+                    entry.values.iter().copied(),
+                    &mut merged,
+                );
             }
         }
         // An absent field's default class need not name any concrete key.

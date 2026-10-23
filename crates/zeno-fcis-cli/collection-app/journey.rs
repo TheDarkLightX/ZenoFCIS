@@ -23,6 +23,62 @@ fn fixture() -> Value {
     )))
 }
 #[test]
+fn canonical_deletion_is_refused_without_publication() {
+    if fixture()["deletion_regression"] != true {
+        return;
+    }
+    let contract = application::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let directory = configuration_directory();
+    let path = directory.join("deletion.sqlite");
+    let owner = Hash32::new([7; 32]);
+    let parties = || vec![(owner, vec!["180".into()])];
+    let binding = |n: u8| zeno_fcis_shell_sqlite::collections::RequestBinding {
+        key: [n; 32],
+        request: [n + 20; 32],
+    };
+    let snapshot = |app: &Application<'_, '_>| {
+        (
+            ok(app.store().version()),
+            ok(app.store().scalar_state()),
+            ok(app.store().root(110)),
+            ok(app.store().entries(110)),
+            ok(app.store().commits()),
+        )
+    };
+    let key = "10".repeat(32);
+    let mut app = ok(Application::open(&authority, &path, parties()));
+    let place = ok(app.decide(owner, 0, &["150".into(), key.clone()], Some(binding(1))));
+    assert_eq!(place["reply"]["class"], "Accept");
+    let before = snapshot(&app);
+    assert_eq!(before.3.len(), 1);
+    for publish in [false, true] {
+        let cancel = app.decide(
+            owner,
+            1,
+            &["151".into(), key.clone()],
+            publish.then(|| binding(2)),
+        );
+        assert!(
+            matches!(cancel, Err(zeno_fcis_ingress::Refusal::Decision)),
+            "canonical deletion was published despite law 500: {cancel:?}"
+        );
+        assert_eq!(snapshot(&app), before, "refusal changed the store");
+        assert!(ok(app.store().request(&binding(2).key)).is_none());
+    }
+    assert!(app.audit().is_ok());
+    drop(app);
+    let reopened = ok(Application::open(&authority, &path, parties()));
+    assert_eq!(
+        snapshot(&reopened),
+        before,
+        "refused deletion survived restart"
+    );
+    drop(reopened);
+    ok(std::fs::remove_dir_all(directory));
+}
+#[test]
 fn full_map_capacity_refuses_without_publication() {
     let fixture = fixture();
     let Some(capacity) = fixture["capacity_regression"].as_u64() else {
@@ -798,6 +854,44 @@ fn collection_receipts_replay_and_restart() {
         "restart did not resume decisions"
     );
     assert!(reopened.audit().is_ok(), "resumed store failed audit");
+    drop(reopened);
+    ok(std::fs::remove_dir_all(directory));
+}
+
+#[test]
+fn lawful_canonical_deletion_publishes_and_replays() {
+    if fixture()["lawful_deletion_regression"] != true {
+        return;
+    }
+    let contract = application::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = ok(application::authority(&descriptor));
+    let directory = configuration_directory();
+    let path = directory.join("lawful-deletion.sqlite");
+    let owner = Hash32::new([7; 32]);
+    let parties = || vec![(owner, vec!["180".into()])];
+    let binding = |n: u8| zeno_fcis_shell_sqlite::collections::RequestBinding {
+        key: [n; 32],
+        request: [n + 20; 32],
+    };
+    let key = "10".repeat(32);
+    let mut app = ok(Application::open(&authority, &path, parties()));
+    ok(app.decide(owner, 0, &["150".into(), key.clone()], Some(binding(1))));
+    let preview = ok(app.decide(owner, 1, &["151".into(), key.clone()], None));
+    assert_eq!(preview["reply"]["class"], "Accept");
+    assert_eq!(ok(app.store().entries(110)).len(), 1);
+    let cancel = ok(app.decide(owner, 1, &["151".into(), key], Some(binding(2))));
+    assert_eq!(cancel["reply"]["class"], "Accept");
+    assert!(ok(app.store().entries(110)).is_empty());
+    assert_eq!(ok(app.store().version()), 2);
+    assert!(
+        app.audit().is_ok(),
+        "lawful deletion failed independent replay"
+    );
+    drop(app);
+    let reopened = ok(Application::open(&authority, &path, parties()));
+    assert_eq!(ok(reopened.store().version()), 2);
+    assert!(ok(reopened.store().entries(110)).is_empty());
     drop(reopened);
     ok(std::fs::remove_dir_all(directory));
 }

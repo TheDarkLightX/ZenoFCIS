@@ -1,0 +1,22 @@
+zeno 1;
+project 1 removal_witness;
+namespace 2 removal;
+type 100 state Store;
+type 101 command Command;
+type 102 context Context;
+type 103 key Id;
+type 104 data Record;
+type 105 int Quantity in 0..=1;
+type 107 data Action;
+field 140 104 quantity 105;
+map 110 100 items 103 104 capacity 4;
+field 130 101 action 107;
+field 131 101 key 103;
+variant 150 107 Place none;
+variant 151 107 Cancel none;
+variant 180 102 User none;
+entry 160 item of 110 at command.101.131;
+component 400 core { owns 100; reads pre.100; writes post.100; contexts context.102; budget steps 128; }
+merge [400];
+law 500 deletion on commit = command.101.130 == 151 && pre.100.160 == 1 && pre.100.161 == 1 -> post.100.161 == 1;
+law 501 marker on commit, genesis = true;

@@ -20,6 +20,12 @@ STORE = "crates/zeno-fcis-shell-sqlite/src/collections.rs"
 LAYOUT = "crates/zeno-fcis-contract/src/collections/runtime.rs"
 WRAP = ["nice", "-n", "19", "ionice", "-c3"]
 CONTROLS = [
+    ("canonical-deletion", APP,
+     "if checked.into_parts().0.is_err() {",
+     "if false && checked.into_parts().0.is_err() {",
+     "deletion", "canonical_deletion_is_refused_without_publication",
+     "Place(10), Cancel(10): raw quantity one passes law 500 but the canonical absent successor has quantity zero; neither preview nor commit may accept it"),
+
     ("unnamed-write", STORE,
      "if !named.get(map).is_some_and(|keys| keys.contains(key)) {",
      "if false && !named.get(map).is_some_and(|keys| keys.contains(key)) {",
@@ -99,6 +105,8 @@ def main():
     def scaffold(label, example):
         app = args.work / label
         project = ROOT / "examples/collections" / example
+        if example == "deletion":
+            project = ROOT / "test-data/collections/deletion"
         if example == "capacity-1":
             project = args.work / "test-projects" / example
             if not project.exists():
@@ -132,7 +140,7 @@ def main():
             command = cargo + ["test", "--locked", "--offline", "--manifest-path", mutant / "Cargo.toml", "--test", "collection_journey"]
             compiled, _ = run(name + "-build", command + ["--no-run"])
             failed, output = run(name + "-mutant", command + [test, "--", "--exact", "--nocapture"])
-            marker = {"unnamed-write": "shell un-named write was accepted", "omitted-post-root": "genuine journal failed independent named-root replay", "capacity-limit": "full map insertion was committed", "declared-capacity-binding": "full map insertion was committed"}.get(name, "assertion")
+            marker = {"canonical-deletion": "canonical deletion was published despite law 500", "unnamed-write": "shell un-named write was accepted", "omitted-post-root": "genuine journal failed independent named-root replay", "capacity-limit": "full map insertion was committed", "declared-capacity-binding": "full map insertion was committed"}.get(name, "assertion")
             row.update(build_exit=compiled, mutant_exit=failed, assertion_marker=marker,
                        killed=compiled == 0 and failed == 101 and marker in output and f"test {test} ... FAILED" in output)
         finally:

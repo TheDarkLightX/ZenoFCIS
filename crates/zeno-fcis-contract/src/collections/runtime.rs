@@ -17,8 +17,17 @@ use zeno_fcis_spec::{ProjectionRoot, TypeKind};
 use crate::ContractError;
 use crate::internals::{
     declarations::{Declarations, Source},
-    review::domain::{self, Position},
+    model::Contract,
+    review::{
+        domain::{self, Position},
+        evaluate::Framer,
+    },
     rules::Rules,
+    schema, schema_commitment,
+};
+
+use zeno_fcis_synthesis::finite::{
+    V2Usage, v2_authority::Evaluation, v2_composition as c, v2_laws as laws,
 };
 
 /// An opaque 32-byte key.
@@ -108,6 +117,8 @@ pub struct Layout {
     /// State positions that belong to no entry.
     scalars: Vec<usize>,
     capacities: BTreeMap<u32, u64>,
+    framer: Framer,
+    declared_laws: Vec<u32>,
 }
 
 /// One decision's view, with what it needs to write back.
@@ -130,6 +141,31 @@ pub struct Writes {
     pub scalars: BTreeMap<u16, i128>,
     /// New records, or `None` for removals, at named keys only.
     pub entries: Vec<(u32, Key, Option<Vec<u8>>)>,
+}
+
+/// Owned evidence for the declared laws on a canonical stored successor.
+/// This is an additional storage guard, never an Authority publication.
+#[derive(Debug)]
+pub struct SuccessorCheck {
+    result: Result<(), laws::Failure>,
+    usage: V2Usage,
+    diagnostics: Vec<laws::Diagnostic>,
+    reads: Vec<laws::ReadAttempt>,
+}
+impl SuccessorCheck {
+    /// Declared-law result, actual recheck usage, full diagnostics and reads.
+    /// Diagnostics also retain any subsequent raw-conformance refusal; the
+    /// original Authority already checked raw conformance on its candidate.
+    pub fn into_parts(
+        self,
+    ) -> (
+        Result<(), laws::Failure>,
+        V2Usage,
+        Vec<laws::Diagnostic>,
+        Vec<laws::ReadAttempt>,
+    ) {
+        (self.result, self.usage, self.diagnostics, self.reads)
+    }
 }
 
 impl Layout {
@@ -224,7 +260,12 @@ impl Layout {
             .filter(|(i, p)| p.source == Source::State && !entry_positions.contains(i))
             .map(|(i, _)| i)
             .collect();
+        let encoded = schema::encode(&declarations)?;
+        let contract = Contract::build(&declarations, &rules, schema_commitment(&encoded)?)?;
+        let framer = Framer::new(&positions, &contract);
         Ok(Self {
+            declared_laws: declarations.laws.iter().map(|law| law.id).collect(),
+            framer,
             positions,
             entries,
             inputs,
@@ -444,10 +485,12 @@ impl Layout {
                     }
                 }
                 None => {
-                    tuple[entry.presence] = 0;
-                    for (index, _) in &entry.values {
-                        tuple[*index] = self.positions[*index].domain.least().unwrap_or(0);
-                    }
+                    super::canonical_absent_view(
+                        &self.positions,
+                        entry.presence,
+                        entry.values.iter().map(|(index, _)| *index),
+                        &mut tuple,
+                    );
                 }
             }
         }
@@ -469,6 +512,174 @@ impl Layout {
             named,
             classes,
             entry_keys,
+        })
+    }
+
+    /// Reconstruct the exact stored successor in the invocation's existing key
+    /// classes. No new storage read or key-class renaming occurs here.
+    pub fn successor(&self, framed: &Framed, writes: &Writes) -> Result<Vec<i128>, ContractError> {
+        let invalid = |reason| ContractError::new("collections successor", reason);
+        let mut merged = framed.tuple.clone();
+        for &index in &self.scalars {
+            merged[index] = *writes
+                .scalars
+                .get(&self.positions[index].field.unwrap_or(0))
+                .ok_or_else(|| invalid("missing scalar write"))?;
+        }
+        for (entry, key) in self.entries.iter().zip(&framed.entry_keys) {
+            let Some((_, _, record)) = writes
+                .entries
+                .iter()
+                .find(|(map, written_key, _)| *map == entry.map && written_key == key)
+            else {
+                continue;
+            };
+            if let Some(bytes) = record {
+                let record = decode_record(bytes).ok_or_else(|| invalid("malformed record"))?;
+                if record.len() != entry.values.len() {
+                    return Err(invalid("record field count"));
+                }
+                merged[entry.presence] = 1;
+                for ((index, key_type), value) in entry.values.iter().zip(record) {
+                    merged[*index] = match (key_type, value) {
+                        (None, RecordValue::Number(n)) => n,
+                        (Some(t), RecordValue::Key(k)) => framed
+                            .classes
+                            .get(t)
+                            .and_then(|keys| keys.iter().position(|key| *key == k))
+                            .and_then(|class| i128::try_from(class).ok())
+                            .ok_or_else(|| invalid("post key has no pre-invocation class"))?,
+                        _ => return Err(invalid("mistyped record")),
+                    };
+                }
+            } else {
+                super::canonical_absent_view(
+                    &self.positions,
+                    entry.presence,
+                    entry.values.iter().map(|(index, _)| *index),
+                    &mut merged,
+                );
+            }
+        }
+        Ok(merged)
+    }
+
+    /// Check every declared applicable law on the canonical successor that will be
+    /// stored. This lower-level check grants no decision authority. Its owned
+    /// outcome retains actual recheck work and diagnostics, including refusal;
+    /// it does not replace or alter the Authority evaluation's usage.
+    pub fn check_successor(
+        &self,
+        descriptor: &c::Descriptor<'_>,
+        framed: &Framed,
+        writes: &Writes,
+        evaluation: &Evaluation<'_>,
+    ) -> Result<SuccessorCheck, ContractError> {
+        let invalid = |reason| ContractError::new("collections successor", reason);
+        let decision = evaluation
+            .result()
+            .map_err(|_| invalid("refused decision"))?;
+        if decision.class() == c::Class::Reject {
+            return Err(invalid("a reject has no successor"));
+        }
+        let merged = self.successor(framed, writes)?;
+        let views = [0, 1, 2].map(|i| self.framer.fields(&self.framer.roots[i], &framed.tuple));
+        let post = self.framer.fields(&self.framer.roots[0], &merged);
+        let patch: Vec<_> = post
+            .iter()
+            .zip(&views[0])
+            .filter_map(|(after, before)| {
+                let index = self
+                    .positions
+                    .iter()
+                    .position(|p| p.source == Source::State && p.field == Some(after.id))?;
+                (merged[index] != framed.tuple[index]).then_some(laws::Patch {
+                    field: after.id,
+                    before: before.value,
+                    after: after.value,
+                })
+            })
+            .collect();
+        let candidate = laws::Candidate {
+            class: decision.class(),
+            reason: decision.reason(),
+            post: laws::RootView::Record(&post),
+            patch: &patch,
+            effects: decision.effects(),
+            outbox: decision.outbox(),
+            reads: evaluation.reads(),
+            attempts: evaluation.decision_attempts(),
+            usage: evaluation
+                .decision_usage()
+                .ok_or_else(|| invalid("missing decision usage"))?,
+        };
+        // Mirror the collection judges: declared contract laws precede the
+        // framework's raw-decision conformance laws. Those remain checked on
+        // the original candidate by Authority and are not canonical-map laws.
+        let selected = self
+            .declared_laws
+            .iter()
+            .map(|id| {
+                descriptor
+                    .laws
+                    .iter()
+                    .find(|law| law.id == *id)
+                    .ok_or_else(|| invalid("missing declared law"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let ordered: Vec<_> = selected
+            .into_iter()
+            .chain(
+                descriptor
+                    .laws
+                    .iter()
+                    .filter(|law| !self.declared_laws.contains(&law.id)),
+            )
+            .map(|law| laws::Law {
+                id: law.id,
+                kind: law.kind,
+                scope: law.scope,
+                genesis: law.genesis,
+                program: laws::Program {
+                    nodes: law.program.nodes,
+                    root: law.program.root,
+                },
+            })
+            .collect();
+        let (result, usage, diagnostics, reads) = laws::evaluate(
+            &ordered,
+            descriptor.required,
+            &laws::Frame::Transition {
+                pre: self
+                    .framer
+                    .view(&self.framer.roots[0], &framed.tuple, &views[0]),
+                command: self
+                    .framer
+                    .view(&self.framer.roots[1], &framed.tuple, &views[1]),
+                context: self
+                    .framer
+                    .view(&self.framer.roots[2], &framed.tuple, &views[2]),
+                candidate: &candidate,
+            },
+            descriptor.limits,
+        )
+        .into_parts();
+        let declared_hold = diagnostics
+            .get(..self.declared_laws.len())
+            .is_some_and(|selected| {
+                selected
+                    .iter()
+                    .all(|d| !matches!(d.verdict, laws::Verdict::Refused(_)))
+            });
+        Ok(SuccessorCheck {
+            result: if declared_hold {
+                Ok(())
+            } else {
+                Err(result.err().unwrap_or(laws::Failure::Frame))
+            },
+            usage,
+            diagnostics,
+            reads,
         })
     }
 

@@ -362,7 +362,13 @@ For each request the shell loads each distinct named key once, snapshots the
 owned records, frames them with `Layout::frame`, calls the checked Authority,
 and stores only `Layout::writes`. Revision, retry and declared capacity guards
 run in the same SQLite transaction as the scalar state and map writes. These
-storage utilities do not supply decision or publication authority. Map-wide
+storage utilities do not supply decision or publication authority. Before
+publication the runtime reconstructs the actual alias-merged successor in the
+invocation's existing key classes and checks every declared contract law again.
+Deleted entries use the declared fields' least values, exactly as an absent
+entry does on the next invocation. A raw decision that passes its laws but
+whose canonical stored successor fails one is refused without publication.
+Map-wide
 reads belong to audit and measurement setup, outside request preparation.
 
 Each application receipt binds scalar state and every named map root before

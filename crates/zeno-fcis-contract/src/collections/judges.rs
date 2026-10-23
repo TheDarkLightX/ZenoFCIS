@@ -370,14 +370,23 @@ impl Model {
         for entry in &self.entries {
             let key = self.key(entry, command, context)?;
             let record = self.record(after, entry.map, &key)?;
-            merged[entry.presence] = i128::from(record.is_some());
+            if record.is_none() {
+                super::canonical_absent_view(
+                    self.layout.positions(),
+                    entry.presence,
+                    entry.values.iter().map(|(i, _)| *i),
+                    &mut merged,
+                );
+                continue;
+            }
+            merged[entry.presence] = 1;
             for (j, (i, t)) in entry.values.iter().enumerate() {
                 merged[*i] = match record.as_ref().and_then(|r| r.get(j)) {
                     Some(RecordValue::Number(n)) => *n,
                     Some(RecordValue::Key(k)) => *classes
                         .get(&(*t, *k))
                         .ok_or_else(|| invalid("post key has no pre-invocation class"))?,
-                    None => self.layout.positions()[*i].domain.least().unwrap_or(0),
+                    None => return Err(invalid("missing stored field")),
                 };
             }
         }

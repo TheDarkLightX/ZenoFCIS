@@ -99,6 +99,29 @@ def main():
         run(label + "-tests", ["cargo", "+1.97.1", "test", "--locked", "--offline",
             "--manifest-path", app / "Cargo.toml", "--test", "collection_journey", "--",
             "--exact", "full_map_capacity_refuses_without_publication", "--nocapture"])
+    deletion = args.work / "canonical-deletion"
+    run("deletion-scaffold", [args.cli.resolve(), "new", deletion, "--contract",
+        ROOT / "test-data/collections/deletion", "--source", ROOT])
+    run("deletion-test", ["cargo", "+1.97.1", "test", "--locked", "--offline",
+        "--manifest-path", deletion / "Cargo.toml", "--test", "collection_journey",
+        "canonical_deletion_is_refused_without_publication", "--", "--exact", "--nocapture"])
+    lawful_project = args.work / "test-projects" / "lawful-deletion"
+    shutil.copytree(ROOT / "test-data/collections/deletion", lawful_project)
+    path = lawful_project / "project.zeno"
+    path.write_text("\n".join(line for line in path.read_text().splitlines()
+        if not line.startswith("law 500")) + "\n")
+    path = lawful_project / "v2/policy.json"
+    rules = json.loads(path.read_text())
+    del rules["law_kinds"]["500"]
+    path.write_text(json.dumps(rules, indent=2) + "\n")
+    path = lawful_project / "tests/collection-journey.json"
+    path.write_text(json.dumps({"lawful_deletion_regression": True, "contexts": [["180"]]}))
+    lawful = args.work / "lawful-deletion"
+    run("lawful-deletion-scaffold", [args.cli.resolve(), "new", lawful, "--contract",
+        lawful_project, "--source", ROOT])
+    run("lawful-deletion-test", ["cargo", "+1.97.1", "test", "--locked", "--offline",
+        "--manifest-path", lawful / "Cargo.toml", "--test", "collection_journey",
+        "lawful_canonical_deletion_publishes_and_replays", "--", "--exact", "--nocapture"])
     print("collection applications: passed (HTTP byte streams; no live socket claim)")
 
 

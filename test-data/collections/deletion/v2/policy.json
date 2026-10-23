@@ -1,0 +1,42 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "removal-witness",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {},
+  "variables": {},
+  "cases": [
+    {
+      "rule": "place",
+      "when": "command.101.130 == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "160": "1",
+        "161": "1"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "cancel",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "160": "0"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "160": 0,
+    "161": 0
+  },
+  "law_kinds": {
+    "500": "AuthoritySubjectRecipient",
+    "501": "StateInvariant"
+  }
+}
