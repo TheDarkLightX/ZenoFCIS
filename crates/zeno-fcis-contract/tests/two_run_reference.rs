@@ -16,7 +16,7 @@ use zeno_fcis_contract::{
 };
 fn normalize(outcome: &Outcome) -> Value {
     match outcome {
-        Outcome::Refused(r) => json!({"class":"Refused","refusal":r.class.name()}),
+        Outcome::Refused(r) => json!({"class":"Refused","refusal":r.class.name(),"law":r.law}),
         Outcome::Decision(d) => json!({"class":d.class.name(),"reason":d.reason,
             "post":d.post.iter().map(|(f,v)|(f.to_string(),v.json())).collect::<serde_json::Map<_,_>>(),
             "outbox":d.outbox.iter().map(|v|json!({"ordinal":v.ordinal,"channel":v.channel,"destination":v.destination.json(),"idempotency":v.idempotency.json(),"payload":v.payload.iter().map(|(f,v)|(f.to_string(),v.json())).collect::<serde_json::Map<_,_>>()})).collect::<Vec<_>>()}),
@@ -83,7 +83,11 @@ fn reference_corpus_matches_every_input_and_property() {
                             .unwrap_or_else(|e| panic!("{e}"))
                     })
                     .collect::<Vec<_>>();
-                let actual = normalize(&evaluate::evaluate(a, &f, &input));
+                let outcome = evaluate::evaluate(a, &f, &input);
+                if name == "regression:invalid-payload" {
+                    assert!(matches!(&outcome, Outcome::Refused(r) if r.text == "Core(Schema)"));
+                }
+                let actual = normalize(&outcome);
                 assert_eq!(actual, row["outcome"], "contract {name}, tuple {input:?}");
                 tuples += 1;
             }

@@ -167,16 +167,19 @@ class Contract:
                     {k:v.evaluate(env,self.variables) for k,v in post.items()},
                     [{k:v.evaluate(env,self.variables) for k,v in ps.items()} for ps in payloads]))
         except ArithmeticError:
-            return {'class':'Refused','refusal':'arithmetic'}
+            return {'class':'Refused','refusal':'arithmetic','law':None}
         _, case, values, payloads = next(c for c in evaluated if c[0] == 1)
         cls = case['class']; successor = []
         outbox = []
         if cls != 'Reject':
             for (fid, tid), old in zip(self.fields[100], state):
                 n = values.get(str(fid), old)
-                if n not in self.domains[tid]: return {'class':'Refused','refusal':'domain'}
+                if n not in self.domains[tid]: return {'class':'Refused','refusal':'domain','law':None}
                 successor.append(bool(n) if tid in self.boolean else str(n))
             for delivery, payload in zip(case['outbox'],payloads):
+                # Payloads are schema values too; invalid values never become deliveries.
+                if any(payload[str(fid)] not in self.domains[tid] for fid,tid in self.fields[104]):
+                    return {'class':'Refused','refusal':'domain','law':None}
                 outbox.append({'ordinal':delivery['ordinal'],'channel':delivery['channel'],
                     'destination':delivery['destination'],'idempotency':str(delivery['idempotency_ordinal']),
                     'payload':{str(fid): bool(payload[str(fid)]) if tid in self.boolean else str(payload[str(fid)]) for fid,tid in self.fields[104]}})
@@ -186,8 +189,8 @@ class Contract:
             applies = 'any' in scope or ('commit' in scope and cls != 'Reject') or ('accept' in scope and cls == 'Accept') or ('reject' in scope and cls == 'Reject') or ('failure' in scope and cls == 'CommittedFailure')
             if applies:
                 try:
-                    if law.evaluate(postenv,{}) != 1: return {'class':'Refused','refusal':'law'}
-                except ArithmeticError: return {'class':'Refused','refusal':'law'}
+                    if law.evaluate(postenv,{}) != 1: return {'class':'Refused','refusal':'law','law':lid}
+                except ArithmeticError: return {'class':'Refused','refusal':'law','law':lid}
         return {'class':cls,'reason':case['reason'],'post':{str(fid):n for (fid,_),n in zip(self.fields[100],successor)},'outbox':outbox}
 
     def after(self, state, outcome):
@@ -210,6 +213,8 @@ class Contract:
         return ('refuted' if different else 'checked') if comparisons else 'UNKNOWN', comparisons, max_distance
 
     def noninterference(self, secret, public):
+        if not self.admissible:
+            return 'UNKNOWN', 0
         secrets = {self.names.index(p.replace('post.','pre.')) for p in secret}
         public = [p.rsplit('.',1)[1] for p in public]
         different = False; comparisons = 0
@@ -220,7 +225,7 @@ class Contract:
                 comparisons += 1
                 def signature(state):
                     o=self.outcome(state,inp)
-                    return (o['class'],o.get('reason',o.get('refusal')),tuple(o.get('post',{}).get(f) for f in public),o.get('outbox',[]))
+                    return (o['class'],o.get('reason',o.get('refusal')),o.get('law'),tuple(o.get('post',{}).get(f) for f in public),o.get('outbox',[]))
                 different |= signature(a)!=signature(b)
         return ('refuted' if different else 'checked'), comparisons
 

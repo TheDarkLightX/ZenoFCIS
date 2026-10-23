@@ -75,6 +75,20 @@ class TwoRunCli(unittest.TestCase):
                 if expected['class']!='Refused':self.assertEqual(expected,actual)
             self.assertNotEqual(witness['runs'][0]['observed'],witness['runs'][1]['observed'])
 
+    def test_reference_regressions(self):
+        for name,verdict,exit_code in [('refusal-reason-only','refuted',1),('no-admissible','UNKNOWN',2),('invalid-payload','checked',0)]:
+            with self.subTest(witness=name):
+                folder=ROOT/'test-data/two-run'/name
+                c=Contract((folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()))
+                self.assertEqual(c.noninterference(['pre.100.111'],['post.100.110'])[0],verdict)
+                p=self.run_cli([str(folder),'--noninterference','--secret','pre.100.111','--public','post.100.110'])
+                self.assertEqual(p.returncode,exit_code,p.stderr)
+                packet=json.loads(p.stdout);self.assertEqual(packet['status'],verdict)
+                (EVIDENCE/(name+'.json')).write_text(p.stdout)
+                if name=='refusal-reason-only':
+                    self.assertEqual(packet['result']['first_difference']['kind'],'reason')
+                    self.assertEqual([r['decisions'][0]['law'] for r in packet['result']['runs']],[502,501])
+
     def test_refuses_invalid_options_and_paths(self):
         ni=['examples/two-run/ledger-private','--noninterference','--secret','pre.100.112','--public','post.100.110']
         commute=['examples/two-run/uniform-price','--commute','--first','true','--second','true','--observe','post.100.110']

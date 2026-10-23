@@ -78,6 +78,9 @@ def contracts(rng, count):
     for name, _, _, questions in examples():
         folder=ROOT/'examples/two-run'/name
         yield 'example:'+name,(folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()),questions
+    for name in ('refusal-reason-only','no-admissible','invalid-payload'):
+        folder=ROOT/'test-data/two-run'/name
+        yield 'regression:'+name,(folder/'project.zeno').read_text(),json.loads((folder/'v2/policy.json').read_text()),[privacy(secret='pre.100.111',public=['post.100.110'])]
     for index in range(count):
         bound=rng.randint(1,3); coefficient=rng.randint(0,3); k=rng.randint(0,2)
         expressions=['command.101.120','pre.100.111 + command.101.121',
