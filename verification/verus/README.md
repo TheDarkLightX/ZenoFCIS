@@ -6,7 +6,7 @@ law projection and signed-law division projection require fresh whole-source
 proofs and reviewed translated inventories. Historical counts and receipts
 below do not qualify these changed bytes. Qualification is pending.
 
-The [Verus workflow](../../.github/workflows/verus.yml) runs 22 qualification
+The [Verus workflow](../../.github/workflows/verus.yml) runs 23 qualification
 gates. Each gate first runs its script's own tests, then the script itself;
 for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
 `python3 tools/check_verus.py --out` with an evidence path. The script requires
