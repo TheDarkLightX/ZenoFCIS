@@ -10,7 +10,8 @@
 use alloc::vec::Vec;
 
 use super::driver::Binding;
-use super::policy::{self, Monitor, Verdict};
+use super::policy::Monitor;
+use super::policy_record;
 use super::port::{Fault as FaultKind, Operation, Response, Sent};
 use super::record::{Entry, Transcript};
 use super::registry::Port;
@@ -204,29 +205,11 @@ impl Stack {
         // Tentative reservations are private invocation scratch. A rejection
         // by any layer or a simulation Suspend discards all of them. There is
         // one terminal call, with the caller's exact immutable operation.
-        let mut next = Vec::new();
-        let mut rejection = None;
-        for (index, layer) in self.layers.iter().enumerate() {
-            if let Layer::Policy(monitor) = layer {
-                let (state, verdict) =
-                    policy::step(&monitor.policy, &monitor.state, operation, None);
-                match verdict {
-                    Verdict::Allow => next.push((index, state)),
-                    Verdict::Reject(code) => {
-                        rejection = Some(code);
-                        break;
-                    }
-                }
-            }
-        }
-        let mut previous = Vec::new();
-        if rejection.is_none() {
-            for (index, state) in next {
-                if let Layer::Policy(monitor) = &mut self.layers[index] {
-                    previous.push((index, core::mem::replace(&mut monitor.state, state)));
-                }
-            }
-        }
+        let previous = self.monitors();
+        self.bind_recording(&previous);
+        let (next, check) = policy_record::admit(&previous, operation);
+        let rejection = check.rejection();
+        self.install(next);
         let handled = match rejection {
             Some(code) => Handled::Answer(Response::Send(Sent::Refused(code))),
             None => terminal.handle(binding, operation),
@@ -234,11 +217,7 @@ impl Stack {
         // Reserve before the terminal call, including if it unwinds. Only a
         // model suspension certifies that no invocation took place.
         if handled == Handled::Suspend {
-            for (index, state) in previous {
-                if let Layer::Policy(monitor) = &mut self.layers[index] {
-                    monitor.state = state;
-                }
-            }
+            self.install(previous);
         }
         let entry = match &handled {
             Handled::Answer(response) => Some(Entry::Response(binding.clone(), response.clone())),
@@ -249,6 +228,9 @@ impl Stack {
             for layer in self.layers.iter_mut().rev() {
                 if let Layer::Record(transcript) = layer {
                     transcript.append(Entry::Request(binding.clone(), operation.clone()));
+                    if !check.decisions.is_empty() {
+                        transcript.append(Entry::Policy(binding.clone(), check.clone()));
+                    }
                     transcript.append(entry.clone());
                 }
             }
@@ -258,9 +240,41 @@ impl Stack {
 
     /// Records the program's outcome.
     pub fn done(&mut self, outcome: &[u8]) {
+        self.bind_recording(&self.monitors());
         for layer in self.layers.iter_mut().rev() {
             if let Layer::Record(transcript) = layer {
                 transcript.append(Entry::Done(outcome.to_vec()));
+            }
+        }
+    }
+
+    fn monitors(&self) -> Vec<Monitor> {
+        self.layers
+            .iter()
+            .filter_map(|layer| match layer {
+                Layer::Policy(monitor) => Some(monitor.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn install(&mut self, monitors: Vec<Monitor>) {
+        let mut values = monitors.into_iter();
+        for layer in &mut self.layers {
+            if let Layer::Policy(monitor) = layer {
+                if let Some(value) = values.next() {
+                    *monitor = value;
+                }
+            }
+        }
+    }
+
+    fn bind_recording(&mut self, monitors: &[Monitor]) {
+        for layer in &mut self.layers {
+            if let Layer::Record(transcript) = layer {
+                if transcript.links.is_empty() {
+                    transcript.manifest.policies = monitors.to_vec();
+                }
             }
         }
     }

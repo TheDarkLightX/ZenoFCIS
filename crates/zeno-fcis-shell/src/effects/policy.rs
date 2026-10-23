@@ -91,6 +91,9 @@ pub fn source() -> Hash32 {
     registry::source_digest(&[
         ("policy.rs", include_bytes!("policy.rs")),
         ("handler.rs", include_bytes!("handler.rs")),
+        ("policy_record.rs", include_bytes!("policy_record.rs")),
+        ("record.rs", include_bytes!("record.rs")),
+        ("codec.rs", include_bytes!("codec.rs")),
     ])
 }
 

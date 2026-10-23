@@ -13,6 +13,8 @@ use zeno_fcis_codec::{CommitmentHasher, Hash32, RustCryptoSha256};
 
 use super::codec;
 use super::driver::{Binding, Driver, Fatal, Reply};
+use super::policy::Monitor;
+use super::policy_record::{self, Check};
 use super::port::{Operation, Outcome, Response};
 use super::program::{Program, Step};
 use super::registry::{self, REGISTRY};
@@ -47,6 +49,8 @@ pub struct Manifest {
     pub configuration: Vec<u8>,
     /// Explicit seed; zero denotes the exhaustive, schedule-driven simulator.
     pub seed: u64,
+    /// Initial owned policy snapshots, in stack order. These grant no authority.
+    pub policies: Vec<Monitor>,
 }
 
 impl Manifest {
@@ -68,6 +72,7 @@ impl Manifest {
             implementations: library_implementations(),
             configuration: Vec::new(),
             seed: 0,
+            policies: Vec::new(),
         }
     }
 
@@ -91,6 +96,16 @@ impl Manifest {
         }
         codec::bytes(&mut out, &self.configuration);
         out.extend_from_slice(&self.seed.to_be_bytes());
+        // Preserve default no-policy manifest bytes. Policy-enabled evidence
+        // has an explicit version and binds the initial reservation lifetime.
+        if !self.policies.is_empty() {
+            codec::bytes(&mut out, b"zeno-fcis/effect-policy-manifest/1");
+            out.extend_from_slice(&(self.policies.len() as u64).to_be_bytes());
+            for monitor in &self.policies {
+                codec::hash(&mut out, monitor.identity());
+                codec::bytes(&mut out, &monitor.state.bytes());
+            }
+        }
         RustCryptoSha256::hash(&out)
     }
 
@@ -150,6 +165,8 @@ pub enum Entry {
     Crash(Binding),
     /// The run's outcome, as canonical bytes.
     Done(Vec<u8>),
+    /// Exact admission verdicts, recomputed during replay before its response.
+    Policy(Binding, Check),
 }
 
 impl Entry {
@@ -173,6 +190,11 @@ impl Entry {
             Self::Done(outcome) => {
                 out.push(3);
                 codec::bytes(&mut out, outcome);
+            }
+            Self::Policy(binding, check) => {
+                out.push(4);
+                codec::bytes(&mut out, &codec::binding(binding));
+                codec::bytes(&mut out, &check.bytes());
             }
         }
         out
@@ -299,12 +321,19 @@ pub fn replay<P: Program>(
         || manifest.registry != registry::identity(&REGISTRY)
         || manifest.program != registry::program_source()
         || manifest.start != start
+        || manifest
+            .stack
+            .iter()
+            .filter(|name| **name == "policy")
+            .count()
+            != manifest.policies.len()
     {
         return Err(ReplayError::Manifest);
     }
     let mut driver = Driver::<P>::start(REGISTRY, epoch, first).map_err(ReplayError::Fatal)?;
     let links = &transcript.links;
     let mut at = 0;
+    let mut monitors = manifest.policies.clone();
     loop {
         if let Some(fatal) = driver.failure() {
             return Err(ReplayError::Fatal(fatal));
@@ -335,30 +364,52 @@ pub fn replay<P: Program>(
             None => return Err(ReplayError::Missing(at)),
         }
         let binding = binding.clone();
-        match links.get(at + 1) {
+        at += 1;
+        let (next, check) = policy_record::admit(&monitors, operation);
+        if !monitors.is_empty() {
+            match links.get(at) {
+                Some(Link {
+                    entry: Entry::Policy(recorded, observed),
+                    ..
+                }) if *recorded == binding && *observed == check => {}
+                Some(_) => return Err(ReplayError::Mismatch(at)),
+                None => return Err(ReplayError::Missing(at)),
+            }
+            at += 1;
+        }
+        monitors = next;
+        match links.get(at) {
             Some(Link {
                 entry: Entry::Response(recorded, response),
                 ..
             }) if *recorded == binding => {
+                if let Some(code) = check.rejection() {
+                    if *response != Response::Send(super::port::Sent::Refused(code)) {
+                        return Err(ReplayError::Mismatch(at));
+                    }
+                }
                 driver
                     .reply(Reply {
                         binding,
                         response: response.clone(),
                     })
-                    .map_err(|_| ReplayError::Mismatch(at + 1))?;
+                    .map_err(|_| ReplayError::Mismatch(at))?;
             }
             Some(Link {
                 entry: Entry::Crash(recorded),
                 ..
             }) if *recorded == binding => {
-                if at + 2 < links.len() {
-                    return Err(ReplayError::Extra(at + 2));
+                if check.rejection().is_some() {
+                    return Err(ReplayError::Mismatch(at));
+                }
+                if at + 1 < links.len() {
+                    return Err(ReplayError::Extra(at + 1));
                 }
                 return Ok(Ended::Crashed);
             }
-            Some(_) => return Err(ReplayError::Mismatch(at + 1)),
-            None => return Err(ReplayError::Missing(at + 1)),
+            Some(_) => return Err(ReplayError::Mismatch(at)),
+            None => return Err(ReplayError::Missing(at)),
         }
-        at += 2;
+        at += 1;
     }
 }

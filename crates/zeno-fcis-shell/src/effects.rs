@@ -20,6 +20,7 @@ pub mod handler;
 pub mod laws;
 pub mod port;
 pub mod policy;
+pub mod policy_record;
 pub mod program;
 pub mod record;
 pub mod registry;
@@ -31,3 +32,5 @@ mod explore_tests;
 mod tests;
 #[cfg(test)]
 mod policy_tests;
+#[cfg(test)]
+mod policy_record_tests;
