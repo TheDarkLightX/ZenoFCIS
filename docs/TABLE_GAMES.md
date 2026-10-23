@@ -2,7 +2,8 @@
 
 ## Journey
 "Can the maintainer always get a change released, however reviews go?" or "Can a user keep withdrawing forever,
-whatever the operator does?" These are questions about what one party can *force* while others choose freely. In
+whatever the operator does?" Often the honest answer is "only if the other side is fair": "Can users keep
+withdrawing, provided the operator reopens the window now and then?" These are questions about what one party can *force* while others choose freely. In
 ZenoFCIS you declare the game as tables, and a recursive derived table computes the answer, exactly, over the
 declared game. Then `check --expand` prints the answer for every state, and laws can state it.
 
@@ -29,6 +30,13 @@ The controllable predecessor of a set X holds at state i when one of these holds
   outside a least one. The outer chain shrinks and stabilizes within N steps on N states, so it is unrolled into N
   strata: `z1 .. zN`, where each `zk` is the least fixed point of `CPre(zk) ∨ (goal ∧ CPre(z(k-1)))`, and `z1`
   starts from every state. Each stratum reads only the one below it.
+- **Fairness:** the controller can force goals g1..gm infinitely often, provided the environment makes assumptions
+  a1..an hold infinitely often (a GR(1) game). If the environment breaks an assumption, the controller wins. The
+  winning region is `νZ. ⋀j μY. ⋁i νX. (gj ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬ai ∧ CPre(X))`. Both outer chains are
+  unrolled into N strata, as for recurrence. Each inner greatest fixed point is the complement of one recursive
+  table, `wi = μW. ¬A ∧ (ai ∨ OPre(W))`, where `OPre(W) = ¬CPre(¬W)` is what the environment can force. The
+  complements of the outer strata are positive in these tables, so no recursive table negates another. A last,
+  non-recursive `win` table negates the top stratum.
 
 ## Examples
 | Example | Question | Answer |
@@ -37,8 +45,14 @@ The controllable predecessor of a set X holds at state i when one of these holds
 | `games/release-pipeline-bounded` | The same with at most two review rounds, then escalation | Yes, from every state. |
 | `games/withdrawal-window` | Can a user withdraw infinitely often while the operator may pause? | No: the operator can keep the window paused. |
 | `games/withdrawal-window-auto-resume` | The same, where a pause lasts one step | Yes, from every state. |
+| `games/withdrawal-window-fair` | The same as the first withdrawal question, assuming the operator reopens the window infinitely often | Yes, from every state (No without the assumption). |
+| `games/release-pipeline-fair` | Can changes be released infinitely often, assuming the reviewer approves infinitely often? | Yes, from every state (No without the assumption). |
 
-Each example was compared with an independent Python solver on every state.
+Each example was compared with an independent Python solver on every state. The fairness encoding was also
+compared on 1,576 games (every two-state game with one assumption and one guarantee, and 1,000 random games of 3 to
+5 states with up to two of each): the tables, a direct nested fixed point and the trace game's certified parity
+solver agreed on every state. Two planted encoding defects, ignoring the assumption and dropping outer strata, each
+produced disagreements.
 
 ## Difference
 A hand-written check of "the maintainer can always release" needs either a proof or a search over every behaviour
@@ -50,6 +64,11 @@ contract's own states, against compromised actors, use the trace game's liveness
 ## Scope
 - The game is declared finite data. Turns follow the declared movers; an alternating honest and adversary schedule
   is a fairness assumption, and must be stated.
+- An assumption is a state the environment visits infinitely often (justice). "If asked infinitely often, eventually
+  answers" (compassion, a Streett condition) is not expressible this way.
+- The fairness encoding uses N·N·m·n recursive tables for N states, m guarantees and n assumptions. In measured
+  runs, 8 states with one guarantee and one assumption, and 6 states with two of each, expanded in under a second;
+  10 states with one of each, and 8 with two of each, exceeded the expansion limit.
 - `rounds` must equal the number of entries exactly. A table holds at most 64 entries. Constant table IDs must not
   collide with field IDs.
 - Expansion grows with the size of the game. One table over every state, with nested quantifiers, reaches the
@@ -65,3 +84,4 @@ contract's own states, against compromised actors, use the trace game's liveness
   McNaughton, "Infinite Games Played on Finite Graphs", APAL 1993; Zielonka, "Infinite Games on Finitely Coloured
   Graphs", TCS 1998.
 - Nested fixed points for Büchi games: Emerson and Jutla, "Tree Automata, Mu-Calculus and Determinacy", FOCS 1991.
+- Fairness assumptions (GR(1)): Piterman, Pnueli and Sa'ar, "Synthesis of Reactive(1) Designs", VMCAI 2006.

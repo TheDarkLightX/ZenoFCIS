@@ -1,6 +1,7 @@
 # Game examples for recursive tables
 
-Four declared games, two questions, each with a variant that fixes the problem. See
+Six declared games and two questions. Each question has a variant that fixes the problem and a variant that
+answers it under a fairness assumption about the other side. See
 [docs/TABLE_GAMES.md](../../../docs/TABLE_GAMES.md) for the model and the scope.
 
 ```
