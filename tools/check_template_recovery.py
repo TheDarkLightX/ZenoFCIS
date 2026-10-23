@@ -45,18 +45,56 @@ def inventory(policy):
         'command.101.120 == 152 -> '
         'post.100.111 + command.101.121 == pre.100.111 && '
         'post.100.111 < pre.100.111'
-    )
+    ), 864
+
+
+def library(_policy):
+    """Every holder assignment satisfying the existing at-most-two invariant."""
+    witnesses = []
+    lines = []
+    for holders in itertools.product(range(4), repeat=3):
+        if holders[0] != 0 and holders[0] == holders[1] == holders[2]:
+            continue
+        state = list(holders)
+        steps = []
+        for index, member in enumerate(holders):
+            if member:
+                before = state.copy()
+                state[index] = 0
+                steps.append({'before': before, 'command': [151, index + 1, member],
+                              'context': [130], 'after': state.copy()})
+        if any(state) or len(steps) > 3:
+            raise AssertionError({'state': holders, 'steps': steps})
+        witnesses.append({'state': list(holders), 'steps': steps})
+        if steps:
+            lines.append('# scenario return-' + '-'.join(map(str, holders)))
+            for step in steps:
+                before = ' '.join(map(str, step['before']))
+                command = ' '.join(map(str, step['command']))
+                after = ' '.join(map(str, step['after']))
+                lines.append(f'{before} {command} 130 | accept - {after} | -')
+    # Clearing the selected occupied copy while every other holder stays fixed
+    # decreases the number of occupied copies by exactly one.
+    cases = []
+    for index, field in enumerate([110, 111, 112], 1):
+        unchanged = ' && '.join(f'post.100.{other} == pre.100.{other}'
+                                for other in [110, 111, 112] if other != field)
+        cases.append(f'(command.101.121 == {index} -> pre.100.{field} != 0 && '
+                     f'post.100.{field} == 0 && {unchanged})')
+    return witnesses, lines, 'command.101.120 == 151 -> (' + ' && '.join(cases) + ')', 2304
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cli', required=True, type=Path)
-    parser.add_argument('--template', required=True, choices=['inventory-reservation'])
+    parser.add_argument('--template', required=True, choices=['inventory-reservation', 'library-loans'])
     parser.add_argument('--out', required=True, type=Path)
     args = parser.parse_args()
-    contract = ROOT / 'crates/zeno-fcis-cli/templates' / args.template
+    contract = (ROOT / 'examples/apps/library-loans' if args.template == 'library-loans'
+                else ROOT / 'crates/zeno-fcis-cli/templates/inventory-reservation')
     policy = json.loads((contract / 'v2/policy.json').read_text())
-    witnesses, lines, formula = inventory(policy)
+    witnesses, lines, formula, tuples = (library(policy) if args.template == 'library-loans'
+                                         else inventory(policy))
     args.out.mkdir(parents=True, exist_ok=False)
     scenarios = args.out / 'recovery-scenarios.txt'
     scenarios.write_text('\n'.join(lines) + '\n')
@@ -86,7 +124,7 @@ def main():
             if checked['count'] != sum(bool(w['steps']) for w in witnesses):
                 raise AssertionError('incomplete recovery scenario coverage')
         elif (len(checked['lemmas']) != 1
-              or checked['lemmas'][0]['tuples'] != 864
+              or checked['lemmas'][0]['tuples'] != tuples
               or checked['lemmas'][0]['refused'] != 0
               or checked['lemmas'][0]['undefined'] != 0):
             raise AssertionError('incomplete declared-domain recovery lemma')

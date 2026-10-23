@@ -27,6 +27,10 @@ and `tests/decision-examples.txt`.
 - The laws: no member holds all three copies (a state invariant), only the
   librarian commits, the other copies keep their holders, and a borrow moves
   a copy from the shelf to the named member while a return moves it back.
+  Laws 504–507 also require each rejection reason's exact guard and its
+  precedence. Together they require every eligible borrow and return to accept.
+- This contract declares no delivery channels. Borrow, Return and every
+  rejection emit no messages; a policy cannot introduce an undeclared channel.
 - `ui.json` names the holder values, so a state line reads "Copy 1: with
   member 2." rather than "Copy 1: 2".
 
@@ -48,6 +52,46 @@ contract, no law refuses a decision from a lawful state, and 78 of 84 rule
 mutants are distinguished. The lemma judge finds the at-most-two invariant
 inductive over the declared domain, with 61 of 64 states reachable. Then run
 the application as [Build an app](../../../docs/BUILD_AN_APP.md) describes.
+
+The complete gap review with laws 504–507 determines all 2,304 input tuples,
+including the exact rejection reasons, state changes and empty outboxes:
+
+```sh
+zeno-fcis contract review examples/apps/library-loans --gaps --format json
+```
+
+## Bounded recovery
+
+From every lawful holder assignment, an available librarian can return all
+copies in at most three `Return` actions. Choose any occupied copy and name
+its recorded holder. A successful return clears that copy and preserves the
+other two, so the number of occupied copies decreases by exactly one.
+An empty shelf needs zero actions. This is a sequence the librarian can choose
+without intervening borrows, not a promise that a scheduler will run it.
+
+The transition lemma checks that each accepted return clears one occupied
+copy and preserves the others over all 2,304 input tuples. The constructive
+recovery check replays these sequences through the actual Authority for all
+61 lawful assignments; the remaining three assignments violate law 500.
+
+## Policy for the owner
+
+- The desk continues to record loans for members; member authentication is
+  outside this contract.
+- An occupied copy is rejected before checking the member's loan limit.
+- Returning a shelf copy, or naming a different holder, rejects with reason
+  203. Returns are not converted to idempotent successful no-ops.
+- No notification channel, due date or fine is introduced.
+
+## Background and scope
+
+The relational obligations follow C. A. R. Hoare, "An Axiomatic Basis for
+Computer Programming," Communications of the ACM, 1969. The decreasing-count
+recovery argument follows E. W. Dijkstra, "Guarded Commands, Nondeterminacy and
+Formal Derivation of Programs," Communications of the ACM, 1975. This example
+applies the existing library interpreter and finite checkers; it claims no new
+verification method. The checks are exhaustive over this three-copy domain
+and do not establish deployment authentication or unconditional availability.
 
 ## Scope
 

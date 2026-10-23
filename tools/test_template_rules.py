@@ -259,6 +259,49 @@ class TemplateRules(unittest.TestCase):
         self.assertEqual(outcome['class'], 'Refused', outcome)
         self.assertEqual(outcome['law'], 503, outcome)
 
+    def library_rejection(self, reason, values):
+        def mutate(policy):
+            policy['cases'].insert(0, {'when': 'true', 'class': 'Reject', 'reason': reason,
+                                       'post': {}, 'outbox': []})
+        return self.probe('examples/apps/library-loans', mutate, values)
+
+    def test_library_eligible_borrow_cannot_require_a_librarian(self):
+        outcome = self.library_rejection(200, '0 0 0 150 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 504, outcome)
+
+    def test_library_free_copy_cannot_be_rejected_as_on_loan(self):
+        outcome = self.library_rejection(201, '0 0 0 150 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 505, outcome)
+
+    def test_library_member_below_limit_cannot_be_rejected_as_full(self):
+        outcome = self.library_rejection(202, '0 0 0 150 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 506, outcome)
+
+    def test_library_matching_holder_must_be_allowed_to_return(self):
+        outcome = self.library_rejection(203, '1 0 0 151 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 507, outcome)
+
+    def test_library_on_loan_reason_precedes_member_limit(self):
+        outcome = self.library_rejection(202, '1 1 0 150 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 506, outcome)
+
+    def test_library_visitor_guard_precedes_other_guards(self):
+        for reason, law in [(201, 505), (202, 506), (203, 507)]:
+            with self.subTest(reason=reason):
+                outcome = self.library_rejection(reason, '1 1 2 150 1 1 131')
+                self.assertEqual(outcome['class'], 'Refused', outcome)
+                self.assertEqual(outcome['law'], law, outcome)
+
+    def test_library_borrow_cannot_name_a_return_rejection(self):
+        outcome = self.library_rejection(203, '0 0 0 150 1 1 130')
+        self.assertEqual(outcome['class'], 'Refused', outcome)
+        self.assertEqual(outcome['law'], 507, outcome)
+
     def test_treasury_swap_request_cannot_be_omitted(self):
         def mutate(policy):
             for case in policy['cases']:

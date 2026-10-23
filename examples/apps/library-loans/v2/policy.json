@@ -32,6 +32,10 @@
     "500": "StateInvariant",
     "501": "AuthoritySubjectRecipient",
     "502": "AssetConservation",
-    "503": "DebitCreditEffectEquality"
+    "503": "DebitCreditEffectEquality",
+    "504": "AuthoritySubjectRecipient",
+    "505": "AuthoritySubjectRecipient",
+    "506": "AuthoritySubjectRecipient",
+    "507": "AuthoritySubjectRecipient"
   }
 }
