@@ -76,7 +76,6 @@ def main():
             raise behavior.Refusal("The guide command supports zal/effects/1 and zal/typed-fsm/1 sources")
         model = behavior2.parse_any(source, options.syntax)
         profile = behavior2 if isinstance(model, behavior2.Machine) else behavior
-        game_export_exit = None
         if options.command == "render":
             print(model.render(options.to == "english"), end="")
             return 0
@@ -127,12 +126,7 @@ def main():
             result = {"status": "lowered" if options.command == "lower" else "exported",
                       "revision": model.revision, "authority": "none"}
         elif options.command == "export-game":
-            decision = behavior2.export_game_decision(model, options.property, str(options.out))
-            if decision["refusal"] is not None:
-                raise behavior.Refusal(decision["refusal"])
-            options.out.parent.mkdir(parents=True, exist_ok=True)
-            options.out.write_text(decision["text"], encoding="ascii")
-            result, game_export_exit = decision["result"], decision["exit_code"]
+            return write_game_export(model, options, source)
         elif options.command == "refine-check":
             from factory import refine_check
             result, code = refine_check(model, options.contract, options.cli, options.max_checks)
@@ -152,14 +146,23 @@ def main():
             serve(source if options.syntax == "symbolic" else model.render(), Path.cwd(), options.port, options.workspace)
             return 0
         print(json.dumps(result, indent=2))
-        if game_export_exit is not None:
-            return game_export_exit
         return 1 if result.get("status") in {"counterexample", "unfinished", "unknown"} else 3 if result.get("status") == "unsupported" else 0
     except (ValueError, OSError) as error:
         from diagnostics import describe
         print(json.dumps({"status": "refused", "diagnostic": str(error),
                           "source_diagnostic": describe(error, source, options.source), "authority": "none"}), file=sys.stderr)
         return 2
+
+
+def write_game_export(model, options, source):
+    """Bind paths and emit the immutable core result without interpreting status."""
+    decision = behavior2.export_game_decision(model, options.property, str(options.out),
+                                               source, str(options.source))
+    if decision.text is not None:
+        options.out.parent.mkdir(parents=True, exist_ok=True)
+        options.out.write_text(decision.text, encoding="ascii")
+    print(decision.status_json, file=sys.stderr if decision.to_stderr else sys.stdout)
+    return decision.exit_code
 
 
 def typed_or_effects(options, source, first):
@@ -169,6 +172,8 @@ def typed_or_effects(options, source, first):
     import typed2
     module = effects if first in {"zal effects 1;", "ZAL effects version 1."} else typed2
     model = module.parse(source, options.syntax)
+    if options.command == "export-game":
+        return write_game_export(model, options, source)
     signatures = isinstance(model, effects.Signatures)
     if options.command == "render":
         print(model.render(options.to == "english"), end="")

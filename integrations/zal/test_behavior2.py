@@ -353,16 +353,16 @@ property reaches: user can force eventually (state == bb);
     def test_game_export_decision_returns_full_result_and_refusal(self):
         game = parse((HERE / "examples/withdrawal_game2.zal").read_text())
         decision = b.export_game_decision(game, "keep_withdrawing", "/tmp/game.zeno")
-        self.assertEqual((decision["status"], decision["refusal"], decision["node_count"],
-                          decision["exit_code"]), ("exported", None, 3, 0))
-        self.assertEqual(decision["result"], {"status": "exported", "format": "contract-tables",
+        self.assertEqual((decision.status, decision.refusal, decision.node_count,
+                          decision.exit_code), ("exported", None, 3, 0))
+        self.assertEqual(json.loads(decision.status_json), {"status": "exported", "format": "contract-tables",
                                                "property": "keep_withdrawing", "nodes": 3,
                                                "out": "/tmp/game.zeno", "authority": "none"})
-        self.assertTrue(decision["text"].startswith("zeno 1;\n"))
+        self.assertTrue(decision.text.startswith("zeno 1;\n"))
 
         wrong_profile = b.export_game_decision(behavior.parse(V1_ORDER), "keep_withdrawing", "/tmp/game.zeno")
-        self.assertEqual((wrong_profile["status"], wrong_profile["refusal"], wrong_profile["text"],
-                          wrong_profile["node_count"], wrong_profile["exit_code"]),
+        self.assertEqual((wrong_profile.status, wrong_profile.refusal, wrong_profile.text,
+                          wrong_profile.node_count, wrong_profile.exit_code),
                          ("refused", "Game export needs a profile-2 game property model", None, None, 2))
 
     def test_parse_any_dispatch_and_cli(self):

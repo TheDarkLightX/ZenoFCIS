@@ -11,10 +11,12 @@ from collections import deque
 from dataclasses import dataclass
 import hashlib
 import itertools
+import json
 import re
 from types import MappingProxyType
 
 from behavior import FUTURE, NAME, Refusal, at_source, canonical, grammar_refusal, source_lines
+from diagnostics import describe as source_diagnostic
 
 
 PROFILE = "zal/finite-fsm/2"
@@ -1852,19 +1854,42 @@ def export_game_project(model, property_id):
     return _game_table_project(reduced), count
 
 
-def export_game_decision(model, property_id, output_path):
-    """Return the pure game-export decision, result, generated text and CLI disposition."""
+@dataclass(frozen=True, slots=True)
+class GameExportResult:
+    """One immutable export decision; paths are labels, never I/O capabilities."""
+    text: str | None
+    node_count: int | None
+    refusal: str | None
+    status_json: str
+    exit_code: int
+    to_stderr: bool
+
+    @property
+    def status(self):
+        return "refused" if self.refusal is not None else "exported"
+
+
+def export_game_decision(model, property_id, output_path, source="", source_path=""):
+    """Decide export, refusal, complete status and process disposition without I/O.
+
+    All retained fields are scalar immutable values. Invocation-local construction
+    dictionaries are serialized before returning and cannot escape by alias.
+    """
     try:
         if not isinstance(model, Machine):
+            if isinstance(model, (_effects.Signatures, _typed.TypedMachine)):
+                profile = _effects.PROFILE if isinstance(model, _effects.Signatures) else _typed.PROFILE
+                raise Refusal(f"The export-game command does not support {profile} sources")
             raise Refusal("Game export needs a profile-2 game property model")
         project, nodes = export_game_project(model, property_id)
     except Refusal as error:
-        return {"status": "refused", "refusal": str(error), "text": None, "node_count": None,
-                "result": None, "exit_code": 2}
+        reason = str(error)
+        result = {"status": "refused", "diagnostic": reason,
+                  "source_diagnostic": source_diagnostic(Refusal(reason), source, source_path), "authority": "none"}
+        return GameExportResult(None, None, reason, json.dumps(result), 2, True)
     result = {"status": "exported", "format": "contract-tables", "property": property_id,
               "nodes": nodes, "out": output_path, "authority": "none"}
-    return {"status": "exported", "refusal": None, "text": project, "node_count": nodes,
-            "result": result, "exit_code": 0}
+    return GameExportResult(project, nodes, None, json.dumps(result, indent=2), 0, False)
 
 
 def _shortest_path(graph, sources, targets, allowed):
@@ -2689,3 +2714,10 @@ def help_topic(model: Machine, topic="", renderer_identity="unbound"):
             "meaning": meaning, "entries": entries, "notes": notes,
             "available_topics": sorted(set(CONSTRUCTS) | set(OPERATORS) | set(objects) | set(syntax)),
             "method": "built-in grammar/model registry; no language model", "authority": "none"}
+
+
+# Prepare profile modules before any decision invocation. typed2 uses the
+# definitions above during its own preparation, so import module references only
+# after those definitions exist. No module loading belongs to the pure API.
+import effects as _effects
+import typed2 as _typed
