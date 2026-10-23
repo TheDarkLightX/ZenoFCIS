@@ -3,7 +3,7 @@ use super::{FILE_LIMIT, Parser, Path, PathBuf, Value, read_bounded};
 use std::collections::BTreeSet;
 use std::fs;
 use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type External = (String, String, String, Option<String>);
 
@@ -43,8 +43,12 @@ fn external_packages(bytes: &[u8]) -> Result<BTreeSet<External>, String> {
 struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Result<Self, String> {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "zeno-app-lock-{}-{}",
+            "zeno-app-lock-{nonce}-{}-{}",
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));

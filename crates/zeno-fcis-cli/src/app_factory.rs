@@ -6,6 +6,15 @@ use std::{
 };
 
 pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
+    // Collection applications use the same checked producer and a plain form.
+    // Their original key inputs are not the finite scalar UI's class inputs.
+    if let Ok(inputs) = crate::contract_files::Inputs::read(contract)
+        && let Ok(spec) = zeno_fcis_spec::parse_project(&inputs.project, Default::default())
+            .and_then(|p| zeno_fcis_spec::elaborate_project(p, Default::default()))
+        && !spec.collections().maps().is_empty()
+    {
+        return crate::contract_files::scaffold(dir, contract, source);
+    }
     let binding = match binding::bind(
         &include_str!("../contract-app/Cargo.toml.in")
             .replace("{package}", "app-template")

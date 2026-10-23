@@ -1172,6 +1172,225 @@ impl fmt::Display for DecodeError {
 #[cfg(test)]
 use RustCryptoSha256 as TestHasher;
 
+/// Pure canonical commitments and path updates for opaque-key collections.
+///
+/// Empty subtrees and singleton leaves collapse; branches with two or more
+/// entries retain their key-bit split. Sibling summaries are supplied by storage,
+/// not authenticated by this utility. No database or I/O enters a path update.
+pub mod collection_merkle {
+    use crate::{CommitmentHasher, RustCryptoSha256};
+    use alloc::vec::Vec;
+
+    /// An opaque collection key.
+    pub type Key = [u8; 32];
+    /// A SHA-256 commitment.
+    pub type Digest = [u8; 32];
+    /// The fixed maximum path length.
+    pub const KEY_BITS: usize = 256;
+
+    /// The only cardinality distinction needed to collapse a subtree.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Subtree {
+        /// No entries.
+        Empty,
+        /// Exactly one keyed leaf.
+        Leaf(Digest),
+        /// At least two entries, split at this prefix's next key bit.
+        Branch(Digest),
+    }
+    impl Subtree {
+        fn digest_with(self, empty: &Digest) -> Digest {
+            match self {
+                Self::Empty => *empty,
+                Self::Leaf(hash) | Self::Branch(hash) => hash,
+            }
+        }
+        /// The canonical root represented by this summary.
+        #[must_use]
+        pub fn digest(self) -> Digest {
+            self.digest_with(&empty_hash())
+        }
+    }
+
+    /// One node row to insert/update, or remove when its subtree has fewer than two entries.
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct NodeWrite {
+        /// Key bits fixed by this prefix, from0 through255.
+        pub depth: usize,
+        /// Prefix bits followed by zero bits.
+        pub prefix: Key,
+        /// Branch hash, or removal.
+        pub hash: Option<Digest>,
+    }
+    /// Owned results of one pure entry update. This is not a publication capability.
+    #[must_use]
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PathUpdate {
+        /// The new keyed leaf, or removal.
+        pub leaf: Option<Digest>,
+        /// The canonical root after applying this path update.
+        pub root: Digest,
+        /// Node writes in deepest-first order.
+        pub nodes: Vec<NodeWrite>,
+    }
+
+    /// The empty collection/subtree commitment, preserving the existing domain.
+    #[must_use]
+    pub fn empty_hash() -> Digest {
+        hash(&[b"ZFCIS-MAP-EMPTY\0"])
+    }
+    /// A keyed record's leaf commitment, preserving the existing domains and byte order.
+    #[must_use]
+    pub fn leaf_hash(key: &Key, record: &[u8]) -> Digest {
+        hash(&[b"ZFCIS-MAP-LEAF\0", key, &hash(&[record])])
+    }
+    /// An ordered branch commitment.
+    #[must_use]
+    pub fn node_hash(left: &Digest, right: &Digest) -> Digest {
+        hash(&[b"ZFCIS-MAP-NODE\0", left, right])
+    }
+    fn hash(parts: &[&[u8]]) -> Digest {
+        *RustCryptoSha256::hash_parts(parts).as_bytes()
+    }
+    fn bit(key: &Key, depth: usize) -> u8 {
+        (key[depth / 8] >> (7 - depth % 8)) & 1
+    }
+    /// First `depth` key bits followed by zeros; depths above256 clamp to256.
+    #[must_use]
+    pub fn prefix(key: &Key, depth: usize) -> Key {
+        let depth = depth.min(KEY_BITS);
+        let (whole, remainder) = (depth / 8, depth % 8);
+        let mut out = [0; 32];
+        out[..whole].copy_from_slice(&key[..whole]);
+        if remainder != 0 {
+            out[whole] = key[whole] & (u8::MAX << (8 - remainder));
+        }
+        out
+    }
+    /// Inclusive least/greatest keys with this prefix, with depth clamped to256.
+    #[must_use]
+    pub fn bounds(key: &Key, depth: usize) -> (Key, Key) {
+        let depth = depth.min(KEY_BITS);
+        let low = prefix(key, depth);
+        let mut high = low;
+        let (whole, remainder) = (depth / 8, depth % 8);
+        if remainder == 0 {
+            high[whole..].fill(u8::MAX);
+        } else {
+            high[whole] |= u8::MAX >> remainder;
+            high[whole + 1..].fill(u8::MAX);
+        }
+        (low, high)
+    }
+    /// Prefix of the other child at `depth`; refuses a depth outside the key.
+    #[must_use]
+    pub fn sibling_prefix(key: &Key, depth: usize) -> Option<Key> {
+        if depth >= KEY_BITS {
+            return None;
+        }
+        let mut other = prefix(key, depth + 1);
+        other[depth / 8] ^= 1 << (7 - depth % 8);
+        Some(other)
+    }
+    /// Equal leading bits, from0 through256.
+    #[must_use]
+    pub fn shared_bits(a: &Key, b: &Key) -> usize {
+        (0..KEY_BITS)
+            .take_while(|i| bit(a, *i) == bit(b, *i))
+            .count()
+    }
+    /// Necessary path length from the indexed predecessor/successor (or all other keys).
+    /// Equal target keys are ignored; the result is at most256.
+    #[must_use]
+    pub fn shared_path_length(key: &Key, neighbours: &[Key]) -> usize {
+        neighbours
+            .iter()
+            .filter(|other| *other != key)
+            .map(|other| shared_bits(key, other) + 1)
+            .max()
+            .unwrap_or(0)
+    }
+    fn combine(left: Subtree, right: Subtree, empty: &Digest) -> Subtree {
+        match (left, right) {
+            (Subtree::Empty, Subtree::Empty) => Subtree::Empty,
+            (Subtree::Empty, Subtree::Leaf(hash)) | (Subtree::Leaf(hash), Subtree::Empty) => {
+                Subtree::Leaf(hash)
+            }
+            _ => Subtree::Branch(node_hash(
+                &left.digest_with(empty),
+                &right.digest_with(empty),
+            )),
+        }
+    }
+    /// Update one key from root-to-leaf sibling summaries, without changing any input.
+    ///
+    /// The path ends below the deepest prefix shared with another entry. Below
+    /// that point the changed subtree is empty or the new leaf. The caller must
+    /// supply siblings from that same pre-state; this function does not authenticate
+    /// storage. A path longer than256 bits is refused before allocating its plan.
+    #[must_use]
+    pub fn update_path(
+        key: &Key,
+        record: Option<&[u8]>,
+        siblings: &[Subtree],
+    ) -> Option<PathUpdate> {
+        if siblings.len() > KEY_BITS {
+            return None;
+        }
+        let empty = empty_hash();
+        let leaf = record.map(|record| leaf_hash(key, record));
+        let mut child = leaf.map_or(Subtree::Empty, Subtree::Leaf);
+        let mut nodes = Vec::with_capacity(siblings.len());
+        for (depth, other) in siblings.iter().enumerate().rev() {
+            let (left, right) = if bit(key, depth) == 0 {
+                (child, *other)
+            } else {
+                (*other, child)
+            };
+            child = combine(left, right, &empty);
+            let hash = match child {
+                Subtree::Branch(hash) => Some(hash),
+                _ => None,
+            };
+            nodes.push(NodeWrite {
+                depth,
+                prefix: prefix(key, depth),
+                hash,
+            });
+        }
+        Some(PathUpdate {
+            leaf,
+            root: child.digest_with(&empty),
+            nodes,
+        })
+    }
+
+    /// Reference rebuild from all entries. Duplicate keys retain their first record.
+    #[must_use]
+    pub fn rebuild_root(entries: &[(Key, Vec<u8>)]) -> Digest {
+        let mut leaves: Vec<(Key, Digest)> = entries
+            .iter()
+            .map(|(key, record)| (*key, leaf_hash(key, record)))
+            .collect();
+        leaves.sort_by_key(|(key, _)| *key);
+        leaves.dedup_by_key(|(key, _)| *key);
+        rebuild(&leaves, 0)
+    }
+    fn rebuild(leaves: &[(Key, Digest)], depth: usize) -> Digest {
+        match leaves {
+            [] => empty_hash(),
+            [(_, leaf)] => *leaf,
+            _ => {
+                let split = leaves.partition_point(|(key, _)| bit(key, depth) == 0);
+                node_hash(
+                    &rebuild(&leaves[..split], depth + 1),
+                    &rebuild(&leaves[split..], depth + 1),
+                )
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

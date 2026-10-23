@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -11,6 +12,16 @@ from cargo_source_scope import source_environment
 
 
 class SourceScopeTest(unittest.TestCase):
+    def test_binary_environment_and_arguments_are_preserved(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="compiler-scope-env-") as directory:
+            environment=source_environment(Path(directory),dict(os.environ))
+            environment["CARGO_BIN_EXE_app-server"]="test-sentinel"
+            result=subprocess.run([environment["RUSTC_WORKSPACE_WRAPPER"],sys.executable,"-c",
+                "import os,sys; print(os.environ.get('CARGO_BIN_EXE_app-server')); print(repr(sys.argv[1:]))",
+                "argument with spaces", "", "literal-$value"],env=environment,capture_output=True,text=True,check=False)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout.splitlines(),["test-sentinel","['argument with spaces', '', 'literal-$value']"])
+
     def test_backdated_copy_and_restored_mutant(self) -> None:
         environment = dict(os.environ, CARGO_NET_OFFLINE="true")
         self.assertIn("CARGO_TARGET_DIR", environment)

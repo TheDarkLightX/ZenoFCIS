@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import sys
 from pathlib import Path
 
 
@@ -15,10 +16,10 @@ def source_environment(root: Path, environment: dict[str, str]) -> dict[str, str
     if environment.get("RUSTC_WORKSPACE_WRAPPER"):
         raise RuntimeError("source controls require an unwrapped workspace compiler")
     target = Path(environment["CARGO_TARGET_DIR"]).resolve()
-    identity = hashlib.sha256(os.fsencode(root.resolve())).hexdigest()
+    identity = hashlib.sha256(b"zeno-fcis/source-compiler/2\0" + os.fsencode(root.resolve())).hexdigest()
     wrapper = target / "source-scopes" / identity / "rustc"
     wrapper.parent.mkdir(parents=True, exist_ok=True)
-    body = '#!/bin/sh\nexec "$@"\n'
+    body = f'#!{sys.executable}\nimport os, sys\nos.execv(sys.argv[1], sys.argv[1:])\n'
     if wrapper.exists():
         if wrapper.read_text() != body:
             raise RuntimeError("unexpected source-scope compiler wrapper")

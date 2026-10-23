@@ -66,6 +66,38 @@ const APPLICATION: &[(&str, &str)] = &[
         include_str!("../contract-app/tests/decisions.rs"),
     ),
 ];
+const COLLECTION_APPLICATION: &[(&str, &str)] = &[
+    ("src/lib.rs", include_str!("../contract-app/src/lib.rs")),
+    (
+        "src/examples.rs",
+        include_str!("../contract-app/src/examples.rs"),
+    ),
+    ("src/main.rs", include_str!("../collection-app/main.rs")),
+    ("src/app.rs", include_str!("../collection-app/app.rs")),
+    (
+        "src/app/operations.rs",
+        include_str!("../collection-app/app/operations.rs"),
+    ),
+    (
+        "www/index.html",
+        include_str!("../collection-app/index.html"),
+    ),
+    ("www/form.js", include_str!("../collection-app/form.js")),
+    (
+        "tests/decisions.rs",
+        include_str!("../collection-app/decisions.rs"),
+    ),
+    (
+        "tests/collection_journey.rs",
+        include_str!("../collection-app/journey.rs"),
+    ),
+    (
+        "tests/support/mod.rs",
+        include_str!("../../zeno-fcis-ingress/tests/support/mod.rs"),
+    ),
+];
+const COLLECTION_MANIFEST: &str = include_str!("../collection-app/Cargo.toml.in");
+const COLLECTION_README: &str = include_str!("../collection-app/README.in");
 const NUMERIC_APPLICATION: &[(&str, &str)] = &[
     ("src/lib.rs", include_str!("../contract-app/numeric/lib.rs")),
     (
@@ -437,6 +469,17 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             &adoptions,
             &evolutions,
         ))?;
+        let spec = zeno_fcis_spec::parse_project(&inputs.project, Default::default())
+            .and_then(|p| zeno_fcis_spec::elaborate_project(p, Default::default()))
+            .map_err(|e| invalid(PROJECT, e))?;
+        let collection = if spec.collections().maps().is_empty() {
+            None
+        } else {
+            Some(zeno_fcis_contract::collections::runtime::Layout::read(
+                &inputs.project,
+                &inputs.rules,
+            )?)
+        };
         // The contract version is part of the package name, so two versions
         // of one application never share a cached build of its library.
         let package = format!(
@@ -457,7 +500,9 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
                 ),
             ));
         }
-        let manifest = if generated.program().is_none() {
+        let manifest = if collection.is_some() {
+            COLLECTION_MANIFEST
+        } else if generated.program().is_none() {
             NUMERIC_MANIFEST
         } else {
             MANIFEST
@@ -469,7 +514,9 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
         let lock = binding
             .application_lock(&manifest)
             .map_err(Failure::Binding)?;
-        let readme = if generated.program().is_none() {
+        let readme = if collection.is_some() {
+            COLLECTION_README
+        } else if generated.program().is_none() {
             NUMERIC_README
         } else {
             README
@@ -483,6 +530,43 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
             (EXAMPLES.to_owned(), examples.into_bytes()),
         ];
+        if let Some(layout) = &collection {
+            let interface = serde_json::to_vec_pretty(&layout.interface())
+                .map_err(|e| invalid("interface", e))?;
+            files.push(("www/interface.json".into(), interface));
+            let description = layout.interface();
+            let context: Vec<String> = description["fields"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|f| f["source"] == "context")
+                .map(|field| {
+                    if field["domain"]["kind"] == "key" {
+                        "00".repeat(32)
+                    } else {
+                        layout
+                            .positions()
+                            .iter()
+                            .find(|p| field["name"].as_str().is_some_and(|name| p.name == name))
+                            .and_then(|p| p.domain.least())
+                            .unwrap_or(0)
+                            .to_string()
+                    }
+                })
+                .collect();
+            files.push((
+                "context.json".into(),
+                serde_json::to_vec(&context).map_err(|e| invalid("context", e))?,
+            ));
+            if let Ok(bytes) = read_input(&contract.join("tests/collection-journey.json")) {
+                files.push(("tests/collection-journey.json".into(), bytes));
+            } else {
+                files.push((
+                    "tests/collection-journey.json".into(),
+                    b"{\"steps\":[]}".to_vec(),
+                ));
+            }
+        }
         if let Some(metadata) = ui_metadata {
             files.push(("ui.json".to_owned(), metadata));
         }
@@ -493,23 +577,24 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
                 .map(|(name, bytes)| (name, bytes.to_vec())),
         );
         files.extend(
-            if generated.program().is_none() {
+            if collection.is_some() { COLLECTION_APPLICATION } else if generated.program().is_none() {
                 NUMERIC_APPLICATION
             } else {
                 APPLICATION
             }
             .iter()
             .map(|(name, source)| {
-                let source = if *name == "src/session.rs" && generated.source().contains("pub fn with_released_24_lineage") {
+                let source = if collection.is_some() && *name == "src/lib.rs" {
+                    let end = source.find("use zeno_fcis_codec::{CanonicalEncode").ok_or_else(|| invalid("application", "missing library core boundary"))?;
+                    format!("//! A checked collection contract, pure view helpers and its storage shell.\n#![forbid(unsafe_code)]\n/// Checked schema, policy, laws and genesis.\npub mod v2_contract;\nmod examples;\n/// Authenticated collection application and local recovery operations.\npub mod app;\n\n{}", &source[end..])
+                } else if *name == "src/session.rs" && generated.source().contains("pub fn with_released_24_lineage") {
                     source.replace("    f(&[]) // released predecessor contexts", "    v2_contract::with_released_24_lineage(f).map_err(|error| format!(\"catalog: {error:?}\"))?")
                 } else { (*source).to_owned() };
-                (
+                Ok((
                     (*name).to_owned(),
-                    source
-                        .replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION"))
-                        .into_bytes(),
-                )
-            }),
+                    source.replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION")).into_bytes(),
+                ))
+            }).collect::<Result<Vec<_>,Failure>>()?,
         );
         if let Some(toolchain) = binding.toolchain {
             files.push(("rust-toolchain.toml".to_owned(), toolchain));

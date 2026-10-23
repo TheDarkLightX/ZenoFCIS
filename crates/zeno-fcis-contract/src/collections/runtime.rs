@@ -107,6 +107,7 @@ pub struct Layout {
     inputs: Vec<(usize, u32)>,
     /// State positions that belong to no entry.
     scalars: Vec<usize>,
+    capacities: BTreeMap<u32, u64>,
 }
 
 /// One decision's view, with what it needs to write back.
@@ -228,12 +229,139 @@ impl Layout {
             entries,
             inputs,
             scalars,
+            capacities: collections
+                .maps()
+                .iter()
+                .map(|map| (map.id().get(), map.capacity()))
+                .collect(),
         })
     }
 
     /// The view's program inputs, in order.
     pub fn positions(&self) -> &[Position] {
         &self.positions
+    }
+
+    /// Declared map capacities; the storage shell enforces these resource limits.
+    pub fn capacities(&self) -> &BTreeMap<u32, u64> {
+        &self.capacities
+    }
+
+    /// Scalar state only, excluding request-dependent entry-view fields.
+    pub fn scalar_state(&self, fields: &BTreeMap<u16, i128>) -> BTreeMap<u16, i128> {
+        self.scalars
+            .iter()
+            .filter_map(|index| {
+                let id = self.positions[*index].field.unwrap_or(0);
+                fields.get(&id).map(|value| (id, *value))
+            })
+            .collect()
+    }
+
+    /// Decode canonical number strings and fixed-width lowercase key hex in input order.
+    pub fn decode_input(&self, source: Source, values: &[String]) -> Result<Input, ContractError> {
+        let invalid =
+            || ContractError::new("collections input", "field count, canonical form or domain");
+        let positions: Vec<_> = self
+            .positions
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.source == source)
+            .collect();
+        if source == Source::State || positions.len() != values.len() {
+            return Err(invalid());
+        }
+        let mut input = Input::default();
+        for ((index, position), text) in positions.into_iter().zip(values) {
+            let field = position.field.unwrap_or(0);
+            if self.inputs.iter().any(|(i, _)| *i == index) {
+                input
+                    .keys
+                    .insert(field, decode_key(text).ok_or_else(invalid)?);
+            } else {
+                let value: i128 = text.parse().map_err(|_| invalid())?;
+                let fits = match &position.domain {
+                    domain::LeafDomain::Bool => value == 0 || value == 1,
+                    domain::LeafDomain::Int { min, max } => (*min..=*max).contains(&value),
+                    domain::LeafDomain::Sum { variants, .. } => {
+                        variants.iter().any(|id| i128::from(*id) == value)
+                    }
+                };
+                if value.to_string() != *text || !fits {
+                    return Err(invalid());
+                }
+                input.scalars.insert(field, value);
+            }
+        }
+        Ok(input)
+    }
+
+    /// Encode a real input with exactly the same canonical wire forms as the decoder.
+    pub fn encode_input(
+        &self,
+        source: Source,
+        input: &Input,
+    ) -> Result<Vec<String>, ContractError> {
+        self.positions
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.source == source)
+            .map(|(index, position)| {
+                let field = position.field.unwrap_or(0);
+                if self.inputs.iter().any(|(i, _)| *i == index) {
+                    input
+                        .keys
+                        .get(&field)
+                        .map(|key| key.iter().map(|b| format!("{b:02x}")).collect())
+                } else {
+                    input.scalars.get(&field).map(ToString::to_string)
+                }
+                .ok_or_else(|| ContractError::new("collections input", "missing input field"))
+            })
+            .collect()
+    }
+
+    /// Distinct named keys, before any storage read. Aliased positions share one load.
+    pub fn named(
+        &self,
+        command: &Input,
+        context: &Input,
+    ) -> Result<BTreeMap<u32, BTreeSet<Key>>, ContractError> {
+        let mut named: BTreeMap<u32, BTreeSet<Key>> = BTreeMap::new();
+        for entry in &self.entries {
+            let (source, field) = entry.key_field;
+            let input = if source == Source::Command {
+                command
+            } else {
+                context
+            };
+            let key = input
+                .keys
+                .get(&field)
+                .ok_or_else(|| ContractError::new("collections input", "missing named key"))?;
+            named.entry(entry.map).or_default().insert(*key);
+        }
+        Ok(named)
+    }
+
+    /// Transport interface over real inputs, retaining key types rather than their classes.
+    pub fn interface(&self) -> serde_json::Value {
+        use serde_json::json;
+        let fields: Vec<_> = self
+            .positions
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.source != Source::State)
+            .map(|(index, p)| {
+                let mut value = p.json();
+                if let Some((_, key_type)) = self.inputs.iter().find(|(i, _)| *i == index) {
+                    value["domain"] =
+                        json!({"kind":"key","bytes":32,"encoding":"hex","type":key_type});
+                }
+                value
+            })
+            .collect();
+        json!({"format":"zeno-fcis/collection-interface/1","fields":fields,"maps":self.capacities.iter().map(|(id,capacity)| json!({"id":id,"capacity":capacity.to_string()})).collect::<Vec<_>>()})
     }
 
     /// Frames one decision's view, reading storage only at the named keys.
@@ -417,4 +545,27 @@ impl Layout {
         }
         Ok(writes)
     }
+}
+
+/// Exactly 32 bytes encoded as 64 lowercase hexadecimal digits; no aliases or prefixes.
+pub fn decode_key(text: &str) -> Option<Key> {
+    if text.len() != 64
+        || !text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return None;
+    }
+    let mut key = [0; 32];
+    for (out, pair) in key.iter_mut().zip(text.as_bytes().chunks_exact(2)) {
+        let digit = |b: u8| if b <= b'9' { b - b'0' } else { b - b'a' + 10 };
+        *out = digit(pair[0]) * 16 + digit(pair[1]);
+    }
+    Some(key)
+}
+
+/// The existing compiler/checker source identity, including this layout and the evaluator.
+/// This is provenance; it confers no decision or publication authority.
+pub fn source_digest() -> [u8; 32] {
+    crate::checked_composition::Identity::current().digest()
 }

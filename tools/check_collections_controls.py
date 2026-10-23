@@ -19,6 +19,7 @@ PARSER = "crates/zeno-fcis-spec/src/parser.rs"
 SPEC_COLLECTIONS = "crates/zeno-fcis-spec/src/collections.rs"
 CHECKER = "crates/zeno-fcis-contract/src/collections.rs"
 STORAGE = "crates/zeno-fcis-shell-sqlite/src/collections.rs"
+MERKLE = "crates/zeno-fcis-codec/src/lib.rs"
 CONTROLS = (
     ("unnamed-entry-read", SPEC, SPEC_COLLECTIONS,
      "if self.reads_map(value) {",
@@ -40,9 +41,9 @@ CONTROLS = (
      "if !named.get(map).is_some_and(|keys| keys.contains(key)) {",
      "if false && !named.get(map).is_some_and(|keys| keys.contains(key)) {",
      "collection_writes_outside_the_named_entries_are_refused"),
-    ("merkle-level-skipped", STORE, STORAGE,
-     "for depth in (0..=shared).rev() {",
-     "for depth in (0..=shared).rev().skip(1) {",
+    ("merkle-level-skipped", STORE, MERKLE,
+     "for (depth, other) in siblings.iter().enumerate().rev() {",
+     "for (depth, other) in siblings.iter().enumerate().rev().skip(1) {",
      "collection_roots_match_a_rebuild_after_every_write"),
 )
 

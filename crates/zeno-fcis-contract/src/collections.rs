@@ -50,7 +50,7 @@ pub const PREMISES: [&str; 4] = [
     "keys are compared only for equality, with keys of the same type; stored post-keys resolve to concrete pre-invocation key bindings",
     "a decision reads and writes only scalar state and the entries its command and context keys name",
     "laws are per entry or over named entries, and aggregates are declared summaries whose changes are checked",
-    "the runtime frames each decision from the stored entries at those keys and writes back only them",
+    "the runtime binds the declared capacities, frames each decision from stored named entries, and atomically stores only their merged writes within those capacities",
 ];
 
 /// Additional premises for ordered collection views.

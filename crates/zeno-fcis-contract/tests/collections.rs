@@ -94,6 +94,12 @@ fn collections_token_balances_check_over_every_admissible_view() {
     assert_eq!(packet["key_types"][0]["positions"], 2);
     assert_eq!(packet["key_types"][0]["patterns"], "2");
     assert_eq!(packet["maps"][0]["capacity"], "1048576");
+    assert!(
+        packet["premises"][3]
+            .as_str()
+            .is_some_and(|premise| premise.contains("binds the declared capacities")),
+        "a checked view must state its external runtime capacity premise"
+    );
     // Independent count: two key patterns. Distinct accounts: 5 x 5 views
     // with supply >= their balances, 115 states; one account: 5 views, 29.
     // Each of the 144 takes 2 actions x 4 amounts x 2 desks.

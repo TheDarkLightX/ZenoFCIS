@@ -123,7 +123,7 @@ on all data with the same equality pattern.
 | P1. Keys are compared only for equality, with keys of the same type, and copied only into stored key fields. | The parser refuses any other key use in a law; the checker refuses it in a rule. |
 | P2. A decision reads only scalar state, named entries, and command and context scalars and key classes. | Structure: a map has no view field, and the parser refuses any formula that reads one. |
 | P3. Entry invariants use the same scalar-independent predicate at every entry, including absence, independently of command/context, and every named post-entry satisfies it. Scalar invariants read only scalars; aggregates are summaries. | Parser checks read locality, input independence and uniform entry predicates; `forall e in entries MAP` supplies the uniform form. The Lean model makes uniform closure explicit in `Checked`; it does not prove the executable parser establishes that premise. |
-| P4. The runtime frames each decision from the stored entries at the named keys and writes back only the merged writes of named entries. | The runtime, outside this check. |
+| P4. The runtime binds the declared capacities, frames stored named entries, and atomically commits only their merged writes within those capacities. | The runtime, outside this check. |
 
 1. *Abstraction.* For a real state and input, build the view: scalars as
    they are, each named entry from the map at its key or absent with
@@ -155,8 +155,23 @@ on all data with the same equality pattern.
    checked admissible views, so its decision is lawful and its writes merge.
 
 The check does not establish P4. The runtime must establish it with its own
-tests and planted controls. Capacity is the runtime's: an insert into
-a full map is refused there, outside the view.
+tests and planted controls. Before contract execution, bind the empty store
+with `CollectionStore::bind`, passing the declared `Layout::capacities()`;
+the emitted applications do this at startup. An unbound `CollectionStore`
+is a schema-free storage utility and has no declared-capacity guarantee.
+
+Capacity is checked on the complete atomic write set. For a map with count c,
+count each distinct written key once and let delta be its new presence minus
+its old presence, summed over those keys. Commit requires 0 <= c + delta <= N.
+Thus inserting a new key into a full map is refused; updating an existing key
+is allowed, and replacing a deleted entry in the same commit is allowed in
+either write order. A refusal changes no entries, scalars, roots, counters,
+retry records or journal rows.
+
+Capacity is outside the view: the Authority can accept a lawful view while
+the bound store refuses its commit for capacity. A checked view result does
+not guarantee storage admission. No capacity decision is re-derived from
+business rules in the shell.
 
 The scoped renaming part of step 1 is proved by `frame_renaming` and
 `decision_renaming` in
@@ -321,11 +336,44 @@ combination is **prior-art search pending**.
   checker as described below; opaque keys remain equality-only.
 - Cross-map invariants use the grouped tally fragment above; arbitrary
   cross-entry state formulas remain unsupported.
-- Generated applications (`new --contract`, `--app`) do not yet run a
-  collections contract: their HTTP preview, command wire and interface carry
-  scalars only. The runtime below is the library such an application would
-  use; wiring it into the generated shell, a key picker and a list idiom in
-  the interface are follow-ups.
+- `new --contract` and `--app` run standalone collection contracts without
+  deliveries or a server clock. Their plain synthesized form and interface
+  retain command and context key fields as exactly 64 lowercase hexadecimal
+  digits. Ordered collection framing, a key picker, collection listing and durable browser request
+  recovery are follow-ups. This collection profile is separate from the
+  scalar publication shell.
+
+## Application
+
+```text
+zeno-fcis new token-app --contract examples/collections/token-balances
+zeno-fcis new library-app --contract examples/collections/library --app
+```
+
+Each application includes an authenticated HTTP server and a plain form.
+Review its `context.json`, provide the private credential file as its README
+explains, and run `cargo +1.97.1 run --locked --offline --bin app-server`.
+`GET /state` reports scalar state and the command/context interface;
+`POST /preview` and `/command` use the existing ingress envelope with a JSON
+array of command strings. Malformed keys receive the existing HTTP 400
+`Malformed` refusal. Context keys come from server configuration.
+
+For each request the shell loads each distinct named key once, snapshots the
+owned records, frames them with `Layout::frame`, calls the checked Authority,
+and stores only `Layout::writes`. Revision, retry and declared capacity guards
+run in the same SQLite transaction as the scalar state and map writes. These
+storage utilities do not supply decision or publication authority. Map-wide
+reads belong to audit and measurement setup, outside request preparation.
+
+Each application receipt binds scalar state and every named map root before
+and after. Its submission journal records the real keys, context, exact
+command bytes and Authority publication subject. Local `app-server --journal
+STORE`, `--replay JOURNAL NEW_STORE` and `--audit STORE` operations reproduce
+and compare each receipt and the final head. Restore publishes a new destination
+only after replay; startup performs the same audit before serving. Receipt,
+submission and journal profile identifiers end in `/2`; earlier collection-app
+profiles require an explicit migration that this implementation does not supply.
+
 
 ## Runtime
 
@@ -337,7 +385,18 @@ with two or more, split at the next key bit. The root depends only on the
 entries. Writing a key rehashes only the subtrees on its path that hold
 another key, as many levels as the bits it shares with its nearest
 neighbour: about log2 of the entries for unrelated keys, at most 256.
-`rebuild_root` recomputes a root from scratch for replay checks.
+The hashing, prefix arithmetic and path update live in the pure
+`zeno_fcis_codec::collection_merkle` module. Storage acquires bounded
+sibling summaries from indexed rows, applies the owned update plan in its
+transaction and retains no invocation scratch. The plan authenticates no
+storage and grants no decision or publication authority. `rebuild_root`
+recomputes a root from scratch for replay checks.
+
+The pure-core tests cover all 256 subsets of eight keys sharing 253 prefix
+bits. For subsets of up to five keys they check every insertion order and
+every removal order, comparing each intermediate root and stored node cache
+with the canonical subset. Independent SHA-256 vectors retain the existing
+root format. This finite corpus is regression evidence, not a general proof.
 
 `zeno_fcis_contract::collections::runtime::Layout` frames each decision:
 `frame` reads storage only at the keys the command and context name,

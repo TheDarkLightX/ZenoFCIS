@@ -24,6 +24,11 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use zeno_fcis_codec::CommitmentHasher;
+use zeno_fcis_codec::collection_merkle::{
+    Subtree, bounds, shared_path_length, sibling_prefix, update_path,
+};
+/// Canonical pure keyed-leaf hash and independent full rebuild, retaining these API names.
+pub use zeno_fcis_codec::collection_merkle::{leaf_hash, rebuild_root};
 use zeno_fcis_crypto::RustCryptoSha256;
 
 /// An opaque 32-byte map key.
@@ -31,14 +36,20 @@ pub type Key = [u8; 32];
 /// A SHA-256 digest.
 pub type Digest = [u8; 32];
 
-/// Number of key bits, and so the deepest level of the tree.
-const KEY_BITS: usize = 256;
-
 /// A store failure.
 #[derive(Debug)]
 pub enum Error {
     /// SQLite refused an operation.
     Sqlite(rusqlite::Error),
+    /// The expected committed revision has changed.
+    Conflict,
+    /// A retry key already names a committed request.
+    Replay,
+    /// A configured map would exceed its declared capacity.
+    Capacity {
+        /// Map at its resource limit.
+        map: u32,
+    },
     /// A decision wrote an entry its command and context did not name.
     Framing {
         /// The map written.
@@ -54,6 +65,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Sqlite(error) => write!(f, "collection store: {error}"),
+            Self::Conflict => write!(f, "collection store revision conflict"),
+            Self::Replay => write!(f, "collection retry key already committed"),
+            Self::Capacity { map } => write!(f, "collection map {map} capacity exceeded"),
             Self::Framing { map, key } => write!(
                 f,
                 "framing: a decision wrote map {map} at an entry it did not name ({})",
@@ -92,10 +106,21 @@ pub struct Commit {
     pub rehashed: u64,
 }
 
+/// Authenticated request binding, supplied by the transport shell.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RequestBinding {
+    /// Principal- and contract-scoped retry key.
+    pub key: Digest,
+    /// Exact authenticated request digest.
+    pub request: Digest,
+}
+
 /// One write: the new record, or `None` to remove the entry.
 pub type Write = (u32, Key, Option<Vec<u8>>);
 
-/// SQLite storage for the maps of one application.
+/// SQLite storage for keyed records.
+/// Contract execution first binds its declared capacities with `bind`.
+/// Unbound commits are schema-free storage utilities, not contract admission.
 pub struct CollectionStore {
     connection: Connection,
 }
@@ -107,6 +132,12 @@ CREATE TABLE IF NOT EXISTS collection_entries (
 CREATE TABLE IF NOT EXISTS collection_nodes (
     map INTEGER NOT NULL, depth INTEGER NOT NULL, prefix BLOB NOT NULL, hash BLOB NOT NULL,
     PRIMARY KEY (map, depth, prefix)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS collection_binding (
+    singleton INTEGER PRIMARY KEY CHECK(singleton = 1), identity BLOB NOT NULL, genesis BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS collection_limits (
+    map INTEGER PRIMARY KEY, capacity INTEGER NOT NULL, entries INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS collection_requests (
+    key BLOB PRIMARY KEY, request BLOB NOT NULL, sequence INTEGER NOT NULL UNIQUE) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS collection_commits (
     sequence INTEGER PRIMARY KEY, decision BLOB NOT NULL, scalars BLOB NOT NULL,
     pre_roots BLOB NOT NULL, post_roots BLOB NOT NULL, chain BLOB NOT NULL);
@@ -126,6 +157,155 @@ impl CollectionStore {
     fn with(connection: Connection) -> Result<Self, Error> {
         connection.execute_batch(SCHEMA)?;
         Ok(Self { connection })
+    }
+
+    /// Bind an empty application store, or verify its existing exact identity and limits.
+    /// This storage preparation handle grants no decision authority.
+    pub fn bind(
+        &mut self,
+        identity: &Digest,
+        genesis: &[u8],
+        capacities: &BTreeMap<u32, u64>,
+    ) -> Result<(), Error> {
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let binding: Option<(Vec<u8>, Vec<u8>)> = tx
+            .query_row(
+                "SELECT identity,genesis FROM collection_binding WHERE singleton=1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if let Some((bound, initial)) = binding {
+            let mut stmt = tx.prepare("SELECT map,capacity FROM collection_limits ORDER BY map")?;
+            let actual = stmt
+                .query_map([], |row| Ok((row.get::<_, u32>(0)?, row.get::<_, i64>(1)?)))?
+                .collect::<Result<BTreeMap<_, _>, _>>()?;
+            if bound != identity
+                || initial != genesis
+                || (actual.len() != capacities.len()
+                    || actual.iter().any(|(map, capacity)| {
+                        u64::try_from(*capacity).ok() != capacities.get(map).copied()
+                    }))
+            {
+                return Err(Error::Corrupt("application binding".into()));
+            }
+        } else {
+            let used: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM collection_entries) OR EXISTS(SELECT 1 FROM collection_commits) OR EXISTS(SELECT 1 FROM collection_requests)", [], |row|row.get(0))?;
+            if used {
+                return Err(Error::Corrupt(
+                    "cannot bind an existing unbound store".into(),
+                ));
+            }
+            tx.execute(
+                "INSERT INTO collection_binding VALUES (1,?1,?2)",
+                params![identity.as_slice(), genesis],
+            )?;
+            for (map, capacity) in capacities {
+                let capacity =
+                    i64::try_from(*capacity).map_err(|_| Error::Corrupt("map capacity".into()))?;
+                tx.execute(
+                    "INSERT INTO collection_limits VALUES (?1,?2,0)",
+                    params![map, capacity],
+                )?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Indexed committed revision; no journal scan or map enumeration.
+    pub fn version(&self) -> Result<u64, Error> {
+        let n: i64 = self.connection.query_row(
+            "SELECT coalesce(max(sequence),0) FROM collection_commits",
+            [],
+            |row| row.get(0),
+        )?;
+        u64::try_from(n).map_err(|_| Error::Corrupt("negative sequence".into()))
+    }
+
+    /// Scalar state at the indexed tip, or the bound scalar genesis.
+    pub fn scalar_state(&self) -> Result<Vec<u8>, Error> {
+        let latest: Option<Vec<u8>> = self
+            .connection
+            .query_row(
+                "SELECT scalars FROM collection_commits ORDER BY sequence DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match latest {
+            Some(scalars) => Ok(scalars),
+            None => Ok(self.connection.query_row(
+                "SELECT genesis FROM collection_binding WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )?),
+        }
+    }
+
+    /// Indexed original request and commit for exact retry recovery.
+    pub fn request(&self, key: &Digest) -> Result<Option<(Digest, Commit)>, Error> {
+        let row: Option<(Vec<u8>, i64)> = self
+            .connection
+            .query_row(
+                "SELECT request,sequence FROM collection_requests WHERE key=?1",
+                params![key.as_slice()],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        row.map(|(request,sequence)| {
+            let (decision,scalars,pre,post,chain) = self.connection.query_row("SELECT decision,scalars,pre_roots,post_roots,chain FROM collection_commits WHERE sequence=?1",params![sequence],|r|Ok((r.get::<_,Vec<u8>>(0)?,r.get::<_,Vec<u8>>(1)?,r.get::<_,Vec<u8>>(2)?,r.get::<_,Vec<u8>>(3)?,r.get::<_,Vec<u8>>(4)?)))?;
+            Ok((key_of(&request)?,Commit{sequence:u64::try_from(sequence).map_err(|_|Error::Corrupt("sequence".into()))?,decision,scalars,pre_roots:roots_of(&pre)?,post_roots:roots_of(&post)?,chain:key_of(&chain)?,rehashed:0}))
+        }).transpose()
+    }
+
+    /// Atomically guard the revision and publish the submission with its scalar/map writes.
+    /// The caller must derive writes from its checked decision; this is a storage utility.
+    pub fn commit_request(
+        &mut self,
+        expected: u64,
+        named: &BTreeMap<u32, BTreeSet<Key>>,
+        writes: &[Write],
+        decision: &[u8],
+        scalars: &[u8],
+        binding: RequestBinding,
+    ) -> Result<Commit, Error> {
+        self.commit_inner(named, writes, decision, scalars, Some((expected, binding)))
+    }
+
+    /// Audit the bound application's cardinality counters and one retry row per commit.
+    /// This complete recovery check is deliberately outside the request path.
+    pub fn audit_application(&self) -> Result<(), Error> {
+        let (requests,commits):(i64,i64)=self.connection.query_row("SELECT (SELECT count(*) FROM collection_requests),(SELECT count(*) FROM collection_commits)",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
+        if requests != commits {
+            return Err(Error::Corrupt("application request cardinality".into()));
+        }
+        let mut statement = self
+            .connection
+            .prepare("SELECT map,capacity,entries FROM collection_limits")?;
+        let rows = statement.query_map([], |r| {
+            Ok((
+                r.get::<_, u32>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
+        })?;
+        for row in rows {
+            let (map, capacity, entries) = row?;
+            if entries < 0
+                || entries > capacity
+                || u64::try_from(entries).ok() != Some(self.len(map)?)
+            {
+                return Err(Error::Corrupt("application map cardinality".into()));
+            }
+        }
+        let unknown:bool=self.connection.query_row("SELECT EXISTS(SELECT 1 FROM collection_entries e LEFT JOIN collection_limits l ON l.map=e.map WHERE l.map IS NULL)",[],|r|r.get(0))?;
+        if unknown {
+            return Err(Error::Corrupt("application has an undeclared map".into()));
+        }
+        Ok(())
     }
 
     /// The record stored at `key`, if any.
@@ -181,6 +361,17 @@ impl CollectionStore {
         decision: &[u8],
         scalars: &[u8],
     ) -> Result<Commit, Error> {
+        self.commit_inner(named, writes, decision, scalars, None)
+    }
+
+    fn commit_inner(
+        &mut self,
+        named: &BTreeMap<u32, BTreeSet<Key>>,
+        writes: &[Write],
+        decision: &[u8],
+        scalars: &[u8],
+        request: Option<(u64, RequestBinding)>,
+    ) -> Result<Commit, Error> {
         for (map, key, _) in writes {
             if !named.get(map).is_some_and(|keys| keys.contains(key)) {
                 return Err(Error::Framing {
@@ -192,6 +383,50 @@ impl CollectionStore {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some((expected, binding)) = request {
+            let actual: i64 = transaction.query_row(
+                "SELECT coalesce(max(sequence),0) FROM collection_commits",
+                [],
+                |row| row.get(0),
+            )?;
+            if u64::try_from(actual).ok() != Some(expected) {
+                return Err(Error::Conflict);
+            }
+            let used: bool = transaction.query_row(
+                "SELECT EXISTS(SELECT 1 FROM collection_requests WHERE key=?1)",
+                params![binding.key.as_slice()],
+                |row| row.get(0),
+            )?;
+            if used {
+                return Err(Error::Replay);
+            }
+        }
+        let bound: bool =
+            transaction.query_row("SELECT EXISTS(SELECT 1 FROM collection_binding)", [], |r| {
+                r.get(0)
+            })?;
+        if bound {
+            let mut deltas: BTreeMap<u32, i64> = BTreeMap::new();
+            let mut unique = BTreeSet::new();
+            for (map, key, record) in writes {
+                if !unique.insert((*map, *key)) {
+                    return Err(Error::Corrupt("duplicate application write".into()));
+                }
+                let present: bool = transaction.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM collection_entries WHERE map=?1 AND key=?2)",
+                    params![map, key.as_slice()],
+                    |r| r.get(0),
+                )?;
+                *deltas.entry(*map).or_default() +=
+                    i64::from(record.is_some()) - i64::from(present);
+            }
+            for (map, delta) in deltas {
+                let changed = transaction.execute("UPDATE collection_limits SET entries=entries+?2 WHERE map=?1 AND entries+?2 BETWEEN 0 AND capacity",params![map,delta])?;
+                if changed != 1 {
+                    return Err(Error::Capacity { map });
+                }
+            }
+        }
         let roots = |connection: &Connection| -> Result<BTreeMap<u32, Digest>, Error> {
             named
                 .keys()
@@ -234,6 +469,16 @@ impl CollectionStore {
                 chain.as_slice()
             ],
         )?;
+        if let Some((_, binding)) = request {
+            transaction.execute(
+                "INSERT INTO collection_requests VALUES (?1,?2,?3)",
+                params![
+                    binding.key.as_slice(),
+                    binding.request.as_slice(),
+                    i64::try_from(sequence).map_err(|_| Error::Corrupt("sequence".into()))?
+                ],
+            )?;
+        }
         transaction.commit()?;
         Ok(Commit {
             sequence,
@@ -279,102 +524,57 @@ impl CollectionStore {
     }
 }
 
-/// The root of a key set, recomputed from scratch: the reference for the
-/// incremental tree.
-pub fn rebuild_root(entries: &[(Key, Vec<u8>)]) -> Digest {
-    let mut sorted: Vec<(Key, Digest)> = entries
-        .iter()
-        .map(|(key, record)| (*key, leaf_hash(key, record)))
-        .collect();
-    sorted.sort_by_key(|(key, _)| *key);
-    sorted.dedup_by_key(|(key, _)| *key);
-    rebuild(&sorted, 0)
-}
-
-fn rebuild(leaves: &[(Key, Digest)], depth: usize) -> Digest {
-    match leaves {
-        [] => empty_hash(),
-        [(_, leaf)] => *leaf,
-        _ => {
-            let split = leaves.partition_point(|(key, _)| bit(key, depth) == 0);
-            node_hash(
-                &rebuild(&leaves[..split], depth + 1),
-                &rebuild(&leaves[split..], depth + 1),
-            )
-        }
-    }
-}
-
-/// Writes one entry and rehashes the subtrees on its path that hold another
-/// key, deepest first; returns how many it rehashed.
+/// Acquire an immutable path, compute its pure update, then persist only that plan.
 fn write(
     connection: &Connection,
     map: u32,
     key: &Key,
     record: Option<&[u8]>,
 ) -> Result<u64, Error> {
+    let neighbours = neighbours(connection, map, key)?;
+    let length = shared_path_length(key, &neighbours);
+    let mut siblings = Vec::with_capacity(length);
+    for depth in 0..length {
+        let other =
+            sibling_prefix(key, depth).ok_or_else(|| Error::Corrupt("sibling depth".into()))?;
+        siblings.push(subtree_summary(connection, map, depth + 1, &other)?);
+    }
+    let plan = update_path(key, record, &siblings)
+        .ok_or_else(|| Error::Corrupt("update path depth".into()))?;
+    let work = u64::try_from(plan.nodes.len()).map_err(|_| Error::Corrupt("path work".into()))?;
     match record {
-        Some(record) => connection.execute(
-            "INSERT INTO collection_entries VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (map, key) DO UPDATE SET record = excluded.record, leaf = excluded.leaf",
-            params![
-                map,
-                key.as_slice(),
-                record,
-                leaf_hash(key, record).as_slice()
-            ],
-        )?,
-        None => connection.execute(
-            "DELETE FROM collection_entries WHERE map = ?1 AND key = ?2",
-            params![map, key.as_slice()],
-        )?,
-    };
-    // Below the deepest prefix the key shares with another key, its subtree
-    // holds it alone and no node row exists.
-    let Some(shared) = deepest_shared(connection, map, key)? else {
-        return Ok(0);
-    };
-    let mut child = match record {
-        Some(record) => leaf_hash(key, record),
-        None => empty_hash(),
-    };
-    for depth in (0..=shared).rev() {
-        let mut sibling = prefix(key, depth + 1);
-        flip(&mut sibling, depth);
-        let other = subtree(connection, map, depth + 1, &sibling)?;
-        let (left, right) = if bit(key, depth) == 0 {
-            (child, other)
-        } else {
-            (other, child)
-        };
-        let here = prefix(key, depth);
-        let under = keys_under(connection, map, depth, &here)?;
-        child = match under.as_slice() {
-            [] => empty_hash(),
-            [only] => leaf_of(connection, map, only)?,
-            _ => node_hash(&left, &right),
-        };
-        let depth_column = i64::try_from(depth).unwrap_or(0);
-        if under.len() >= 2 {
+        Some(record) => {
+            let leaf = plan
+                .leaf
+                .ok_or_else(|| Error::Corrupt("missing update leaf".into()))?;
+            connection.execute("INSERT INTO collection_entries VALUES (?1,?2,?3,?4) ON CONFLICT (map,key) DO UPDATE SET record=excluded.record,leaf=excluded.leaf",params![map,key.as_slice(),record,leaf.as_slice()])?;
+        }
+        None => {
             connection.execute(
-                "INSERT INTO collection_nodes VALUES (?1, ?2, ?3, ?4)
-                 ON CONFLICT (map, depth, prefix) DO UPDATE SET hash = excluded.hash",
-                params![map, depth_column, here.as_slice(), child.as_slice()],
-            )?;
-        } else {
-            connection.execute(
-                "DELETE FROM collection_nodes WHERE map = ?1 AND depth = ?2 AND prefix = ?3",
-                params![map, depth_column, here.as_slice()],
+                "DELETE FROM collection_entries WHERE map=?1 AND key=?2",
+                params![map, key.as_slice()],
             )?;
         }
     }
-    Ok(u64::try_from(shared + 1).unwrap_or(u64::MAX))
+    for node in plan.nodes {
+        let depth = i64::try_from(node.depth).map_err(|_| Error::Corrupt("node depth".into()))?;
+        match node.hash {
+            Some(hash) => {
+                connection.execute("INSERT INTO collection_nodes VALUES (?1,?2,?3,?4) ON CONFLICT (map,depth,prefix) DO UPDATE SET hash=excluded.hash",params![map,depth,node.prefix.as_slice(),hash.as_slice()])?;
+            }
+            None => {
+                connection.execute(
+                    "DELETE FROM collection_nodes WHERE map=?1 AND depth=?2 AND prefix=?3",
+                    params![map, depth, node.prefix.as_slice()],
+                )?;
+            }
+        }
+    }
+    Ok(work)
 }
 
-/// The deepest level at which the key's subtree holds another key: the bits
-/// it shares with its nearest neighbour in sorted order. `None` when the map
-/// holds no other key.
-fn deepest_shared(connection: &Connection, map: u32, key: &Key) -> Result<Option<usize>, Error> {
+/// Acquire the indexed predecessor and successor. Pure code computes their shared depth.
+fn neighbours(connection: &Connection, map: u32, key: &Key) -> Result<Vec<Key>, Error> {
     let neighbour = |sql: &str| -> Result<Option<Key>, Error> {
         let found: Option<Vec<u8>> = connection
             .query_row(sql, params![map, key.as_slice()], |row| row.get(0))
@@ -387,19 +587,23 @@ fn deepest_shared(connection: &Connection, map: u32, key: &Key) -> Result<Option
     let after = neighbour(
         "SELECT key FROM collection_entries WHERE map = ?1 AND key > ?2 ORDER BY key LIMIT 1",
     )?;
-    Ok([before, after]
-        .into_iter()
-        .flatten()
-        .map(|other| shared_bits(key, &other))
-        .max())
+    Ok([before, after].into_iter().flatten().collect())
 }
 
 /// The hash of the subtree at `depth` under the first `depth` bits of
 /// `prefix`.
 fn subtree(connection: &Connection, map: u32, depth: usize, prefix: &Key) -> Result<Digest, Error> {
+    Ok(subtree_summary(connection, map, depth, prefix)?.digest())
+}
+fn subtree_summary(
+    connection: &Connection,
+    map: u32,
+    depth: usize,
+    prefix: &Key,
+) -> Result<Subtree, Error> {
     match keys_under(connection, map, depth, prefix)?.as_slice() {
-        [] => Ok(empty_hash()),
-        [only] => leaf_of(connection, map, only),
+        [] => Ok(Subtree::Empty),
+        [only] => Ok(Subtree::Leaf(leaf_of(connection, map, only)?)),
         _ => {
             let hash: Option<Vec<u8>> = connection
                 .query_row(
@@ -410,6 +614,7 @@ fn subtree(connection: &Connection, map: u32, depth: usize, prefix: &Key) -> Res
                 .optional()?;
             hash.map(|h| key_of(&h))
                 .transpose()?
+                .map(Subtree::Branch)
                 .ok_or_else(|| Error::Corrupt(format!("map {map} node at depth {depth}")))
         }
     }
@@ -445,62 +650,8 @@ fn leaf_of(connection: &Connection, map: u32, key: &Key) -> Result<Digest, Error
     key_of(&leaf)
 }
 
-fn bit(key: &Key, depth: usize) -> u8 {
-    (key[depth / 8] >> (7 - depth % 8)) & 1
-}
-
-fn flip(key: &mut Key, depth: usize) {
-    key[depth / 8] ^= 1 << (7 - depth % 8);
-}
-
-/// The first `depth` bits of the key, then zeros.
-fn prefix(key: &Key, depth: usize) -> Key {
-    let mut out = [0u8; 32];
-    for index in 0..depth.min(KEY_BITS) {
-        if bit(key, index) == 1 {
-            out[index / 8] |= 1 << (7 - index % 8);
-        }
-    }
-    out
-}
-
-/// The least and greatest keys with the prefix's first `depth` bits.
-fn bounds(prefix: &Key, depth: usize) -> (Key, Key) {
-    let low = self::prefix(prefix, depth);
-    let mut high = low;
-    for index in depth..KEY_BITS {
-        high[index / 8] |= 1 << (7 - index % 8);
-    }
-    (low, high)
-}
-
-fn shared_bits(a: &Key, b: &Key) -> usize {
-    (0..KEY_BITS)
-        .take_while(|i| bit(a, *i) == bit(b, *i))
-        .count()
-}
-
 fn sha256(bytes: &[u8]) -> Digest {
     *<RustCryptoSha256 as CommitmentHasher>::hash(bytes).as_bytes()
-}
-
-fn empty_hash() -> Digest {
-    sha256(b"ZFCIS-MAP-EMPTY\0")
-}
-
-/// The leaf of one entry: its key and the hash of its record.
-pub fn leaf_hash(key: &Key, record: &[u8]) -> Digest {
-    let mut framed = b"ZFCIS-MAP-LEAF\0".to_vec();
-    framed.extend_from_slice(key);
-    framed.extend_from_slice(&sha256(record));
-    sha256(&framed)
-}
-
-fn node_hash(left: &Digest, right: &Digest) -> Digest {
-    let mut framed = b"ZFCIS-MAP-NODE\0".to_vec();
-    framed.extend_from_slice(left);
-    framed.extend_from_slice(right);
-    sha256(&framed)
 }
 
 fn roots_bytes(roots: &BTreeMap<u32, Digest>) -> Vec<u8> {
@@ -556,4 +707,9 @@ fn key_of(bytes: &[u8]) -> Result<Key, Error> {
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Exact compiled storage source for application binding, not a publication capability.
+pub fn source_digest() -> Digest {
+    sha256(include_bytes!("collections.rs"))
 }
