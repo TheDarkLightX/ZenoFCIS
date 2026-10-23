@@ -18,7 +18,7 @@ import subprocess
 import tempfile
 import time
 
-from cargo_source_scope import source_environment
+from cargo_source_scope import require_build_space, source_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = 'crates/zeno-fcis-shell/src/effects/registry.rs'
@@ -229,11 +229,11 @@ def main() -> None:
     args = parser.parse_args()
     env = dict(os.environ, CARGO_NET_OFFLINE='true')
     env.setdefault('CARGO_TARGET_DIR', str(ROOT / 'target' / 'shell-effects-controls'))
+    env['CARGO_TARGET_DIR'] = str(Path(env['CARGO_TARGET_DIR']).resolve())
     cargo = ['cargo', '+1.97.1', 'test', '--locked', '--offline'] + (['--release'] if args.release else [])
 
     def run(root: Path, argv: list[str]) -> subprocess.CompletedProcess[str]:
-        if shutil.disk_usage('/').free < 8 * 1024**3:
-            raise RuntimeError('root free space below 8 GiB')
+        require_build_space(root, Path(env['CARGO_TARGET_DIR']))
         return subprocess.run(argv, cwd=root, env=source_environment(root, env) if argv[0] == "cargo" else env, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True, timeout=900)
 
@@ -252,6 +252,7 @@ def main() -> None:
         baseline_exits[name] = baseline.returncode
     rows = []
     with tempfile.TemporaryDirectory(prefix='shell-effects-controls-') as temp:
+        require_build_space(Path(temp), Path(env['CARGO_TARGET_DIR']))
         copy = Path(temp) / 'source'
         shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns('.git', 'target', 'node_modules', '__pycache__'))
         for name, target, test, markers, witness, edits in selected:

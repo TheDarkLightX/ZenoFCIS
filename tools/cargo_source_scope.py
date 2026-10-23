@@ -10,6 +10,17 @@ import hashlib
 import os
 import sys
 from pathlib import Path
+import shutil
+
+
+def require_build_space(work: Path, target: Path, minimum: int = 8 * 1024**3) -> None:
+    """Check the actual work/target mounts, including not-yet-created paths."""
+    for purpose, requested in (("work", work), ("target", target)):
+        existing = requested.resolve()
+        while not existing.exists():
+            existing = existing.parent
+        if shutil.disk_usage(existing).free < minimum:
+            raise RuntimeError(f"{purpose} free space below {minimum} bytes at {existing}")
 
 
 def source_environment(root: Path, environment: dict[str, str]) -> dict[str, str]:

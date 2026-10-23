@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import tempfile
 
-from cargo_source_scope import source_environment
+from cargo_source_scope import require_build_space, source_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 EFFECTS = "crates/zeno-fcis-shell/src/effects/"
@@ -77,16 +77,17 @@ def main() -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, CARGO_NET_OFFLINE="true")
     env.setdefault("CARGO_TARGET_DIR", str(ROOT / "target" / "effect-policy-controls"))
+    env["CARGO_TARGET_DIR"] = str(Path(env["CARGO_TARGET_DIR"]).resolve())
     cargo = ["cargo", "+1.97.1", "test", "--locked", "--offline", "-p", "zeno-fcis-shell", "--lib"] + (["--release"] if args.release else [])
 
     def run(root: Path, extra: list[str]) -> subprocess.CompletedProcess[str]:
-        if shutil.disk_usage("/").free < 8 * 1024**3:
-            raise RuntimeError("root free space below 8 GiB")
+        require_build_space(root, Path(env["CARGO_TARGET_DIR"]))
         return subprocess.run(cargo + extra, cwd=root, env=source_environment(root, env), text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
 
     rows = []
     with tempfile.TemporaryDirectory(prefix="effect-policy-controls-", dir=os.environ.get("TMPDIR")) as temp:
+        require_build_space(Path(temp), Path(env["CARGO_TARGET_DIR"]))
         copy = Path(temp) / "source"
         shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".git", "target", "node_modules", "__pycache__"))
         for name, test, marker, edits in CONTROLS:
