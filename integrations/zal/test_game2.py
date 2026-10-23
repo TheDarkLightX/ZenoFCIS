@@ -338,3 +338,131 @@ property reaches: user can force eventually (state == withdrawn);
             self.assertEqual(fixed, parity, f"solver disagreement in random machine {case}")
 
 
+class GameTableTests(unittest.TestCase):
+    def test_readme_commands_and_exact_output(self):
+        readme = README.read_text(encoding="utf-8")
+
+        def documented_output(marker):
+            match = re.search(rf"<!-- {marker} -->\s*```json\n(.*?)\n```", readme, re.DOTALL)
+            self.assertIsNotNone(match, f"missing documented output {marker}")
+            return match.group(1) + "\n"
+
+        WITHDRAWAL_PROJECT.parent.mkdir(parents=True, exist_ok=True)
+        commands = [
+            ["python3", "integrations/zal/run.py", "check",
+             "integrations/zal/examples/withdrawal_game2.zal"],
+            ["python3", "integrations/zal/run.py", "export-game",
+             "integrations/zal/examples/withdrawal_game2.zal", "--property", "keep_withdrawing",
+             "--out", str(WITHDRAWAL_PROJECT)],
+        ]
+        markers = ["withdrawal-game-check-output", "withdrawal-game-export-output"]
+        for command, marker in zip(commands, markers):
+            with self.subTest(command=command):
+                completed = subprocess.run(command, cwd=REPOSITORY, text=True, encoding="utf-8",
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stdout, documented_output(marker))
+
+        binary = os.environ.get("ZENO_FCIS_BIN")
+        if binary:
+            checked = subprocess.run([binary, "check", "--expand", str(WITHDRAWAL_PROJECT)],
+                                     cwd=REPOSITORY, text=True, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, timeout=120)
+            self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+            stable = re.findall(r"^law 510 stable on commit = (true|false);$",
+                                checked.stdout, flags=re.MULTILINE)
+            self.assertEqual(stable, ["true"], checked.stdout[-2000:])
+            rows = re.findall(r"^law (6\d\d) from_[a-z0-9_]+ on commit = (true|false);$",
+                              checked.stdout, flags=re.MULTILINE)
+            self.assertEqual(len(rows), 3, checked.stdout[-2000:])
+            actual = {int(law) - 600: value == "true" for law, value in rows}
+            model = b.parse((EXAMPLES / "withdrawal_game2.zal").read_text(encoding="ascii"))
+            game = reduced_for(model)
+            expected_winners = b._fixed_point_winners(game)
+            self.assertEqual(actual, {node: node in expected_winners for node in range(3)})
+
+    def test_300_random_reduced_games_export_tables(self):
+        rng = random.Random(20261023)
+        binary = os.environ.get("ZENO_FCIS_BIN")
+        with tempfile.TemporaryDirectory(prefix="zal-games-") as temporary:
+            for case in range(300):
+                count = rng.randint(1, 8)
+                successors = tuple(tuple(sorted(rng.sample(range(count), rng.randint(1, min(3, count)))))
+                                   for _ in range(count))
+                owners = tuple(rng.randint(0, 1) for _ in range(count))
+                goal = tuple(bool(rng.getrandbits(1)) for _ in range(count))
+                fairness = tuple(tuple(bool(rng.getrandbits(1)) for _ in range(count))
+                                 for _ in range(rng.randint(1, min(3, max(1, 12 // count)))))
+                configurations = tuple(("configuration", f"s{node}", ()) for node in range(count))
+                game = b._GameGraph(successors, owners, goal, fairness, configurations,
+                                    tuple(range(count)), 0, False)
+                project = b._game_table_project(game)
+                self.assertIn("const table 110 mover 107", project)
+                self.assertIn("const table 840 goal 107", project)
+                self.assertIn("derived table", project)
+                self.assertIn("law 510 stable on commit = stable[0];", project)
+                path = Path(temporary) / f"game-{case:03}.zeno"
+                path.write_text(project, encoding="ascii")
+                if binary:
+                    checked = subprocess.run([binary, "check", "--expand", str(path)], text=True,
+                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+                    self.assertEqual(checked.returncode, 0, checked.stdout[-2000:])
+                    stable = re.findall(r"^law 510 stable on commit = (true|false);$",
+                                        checked.stdout, flags=re.MULTILINE)
+                    self.assertEqual(stable, ["true"], checked.stdout[-2000:])
+                    rows = re.findall(r"^law (6\d\d) from_[a-z0-9_]+ on commit = (true|false);$",
+                                      checked.stdout, flags=re.MULTILINE)
+                    self.assertEqual(len(rows), count, checked.stdout[-2000:])
+                    actual = {int(law) - 600: value == "true" for law, value in rows}
+                    self.assertEqual(set(actual), set(range(count)))
+                    expected = b._fixed_point_winners(game)
+                    self.assertEqual(actual, {node: node in expected for node in range(count)},
+                                     f"table result mismatch in reduced game {case}")
+        if not binary:
+            print("ZENO_FCIS_BIN is unset; skipped zeno-fcis check --expand and stable-law replay for the "
+                  "300 exported games.")
+
+    def test_one_fewer_outer_stratum_makes_stable_false(self):
+        rng = random.Random(20261024)
+        for case in range(500):
+            model = b.parse(random_game_source(rng, case))
+            game = reduced_for(model)
+            outer, levels, z_chain, middle_chains = b._fixed_point_strata(game)
+            if outer <= 1:
+                continue
+            outer_stable = z_chain[outer] == z_chain[outer - 1]
+            middle_stable = all(middle_chains[index][levels[index]]
+                                == middle_chains[index][levels[index] - 1]
+                                for index in range(1, outer + 1))
+            self.assertTrue(outer_stable and middle_stable,
+                            f"the proposed {outer} outer strata must make stable true")
+            self.assertNotEqual(z_chain[outer - 1], z_chain[outer - 2],
+                                "one fewer outer stratum must make stable false")
+            return
+        self.fail("random campaign found no game requiring more than one outer stratum")
+
+    def test_export_names_and_comments_follow_model_shape(self):
+        simple, count = b.export_game_project(b.parse(GAME_SOURCE), "reaches")
+        self.assertEqual(count, 2)
+        self.assertIn("law 600 from_aa on commit = win[0];", simple)
+        self.assertIn("law 601 from_bb on commit = win[1];", simple)
+        contextual, _ = b.export_game_project(b.parse(GameSolverTests.CONTEXT_GAME), "reaches")
+        self.assertIn("// n0: configuration state=open variables=", contextual)
+        self.assertIn("// n2: context choice state=open variables= event=idle", contextual)
+        self.assertIn("law 600 from_n0 on commit = win[0];", contextual)
+
+    def test_table_export_refuses_more_than_sixty_four_nodes_exactly(self):
+        model = b.parse(GAME_SOURCE)
+        count = 65
+        configurations = tuple(("configuration", "aa", ()) for _ in range(count))
+        too_wide = b._GameGraph(tuple((node,) for node in range(count)), tuple(0 for _ in range(count)),
+                                tuple(False for _ in range(count)), (tuple(True for _ in range(count)),),
+                                configurations, tuple(range(count)), 0, False)
+        with self.assertRaises(b.Refusal) as raised:
+            with patch.object(b, "_reduce_game", return_value=too_wide):
+                b.export_game_project(model, "reaches")
+        self.assertEqual(str(raised.exception), "The table form of this game has 65 nodes; a table holds at most 64")
+
+
+if __name__ == "__main__":
+    unittest.main()

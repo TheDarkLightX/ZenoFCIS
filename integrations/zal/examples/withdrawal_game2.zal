@@ -1,0 +1,17 @@
+zal 2;
+# Can the user keep withdrawing, whatever the operator does, if the operator reopens the window now and then?
+machine withdrawal_game;
+states open, paused, withdrawn;
+events pause, reopen, withdraw;
+context none;
+initial open;
+step atomic; frame control_and_variables;
+default reject not_allowed unchanged;
+rule w1: open + withdraw [true] -> accept withdrawn;
+rule p1: withdrawn + pause [true] -> accept paused;
+rule r1: withdrawn + reopen [true] -> accept open;
+rule r2: paused + reopen [true] -> accept open;
+player user moves in open;
+player operator moves in paused, withdrawn;
+fairness reopens: infinitely often (state' == open);
+property keep_withdrawing: user can force infinitely often (state == withdrawn);

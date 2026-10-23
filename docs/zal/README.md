@@ -538,6 +538,116 @@ on, including every step of the repeating cycle, so it never happens." In
 other, and `want` can name `Trap` to find the nearest input whose update
 leaves a range. The same commands accept profile 1 models without `variables`.
 
+### Game properties
+
+The withdrawal example checks whether the user can keep withdrawing while
+the operator controls the other states and reopens the window infinitely
+often:
+
+```sh
+python3 integrations/zal/run.py check integrations/zal/examples/withdrawal_game2.zal
+python3 integrations/zal/run.py export-game integrations/zal/examples/withdrawal_game2.zal --property keep_withdrawing --out /tmp/withdrawal-game/project.zeno
+zeno-fcis check --expand /tmp/withdrawal-game/project.zeno
+```
+
+The first command prints this JSON:
+
+<!-- withdrawal-game-check-output -->
+```json
+{
+  "status": "pass-with-scope",
+  "revision": "62f361bbe3dbdb74bdbfe7050626e26f4d029990be5ddc1d37f9187dd729b8e0",
+  "profile": "zal/finite-fsm/2",
+  "checker": "2e282c958a90a91b400f14a2a11cfd53878c4f10317c178e1795b211485215ab",
+  "scope": "Finite atomic steps over declared control states and integer variables; context ranges over fresh Boolean and integer inputs on every step. Ranges, invariant preservation and requirements cover every admissible configuration (declared and satisfying every invariant); properties range over every infinite execution from the initial configuration, liveness only over executions satisfying every fairness declaration; game properties range over every play from the initial configuration in which each player chooses the event in its own states and the other player chooses the context.",
+  "checks": {
+    "initial_nonempty": "pass-with-scope",
+    "typing": "pass-with-scope",
+    "determinism": "pass-with-scope",
+    "update_ranges": "pass-with-scope",
+    "coverage_with_explicit_default": "pass-with-scope",
+    "reachable_invariants": "pass-with-scope",
+    "invariant_preservation": "pass-with-scope",
+    "transition_requirements": "pass-with-scope",
+    "temporal_properties": "pass-with-scope",
+    "game_properties": "pass-with-scope"
+  },
+  "input_tuples": 9,
+  "configurations": 3,
+  "admissible_configurations": 3,
+  "reachable_configurations": 3,
+  "reachable_states": [
+    "open",
+    "paused",
+    "withdrawn"
+  ],
+  "unreachable_rules": [],
+  "invariant_count": 0,
+  "requirement_count": 0,
+  "property_count": 1,
+  "fairness_count": 1,
+  "properties": {
+    "keep_withdrawing": {
+      "status": "pass-with-scope",
+      "kind": "game",
+      "player": "user",
+      "objective": "infinitely often",
+      "english": "Property keep_withdrawing: user can force (state is withdrawn) to happen infinitely often.",
+      "configurations": 3,
+      "winning_configurations": 3,
+      "initial_wins": true,
+      "solvers": [
+        "fixed-point",
+        "parity"
+      ]
+    }
+  },
+  "advisories": [],
+  "default_count": 5,
+  "default_witness": {
+    "state": "open",
+    "variables": {},
+    "event": "pause",
+    "context": {},
+    "outcome": {
+      "class": "Reject",
+      "state": "open",
+      "variables": {},
+      "reason": "not_allowed",
+      "rule": "default"
+    }
+  },
+  "unresolved": [],
+  "factory": "not-run",
+  "authority": "none",
+  "game_property_count": 1
+}
+```
+
+The export command prints:
+
+<!-- withdrawal-game-export-output -->
+```json
+{
+  "status": "exported",
+  "format": "contract-tables",
+  "property": "keep_withdrawing",
+  "nodes": 3,
+  "out": "/tmp/withdrawal-game/project.zeno",
+  "authority": "none"
+}
+```
+
+When `$ZENO_FCIS_BIN` is set, the replay test runs the third command and
+checks each `from_` law against the fixed-point solver. With it unset, the
+external expansion is skipped; the ZAL check and table export still run. The
+`check` and `export-game` output shown here is compared byte for byte by the
+profile 2 game tests. The exporter supports up to 64 nodes and includes a
+`stable` law that must expand to exactly `true`. Native formula expansion has
+a lower practical limit: measured expansion is about 20 nodes with one goal
+and one fairness assumption, and about 12 nodes with two of each. Beyond that
+limit, `zeno-fcis check --expand` refuses and the ZAL check result stands.
+
 ## Types and effect signatures
 
 `zal/effects/1` writes the shell's effect ports in ZAL, and `zal/typed-fsm/1`

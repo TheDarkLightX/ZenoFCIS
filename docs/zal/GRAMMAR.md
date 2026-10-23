@@ -295,7 +295,11 @@ an input, fairness and every temporal operator.
 | `invariant ID: STATE_FORMULA;` | `Invariant ID: STATE_FORMULA.` |
 | `require ID: STEP_FORMULA;` | `Requirement ID: STEP_FORMULA.` |
 | `fairness ID: infinitely often (STEP_FORMULA);` | `Fairness ID: assume (STEP_FORMULA) happens infinitely often.` |
+| `player NAME moves in STATE;` | `Player NAME moves in STATE.` |
 | `property ID: TEMPORAL_FORMULA;` | `Property ID: TEMPORAL_FORMULA.` |
+| `property ID: NAME can force eventually (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen eventually.` |
+| `property ID: NAME can force always (FORMULA);` | `Property ID: NAME can force (FORMULA) to hold always.` |
+| `property ID: NAME can force infinitely often (FORMULA);` | `Property ID: NAME can force (FORMULA) to happen infinitely often.` |
 
 The `machine`, `states`, `events`, `context`, `initial`, `default`, reject
 rule and `unresolved` forms are unchanged from profile 1. An Accept rule
@@ -356,6 +360,68 @@ The temporal phrases are the intuitive-rung templates of the
 both. Profile 2 reserves every word of these phrases, and the update words
 `with`, `set`, `to`, `by`, `increased` and `decreased`, as names. The
 complete list is in the legend.
+
+### Game properties
+
+`NAME` is one of two declared players, and the two players' disjoint state
+lists cover the machine's states. `FORMULA` is a state formula in invariant
+scope. A game property counts toward the eight-property limit; at most four
+game properties may be declared.
+
+A play starts at the initial configuration (control state and variables). In a configuration whose state is in
+player P's list, P chooses the event. When the model declares context, the context of each step is chosen against the property's player: by the other player. The step follows the rules exactly as `check` does: an accepted rule moves, a rejection keeps the configuration. Every configuration has a step for every event, so plays are infinite.
+A fairness formula holds on a step when it holds on the configuration after the step.
+- `P can force eventually (Q)`: P can play so that every play reaches Q, or some fairness formula holds on only finitely many steps.
+- `P can force infinitely often (Q)`: P can play so that every play visits Q infinitely often, or some fairness formula holds on only finitely many steps.
+- `P can force always (Q)`: P can play so that every play stays in Q. Fairness does not apply: a violation happens at a finite time.
+- The property holds when P can do this from the initial configuration.
+
+The game graph contains configurations reachable from the initial one. A
+configuration is owned by the player whose state list contains it. In states
+owned by the property's player, there is one edge per event; with context,
+each such edge leads to an intermediate node owned by the other player, who
+chooses the context. In the other player's states, the opponent chooses each
+event and context together. Intermediate nodes make every goal and fairness
+formula false. Fairness formulas read only the post-step state (`state'` and
+primed variables).
+
+All objectives reduce to “goal infinitely often, provided every fairness
+formula holds infinitely often.” For `eventually`, goal configurations become
+absorbing, with goal and fairness true. For `always`, fairness is ignored,
+violating configurations become absorbing with goal false, and every other
+node has goal true. `infinitely often` uses the graph unchanged. If there are
+no applicable fairness formulas, one assumption true on every node is used.
+
+Two independent solvers must agree on the winning set. With
+CPre(X)(v) meaning that the property player has some successor in X at its
+nodes and the other player has every successor in X, the fixed-point solver
+computes `νZ. μY. ⋁ᵢ νX. (goal ∧ CPre(Z)) ∨ CPre(Y) ∨ (¬fairᵢ ∧ CPre(X))` by
+iterating sets to stability. It does not unroll a bound. The parity solver
+uses product nodes `(v,d)` for the fairness assumptions, advances `d` when
+the current assumption holds, and assigns priority 2 for goal, 1 when the
+last assumption advances, and 0 otherwise. A recursive Zielonka solver uses
+maximum parity, with even priorities winning for the property player. A
+disagreement is `UNKNOWN`, and `check` does not pass.
+
+The table export command is:
+
+```sh
+python3 integrations/zal/run.py export-game FILE --property ID --out PATH
+```
+
+It emits the contract tables for the reduced game using the fixed-point
+solver's first stable outer and middle strata. A `stable` table compares each
+proposed stratum with its predecessor, and `law 510 stable on commit =
+stable[0];` must expand to exactly `true` before the table answers are
+accepted. The exporter refuses graphs above 64 nodes. Native formula expansion
+has a lower practical limit: measured expansion is about 20 nodes with one
+goal and one fairness assumption, and about 12 nodes with two of each. Beyond
+the expansion limit, the ZAL check result stands. The game semantics use the “can force” operator from
+Alur, Henzinger and Kupferman, “Alternating-Time Temporal Logic,” *JACM*,
+2002. The parity construction follows Piterman, Pnueli and Sa'ar,
+“Synthesis of Reactive(1) Designs,” *VMCAI*, 2006; the recursive solver is
+from Zielonka, “Infinite Games on Finitely Coloured Graphs,” *Theoretical
+Computer Science*, 1998.
 
 ### Property shapes and refusals
 

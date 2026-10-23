@@ -18,7 +18,7 @@ def main():
     from guide_help import example_help
     parser = argparse.ArgumentParser(description=__doc__, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["legend", "check", "render", "export", "qualify", "diff", "ui", "story", "why-not", "what-if",
+    for command in ["legend", "check", "render", "export", "export-game", "qualify", "diff", "ui", "story", "why-not", "what-if",
                     "lower", "refine-check", "explain", "guide"]:
         p = sub.add_parser(command, epilog=example_help("zal"), formatter_class=argparse.RawDescriptionHelpFormatter)
         p.add_argument("source", type=Path, nargs="?" if command in {"legend", "ui"} else None,
@@ -26,8 +26,10 @@ def main():
         p.add_argument("--syntax", choices=["symbolic", "english"], default="symbolic")
         if command == "render":
             p.add_argument("--to", choices=["symbolic", "english"], required=True)
-        if command in {"export", "lower"}:
-            p.add_argument("--out", type=Path, required=command == "export")
+        if command in {"export", "export-game", "lower"}:
+            p.add_argument("--out", type=Path, required=command in {"export", "export-game"})
+        if command == "export-game":
+            p.add_argument("--property", required=True)
         if command == "refine-check":
             p.add_argument("contract", type=Path)
             p.add_argument("--cli", type=Path, required=True)
@@ -105,6 +107,14 @@ def main():
             write_new(lower(model), options.out)
             result = {"status": "lowered" if options.command == "lower" else "exported",
                       "revision": model.revision, "authority": "none"}
+        elif options.command == "export-game":
+            if profile is not behavior2:
+                raise behavior.Refusal("Game export needs a profile-2 game property model")
+            project, nodes = behavior2.export_game_project(model, options.property)
+            options.out.parent.mkdir(parents=True, exist_ok=True)
+            options.out.write_text(project, encoding="ascii")
+            result = {"status": "exported", "format": "contract-tables", "property": options.property,
+                      "nodes": nodes, "out": str(options.out), "authority": "none"}
         elif options.command == "refine-check":
             from factory import refine_check
             result, code = refine_check(model, options.contract, options.cli, options.max_checks)
@@ -124,7 +134,7 @@ def main():
             serve(source if options.syntax == "symbolic" else model.render(), Path.cwd(), options.port, options.workspace)
             return 0
         print(json.dumps(result, indent=2))
-        return 1 if result.get("status") in {"counterexample", "unfinished"} else 3 if result.get("status") == "unsupported" else 0
+        return 1 if result.get("status") in {"counterexample", "unfinished", "unknown"} else 3 if result.get("status") == "unsupported" else 0
     except (ValueError, OSError) as error:
         from diagnostics import describe
         print(json.dumps({"status": "refused", "diagnostic": str(error),
