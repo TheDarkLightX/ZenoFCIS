@@ -934,8 +934,14 @@ def validate_machine(model: Machine):
     for item in model.inputs:
         tuples *= item.high - item.low + 1
     if configurations > MAX_CONFIGURATIONS or tuples > MAX_TUPLES:
-        raise Refusal(f"Declared finite domain has {configurations} configurations and {tuples} input tuples; "
-                      f"this profile refuses more than {MAX_CONFIGURATIONS} and {MAX_TUPLES}")
+        detail = (f"Declared finite domain has {configurations} configurations and {tuples} input tuples; "
+                  f"this profile refuses more than {MAX_CONFIGURATIONS} and {MAX_TUPLES}")
+        if model.symmetries:
+            from symmetry2 import refuse
+            item = model.symmetries[0]
+            name = item[0] if isinstance(item, tuple) and item and isinstance(item[0], str) else "declarations"
+            refuse(name, "finiteness", detail)
+        raise Refusal(detail)
     for values, maximum in [(model.rules, 32), (model.invariants, 8), (model.requirements, 8),
                             (model.fairness, 4), (model.properties, 8), (model.obligations, 8),
                             (model.games, 4)]:

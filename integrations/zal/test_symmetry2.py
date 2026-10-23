@@ -2,7 +2,10 @@
 
 from dataclasses import replace
 from pathlib import Path
+import json
 import random
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -56,6 +59,16 @@ class SymmetryDeclarationTests(unittest.TestCase):
     def test_generator_bound(self):
         source = BASE + '\n'.join(f'symmetry g{i}: swap (aa bb);' for i in range(4))
         with self.assertRaisesRegex(b.Refusal, "Symmetry .*: finiteness"):
+            b.parse(source)
+
+    def test_finite_domain_bound_names_statement(self):
+        source = BASE.replace('in 0..=1 initially', 'in 0..=63 initially')
+        with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: finiteness'):
+            b.parse(source)
+
+    def test_ambiguous_declaration_kind_refused(self):
+        source = BASE.replace('states env, user;', 'states aa, env, user;')
+        with self.assertRaisesRegex(b.Refusal, 'Symmetry rivals: declaration.*ambiguous'):
             b.parse(source)
 
     def test_owned_ir(self):
@@ -157,6 +170,24 @@ def explore(graph):
 
 
 class SymmetryGraphTests(unittest.TestCase):
+    def test_cli_full_graph_and_owned_result(self):
+        here = Path(__file__).parent
+        source = here / 'examples/ladder_symmetry2.zal'
+        commands = [[sys.executable, '-B', str(here / 'run.py'), 'check', str(source), *flags]
+                    for flags in [[], ['--no-symmetry']]]
+        results = [subprocess.run(command, text=True, capture_output=True) for command in commands]
+        self.assertEqual([r.returncode for r in results], [0, 0])
+        quotient, full = [json.loads(r.stdout) for r in results]
+        for key in ['status', 'revision', 'properties', 'symmetry']:
+            self.assertEqual(quotient[key], full[key])
+        model = b.parse(source.read_text())
+        revision = model.revision
+        report = b.check(model)
+        report['symmetry']['orbits'] = -1
+        report['properties']['alice_funded']['winning_configurations'] = -1
+        self.assertEqual(model.revision, revision)
+        self.assertEqual(b.check(model)['symmetry']['orbits'], 36)
+
     def test_state_swap_and_ownership(self):
         source = '''zal 2;
 machine state_swap;

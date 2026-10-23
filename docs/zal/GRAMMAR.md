@@ -467,6 +467,75 @@ the expansion limit, the ZAL check result stands. The game semantics use the
 from Zielonka, “Infinite Games on Finitely Coloured Graphs,” *Theoretical
 Computer Science*, 1998.
 
+### Symmetry quotients
+
+Symmetry declarations can accompany LLM-generated or synthesized profile-2
+machines. These two statements describe the same generator:
+
+```text
+symmetry rivals: swap (a b) (c d);
+Symmetry rivals: swapping a with b and c with d changes nothing.
+```
+
+Each pair contains declared names of one kind: variables with identical ranges
+and initial values, states, or events. Names in a generator are disjoint; a name
+shared by different declaration kinds is ambiguous and refused. At most four
+generators are allowed. Pair order, pair orientation and declaration order are
+canonicalized. A machine without declarations retains its existing revision.
+
+Before reducing a graph, `check` checks all four obligations, exhaustively over
+the declared domains. A failure refuses with the symmetry statement's ID and
+the obligation's name; there is no automatic fallback.
+
+1. **Automorphism:** initialization is fixed. For every configuration, event
+   and context, simultaneously renaming configuration and event preserves
+   class, reason, rule outcome and successor. Overlaps and arithmetic traps
+   must correspond too. Observed rule IDs have a consistent bijective renaming;
+   explicit rejection reasons and the default outcome stay fixed.
+2. **Claim invariance:** every invariant, requirement, fairness formula,
+   temporal property and game objective is unchanged by renaming on the
+   configurations or steps where it is evaluated. Temporal constructors retain
+   their non-temporal predicates. A claim observing one swapped party is
+   refused with “the property observes a swapped name”; fix that observer in
+   the symmetry instead of replacing its claim with a symmetric closure.
+3. **Players:** each player's states map to that same player's states.
+   The opponent's context choice is unchanged: context names and values do
+   not move, and each representative retains every event/context combination.
+4. **Finiteness:** the existing limits of 4,096 configurations and 16,384 input
+   tuples still apply before reduction. Symmetry cannot admit a larger domain.
+
+The generated group acts on configurations. An orbit's representative is its
+least configuration in the existing canonical state/value order. Reachable
+invariants, reachable transition requirements and game arenas use these
+representatives. Requirements and invariant preservation on all admissible
+declared configurations retain their full-domain checks. Game ownership and
+fairness labels are preserved; winning counts weight orbits by their concrete
+sizes. Concrete counterexample paths come from the retained full graph.
+Linear temporal checks, including fairness lassos, lowering and export retain
+the full graph. The result includes
+`"symmetry": {"generators": N, "configurations": C, "orbits": O}`.
+Use `python3 integrations/zal/run.py check FILE --no-symmetry` to use the full
+graph for every check; the declarations' obligations are still checked.
+
+See the [collateral ladder example](../../integrations/zal/examples/ladder_symmetry2.zal):
+Alice is the fixed observed borrower, while Bob and Carol are swappable.
+Its declared domain has 54 configurations and 36 orbits.
+
+**Background.** This follows Emerson and Sistla, “Symmetry and Model Checking,”
+*Formal Methods in System Design*, 1996; Ip and Dill, “Better Verification
+Through Symmetry,” *Formal Methods in System Design*, 1996; and Clarke,
+Enders, Filkorn and Jha, “Exploiting Symmetry in Temporal Logic Model Checking,”
+*Formal Methods in System Design*, 1996.
+
+**What is new here.** This is a bounded integration of established symmetry
+reduction methods. Comparative prior-art search pending.
+
+**Scope.** Orbit equivalence preserves the checked state claims and game
+objectives under these obligations. With renamed events, bisimulation uses
+joint configuration/event/outcome orbits as labels; it does not preserve each
+concrete event spelling. No privacy theorem, parameterized population cutoff,
+runtime speed-up or production authorization is established.
+
 ### Property shapes and refusals
 
 A property is `always(P)`, `never(P)`, `always(P => T)`, `always(T)` or `T`,
