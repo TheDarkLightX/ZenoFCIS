@@ -12,7 +12,6 @@ const REVIEWED_FILES: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.toml.orig",
     "examples/service_product.rs",
-    "examples/trace_game_input.rs",
     "src/checked_composition/assembly_differential_tests.rs",
     "src/checked_composition/assembly_tests.rs",
     "src/checked_composition/compose_tests.rs",

@@ -342,22 +342,21 @@ impl ServiceAuthority {
                 if name == "accepted" {
                     continue;
                 }
-                if let Some(field) = name.strip_prefix("request.") {
-                    if !law.genesis && joint.request_layout().iter().any(|s| s.name == field) {
-                        continue;
-                    }
+                if let Some(field) = name.strip_prefix("request.")
+                    && !law.genesis
+                    && joint.request_layout().iter().any(|s| s.name == field)
+                {
+                    continue;
                 }
                 if let Some(field) = name
                     .strip_prefix("pre.")
                     .or_else(|| name.strip_prefix("post."))
-                {
-                    if joint
+                    && joint
                         .state_layout()
                         .iter()
                         .any(|s| format!("{}.{}", s.component, s.field) == field)
-                    {
-                        continue;
-                    }
+                {
+                    continue;
                 }
                 return Err(format!("law-observation:{name}"));
             }
@@ -523,16 +522,15 @@ impl ServiceAuthority {
             if version >= i64::MAX as u64 {
                 return Err("version-exhausted".into());
             }
-            if let Some(request) = request {
-                if request.values.len() != self.joint.request_layout().len()
+            if let Some(request) = request
+                && (request.values.len() != self.joint.request_layout().len()
                     || request
                         .values
                         .iter()
                         .zip(self.joint.request_layout())
-                        .any(|(v, s)| !s.domain.contains(*v))
-                {
-                    return Err("request-domain".into());
-                }
+                        .any(|(v, s)| !s.domain.contains(*v)))
+            {
+                return Err("request-domain".into());
             }
             let pre = self.split(state);
             self.invariants(&pre, &mut usage)?;
