@@ -113,6 +113,35 @@ class CoverageVerdictTests(unittest.TestCase):
             self.assertEqual(len(result["rounds"]), 2)
             self.assertEqual(calls[-1], first.laws + second.laws)
 
+    def test_no_progress_proposal_is_retried_after_the_law_set_changes(self):
+        final_packet = copy.deepcopy(self.after_packet)
+        view = final_packet["gaps"]["proposals"]["after"]
+        view["admissible"]["full"].update(undetermined=0, determined=12, examples=[])
+        view["mutation"]["full"]["admitted"] = 0
+        for mutant in view["mutation"]["list"]:
+            mutant["classification"] = "caught"
+        proposed = coverage.Candidate("context_dependent", "proposed", ("law 9100 suggestion on reject = true;",), ("state",), "suggestion")
+        synthesized = coverage.Candidate("first_gain", "synthesized", ("law 9101 first_gain on reject = true;",), ("state",), "first gain")
+        calls = []
+        def review(judge, laws=()):
+            calls.append(laws)
+            return 0, [self.before_packet, self.before_packet, self.after_packet, final_packet][len(calls) - 1], "native.json"
+        with tempfile.TemporaryDirectory() as tmp:
+            options = type("Options", (), {"directory": ROOT / "examples/guide-counter", "out": Path(tmp) / "out",
+                                           "proposals": None, "zal": None, "max_work": None, "rounds": 3})()
+            binary = Path(tmp) / "binary"
+            binary.write_text("fixture")
+            with patch.dict(os.environ, {"ZENO_FCIS_BIN": str(binary)}), \
+                 patch.object(coverage, "proposals", side_effect=lambda *a, **kw: [] if kw.get("idioms") else [proposed]), \
+                 patch.object(coverage, "synthesize", return_value=[synthesized]), \
+                 patch.object(coverage.Judge, "review", review):
+                self.assertEqual(coverage.run(options), 0)
+            report = json.loads((options.out / "coverage.json").read_text())
+            self.assertEqual(len(calls), 4, "a no-progress law was not retried in its new context")
+            self.assertEqual(calls[-1], synthesized.laws + proposed.laws)
+            self.assertEqual(report["rounds"][0]["rejected"][0]["id"], proposed.id)
+            self.assertEqual(report["rounds"][1]["kept"][0]["id"], proposed.id)
+
 
 class CoverageDocumentationTests(unittest.TestCase):
     def test_card_and_reference_show_the_same_exact_commands_and_outputs(self):

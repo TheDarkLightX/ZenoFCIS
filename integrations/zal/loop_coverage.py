@@ -441,7 +441,7 @@ def run(options):
                                  for name in ("loop_coverage.py", "factory.py", "behavior.py", "behavior2.py",
                                               "loop_language.py", "loop_judges.py", "run.py")}
     judge = Judge(binary, subject, out, options.max_work)
-    kept_laws, tried, pending = [], set(), list(supplied)
+    kept_laws, settled = [], set()
     current = None
     try:
         code, packet, packet_path = judge.review()
@@ -456,16 +456,16 @@ def run(options):
             rnd = {"round": round_number, "before": current, "after": current,
                    "kept": [], "rejected": [], "disagreeing": []}
             report["rounds"].append(rnd)
-            candidates = pending + (synthesize(packet, policy, current, allocate) if current["gaps"] or current["admitted_mutants"] else [])
-            pending = []
+            candidates = list(supplied) + (synthesize(packet, policy, current, allocate) if current["gaps"] or current["admitted_mutants"] else [])
+            seen = set()
             for candidate in candidates:
                 if candidate.source == "synthesized" and not current["gaps"] and not current["admitted_mutants"]:
                     break
                 # IDs vary across rounds; compare the law bodies and source instead.
                 signature = canonical([candidate.source, [re.sub(r"^law \d+", "law", l) for l in candidate.laws]])
-                if signature in tried:
+                if signature in settled or signature in seen:
                     continue
-                tried.add(signature)
+                seen.add(signature)
                 code, checked, reference = judge.review(tuple(kept_laws) + candidate.laws)
                 try:
                     verdict, detail = assess(checked, code, current, project, policy)
@@ -476,7 +476,9 @@ def run(options):
                 rnd[verdict].append({**asdict(candidate), **detail, "packet": reference})
                 if verdict == "disagreeing":
                     report["exit_code"] = 1
+                    settled.add(signature)
                 elif verdict == "kept":
+                    settled.add(signature)
                     kept_laws.extend(candidate.laws)
                     current, packet = detail["after"], checked
                     rnd["after"] = current

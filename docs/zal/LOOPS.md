@@ -418,7 +418,8 @@ One requirement may lower to separate accept and reject laws; it is judged
 as a single proposal. A tautology that lowers to no laws closes nothing.
 
 `--rounds N` defaults to 3 (1–32). Each native check includes all earlier kept
-laws. The loop stops when no witness remains, a round keeps nothing, or the
+laws. Laws rejected for no progress are reconsidered after the kept set changes;
+kept and disagreeing laws are not resubmitted. The loop stops when no witness remains, a round keeps nothing, or the
 round limit is reached. `--max-work` forwards the native law-check budget.
 Exit 0 means the loop ran, even with residual witnesses; exit 1 retains a
 disagreement and its native input; exit 2 preserves an inconclusive judge.
