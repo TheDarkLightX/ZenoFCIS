@@ -427,6 +427,18 @@ fn restored_transcript_recomputes_evidence() {
         replay_run(&rechain(changed)).is_err(),
         "changed restore bytes replayed"
     );
+    let mut substituted = original.clone();
+    let mut configuration = MAGIC.to_vec();
+    codec::bytes(&mut configuration, &[]);
+    codec::bytes(
+        &mut configuration,
+        &ok(initial(simulation::STORE, &policies())),
+    );
+    substituted.manifest.configuration = configuration;
+    assert!(
+        replay_run(&rechain(substituted)).is_err(),
+        "valid but substituted restore bytes replayed"
+    );
     let mut changed = original.clone();
     changed.manifest.policies = policies().into_iter().map(Monitor::new).collect();
     assert!(
@@ -443,5 +455,165 @@ fn restored_transcript_recomputes_evidence() {
     assert!(
         replay_run(&rechain(changed)).is_err(),
         "altered admission evidence replayed"
+    );
+}
+
+#[test]
+fn store_and_evidence_premise_counterexamples() {
+    #[derive(Clone)]
+    struct Broken {
+        disk: Memory,
+        mode: u8,
+        genesis: Vec<u8>,
+    }
+    impl StateStore for Broken {
+        fn load(&mut self) -> Result<Vec<u8>, Error> {
+            if self.mode == 2 {
+                Ok(self.genesis.clone())
+            } else {
+                self.disk.load()
+            }
+        }
+        fn commit(&mut self, expected: &[u8], next: &[u8]) -> Result<(), Error> {
+            match self.mode {
+                0 => Ok(()), // dishonest durability acknowledgement
+                1 => {
+                    self.disk.0.borrow_mut().bytes = next.to_vec();
+                    Ok(())
+                } // non-atomic compare/update
+                _ => self.disk.commit(expected, next),
+            }
+        }
+    }
+    struct Counter {
+        calls: usize,
+        dishonest: bool,
+    }
+    impl Terminal for Counter {
+        fn ports(&self) -> &'static [Port] {
+            &Port::ALL
+        }
+        fn handle(&mut self, b: &Binding, op: &Operation) -> Handled {
+            self.handle_with_invocation(b, op).outcome
+        }
+        fn handle_with_invocation(&mut self, _: &Binding, _: &Operation) -> Handling {
+            self.calls += 1;
+            if self.dishonest {
+                Handling {
+                    outcome: Handled::Suspend,
+                    invocation: Invocation::NotInvoked,
+                }
+            } else {
+                Handling {
+                    outcome: Handled::Answer(Response::Send(Sent::Unknown(
+                        super::super::port::Fault::Io,
+                    ))),
+                    invocation: Invocation::MayHaveInvoked,
+                }
+            }
+        }
+    }
+    let op = operation(1);
+    for mode in 0..3 {
+        let disk = Memory::new();
+        let store = Broken {
+            genesis: disk.0.borrow().bytes.clone(),
+            disk: disk.clone(),
+            mode,
+        };
+        let make = || {
+            ok(Relay::open(
+                store.clone(),
+                simulation::STORE,
+                &policies(),
+                manifest(),
+            ))
+        };
+        let mut first = make();
+        let mut stale = make();
+        let mut terminal = Counter {
+            calls: 0,
+            dishonest: false,
+        };
+        ok(first.handle(&mut terminal, &binding(&op), &op));
+        if mode != 1 {
+            stale = make();
+        }
+        let retry = stale.handle(&mut terminal, &binding(&op), &op);
+        if mode == 2 {
+            // A stale load violates exact restoration, but atomic CAS prevents
+            // a second send. Current reads are not needed for this safety bound.
+            assert_eq!(retry, Err(Error::Conflict));
+            assert_eq!(terminal.calls, 1);
+        } else {
+            ok(retry);
+            assert_eq!(
+                terminal.calls, 2,
+                "premise removal did not witness duplicate mode={mode}"
+            );
+        }
+    }
+    let disk = Memory::new();
+    let mut terminal = Counter {
+        calls: 0,
+        dishonest: true,
+    };
+    ok(disk.open().handle(&mut terminal, &binding(&op), &op));
+    ok(disk.open().handle(&mut terminal, &binding(&op), &op));
+    assert_eq!(
+        terminal.calls, 2,
+        "dishonest non-invocation must exhibit the missing premise"
+    );
+    // Initializing a different lifetime with the same effect keys is unsafe.
+    let mut terminal = Counter {
+        calls: 0,
+        dishonest: false,
+    };
+    ok(Memory::new()
+        .open()
+        .handle(&mut terminal, &binding(&op), &op));
+    ok(Memory::new()
+        .open()
+        .handle(&mut terminal, &binding(&op), &op));
+    assert_eq!(terminal.calls, 2, "lifetime reset premise witness");
+}
+
+#[test]
+fn restore_capacity_and_owned_snapshots() {
+    let mut monitors: Vec<_> = policies().into_iter().map(Monitor::new).collect();
+    let original = monitors.clone();
+    let mut bigger = Monitor::new(Policy::AtMostOne { capacity: 3 });
+    for key in 1..=3 {
+        bigger = policy_record::admit(&[bigger], &operation(key)).0.remove(0);
+    }
+    monitors[0].state = bigger.state;
+    let over_capacity = ok(checkpoint(simulation::STORE, &monitors, None));
+    assert_eq!(
+        restore(simulation::STORE, &policies(), &over_capacity),
+        Err(Error::Corrupt)
+    );
+    assert_eq!(
+        restore(simulation::STORE, &policies(), &vec![0; MAX_BYTES + 1]),
+        Err(Error::Capacity)
+    );
+    let input = ok(initial(simulation::STORE, &policies()));
+    let saved = input.clone();
+    let mut restored = ok(restore(simulation::STORE, &policies(), &input));
+    restored[0] = policy_record::admit(&restored, &operation(1)).0.remove(0);
+    assert_eq!(input, saved);
+    assert_eq!(
+        ok(restore(simulation::STORE, &policies(), &input)),
+        original,
+        "restoration exposed mutable alias"
+    );
+    let zero = [Policy::AtMostOne { capacity: 0 }];
+    let restored = ok(restore(
+        simulation::STORE,
+        &zero,
+        &ok(initial(simulation::STORE, &zero)),
+    ));
+    assert_eq!(
+        policy_record::admit(&restored, &operation(1)).1.rejection(),
+        Some(Code::PolicyCapacity)
     );
 }

@@ -485,10 +485,10 @@ and schema stay unchanged. Existing independent regression checks remain.
 
 Provider idempotency is an environment assumption. A timeout can hide success.
 The claim is "no second send of the same key by this protocol", never
-"executed exactly once externally". One trusted relay must retain policy
-state across retries and restarts; real process loss requires durable state
-restoration before sending. That persistence adapter is outside this finite
-simulation check. Receiver deduplication remains a separate environment law.
+"executed exactly once externally". A retained in-memory stack covers its
+existing process lifetime. The optional durable adapter below continues that
+reservation lifetime across relay process loss under its stated store premises.
+Receiver deduplication remains a separate environment law.
 Every policy exploration result carries these premises and nonclaims.
 
 `tools/check_effect_policy_controls.py --out <file>` builds six source mutants:
@@ -496,6 +496,59 @@ recipient rewrite, duplicate send admission, missing allowlist, silent record
 drop, undeclared field access, and skipping policies on retry. Each must fail
 its named behavioral check and pass again after restoration. The ignored
 `policy_frozen_profile` test runs the complete frozen policy product.
+
+### Reservations across process loss
+
+`effects::durable::Relay` is an opt-in shell handle around the existing pure
+admission function. `zeno_fcis_shell_sqlite::effects::durable::SqliteStateStore`
+stores its opaque checkpoint in a separate SQLite file. For a new reservation
+lifetime only, call `durable::initial(store_identity, policies)` and
+`SqliteStateStore::create(path, bytes)`. Creation refuses an existing path.
+For every subsequent opening, use `SqliteStateStore::open` and `Relay::open`
+with the same store identity and ordered policies. Never initialize as a
+fallback for an opening error, delete the checkpoint, or substitute an older copy.
+The ordinary generated `Effects` handle still uses in-memory reservations;
+applications using durability drive the existing programs through `Relay::handle`
+and the production terminal directly.
+
+Opening purely validates the checkpoint version, implementation source, scope,
+policy identities, canonical reservations and checksum. Missing, corrupt or
+differently bound state refuses before sending. The bound is 64 policy layers
+and 1 MiB per checkpoint; an AtMostOne guard is required. Restoration reconstructs
+its key-only projection through the existing policy evaluator, checking duplicates
+and capacity. An allowlist cannot contain reservation state.
+
+Each admitted Send commits its reservation before the terminal is called. SQLite
+uses FULL synchronization and an atomic comparison against the previous checkpoint
+bytes. A write error, stale checkpoint, crash or unwind stops the handle; reopen
+to resolve uncertainty. A complete-call Suspend with NotInvoked can release only
+after committing an explicit release record containing the reserved state and
+its last key. Losing the process before that commit keeps the reservation; after
+it, restoration validates and applies the recorded release. Other responses,
+including NotSent and Unknown, retain it. Later checkpoints supersede earlier
+release evidence; this is a current-state store, not a historical audit log.
+
+The transcript manifest contains the exact restoration checkpoint. Use
+`durable::replay` with the expected store and policies: it recomputes restoration,
+compares the initial monitors and then runs ordinary admission/program replay.
+Ordinary `record::replay` alone does not check durable restoration. These private
+transcripts are integrity evidence, not authenticated storage receipts. A process
+can disappear before recording its outcome; such a transcript remains incomplete.
+
+The process-loss simulation extension enumerates two attempts, two keys, ten
+loss/write-error placements and eight terminal choices, including duplication
+and certified non-invocation. It checks 25,760 edges, 25,600 leaves, restored
+reservations, protocol invocation counts and receiver effects. Real SQLite tests
+also close and reopen child processes at eight boundaries. These are bounded
+tests, not a durability proof or power-failure qualification. The store must
+commit atomically, retain acknowledged commits and return current bytes after
+restart. Stable configuration, one controlled reservation lifetime and truthful
+complete-call non-invocation evidence remain premises. Transport copies may
+duplicate; atomic retained receiver deduplication bounds receiver effects.
+No progress, migration, rollback-attack protection or external exactly-once
+execution is promised. Existing in-memory policy sources and encodings are
+unchanged; the SQLite implementation provenance digest refreshes through its
+existing source-digest producer when its module export changes.
 
 ### Generated payment sender and independent product
 
@@ -526,7 +579,9 @@ Invited Tutorial Paper*, Electronic Notes in Theoretical Computer Science,
 Security Policies*, ACM Transactions on Information and System Security,
 2000, studies execution monitors. Edmund M. Clarke, Orna Grumberg and Doron A.
 Peled, *Model Checking*, MIT Press, 1999, describes transition-system products
-and counterexamples.
+and counterexamples. Jim Gray and Andreas Reuter, *Transaction Processing:
+Concepts and Techniques*, Morgan Kaufmann, 1992, describes write-ahead recovery
+and transaction durability, the background for the reservation checkpoint.
 
 What is new here: these mechanisms are integrated with the shell's source-bound
 transcripts and bounded product evidence. Comparative prior-art search pending.

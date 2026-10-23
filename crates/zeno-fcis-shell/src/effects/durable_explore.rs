@@ -178,6 +178,7 @@ fn process_loss_explorer() {
         "non-vacuity: no releases or receiver effects"
     );
     std::println!(
-        "durable explorer: bound=2, keys=2, cuts=10, outcomes=8, edges={edges}, leaves={leaves}, certified_releases={releases}, receiver_effect_observations={effects}, complete=true"
+        "durable explorer: bound=2, keys=2, cuts=10, outcomes=8, edges={edges}, leaves={leaves}, certified_releases={releases}, receiver_effect_observations={effects}, complete=true, census={}",
+        RustCryptoSha256::hash(&census)
     );
 }
