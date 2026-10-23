@@ -167,10 +167,12 @@ type 105 int V in 0..={state_max}; table 110 100 entries 105 size 2;
 type 106 {kind} Position in {bounds}; field 121 101 position 106;
 variant 130 102 Desk none; law 500 defined on commit = true;"
         );
-        std::fs::write(&project, source).unwrap();
+        std::fs::write(&project, source)
+            .unwrap_or_else(|error| panic!("cardinality fixture failed: {error:?}"));
         let output = cli(&["check", "--expand", "--format", "json"], &[&project]);
         assert!(output.status.success(), "{output:?}");
-        let packet: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let packet: Value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|error| panic!("cardinality fixture failed: {error:?}"));
         assert_eq!(packet["canonical_match"], true);
         assert_eq!(
             packet["inputs"][2]["values"],
@@ -183,7 +185,8 @@ variant 130 102 Desk none; law 500 defined on commit = true;"
             "{kind} {bounds}"
         );
     }
-    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(dir)
+        .unwrap_or_else(|error| panic!("cardinality fixture failed: {error:?}"));
 }
 
 #[test]
