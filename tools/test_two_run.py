@@ -111,10 +111,10 @@ class TwoRunCli(unittest.TestCase):
         (EVIDENCE/'swap-capacity.json').write_text(p.stdout)
 
     def test_documented_dependency_probes(self):
-        for name,answer in [('constant-product','yes'),('uniform-price','yes'),('ledger-private','yes'),('ledger-leak','no')]:
+        for name,answer,exit_code in [('constant-product','yes',0),('uniform-price','yes',0),('ledger-private','yes',0),('ledger-leak','no',1)]:
             cmd=[str(BIN),'contract','probe','depends','examples/two-run/'+name,'--position','command.101.120','--no-kb']
             p=subprocess.run(cmd,cwd=ROOT,capture_output=True,text=True)
-            self.assertEqual(p.returncode,0,p.stderr);packet=json.loads(p.stdout)
+            self.assertEqual(p.returncode,exit_code,p.stderr);packet=json.loads(p.stdout)
             self.assertEqual(packet['status'],'answered');self.assertEqual(packet['result']['answer'],answer)
             (EVIDENCE/('depends-'+name+'.json')).write_text(p.stdout)
 
