@@ -398,6 +398,23 @@ transaction and retains no invocation scratch. The plan authenticates no
 storage and grants no decision or publication authority. `rebuild_root`
 recomputes a root from scratch for replay checks.
 
+Opening a store rebuilds every leaf and branch hash from stored records in one
+read snapshot. A changed, missing or surplus cache row refuses startup. The
+full application audit retains independent journal replay and root/record
+comparison. Before each write, singleton leaf hashes are recomputed and checked
+against their records, and the old target path is reconstructed from the actual
+record and sibling summaries. It must match the checked pre-state root before
+the new update plan is applied in the same transaction. The storage handle keeps
+one verified root per map, initialized by the complete startup audit. A cached
+root must also match that anchor, so coordinated changes to a root and sibling
+cache cannot replace the checked state. The next anchors are prepared before
+commit and installed only after SQLite commits; refusal and retry retain the old
+ones. Both path folds have at most 256 levels; the full cache audit is outside
+request preparation.
+The returned commit's `rehashed` observation counts update-plan subtree rows; it excludes
+this additional verification work. These storage checks do not authorize a
+business decision or authenticate an externally rewritten store and history.
+
 The pure-core tests cover all 256 subsets of eight keys sharing 253 prefix
 bits. For subsets of up to five keys they check every insertion order and
 every removal order, comparing each intermediate root and stored node cache
@@ -549,6 +566,12 @@ these candidate references are not invoked as a theorem proving it.
 **What is new here.** This integration combines bounded observations,
 weak-order views, explicit absence intervals and grouped tally deltas. Prior-art search pending;
 no novelty claim is made.
+
+**Background for commitments.** R. C. Merkle, *A Digital Signature Based on
+a Conventional Encryption Function*, CRYPTO 1987 (proceedings 1988), describes
+hash-tree commitments. The cache audit and path verification here preserve
+the stated binary-prefix tree representation; the citation does not establish
+this implementation.
 
 **Background for reachability.** E. M. Clarke, O. Grumberg and D. A. Peled,
 *Model Checking*, MIT Press, 1999, describes finite-state reachability.

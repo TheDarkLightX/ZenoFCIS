@@ -220,3 +220,219 @@ fn collection_writes_rehash_only_the_shared_prefix() {
     commit(&mut store, &[(2, near, Some(vec![0]))]);
     assert_eq!(commit(&mut store, &[(2, other, Some(vec![0]))]), 256);
 }
+
+// SQLite cache faults are storage failures, never new decision authority.
+fn cache_fixture(
+    four_keys: bool,
+) -> Result<(CollectionStore, std::path::PathBuf), Box<dyn std::error::Error>> {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_nanos();
+    let directory =
+        std::env::temp_dir().join(format!("collection-cache-{}-{nonce}", std::process::id()));
+    std::fs::create_dir(&directory)?;
+    let path = directory.join("store.sqlite");
+    let mut store = CollectionStore::open(&path)?;
+    // The genuine token journey: mint3, transfer1, then an aliased no-op.
+    let record = |amount: i128| {
+        let mut bytes = vec![0];
+        bytes.extend_from_slice(&amount.to_be_bytes());
+        bytes
+    };
+    store.commit(
+        &named(110, &[[0x11; 32]]),
+        &[(110, [0x11; 32], Some(record(3)))],
+        b"mint3",
+        b"supply3",
+    )?;
+    store.commit(
+        &named(110, &[[0x11; 32], [0x22; 32]]),
+        &[
+            (110, [0x11; 32], Some(record(2))),
+            (110, [0x22; 32], Some(record(1))),
+        ],
+        b"transfer1",
+        b"supply3",
+    )?;
+    store.commit(
+        &named(110, &[[0x11; 32]]),
+        &[],
+        b"self-transfer1",
+        b"supply3",
+    )?;
+    if four_keys {
+        // A sibling subtree has two entries, so the writer must verify a
+        // cached branch as well as the recomputed singleton leaf hashes.
+        store.commit(
+            &named(110, &[[0x81; 32], [0x82; 32]]),
+            &[
+                (110, [0x81; 32], Some(record(1))),
+                (110, [0x82; 32], Some(record(1))),
+            ],
+            b"two-more",
+            b"supply5",
+        )?;
+    }
+    Ok((store, path))
+}
+#[test]
+fn cached_leaf_corruption_refuses_startup() -> Result<(), Box<dyn std::error::Error>> {
+    let (store, path) = cache_fixture(false)?;
+    drop(store);
+    let db = rusqlite::Connection::open(&path)?;
+    assert_eq!(
+        db.execute(
+            "UPDATE collection_entries SET leaf=zeroblob(32) WHERE key=?1",
+            rusqlite::params![[0x11u8; 32].as_slice()]
+        )?,
+        1
+    );
+    drop(db);
+    assert!(
+        matches!(CollectionStore::open(&path), Err(Error::Corrupt(_))),
+        "startup accepted the corrupted token-journey leaf cache"
+    );
+    std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    Ok(())
+}
+#[test]
+fn cached_leaf_corruption_refuses_write_without_publication()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (mut store, path) = cache_fixture(false)?;
+    let before = (store.entries(110)?, store.commits()?, store.root(110)?);
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute(
+        "UPDATE collection_entries SET leaf=zeroblob(32) WHERE key=?1",
+        rusqlite::params![[0x11u8; 32].as_slice()],
+    )?;
+    drop(db);
+    let result = store.commit(
+        &named(110, &[[0x22; 32]]),
+        &[(110, [0x22; 32], Some(vec![2]))],
+        b"mint1",
+        b"supply4",
+    );
+    assert!(
+        matches!(result, Err(Error::Corrupt(_))),
+        "write accepted the corrupted cached sibling leaf: {result:?}"
+    );
+    assert_eq!(
+        (store.entries(110)?, store.commits()?, store.root(110)?),
+        before,
+        "cache refusal published entries, roots or journal"
+    );
+    assert!(store.audit_hashes().is_err());
+    drop(store);
+    std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    Ok(())
+}
+#[test]
+fn cached_branch_corruption_refuses_write_without_publication()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (mut store, path) = cache_fixture(true)?;
+    let before = (store.entries(110)?, store.commits()?, store.root(110)?);
+    let db = rusqlite::Connection::open(&path)?;
+    let mut right = [0u8; 32];
+    right[0] = 0x80;
+    assert_eq!(
+        db.execute(
+            "UPDATE collection_nodes SET hash=zeroblob(32) WHERE map=110 AND depth=1 AND prefix=?1",
+            rusqlite::params![right.as_slice()]
+        )?,
+        1
+    );
+    drop(db);
+    let result = store.commit(
+        &named(110, &[[0x11; 32]]),
+        &[(110, [0x11; 32], Some(vec![2]))],
+        b"change",
+        b"supply5",
+    );
+    assert!(
+        matches!(result, Err(Error::Corrupt(_))),
+        "write accepted a cached branch not authenticated by the old root: {result:?}"
+    );
+    assert_eq!(
+        (store.entries(110)?, store.commits()?, store.root(110)?),
+        before
+    );
+    drop(store);
+    std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    Ok(())
+}
+#[test]
+fn startup_checks_every_branch_including_missing_and_surplus_rows()
+-> Result<(), Box<dyn std::error::Error>> {
+    for fault in ["changed", "missing", "surplus"] {
+        let (store, path) = cache_fixture(true)?;
+        store.audit_hashes()?;
+        drop(store);
+        let db = rusqlite::Connection::open(&path)?;
+        match fault {
+            "changed" => {
+                db.execute(
+                    "UPDATE collection_nodes SET hash=zeroblob(32) WHERE depth=1",
+                    [],
+                )?;
+            }
+            "missing" => {
+                db.execute("DELETE FROM collection_nodes WHERE depth=1", [])?;
+            }
+            _ => {
+                db.execute(
+                    "INSERT INTO collection_nodes VALUES(999,0,zeroblob(32),zeroblob(32))",
+                    [],
+                )?;
+            }
+        }
+        drop(db);
+        assert!(
+            matches!(CollectionStore::open(&path), Err(Error::Corrupt(_))),
+            "startup accepted {fault} branch cache"
+        );
+        std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn coordinated_cache_changes_cannot_replace_the_checked_root()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (mut store, path) = cache_fixture(true)?;
+    let entries = store.entries(110)?;
+    let commits = store.commits()?;
+    let db = rusqlite::Connection::open(&path)?;
+    let left: Vec<u8> = db.query_row(
+        "SELECT hash FROM collection_nodes WHERE map=110 AND depth=1 AND prefix=zeroblob(32)",
+        [],
+        |row| row.get(0),
+    )?;
+    let left: [u8; 32] = left.try_into().map_err(|_| "left hash")?;
+    let forged = zeno_fcis_codec::collection_merkle::node_hash(&left, &[0; 32]);
+    let mut right = [0u8; 32];
+    right[0] = 0x80;
+    db.execute(
+        "UPDATE collection_nodes SET hash=zeroblob(32) WHERE map=110 AND depth=1 AND prefix=?1",
+        rusqlite::params![right.as_slice()],
+    )?;
+    db.execute(
+        "UPDATE collection_nodes SET hash=?1 WHERE map=110 AND depth=0",
+        rusqlite::params![forged.as_slice()],
+    )?;
+    drop(db);
+    let result = store.commit(
+        &named(110, &[[0x11; 32]]),
+        &[(110, [0x11; 32], Some(vec![2]))],
+        b"change",
+        b"supply5",
+    );
+    assert!(
+        matches!(result, Err(Error::Corrupt(_))),
+        "coordinated cache changes replaced the checked root: {result:?}"
+    );
+    assert_eq!(store.entries(110)?, entries);
+    assert_eq!(store.commits()?, commits);
+    drop(store);
+    std::fs::remove_dir_all(path.parent().ok_or("parent")?)?;
+    Ok(())
+}

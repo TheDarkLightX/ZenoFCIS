@@ -25,7 +25,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_codec::collection_merkle::{
-    Subtree, bounds, shared_path_length, sibling_prefix, update_path,
+    Subtree, bounds, empty_hash, node_hash, prefix, shared_path_length, sibling_prefix, update_path,
 };
 /// Canonical pure keyed-leaf hash and independent full rebuild, retaining these API names.
 pub use zeno_fcis_codec::collection_merkle::{leaf_hash, rebuild_root};
@@ -57,7 +57,7 @@ pub enum Error {
         /// The key no named entry holds.
         key: Key,
     },
-    /// A stored subtree hash is missing, so the store is damaged.
+    /// Stored records, cached hashes or indexes are inconsistent.
     Corrupt(String),
 }
 
@@ -101,8 +101,8 @@ pub struct Commit {
     pub post_roots: BTreeMap<u32, Digest>,
     /// The chain over the previous row and all of the above.
     pub chain: Digest,
-    /// Subtrees rehashed to apply the writes; work, not journaled, so 0 in
-    /// rows read back.
+    /// Subtree rows processed by the update plan, not journaled, so 0 in
+    /// rows read back. Excludes the additional pre-update path verification.
     pub rehashed: u64,
 }
 
@@ -123,6 +123,9 @@ pub type Write = (u32, Key, Option<Vec<u8>>);
 /// Unbound commits are schema-free storage utilities, not contract admission.
 pub struct CollectionStore {
     connection: Connection,
+    // Verified on open, advanced only after our transaction commits. This
+    // storage anchor is not decision authority and cannot be borrowed mutably.
+    checked_roots: BTreeMap<u32, Digest>,
 }
 
 const SCHEMA: &str = "
@@ -156,7 +159,13 @@ impl CollectionStore {
 
     fn with(connection: Connection) -> Result<Self, Error> {
         connection.execute_batch(SCHEMA)?;
-        Ok(Self { connection })
+        let snapshot = connection.unchecked_transaction()?;
+        let checked_roots = audit_hashes(&snapshot)?;
+        snapshot.commit()?;
+        Ok(Self {
+            connection,
+            checked_roots,
+        })
     }
 
     /// Bind an empty application store, or verify its existing exact identity and limits.
@@ -275,9 +284,33 @@ impl CollectionStore {
         self.commit_inner(named, writes, decision, scalars, Some((expected, binding)))
     }
 
+    /// Validate every cached leaf and branch against stored records in one
+    /// read snapshot. Missing and surplus node rows also refuse. This full
+    /// recovery check is outside the bounded request path.
+    pub fn audit_hashes(&self) -> Result<(), Error> {
+        let snapshot = self.connection.unchecked_transaction()?;
+        let actual = audit_hashes(&snapshot)?;
+        for map in actual.keys().chain(self.checked_roots.keys()) {
+            if actual.get(map).copied().unwrap_or_else(empty_hash)
+                != self
+                    .checked_roots
+                    .get(map)
+                    .copied()
+                    .unwrap_or_else(empty_hash)
+            {
+                return Err(Error::Corrupt(
+                    "records changed outside the checked commits".into(),
+                ));
+            }
+        }
+        snapshot.commit()?;
+        Ok(())
+    }
+
     /// Audit the bound application's cardinality counters and one retry row per commit.
     /// This complete recovery check is deliberately outside the request path.
     pub fn audit_application(&self) -> Result<(), Error> {
+        self.audit_hashes()?;
         let (requests,commits):(i64,i64)=self.connection.query_row("SELECT (SELECT count(*) FROM collection_requests),(SELECT count(*) FROM collection_commits)",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
         if requests != commits {
             return Err(Error::Corrupt("application request cardinality".into()));
@@ -434,6 +467,19 @@ impl CollectionStore {
                 .collect()
         };
         let pre_roots = roots(&transaction)?;
+        for (map, root) in &pre_roots {
+            if self
+                .checked_roots
+                .get(map)
+                .copied()
+                .unwrap_or_else(empty_hash)
+                != *root
+            {
+                return Err(Error::Corrupt(
+                    "cached root changed since checked snapshot".into(),
+                ));
+            }
+        }
         let mut rehashed = 0;
         for (map, key, record) in writes {
             rehashed += write(&transaction, *map, key, record.as_deref())?;
@@ -479,7 +525,12 @@ impl CollectionStore {
                 ],
             )?;
         }
+        // Prepare all allocation before publication. A refusal retains the
+        // old anchors; after SQLite commits, replacing this owned map cannot fail.
+        let mut checked_roots = self.checked_roots.clone();
+        checked_roots.extend(post_roots.iter().map(|(map, root)| (*map, *root)));
         transaction.commit()?;
+        self.checked_roots = checked_roots;
         Ok(Commit {
             sequence,
             decision: decision.to_vec(),
@@ -524,6 +575,83 @@ impl CollectionStore {
     }
 }
 
+/// Rebuild all cache rows independently from record bytes.
+fn audit_hashes(connection: &Connection) -> Result<BTreeMap<u32, Digest>, Error> {
+    type Node = (u32, usize, Key);
+    fn branches(
+        map: u32,
+        leaves: &[(Key, Digest)],
+        depth: usize,
+        expected: &mut BTreeMap<Node, Digest>,
+    ) -> Digest {
+        match leaves {
+            [] => empty_hash(),
+            [(_, leaf)] => *leaf,
+            _ => {
+                let split =
+                    leaves.partition_point(|(key, _)| (key[depth / 8] >> (7 - depth % 8)) & 1 == 0);
+                let hash = node_hash(
+                    &branches(map, &leaves[..split], depth + 1, expected),
+                    &branches(map, &leaves[split..], depth + 1, expected),
+                );
+                expected.insert((map, depth, prefix(&leaves[0].0, depth)), hash);
+                hash
+            }
+        }
+    }
+    let mut statement = connection
+        .prepare("SELECT map,key,record,leaf FROM collection_entries ORDER BY map,key")?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, u32>(0)?,
+            row.get::<_, Vec<u8>>(1)?,
+            row.get::<_, Vec<u8>>(2)?,
+            row.get::<_, Vec<u8>>(3)?,
+        ))
+    })?;
+    let mut maps: BTreeMap<u32, Vec<(Key, Digest)>> = BTreeMap::new();
+    for row in rows {
+        let (map, key, record, cached) = row?;
+        let key = key_of(&key)?;
+        let actual = leaf_hash(&key, &record);
+        if key_of(&cached)? != actual {
+            return Err(Error::Corrupt("cached leaf does not match record".into()));
+        }
+        maps.entry(map).or_default().push((key, actual));
+    }
+    let mut expected = BTreeMap::new();
+    let mut roots = BTreeMap::new();
+    for (map, leaves) in maps {
+        roots.insert(map, branches(map, &leaves, 0, &mut expected));
+    }
+    let mut statement = connection.prepare("SELECT map,depth,prefix,hash FROM collection_nodes")?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, u32>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, Vec<u8>>(2)?,
+            row.get::<_, Vec<u8>>(3)?,
+        ))
+    })?;
+    for row in rows {
+        let (map, depth, prefix, hash) = row?;
+        if expected.remove(&(
+            map,
+            usize::try_from(depth).map_err(|_| Error::Corrupt("node depth".into()))?,
+            key_of(&prefix)?,
+        )) != Some(key_of(&hash)?)
+        {
+            return Err(Error::Corrupt(
+                "cached branch does not match records".into(),
+            ));
+        }
+    }
+    if !expected.is_empty() {
+        return Err(Error::Corrupt("missing cached branch".into()));
+    }
+    Ok(roots)
+}
+
 /// Acquire an immutable path, compute its pure update, then persist only that plan.
 fn write(
     connection: &Connection,
@@ -538,6 +666,24 @@ fn write(
         let other =
             sibling_prefix(key, depth).ok_or_else(|| Error::Corrupt("sibling depth".into()))?;
         siblings.push(subtree_summary(connection, map, depth + 1, &other)?);
+    }
+    // Authenticate every sibling used below against the checked pre-state
+    // root by reconstructing the old path from the actual stored record.
+    // This catches cache changes after startup without scanning the map.
+    let old_root = subtree(connection, map, 0, &[0; 32])?;
+    let old_record: Option<Vec<u8>> = connection
+        .query_row(
+            "SELECT record FROM collection_entries WHERE map=?1 AND key=?2",
+            params![map, key.as_slice()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let verified = update_path(key, old_record.as_deref(), &siblings)
+        .ok_or_else(|| Error::Corrupt("verification path depth".into()))?;
+    if verified.root != old_root {
+        return Err(Error::Corrupt(
+            "cached update path does not match root".into(),
+        ));
     }
     let plan = update_path(key, record, &siblings)
         .ok_or_else(|| Error::Corrupt("update path depth".into()))?;
@@ -642,12 +788,16 @@ fn keys_under(
 }
 
 fn leaf_of(connection: &Connection, map: u32, key: &Key) -> Result<Digest, Error> {
-    let leaf: Vec<u8> = connection.query_row(
-        "SELECT leaf FROM collection_entries WHERE map = ?1 AND key = ?2",
+    let (record, leaf): (Vec<u8>, Vec<u8>) = connection.query_row(
+        "SELECT record,leaf FROM collection_entries WHERE map = ?1 AND key = ?2",
         params![map, key.as_slice()],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    key_of(&leaf)
+    let actual = leaf_hash(key, &record);
+    if key_of(&leaf)? != actual {
+        return Err(Error::Corrupt("cached leaf does not match record".into()));
+    }
+    Ok(actual)
 }
 
 fn sha256(bytes: &[u8]) -> Digest {
