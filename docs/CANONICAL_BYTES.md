@@ -81,6 +81,17 @@ to rejection in the correspondence theorem; exact error text and refusal
 order are checked by differential execution. Concrete encoding and admission
 checks test the specification against independent codec vectors.
 
+The encoder and decoder also agree in the other direction. For a valid `Value`
+within the supplied structural limits, `encode_value_with_limits` succeeds and
+appends exactly its specification encoding, provided the existing output length
+plus the encoding length is at most `usize::MAX`. This explicit condition is
+the encoder's native output-length bound; it does not guarantee available memory.
+Starting with an empty buffer gives exactly the canonical bytes. If those bytes
+also fit `limits.max_input_bytes`, `decode_value` succeeds and returns the same
+semantic value. Completeness is proved first on the specification by structural
+induction, carrying exact consumption and resource charges, and then through
+the production correspondence.
+
 This qualification covers Linux x86-64 and the value-decoder configuration in
 the pinned harness. The trusted base includes Verus and its bundled standard
 library specifications, Z3, rustc, and five additional standard-library
@@ -88,8 +99,8 @@ contracts for allocation conversions, byte-slice cloning, ASCII checking and
 UTF-8 conversion. Those additional contracts have native sample tests.
 Execution assumes sufficient heap and stack; stack byte consumption is tested
 and is not proved. The result does not establish machine-code correspondence,
-allocator availability, encoder agreement for every mathematically admitted
-value, or decoder completeness. Envelope and commit-bundle decoding remain
+allocator availability, or encoder agreement without the explicit native
+output-length bound. Envelope and commit-bundle decoding remain
 outside this proof's scope.
 
 The method follows the layered refinement, explicit assumptions, specification

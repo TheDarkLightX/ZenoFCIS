@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the production value decoder, its refinement proof and six defects."""
+"""Check production value encoding/decoding, their proofs, six semantic defects and two native-configuration defects."""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +25,8 @@ STD_TESTS = Path("verification/verus/value_decoder_std_tests.rs")
 UNIT_SOURCES = (
     HARNESS, STD_CONTRACTS, STD_TESTS,
     Path("verification/verus/value_decoder_vectors.rs"),
+    Path("verification/verus/value_decoder_roundtrip.rs"),
+    Path("verification/verus/value_decoder_completeness.rs"),
     SUBJECT,
     Path("crates/zeno-fcis-codec/src/decoder_bytes.rs"),
     Path("crates/zeno-fcis-codec/src/decoder_spec.rs"),
@@ -49,6 +51,8 @@ SEMANTIC_TARGETS = {
     "skip_map_key_order": "decode_entries",
     "skip_depth_check": "enter",
     "little_endian_u32": "take_blob",
+    "encoder_extra_byte": "encode_value_with_limits",
+    "reject_empty_vector": "decode_value_inner",
 }
 NATIVE_TARGETS = {
     "native_early_return": "value_decoder::codec::decode_complete_value",
@@ -298,7 +302,9 @@ def audit_native_binding(root: Path, report: dict) -> list[dict]:
                 namespace += "::" + path.stem
         else:
             namespace = {HARNESS: "value_decoder", STD_CONTRACTS: "value_decoder::std_contracts",
-                         Path("verification/verus/value_decoder_vectors.rs"): "value_decoder::vectors"}[path]
+                         Path("verification/verus/value_decoder_vectors.rs"): "value_decoder::vectors",
+                         Path("verification/verus/value_decoder_roundtrip.rs"): "value_decoder::roundtrip",
+                         Path("verification/verus/value_decoder_completeness.rs"): "value_decoder::completeness"}[path]
         declarations.extend((path, item) for item in source_items(source, namespace))
     inventory = sorted(name for name in report["func-details"] if name.startswith("value_decoder::"))
     if not inventory:
@@ -437,6 +443,16 @@ def mutation_sources(source: str) -> dict[str, str]:
         ) + "\n#[cfg(not(verus_keep_ghost))]\nimpl Cursor<'_> {\n"
             "    fn take_u8(&mut self) -> Result<u8, DecodeError> {\n"
             "        self.take(1)?;\n        Ok(0)\n    }\n}\n",
+        "encoder_extra_byte": replace_once(source,
+            "    value\n        .encode_zcve_to_with_limits(output, limits)\n"
+            "        .map_err(map_value_encode_error)\n}",
+            "    let result = value\n        .encode_zcve_to_with_limits(output, limits)\n"
+            "        .map_err(map_value_encode_error);\n"
+            "    if result.is_ok() { output.push(0); }\n    result\n}"),
+        "reject_empty_vector": replace_once(source,
+            "        TAG_TUPLE | TAG_VECTOR => {\n            let count = cursor.take_u32()?;",
+            "        TAG_TUPLE | TAG_VECTOR => {\n            let count = cursor.take_u32()?;\n"
+            "            if tag == TAG_VECTOR && count == 0 { return Err(DecodeError::NonCanonical); }"),
     }
 
 
@@ -446,6 +462,8 @@ def accepted(proc: subprocess.CompletedProcess, report: dict, pin: dict, profile
     return (type(profile["expected_verified"]) is int and profile["expected_verified"] > 0
             and proc.returncode == 0 and verifier.accepted(report, report_pin)
             and verifier.proof_succeeded(report, pin)
+            and {name for name in report["func-details"] if name.startswith("value_decoder::")}
+                == set(profile["target_functions"])
             and not verifier.ERROR_HEADER.search(proc.stderr)
             and not verifier.NON_SEMANTIC.search(proc.stderr))
 

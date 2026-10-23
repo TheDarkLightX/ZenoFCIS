@@ -19,3 +19,9 @@ pub mod std_contracts;
 
 #[path = "value_decoder_vectors.rs"]
 pub mod vectors;
+
+#[path = "value_decoder_roundtrip.rs"]
+pub mod roundtrip;
+
+#[path = "value_decoder_completeness.rs"]
+pub mod completeness;

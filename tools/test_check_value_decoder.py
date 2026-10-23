@@ -47,6 +47,9 @@ class DecoderGateTests(unittest.TestCase):
         report = copy.deepcopy(self.report)
         report["func-details"] = {}
         self.assertFalse(self.accepts(report))
+        report = copy.deepcopy(self.report)
+        report["func-details"]["value_decoder::unexpected"] = {}
+        self.assertFalse(self.accepts(report))
         for code in (1, 2, -9, 137, None):
             self.assertFalse(self.accepts(code=code))
         for stderr in ("error: failed", "resource limit exceeded", "solver returned unknown",
@@ -65,12 +68,12 @@ class DecoderGateTests(unittest.TestCase):
             proc = subprocess.CompletedProcess([], 1, text, "")
             self.assertEqual(gate.parse_report(proc), {})
 
-    def test_six_unique_mutations_preserve_original_source(self):
+    def test_eight_unique_mutations_preserve_original_source(self):
         original = (gate.ROOT / gate.SUBJECT).read_bytes()
         source = original.decode()
         mutants = gate.mutation_sources(source)
         self.assertEqual(set(mutants), set(gate.SEMANTIC_TARGETS) | set(gate.NATIVE_TARGETS))
-        self.assertEqual(len(mutants), 6)
+        self.assertEqual(len(mutants), 8)
         for name, changed in mutants.items():
             self.assertNotEqual(source, changed, name)
             if name in gate.SEMANTIC_TARGETS:

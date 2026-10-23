@@ -639,7 +639,7 @@ remains advisory and grants no application authority.
 `value_decoder.rs` includes the actual value and codec libraries with `#[path]`.
 The qualification profile is [value-decoder.json](value-decoder.json). The gate
 uses the tool files pinned in [toolchain.json](toolchain.json), verifies the
-whole crate, requires the exact obligation count and function inventory, and
+whole crate, requires the exact obligation count and local declaration inventory, and
 refuses verifier errors, incomplete coverage, timeouts and nonsemantic control
 failures. The CI matrix runs the same gate.
 
@@ -649,6 +649,8 @@ The proof layers are:
    resource accounting and wire order.
 2. `zeno-fcis-codec/src/decoder_spec.rs` and `decoder_induction.rs`: a total
    decoder and depth/count induction for consumption and resource bounds.
+   `value_decoder_completeness.rs` proves the reverse direction by structural
+   node-count induction, with exact consumed prefixes and resource charges.
 3. Named `Cursor::invariant` and `DecodeState::invariant` predicates, preserved
    by every reader and state method.
 4. Contracts on the production constructors, validators, encoding functions,
@@ -663,9 +665,24 @@ An accepted result additionally ensures `wf(value.model(), limits.model())`,
 All executable recursion has decreasing measures, and every loop has a
 termination argument. No application body or termination check is exempted.
 This completes Tier 1 (T1 safety/termination, T2 canonical acceptance, T3 input
-limit). Tier 2 encoder agreement and Tier 3 completeness are not claimed.
-The encoder contracts used in refinement include a representable output-length
-condition; they must not be reported as unrestricted encoder agreement.
+limit). `value_decoder_roundtrip.rs` adds the production call-boundary theorems:
+
+- Tier 2, `t4_encoder_append`: representation-valid storage, `wf`, and
+  `old(output).len() + spec_encode(value.model()).len() <= usize::MAX` imply
+  successful `encode_value_with_limits` and exact append of the specification
+  bytes. `t4_encoder_agreement` starts with an empty output buffer. The length
+  precondition is explicit and does not establish allocation availability.
+- Tier 3, `t5_decoder_complete`: `wf(v, L)` and
+  `spec_encode(v).len() <= L.max_input_bytes` imply successful production decoding
+  of those bytes with resulting model `v`. It invokes `spec_t5_complete` from the
+  completeness module and the existing production correspondence.
+- `production_roundtrip` composes both production calls under their respective
+  byte bounds. Value equality is expressed by the `ModelValue` relation.
+
+The completeness induction first proves that parsing an encoding with any suffix
+consumes exactly that encoding and adds its exact node and payload costs. Separate
+tag lemmas keep solver contexts small. Nested map frames retain both validation
+and canonical re-encoding checks. None of these additions changes runtime code.
 
 `value_decoder_vectors.rs` checks literal encodings, admission rules and
 resource totals from the existing codec corpus and the public canonical-byte
@@ -685,9 +702,10 @@ exact reviewed standard-contract file and rejects application trust escapes.
 contracts, so the gate uses this audit and `--no-external-by-default` while
 retaining lifetime, erasure, overflow, bounds and termination checking.
 
-The four defects are checked in separate copies: acceptance of trailing input,
+The six defects are checked in separate copies: acceptance of trailing input,
 removal of map-key order checking, removal of the depth check, and a
-little-endian blob length. Each must produce a semantic proof failure in its
+little-endian blob length, plus an encoder that appends an extra byte and a decoder
+that refuses a valid empty vector. Each must produce a semantic proof failure in its
 named production function. Normal and restored runs must both pass, and the
 original source hashes must remain unchanged. A compiler error, solver resource
 limit or timeout never counts as a successful control.
