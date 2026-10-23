@@ -84,7 +84,7 @@
     "contract review",
     "contract profile"
   ],
-  "pitfalls": "Read the result scope before revising the input. Solver executable copies and working directories are claimed exclusively for each run; occupied names are skipped, with a limit of 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority."
+  "pitfalls": "Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority."
 }
 ```
 
@@ -146,7 +146,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 ## Pitfalls
 
-Read the result scope before revising the input. Solver executable copies and working directories are claimed exclusively for each run; occupied names are skipped, with a limit of 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority.
+Read the result scope before revising the input. Private executable copies and working directories are claimed exclusively for each run; occupied names are skipped. Executable copies retain their 1,024-attempt limit, and working directories allow 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority.
 
 Refusals and remedies: {"contract-invalid": "Repair the named declaration or policy entry; generate contract DIR to diagnose."}
 
