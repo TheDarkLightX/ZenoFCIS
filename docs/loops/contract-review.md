@@ -84,7 +84,7 @@
     "contract review",
     "contract profile"
   ],
-  "pitfalls": "Read the result scope before revising the input. No report grants runtime or publication authority."
+  "pitfalls": "Read the result scope before revising the input. Solver executable copies and working directories are claimed exclusively for each run; occupied names are skipped, with a limit of 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority."
 }
 ```
 
@@ -146,7 +146,7 @@ Run Commons `advise` for the task first. Compute the exact subject digest, take 
 
 ## Pitfalls
 
-Read the result scope before revising the input. No report grants runtime or publication authority.
+Read the result scope before revising the input. Solver executable copies and working directories are claimed exclusively for each run; occupied names are skipped, with a limit of 128 creation attempts. Exhaustion or any other I/O refusal gives no solver evidence. No report grants runtime or publication authority.
 
 Refusals and remedies: {"contract-invalid": "Repair the named declaration or policy entry; generate contract DIR to diagnose."}
 
@@ -191,3 +191,5 @@ declared finite scalar domains; prior-art search pending.
 Sources: {"engine": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "exit_codes": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "inputs": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "limits": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "outputs": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "refusals": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "synopsis": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139", "verdicts": "docs/CLI_REFERENCE.md:1642-1795; docs/CONTRACT_JUDGES.md:86-139"}
 
 Run `zeno-fcis guide find "review contract behaviour"` for related cards.
+
+Background: The Open Group, *POSIX.1-2024*, `open()` and exclusive creation, 2024 ([specification](https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html)). This repair applies that established file-ownership mechanism; no new method is claimed. Scope: fresh shell scratch does not change solver admission, query semantics, evidence checks or Authority decisions.

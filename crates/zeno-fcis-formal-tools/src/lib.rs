@@ -912,6 +912,31 @@ fn lean_executable_relative(config: &ToolConfig, runtime: &ToolRuntimeConfig) ->
     Some(relative.to_path_buf())
 }
 
+/// Atomically claims a fresh shell-owned path. PIDs can repeat across namespaces
+/// sharing a temporary root, and a killed run can leave its files behind. A name
+/// collision is not permission to reuse, truncate or remove the existing path.
+fn fresh_temporary<T>(
+    name: &str,
+    extension: &str,
+    mut create: impl FnMut(&Path) -> std::io::Result<T>,
+) -> Result<(PathBuf, T), ToolFailure> {
+    for _ in 0..128 {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "zeno-fcis-{name}-{}-{sequence}{extension}",
+            std::process::id()
+        ));
+        match create(&path) {
+            Ok(value) => return Ok((path, value)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(ToolFailure::Io(error.to_string())),
+        }
+    }
+    Err(ToolFailure::Io(
+        "temporary path collision limit (128)".into(),
+    ))
+}
+
 struct PrivateExecutable {
     path: PathBuf,
 }
@@ -3309,14 +3334,12 @@ struct PrivateWorkingDirectory {
 #[cfg(unix)]
 impl PrivateWorkingDirectory {
     fn create() -> Result<Self, ToolFailure> {
-        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("zeno-fcis-work-{}-{sequence}", std::process::id()));
-        fs::create_dir(&path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let (path, ()) = fresh_temporary("work", "", |path| fs::create_dir(path))?;
+        let directory = Self { path };
         use std::os::unix::fs::PermissionsExt as _;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))
             .map_err(|error| ToolFailure::Io(error.to_string()))?;
-        Ok(Self { path })
+        Ok(directory)
     }
     fn path(&self) -> &Path {
         &self.path
@@ -6949,6 +6972,83 @@ mod tests {
         fs::write(root.join("descendant"), std::process::id().to_string())
             .unwrap_or_else(|error| panic!("write descendant pid: {error}"));
         thread::sleep(Duration::from_secs(30));
+    }
+
+    #[test]
+    fn solver_paths_are_fresh_and_occupied_files_are_preserved() {
+        let mut occupied = None;
+        let mut attempts = 0;
+        let result = fresh_temporary("solver-collision-test", "", |path| {
+            attempts += 1;
+            if occupied.is_none() {
+                fs::write(path, b"another live solver")?;
+                occupied = Some(path.to_path_buf());
+            }
+            OpenOptions::new().create_new(true).write(true).open(path)
+        });
+        let path = occupied.unwrap_or_else(|| panic!("allocation was never attempted"));
+        let contents = fs::read(&path);
+        fs::remove_file(&path).unwrap_or_else(|error| panic!("remove sentinel: {error}"));
+        let (fresh_path, error) = match result {
+            Ok((path, file)) => {
+                drop(file);
+                (Some(path), None)
+            }
+            Err(error) => (None, Some(error)),
+        };
+        if let Some(path) = &fresh_path {
+            fs::remove_file(path).unwrap_or_else(|error| panic!("remove fresh file: {error}"));
+        }
+        assert!(
+            error.is_none(),
+            "occupied solver path must be skipped: {error:?}"
+        );
+        assert_eq!(attempts, 2, "one occupied name followed by a fresh name");
+        assert_eq!(
+            contents.unwrap_or_else(|error| panic!("read sentinel: {error}")),
+            b"another live solver"
+        );
+        assert_ne!(fresh_path, Some(path));
+
+        let first = PrivateExecutable::create_named("solver-fresh-test", b"first");
+        let second = PrivateExecutable::create_named("solver-fresh-test", b"second");
+        assert!(
+            first.is_ok() && second.is_ok(),
+            "live solvers need separate files"
+        );
+        let (first, second) = (
+            first.unwrap_or_else(|error| panic!("first solver: {error:?}")),
+            second.unwrap_or_else(|error| panic!("second solver: {error:?}")),
+        );
+        assert_ne!(first.path(), second.path());
+        assert_eq!(
+            fs::read(first.path()).unwrap_or_else(|error| panic!("read first: {error}")),
+            b"first"
+        );
+        assert_eq!(
+            fs::read(second.path()).unwrap_or_else(|error| panic!("read second: {error}")),
+            b"second"
+        );
+    }
+
+    #[test]
+    fn fresh_solver_path_retries_are_bounded_and_other_errors_stop() {
+        let mut attempts = 0;
+        let result = fresh_temporary("solver-budget-test", "", |_| {
+            attempts += 1;
+            Err::<(), _>(std::io::Error::from(std::io::ErrorKind::AlreadyExists))
+        });
+        assert!(
+            matches!(result, Err(ToolFailure::Io(ref reason)) if reason == "temporary path collision limit (128)")
+        );
+        assert_eq!(attempts, 128);
+        attempts = 0;
+        let result = fresh_temporary("solver-error-test", "", |_| {
+            attempts += 1;
+            Err::<(), _>(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+        });
+        assert!(matches!(result, Err(ToolFailure::Io(_))));
+        assert_eq!(attempts, 1);
     }
 
     /// A stand-in solver that answers each script by the `answer=` marker the
