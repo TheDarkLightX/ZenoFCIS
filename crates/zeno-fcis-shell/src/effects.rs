@@ -18,10 +18,10 @@ pub mod driver;
 pub mod explore;
 pub mod handler;
 pub mod laws;
-pub mod port;
 pub mod policy;
 pub mod policy_product;
 pub mod policy_record;
+pub mod port;
 pub mod program;
 pub mod record;
 pub mod registry;
@@ -30,8 +30,8 @@ pub mod simulation;
 #[cfg(test)]
 mod explore_tests;
 #[cfg(test)]
-mod tests;
+mod policy_record_tests;
 #[cfg(test)]
 mod policy_tests;
 #[cfg(test)]
-mod policy_record_tests;
+mod tests;
